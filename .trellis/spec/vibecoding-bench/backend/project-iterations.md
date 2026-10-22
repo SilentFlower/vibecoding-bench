@@ -77,7 +77,7 @@ SQLite 的 `PROJECT_SCHEMA` 由 `init_db()` 幂等执行，新增：
 
 **legacy 内容与版本**：内容 schema 1 的 `catalog.json` 为 schema 1；每个项目包含 `project.json`、可运行 `seed/` 和控制端 `verification/`。当前适配协议固定为 `python3 app.py`，逐行输入／输出 JSON。基线代码必须具有自己的业务核心；通用算法与启动脚手架可以复用。每步依赖紧邻前一步并属于明确阶段。
 
-旧 100 个生成项目、生成器和参考运行时保持退役。当前源码 catalog 为内容 schema 2，六个真实项目共 26 场景／57 任务；原生适配与场景执行见后节。legacy 调度回归由 `orchestrator/project_test_content.py` 在临时目录构造夹具；源码变更不代表生产已部署，不删除历史发布及实例成果。
+旧 100 个生成项目、生成器和参考运行时保持退役。当前源码 catalog 为内容 schema 2，实际版本和项目／场景／任务数量、原生适配与场景执行见后节。legacy 调度回归由 `orchestrator/project_test_content.py` 在临时目录构造夹具；源码变更不代表生产已部署，不删除历史发布及实例成果。
 
 内容首次注册到 `BENCH_DATA/project-library/releases/<digest>`，旧批次固定旧版本。账号只复制 `seed/`，不挂载参考器或冻结验收目录。内容摘要覆盖相对路径和字节，不包括账号、mtime；拒绝链接、特殊文件及越界路径。快照上限为 128 MiB／10,000 文件，JSON 文件上限为 4 MiB。
 

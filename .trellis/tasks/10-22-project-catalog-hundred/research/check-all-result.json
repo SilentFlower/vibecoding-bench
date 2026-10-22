@@ -1,0 +1,198 @@
+{
+  "status": "strict-pass",
+  "recorded_at": "2026-10-22T08:09:10.211078+00:00",
+  "task": ".trellis/tasks/10-22-project-catalog-hundred",
+  "run_id": "auto-20261021191233",
+  "check_profile": {
+    "context": "auto-loop",
+    "requested_depth": "auto",
+    "effective_depth": "full",
+    "confidence": "fallback-full",
+    "reasons": [
+      "父任务对三阶段独立交付作全量验收映射，覆盖固定来源、完整原生、真实产品链、全量API与历史兼容和Git/Docker交付，单一投影检查不足"
+    ]
+  },
+  "route": {
+    "mode": "check-all-inline",
+    "source": "route-prefs"
+  },
+  "scope": {
+    "owned_task_files_before_report": 20,
+    "project_spec_fact_corrections": 1,
+    "production_code_changes": 0,
+    "retained_dirty_files": 265
+  },
+  "requirements": [
+    {
+      "id": "R1",
+      "status": "passed",
+      "assertion": "100研究仓与正式集合相等，固定90新增及三阶段归属无替换/重复，200研究报告SHA未变"
+    },
+    {
+      "id": "R2",
+      "status": "passed",
+      "assertion": "当前100项目426场景726任务；五类任务分别234/227/119/109/37，689非修改；90新增381场景619任务"
+    },
+    {
+      "id": "R3",
+      "status": "passed",
+      "assertion": "逐仓独立问题、材料/分支/授权及真实依赖由原任务矩阵和不可变内容核实；不按重试或路径增数"
+    },
+    {
+      "id": "R4",
+      "status": "passed",
+      "assertion": "23963固定源码对象及许可/精确离线制品，210536主项和47666子项分列；可选私有SQLGlot测试明确未验证"
+    },
+    {
+      "id": "R5",
+      "status": "passed",
+      "assertion": "642业务/候选控制含20修改的原版失败、参考成功、公开测试、错误候选拒绝及完整回归；原件SHA均匹配"
+    },
+    {
+      "id": "R6",
+      "status": "passed",
+      "assertion": "45批1781真实产品路径，619新增独立任务完整覆盖；98358份归档原件摘要匹配，28552页面检查/1454截图及API/DB、角色、用量和接受父链核实"
+    },
+    {
+      "id": "R7",
+      "status": "passed",
+      "assertion": "复用内容语言/结构静态结果并核当前完整交付字节；英文模型首问/材料/评审与中文显示遵守原合同，保留原始Unicode数据例外"
+    },
+    {
+      "id": "R8",
+      "status": "passed",
+      "assertion": "32188当前文件与已验证Git恢复后/Docker COPY交付相等，初始3069文件和稳定ID不变；新reader无当前库/缓存仍读100历史实例和冻结release"
+    },
+    {
+      "id": "R9",
+      "status": "passed",
+      "assertion": "90新增全本地准入，真实模型/OAuth/生产状态分列；三阶段本地提交完成，Close决策人审仍阻塞并披露，265无关dirty保持"
+    },
+    {
+      "id": "R10",
+      "status": "passed",
+      "assertion": "实际缺口为600场景差174、800场景差374、2000任务差1274；不把旧工程提案算任务或改写原十仓深化目标"
+    }
+  ],
+  "acceptance_criteria": {
+    "AC1": "passed",
+    "AC2": "passed",
+    "AC3": "passed",
+    "AC4": "passed",
+    "AC5": "passed",
+    "AC6": "passed"
+  },
+  "dimensions": {
+    "planning_implementation": "passed",
+    "assumptions": "passed",
+    "completeness_and_conventions": "passed"
+  },
+  "assumption_dimensions": {
+    "api_contract": "passed：读真实DTO、路由、scenario_summary与create_batch后，实际百项目公开投影/默认600策略和历史503/200边界通过",
+    "component_context": "N/A：本轮未改组件；各批页面证据复用且完整归档未变",
+    "data_history": "passed：原十仓3069文件及冻结manifest/ID不变，新reader从冻结release读取，现有DB和账号未接触",
+    "data_flow": "passed：固定来源/依赖→候选实际绑定/原生→Scheduler/driver/独立评审→SQLite→页面/API；45批全部归档摘要匹配；元数据探针单独零执行"
+  },
+  "verification": {
+    "new_final_api": "passed",
+    "new_paused_batch_counts": {
+      "project_iteration_batches": 1,
+      "project_instances": 100,
+      "project_scenario_instances": 426,
+      "project_scenario_tasks": 726,
+      "runs": 0,
+      "project_task_attempts": 0,
+      "project_task_executions": 0,
+      "project_evaluation_jobs": 0,
+      "project_execution_sources": 0,
+      "project_task_deliveries": 0
+    },
+    "new_complete_mock_integrity_files": 98358,
+    "new_complete_mock_integrity_batches": 45,
+    "reused_current_project_tests": 153,
+    "reused_native_adapter_subset_included": 48,
+    "reused_deployment_management_tests": 30,
+    "reused_audit_adapter_tests": 6,
+    "reused_unchanged_parsed_python_files": 110,
+    "new_python_helpers_parsed": 2,
+    "primary_native_main": 210536,
+    "subtests_separate": 47666,
+    "business_cases": 642,
+    "mock_paths": 1781,
+    "existing_control_replay_paths": 18,
+    "unique_new_tasks": 619,
+    "browser_checks": 28552,
+    "screenshots": 1454
+  },
+  "evidence": [
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+      "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-api-verification.json",
+      "sha256": "a42cb7323d9a6710a350163afee55492cbdaf8ed8e8b3da4b8916cedf3ca8469"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred/research/focused-validation.json",
+      "sha256": "0280b1444e7029b3480135a4658f1341a3ce3ae693b9d4960d15c2b0a2a99626"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred/research/check-evidence-integrity.json",
+      "sha256": "f947c34dfc8a449c27442e41fd8ca0eeabf3fb9d08721b807e96d43ce8a527ad"
+    }
+  ],
+  "reused_evidence": [
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-static-checks.json",
+      "sha256": "3947fce64663378ebe4d193867291735d9c26c0df45089f977c68b228d4735ed"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/focused-checks-sqlglot.json",
+      "sha256": "12623c749799fbb408ac87a748d0e6fe3f5085896c2cd5c3542dbe0f2ab97e0b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-audit-adapter-tests.json",
+      "sha256": "f115734987c015cfd8c946c61a88fa9cba30a128034096c0bd990abd141247e5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/full-python-syntax-check.json",
+      "sha256": "be806140305ee34d948ffae28e0dbcaec347dbdd3946810c52f9743cf10a86d2"
+    }
+  ],
+  "automatic_doc_remediation": [
+    {
+      "id": "DOC-001",
+      "type": "fact-status",
+      "file": ".trellis/spec/vibecoding-bench/backend/project-iterations.md",
+      "line": 80,
+      "drift": "legacy节仍称当前6项目26场景57任务，与同文件当前schema2节及正式100/426/726不一致",
+      "repair": "移除过期重复统计，指向同文件后节的实际版本/数量；退役、原生、历史和生产边界原文不变",
+      "verification": "重读唯一一行diff并与正式catalog/schema2节核对，git diff --check通过",
+      "status": "fixed"
+    }
+  ],
+  "findings": {
+    "CHK": [],
+    "FBK": [],
+    "DOC": []
+  },
+  "blocking_partial_verification": [],
+  "outside_approved_scope_unverified": [
+    "SQLGlot可选私有外部集成测试源码/许可/用例",
+    "其他平台及未执行的编译矩阵",
+    "真实模型质量/成本和OAuth",
+    "生产部署"
+  ],
+  "workflow_close_boundary": "Check-All严格通过与本地提交完成不表示AI决策人工review已接受；Close由runner独立计算，保留decision-review-required",
+  "documentation_sync": {
+    "planning": "DEC-0001已由run_implement绑定六份指定规划/台账文件；Check期间没有修改planning/handoff",
+    "spec_fact_correction": "DOC-001已验证",
+    "parent_task_progress": "由commit_only成功后的runner写入，不手工冒写完成"
+  },
+  "post_release_verification": [],
+  "real_model_calls": 0,
+  "real_oauth_calls": 0,
+  "pushed": false,
+  "production_touched": false
+}

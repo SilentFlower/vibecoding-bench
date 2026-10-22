@@ -1,0 +1,15 @@
+{
+  "purpose": "本次commit-only循环的显式队列输入，不属于runner runtime",
+  "profile": "commit-only",
+  "tasks": [
+    ".trellis/tasks/10-22-project-catalog-hundred-wave-01",
+    ".trellis/tasks/10-22-project-catalog-hundred-wave-02",
+    ".trellis/tasks/10-22-project-catalog-hundred-wave-03",
+    ".trellis/tasks/10-22-project-catalog-hundred"
+  ],
+  "depends_on": [
+    {"dependent": ".trellis/tasks/10-22-project-catalog-hundred", "dependency": ".trellis/tasks/10-22-project-catalog-hundred-wave-01"},
+    {"dependent": ".trellis/tasks/10-22-project-catalog-hundred", "dependency": ".trellis/tasks/10-22-project-catalog-hundred-wave-02"},
+    {"dependent": ".trellis/tasks/10-22-project-catalog-hundred", "dependency": ".trellis/tasks/10-22-project-catalog-hundred-wave-03"}
+  ]
+}

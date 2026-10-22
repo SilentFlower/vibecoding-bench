@@ -1,0 +1,330 @@
+{
+  "status": "passed",
+  "scope": "独立重算45批完整归档证据全集摘要，确认已有数据流、角色、用量和真实原生结论原件未变；不重跑候选或模型",
+  "batches": 45,
+  "evidence_files": 98358,
+  "items": [
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-001/run-001/evidence",
+      "files": 2144,
+      "inventory_digest": "470328a95a711af84940a7be5599de675981d3e96f2a2342144a0270021a4080",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-002/run-001/evidence",
+      "files": 2119,
+      "inventory_digest": "f5b5b46f98cc8f87ee9f8e0050c6b683cdfe88e28f21e39abc8c6804e5d68d2c",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-003/run-001/evidence",
+      "files": 1933,
+      "inventory_digest": "7f23885175da942024d8f605a1570c737afbe4f0400068c8fa8d6afff7a3a9aa",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-004/run-001/evidence",
+      "files": 2039,
+      "inventory_digest": "2c27e8268c84612ad96b4334d2b5256152569932adc8364e44cf878a3b73e104",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-005/run-001/evidence",
+      "files": 1875,
+      "inventory_digest": "91f33cd626d75ebcbf9aa4d268e15d518ef0be0d03e23f2cf781caada84ada07",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-006/run-001/evidence",
+      "files": 2338,
+      "inventory_digest": "a4f24d2e210c33c9be2cf05a5400db5beba7bff41c15cff0ad31dceddfcf9ec4",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-007/run-001/evidence",
+      "files": 2053,
+      "inventory_digest": "9fef4fc7b72cd2c1d55885085732d63228202cbe5a4aa51d5a4599797e131f69",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-008/run-001/evidence",
+      "files": 2155,
+      "inventory_digest": "febda160abf3c682f697692e06cebd96cfac4a5f0037b473cbc7476fc3024ff7",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-009/run-001/evidence",
+      "files": 2846,
+      "inventory_digest": "a28c4aca23db1a60185a40376374bfd1bfdf49c1ece49e90472f3c6a45fe5722",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-010/run-001/evidence",
+      "files": 4591,
+      "inventory_digest": "8ab993884990f923b105072a8b522caf64c34009b107503481599bffe26d628c",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-011/run-001/evidence",
+      "files": 2261,
+      "inventory_digest": "462692cebaba493c3e3f45132de5d33be755affd805573e3818185d0aa8c61e2",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-012/run-001/evidence",
+      "files": 1862,
+      "inventory_digest": "9eac85376a94917db9466d87a39b1177c95b21c9c15c011f2a1e07a3ea6a1a46",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-013/run-001/evidence",
+      "files": 1786,
+      "inventory_digest": "e0ac8a2a58ac7fad3cc4e2c1a1eff4202826edf1ec16b118a20a97229bf94c18",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-014/run-001/evidence",
+      "files": 1681,
+      "inventory_digest": "892f30b8d2fa42c9c39c0f366a6e1dc499a53e3870f9e1b41508656bd5650d19",
+      "status": "passed"
+    },
+    {
+      "stage": 1,
+      "evidence": ".deploy/project-catalog-hundred/stage-01/mock-batch-015/run-001/evidence",
+      "files": 1421,
+      "inventory_digest": "51cb5a733e6eeb08a204458a228495e02488e6d106e59555fea00a89f0af9426",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-001/run-001/evidence",
+      "files": 1733,
+      "inventory_digest": "e119513e267aa65f5a48658ecb62604f09c71dc0129342c6382756b6251b7b58",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-002/run-001/evidence",
+      "files": 1826,
+      "inventory_digest": "d00fc6f448dc33f9cb0ccf26ea936b13dabed70b3d42a446785a07347dac82d6",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-003/run-001/evidence",
+      "files": 2460,
+      "inventory_digest": "892b596a7d1106150c5b056a2a2af1fdb2c37f693b89711b92a2f364a8f74335",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-004/run-001/evidence",
+      "files": 1802,
+      "inventory_digest": "b08bf4103d8be07d217909578554e8e1a0278283cf9a8508418a8afaef7359d1",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-005/run-001/evidence",
+      "files": 4628,
+      "inventory_digest": "b2a220ffc722c2b4154982f009018fe6f091cb878ad5a6211885da8309c97643",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-006/run-001/evidence",
+      "files": 2113,
+      "inventory_digest": "483b98c7f54a3541c3795d69bec87898e57ba5a3d6ddec2ee1b712c2f226b2ca",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-007/run-001/evidence",
+      "files": 2524,
+      "inventory_digest": "9ed62c6619789e2663d2cf24b6aae6ac75b8bfdde2030f4f5c7a099ce45cf247",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-008/run-001/evidence",
+      "files": 2470,
+      "inventory_digest": "ec2f5c2878bf09b71748dc91fd9c98590e5ee09f87ace84d9a70d272993bfd2c",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-009/run-001/evidence",
+      "files": 1700,
+      "inventory_digest": "a27c993f400dfcd0432a5e384c880e87cd01251e33d786c916770604aee9ac19",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-010/run-001/evidence",
+      "files": 1844,
+      "inventory_digest": "fc08326fcdb8ddb10c3c504456779939fd597316d48d67e3696ec10126693fd2",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-011/run-001/evidence",
+      "files": 2948,
+      "inventory_digest": "2bf2d00edff1e6e904093d3fd7ae39e7c7a510b724321a391719ebe593f1c716",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-012/run-001/evidence",
+      "files": 1995,
+      "inventory_digest": "4d418dce367d9ce5ab81515dffb5c45655c1b95909dd158857e0f1a4ceb3d6d6",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-013/run-001/evidence",
+      "files": 1868,
+      "inventory_digest": "90a83031b0ce0f710f760e6d2e2a266cc91bfefd95cb20badd7350ed3d8b15e7",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-014/run-001/evidence",
+      "files": 1565,
+      "inventory_digest": "6b219ee5e0ed99cc0f1c02a61dfe687c400cb093fa24f0d8db33bd98394b0f7a",
+      "status": "passed"
+    },
+    {
+      "stage": 2,
+      "evidence": ".deploy/project-catalog-hundred/stage-02/mock-batch-015/run-001/evidence",
+      "files": 1830,
+      "inventory_digest": "a2f6ea2588e9f9a6b555d2c2ec9c29256f105cf434dd01f2df9fa683c6131cfc",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-001/run-001/evidence",
+      "files": 1679,
+      "inventory_digest": "a8269ee9d8eeb4fc45af89eef9aa4a041ced8cd7dcdf0c3a0ad1ce4d3ee37627",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-002/run-001/evidence",
+      "files": 1663,
+      "inventory_digest": "9fba20e9484a75a25769f2ee2a73e05a6a57b03f2dcf062206ab816ef3babefa",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-003/run-001/evidence",
+      "files": 1845,
+      "inventory_digest": "3f137bf00710c8d2ef508a14f14578cb6892b7d766a7d341e4fb4027582d5037",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-004/run-001/evidence",
+      "files": 1735,
+      "inventory_digest": "980db75f6e77f23c20eb9d72d767716accdcab0a6eb4ea9f04aced8f67582cd5",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-005/run-001/evidence",
+      "files": 1970,
+      "inventory_digest": "d94eb0c5a3c2f0f658076dc764827bff5e4255a880a5232d6f8a647f89ae2022",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-006/run-001/evidence",
+      "files": 1791,
+      "inventory_digest": "af6092f3ae7fc01f7c46234e1552d832c222a27cab1b2c13d666c82fdb384fef",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-007/run-001/evidence",
+      "files": 3731,
+      "inventory_digest": "41b003b1aa6b871afc3bb0e4ac9bf61cb6ff3a1ab82a7bc54519d03ec03bf0f4",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-008-retry-003/run-001/evidence",
+      "files": 2101,
+      "inventory_digest": "ee04adc3e19de002e6e2b6e19f696c14dde186e48a9589437521a483e6b5c0a6",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-009/run-001/evidence",
+      "files": 1858,
+      "inventory_digest": "ca74ae6a9e1acf62fdcafe3da345ff4ac195e4bae095abe1db9f5757fc19affa",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-010/run-001/evidence",
+      "files": 1687,
+      "inventory_digest": "cb55e0258c7ec8fa5796e92d2e5cbbb81615cffec00113b3193cab4e38ae4877",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-011/run-001/evidence",
+      "files": 2250,
+      "inventory_digest": "d56cc82fc7df11a37c35ab3a3899bdd688e56888b3820c9dcaa2b58162d09d05",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-012/run-001/evidence",
+      "files": 1646,
+      "inventory_digest": "bac960fd247ed530c8dd30834f18220d9d3e9353063d5fe2f17c022c0e5f1b12",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-013-retry-002/run-001/evidence",
+      "files": 2312,
+      "inventory_digest": "ea4fb6a206d8609aa900cf1d16a03f37f6e767132911bc67a97b6f25f1f32cf3",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-014-final-three/run-001/evidence",
+      "files": 3503,
+      "inventory_digest": "875d836193f67c44373963f4c2ab488696a49a9f1d740846c9e7a8ac172f4f9d",
+      "status": "passed"
+    },
+    {
+      "stage": 3,
+      "evidence": ".deploy/project-catalog-hundred/stage-03/mock-batch-015-retry-002-sqlglot/run-001/evidence",
+      "files": 2177,
+      "inventory_digest": "7153c330e04da2ffa30ac2414ce250c8bf12de92032ef74d4e163d039764431e",
+      "status": "passed"
+    }
+  ],
+  "trusted_inventory_recipe": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/audit_mock.py",
+    "sha256": "bbb0b390b26f5b8bf52776e07bfd37ffeead9eddd5e32b58899244ed06dc6006"
+  },
+  "elapsed_sec": 58.219,
+  "real_model_calls": 0,
+  "production_touched": false
+}

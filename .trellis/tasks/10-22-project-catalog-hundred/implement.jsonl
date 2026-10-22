@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/project-iterations.md", "reason": "百项目真实来源、场景schema2、原生准入、独立计数及历史兼容"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "项目实施及最终检查要求"}
+{"file": ".trellis/tasks/10-22-project-catalog-hundred/research/inventory.json", "reason": "固定一百研究项目、十项目基线及九十仓完整差集"}
+{"file": ".trellis/tasks/10-22-project-catalog-hundred/research/batches.md", "reason": "三个阶段的完整范围及最终集成依赖"}

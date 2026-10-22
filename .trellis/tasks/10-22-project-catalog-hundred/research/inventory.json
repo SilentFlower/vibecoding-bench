@@ -1,0 +1,3642 @@
+{
+  "schema": 1,
+  "purpose": "本任务的接入规划台账，不属于产品内容schema，也不改写原研究快照",
+  "snapshot_date": "2026-10-22",
+  "research_source": "research/github-projects/progress.json",
+  "research_source_sha256": "667476588ee41c2d1e5b3fb8d6c696761562b5874ea99dd7330ebb82ea44a233",
+  "catalog_source": "project_library/catalog.json",
+  "catalog_source_sha256": "a4bb8ddbcb28266f430449aa7e5f4a0a73e3527e5fde33cb5a9646f5cc957dce",
+  "baseline_version": "real-project-scenarios-v4-en",
+  "baseline_digest": "600c930ff5d43986c4d841ee1612c4dbd83a318d7bd706b50666f7f8f116139d",
+  "target_projects": 100,
+  "baseline_projects": 10,
+  "baseline_scenarios": 45,
+  "baseline_tasks": 107,
+  "remaining_projects": 0,
+  "projects": [
+    {
+      "slug": "sqlite-utils",
+      "repository": "https://github.com/simonw/sqlite-utils",
+      "revision": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+      "review_report": "research/github-projects/sqlite-utils.md",
+      "review_sha256": "5faf0b1d2987e35777a78e5c9f28faa1cd3e4555115007436a55134cf65ad7d1",
+      "roadmap_report": "research/github-projects/sqlite-utils-roadmap-20.md",
+      "roadmap_sha256": "e284ac9b1fc775aa162736f34a326fd9146461e7bbbcf926a68c78923bd1b8ac",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/sqlite-utils/project.json",
+      "baseline_manifest_sha256": "a7fe2c9dc3b2da6e15b705ced16b6b6b5b50d657b74d357e8d1444909701a30a",
+      "baseline_scenarios": 4,
+      "baseline_tasks": 13,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "schedule",
+      "repository": "https://github.com/dbader/schedule",
+      "revision": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+      "review_report": "research/github-projects/schedule.md",
+      "review_sha256": "d0f73bfaa2f62796eebe9b9061427f6b685aa14cd8b79de449381468a8cff6ee",
+      "roadmap_report": "research/github-projects/schedule-roadmap-20.md",
+      "roadmap_sha256": "0c251a4a31b4c0fda789edcd88c53ea893782b723d0d458bd8956484269cbdbb",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/schedule/project.json",
+      "baseline_manifest_sha256": "65f708484ed3ce7df1990f5ab0e57e3423fa847e7e8c8dfcf250a84a91d8bbd5",
+      "baseline_scenarios": 5,
+      "baseline_tasks": 13,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "python-dotenv",
+      "repository": "https://github.com/theskumar/python-dotenv",
+      "revision": "0b2880591780a426b0551436f47a17e7a76d954f",
+      "review_report": "research/github-projects/python-dotenv.md",
+      "review_sha256": "a13321aab596fcd361023741b6dc66b8ad9c685a6f994e95f13efaf1d727f2ac",
+      "roadmap_report": "research/github-projects/python-dotenv-roadmap-20.md",
+      "roadmap_sha256": "1698d729885a67899b1f6d2d2cf3baa3c0c7e7d12f0a234e58ee81049a4b8893",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/python-dotenv/project.json",
+      "baseline_manifest_sha256": "eb3e48574961b70a4c96d898181f39f450d30cc17d0a0c9d00ba95afdc6b0cb4",
+      "baseline_scenarios": 5,
+      "baseline_tasks": 12,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "click",
+      "repository": "https://github.com/pallets/click",
+      "revision": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+      "review_report": "research/github-projects/click.md",
+      "review_sha256": "576fc9368aa5ced35cd045cd8df52b038dc47973be015b63705693e0661ab483",
+      "roadmap_report": "research/github-projects/click-roadmap-20.md",
+      "roadmap_sha256": "33369973b166e56b0340b092f9017e214edf8f5b80425245f91fb02156b38c34",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/click-admission.json",
+          "sha256": "4642cfacb62044e4e7aa5ddab0a1aae3e3037e28fc0c5dc0e106cb8f457a4d13"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/click.json",
+          "sha256": "65e8308345b4732b5961b5ea7bc3dd64c51ccbe35a47b25f10478b2c0512dbac"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-004/click/result.json",
+          "sha256": "611355f04902af1e5f9f2cd98261f1473530e2df263b0d57a3d4257fe74526de"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "cli-helpers",
+      "repository": "https://github.com/dbcli/cli_helpers",
+      "revision": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+      "review_report": "research/github-projects/cli-helpers.md",
+      "review_sha256": "9f9a272991ee9f59396669793fdae3b89037cde9338127508952c1e0b1b38920",
+      "roadmap_report": "research/github-projects/cli-helpers-roadmap-20.md",
+      "roadmap_sha256": "46be27cc800e067c1777c0e49648ff6f57a15436f8b4d9e838e167029bd911bc",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/cli-helpers-admission.json",
+          "sha256": "5609df6f6c2094486f784b7256dc346b5afb8e05f77e823f3308b9c9d7ff586b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/cli-helpers.json",
+          "sha256": "b934208a6281699d6ab7358b694c7daed51f7ee11ba73f87597bc34d5df11f67"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/cli-helpers/result.json",
+          "sha256": "79351868ee590aef8011de5c1b22e771aa8e32e8ee889a920c3090dd369e0e0f"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "tinydb",
+      "repository": "https://github.com/msiemens/tinydb",
+      "revision": "edff96aeb2616402e9489d46e90a592c05565621",
+      "review_report": "research/github-projects/tinydb.md",
+      "review_sha256": "b9a106b227ea49f63a4e53dee00848784c42870939e0a90b922948f0605c5f84",
+      "roadmap_report": "research/github-projects/tinydb-roadmap-20.md",
+      "roadmap_sha256": "6846fe012aff4d86afa5fca6698c4d38d6cf03af682a5932485e37008760be2c",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/tinydb/project.json",
+      "baseline_manifest_sha256": "4432bc426efeb62f9d9633dbbac38882d5183570298cfb0d8557c32be7121438",
+      "baseline_scenarios": 4,
+      "baseline_tasks": 12,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "mistune",
+      "repository": "https://github.com/lepture/mistune",
+      "revision": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+      "review_report": "research/github-projects/mistune.md",
+      "review_sha256": "454b693562e9830d6bbceaaed7f6373a24592dfe0aeeec7ab0fea8cf784354c5",
+      "roadmap_report": "research/github-projects/mistune-roadmap-20.md",
+      "roadmap_sha256": "c8f8de8a271f5728fe218ea0c4d0e476416ef178972cc4d0de17ebb213c8d638",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/mistune-admission.json",
+          "sha256": "3fd70ad51dd678010235fb4f9322be88c543d8767f7dcaf729497f0c1abbc4c0"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/mistune.json",
+          "sha256": "14eabca3800f1077856dce0e79b110eb55c7fb0ab1e2d311a29bd700530d244e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/mistune/result.json",
+          "sha256": "3c800e5f67adec213f8a10c8079d523da7e3eb2095355d7cc01403d409bd6c2a"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "boltons",
+      "repository": "https://github.com/mahmoud/boltons",
+      "revision": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+      "review_report": "research/github-projects/boltons.md",
+      "review_sha256": "5382a7cece66bf7f667f74becab4bd4b7c0f83678a17348e0ddc300bef05520a",
+      "roadmap_report": "research/github-projects/boltons-roadmap-20.md",
+      "roadmap_sha256": "4a2be61508f71181ef5ec69f3de7f4cde9d953e2f068e3ff94c5f626ee57a338",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/boltons-admission.json",
+          "sha256": "8875890276d1252138fadc3fb56732f276a92e44dae1b9d0760984570ab79fbd"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/boltons.json",
+          "sha256": "86397d6c88c27eed224d9bc4ab15264e989a9115fb5285283397b0c6f8ea909e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-003/boltons/result.json",
+          "sha256": "b6dd4a95b028c6621d50f47014c66849935673dd2d68beb15cbf090f1e2298eb"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 10,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "more-itertools",
+      "repository": "https://github.com/more-itertools/more-itertools",
+      "revision": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+      "review_report": "research/github-projects/more-itertools.md",
+      "review_sha256": "92251fc118fbb2eadc4f12a86c063f5df1ca01fb8e3b665ca465538233fe1333",
+      "roadmap_report": "research/github-projects/more-itertools-roadmap-20.md",
+      "roadmap_sha256": "01d64dfb7f9c4cad14b9f222abd867dbc4f2bc306b517a929c6918beb71d8287",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/more-itertools-admission.json",
+          "sha256": "2700d74540c14b5f327586e6800d1e1597d06e1d70e179aad6dbd8fecffbb6c6"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/more-itertools.json",
+          "sha256": "a2742a6450685126d517f1cb343ffc571c26b33a7a640c95e7c7b983d4019109"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-003/more-itertools/result.json",
+          "sha256": "3be0fcd69b3091ba8f921e2dd63026c388e45dd22478749e7635af7a8cd313b3"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 9,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "configobj",
+      "repository": "https://github.com/DiffSK/configobj",
+      "revision": "b7707c94c0317b8f89b704a01525a68eb6c72521",
+      "review_report": "research/github-projects/configobj.md",
+      "review_sha256": "39ea31b81e1f39c271770d26eb982edcbaa944763c90ac3e4bc7315960736010",
+      "roadmap_report": "research/github-projects/configobj-roadmap-20.md",
+      "roadmap_sha256": "15f2e4cd35611fb7330105763584b58967900ebe76625bf529352cd41d64a11c",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/configobj-admission.json",
+          "sha256": "75d0417bbbb147a5a526d8a2e0820ace49d69e28fd2d2bafc5cadd1bb9552283"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/configobj.json",
+          "sha256": "a9ca4eccaf5ff9df478daeafce7de213b5913d61acb8d9bfd82b308d790e0b93"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/configobj/result.json",
+          "sha256": "ba5344fb179f213a5a2c398fff02ecc0d8753e6ae4b852e1fd0a0a7857c0f0ef"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 9,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "dataset",
+      "repository": "https://github.com/pudo/dataset",
+      "revision": "db592cc041014762bba55fd544e982170831f227",
+      "review_report": "research/github-projects/dataset.md",
+      "review_sha256": "0e7fbc14aeb41e800027a3f534aed9d5b00b3aa632338c8e7edda0effb77af03",
+      "roadmap_report": "research/github-projects/dataset-roadmap-20.md",
+      "roadmap_sha256": "6ca0fdd1da5899f7a3cbb42e88a6816e16d67b846f42992b1ad3d12806afb42d",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/dataset-admission.json",
+          "sha256": "b745dc7faddb17be3d2c4f706560723b7d1dc2c20e88b32fc9dc90f3f6277d72"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/dataset.json",
+          "sha256": "92c9acaaa83cad1152982ba4259c2450e38855f2d1fc402667a497724233547e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/dataset/result.json",
+          "sha256": "22be10d0ccf9206c0b207883a0fb985fc9e2151f0eab2e5b10bd97cdeed710ae"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "python-markdown",
+      "repository": "https://github.com/Python-Markdown/markdown",
+      "revision": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+      "review_report": "research/github-projects/python-markdown.md",
+      "review_sha256": "3de9ce6ad526196d8965d643bbf495669edb4a041b4e41a9ac75af2ed0bf3cb3",
+      "roadmap_report": "research/github-projects/python-markdown-roadmap-20.md",
+      "roadmap_sha256": "1822a95cb209607b7c9892b23df31cf48cddf1586a23194d88b6a8f5fc2b6857",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/python-markdown-admission.json",
+          "sha256": "d94d9d5a2b8291e328bfae53099c6d77d38d81226542dcd51811de463b751e7a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/python-markdown.json",
+          "sha256": "b5f5f79e00eb9adca92ccb1f98efecf8fb7d4a95c8750f0405cc5ecf18f2876a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/python-markdown/result.json",
+          "sha256": "ef10672663511993c782fd2394e16203ca9a501db499b4f4597e0bd1e7f94f7c"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "markdown-it-py",
+      "repository": "https://github.com/executablebooks/markdown-it-py",
+      "revision": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+      "review_report": "research/github-projects/markdown-it-py.md",
+      "review_sha256": "4cc90708d4425ccf683874c40ac2092772defb85dd610d64c8240d8534e29fff",
+      "roadmap_report": "research/github-projects/markdown-it-py-roadmap-20.md",
+      "roadmap_sha256": "ccb900755b11f424df42633f789a705354962c4e463d507af722847b39f30336",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/markdown-it-py-admission.json",
+          "sha256": "3bd012b02378b38a07121736c85d1358e9babdcdecf80567d31f2405939d2dca"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/markdown-it-py.json",
+          "sha256": "9b5b31962766d179ad1bee7aad24daa744a980911c8a687fecd06b9db5d64420"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/markdown-it-py/result.json",
+          "sha256": "10b4a65b99c6bfb3b53481981f739b9721a84c1f74120ea2d4197db25bcbecff"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "path",
+      "repository": "https://github.com/jaraco/path",
+      "revision": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+      "review_report": "research/github-projects/path.md",
+      "review_sha256": "4047f3056fdbc367e806ee412b940e8e460105580ef7d758077b896b36d9bdd9",
+      "roadmap_report": "research/github-projects/path-roadmap-20.md",
+      "roadmap_sha256": "391d363f3484ad90780d6b73e4a4d0325a8bfc5608863f6c7d3d140bef1f09c1",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/path-admission.json",
+          "sha256": "f5c1255c72ac5cada2acd8f3087915cac2a38dd096a2f9344cbda9a630e88b97"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/path.json",
+          "sha256": "186be8195d5d04abac400056d713f5e92caafa919f6c91bbd352f9c1399931f4"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/path/result.json",
+          "sha256": "bfe36decb966881564664f17a9a6eaba6168dd86a0d0b5f2914a444228135cf5"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 9,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "petl",
+      "repository": "https://github.com/petl-developers/petl",
+      "revision": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+      "review_report": "research/github-projects/petl.md",
+      "review_sha256": "433109a15402a2f33c575a2a6a59eaafbc46e06f80e0fb5ab5ec16c366d4cc9c",
+      "roadmap_report": "research/github-projects/petl-roadmap-20.md",
+      "roadmap_sha256": "b30e388c17f8a0fc0469cc2532a9e9e8dc3d2f67072deb9130de12dcf8b1d472",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/petl-admission.json",
+          "sha256": "fae905b2389b5912c294087ecca92bf646caf1aef68608b2b08ef9cbf714cb14"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/petl.json",
+          "sha256": "af30abc8edf163a9bfbcce2edb4ce06334cec41210f9edf3455b20c74e27e9c0"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/petl/result.json",
+          "sha256": "6c6e94d9d8d96736b54009234027e9324294e231705ade0f52818566d631e663"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "toolz",
+      "repository": "https://github.com/pytoolz/toolz",
+      "revision": "451af60dec590a6010e2babdbf391ea8f815122f",
+      "review_report": "research/github-projects/toolz.md",
+      "review_sha256": "0d50aad4e9445e17a1e5bbcb3778dceec6e1f01f72d094dc8026ab316a5ef829",
+      "roadmap_report": "research/github-projects/toolz-roadmap-20.md",
+      "roadmap_sha256": "5ef4cf7d53f1a2119df8961586e6b040ed57517b532f9e1bca56f36466856015",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/toolz-admission.json",
+          "sha256": "ee075eb9faf183af18d6516557d62640460c5c0e40d39be35d8f10e95136ba05"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/toolz.json",
+          "sha256": "60b3765332bb6fde6acda13962f2097c1e2da7835be90abb596d62054f1c7c98"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-003/toolz/result.json",
+          "sha256": "9f58e4edf3f641efeb91cb785b309fcf8ea81894577e83e1e90babd3ff68f36a"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "xmltodict",
+      "repository": "https://github.com/martinblech/xmltodict",
+      "revision": "6e29fba282e68631034dd2722a413b4e35276584",
+      "review_report": "research/github-projects/xmltodict.md",
+      "review_sha256": "9c0388d169478fa7eaa9044647d8795c10d4459b76a72b7d0fea6253f4927b42",
+      "roadmap_report": "research/github-projects/xmltodict-roadmap-20.md",
+      "roadmap_sha256": "892c41fc6242e740dde5f4ce001551a10556bff8912976a6e1afce319aa3034a",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/xmltodict-admission.json",
+          "sha256": "c50265409cfd7ec29e25231d956c864bf1bddcf020e3b4640a71fb9fe6d0a061"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/xmltodict.json",
+          "sha256": "5dc9aaf807cafb8686febeccd3c0060625fc02399bdee243fdd193688a43e31e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/xmltodict/result.json",
+          "sha256": "378d7efbcbc7c8e1caf4114f49c5411a13a07ff10840ea73966301ac8afff931"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 11,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "tomlkit",
+      "repository": "https://github.com/python-poetry/tomlkit",
+      "revision": "eddd27e43a62fe58707c311bfad2f52e72493f53",
+      "review_report": "research/github-projects/tomlkit.md",
+      "review_sha256": "acc3e6c3eeec5f5db067be9796d48e1c346549ad6b115fcfad4bfc86be3a1473",
+      "roadmap_report": "research/github-projects/tomlkit-roadmap-20.md",
+      "roadmap_sha256": "b1265ab6db10758e6d02090427b4140f181b11375548a11c5bdb5d125a28ce29",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/tomlkit/project.json",
+      "baseline_manifest_sha256": "a77c33c4acbce63061a8cf3bff3c3a9905e42ed74d7822f20c56a2e1e0af900c",
+      "baseline_scenarios": 5,
+      "baseline_tasks": 12,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "cachetools",
+      "repository": "https://github.com/tkem/cachetools",
+      "revision": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+      "review_report": "research/github-projects/cachetools.md",
+      "review_sha256": "ddfda0e31be191dd84cb7396f0f735b05d173e595d4ca053c17e8233e0b391ca",
+      "roadmap_report": "research/github-projects/cachetools-roadmap-20.md",
+      "roadmap_sha256": "e6e95be4b3559dfdd65e48638bb1e0dc632affc445174ce588c62b3a5d412936",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/cachetools-admission.json",
+          "sha256": "05677d8239ac5cb36bb89fac400e0e7e863635a6deb05dc5a380ae41dae2580f"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/cachetools.json",
+          "sha256": "a10206d792d5c38cb77868d3d8a1696f98d327297255af9229b4f8c9c8b56c99"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/cachetools/result.json",
+          "sha256": "02383cbf675c88b061e60f4ce95d8b033619167e4a0d1e518db363206b21cc8c"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 9,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "tabulate",
+      "repository": "https://github.com/astanin/python-tabulate",
+      "revision": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+      "review_report": "research/github-projects/tabulate.md",
+      "review_sha256": "3acb6785eb7d3ce566ae9d2aaa7d79984febe76c296686e7a04b7a87f9a79943",
+      "roadmap_report": "research/github-projects/tabulate-roadmap-20.md",
+      "roadmap_sha256": "947ca3a94ac6f3291f3ce63b6e545bd63882f6642e6d8bf9998032f765e931a6",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/tabulate-admission.json",
+          "sha256": "120b328ad3aab5eef7fd2e0cf2c537ff614d3412506272bf17a39e605a9f0631"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/tabulate.json",
+          "sha256": "4ce5388303eaa424eb79a24a8192753e249476998b165c8ca4c85d6aff9c3283"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/tabulate/result.json",
+          "sha256": "db280f972fc8959c1ff618f261956b664e52efbb98dc2693c4784b1851be481b"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 9,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "jsonschema",
+      "repository": "https://github.com/python-jsonschema/jsonschema",
+      "revision": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+      "review_report": "research/github-projects/jsonschema.md",
+      "review_sha256": "50dc70a8e5b64deffd8545921d9d842269b4f47d785a214abe60fcc19c88221c",
+      "roadmap_report": "research/github-projects/jsonschema-roadmap-20.md",
+      "roadmap_sha256": "762e83931d66e259045f785dca4d5109e85c9608512f5d7f42315e9f57eecded",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/jsonschema-admission.json",
+          "sha256": "eaec9c254b2d34b95d4e6d32873d88d3a10783e070f8ac15dc7edf2bfba12515"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/jsonschema.json",
+          "sha256": "d1af1b7a511009c3347c4efb845d3db649854176293dc5c8d66f3acabb1cd095"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/jsonschema/result.json",
+          "sha256": "2a92c3e1e271c83392268335d4e9e43cb98969e60be279566806ebde1986b5c2"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 9,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "docutils",
+      "repository": "https://github.com/live-clones/docutils",
+      "revision": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+      "review_report": "research/github-projects/docutils.md",
+      "review_sha256": "600f272c475941156688e315ea114bd5f7e45dce59d5f0f003c865ba9d488f4f",
+      "roadmap_report": "research/github-projects/docutils-roadmap-20.md",
+      "roadmap_sha256": "77efa7abc1bd36aa8bff2ef3b40b03c83388e36016bdfb4e58dd722a8f575c15",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/docutils-admission.json",
+          "sha256": "3e3de50efb6c0094a288794e45988a52c91281039b5858cd3e77c5ce70c78c58"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/docutils.json",
+          "sha256": "228c9f4584cbcebafe4bddb98a751499afe9bfddeb8c349c2dc122d2fc856918"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/docutils/result.json",
+          "sha256": "6cd4ef8d9aff8b980e22092c478b0d41edb33434109cec6e6035014c4438cba5"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "python-decouple",
+      "repository": "https://github.com/HBNetwork/python-decouple",
+      "revision": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
+      "review_report": "research/github-projects/python-decouple.md",
+      "review_sha256": "aba0a8d2b66b411827e139b5dd79f4ad9333dbd1c0cd5a3dd72dff42197c92e4",
+      "roadmap_report": "research/github-projects/python-decouple-roadmap-20.md",
+      "roadmap_sha256": "741cbdc29f6d491e53c9770804f9c7a8de95c15cc57dab2e3abc1fd0c62820fb",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/python-decouple-admission.json",
+          "sha256": "862ba8a2faa9b2b85d7060d88fc66346335d6127e0cfbfab1ed9349fefb8f43e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/python-decouple.json",
+          "sha256": "9730cb73d823a3b25c05c104fc2fe89b83d4e313a02dbeb2d1b75302c076f24a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/python-decouple/result.json",
+          "sha256": "fc58245b37a5ca0ecf0b11d473ca454f7a4b7691616bb26205bd7565e1e1cb17"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 9,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "agate",
+      "repository": "https://github.com/wireservice/agate",
+      "revision": "202796ada63357c275a2a5f8685a983e37bad9bf",
+      "review_report": "research/github-projects/agate.md",
+      "review_sha256": "715a30974fd863a005f231d67d648670454113c0d3a72c13fe316ca096250498",
+      "roadmap_report": "research/github-projects/agate-roadmap-20.md",
+      "roadmap_sha256": "23b2057ee8ab07911a2e9e2a66e57332be24acb851f0543c295cafd3487649bd",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/agate-admission.json",
+          "sha256": "cdab8b5f52043c5f787fb9f7d49ffeae0f2473b3f2efb1eee69f07215c930fe0"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/agate.json",
+          "sha256": "497c794d0252ad2319914344a73bd15f16c4603fd18306706eff81ebb0cd77f8"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/agate/result.json",
+          "sha256": "686dd1cf18c93d2112c995ba7b46c4b4c107ddefe328d95ee3e603b4cc70c94a"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 9,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "tenacity",
+      "repository": "https://github.com/jd/tenacity",
+      "revision": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+      "review_report": "research/github-projects/tenacity.md",
+      "review_sha256": "65ba757990cc05cb7f0336703ad980dcb911173803a5cca4b79283d9a1678402",
+      "roadmap_report": "research/github-projects/tenacity-roadmap-20.md",
+      "roadmap_sha256": "58441d81f09245b6613996929bdf9227f620f004c7bc97ee64ce4ddd07180aa5",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/tenacity/project.json",
+      "baseline_manifest_sha256": "50c73a28f2095bc9b167a2da2c34a374cdb5a8143555a43d1043ac3732ede943",
+      "baseline_scenarios": 5,
+      "baseline_tasks": 13,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "csvkit",
+      "repository": "https://github.com/wireservice/csvkit",
+      "revision": "6d19c625214977ab2988e674441ca24638bc12d3",
+      "review_report": "research/github-projects/csvkit.md",
+      "review_sha256": "92befb489fc3820ae2020712059fb0f72430ffb220f6c7563e451075b0b1a50c",
+      "roadmap_report": "research/github-projects/csvkit-roadmap-20.md",
+      "roadmap_sha256": "5fefe9ec71a38e533021df1789ca2d8dab7273e8a8c764a68e88b1e21979ead7",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/csvkit-admission.json",
+          "sha256": "f4db5985dc46e67f7be345a7929af65142ee59edc90c1bf927a0fda263aeef49"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/csvkit.json",
+          "sha256": "5712d503bbc3570af4ceaee94a5581e015cad9374c6eaca9533f37221e6f31c7"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/csvkit/result.json",
+          "sha256": "6b42b9212020931dc6ff73e8e66e4a299adda7394d224ac62223d3c805746a21"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "python-box",
+      "repository": "https://github.com/cdgriffith/Box",
+      "revision": "a4c10e977b574114613431394b30412b50aaacce",
+      "review_report": "research/github-projects/python-box.md",
+      "review_sha256": "7586651ef75a1e1f09ece89f4fc638986159b347d7c572e69e9b6209a774475b",
+      "roadmap_report": "research/github-projects/python-box-roadmap-20.md",
+      "roadmap_sha256": "bbe7e8702e3cd0a17f6bd000cb4790d850a7b21d9edb4315d607695c8dd8fce3",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/python-box-admission.json",
+          "sha256": "f712d8f15844074b8d8a6800c18dade29482940052e23d3d01d6398c00a68274"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/python-box.json",
+          "sha256": "8eb4f049204504c1b3eddc9a07ad6c3e49d580ff77b16ee18fd1864b52d46e5f"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/python-box/result.json",
+          "sha256": "1a96869f4bedd87763cc0cae226f0acc0aa684797c2c36423b3b1fb93fddb10d"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "rich",
+      "repository": "https://github.com/Textualize/rich",
+      "revision": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+      "review_report": "research/github-projects/rich.md",
+      "review_sha256": "65eb584bda1d82e05af9fa1b63c192b5c2afb5e0f142d21dbac5937391987209",
+      "roadmap_report": "research/github-projects/rich-roadmap-20.md",
+      "roadmap_sha256": "cdf15c887bb13de612aa99e6eda9b4fd88e6f41d9e461eef4fbe7bf6368bbce2",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/rich-admission.json",
+          "sha256": "0623e42970101172eed3cdae054fccfac206c0b7b677a9aabe25bcd7385a1957"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/rich.json",
+          "sha256": "15d42993c9173e710e022bdb3025ad5803a183fa686321181e059ac09421c64a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/rich/result.json",
+          "sha256": "f9d996600681f60cda12814f30bfeacde24c7d19cca660ba77014c0696758259"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "pydash",
+      "repository": "https://github.com/dgilland/pydash",
+      "revision": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+      "review_report": "research/github-projects/pydash.md",
+      "review_sha256": "088d9a347b74fa111c86b351cf18c5af8ddf95ed2f6d973cec6b84e216e080db",
+      "roadmap_report": "research/github-projects/pydash-roadmap-20.md",
+      "roadmap_sha256": "cb85eb0c46926e0a6b5c163a9c69831561c17dec2c7e45554aedc7558e36d94a",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/pydash-admission.json",
+          "sha256": "ccc5876acaf937ebd599c5e7ec217275b1180dc553eed5b286dd2204204ebfa5"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/pydash.json",
+          "sha256": "0f6d7236890e4583d4f8ee3e29778a530adf8e482641c0d2d78555fcdcf82be0"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/pydash/result.json",
+          "sha256": "5364c86f280df4f5e9cfb9c5e11f3d41ab614707052a364256844d1a2e5a2293"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "configargparse",
+      "repository": "https://github.com/bw2/ConfigArgParse",
+      "revision": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+      "review_report": "research/github-projects/configargparse.md",
+      "review_sha256": "01f0b01b4b0217e7d7b2a4e862e39c98018888f3232f8ca8d97410505a0d7091",
+      "roadmap_report": "research/github-projects/configargparse-roadmap-20.md",
+      "roadmap_sha256": "90d310727a7f11a9a43f6baef13ee8a3a4f3af905f73589ee0532b1173e4fcfe",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/configargparse-admission.json",
+          "sha256": "e62702bf06f9e11f477d63c1565b15c87aa92bd0254cf023dd7873225a0d569a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/configargparse.json",
+          "sha256": "e63de6b73c00f4f55abfb51126b47605fc34cbde0bd1ed225f3298206fbf570b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-001/configargparse/result.json",
+          "sha256": "b57b59afc2eabc8b24606484d1a6de811a7943681fdbb6ccc4ba8a8bbb61f206"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "backoff",
+      "repository": "https://github.com/litl/backoff",
+      "revision": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+      "review_report": "research/github-projects/backoff.md",
+      "review_sha256": "75e4622ecaf8c5d7fd48d74849938f577d39225c5f4512421be951ad4e4b747e",
+      "roadmap_report": "research/github-projects/backoff-roadmap-20.md",
+      "roadmap_sha256": "f992ab85d5252ebbad2631f9291f04d9333af59ae46ba7aba1bd98167063527b",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/backoff-admission.json",
+          "sha256": "8e65a51199937997dcad8f34148ec7e89fef97a5dd531e6f7df7cc4055974153"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/backoff.json",
+          "sha256": "3c014e2b31f511c9d8a0acafe44cd0a077e28e1159bc76e4c022c61e72d55296"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/backoff/result.json",
+          "sha256": "9a17ded5387e36cbb7ec7a5339ac580727dea59bdc759f0bca64e90364b36c61"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "bottle",
+      "repository": "https://github.com/bottlepy/bottle",
+      "revision": "8ec5fe29420d14998c0d86885083983eaea8b839",
+      "review_report": "research/github-projects/bottle.md",
+      "review_sha256": "65296cacdef006b66fcd187ca137d28815558f8ce6b237fd29a91af3197791df",
+      "roadmap_report": "research/github-projects/bottle-roadmap-20.md",
+      "roadmap_sha256": "c6696dda0beed5def5af85191621491ebb1f4c57b8795105aa77b65e900c4d8d",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/bottle-admission.json",
+          "sha256": "244e301c0408d2fb6feb14e4e0ecc35917c273cbfe2919e3a5769ffe59073600"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/bottle.json",
+          "sha256": "6bcfeba518c02f5d22b0be8756d7c73a81a40b8efe4aed937a2840fe9ef1315f"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/bottle/result.json",
+          "sha256": "3c337db6d38b7dad49e5e8106c75a5293ecf61568d2f6923ad61bf24402d85e9"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "deepdiff",
+      "repository": "https://github.com/qlustered/deepdiff",
+      "revision": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+      "review_report": "research/github-projects/deepdiff.md",
+      "review_sha256": "db5ae321841fd81b09ea5256a608ca2b51a20ac3367baad9e5fcb1ee46f5121b",
+      "roadmap_report": "research/github-projects/deepdiff-roadmap-20.md",
+      "roadmap_sha256": "e1fca636f8ae2a6267a4d7c4f3f1902e006ef4a9a86a062cd3e04b537bd12e10",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/deepdiff-admission.json",
+          "sha256": "8d6a9f436386a95f194159cd4a6152b1a3b52acfd02ba9bd5a3dbe7c5b6e01d2"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/deepdiff.json",
+          "sha256": "46ae2e7ce0ac8cc79e0cb71d6d0f179d4a9bd1e230239e6bd096677c2fae4c0b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-004/deepdiff/result.json",
+          "sha256": "d77396322555e8d66be29eedbc70190a23f176dd2e6d22f583acbc039613077e"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "cerberus",
+      "repository": "https://github.com/pyeve/cerberus",
+      "revision": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+      "review_report": "research/github-projects/cerberus.md",
+      "review_sha256": "aafb2f5b34b7eacd23cf7a94e64b9995731c8fa2bd0ba63f6f5d819868fd21fd",
+      "roadmap_report": "research/github-projects/cerberus-roadmap-20.md",
+      "roadmap_sha256": "78f3e0052ac14d1deda3d4c42f33ca07b80d6b3e4505e795afb89983671448b5",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/cerberus-admission.json",
+          "sha256": "b83851952e3c2066ac3f18d52ca07b35b2f5f2d8489e36e0c59a9be1c5c369b9"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/cerberus.json",
+          "sha256": "3cb5946e818fb4465914d16a89340a66bfaa5af48b1e7d699ccce5b263122531"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/cerberus/result.json",
+          "sha256": "ebb10a322d0cc790b27dcdbc39f57714c57827f14001912b2dec87be65638d38"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "icecream",
+      "repository": "https://github.com/gruns/icecream",
+      "revision": "05af3e95b0080162813bb017de90966bc75f3b91",
+      "review_report": "research/github-projects/icecream.md",
+      "review_sha256": "88087184a822d366a16dcc56eab31d6b20be8fe29423ca097070531767368040",
+      "roadmap_report": "research/github-projects/icecream-roadmap-20.md",
+      "roadmap_sha256": "04c4827bf16865905c269ab1e36aafab34ebbd211774def611d3ce70533dc4d2",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/icecream-admission.json",
+          "sha256": "a950a65cca176b7a6cdcc6a9b2c101c25b9d933059071d7dc5272c6b00062f3e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/icecream.json",
+          "sha256": "da3efd9ca471c29945bc977f72495e66be6d20fb722e02b75fa4ce9204a54a11"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/icecream/result.json",
+          "sha256": "24a6e48110bd2cdd545c2de1de462710d3416e8b107c764cd5ebf003a7630869"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 3,
+      "current_tasks": 5,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "dpath",
+      "repository": "https://github.com/dpath-maintainers/dpath-python",
+      "revision": "15759d96a006fef5278de731cd263b4d839094c3",
+      "review_report": "research/github-projects/dpath.md",
+      "review_sha256": "7ce5536619dcb1a90b89928313e2031b74b4c739dabdc2d2ab752e199436c3ce",
+      "roadmap_report": "research/github-projects/dpath-roadmap-20.md",
+      "roadmap_sha256": "b9b34afa8257ace9c468b1aac6c7fd27b14a45d59b55a237ebf065ff89e8438d",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-01/research/dpath-admission.json",
+          "sha256": "2ca2ed5730edde5b9db5133cffc40de6f9ae1b7280966625877860ef6cdddd4b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/source-proofs/dpath.json",
+          "sha256": "f2f700b1bc35810fc476793052cbb01f35ccbc172568104058a4e967d415927c"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-01/calibration/attempt-002/dpath/result.json",
+          "sha256": "b29b00dd516d656ee7c6dae4e451005fbe83c360b95fd45f03dfb6a8842d6659"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 1,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e"
+    },
+    {
+      "slug": "jinja",
+      "repository": "https://github.com/pallets/jinja",
+      "revision": "5ef70112a1ff19c05324ff889dd30405b1002044",
+      "review_report": "research/github-projects/jinja.md",
+      "review_sha256": "70586fa5398d0ac47967f4c98226f0e0f6849ced056f1b9a2962724db1567c23",
+      "roadmap_report": "research/github-projects/jinja-roadmap-20.md",
+      "roadmap_sha256": "cbdad92810d1d8e4c686488bc48f200b6de149b515c2456d5e897cea139bf846",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/jinja/project.json",
+      "baseline_manifest_sha256": "f3bee77164844ebdedfd2dbaf1000effc5fdb6f79f5c994bd6986b2aed412ed3",
+      "baseline_scenarios": 4,
+      "baseline_tasks": 12,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "alive-progress",
+      "repository": "https://github.com/rsalmei/alive-progress",
+      "revision": "69d9bf0aba6276e2434a3a595cceca55040d64d7",
+      "review_report": "research/github-projects/alive-progress.md",
+      "review_sha256": "27085597b176fb96388f316f5d9e8d2f97c27740e14744a1de88c07868c78404",
+      "roadmap_report": "research/github-projects/alive-progress-roadmap-20.md",
+      "roadmap_sha256": "8d960e3c3fc4bea72d4508d64d5b703da90dee1df404fa4cbb0c4cedbd4f1857",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/alive-progress-admission.json",
+          "sha256": "61730234e6f15b0f7405b687d31b2d5f2b3870c8424d9f79fba057d949c7f6ea"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/alive-progress.json",
+          "sha256": "a6d3fa6fcadf823c239b0da20a56a86d4a1e0446046d39b9a1f34dac6c27c503"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/alive-progress/result.json",
+          "sha256": "e5c94dd0ce5caeec14db229772357e2099cd7fa779c1769638cd2f2ec9ed2b82"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "jmespath",
+      "repository": "https://github.com/jmespath/jmespath.py",
+      "revision": "2812594e69d43098ef60f81f4efc404c071b0418",
+      "review_report": "research/github-projects/jmespath.md",
+      "review_sha256": "55bc7035c73de62597ca1a9eb45257406822415604e4af4186b6b1cab107fc41",
+      "roadmap_report": "research/github-projects/jmespath-roadmap-20.md",
+      "roadmap_sha256": "78223b2a57733e4abfa38ee830fe9ace988294b7c9cc3acab1b90969b17f5f4e",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/jmespath-admission.json",
+          "sha256": "e2f9087f7291c1786882e831237bacd6912ac240070668eb238189dfbf0e8c5a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/jmespath.json",
+          "sha256": "be86bab769fb0affc816546e620f89bda18a044fff38f63d6ddcb7d4534c5000"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/jmespath/result.json",
+          "sha256": "53e1f03307dc8c0667b549e693de8766b59dfd1036d4ca45c80ce66df703772b"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "confuse",
+      "repository": "https://github.com/beetbox/confuse",
+      "revision": "bf42783301ac4e9c640328ec95486952fd599ce6",
+      "review_report": "research/github-projects/confuse.md",
+      "review_sha256": "331d9fb18a983d7c34069f57349758e775c9b4156c810e73de4b04b6e8fc6464",
+      "roadmap_report": "research/github-projects/confuse-roadmap-20.md",
+      "roadmap_sha256": "76a85079705b1554958f1b953655a7899ddaf15eebc761b512e35da53a2320c5",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/confuse-admission.json",
+          "sha256": "136f1c1e1a910ab098a636ee00645c8770b4a0b392b591a14c9efdb7d37be1d5"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/confuse.json",
+          "sha256": "10396f3555b48660ddb4d7b8b6e88b2f92878ca6c312a293061da6216f4eb58c"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/confuse/result.json",
+          "sha256": "56a112a4ad1b7e2c4bcf1a15fe17a270032275e2ff8136b6c71cc90dc996989b"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "simplejson",
+      "repository": "https://github.com/simplejson/simplejson",
+      "revision": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+      "review_report": "research/github-projects/simplejson.md",
+      "review_sha256": "06cdb4c0feb74fddbaac0c2c37a00b007e5341d19d23323c3f9c88d9ee73c602",
+      "roadmap_report": "research/github-projects/simplejson-roadmap-20.md",
+      "roadmap_sha256": "b1b111312467090587c96405f1e0b8e6c56c824d7713854e827beb1e83e840d9",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/simplejson-admission.json",
+          "sha256": "70a45d0d5a68e6ae10b77ddb9eb00de6a1bd5fb3f1c7901d52604c9f93911fbf"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/simplejson.json",
+          "sha256": "a3ecf400783fc09a2aa0c1ab459b3dffb4e1671e914d6cccc08dd1b60db06437"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-005/simplejson/result.json",
+          "sha256": "9aa4f0a8176fac967141ff3c3357b27313067b33510d88b3046456095da57d9c"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "marshmallow",
+      "repository": "https://github.com/marshmallow-code/marshmallow",
+      "revision": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+      "review_report": "research/github-projects/marshmallow.md",
+      "review_sha256": "fadd74ab24ad45cba75c394227b6ef3066b7c8e7ac0865db2a565ed8ed90ec4f",
+      "roadmap_report": "research/github-projects/marshmallow-roadmap-20.md",
+      "roadmap_sha256": "9f80b831f0015630d17ef81cc7a2040b6a4d0fac014e314708001aca417f8c92",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/marshmallow-admission.json",
+          "sha256": "c9e451f86c904737e755726e18bb61039baeef58474699660d95332e78aa460c"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/marshmallow.json",
+          "sha256": "1e661693c2393c9312ac527db725a538acf9cf460a53bd04b74566872cbb9f43"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/marshmallow/result.json",
+          "sha256": "db15884514e914dc11daac771513c2697ac16e9b772dd6ffa150e2875eeda1d8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "inflect",
+      "repository": "https://github.com/jaraco/inflect",
+      "revision": "99596854bd296af1557db2015cfa98c8104ec155",
+      "review_report": "research/github-projects/inflect.md",
+      "review_sha256": "f65d5e03e050dd70d4ad188cc5279681186bfe2b93e3df641c1fffeb4366b6f7",
+      "roadmap_report": "research/github-projects/inflect-roadmap-20.md",
+      "roadmap_sha256": "4f1fc7e3cd481fa625e29952671d85d196a367bffc601b8a1e3d4d953526f2ad",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/inflect-admission.json",
+          "sha256": "25eeb8e8f68ee4712f5d8dd8aada9bfdfce18475633c92cf3c83de5677bd6991"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/inflect.json",
+          "sha256": "11cd47507f6bc1f1124fd94257ebcd1743b96b4b873591f6099cfbfca3886ff5"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/inflect/result.json",
+          "sha256": "10b94ac324151a0198d625863e18e296ddf916fd8eb180bcfe2b66f1c35a69f2"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "tqdm",
+      "repository": "https://github.com/tqdm/tqdm",
+      "revision": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+      "review_report": "research/github-projects/tqdm.md",
+      "review_sha256": "613b130ff5c9c95ee2e7d4defaba755f7fc6e1b3cbc9cdb186ee17ef371c4332",
+      "roadmap_report": "research/github-projects/tqdm-roadmap-20.md",
+      "roadmap_sha256": "1b51aea15004ce460a4e87c4e1ef710aa707a8c203c447f573518359bb62cc31",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/tqdm-admission.json",
+          "sha256": "ece0d70ac7b3c65bcddd61da8e117bee8f7fac3ab912bacd1c8f1ed9dc07dc9e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/tqdm.json",
+          "sha256": "3d0c003cbd1e4da9abf649067be18cf9fa4f3ba63d2903b452138964ddab1179"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/tqdm/result.json",
+          "sha256": "34177e0530f04876e40ba4fe218003e0c2144cbaefb489fb7c80626d66add881"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "pyyaml",
+      "repository": "https://github.com/yaml/pyyaml",
+      "revision": "f5e4504a92f169f65350a1047dccb23bc97028be",
+      "review_report": "research/github-projects/pyyaml.md",
+      "review_sha256": "f131bcc65d70b74b2d13bad1e8cec9b9cbeb850175a7f11cf4c0760bd63abd99",
+      "roadmap_report": "research/github-projects/pyyaml-roadmap-20.md",
+      "roadmap_sha256": "df037bf5e26bfde6d923620f225acb9c5977497e293990ed92e598a08409153b",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/pyyaml-admission.json",
+          "sha256": "070b7d46df22753706adf364ff05889a70937c23b2056d40805841cf9b3a0eb3"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/pyyaml.json",
+          "sha256": "8b7129689c82fdec2ad9c9b262fc729a77202b95b89bc3b7fd12e9ee7e4cbcca"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/pyyaml/result.json",
+          "sha256": "e5372d9d4ada2458f3b4804e4a7b7aa8f86468512d5b9d8be9a5decdf5af5c55"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "pluggy",
+      "repository": "https://github.com/pytest-dev/pluggy",
+      "revision": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+      "review_report": "research/github-projects/pluggy.md",
+      "review_sha256": "10148dde2232875df03b080ac24ad0ac0b2bd450e30e69f96ad3ef5b8f0e2c5a",
+      "roadmap_report": "research/github-projects/pluggy-roadmap-20.md",
+      "roadmap_sha256": "c6362e01dd326b73a62292b43226aacb971aa3d70cda11204212c9856761c3a9",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/pluggy-admission.json",
+          "sha256": "d892f2a0f8db36c09fa9461a27ab931aa40afdfdd6ff09e18a3d06329f1f11a4"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/pluggy.json",
+          "sha256": "355b9284b0a778dab26c71f7474565b5fb0ad47d3a418755f909559f3d3e7f2b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/pluggy/result.json",
+          "sha256": "b74905a1829253d59af0b14f6046dd11ae53ff249e80154383d1eb1b3328f053"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "xlsxwriter",
+      "repository": "https://github.com/jmcnamara/XlsxWriter",
+      "revision": "5d4606d89a955226d2d0825a0f44309043ae7251",
+      "review_report": "research/github-projects/xlsxwriter.md",
+      "review_sha256": "72cb2837828a4188a253aa5df9fc4f73efe085bf58fdb3297c8abf4302e45c21",
+      "roadmap_report": "research/github-projects/xlsxwriter-roadmap-20.md",
+      "roadmap_sha256": "5615da1af72a15ddb7a5b701a0f0ef0d4ff86ac15995f7ed8f3e69b4844bf999",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/xlsxwriter-admission.json",
+          "sha256": "6d1023a28be4c764512dc60eeecb765a73cabb2eb8b6125d5d4e3913e8c39385"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/xlsxwriter.json",
+          "sha256": "dd95049a9873e3fdb329344205d692b27a128609486d877ed677fb9f7d406666"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/xlsxwriter/result.json",
+          "sha256": "f653ca6597ad17096e99cdd34b1eaed0098e58ad6b88d37bc163e8b6b9967920"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "mistletoe",
+      "repository": "https://github.com/miyuchina/mistletoe",
+      "revision": "ebf9ae4e9279f3d8c79b7cf2710f7e73ea6438a7",
+      "review_report": "research/github-projects/mistletoe.md",
+      "review_sha256": "b340f5693f238ee501ed14a08a27d254a36d0f0fce4d4cec699b0c52787be3b1",
+      "roadmap_report": "research/github-projects/mistletoe-roadmap-20.md",
+      "roadmap_sha256": "dd2b0db565a1e714cd3c84e232a0476afb06faa9f50867fea099d63fba9f1a5a",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/mistletoe-admission.json",
+          "sha256": "4cc87a661f0dc7ecd488d0f5e584754fdaaa46f2411b39a3e454c826f023ff68"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/mistletoe.json",
+          "sha256": "7f4057ddfd51c4bab8ec30376c4e64f029351d97b5ad44faa599268f6056dd92"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/mistletoe/result.json",
+          "sha256": "62adc348a16d5bd85e023ce529161334b51217f484e62597912cabf3b9db4ee7"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 5,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "python-docx",
+      "repository": "https://github.com/python-openxml/python-docx",
+      "revision": "e45454602b53e8e572b179ccf1c91093ec9f4ed7",
+      "review_report": "research/github-projects/python-docx.md",
+      "review_sha256": "ce76348dd8b37a018b1330696e60ac56c39a232f852109cd6e3a8d95797e7aeb",
+      "roadmap_report": "research/github-projects/python-docx-roadmap-20.md",
+      "roadmap_sha256": "1ca89a49bc7c97949d0b509091cc2174c0db029e55d97d257a93369cc6080163",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/python-docx-admission.json",
+          "sha256": "8f549fec2598853c556385c6744612178072c5b89f82a267dff8e6c152bce630"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/python-docx.json",
+          "sha256": "389e5a595bd7c9868c1b24878aa0de9ed973894f0a0a9ba769afd6dadf1cf168"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/python-docx/result.json",
+          "sha256": "5b99e7cd1a325ef031b3915fc84705d7dd04f4882f95afcd1d4a1482efba534b"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "python-pptx",
+      "repository": "https://github.com/scanny/python-pptx",
+      "revision": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+      "review_report": "research/github-projects/python-pptx.md",
+      "review_sha256": "bcfd867172641b5b7b36a547a35db3525fe26019c53189118b1c56da4a9e2f4d",
+      "roadmap_report": "research/github-projects/python-pptx-roadmap-20.md",
+      "roadmap_sha256": "12388b1689a650fde8041ce9bd851c1b47775da4512168ce33f25c2871096a6b",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/python-pptx-admission.json",
+          "sha256": "c5daca341a2e5491b0b2b48437dee128d71062311dcf86ae9e768bed13f51095"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/python-pptx.json",
+          "sha256": "e1c29a0c2eb657c6930cb4617bd2b27b87a7e76cbef248b75d1f8237e90434ed"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/python-pptx/result.json",
+          "sha256": "29052bb8bc292669fc02facd0107976ce3c0d8415c1d73be251008cb5e415cc2"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "mdit-py-plugins",
+      "repository": "https://github.com/executablebooks/mdit-py-plugins",
+      "revision": "519953da0a394a92534bc27580f4e7415462df44",
+      "review_report": "research/github-projects/mdit-py-plugins.md",
+      "review_sha256": "5daef0088cb68ca1d93173c3a50b44a85267aee6361906ee32cd1cc32ade7984",
+      "roadmap_report": "research/github-projects/mdit-py-plugins-roadmap-20.md",
+      "roadmap_sha256": "af811b2a083bdcf4722e296560b47012be185c268df0e5e293cf9a8e3cc9a326",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/mdit-py-plugins-admission.json",
+          "sha256": "fd7223ca570ec812cb1e4a5749bcade2092529f6058a9c506dc532dfb3378d6e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/mdit-py-plugins.json",
+          "sha256": "1cd8b382798e89b9822d723b2dde57d24e4c7ded14bd9c936936636db034efce"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/mdit-py-plugins/result.json",
+          "sha256": "a88357d763eb2aaf3c8c2fcd1d5a70530d3496135e46dfe686584d11f34da1a8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "dynaconf",
+      "repository": "https://github.com/dynaconf/dynaconf",
+      "revision": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+      "review_report": "research/github-projects/dynaconf.md",
+      "review_sha256": "01219e424032845fc4c5725680702b2bb0e3232efb63fab8520102342271f0e6",
+      "roadmap_report": "research/github-projects/dynaconf-roadmap-20.md",
+      "roadmap_sha256": "0bb558a9bd8ceac86d5637ee0cabaf5a7218eef8a006b998ca86c773160d8534",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/dynaconf-admission.json",
+          "sha256": "5c44aac20df908c19ae16e4f6acdcbf4910c01d3e03726d4fef919b0599b9f1b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/dynaconf.json",
+          "sha256": "3cf6397b89672f390daca716fcc161c1fd9e053a5425c65c902bace4b1e5e9bb"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/dynaconf/result.json",
+          "sha256": "4be27cb8764d2719e3b0ecbeb8f4ec0eeb6c8aaa123785c5c0d8a5a1720437e3"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "attrs",
+      "repository": "https://github.com/python-attrs/attrs",
+      "revision": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+      "review_report": "research/github-projects/attrs.md",
+      "review_sha256": "989fdb650235b8fdf57d95ed06bee3001429449930b3827f9cecd42d8e4d5002",
+      "roadmap_report": "research/github-projects/attrs-roadmap-20.md",
+      "roadmap_sha256": "e7c3f56446f8cf79617b1cd8d7204a3515622722549be1a5e7a213da3d191c14",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/attrs-admission.json",
+          "sha256": "6e8d14357e08f96429ef046c71f11345dcab0ff711caf3ec9f35ca384d0495a6"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/attrs.json",
+          "sha256": "b0c3cb8145366840616e1373daa7be5b978efaad307ac07bfae64203c893220c"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/attrs/result.json",
+          "sha256": "7c2fdf20d89984708de8a406d385b636c08754c4538d06f9eda48d75fdc502cf"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "cssselect",
+      "repository": "https://github.com/scrapy/cssselect",
+      "revision": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+      "review_report": "research/github-projects/cssselect.md",
+      "review_sha256": "10dc7b7c55fc7b1244a6c8ddbdf3cc79df1b11ef4ed34c34b532189250b8aef1",
+      "roadmap_report": "research/github-projects/cssselect-roadmap-20.md",
+      "roadmap_sha256": "b8e281149f5b91481fcbd083d9be7587c31c09be9322792189e22f43c32bbc20",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/cssselect-admission.json",
+          "sha256": "c588fd87d1d8ff03873d2032559cb79211159be6d8c4336ac6baa87582a6d793"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/cssselect.json",
+          "sha256": "ef5dc83b2ea6865a4103fcf2d0ef525bfa3b23d2578b5860d6b879a66db1ef67"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/cssselect/result.json",
+          "sha256": "5c15bc04bd13885efa87503a6c4a5585916a2048430e4a6214522e2f2aff2730"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "structlog",
+      "repository": "https://github.com/hynek/structlog",
+      "revision": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+      "review_report": "research/github-projects/structlog.md",
+      "review_sha256": "e1d01869a395a3db666595e0c0b8e3578ff2239dbf89ff673172c6833f40cca7",
+      "roadmap_report": "research/github-projects/structlog-roadmap-20.md",
+      "roadmap_sha256": "9321b2456b4a25090f205158126dbdd99c7cfe7c191411b9e7ee4332308c5819",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/structlog-admission.json",
+          "sha256": "aeac2a60dae8938ac9c0a02a84872432070b0023eb2e3d4c0a48b37b71480699"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/structlog.json",
+          "sha256": "4c95382652d8ed3ee20aa669163e3e6e4a82a064242aed098c01fc95b9a61ee0"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/structlog/result.json",
+          "sha256": "0b7a45728892ed76e97544014b0524fa25686f08b56c8c21d87353f90243f1dd"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "cattrs",
+      "repository": "https://github.com/python-attrs/cattrs",
+      "revision": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+      "review_report": "research/github-projects/cattrs.md",
+      "review_sha256": "15af64b0212eb1b95dd894b3005218dfc9175979f927bb487560110f62f76b60",
+      "roadmap_report": "research/github-projects/cattrs-roadmap-20.md",
+      "roadmap_sha256": "38d1b499e3a47db683dcabbf8fc52a1dbe80351d3362301c30cd4ab195b19f1c",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/cattrs-admission.json",
+          "sha256": "9ac76ae9842d24d4cd64cd704fc250610fb19c74dd806e97a0378a3021b5be47"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/cattrs.json",
+          "sha256": "796c9d0e3a9c92691b589e5cd6216c715ebb7413237c7ede65f576162449d3ab"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/cattrs/result.json",
+          "sha256": "85f149e461f964845f4df1997d3e663c8e18bb8c125b39e678b6ebd52e74a2eb"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "flask",
+      "repository": "https://github.com/pallets/flask",
+      "revision": "d086db856be187255b8ec61ef409357393020f32",
+      "review_report": "research/github-projects/flask.md",
+      "review_sha256": "66fcb629c15d22528a211c95c6afcfb648b80346d1c3d82ac4e39ec054018faa",
+      "roadmap_report": "research/github-projects/flask-roadmap-20.md",
+      "roadmap_sha256": "5e256cf30ecc73ee6c034033dee5f958d390491348b9dedcbaa902db2ccf6ead",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/flask-admission.json",
+          "sha256": "dc0dc1dccc7e000cf347b69cae117b6dd850e329a8fcf13336c1b809bf30b891"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/flask.json",
+          "sha256": "4e3875cebf564c94a7e647d31b02b2d7b71d405a7b0808007203c0e375bb2ffa"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/flask/result.json",
+          "sha256": "f4f53fe6be8cd6af702744cef61f49372f78f87e0d35a194e961cf197d770508"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "babel",
+      "repository": "https://github.com/python-babel/babel",
+      "revision": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+      "review_report": "research/github-projects/babel.md",
+      "review_sha256": "205887beb97e55f7d3b712affc262d65941b41d05ca76ad3a4de808e718d2745",
+      "roadmap_report": "research/github-projects/babel-roadmap-20.md",
+      "roadmap_sha256": "df8423ed6c83dbb9ca4b2c77bebb546c3af74b0eac7b63cb4b148cc947baa16f",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/babel-admission.json",
+          "sha256": "04581ec3468d10f20ea1da465c497db2a484340f62f0f1b9489fdffef7233ef9"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/babel.json",
+          "sha256": "8db0413a75139ff2888d0df76b81a140d130f250ea2ea02c8f3134bbd7d572b5"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-003/babel/result.json",
+          "sha256": "9314d1da92840732ec1982f6cce8871d66761e120928863b49ee24e07bf5a66c"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "anytree",
+      "repository": "https://github.com/c0fec0de/anytree",
+      "revision": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+      "review_report": "research/github-projects/anytree.md",
+      "review_sha256": "2bd3fb6cf03638ca7d63661382bfcf3dbe53f01160d1acb90dadcc6a09411774",
+      "roadmap_report": "research/github-projects/anytree-roadmap-20.md",
+      "roadmap_sha256": "8e5afdfb603b0dec38010944e9a04f40ee34b7063a2baa6f70296206ba17376a",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/anytree-admission.json",
+          "sha256": "ffb52b290c26dc40b7a153b93c3bd7785635aae8f8679fc45ff43bd99fe57a08"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/anytree.json",
+          "sha256": "8fb31feb2f09f535080236cd74bc1cf7e55c99e538b45b9011c68f68aff6d09b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/anytree/result.json",
+          "sha256": "85425ccc8d70d140531d97567568efa3325c8c2da43e8e7d226f7b6c1bd326a4"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "werkzeug",
+      "repository": "https://github.com/pallets/werkzeug",
+      "revision": "665e760ca6325a348ce03e5cf780b17e4be01848",
+      "review_report": "research/github-projects/werkzeug.md",
+      "review_sha256": "35f085bdca232a8bddbb4494f6f7e09263bd851097141195371cca68f6fbbde6",
+      "roadmap_report": "research/github-projects/werkzeug-roadmap-20.md",
+      "roadmap_sha256": "47595df123f1d9787618cd4000a852163db4e4296b4ad46df511a53aae2f67d8",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/werkzeug-admission.json",
+          "sha256": "86e6604f20ca1fe956c152474d5d6ccb51481906e44f6c3814a1c1934d5a0768"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/werkzeug.json",
+          "sha256": "ed752b15b02b1b7ca8b0900bae923020dc94416e33a5a40ccb67949622483c17"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/werkzeug/result.json",
+          "sha256": "36230e09ce90a4e24399b664fdbd225fa9287bed449ccdc3c3ebe2273f810633"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "html2text",
+      "repository": "https://github.com/Alir3z4/html2text",
+      "revision": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+      "review_report": "research/github-projects/html2text.md",
+      "review_sha256": "5ce6a4b11c825c7fe25fd2fa2ed6b5e0dd25dfd04982a0fca8b6f7aceaebd1df",
+      "roadmap_report": "research/github-projects/html2text-roadmap-20.md",
+      "roadmap_sha256": "f0e05c547200f178e8f4722a6b634cf501a2d3dbef77003f23be8e4fcae9d15b",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/html2text-admission.json",
+          "sha256": "98bc197c2b686e7878b3fa5192579652700cfb1a9b5b2073b5770a30b4027359"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/html2text.json",
+          "sha256": "26f7af28cf22f45b1ad77bbc43fab7e4bf9868f432b4a6de4055666b82546374"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/html2text/result.json",
+          "sha256": "5060c22141fc4aac70bfbcffc020072a4850a9e49b5282378a0b939c232293bd"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "packaging",
+      "repository": "https://github.com/pypa/packaging",
+      "revision": "1a62a26afe0f4881593e31bed4f7753bd1c8fe27",
+      "review_report": "research/github-projects/packaging.md",
+      "review_sha256": "4227a6149f5ab1c9b1e3bf5111fc9c603e99f09062547acca082f95a3c7188b3",
+      "roadmap_report": "research/github-projects/packaging-roadmap-20.md",
+      "roadmap_sha256": "6a43f06b9eb3f625f4e4867dc50fd27db95dbc09089301386841c22e0ef3eddf",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/packaging-admission.json",
+          "sha256": "c918c7d4ccd4ff07210e8a8d8f19fa69456da7efb1de15610558d082c9581723"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/packaging.json",
+          "sha256": "5ecfcddf554a88bacfa1f26ec942757040ad3ba89b7ce33350ffd63f002b6961"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-003/packaging/result.json",
+          "sha256": "a8d7120d71e992888e16e5c9f1eac91cde0a1f247ffd074ecbc81e1a76c88b5d"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "bibtexparser",
+      "repository": "https://github.com/sciunto-org/python-bibtexparser",
+      "revision": "af329ca482b29691caff69cb2f8e6099670a105f",
+      "review_report": "research/github-projects/bibtexparser.md",
+      "review_sha256": "9556759815a72a9cb12912ba9f1f2843f8a123435de19d2807c44f3d1c6f9b08",
+      "roadmap_report": "research/github-projects/bibtexparser-roadmap-20.md",
+      "roadmap_sha256": "154a47a4b10e3aff4e2c2abece419a4d9715e23f8327cb67a782e2f13b8e3ef0",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/bibtexparser-admission.json",
+          "sha256": "cacce92083cccc66de30c8e0fcb6efd5b91efa1ccfac147b5c3aa7b9f59e6f5b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/bibtexparser.json",
+          "sha256": "b9df6925d945f473a898c477e6ec325cb2e1ff544af77ad5418245ec62b9716b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/bibtexparser/result.json",
+          "sha256": "a24ba1be0cadc28e4971574ed4e31fdd5d74004c7df983ef1987f118af4b053a"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "treelib",
+      "repository": "https://github.com/caesar0301/treelib",
+      "revision": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+      "review_report": "research/github-projects/treelib.md",
+      "review_sha256": "e834b493f568259a8f3440ddea3f400e62acb9cf0ba338ec48eb68ec7b077721",
+      "roadmap_report": "research/github-projects/treelib-roadmap-20.md",
+      "roadmap_sha256": "2690159a1f80bb26945511dbb8382b599acdaaad2deb04db3b4d7f60eec185ed",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/treelib-admission.json",
+          "sha256": "9502932c984caa8b58f6f1691d027ce65f8353020c746297f6f18479710c5bc1"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/treelib.json",
+          "sha256": "be13126cedc8eea2b1d15f21291e21c9f6b0fa68b35c2d9a53331e23ffdc1710"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/treelib/result.json",
+          "sha256": "67bb3fa9959804c80de3e42f8b541c9a06f5512995a040583198f105a61d27cf"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 5,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "sqlparse",
+      "repository": "https://github.com/andialbrecht/sqlparse",
+      "revision": "60cdc649726bf1bc4f1b336050560b336da715ec",
+      "review_report": "research/github-projects/sqlparse.md",
+      "review_sha256": "610d966864e67e805640985da3b050ee452a87a0a12d9c4430f1d47b9b93f4e2",
+      "roadmap_report": "research/github-projects/sqlparse-roadmap-20.md",
+      "roadmap_sha256": "e06a24ae5564035f065d151f07c3c20ea0570fe8eb4554adedaf41629c7c890e",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/sqlparse-admission.json",
+          "sha256": "910c215771d8158ed221d465c3f3079078bc43a138ebeb77bb3b60ffe4bb86ff"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/sqlparse.json",
+          "sha256": "27d8a7c4b91c021bcbcb9e13bec462738fee5d1d3b2b2c37e314adbdb0914e72"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/sqlparse/result.json",
+          "sha256": "db64305cf07925bb27951184d1a59281e881775dca80745b0e34097df8a86ea3"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "python-dateutil",
+      "repository": "https://github.com/dateutil/dateutil",
+      "revision": "68994217fbe253835989e7c1e3eeef5c653088d1",
+      "review_report": "research/github-projects/python-dateutil.md",
+      "review_sha256": "45e8cd6b56e6f6c317ff852f88183a92c4c19860545c72c8ad170b2add77b9ba",
+      "roadmap_report": "research/github-projects/python-dateutil-roadmap-20.md",
+      "roadmap_sha256": "8a3f2aba27acc8cad6224a31bac953f6d0184fbbeee2fa339fcb7800f62a3766",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/python-dateutil-admission.json",
+          "sha256": "980532927ccdaecc63a269a36cf48fc9085ee05392ebea26d02536bd9528fc5c"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/python-dateutil.json",
+          "sha256": "347587ac01c9e6e9cafcf4ee69a048e6de4e7a17d256f9779bfbe5d8efd0e63d"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/python-dateutil/result.json",
+          "sha256": "d38400ff7b00472255a1167737d37a2fb196d613016446e637e2e1410f75068c"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "ftfy",
+      "repository": "https://github.com/rspeer/python-ftfy",
+      "revision": "74dd0452b48286a3770013b3a02755313bd5575e",
+      "review_report": "research/github-projects/ftfy.md",
+      "review_sha256": "1f4e192d73a0309d23bd76d99af28c43d611eaf16d4cb7a8bc6c79397fedb70c",
+      "roadmap_report": "research/github-projects/ftfy-roadmap-20.md",
+      "roadmap_sha256": "4118d96473bee059c0c53f6cab7de59fdde5ef58fc024c17a6defdfee1f13f5a",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/ftfy-admission.json",
+          "sha256": "3920d34bf274e62cc403a28b6c094b7f7ff285849db4a0179fa0c089628d7951"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/source-proofs/ftfy.json",
+          "sha256": "2be8529ace6e78ff746e3f3f564c37cdb5de36e3f726104ff78694bf3afd90d8"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/ftfy/result.json",
+          "sha256": "2ebf60fa1ab7bb1b7d0ca3033cffccb874f56267267d8a2e580bd03f3b45a580"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 2,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "6ca422ab76eb967381b508602246924234065953"
+    },
+    {
+      "slug": "pypika",
+      "repository": "https://github.com/kayak/pypika",
+      "revision": "465fb9ae12f7727d28785d087b64e6226da5714e",
+      "review_report": "research/github-projects/pypika.md",
+      "review_sha256": "62ea2ec38e613e979afb335fad1801239612380ce6e61da9b608b63f48371914",
+      "roadmap_report": "research/github-projects/pypika-roadmap-20.md",
+      "roadmap_sha256": "fda740fe1a9d2b65c2f061f779ba015451466cebd9da2141c691bd6e1dcfaf62",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pypika-admission.json",
+          "sha256": "d5c29bcb1abae45140e6ce08e3294439d00fdf5c19798089456271b9bc772688"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/pypika.json",
+          "sha256": "11951463f7e04a5094d49c54754513af527acf2d07e2ea8b4434293ecee8eb90"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/pypika/result.json",
+          "sha256": "9aa6943173249ca8000bdcc5e125bcc4b56ea48a00c9970d15698430260b0975"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "arrow",
+      "repository": "https://github.com/arrow-py/arrow",
+      "revision": "2224255c4acc594d734cef0bbc83360452a67983",
+      "review_report": "research/github-projects/arrow.md",
+      "review_sha256": "5cc6e2f5863fdc5deb59d81df0d3f3ef6e7c1ba52f81f67bd330a09fa220447c",
+      "roadmap_report": "research/github-projects/arrow-roadmap-20.md",
+      "roadmap_sha256": "a4429b1ffc8909ac29dce623dc4bd92871cfdea68b9359cebd9a0fce029866d9",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/arrow-admission.json",
+          "sha256": "4650c537c69b54212de090043006047313dbfd7c62cb323c463f419ecd3c4b66"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/arrow.json",
+          "sha256": "2e30c3df2a1174a4a1d08d70531064bfc9cda07cc88d8ebd3d0fa642cce8b663"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/arrow/result.json",
+          "sha256": "f17aed86d153326a2cf029e4decebb3d31e5f68c718b063990baf26e7f56bd9c"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "charset-normalizer",
+      "repository": "https://github.com/jawah/charset_normalizer",
+      "revision": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+      "review_report": "research/github-projects/charset-normalizer.md",
+      "review_sha256": "ef6ab82e901685d1168e1e5b08e9398b468611f1b921f8b5cbd41a1c363ce49e",
+      "roadmap_report": "research/github-projects/charset-normalizer-roadmap-20.md",
+      "roadmap_sha256": "a39903b058634affffeef458b5f8aeccf2df042f728437977b18bace29d7b31d",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/charset-normalizer-admission.json",
+          "sha256": "60cf047368ad2b2e1b5fc0c9a812b1b146026ec3375a83049599e712856781c6"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/charset-normalizer.json",
+          "sha256": "ba4cbbd73a6bc15a2b7e67ee93c8c16ce0f0b056acd0a546aeea0fcf2143c50e"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/charset-normalizer/result.json",
+          "sha256": "f6ce25c331ed1d7f75db39641200cef53c9e1e0d547d14180f81ce682c77f567"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "injector",
+      "repository": "https://github.com/python-injector/injector",
+      "revision": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+      "review_report": "research/github-projects/injector.md",
+      "review_sha256": "88de2c875b7faf70041831680d82ede1981756a4bbd81268a55e233e0cb68b1a",
+      "roadmap_report": "research/github-projects/injector-roadmap-20.md",
+      "roadmap_sha256": "7bb520f6ef5d2fa03f8ee3d26db6550afc05554c9f822703d972c841abf00e7a",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/injector-admission.json",
+          "sha256": "f75fc4fb242442f67862446b73afcddc5006930da14077813e68af2bc0602aa9"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/injector.json",
+          "sha256": "b59b8f04681bc6858e67ecd87b97e2287db3867dfbd8ae3c4830e91695ed73a1"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/injector/result.json",
+          "sha256": "0028cd5c03628d6d11ef665ad549e2a783b16928a085343ecb466fa71138671f"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "loguru",
+      "repository": "https://github.com/Delgan/loguru",
+      "revision": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+      "review_report": "research/github-projects/loguru.md",
+      "review_sha256": "673cd1e7b97952c01ba4938a92f41adfcfae4fef9eb6baedf0a6284c6927c8f1",
+      "roadmap_report": "research/github-projects/loguru-roadmap-20.md",
+      "roadmap_sha256": "722ccc4256a078f3476b66e583adfa458f435841b732bfa92058be29ff760c00",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/loguru-admission.json",
+          "sha256": "687d9ccfdf5772b0fd6083f15c982e87315a948eed22b8a7b700f7c6836edf05"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/loguru.json",
+          "sha256": "46e161db90e1498b8c12e769607c13d6239d0d2955cee361fe3e4efbd4102107"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-006/loguru/result.json",
+          "sha256": "d1142bc39260a04850ac52be8e2cfbf3dbe5beaddd392bbb996a658393bdc3ff"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "pyparsing",
+      "repository": "https://github.com/pyparsing/pyparsing",
+      "revision": "810199f89bf916590426e1c5cb3d612584f11a2f",
+      "review_report": "research/github-projects/pyparsing.md",
+      "review_sha256": "9bf01ba49cde66ccb7e35fed066ca85cd1fa8247bcb5895ffe6b15ccd22ac8e4",
+      "roadmap_report": "research/github-projects/pyparsing-roadmap-20.md",
+      "roadmap_sha256": "62e4bd54795da3e4fa6da2d5156fb41ee3b1671d2d02d1fe66c2aae4067533c4",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyparsing-admission.json",
+          "sha256": "24274a066a89539bcccde53d5c1abec2d147ad46e7a147f2a3dc69b3eff43474"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/pyparsing.json",
+          "sha256": "7f21a8b20c7ffc5c088e916738333973be1e0b1e0cc51a2a6b565bcd7eaca30f"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/pyparsing/result.json",
+          "sha256": "901cff3d7ca3f6c50f5fda58b264b49614537672ec1ae003897cc67fa453c14b"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "markdownify",
+      "repository": "https://github.com/matthewwithanm/python-markdownify",
+      "revision": "bc98c9e134ec55b2853716ab859754f061cb7054",
+      "review_report": "research/github-projects/markdownify.md",
+      "review_sha256": "a660beb932c6bf66fd1897eeef089554827e379e638331257f1548faa70cfa62",
+      "roadmap_report": "research/github-projects/markdownify-roadmap-20.md",
+      "roadmap_sha256": "34e5c0df94a8915bc179b3aa634e430c7c8d16517d0d3ce6d7e700a9139327f1",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/markdownify-admission.json",
+          "sha256": "bb16d77f4e1412e87c51972617115a7ab98cb666ad80d807c924fecdbbded674"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/markdownify.json",
+          "sha256": "07bff8b3933640bd25d73825b927ba4dec37bbde8310da6a2b318f367284e4f5"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/markdownify/result.json",
+          "sha256": "e3e77adc8e64e557175b3b2db60d8ced5230a76226d84718a414cbbea67d793d"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "pyrsistent",
+      "repository": "https://github.com/tobgu/pyrsistent",
+      "revision": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+      "review_report": "research/github-projects/pyrsistent.md",
+      "review_sha256": "00181607d7a4ac598366284cc9559882c56d6609ee297e0ec41012745c6be0cd",
+      "roadmap_report": "research/github-projects/pyrsistent-roadmap-20.md",
+      "roadmap_sha256": "345a83856cfbf58b2181dbad32d83d5943ac0d58507c9e279751238f2d29e784",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pyrsistent-admission.json",
+          "sha256": "01837621863dce950b5619e1f07c69cc660b548ef272c70c1967be842fa9f180"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/pyrsistent.json",
+          "sha256": "ca35bcc070aaf0d30dd68e4adbd1cc85aab460b89e99648ef9f83cd4be803067"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/pyrsistent/result.json",
+          "sha256": "1bdcd12caa91147e1eccfeffa021a024f64d601b968bec0c4c73bcceb36ddce1"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 3,
+      "current_tasks": 5,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "feedgen",
+      "repository": "https://github.com/lkiesow/python-feedgen",
+      "revision": "97260abb1793eb164c458c10b493690beb413f6d",
+      "review_report": "research/github-projects/feedgen.md",
+      "review_sha256": "9e704e859ea33509f8c8ec1deb1faa860004a199eb24e2dcdffe278a9cbe1dfd",
+      "roadmap_report": "research/github-projects/feedgen-roadmap-20.md",
+      "roadmap_sha256": "2fcc550bc52a7a1d2089608dcb63f5904960c7bed9af932db5201fdfb226cb87",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedgen-admission.json",
+          "sha256": "9db10afb201281bf581919e6cd495b6a58086121819911d27370f4135452c8e5"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/feedgen.json",
+          "sha256": "c3a29234f820ba43e3391607b54656a92c905899f15e2a6ebfa7ee1f65ecb18a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/feedgen/result.json",
+          "sha256": "551b75bcd33ffeff65a1953f27f12c967cee66fc4ca640f28d857e4b191e075a"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "sortedcontainers",
+      "repository": "https://github.com/grantjenks/python-sortedcontainers",
+      "revision": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+      "review_report": "research/github-projects/sortedcontainers.md",
+      "review_sha256": "7a76357ebbdb98090894e28969c32985a805076a9ac8914cdcbe38bd41fe7d29",
+      "roadmap_report": "research/github-projects/sortedcontainers-roadmap-20.md",
+      "roadmap_sha256": "44eafd2ab61ea5994c5956355aedf34da1c7b9ccd9621a3ec54a4ddd8a0cf2d5",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sortedcontainers-admission.json",
+          "sha256": "63625bb90e15b8634b0a1df5ce6f67b8cf7759c6e0d73b03fe00363f9b70860a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/sortedcontainers.json",
+          "sha256": "19fb0b941d9c56d6e7711504cd32b829602199f763130ee5a1bda113ed714088"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/sortedcontainers/result.json",
+          "sha256": "41a96f435d2b59303799474b563d4b78e4d16eac231fd52fc548518e38c03f6f"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "wtforms",
+      "repository": "https://github.com/pallets-eco/wtforms",
+      "revision": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+      "review_report": "research/github-projects/wtforms.md",
+      "review_sha256": "171af02188d1424b8bc66395fbf9e202d1397c0bab36bc6a56c82b11acda9af3",
+      "roadmap_report": "research/github-projects/wtforms-roadmap-20.md",
+      "roadmap_sha256": "368c8a33484447aff3254fda95907df5dba0769f2b89af5250f3fb5bb8a0c3b7",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wtforms-admission.json",
+          "sha256": "ea3bbdfa2883812eb234670c13d4a313bda1df9450ff763ef0c93782a56eda5c"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/wtforms.json",
+          "sha256": "d7eeeb2c18c9c1433c502476a6fac7273f357253af819e15b2ce98e319ad7596"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/wtforms/result.json",
+          "sha256": "af41836cd551e8a787f94bc80b39baa4b54353f2dd612f7d98ff3baed19d8132"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "python-constraint",
+      "repository": "https://github.com/python-constraint/python-constraint",
+      "revision": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+      "review_report": "research/github-projects/python-constraint.md",
+      "review_sha256": "06fea8ba3410fbd352e06987eacb674836df6ef79f78967519f4c42140bd3a5a",
+      "roadmap_report": "research/github-projects/python-constraint-roadmap-20.md",
+      "roadmap_sha256": "41a839115fa8a49223931667d81eb5831c7393df1752907ed266644c75814814",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-constraint-admission.json",
+          "sha256": "edf534f916c0c847ba823fdd358c4db85f2188948d15c3ebf2469fdd95b5bbf4"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/python-constraint.json",
+          "sha256": "1d275d5b49fb9eeaae6b6d353038265f1a708f827c13fcd3fea0360d28a5b1a0"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/python-constraint/result.json",
+          "sha256": "95705d0f411f5501a3f8a0c11d709eaf59a7255163fbac51f31ce67f068a799e"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "feedparser",
+      "repository": "https://github.com/kurtmckee/feedparser",
+      "revision": "a22c5521cbb109871f1a2318948581901bd47e26",
+      "review_report": "research/github-projects/feedparser.md",
+      "review_sha256": "4561b1545c049d731d39166370fbac64348d13199fcd22f8394bfe6f2d0bddee",
+      "roadmap_report": "research/github-projects/feedparser-roadmap-20.md",
+      "roadmap_sha256": "e07961f5b05de8c5ced7673048de952a8ff2d29ec778aeca2608c1f7911215aa",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/feedparser-admission.json",
+          "sha256": "9fe9dd92e6a85ea829b11b82dacdb43dafe6a27b799cd9fad3b1323cc1e950c2"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/feedparser.json",
+          "sha256": "c2060a4f23067a832111bcdfad03f31bd6a454b9f1fc93fa3c3e28fecc995b90"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/feedparser/result.json",
+          "sha256": "f6f856a34f4b0d68c98900e5258cb1714a2f43782393f6e80c82f4d24e8503cd"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "portion",
+      "repository": "https://github.com/AlexandreDecan/portion",
+      "revision": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+      "review_report": "research/github-projects/portion.md",
+      "review_sha256": "5b94c7eebf2c6e30d81cac04d9a5613db81dd685b3e6721e30dc793e54273bb1",
+      "roadmap_report": "research/github-projects/portion-roadmap-20.md",
+      "roadmap_sha256": "58c7879b48a06848b59c0aa1770a8219b9c5a40632ec6f0c0f10276dd72abfa3",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/portion-admission.json",
+          "sha256": "ba250e7a8d0e0140ee7deb2f09238fa8bde81c8e3cc573cc09977009b615d120"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/portion.json",
+          "sha256": "5e9fe5c0150c6caad2634ffaf34a16732eb9bea7bfc4cc8377a6324f760d2a6b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/portion/result.json",
+          "sha256": "464226b13e4d5a42fa8224b288c46d88b99bbeba142fae7de91f6d02d93e1ad9"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 3,
+      "current_tasks": 5,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "textdistance",
+      "repository": "https://github.com/life4/textdistance",
+      "revision": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+      "review_report": "research/github-projects/textdistance.md",
+      "review_sha256": "21006648ab36a6f6efc50a07a33593dd5e47a6adb530c5352a6610bb4a3654b1",
+      "roadmap_report": "research/github-projects/textdistance-roadmap-20.md",
+      "roadmap_sha256": "bae80d88ebd48a28864184c8ef9bd5eb5de5f9293415dc391f1dc258687a61da",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/textdistance-admission.json",
+          "sha256": "be96667b797d93377f31e26c71aff5f3b9dd0cec0b7112b59c404af776fa187b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/textdistance.json",
+          "sha256": "f4f7ff11c0df883e35b63444a2e1aaf4ff827a5825c3794168ac094b3f2fc41b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/textdistance/result.json",
+          "sha256": "85f6d2103fd4255d3e8a5f0edd2aebadb01e87f3dbb2d69017fa8755263cbb5a"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "humanize",
+      "repository": "https://github.com/python-humanize/humanize",
+      "revision": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+      "review_report": "research/github-projects/humanize.md",
+      "review_sha256": "9c17ae1e960fde144031b5680777c0cf06b3de50690a5942932b9bbd6d16c10d",
+      "roadmap_report": "research/github-projects/humanize-roadmap-20.md",
+      "roadmap_sha256": "ccc53cf2b124076e592ce3dcfac36dc75054bc4a0a8c70be19ed11e18c215bae",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/humanize-admission.json",
+          "sha256": "f54cbd04ea650a9c31672dae8e7b62d17014faab98098395e2c6f65e5da102da"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/humanize.json",
+          "sha256": "afe425462ac550a0237acf4a32ea88b0083f00fb4125e60c9fdab5b6848be0e1"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/humanize/result.json",
+          "sha256": "f3c7cda6138398f6375eea0982cdfe52b2049e9e2a2e23ecf6a541a1e496c9fa"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "bidict",
+      "repository": "https://github.com/jab/bidict",
+      "revision": "299fedc89f1d70d5d41cf7922564b376d3e2d435",
+      "review_report": "research/github-projects/bidict.md",
+      "review_sha256": "f478cd4f43e433765027ba6c2239cb1e89a4b673b9dd9ee75dc4ae72226220c5",
+      "roadmap_report": "research/github-projects/bidict-roadmap-20.md",
+      "roadmap_sha256": "f20e94d66605ca6aa377d32f1fd4ca249af438c33a8b4d2d34e7a7f1f0c514a6",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/bidict-admission.json",
+          "sha256": "80c0a3e4f5e3a9a8ae7eb0d99eb6516e30cb1368e74208c28b6dde3b14ea0e1d"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/bidict.json",
+          "sha256": "b4e79f10670d22f2a914245f32743d4cf2413b574f98c5f848325d3d86ea32b9"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/bidict/result.json",
+          "sha256": "bb2c5da3c4c2a1084b06186d3fb6ce77a52f8e0f0cbedf2d30088179887cbbd1"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "tablib",
+      "repository": "https://github.com/jazzband/tablib",
+      "revision": "966876c76a6378557c1951badc1665b4d1375875",
+      "review_report": "research/github-projects/tablib.md",
+      "review_sha256": "301ff9028a25a1d411b83d8f09baf9341834f200178983c28ddf13b25d435af6",
+      "roadmap_report": "research/github-projects/tablib-roadmap-20.md",
+      "roadmap_sha256": "25b292cdc18955f23e382cc4cea1d9cf882b843a368cf636b45027b8567d87cb",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/tablib-admission.json",
+          "sha256": "1d01ce5279be8f59251c3a6a90f21ed0a9d1f2e54f563e50effc783b1b5f5657"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/tablib.json",
+          "sha256": "805033033777998cfc72b25f8489eb6a6e7c3fdb76277acbfa30b472138e2165"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/tablib/result.json",
+          "sha256": "b49860949de032f01d89515f8ef746bacc602d5550e2892a60a4afd92467ae48"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 5,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "chardet",
+      "repository": "https://github.com/chardet/chardet",
+      "revision": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+      "review_report": "research/github-projects/chardet.md",
+      "review_sha256": "14147c398b027c191e3c87b3126bb4670a26fc5c703b6637b611d8e94da5959b",
+      "roadmap_report": "research/github-projects/chardet-roadmap-20.md",
+      "roadmap_sha256": "998af25a228cd2726c397fba98a3e2e27aaee9298ed2d3f2161d28483723e7e5",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/chardet-admission.json",
+          "sha256": "de5bd13c1670794d92784cbeee674e96d594b11902206e770ebaaa8b04e15eaa"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/chardet.json",
+          "sha256": "70418bb9944f38ad08bb143fe5ef62b51cc9ddfa4c4551c9f5c37dde8f1a401b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/chardet/result.json",
+          "sha256": "e15e3769b014cd918dc0323bbed9ce980c3c9ca8618e3045f2fde155324127fd"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "natsort",
+      "repository": "https://github.com/SethMMorton/natsort",
+      "revision": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+      "review_report": "research/github-projects/natsort.md",
+      "review_sha256": "f8916abe37db79b72c22aba9c89868381d0768111b3477bcfc0ba5fcbc92facf",
+      "roadmap_report": "research/github-projects/natsort-roadmap-20.md",
+      "roadmap_sha256": "b7557cc2eacbebcc90930b4216422d30b661dbd4d8ee8efc999a43be54962ab3",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/natsort-admission.json",
+          "sha256": "7b6e5432d05767dbd0a0a8832f802ff7b0bf164f83083a36dd712bcb8d7b8075"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/natsort.json",
+          "sha256": "9770483332c14a9b3549a83d0cbdf1999468db91a87b6becf49c393f3b55e634"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/natsort/result.json",
+          "sha256": "dc785b29eb249bc674b1e85faf4657a8702d0ea58b89e6d1fd83116f5ec1aeb3"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "transitions",
+      "repository": "https://github.com/pytransitions/transitions",
+      "revision": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+      "review_report": "research/github-projects/transitions.md",
+      "review_sha256": "ae6a15cefccccaa6e57f55413ae4ef654fcbc1b3ac0c4fb36b757f2738df4747",
+      "roadmap_report": "research/github-projects/transitions-roadmap-20.md",
+      "roadmap_sha256": "4747ca8bd4dc2fe4d6de008c766ac69af91b8f427ba2965efe365ec2e51dc921",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/transitions-admission.json",
+          "sha256": "c1105a6a2ac4a11a0b451a6ae833aaa8eec5a1f741d1750adc3c8bfef5042ec8"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/transitions.json",
+          "sha256": "149ab6c5fe5f43c7f323441d06ad29c9f9e55af7935d25e0ff6813d462ff4e98"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-004/transitions/result.json",
+          "sha256": "f4b3d54073b7d66f7e473283a007d77ba5642a2103c40d0d958475836ce17502"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "html5lib",
+      "repository": "https://github.com/html5lib/html5lib-python",
+      "revision": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+      "review_report": "research/github-projects/html5lib.md",
+      "review_sha256": "bfbca4383053c84ca9e51d409ecb957262ef3aae881cab9f9df05def1f8e58a8",
+      "roadmap_report": "research/github-projects/html5lib-roadmap-20.md",
+      "roadmap_sha256": "31b99e3a51a05a797087ee1dda813224ba2c05670ead79239bfd77e71de45f8a",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/html5lib-admission.json",
+          "sha256": "6b32fa4291a019f874c7b9dc5840c334804bfb877e1490719f50ee664912e91a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/html5lib.json",
+          "sha256": "023b0e3d4f18a02887605276d17dad1e38eda6b60806266331e284631a7704d1"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/html5lib/result.json",
+          "sha256": "e2a2e05bad73ab50d2ce9a442a6e6084a6d19b86dba66017918d608858ef9129"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "pendulum",
+      "repository": "https://github.com/python-pendulum/pendulum",
+      "revision": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+      "review_report": "research/github-projects/pendulum.md",
+      "review_sha256": "c369b484627888fa9213f0026d3aa675bf1192a7a1f71cde84112126a7a32193",
+      "roadmap_report": "research/github-projects/pendulum-roadmap-20.md",
+      "roadmap_sha256": "dc36b9bffb00e4e535ca690fef94b07caae2d2cc4877ca86575b10b4f45b920a",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/pendulum-admission.json",
+          "sha256": "9f77d8bba1f9eb04331bdb954161261b528047cb25246c14c5b703c083961099"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/pendulum.json",
+          "sha256": "fc7c905ce00371cb0f632135e7b5cd8f97931aefd7fafcf74b52195f3540b7c5"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/pendulum/result.json",
+          "sha256": "d1944b518d35e227194b801921a652a7ae6cb9f74f0a2c0879a67380a3a141bc"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "python-liquid",
+      "repository": "https://github.com/jg-rp/liquid",
+      "revision": "878f589adff6cb6bf08ccea7895570f96980248e",
+      "review_report": "research/github-projects/python-liquid.md",
+      "review_sha256": "d394300622f10ef4269def3c5ec229b15062d70840ea131e113fb1336a846a50",
+      "roadmap_report": "research/github-projects/python-liquid-roadmap-20.md",
+      "roadmap_sha256": "a365873c9149f778c39056da5875419f96403b288ae147136c9a709b925f2396",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-liquid-admission.json",
+          "sha256": "e377e46c69dbac3fa180072a8860e9d70282d729021f6469d91389d6691a0c83"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/python-liquid.json",
+          "sha256": "1082388b41cd49ae9ec25f34952f3dadee8b87bec193fabbae90a417b115655f"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/python-liquid/result.json",
+          "sha256": "8c2fe1fb6dfaa76839c3c80d692fa1ceead4d831037900fb4dd84b5bfca0ddc8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 7,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "python-statemachine",
+      "repository": "https://github.com/fgmacedo/python-statemachine",
+      "revision": "ec5d8173f740b37941818df13727db9d64ef498d",
+      "review_report": "research/github-projects/python-statemachine.md",
+      "review_sha256": "fe2773379b0eab9c8b342e728d674ebbe2ecc663a0822bf6c0c12bb3bcbdbaa7",
+      "roadmap_report": "research/github-projects/python-statemachine-roadmap-20.md",
+      "roadmap_sha256": "0c646af7ad8758513413111d54e8320bce3bc014bbf31acc7f34a5be76de61a4",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/python-statemachine-admission.json",
+          "sha256": "32482d499001558ac64ad1b0c46d9108ed5f112ea50380a5dc663bcf60cdb02a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/python-statemachine.json",
+          "sha256": "a10179d0ba700f619cff2905765d49f8eeac68f7d49d542081c42484550fd371"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/python-statemachine/result.json",
+          "sha256": "12da9690cc9e0db05bbb5d670f9369f604da0abe38268feb8f0505835358ca86"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "webcolors",
+      "repository": "https://github.com/ubernostrum/webcolors",
+      "revision": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+      "review_report": "research/github-projects/webcolors.md",
+      "review_sha256": "583ac1acfa7658f05652c126d1f482d8404a8be25132370d5b3d9ed02495bd9e",
+      "roadmap_report": "research/github-projects/webcolors-roadmap-20.md",
+      "roadmap_sha256": "8aef586a39d99067f69957584483b46876665408733054dbd3d53f51c966e131",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/webcolors-admission.json",
+          "sha256": "6e371172d0c097aa2d22652ea3d17df60f567c690701f7eee59813fd8b9e8f1a"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/webcolors.json",
+          "sha256": "c3a9cb44e2b9c215f6f22857c0cb94299c227f2c407b43fe922b0fe705d8c9ee"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/webcolors/result.json",
+          "sha256": "374fd7edce0fb5d2058a95612d5acfdbe6482d03b344bceca07a851be4aa1a24"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "wrapt",
+      "repository": "https://github.com/GrahamDumpleton/wrapt",
+      "revision": "6b4e844950213118b19e613248d2bc9469eb731e",
+      "review_report": "research/github-projects/wrapt.md",
+      "review_sha256": "48987fba4a237444e2ddf92fc81807a4d2abf533319e318926317f2a81eebe31",
+      "roadmap_report": "research/github-projects/wrapt-roadmap-20.md",
+      "roadmap_sha256": "6c72203b3e035dbf2a870794c3e9f4a8e6fd89a079833d87b3c57337a87c63ad",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/wrapt-admission.json",
+          "sha256": "f11758233ac8ae28b48de39dd1973f9684c216ea3bf73f583929ac6ac2d0301b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/wrapt.json",
+          "sha256": "078dfb5ce9fec091d000fb8ad647b9838f88e305bc2cef2cc5ef6783049166be"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-002/wrapt/result.json",
+          "sha256": "db2f5275652bfc1e93e5afce311f8ebddca70fa4e9186eb29fad89159e9b90a3"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "funcy",
+      "repository": "https://github.com/Suor/funcy",
+      "revision": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+      "review_report": "research/github-projects/funcy.md",
+      "review_sha256": "4b1efa3aed5501ba7e639c4708e95b1e9362301fba681eba8f3f0622794407af",
+      "roadmap_report": "research/github-projects/funcy-roadmap-20.md",
+      "roadmap_sha256": "26e58ff8b17c82d71a19dd5779bc4ab3dee6810c83ab8819d7d80cd7bd84cd99",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/funcy-admission.json",
+          "sha256": "41b2aa084f22bbd18dad9c544eb8a190116eed8008379c127826e3c52183ae94"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/funcy.json",
+          "sha256": "8f9174b406c5c48d3aa569e1438491bb221f4329f820c30ae2a0eb9e3402f247"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/funcy/result.json",
+          "sha256": "60f54d7dff6d60323e94d62e6291a6275b6bea22e4b100d37f78b0760f435353"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "collective-icalendar",
+      "repository": "https://github.com/collective/icalendar",
+      "revision": "3ecf079acba0e592ea6a40c456514984c8657852",
+      "review_report": "research/github-projects/collective-icalendar.md",
+      "review_sha256": "3bb0d8ee3f917db7cc7c25a07301e64b695cc2a8c937fab857c332a0a95e4c92",
+      "roadmap_report": "research/github-projects/collective-icalendar-roadmap-20.md",
+      "roadmap_sha256": "c81d5643bfeb7bba6aa1ef8b4423d41c9d285adcdaae3072e818716b807a5228",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/collective-icalendar-admission.json",
+          "sha256": "194f8bdb5f594651c14fee4d361d15ecf7ecc077e03a993425e5839d24793179"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/collective-icalendar.json",
+          "sha256": "1ca2581bffcb7af120f1616665e2dfc8054a10e1f12097be7032652cbe9dd29b"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-001/collective-icalendar/result.json",
+          "sha256": "cca92c070497050a97db769b645e7d8d35eb4919effa7b5edb1911bd04744f41"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_repository",
+      "unverified_external_submodules": [],
+      "current_scenarios": 4,
+      "current_tasks": 6,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    },
+    {
+      "slug": "pydantic-settings",
+      "repository": "https://github.com/pydantic/pydantic-settings",
+      "revision": "8dc9e05ab07d91e21dd2a37d0b9c30f6d92b1930",
+      "review_report": "research/github-projects/pydantic-settings.md",
+      "review_sha256": "ea02df2d6c6b1f94cda58a267e05356b23fb3ab9d4f546cd88eec132308efce3",
+      "roadmap_report": "research/github-projects/pydantic-settings-roadmap-20.md",
+      "roadmap_sha256": "aa7aab911a8ef78361ddf60f943fa3953ef4ea6b728b23d4db7c6e41d5d4ffc8",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/pydantic-settings/project.json",
+      "baseline_manifest_sha256": "6168cfbb9ad58e28ebfaf6ac7f0b788d139fbf84dcb550a87115498c32ae54f1",
+      "baseline_scenarios": 5,
+      "baseline_tasks": 7,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "python-frontmatter",
+      "repository": "https://github.com/eyeseast/python-frontmatter",
+      "revision": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+      "review_report": "research/github-projects/python-frontmatter.md",
+      "review_sha256": "e06db117c8d6c1315b67416cf30508bc05aa8a568183eca8621b2af9a776ec93",
+      "roadmap_report": "research/github-projects/python-frontmatter-roadmap-20.md",
+      "roadmap_sha256": "4b855751aa3b8f89582631259c43ca23c6bd905b2ec49c4503f0eb92afa53b1d",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/python-frontmatter/project.json",
+      "baseline_manifest_sha256": "b2a9c13ad23d779aa7481b7673cd75ca1a768e7b90279f2a26a2cd837ec674b9",
+      "baseline_scenarios": 4,
+      "baseline_tasks": 6,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "typer",
+      "repository": "https://github.com/fastapi/typer",
+      "revision": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+      "review_report": "research/github-projects/typer.md",
+      "review_sha256": "8d40b968ac19f73f63045edaf74ac26e2f4db3934dcbafd9bfc76891507253f5",
+      "roadmap_report": "research/github-projects/typer-roadmap-20.md",
+      "roadmap_sha256": "edae1e223b5e49974d3d201d5a92c00fd574ea58d719d54a7d4b9f76bb5beaec",
+      "research_status": "complete",
+      "admission_status": "existing_catalog_preserved",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+          "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "baseline_manifest": "project_library/projects/typer/project.json",
+      "baseline_manifest_sha256": "988424344e4eb8ca631cc4c9a9bb5a12154c4d70e28c5e1fc0ee12778d79a20f",
+      "baseline_scenarios": 4,
+      "baseline_tasks": 7,
+      "planned_stage": null,
+      "compatibility_status": "original_bytes_and_stable_ids_preserved"
+    },
+    {
+      "slug": "sqlglot",
+      "repository": "https://github.com/tobymao/sqlglot",
+      "revision": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+      "review_report": "research/github-projects/sqlglot.md",
+      "review_sha256": "ef7d8bf44f1215449368d3f99fe1412349db6a8b5cb25e04739a5fc79a8e1718",
+      "roadmap_report": "research/github-projects/sqlglot-roadmap-20.md",
+      "roadmap_sha256": "171855f77f3fcbdb0e8e2a4d280df1434b68324d1570130521f2770e70bdd2c7",
+      "research_status": "complete",
+      "admission_status": "formal_registered_local_verified",
+      "admission_evidence": [
+        {
+          "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-03/research/sqlglot-admission.json",
+          "sha256": "ef302d0691302492499586af73751038dd44ace51ac670c5ba793abc61552184"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/source-proofs/sqlglot.json",
+          "sha256": "813b979cdad9d5952d6f7eb8e869c1e7c5a1afb09b086e9a6966cb46548331ee"
+        },
+        {
+          "path": ".deploy/project-catalog-hundred/stage-03/calibration/attempt-005/sqlglot/result.json",
+          "sha256": "c475e13eb29799341f4ce56b96765608c8b3d76c11558993eb03eca8e9b0d55e"
+        }
+      ],
+      "real_model_status": "not_run_in_this_run",
+      "production_status": "not_deployed_in_this_run",
+      "planned_stage": 3,
+      "source_scope": "complete_pinned_public_main_repository",
+      "unverified_external_submodules": [
+        {
+          "path": "sqlglot-integration-tests",
+          "commit": "8cbf013a7b0bd1871abce4ebb543560d0e554799",
+          "repository": "git@github.com:fivetran/sqlglot-integration-tests.git",
+          "status": "unavailable_optional_private_tests_unverified"
+        }
+      ],
+      "current_scenarios": 5,
+      "current_tasks": 8,
+      "native_status": "passed",
+      "product_mock_status": "passed",
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760"
+    }
+  ],
+  "initial_stage_count": 3,
+  "stages": [
+    {
+      "number": 1,
+      "task": ".trellis/tasks/10-22-project-catalog-hundred-wave-01",
+      "projects": [
+        "cachetools",
+        "xmltodict",
+        "tabulate",
+        "python-decouple",
+        "click",
+        "cli-helpers",
+        "mistune",
+        "boltons",
+        "more-itertools",
+        "configobj",
+        "dataset",
+        "python-markdown",
+        "markdown-it-py",
+        "path",
+        "petl",
+        "toolz",
+        "jsonschema",
+        "docutils",
+        "agate",
+        "csvkit",
+        "python-box",
+        "rich",
+        "pydash",
+        "configargparse",
+        "backoff",
+        "bottle",
+        "deepdiff",
+        "cerberus",
+        "icecream",
+        "dpath"
+      ],
+      "status": "local_completed",
+      "cumulative_project_target_if_prior_stages_passed": 40,
+      "totals": {
+        "projects": 30,
+        "scenarios": 126,
+        "tasks": 244,
+        "modify_tasks": 9,
+        "business_cases": 268,
+        "primary_native_main": 25792,
+        "subtests_separate": 23404,
+        "git_files": 7047
+      },
+      "local_commit": "ada3ff9053d81dda478046571781dcd9de91ec9e",
+      "close_result": "blocked",
+      "close_blockers": [
+        {
+          "code": "decision-review-required",
+          "owner": "decision_log.py",
+          "message": "当前 AI 决策摘要尚未获得 accepted review",
+          "detail": {
+            "decisionDigest": "3d3df52b108cf7c4480ee3456297ba0f65ffc6ffbd67b4818920270c4aab4bbc"
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "task": ".trellis/tasks/10-22-project-catalog-hundred-wave-02",
+      "projects": [
+        "alive-progress",
+        "jmespath",
+        "confuse",
+        "simplejson",
+        "marshmallow",
+        "inflect",
+        "tqdm",
+        "pyyaml",
+        "pluggy",
+        "xlsxwriter",
+        "mistletoe",
+        "python-docx",
+        "python-pptx",
+        "mdit-py-plugins",
+        "dynaconf",
+        "attrs",
+        "cssselect",
+        "structlog",
+        "cattrs",
+        "flask",
+        "babel",
+        "anytree",
+        "werkzeug",
+        "html2text",
+        "packaging",
+        "bibtexparser",
+        "treelib",
+        "sqlparse",
+        "python-dateutil",
+        "ftfy"
+      ],
+      "status": "local_completed",
+      "cumulative_project_target_if_prior_stages_passed": 70,
+      "totals": {
+        "projects": 30,
+        "scenarios": 134,
+        "tasks": 192,
+        "modify_tasks": 8,
+        "business_cases": 204,
+        "primary_native_main": 98924,
+        "subtests_separate": 79,
+        "git_files": 8911
+      },
+      "local_commit": "6ca422ab76eb967381b508602246924234065953",
+      "close_result": "blocked",
+      "close_blockers": [
+        {
+          "code": "decision-review-required",
+          "owner": "decision_log.py",
+          "message": "当前 AI 决策摘要尚未获得 accepted review",
+          "detail": {
+            "decisionDigest": "18992685ce9664a1d71b464df287cdd8b2e633dd4963ac808f17c44b6365afee"
+          }
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "task": ".trellis/tasks/10-22-project-catalog-hundred-wave-03",
+      "projects": [
+        "pypika",
+        "arrow",
+        "charset-normalizer",
+        "injector",
+        "loguru",
+        "pyparsing",
+        "markdownify",
+        "pyrsistent",
+        "feedgen",
+        "sortedcontainers",
+        "wtforms",
+        "python-constraint",
+        "feedparser",
+        "portion",
+        "textdistance",
+        "humanize",
+        "bidict",
+        "tablib",
+        "chardet",
+        "natsort",
+        "transitions",
+        "html5lib",
+        "pendulum",
+        "python-liquid",
+        "python-statemachine",
+        "webcolors",
+        "wrapt",
+        "funcy",
+        "collective-icalendar",
+        "sqlglot"
+      ],
+      "status": "local_completed",
+      "cumulative_project_target_if_prior_stages_passed": 100,
+      "totals": {
+        "projects": 30,
+        "scenarios": 121,
+        "tasks": 183,
+        "modify_tasks": 3,
+        "business_cases": 170,
+        "primary_native_main": 85820,
+        "subtests_separate": 24183,
+        "git_files": 8005
+      },
+      "local_commit": "d246f393886538a295d340c0b30ec0c5f1d9b760",
+      "close_result": "blocked",
+      "close_blockers": [
+        {
+          "code": "decision-review-required",
+          "owner": "decision_log.py",
+          "message": "当前 AI 决策摘要尚未获得 accepted review",
+          "detail": {
+            "decisionDigest": "3a7b4b609eef29aa20e91f5c61d861da81d3db3ecb95a94ae36e4b0c3962b233"
+          }
+        }
+      ]
+    }
+  ],
+  "initial_inventory": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred/research/inventory-initial.json",
+    "sha256": "6d9f3b59fe8c787ed7ae4da8d0105487ae0d33cb16a38d10d1ea68c8b4445d87"
+  },
+  "initial_remaining_projects": 90,
+  "current_formal": {
+    "version": "real-project-scenarios-v37-en",
+    "digest": "2905c1d0c58758830db4eead47cbd8a200367283a0ba5fa9b90579279541a297",
+    "projects": 100,
+    "scenarios": 426,
+    "tasks": 726,
+    "kinds": {
+      "understand": 234,
+      "consult": 227,
+      "diagnose": 119,
+      "modify": 37,
+      "plan": 109
+    }
+  },
+  "current_admitted_projects": 100,
+  "newly_admitted_projects": 90,
+  "current_integration_status": "verified",
+  "integration_evidence": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred/research/final-integration-audit.json",
+    "sha256": "665278cfe82f626908b9adaf862a148af5ac250651a599c0de60c23602c296b8"
+  },
+  "pool_direction_gap": {
+    "scenes_to_600": 174,
+    "scenes_to_800": 374,
+    "tasks_to_2000": 1274
+  },
+  "real_model_status": "not_run",
+  "production_status": "not_deployed",
+  "parent_workflow_status_authority": ".trellis/tasks/10-22-project-catalog-hundred/task.json; auto-20261021191233 runner"
+}

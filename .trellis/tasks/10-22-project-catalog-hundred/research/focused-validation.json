@@ -1,0 +1,35 @@
+{
+  "status": "passed",
+  "parsed_task_files": 18,
+  "new_python_helpers": 2,
+  "reused_project_tests": 153,
+  "reused_native_adapter_subset_included": 48,
+  "reused_deploy_tests": 30,
+  "reused_sqlglot_audit_adapter_tests": 6,
+  "unchanged_previous_parsed_python_files": 110,
+  "api_source_sha256_verified": {
+    "orchestrator/main.py": "6c9e1b01e95382b207387a004f54e73586a6d3748d32a7c5c25e15b78b8b580b",
+    "orchestrator/project_library.py": "7afde7739221750a9ecdac9c1e89709ba1d055b631d244c71e8523dcf295263e",
+    "orchestrator/project_iteration.py": "477441991b45c80072958f2687c82c11d70aa865b574d79d033b945254bec35c",
+    "orchestrator/project_scenarios.py": "da69387cde49af3355ad11792e03e32a8b9212b0c67c729cf3a01ac92d00b1eb",
+    "orchestrator/project_scenario_content.py": "8ec2a41382c2a09bd4fd04411cbebd317b0b352cb6651e134f39a6e66b0b4660"
+  },
+  "new_synthetic_api_status": "passed",
+  "new_synthetic_api_main_counts": {
+    "project_iteration_batches": 1,
+    "project_instances": 100,
+    "project_scenario_instances": 426,
+    "project_scenario_tasks": 726,
+    "runs": 0,
+    "project_task_attempts": 0,
+    "project_task_executions": 0,
+    "project_evaluation_jobs": 0,
+    "project_execution_sources": 0,
+    "project_task_deliveries": 0
+  },
+  "known_probe_failure_retained": ".deploy/project-catalog-hundred/final-integration/api-attempt-001/failure.json",
+  "probe_failure_scope": "探针白名单遗漏公开goal字段，按实际源码修正后attempt-002通过；无产品代码改动",
+  "source_diff": [],
+  "real_model_calls": 0,
+  "production_touched": false
+}

@@ -1,0 +1,60 @@
+{
+  "status": "passed",
+  "scope": "真实百项目API、元数据暂停批次及冻结历史读取；不代替原生和产品执行证据",
+  "formal": {
+    "version": "real-project-scenarios-v37-en",
+    "digest": "2905c1d0c58758830db4eead47cbd8a200367283a0ba5fa9b90579279541a297",
+    "projects": 100,
+    "scenarios": 426,
+    "tasks": 726
+  },
+  "api_project_details": 100,
+  "historical_instances": 100,
+  "new_reader_initial_cache_empty": true,
+  "current_unavailable_responses": [
+    503,
+    503,
+    503
+  ],
+  "database_counts": {
+    "project_iteration_batches": 1,
+    "project_instances": 100,
+    "project_scenario_instances": 426,
+    "project_scenario_tasks": 726,
+    "runs": 0,
+    "project_task_attempts": 0,
+    "project_task_executions": 0,
+    "project_evaluation_jobs": 0,
+    "project_execution_sources": 0,
+    "project_task_deliveries": 0
+  },
+  "default_entry_selected_tasks": 726,
+  "execution_calls": 0,
+  "background_threads_started": 0,
+  "evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/final-integration/api-attempt-002/api-observations.json",
+      "sha256": "c982c3f55de04d5c853c723726c7a75faae95296c778a4427d9e0e763ddd02b7"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/final-integration/api-attempt-002/synthetic-db.sqlite",
+      "sha256": "8024d5af4a03cb28301226c17a0097bde89f2e4e5709d136149c72d757339c78"
+    }
+  ],
+  "source_sha256": {
+    "orchestrator/main.py": "6c9e1b01e95382b207387a004f54e73586a6d3748d32a7c5c25e15b78b8b580b",
+    "orchestrator/project_library.py": "7afde7739221750a9ecdac9c1e89709ba1d055b631d244c71e8523dcf295263e",
+    "orchestrator/project_iteration.py": "477441991b45c80072958f2687c82c11d70aa865b574d79d033b945254bec35c",
+    "orchestrator/project_scenarios.py": "da69387cde49af3355ad11792e03e32a8b9212b0c67c729cf3a01ac92d00b1eb",
+    "orchestrator/project_scenario_content.py": "8ec2a41382c2a09bd4fd04411cbebd317b0b352cb6651e134f39a6e66b0b4660"
+  },
+  "script": {
+    "path": ".trellis/tasks/10-22-project-catalog-hundred/research/verify_final_api.py",
+    "sha256": "2e910812df1687692f9202d75c4735604bd7cc7d73c299ce5c9a3a6fec59b400"
+  },
+  "real_model_calls": 0,
+  "real_oauth_calls": 0,
+  "production_touched": false,
+  "temporary_data_removed": true,
+  "elapsed_sec": 51.716
+}

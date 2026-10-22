@@ -1,0 +1,19 @@
+{
+  "result": "passed",
+  "scope": "规划集合、固定来源摘要、三件套和实际context文件，不代表新增项目业务通过",
+  "queue_tasks": 4,
+  "stage_tasks": 3,
+  "projects_per_stage": [
+    30,
+    30,
+    30
+  ],
+  "baseline_projects": 10,
+  "remaining_projects": 90,
+  "target_projects": 100,
+  "research_file_sha_checks": 200,
+  "planning_artifacts_checked": 12,
+  "research_snapshot_unchanged": true,
+  "catalog_unchanged": true,
+  "baseline_manifests_unchanged": true
+}
