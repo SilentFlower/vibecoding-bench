@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "XW-C01",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With strings_to_numbersFalse the identifier remains text00123; enabling it converts to numeric123 and loses leading zeros. write_string keeps the expression-looking label literal with no formula node. Choose explicit text/type policy instead of assuming every numeric-looking identifier should convert.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

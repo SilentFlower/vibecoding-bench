@@ -1,0 +1,1 @@
+Get library.entries_dict from @article{a,title={Original}}. Retain its entry a,clear the returned mapping,then assign retained_entry[title]=Changed. Compare the original library after each operation. Advise a retained audit snapshot policy and distinguish mapping ownership from object/field ownership. No edits.

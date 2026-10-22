@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JM-D01",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Diagnose only consumed evidence. Ask for the expression and actual payload/types. After the complete reproduction, explain projection/index scope and string indexing returning null, then use a pipe to index the projected list when selecting its first ID. If evidence is unavailable, state missing facts and stop without inventing a defect or repair.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

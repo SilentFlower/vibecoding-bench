@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SL-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "capture_logs_replaces_configured_processors_unless_explicitly_supplied": true
+  },
+  "resource_profile": "business"
+}

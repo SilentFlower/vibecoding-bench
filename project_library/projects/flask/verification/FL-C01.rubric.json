@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FL-C01",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default dates become HTTP-date strings with seconds and lose microseconds;Decimal becomesstring1.20. Define aware-time,precision and financial type contracts and use an explicit provider/default or caller-normalized representation. Currentprovider customization already exists; do not claim defaultISO precision or numericDecimal JSON.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

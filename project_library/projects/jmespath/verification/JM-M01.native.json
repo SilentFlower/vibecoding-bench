@@ -1,0 +1,19 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JM-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "nested_json_equality_preserves_boolean_types_and_numeric_controls": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

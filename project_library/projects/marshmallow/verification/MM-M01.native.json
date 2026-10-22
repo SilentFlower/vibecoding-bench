@@ -1,0 +1,19 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MM-M01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "date_rejects_datetime_without_truncation_and_preserves_date_controls": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

@@ -1,0 +1,1197 @@
+{
+  "baseline_digest": "58ae8368593239a7a59176b3932955d4f71b639d7998b0036733562ab680eddf",
+  "nodes": [
+    {
+      "id": "docs/dotexport.rst::dotexport.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/index.rst::index.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/intro.rst::intro.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/tricks/consistencychecks.rst::consistencychecks.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/tricks/multidim.rst::multidim.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/tricks/readonly.rst::readonly.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/tricks/weightededges.rst::weightededges.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/tricks/yaml.rst::yaml.rst",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/exporter/dictexporter.py::anytree.exporter.dictexporter.DictExporter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/exporter/dotexporter.py::anytree.exporter.dotexporter.DotExporter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/exporter/dotexporter.py::anytree.exporter.dotexporter.DotExporter.to_dotfile",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/exporter/dotexporter.py::anytree.exporter.dotexporter.UniqueDotExporter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/exporter/jsonexporter.py::anytree.exporter.jsonexporter.JsonExporter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/exporter/mermaidexporter.py::anytree.exporter.mermaidexporter.MermaidExporter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/exporter/mermaidexporter.py::anytree.exporter.mermaidexporter.MermaidExporter.to_file",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/importer/dictimporter.py::anytree.importer.dictimporter.DictImporter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/importer/jsonimporter.py::anytree.importer.jsonimporter.JsonImporter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/iterators/levelordergroupiter.py::anytree.iterators.levelordergroupiter.LevelOrderGroupIter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/iterators/levelorderiter.py::anytree.iterators.levelorderiter.LevelOrderIter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/iterators/postorderiter.py::anytree.iterators.postorderiter.PostOrderIter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/iterators/preorderiter.py::anytree.iterators.preorderiter.PreOrderIter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/iterators/zigzaggroupiter.py::anytree.iterators.zigzaggroupiter.ZigZagGroupIter",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/anynode.py::anytree.node.anynode.AnyNode",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.ancestors",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.children",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.depth",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.descendants",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.height",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.is_leaf",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.is_root",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.iter_path_reverse",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.leaves",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.parent",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.path",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.root",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.siblings",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/lightnodemixin.py::anytree.node.lightnodemixin.LightNodeMixin.size",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/node.py::anytree.node.node.Node",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.ancestors",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.children",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.depth",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.descendants",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.height",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.is_leaf",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.is_root",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.iter_path_reverse",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.leaves",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.parent",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.path",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.root",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.siblings",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/nodemixin.py::anytree.node.nodemixin.NodeMixin.size",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/symlinknode.py::anytree.node.symlinknode.SymlinkNode",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/node/symlinknodemixin.py::anytree.node.symlinknodemixin.SymlinkNodeMixin",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/render.py::anytree.render.AsciiStyle",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/render.py::anytree.render.ContRoundStyle",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/render.py::anytree.render.ContStyle",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/render.py::anytree.render.DoubleStyle",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/render.py::anytree.render.RenderTree",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/render.py::anytree.render.RenderTree.by_attr",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/resolver.py::anytree.resolver.Resolver.get",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/resolver.py::anytree.resolver.Resolver.glob",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/search.py::anytree.search.find",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/search.py::anytree.search.find_by_attr",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/search.py::anytree.search.findall",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/search.py::anytree.search.findall_by_attr",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/util/__init__.py::anytree.util.commonancestors",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/util/__init__.py::anytree.util.leftsibling",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/util/__init__.py::anytree.util.rightsibling",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "src/anytree/walker.py::anytree.walker.Walker.walk",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cachedsearch.py::test_find",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cachedsearch.py::test_find_by_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cachedsearch.py::test_findall",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cachedsearch.py::test_findall_by_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictexporter.py::test_dict_exporter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictexporter.py::test_dict_exporter_filter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictexporter.py::test_dict_exporter_mixin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictexporter.py::test_dict_exporter_node",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictimporter.py::test_dict_importer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dictimporter.py::test_dict_importer_node",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dotexport.py::test_tree1",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dotexport.py::test_tree2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dotexport.py::test_tree_png",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dotexporter.py::test_esc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dotexporter.py::test_tree",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dotexporter.py::test_tree_custom",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dotexporter.py::test_tree_filter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dotexporter.py::test_tree_maxlevel",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dotexporter.py::test_tree_stop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples.py::test_stackoverflow",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterators.py::test_levelgrouporder",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterators.py::test_levelorder",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterators.py::test_levelordergroup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterators.py::test_postorder",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterators.py::test_preorder",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_iterators.py::test_zigzaggroup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonexporter.py::test_json_exporter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_jsonimporter.py::test_json_importer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_ancestors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_children_setter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_children_setter_large",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_depth",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_descendants",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_detach_children",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_height",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_hookups",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_is_leaf",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_is_root",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_leaves",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_node_children_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_node_children_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_parent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_parent_child",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_post_order_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_pre_order_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_recursion_detection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_root",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_siblings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lightnode.py::test_size",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mermaidexporter.py::test_tree",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mermaidexporter.py::test_tree_custom",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mermaidexporter.py::test_tree_filter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mermaidexporter.py::test_tree_maxlevel",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_mermaidexporter.py::test_tree_stop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_ancestors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_any_node",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_any_node_parent_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_anyname",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_anynode_children_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_children_setter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_children_setter_large",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_depth",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_descendants",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_detach_children",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_eq_overwrite",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_height",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_hookups",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_is_leaf",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_is_root",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_leaves",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_node_children_init",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_node_children_multiple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_node_children_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_node_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_node_parent_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_parent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_parent_child",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_post_order_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_pre_order_iter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_recursion_detection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_root",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_siblings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_size",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::test_tuple_as_children",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_attach_detach.py::test_children_setter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_attach_detach.py::test_detach_children",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_attach_detach.py::test_parent_child",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_integrity.py::test_readonly_pre",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_sep.py::test_get",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_sep.py::test_glob",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_sep.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_symlink.py::test_symlink",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_pickle.py::test_pickle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_asciistyle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_by_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_controundstyle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_contstyle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_doublestyle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_maxlevel",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_render_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_render_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_render.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_get",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_get_relaxed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_glob",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_glob_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_glob_consistency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_glob_consistency_relax",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_glob_relaxed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_ignorecase",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_resolver.py::test_same_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::test_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::test_find",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::test_find_by_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::test_findall",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::test_findall_by_attr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_ancestors__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_ancestors__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_children__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_children__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_children__setter__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_children__setter__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_depth__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_depth__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_descendants__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_descendants__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_height__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_height__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_is_leaf__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_is_leaf__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_is_root__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_is_root__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_iter_path_reverse__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_iter_path_reverse__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_leaves__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_leaves__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_parent__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_parent__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_parent__setter__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_parent__setter__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_path__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_path__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_root__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_root__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_siblings__child2b",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestConsistency::test_siblings__root1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestMyMapping::test_getitem",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestMyMapping::test_iter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_special_methods_access.py::TestMyMapping::test_len",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_uniquedotexporter.py::test_esc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_uniquedotexporter.py::test_tree",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_uniquedotexporter.py::test_tree_custom",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_uniquedotexporter.py::test_tree_filter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_uniquedotexporter.py::test_tree_maxlevel",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_uniquedotexporter.py::test_tree_stop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_util.py::test_commonancestors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_util.py::test_leftsibling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_util.py::test_rightsibling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_walker.py::test_walker",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "test2ref",
+      "module": "test2ref._pytest_plugin",
+      "module_sha256": "fc0f01e50cea1c3fbc733d994393cc6aa2e7eb96f290cb8e35cefec3c90804bc",
+      "version": "1.3.0"
+    }
+  ],
+  "project": "anytree",
+  "python": "3.12.15",
+  "schema": 1
+}

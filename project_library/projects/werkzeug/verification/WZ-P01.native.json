@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WZ-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "reading_stream_data_eagerly_consumes_and_caches_but_close_hooks_require_close": true
+  },
+  "resource_profile": "business"
+}

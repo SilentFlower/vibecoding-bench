@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WZ-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "typed_getlist_omits_invalid_items_and_flat_mapping_keeps_first_only": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FL-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "prefixed_env_loading_can_leave_earlier_writes_after_a_nested_type_error": true
+  },
+  "resource_profile": "business"
+}

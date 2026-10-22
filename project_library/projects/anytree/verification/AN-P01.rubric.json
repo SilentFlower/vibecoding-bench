@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AN-P01",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "JsonExporter(maxlevel1) assigns that value into the supplied DictExporter; subsequent reuse remains truncated atroot. A fresh full exporter retainschildren/grandchildren. Own exporters per intended scope/depth,avoid shared mutable configuration and verify complete expected topology/artifact before publication. No universal rollback or concurrent safety is promised.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

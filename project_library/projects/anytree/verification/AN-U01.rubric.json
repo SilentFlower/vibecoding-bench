@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AN-U01",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Cycle validation rejects root->a1 before detaching root; valid reparenting moves the same a1 identity froma tob afterb1 and updates its path. Duplicate child identity is rejected with the originalroot children retained. These controls do not prove arbitrary custom hook or multi-node transaction rollback.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

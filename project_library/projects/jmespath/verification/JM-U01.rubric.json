@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JM-U01",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Projection yields[A,0,false], while map yields[A,null,null,0,false]. Projection removes null results, not all false-like values. Choose the declared positional versus compact export shape; neither form alone establishes required-field validation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

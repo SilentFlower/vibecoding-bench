@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "crossref_is_retained_without_automatic_parent_field_inheritance": true
+  },
+  "resource_profile": "business"
+}

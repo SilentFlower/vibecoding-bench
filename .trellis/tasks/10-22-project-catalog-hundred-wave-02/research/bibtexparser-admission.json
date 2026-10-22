@@ -1,0 +1,146 @@
+{
+  "project": "bibtexparser",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "source_file_count": 89,
+  "license_files": [
+    "seed/library/LICENSE"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 7,
+  "modify_tasks": 0,
+  "non_modify_tasks": 7,
+  "native_baseline": {
+    "project": "bibtexparser",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/bibtexparser/result.json",
+    "result_sha256": "a24ba1be0cadc28e4971574ed4e31fdd5d74004c7df983ef1987f118af4b053a",
+    "main_collected": 2831,
+    "counts": {
+      "passed": 2819,
+      "failed": 0,
+      "error": 0,
+      "skipped": 12,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 2831,
+    "xml_skipped": 12,
+    "runner_sha256": "332c782b777a1c24e647d133a86154140a92760a68e59ae791084540191420a1",
+    "contract_sha256": "2ba804c6899c988d30c905221e5ad70ae1c6f98156e24768c4fa03622001d7a7",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 6,
+  "native_evidence": [
+    {
+      "case": "original-BT-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/bibtexparser/attempt-001/original-BT-C01.json",
+      "sha256": "d01be5339d525dd9c339615d5809a8b1a5a0bac4bbe59e5644a6707b5e516a04",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-BT-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/bibtexparser/attempt-001/original-BT-C02.json",
+      "sha256": "5feda2c7bbc8fd2b64d5ad0e24e2e9c259097287d75de5eb7fca41ae307bade3",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-BT-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/bibtexparser/attempt-001/original-BT-P01.json",
+      "sha256": "ee5081d4010ef79439d44c374ee6fe5d25cd3b22804a967c4cbe65a7f401823c",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-BT-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/bibtexparser/attempt-002/original-BT-U01.json",
+      "sha256": "fd5165dd98ee1d263cf13b98acf70530161dbbb2afd676effef1288f7a97cb0b",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-BT-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/bibtexparser/attempt-001/original-BT-U02.json",
+      "sha256": "bfba6013f9a21c1db25a1789e94e2eeec645c3eb946e886d3157daf0adb3f499",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-BT-U03",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/bibtexparser/attempt-001/original-BT-U03.json",
+      "sha256": "0d8030294b2c74133c94e8889da8053b39f3ed74a7d7604dd464adedf4d3689c",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/bibtexparser/attempt-001/summary.json",
+      "sha256": "8b43bd85355db86b6904ee448cfedcc163cedb06f4695fae7d8d6ddbdef5fe60",
+      "passed": false
+    },
+    {
+      "attempt": 2,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/bibtexparser/attempt-002/summary.json",
+      "sha256": "90cab01bf568a25c966d314771592b8f3b29f2b56a9c62ed59b068dc53b9a1c4",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v24-en",
+  "formal_digest": "6e6206d691130f74396a27a1234f9aaa72494f80cefaa7df0e1c596a101238c9",
+  "full_delivery_files": 22623,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-013/run-001/evidence/result.json",
+      "sha256": "6fdc73136d4d13e969aa82e6f5f17ad7f9986e6458d446f6d0f5a66879987c9d"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-013/run-001/cleanup.json",
+      "sha256": "094d7a4a6d8e34db2956e2940e753b8e4bb00e222413ce70ab2befbb6dbf088b"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/mock-batch-013-audit.json",
+      "sha256": "52a015239d3af0656a219e4ed7dd57fe80baa52bb67ebbc06d235b1d6b810367"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-013/browser/run-001/diagnostics/result.json",
+      "sha256": "5ae6ac39442370d6ba2b74ef4f15b6c88d725eef68ee9652359d6324b34d8544"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/delivery-all-thirty.json",
+      "sha256": "c481d815e82e29b6f8b503380cdc867441a214f99f4be1260ed1e59edf30c028"
+    }
+  ]
+}

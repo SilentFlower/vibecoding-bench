@@ -1,0 +1,278 @@
+{
+  "schema": 2,
+  "project_key": "confuse",
+  "title": "Confuse分层配置工作场景",
+  "category": "YAML配置与源归属",
+  "description": "真实优先级、类型、环境快照、脱敏、发布和单文件重载七项独立任务。",
+  "seed_digest": "c04ba316aeae924e01b78c32d9b26c573804551f9ea771a6096b309522fca69b",
+  "environment": "confuse-py312",
+  "source": {
+    "repository": "https://github.com/beetbox/confuse",
+    "commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CF-S01",
+      "title": "配置层和类型政策",
+      "goal": "正确投影优先级并选择计数校验",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CF-U01",
+            "CF-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-U01",
+          "kind": "understand",
+          "goal": "区分优先级查值和完整配置投影",
+          "prompt": "Trace all complete layered-source controls and give the exact mapping shapes. Do not load discovered files or edit the project.",
+          "requires": [],
+          "materials": [
+            "materials/layers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CF-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CF-C01",
+          "kind": "consult",
+          "goal": "为工作进程数选择显式类型政策",
+          "prompt": "Explain the complete integer-template controls and advise a strict bounded count policy without changing library files.",
+          "requires": [],
+          "materials": [
+            "materials/types.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CF-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CF-S02",
+      "title": "环境快照",
+      "goal": "在明确合成输入下追踪类型和刷新归属",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CF-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-U02",
+          "kind": "understand",
+          "goal": "追踪环境覆盖的类型和快照时点",
+          "prompt": "Trace only the complete cleared synthetic environment and file-reload controls. Explain actual values and which component owns refresh; do not inspect a real environment.",
+          "requires": [],
+          "materials": [
+            "materials/environment.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CF-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CF-S03",
+      "title": "诊断投影",
+      "goal": "明确脱敏显示和原值访问的边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CF-C02",
+            "CF-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "CF-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CF-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-C02",
+          "kind": "consult",
+          "goal": "为诊断输出选择脱敏投影",
+          "prompt": "Meet the complete synthetic diagnostic requirement using current redaction support. State the actual remaining access boundary without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/redaction.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CF-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CF-D01",
+          "kind": "diagnose",
+          "goal": "先核来源和原始类型再定位整数校验失败",
+          "prompt": "A retries setting displayed as3 fails integer validation. Request the exact source construction, raw value/type and template before diagnosing. Use only consumed evidence and do not change library files.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CF-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "source-type-evidence",
+              "when": "The exact source, raw value/type and template have not been supplied or declared unavailable, and the user is reasonably asked for sufficient reproduction evidence.",
+              "materials": [
+                "disclosure/types.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "CF-S04",
+      "title": "配置发布计划",
+      "goal": "按真实部分更新行为规划完整发布",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CF-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-P01",
+          "kind": "plan",
+          "goal": "规划跨文件配置的整体验证后发布",
+          "prompt": "Plan the complete reload/publication requirement from the observed partial update. Keep ownership and per-source versus all-source guarantees explicit; no implementation.",
+          "requires": [],
+          "materials": [
+            "materials/publication.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CF-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CF-S05",
+      "title": "文件源重载",
+      "goal": "按明确授权修复删除项残留并保留失败现场",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CF-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-M01",
+          "kind": "modify",
+          "goal": "修复文件重载后已删除配置仍残留",
+          "prompt": "Implement only the explicitly authorized single-source replacement repair and public regressions. Preserve all stated parsing, identity and compatibility boundaries.",
+          "requires": [],
+          "materials": [
+            "materials/reload-repair.md"
+          ],
+          "allowed_paths": [
+            "library/confuse/sources.py",
+            "app/test_reload.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CF-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

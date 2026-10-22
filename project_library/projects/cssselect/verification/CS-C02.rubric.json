@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CS-C02",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "HTMLTranslator matches the supported serialized checked checkbox and selectedoption,not the textinput carryingchecked. GenericTranslator treats this dynamic pseudo-class as never matching. This is attribute-based static-tree interpretation,not a browser runtime property or current user interaction state.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MD-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "footnotes_render_only_referenced_definitions_with_backlinks_and_configurable_inline_syntax": true
+  },
+  "resource_profile": "business"
+}

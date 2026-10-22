@@ -1,0 +1,1 @@
+Order declares sku=String(required=True,data_key="product") and qty=Integer(required=True,strict=True,validate=positive). The trusted positive callback raises ValidationError for values<=0. Compare dump({sku:A,qty:-2}) and load({product:A,qty:-2}). Explain why a serialized object is not certified by load validators. No implementation.

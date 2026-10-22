@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SJ-P01",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The supplied empty-SKU/negative-quantity document is syntactically valid and parses unchanged. Bound bytes/work before or during the chosen acquisition path, establish strict JSON/duplicate policy, validate business fields/types/bounds separately, and publish only a fully validated owned value. Parsing itself provides neither the order schema nor a publication transaction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

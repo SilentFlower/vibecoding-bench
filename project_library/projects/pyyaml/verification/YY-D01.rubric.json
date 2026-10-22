@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "YY-D01",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use supplied text and actual error only. With complete evidence identify the undefined missing alias within the document and distinguish zero-based mark fields from one-based display. Do not infer encoding or parser corruption from a partial symptom; unavailable evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

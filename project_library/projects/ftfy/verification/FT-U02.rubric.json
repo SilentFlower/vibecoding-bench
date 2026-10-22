@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FT-U02",
+  "source_commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "fix_text segments by lines: the first amp decodes,the HTML line disables automatic entity unescaping and the later amp stays escaped. Whole-string fix_and_explain sees< and preserves all entities. ExplicitTrue decodes both. Choose document/segment policy deliberately; do not claim universal per-line resetting or that the two entrypoints have identical auto scope.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

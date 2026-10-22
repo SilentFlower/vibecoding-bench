@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AT-P01",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The validator attached only to end does not run when start changes,so stepwise updates expose20,10 before20,30. Construct/evolve a separate complete proposed object and publish only on successful validation; failed evolve(start20) leaves a fresh original0,10 untouched. Coordinate external ownership/concurrency; attrs field hooks provide no multi-field transaction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

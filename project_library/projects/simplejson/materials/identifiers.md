@@ -1,0 +1,1 @@
+A synthetic invoice has invoice=9007199254740993 and small=5. Compare default serialization with bigint_as_string=True and the actual decoded wire types. The receiving contract may accept a decimal identifier string and must preserve exact IDs; choose an explicit producer/consumer contract without claiming a JavaScript engine was run or changing the library.

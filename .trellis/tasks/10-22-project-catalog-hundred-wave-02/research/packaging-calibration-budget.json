@@ -1,0 +1,38 @@
+{
+  "project": "packaging",
+  "regression_memory_mb": 1024,
+  "business_memory_mb": 256,
+  "reason": "固定原生默认63338项，已有同CPython3.12.15容器最大RSS551868KiB，超过512MiB。保留全部默认集合及上游434项opt-in排除，不删测试。",
+  "historical_baseline": {
+    "exit_code": 0,
+    "elapsed_sec": 61.574,
+    "source_commit": "1a62a26afe0f4881593e31bed4f7753bd1c8fe27",
+    "image": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-39482854683-1",
+    "network": "none",
+    "user": "1000:1000",
+    "memory": "768m",
+    "oom_killed": false,
+    "read_only": true,
+    "private_account_home_mounted": false,
+    "test_arguments": [
+      "tests"
+    ],
+    "scope": "原生pytest适用集合，原样运行上游源码和测试",
+    "max_rss_kib": 551868,
+    "container_removed": true,
+    "tests": 63338,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 3,
+    "passed": 63335,
+    "pytest_elapsed_sec": 58.33
+  },
+  "current_target_status": "attempt-003-passed",
+  "regression_timeout_sec": 600,
+  "current_attempt_evidence": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/packaging/result.json",
+  "current_observation": "150秒脚本执行到77%，未OOM；完整逐阶段钩子和并发负载均保留，扩大有限回归时限再测，不改变集合。",
+  "second_attempt_evidence": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/packaging/result.json",
+  "second_observation": "当前768MiB完整测试到100%，保存逐阶段原始证据时容器OOM，原件全部保留。只扩有限回归内存至1024MiB重跑，业务仍256MiB。",
+  "successful_attempt": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-003/packaging/result.json",
+  "elapsed_sec": 81.483289
+}

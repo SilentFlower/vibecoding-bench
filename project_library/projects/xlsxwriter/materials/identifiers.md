@@ -1,0 +1,1 @@
+An inventory export must preserve identifier00123 as text and an expression-looking label=1+2 as literal text. Compare write of00123 with strings_to_numbers=False/True and write_string of the label. Inspect actual XLSX cell types/shared strings. Choose explicit existing APIs/options,without a numeric conversion claim or library edit.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-C01",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Frame-wide replacement discards old runs and direct bold becomesNone; replacing only a run text retains its direct bold. Use deliberate run-aware replacement with an explicit cross-run policy and distinguish directNone from effective inherited formatting.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

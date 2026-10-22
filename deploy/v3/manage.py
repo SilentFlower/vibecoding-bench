@@ -224,7 +224,87 @@ def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
     :return: 仍应排除的名称集合。
     """
     ignored = set(shutil.ignore_patterns('.git','target','node_modules','__pycache__','.env','.env.*','*.log')(directory,names))
+    if not ignored:
+        return ignored
+    resolved_directory = Path(directory).resolve()
     public_files = {
+        'project_library/projects/flask/seed/library/tests/test_apps/.env': '3739562018bb8d8aeddbb540fb4c53e61af5385fb4d3b613e784057c3129ccc0',
+        'project_library/projects/dynaconf/seed/library/tests/.env': '5c3cc246f660d747b5e4941403b45417a22707abea4f3e5dadecf4725eb3fbc7',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/1000_django_attribute_error/flab/.env': 'e62ccfcf912f860db8cd4b8740c556d5c9bbad47a6dd6d4d3ee1262359f9f303',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/160_path_traversal_fixed/.env': 'a9b9a1244196b0fe2149c93bccad4f00a6ca8bf7d29f3a682c2a5a9068bf42d8',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/166_renamed_global_env/.env': '0229f7106eee0bd601c3fa39c3de1a41971b987bf23b0a383db4d5925d680306',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/169_renamed_settings_module/.env': 'e84d120432819718be12a0a10e2e0d3fd49545876cd10e873bc4a6f345c55bde',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/182_multiple_locations/.env': 'd4eb6ec91dd0d24ea2a7ef86c777b468b0793a2c5a16fbb83e877a76aac36e2a',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/184_ipython/.env': '9ffe566fe25f5f9e9b19f2ab91b087ebfe9fef1082941bbce1f8d11400d86387',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/251_dotted_unexistent/.env': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/266_envvar_from_env_override/.env': '49005ce7e9f1f46c93b733a264d56cba7e4597fb4d903f01b73f3c9556adacc0',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/288_null_values/.env': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/306_merge_replace/.env': '691936f8ca331c4f3d7009cbd014f95f8d209cf567b7f46f9889a809cd4f29df',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/325_flask_dot_env/.env': '9eeb72df365e38d96f31a5b19d3e0ee10f281f2f298804d47086e8a75ae97561',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/392_evaluate_nested_structures/.env': '1c3fb8ac784b1c8b6f39f4ff84c4c062c36150f773958e914fe63df5065a0d0c',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/445_casting/.env': 'f24ec21448bcda7101281e886add47b28ff17ecb029dc243187996c25c4db083',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/449_django_lazy_path/.env': '4932857a4ec6e345c34b530700b2202481adfac420f74796b7f5e15e199db7a4',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/709_yaml_merge_with_env/.env': '26a9bc4e3b771bd2d2958b302e57f214108ff9d9b8015bfd083a7e0b8dfbe425',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/720_load_dotenv/.env': '9fb182573df36d42a8b77ce7c515b48f3499e5c2feb609b6af8e625e832189ce',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/722_docs_example/.env': '957bb29c65b70164bb403b5bf811d51c08bb026d5b37bbd5c9da7fbdd17a2761',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/869_order_break_parsing/.env': '8f9040d468d689f9934a8a656ca785e914647e3a189e887c4359e45496a6d47a',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/905_item_duplication_in_list/.env': 'c89405332a78bf9e65bca90701f60cdd27053143d3bc9a2c3c97792b9890843a',
+        'project_library/projects/dynaconf/seed/library/tests_functional/issues/976_True_False/.env': '473b8e8350d254cb005cc67be4cac06bda12956fb8e7ca828425263a3b08cecc',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/app/.env': '777264dd18df422f8f794521bfa9d4df6cdee25e92232c8f1ce636a342939152',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/app_with_dotenv/.env': 'dd3ac49c2cbfda9301488d9425e6edee7c2caf5245547c5929d75c22369ecf88',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/cli_override_argparse/.env': '0135c01d8fad3a5477cb375ae264a1e81626a3d12f1a1b6c13430d2a0f5f0c1b',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/click_override_generic/.env': '0135c01d8fad3a5477cb375ae264a1e81626a3d12f1a1b6c13430d2a0f5f0c1b',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/click_override_strict/.env': '0135c01d8fad3a5477cb375ae264a1e81626a3d12f1a1b6c13430d2a0f5f0c1b',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/common-encoding/.env': 'b4a0a86f86306fc14a142b417f45764d75132fff17beb8def426864d885ab517',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/common/.env': '2ca58783ea2282fe761a9ce7bd21a8897fee85b265186a065f734e09773aa826',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/configure/.env': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/custom_loader/.env': '604fec6743fb6b1db43136024026e0ca71df11fdc0e9f10046860cbc7f5995ba',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/django_example/.env': '47e710094502b1d017cde94894653b2b68b9d34f10c3dc456a7947284d2d7372',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/django_example_compat/config/.env': '1b853d29356f6dc86627b414f6945e1f4894b2d7309e4c28d6fdf99e834aa91e',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/django_pytest/.env': '5779d55a759783a5f8079440516e9825ae454dd1985d955ecf21711d4a7fa865',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/django_pytest_pure/.env': '5779d55a759783a5f8079440516e9825ae454dd1985d955ecf21711d4a7fa865',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/dotenv_loaded_if_enabled/.env': 'fa5cf748bd367b3dabe85045d1273bb0b1dcc9ceaf8c9f4bb60717adf586eb89',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/dotenv_not_loaded_by_default/.env': 'fa5cf748bd367b3dabe85045d1273bb0b1dcc9ceaf8c9f4bb60717adf586eb89',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/dunder/.env': '68de277b7faac289daddce616619cb8c5c4fdc7576303a5019294fcac09ca14c',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/dynaconf_merge/.env': 'a0ea99115067c7650fcbc8818be325163e36e3846a2374ef2839014d6d824ef5',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/envless_mode/.env': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/envs/.env': '0135c01d8fad3a5477cb375ae264a1e81626a3d12f1a1b6c13430d2a0f5f0c1b',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/envvar_prefix/.env': '18c5c779c2829542389819287f0c984c875358d9e839aba5ad360c9550dc8478',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_commentjson/.env': '5f9b2db8725ff94f0044b2014207940e467dfd1e8cda03f9e795902d2c618cf0',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_dotenv/.env': 'e30fe4b9213098276e35cc6feb3eb0272b320d790dd1183465289249f0fd7402',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_ini/.env': 'dcf76abbc07bf6beb82a4a36dfb4ba5a03a96b0faedb4f4e0a95db6ba8ae807b',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_json/.env': '5f9b2db8725ff94f0044b2014207940e467dfd1e8cda03f9e795902d2c618cf0',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_toml/.env': '2d4bcf2d190e07c22851f6ea5abe1849d7fd07614ed7eb908e009081610bbfcd',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_yaml/.env': '69153361d3fb50521ad5397496fcd63947516c9cb26283bb0cb7d69d3d64e612',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/format/.env': '987c3d50275cdb9d2e6823f5c1b88b14dbefd8306393d80d969de9498e96e873',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/full_test/.env': 'a33c054fd2411de64c598b95772568b0cb002030a779c0b4134a8f515b77a897',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/get_fresh/.env': '013f1cdd3bb493ecb44e6b7de45c12e49cd824549b60ce88675426506c92e1cb',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/ignore_unknown_envvars/.env': 'a095f1b4ee7ec5afd2b0c3460d2e6e2addeff92fd1915d8de2da335a1a69d92a',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/includes/.env': '8bdf408c5501870c23a73d95b9126bd1fd0f1cfea8df164815772c25ed692a68',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/inspect_load_file/.env': '64b306e5c39312aac90264977abd64595d958c3449c31d6a18357b400665719a',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/jenkins_secrets_file/.env': '6dd40a0c163bd54ea642e63b862fc4ccaa19985a77a4f6c46f287d3d4384fb6e',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/lower_read/.env': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/merge_enabled/.env': 'a7697a76bcaae02abc275224488fb26faa831557f4dde7a2e541b3aa0f5699ec',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/multiple_folders/.env': '1a1aa200b1b7a07eaa458850629cf2b00e3e6d764c23e9fd86a78d266dc016f1',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/multiple_sources/.env': 'd4f7af5f3402082ff774aad637160177d13f36969c1f36dcd075535e72ba00c7',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/new_merge/.env': '23f6540b77c6a73e90b853ec7038a4d6693daeb203c66e43f77ef4d6327b690c',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/overriding/.env': 'ed6d3329b9cc48f000b596a6a73ac2b02f57f6b7426bdd5e9152272cd372a5b8',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/project_root/.env': '52adfb8982be5c8de00b9f7235e2de524c7d5e47c7b726ee013ce90f3d7d9d0a',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/pytest_example_app/.env': '49005ce7e9f1f46c93b733a264d56cba7e4597fb4d903f01b73f3c9556adacc0',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/pytest_example_app/flask/.env': '49005ce7e9f1f46c93b733a264d56cba7e4597fb4d903f01b73f3c9556adacc0',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/redis_example/.env': '710efa7d556f1172ad51de9ee153847f90ee38327afda7cc0638c89623279998',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/settings_file/.env': '8ddf66fb8d7fa9e591b23ba1632f3ecb52b0d483c3cf3ce39b12032ebe68a109',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/simple/.env': 'e62ccfcf912f860db8cd4b8740c556d5c9bbad47a6dd6d4d3ee1262359f9f303',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/specific_settings_files/.env': '29b9e102a1e2b581dffb52c4e34f767e6d6e231cfc90b7f607ec4ff307814024',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/toml_with_secrets/.env': '0992caaadfe002b46e00273e92892011cc4ec9502d25431412ed279cacb89e42',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/validators_with_python/.env': '4437bd40a1d9bcd916663d5595994eab50ff1b3878c0fa6aa2ed672af23fb34f',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/validators_with_toml/.env': 'e62ccfcf912f860db8cd4b8740c556d5c9bbad47a6dd6d4d3ee1262359f9f303',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/vault/.env': '52405048c114c1aa8b0d36171e7d4edad25fdd4cf88aa2c60094679b94e4d288',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/vault_userpass/.env': '3bd6c1109997ef027781aed231b3df3294e8ffffbee912706ffdb4879cc9ddbf',
+        'project_library/projects/dynaconf/seed/library/tests_functional/legacy/yaml_example_extra/.env': '0a32f4b57721bd92cffa3a6476f04a1d3a57256676bd8e743d9e45bf568cf5f9',
+        'project_library/projects/dynaconf/seed/library/tests_functional/typed/insert/.env': '73b186119c0fa30eb8c78c657677b16c81a9a51cd787e01db16ecbd49fa9d3a2',
+        'project_library/projects/dynaconf/seed/library/tests_functional/typed/multiple_env_prefixes/.env': '3791bbb81301bae0152fc29883f47819169c1fcfacb75aaa25b0012bdbfcf2ed',
+        'project_library/projects/dynaconf/seed/library/tests_functional/typed/typed_with_dotenv_toml_secrets_validator_condition/.env': '732727f96268ea4f43da98dfe138190db42d511b0ec5e2a2c2452d4ead64132e',
         'project_library/projects/typer/seed/library/.env': '81b463a540ebc72b1d4afbc954d5247146344f986e7d842a82e032b7e08ecb2f',
         'project_library/projects/python-decouple/seed/library/tests/autoconfig/env/.env': '5b7f07de0fa0896faddd64c9f23966f5e0b611a3ff515beb3e2c82e3a2452a5b',
         'project_library/projects/python-decouple/seed/library/tests/autoconfig/env/custom-path/.env': 'b4eea58127083a24664bccf4cf4b278aca8804070a1384bf86ea4403c26af095',
@@ -246,7 +326,7 @@ def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
     }
     for relative, checksum in public_files.items():
         public = REPO / relative
-        if Path(directory).resolve() == public.parent and public.name in ignored:
+        if resolved_directory == public.parent and public.name in ignored:
             if public.is_symlink() or hashlib.sha256(public.read_bytes()).hexdigest() != checksum:
                 raise ValueError('固定上游公开文件摘要不符')
             ignored.remove(public.name)
@@ -257,11 +337,51 @@ def source_snapshot_ignore(directory: str, names: list[str]) -> set[str]:
     }
     for relative, checksum in public_directories.items():
         public = REPO / relative
-        if Path(directory).resolve() == public.parent and public.name in ignored:
+        if resolved_directory == public.parent and public.name in ignored:
             if _public_source_directory_digest(public) != checksum:
                 raise ValueError('固定上游夹具目录摘要不符')
             ignored.remove(public.name)
     return ignored
+
+
+def restore_upstream_checkout_bytes(root: Path) -> list[str]:
+    """在交付副本中恢复已核上游 Git 行尾转换，保留固定源码 blob 的原始字节。
+
+    :param root: 完整源码副本根；调用者不得传入生产数据目录。
+    :return: 本次实际恢复的相对路径；未知内容或链接拒绝，不泛化转换其它文件。
+    """
+    originals = {
+        'project_library/projects/python-dateutil/seed/library/NEWS': (
+            '9e3ee1f3d960cc0cf7e823abb665cc43fc879330e175b8267a3b5cdc5627a3c5',
+            '2619c43f820d1f8f8cf3c2ad698ceaf2529baf88482a83164471d9f4d00d6a6e'),
+        'project_library/projects/python-dateutil/seed/library/docs/make.bat': (
+            'd853adea8f9e9c2b5e67a443114b4e940764d1856a104ff3e79598212c73a0b7',
+            '85cb8f97fa68e42e6bf11747fae73a7ed0a52a4cfb98d9909d4ba91e41b8cd4a'),
+    }
+    pending = []
+    for relative, (original_sha, checkout_sha) in originals.items():
+        path = root / relative
+        if root.is_symlink() or path.is_symlink():
+            raise ValueError('固定上游行尾原件不能是链接')
+        if any((root / parent).is_symlink() for parent in Path(relative).parents):
+            raise ValueError('固定上游行尾原件不能沿父目录链接读取')
+        if not path.exists():
+            continue
+        if not path.is_file():
+            raise ValueError('固定上游行尾原件必须是普通文件')
+        content = path.read_bytes()
+        checksum = hashlib.sha256(content).hexdigest()
+        if checksum == original_sha:
+            continue
+        # 上游属性显式指定 CRLF；只接受完整文件的已核转换结果，不能掩盖源码修改。
+        restored = content.replace(b'\r\n', b'\n')
+        if checksum != checkout_sha or hashlib.sha256(restored).hexdigest() != original_sha:
+            raise ValueError('固定上游行尾原件摘要不符：' + relative)
+        pending.append((relative, path, restored))
+    # 全部校验后才写本次副本；拒绝后一文件时不会留下部分恢复。
+    for _, path, restored in pending:
+        path.write_bytes(restored)
+    return [relative for relative, _, _ in pending]
 
 
 def build(release: str, manifest_path: Path) -> None:
@@ -287,6 +407,7 @@ def build(release: str, manifest_path: Path) -> None:
         for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md"):
             (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO / relative, snapshot / relative)
+        restore_upstream_checkout_bytes(snapshot)
         digest = hashlib.sha256()
         for path in sorted(item for item in snapshot.rglob("*") if item.is_file()):
             digest.update(str(path.relative_to(snapshot)).encode())

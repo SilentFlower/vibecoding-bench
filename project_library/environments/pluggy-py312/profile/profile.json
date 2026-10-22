@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "id": "pluggy-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "coverage==7.16.2",
+    "pytest-benchmark==5.3.0",
+    "py-cpuinfo2==10.1.1"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d",
+      "size": 258571
+    },
+    {
+      "path": "artifacts/pytest_benchmark-5.3.0-py3-none-any.whl",
+      "digest": "920ab1dfcffa718d49aa15ba144c7e357bda59216a0dc308016cc1c7236f719d",
+      "size": 48401
+    },
+    {
+      "path": "artifacts/py_cpuinfo2-10.1.1-py3-none-any.whl",
+      "digest": "adc53396bfb206e6498d078ec2ab407f85799ecd819584ac36a8f80a2d4d762d",
+      "size": 23791
+    }
+  ],
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "verification_status": "verified_target_runtime"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DX-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "comment_runs_must_belong_to_the_target_document_before_publication": true
+  },
+  "resource_profile": "business"
+}

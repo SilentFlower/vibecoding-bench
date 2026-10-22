@@ -1,0 +1,1 @@
+A PluginManager("warehouse") has a render(value) spec. Register ordinary A,tryfirst First,ordinary B,trylast Last in that order. A/B/First return their name plus valueX; Last records its call and returnsNone. Trace result order and Last execution. Do not invent a before/after dependency graph or sort plugins alphabetically. No edits.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MM-U01",
+  "source_commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "load produces label:A and secret:SYNTHETIC; dump produces displayName:A and ident7 with no secret. ident is not a load field and default unknown policy rejects it. data_key maps the external name, attribute the internal value; these directions are explicit projections, not automatic protection of arbitrary logs.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

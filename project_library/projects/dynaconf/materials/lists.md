@@ -1,0 +1,1 @@
+Set NESTED to {items:[1,2]},read first=settings.NESTED[items],append3 to first,then read again and compare values/identity. Separately assign [1,2,3] using settings.set("NESTED.items",...,validate=False). The caller wants a persistent configuration update. Advise explicit replacement and validation,not live-view mutation assumptions; no edits.

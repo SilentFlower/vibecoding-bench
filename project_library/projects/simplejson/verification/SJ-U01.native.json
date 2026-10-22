@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SJ-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explicit_decimal_mode_preserves_local_money_representation": true
+  },
+  "resource_profile": "business"
+}

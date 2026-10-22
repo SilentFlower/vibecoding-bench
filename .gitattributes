@@ -9,7 +9,7 @@
 .trellis/workspace/*/journal-*.md merge=union
 
 # 固定项目内容按字节校验，保留上游行尾和原始输出。
-project_library/** -text
+project_library/** -text eol=lf
 # 本任务的冻结样本与校准证据使用相同的字节保留规则。
 .trellis/tasks/10-21-project-scenario-workflows/research/** -text
 # 首批扩容内容的来源研究与实际验收证据保留原始字节。

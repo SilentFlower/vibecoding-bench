@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "anytree",
+  "title": "AnyTree分类树工作场景",
+  "category": "结构、路径与导出归属",
+  "description": "节点迁移、遍历裁剪、同名定位、快照归属、预览配置和节点表示诊断六项只读任务。",
+  "seed_digest": "e543fef9531643095cbb40ec62663be9a5e0bb1b75256cde8293f8f0fcbf1425",
+  "environment": "anytree-py312",
+  "source": {
+    "repository": "https://github.com/c0fec0de/anytree",
+    "commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "AN-S01",
+      "title": "结构迁移与遍历",
+      "goal": "明确节点身份、守卫和裁剪政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AN-U01",
+            "AN-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-U01",
+          "kind": "understand",
+          "goal": "明确节点迁移与现有结构守卫",
+          "prompt": "Trace all complete move/cycle/duplicate controls and explain their bounded guarantees. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/moves.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AN-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AN-U02",
+          "kind": "understand",
+          "goal": "区分隐藏节点与裁剪整棵子树",
+          "prompt": "Meet the complete category traversal requirement using existing options without edits.",
+          "requires": [],
+          "materials": [
+            "materials/iteration.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AN-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AN-S02",
+      "title": "业务定位",
+      "goal": "明确同名与稳定身份政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AN-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-C01",
+          "kind": "consult",
+          "goal": "为同名分类建立明确的业务定位政策",
+          "prompt": "Advise unambiguous lookup from complete get/glob/order controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/paths.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AN-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AN-S03",
+      "title": "导出归属",
+      "goal": "核快照引用与预览配置",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AN-C02",
+            "AN-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-C02",
+          "kind": "consult",
+          "goal": "为树导出建立完整的快照归属",
+          "prompt": "Advise immutable retention from the complete nested-identity controls without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/ownership.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AN-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AN-P01",
+          "kind": "plan",
+          "goal": "规划预览与完整导出的配置归属",
+          "prompt": "Plan the complete mixed-depth export requirement from actual shared/fresh exporter controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/export-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AN-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AN-S04",
+      "title": "节点表示诊断",
+      "goal": "取得节点和导出器的完整证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AN-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "AN-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-D01",
+          "kind": "diagnose",
+          "goal": "先核节点表示再定位导出异常",
+          "prompt": "Tree export raises an exception. Request the complete node class/mixins/slots,exporter options and exact exception before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AN-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "node-representation-evidence",
+              "when": "The node class/mixin/slots declaration,exporter configuration and exact exception are not supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/slots.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

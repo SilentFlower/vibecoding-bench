@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DT-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "existing_xafter_bounds_next_occurrences_without_materializing_the_full_rule": true
+  },
+  "resource_profile": "business"
+}

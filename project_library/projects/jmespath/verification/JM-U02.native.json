@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JM-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "literal_results_can_alias_compiled_cache_and_need_owned_copies": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MT-U03",
+  "source_commit": "ebf9ae4e9279f3d8c79b7cf2710f7e73ea6438a7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The numeric hash entity originally renders literal # heading,but rewritten Markdown reparses as a heading. The independent backslash-escaped hash control remains protected. Distinguish these parsing paths. Parseability and whitespace claims do not prove semantic equivalence; validate intended AST/rendered meaning and retain original/rollback on mismatch before bulk publication. No automatic rewrite is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

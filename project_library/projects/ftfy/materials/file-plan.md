@@ -1,0 +1,1 @@
+Encode "第一行\n第二行\n" as UTF-16 with BOM. Compare list(fix_file(BytesIO(payload),encoding="utf-16")) against decoding the complete payload as UTF-16 and then using fix_file on a StringIO. Plan a local file-ingestion boundary with decoding before text line iteration,explicit failure handling and complete artifact checks. No library changes or publication.

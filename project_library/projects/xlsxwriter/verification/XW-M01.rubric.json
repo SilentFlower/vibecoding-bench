@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "XW-M01",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Gate braced generic array-formula conversion on the existing strings_to_formulas flag just like ordinary formulas. Disabled generic inputs stay unchanged literal strings; default-enabled detection and explicit formula APIs keep working. Only worksheet.py and app/test_formula_optout.py may change.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

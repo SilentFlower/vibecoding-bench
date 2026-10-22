@@ -1,0 +1,47 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "babel",
+      "attempt": 3,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-003/babel/result.json",
+      "result_sha256": "9314d1da92840732ec1982f6cce8871d66761e120928863b49ee24e07bf5a66c",
+      "main_collected": 7998,
+      "counts": {
+        "passed": 7989,
+        "failed": 0,
+        "error": 0,
+        "skipped": 7,
+        "xfailed": 2,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 318,
+      "subtest_count": 0,
+      "collection_skip_count": 1,
+      "xml_testcases": 7999,
+      "xml_skipped": 10,
+      "runner_sha256": "0ffc9f24d34a43d5e835566246d6488af99e9e78e1ab64e499dcdae24771b3d9",
+      "contract_sha256": "65573d1371e5e0e7961e34153572c38dc4b4b0d6fe29c12cbaa5d471666d9f9a",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成",
+      "duplicate_execution_count": 318,
+      "doctest_counts": {
+        "passed": 316,
+        "skipped": 2,
+        "xfailed": 0,
+        "failed": 0,
+        "unexecuted": 0
+      }
+    }
+  ]
+}

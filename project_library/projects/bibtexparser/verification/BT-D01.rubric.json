@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-D01",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The supplied programmatic duplicate has rawNone,so the writer cannot retain its raw BibTeX and explicitly raises. Parsed duplicates have real raw source and can be serialized with warning comments. Review the failed block and explicitly remove or fix/readd its retained block as authorized; do not fabricate raw text,drop evidence or patch the writer. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

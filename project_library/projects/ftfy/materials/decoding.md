@@ -1,0 +1,1 @@
+A local transport supplies UTF-8 bytes for café. Compare passing these bytes directly to fix_text and explicitly decoding UTF-8 before repair. The actual encoding must be established or recorded as unknown. Advise the bytes/Unicode boundary without promising that guess_bytes is a universal encoding detector. No implementation.

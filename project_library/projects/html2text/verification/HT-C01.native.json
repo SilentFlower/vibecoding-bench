@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "HT-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "tag_callback_can_replace_selected_tag_dispatch_and_retain_other_defaults": true
+  },
+  "resource_profile": "business"
+}

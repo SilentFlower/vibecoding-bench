@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MM-U02",
+  "source_commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "dump emits product:A and qty-2 without running the load validator; load rejects the negative quantity. Do not certify a business object merely because serialization succeeded; apply the explicit validation boundary.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

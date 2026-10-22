@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AP-U02",
+  "source_commit": "69d9bf0aba6276e2434a3a595cceca55040d64d7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With total10 the successive current values are5,2,0,12: manual updates are absolute fractions and use ceil for count, lower-clamped but not capped at100%. Without a total current is the fraction. A bounded business percentage policy belongs to the caller; do not describe these updates as increments.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

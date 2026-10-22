@@ -1,0 +1,1 @@
+For fresh parsed @article{a,title={Original}},compare write_string defaults with write_string(unparse_stack=default_unparse_stack(allow_inplace_modification=True)). Compare emitted text and original title value before/after. Advise whether the caller can reuse the parsed library; avoid claiming that all possible middleware stacks copy or all writes mutate. No implementation.

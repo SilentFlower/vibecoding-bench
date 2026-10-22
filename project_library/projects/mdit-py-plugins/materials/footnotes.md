@@ -1,0 +1,1 @@
+Render Ref[^a] again[^a],definition[^a]: Used note and an unused definition[^unused]: OMIT_THIS_NOTE. Inspect footnote_open and footnote_anchor tokens and rendered text. Compare inline ^[LOCAL_INLINE] with inline=True versusFalse. Advise cited-note versus archival-all-definitions output and explicit syntax policy; do not add a second footnote feature or mutate the library.

@@ -1,0 +1,141 @@
+{
+  "project": "python-pptx",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "source_file_count": 798,
+  "license_files": [
+    "seed/library/LICENSE"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 6,
+  "modify_tasks": 0,
+  "non_modify_tasks": 6,
+  "native_baseline": {
+    "project": "python-pptx",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/python-pptx/result.json",
+    "result_sha256": "29052bb8bc292669fc02facd0107976ce3c0d8415c1d73be251008cb5e415cc2",
+    "main_collected": 2700,
+    "counts": {
+      "passed": 2700,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 2700,
+    "xml_skipped": 0,
+    "runner_sha256": "8427114908f90aed68fc0143a471756c82943b33e62dda3e08aafdca49f6fdde",
+    "contract_sha256": "cce06b659e35de628ba35c2257a76ee126bdf3641dba4dd4aab6fd76c6ce89f0",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-PP-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-pptx/attempt-001/original-PP-C01.json",
+      "sha256": "535b674be47a7717c75b6a52213e1ad2b0a772c714f6535ac3b55151f0fdf5ba",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PP-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-pptx/attempt-001/original-PP-C02.json",
+      "sha256": "9e0e457efe60a237f42b0bd36d21cc0324cb9e7401f2c0ee94ea5cfaa4c7ac87",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PP-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-pptx/attempt-001/original-PP-P01.json",
+      "sha256": "ae26af741ba75cff6e4cc826afaaffc7700a7192e5e177fe3efa7f5678c1cc69",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PP-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-pptx/attempt-001/original-PP-U01.json",
+      "sha256": "e9dca04cbb803b453c602e93727edee1e6549f420abe6276cb72e11d39a7e262",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-PP-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-pptx/attempt-001/original-PP-U02.json",
+      "sha256": "515e719b461f92861b93f8c2f6abed0066d708eab95cbcaf4fa909c07a49cbca",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/python-pptx/attempt-001/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/additional-native/attempt-001/python-pptx/result.json",
+      "sha256": "dfd6fd638ad3f5c0f9995c04a22cc1a034f5ea977506024cd9591bd0483d0795",
+      "library_digest": "cdb5a655c1a78be6401cda01b8871a29b161d43b428018bd00b85a3023efa221",
+      "collected": 973,
+      "passed": 973,
+      "scope": "固定原版额外官方集合；不是可修改候选回归"
+    }
+  ],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v20-en",
+  "formal_digest": "ef7b0cb4ca02e58b7dc4caff91b36942246671faff9c1ebfdd295f3732dda56b",
+  "full_delivery_files": 17864,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-007/run-001/evidence/result.json",
+      "sha256": "7d8749cd6aa058b30a00043b3e9aa0705b1df4a248ac013214ecb486ae380ca2"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-007/run-001/cleanup.json",
+      "sha256": "13b43f6cfb2ae65f3c4a6ed871bf6afd895aade979d96e886874263b085ee10d"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/mock-batch-007-audit.json",
+      "sha256": "15d5554de4ebc6c4e081ef266d38a146fc17ad11d69f8208f9f24bee5e0c07e4"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-007/browser/run-001/diagnostics/result.json",
+      "sha256": "b1fa5b734e9d26cbfd25419c79bf530bb5dcbde359a70f2b06b2501aeb70e34a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/delivery-first-fourteen.json",
+      "sha256": "49cd2649787833124fc940f182c6e6a3db9bac4a23bbdc976a1dff1fa27532bd"
+    }
+  ]
+}

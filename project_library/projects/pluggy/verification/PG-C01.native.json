@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PG-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "firstresult_stops_on_false_and_zero_but_not_none": true
+  },
+  "resource_profile": "business"
+}

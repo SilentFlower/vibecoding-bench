@@ -1,0 +1,1 @@
+Credentials declares name=String(data_key="displayName",attribute="label"),secret=String(load_only=True),ident=Integer(dump_only=True). Trace load({displayName:A,secret:SYNTHETIC}),dump({label:A,secret:SYNTHETIC,ident:7}),and load({ident:7}) with default unknown policy. Explain external/internal names and directional projection. No real secret or edit is authorized.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AT-C03",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "repr=False hides the secret from repr but ordinary asdict still includes it; metadata has no intrinsic export semantics. An explicit metadata filter applies recursively to nested attrs classes; recurse=False returns the original nested object. Define policy for arbitrary payloads instead of promising universal redaction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

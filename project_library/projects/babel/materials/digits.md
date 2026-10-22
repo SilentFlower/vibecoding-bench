@@ -1,0 +1,1 @@
+An Egyptian report requires Eastern Arabic digit glyphs. Compare format_decimal(Decimal('1099.98'),ar_EG,numbering_system='default') and 'latn',then parse the default output. Distinguish separators/symbols from digit glyph shaping and recommend an explicit rendering policy. No edits.

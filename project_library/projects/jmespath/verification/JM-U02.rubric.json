@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JM-U02",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "A literal result can be the stored AST value: modifying its nested list changes later searches of the compiled result and the cached top-level expression. Deep-copy the result into an owned mutable value before changing it. Distinguish this concrete alias observation from a guarantee for every result or a request to change cache semantics.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

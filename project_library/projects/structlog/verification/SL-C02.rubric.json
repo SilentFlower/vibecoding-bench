@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SL-C02",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default rendering invokesOrder.__structlog__ but falls back to repr forDecimal,soamount is the stringDecimal(1.20) representation,not numericJSON. default=str overrides that fallback entirely,turningOrder intoORDER_LITERAL andDecimal into1.20 string. Define precision/type and custom-object dispatch explicitly with current extension points rather than assume a universal transparent serializer.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SP-C01",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The column lexical realname isname,parentp,alias/displaynamedisplay;the table realname ispeople withaliasp. These are token/group facts. Physical lineage needs query scope,alias resolution,schema and dialect semantics;get_name is not necessarily the source column or proof of resolved lineage. No database access or implementation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

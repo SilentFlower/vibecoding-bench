@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TL-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "traversal_filter_prunes_subtrees_and_sorting_is_an_explicit_order_policy": true
+  },
+  "resource_profile": "business"
+}

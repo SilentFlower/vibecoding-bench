@@ -1,0 +1,1 @@
+Parse @article{same,title={First}} followed by @article{same,title={Second}}. Inspect entries,entries_dict,blocks,failed_blocks and the duplicate failure raw/ignore_error_block. A bibliography import must account for both inputs. Explain why return without an exception is not full successful ingestion; no edits.

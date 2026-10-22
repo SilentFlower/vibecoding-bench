@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AP-U03",
+  "source_commit": "69d9bf0aba6276e2434a3a595cceca55040d64d7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Before start current raisesUserWarning. After first and second next the yielded items areA/B but current is0/1; advancing to exhaustion reaches2. A second iteration yields nothing and direct adapter() raisesUserWarning. An explicit closed bar ignores further updates. Do not promise replay or count a yielded item before its caller resumes iteration.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

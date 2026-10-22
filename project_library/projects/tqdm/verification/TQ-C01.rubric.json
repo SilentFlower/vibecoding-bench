@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TQ-C01",
+  "source_commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default disableFalse emits to the non-TTY stream and reaches2. disableNone detects non-TTY and becomes quiet; explicitTrue is quiet too,both with counter0. Select display policy explicitly and keep an independent business counter; do not equate terminal detection with the default or promise disabled counting.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

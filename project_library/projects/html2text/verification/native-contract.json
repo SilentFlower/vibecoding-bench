@@ -1,0 +1,996 @@
+{
+  "baseline_digest": "ff2d278e29f5dab658efb10bc77c850823aa491e94c26c3657d638a96b53e738",
+  "nodes": [
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocMassDownload.html-cmdline_args16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocSaved.html-cmdline_args69]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocSaved_two.html-cmdline_args1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/abbr_tag.html-cmdline_args10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/anchors.html-cmdline_args43]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/apos_element.html-cmdline_args14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/backquote_code_style.html-cmdline_args70]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/blockquote_example.html-cmdline_args9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/bodywidth_newline.html-cmdline_args64]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/bold_inside_link.html-cmdline_args49]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/bold_long_line.html-cmdline_args2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/break_preserved_in_blockquote.html-cmdline_args22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/css_import_no_semicolon.html-cmdline_args61]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/decript_tage.html-cmdline_args51]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/default_image_alt.html-cmdline_args8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table.html-cmdline_args7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table_bypass.html-cmdline_args52]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/emdash-para.html-cmdline_args23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_preserved_whitespace.html-cmdline_args63]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_whitespace.html-cmdline_args59]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/empty-img-src.html-cmdline_args71]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/empty-link.html-cmdline_args66]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/empty-title-tag.html-cmdline_args48]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/flip_emphasis.html-cmdline_args55]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/google-like_font-properties.html-cmdline_args60]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/header_tags.html-cmdline_args34]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/horizontal_rule.html-cmdline_args11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/html-escaping.html-cmdline_args72]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/html_entities_out_of_text.html-cmdline_args68]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/images_as_html.html-cmdline_args12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/images_to_alt.html-cmdline_args42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_div_wrap.html-cmdline_args37]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_size.html-cmdline_args5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/img-tag-with-link.html-cmdline_args35]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_start.html-cmdline_args26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_unicode.html-cmdline_args56]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/kbd_tag.html-cmdline_args13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/link_titles.html-cmdline_args32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/list_tags_example.html-cmdline_args15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/long_lines.html-cmdline_args3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_b.html-cmdline_args29]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_i.html-cmdline_args67]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_inside_i.html-cmdline_args41]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/mark_code.html-cmdline_args17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/mixed_nested_lists.html-cmdline_args53]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp.html-cmdline_args46]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp_unicode.html-cmdline_args33]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_example.html-cmdline_args27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_images_to_alt.html-cmdline_args40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_nested.html-cmdline_args58]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_mailto_links.html-cmdline_args6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_p_in_table.html-cmdline_args50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_wrap_links.html-cmdline_args31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_wrap_links_no_inline_links.html-cmdline_args20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/normal.html-cmdline_args45]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/normal_escape_snob.html-cmdline_args18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table.html-cmdline_args65]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table_empty.html-cmdline_args28]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table_no_closed_tr.html-cmdline_args24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/pre.html-cmdline_args38]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/preformatted_in_list.html-cmdline_args25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/protect_links.html-cmdline_args4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/q_tag.html-cmdline_args57]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/rlm_inside_strong.html-cmdline_args47]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/single_line_break.html-cmdline_args62]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/stressed_with_html_entities.html-cmdline_args44]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/sub_tag.html-cmdline_args0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/sup_tag.html-cmdline_args21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/table_ignore.html-cmdline_args39]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/text_after_list.html-cmdline_args30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/url-escaping.html-cmdline_args19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/wrap_list_items_example.html-cmdline_args36]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/wrap_tables.html-cmdline_args54]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/abbr_tag.html-func_args4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/anchors.html-func_args22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/apos_element.html-func_args7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/blockquote_example.html-func_args3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/bodywidth_newline.html-func_args37]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/bold_inside_link.html-func_args29]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/bold_long_line.html-func_args0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/break_preserved_in_blockquote.html-func_args10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/css_import_no_semicolon.html-func_args35]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/decript_tage.html-func_args31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table.html-func_args2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/emdash-para.html-func_args11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_preserved_whitespace.html-func_args36]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_whitespace.html-func_args34]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/empty-img-src.html-func_args41]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/empty-link.html-func_args38]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/empty-title-tag.html-func_args28]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/header_tags.html-func_args17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/horizontal_rule.html-func_args5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/html-escaping.html-func_args42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/html_entities_out_of_text.html-func_args40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_div_wrap.html-func_args19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/img-tag-with-link.html-func_args18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/inplace_baseurl_substitution.html-func_args25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_start.html-func_args13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/kbd_tag.html-func_args6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/link_titles.html-func_args16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/list_tags_example.html-func_args8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/long_lines.html-func_args1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_b.html-func_args14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_i.html-func_args39]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_inside_i.html-func_args21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/mixed_nested_lists.html-func_args32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp.html-func_args26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/no_p_in_table.html-func_args30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/normal.html-func_args24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/pre.html-func_args20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/preformatted_in_list.html-func_args12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/q_tag.html-func_args33]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/rlm_inside_strong.html-func_args27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/stressed_with_html_entities.html-func_args23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/text_after_list.html-func_args15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/url-escaping.html-func_args9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocMassDownload.html-module_args16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocSaved.html-module_args70]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocSaved_two.html-module_args1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/abbr_tag.html-module_args10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/anchors.html-module_args43]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/apos_element.html-module_args14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/backquote_code_style.html-module_args71]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/blockquote_example.html-module_args9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/bodywidth_newline.html-module_args65]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/bold_inside_link.html-module_args50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/bold_long_line.html-module_args2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/break_preserved_in_blockquote.html-module_args22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/css_import_no_semicolon.html-module_args62]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/decript_tage.html-module_args52]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/default_image_alt.html-module_args8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table.html-module_args7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table_bypass.html-module_args53]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/emdash-para.html-module_args23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_preserved_whitespace.html-module_args64]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_whitespace.html-module_args60]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/empty-img-src.html-module_args72]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/empty-link.html-module_args67]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/empty-title-tag.html-module_args49]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/flip_emphasis.html-module_args56]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/google-like_font-properties.html-module_args61]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/header_tags.html-module_args34]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/horizontal_rule.html-module_args11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/html-escaping.html-module_args73]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/html_entities_out_of_text.html-module_args69]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/images_as_html.html-module_args12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/images_to_alt.html-module_args42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_div_wrap.html-module_args37]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_size.html-module_args5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/img-tag-with-link.html-module_args35]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/inplace_baseurl_substitution.html-module_args46]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_start.html-module_args26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_unicode.html-module_args57]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/kbd_tag.html-module_args13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/link_titles.html-module_args32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/list_tags_example.html-module_args15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/long_lines.html-module_args3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_b.html-module_args29]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_i.html-module_args68]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_inside_i.html-module_args41]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/mark_code.html-module_args17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/mixed_nested_lists.html-module_args54]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp.html-module_args47]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp_unicode.html-module_args33]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_example.html-module_args27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_images_to_alt.html-module_args40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_nested.html-module_args59]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_mailto_links.html-module_args6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_p_in_table.html-module_args51]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_wrap_links.html-module_args31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_wrap_links_no_inline_links.html-module_args20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/normal.html-module_args45]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/normal_escape_snob.html-module_args18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table.html-module_args66]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table_empty.html-module_args28]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table_no_closed_tr.html-module_args24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/pre.html-module_args38]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/preformatted_in_list.html-module_args25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/protect_links.html-module_args4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/q_tag.html-module_args58]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/rlm_inside_strong.html-module_args48]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/single_line_break.html-module_args63]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/stressed_with_html_entities.html-module_args44]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/sub_tag.html-module_args0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/sup_tag.html-module_args21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/table_ignore.html-module_args39]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/text_after_list.html-module_args30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/url-escaping.html-module_args19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/wrap_list_items_example.html-module_args36]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/wrap_tables.html-module_args55]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_strong_emptied",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html2text.py::test_tag_callback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_memleak.py::test_abbr_data",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_memleak.py::test_empty_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_memleak.py::test_same_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_newlines_on_multiple_calls.py::test_newline_on_multiple_calls",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "html2text",
+  "python": "3.12.15",
+  "schema": 1
+}

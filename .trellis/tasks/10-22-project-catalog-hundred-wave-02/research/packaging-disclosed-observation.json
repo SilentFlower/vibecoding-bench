@@ -1,0 +1,18 @@
+{
+  "module": "/root/project/vibecoding-bench/.deploy/project-catalog-hundred/stage-02/drafts/projects/packaging/seed/library/src/packaging/__init__.py",
+  "headers": "Metadata-Version: 2.4\nName: demo\nVersion: bad version\nRequires-Python: =>3.12\n\n",
+  "group": "invalid or unparsed metadata (2 sub-exceptions)",
+  "errors": [
+    {
+      "type": "InvalidMetadata",
+      "field": "requires-python",
+      "message": "'=>3.12' is invalid for 'requires-python'"
+    },
+    {
+      "type": "InvalidMetadata",
+      "field": "version",
+      "message": "'bad version' is invalid for 'version'"
+    }
+  ],
+  "valid_version": "1.0"
+}

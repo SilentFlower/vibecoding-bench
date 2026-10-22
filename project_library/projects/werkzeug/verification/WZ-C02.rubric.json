@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WZ-C02",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "save copies from the current input position,so seek2 savesCDEF. Explicitseek0 givesABCDEF. save does not close the input or caller-owned destination; FileStorage.close closes the source only. Explicitly own positioning,complete-byte validation and caller-stream cleanup; do not claim automatic rewind,atomic saving or closing caller destinations.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

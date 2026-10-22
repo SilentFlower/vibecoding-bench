@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BA-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "numbering_system_selects_symbols_without_replacing_digit_glyphs": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AT-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "field_hooks_are_not_a_multi_field_transaction_and_new_objects_can_gate_publication": true
+  },
+  "resource_profile": "business"
+}

@@ -2,6 +2,7 @@
 from contextlib import ExitStack
 import hashlib
 from importlib.util import find_spec
+from importlib.metadata import PathDistribution
 import json
 import os
 import subprocess
@@ -195,6 +196,70 @@ class NativeRegressionTests(unittest.TestCase):
                 regression.pytest_sessionstart(None)
             self.assertEqual(render.__doc__, expected)
             self.assertEqual(state['imports']['tabulate']['path'], str(origin))
+
+    def test_metadata_reader_preserves_declared_primary_url_and_rejects_header_injection(self) -> None:
+        """标准分发读取器保留上游首个URL及描述，拒绝额外头字段注入。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            private, purelib = root / 'python', root / 'python/lib/site-packages'
+            purelib.mkdir(parents=True)
+            with patch.object(regression, '_WORK_ROOT', root), \
+                    patch.object(regression.sys, 'prefix', str(private)), \
+                    patch.object(regression.sys, 'base_prefix', '/system'), \
+                    patch.object(regression.sysconfig, 'get_path', return_value=str(purelib)):
+                with ExitStack() as cleanup:
+                    result = regression._bind_source(root / 'candidate', Path('.'), cleanup,
+                        distribution=('local-metadata', '1.0'),
+                        project_urls={'Documentation': 'https://docs.example.test/',
+                            'Changelog': 'https://changes.example.test/'},
+                        metadata_fields={'Summary': 'Local description', 'Author-email': 'Local <local@example.test>'})
+                    metadata = PathDistribution(Path(result['distribution']['path'])).metadata
+                    self.assertEqual(metadata['Project-URL'], 'Documentation, https://docs.example.test/')
+                    self.assertEqual(metadata.get_all('Project-URL'), ['Documentation, https://docs.example.test/',
+                        'Changelog, https://changes.example.test/'])
+                    self.assertEqual(metadata['Summary'], 'Local description')
+                    self.assertEqual(metadata['Author-email'], 'Local <local@example.test>')
+                for fields in [{'Name': 'different'}, {'Summary': 'value\nName: different'}]:
+                    with self.subTest(fields=fields), self.assertRaises(ValueError), ExitStack() as invalid:
+                        regression._bind_source(root / 'candidate', Path('.'), invalid,
+                            distribution=('local-metadata', '1.0'), metadata_fields=fields)
+                self.assertFalse(list(purelib.iterdir()))
+
+    def test_source_console_executes_candidate_and_preserves_existing_entries(self) -> None:
+        """真实子进程经私有.pth执行候选，拒绝覆盖入口和注入式目标。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            private = root / 'venv'
+            subprocess.run([sys.executable, '-m', 'venv', '--without-pip', str(private)], check=True, capture_output=True)
+            purelib = private / 'lib' / ('python' + '.'.join(map(str, sys.version_info[:2]))) / 'site-packages'
+            source = root / 'candidate'
+            source.mkdir()
+            module = source / 'local_candidate.py'
+            module.write_text('def main():\n    print("CANDIDATE_ONE")\n')
+            with patch.object(regression, '_WORK_ROOT', root), patch.object(regression.sys, 'prefix', str(private)), \
+                    patch.object(regression.sys, 'executable', str(private / 'bin/python')), \
+                    patch.object(regression.sysconfig, 'get_path', return_value=str(purelib)):
+                with ExitStack() as cleanup:
+                    report = regression._bind_source(source, Path('.'), cleanup,
+                        console_scripts={'local-probe': 'local_candidate:main'})
+                    entry = Path(report['source_console_scripts'][0]['path'])
+                    environment = dict(os.environ)
+                    environment.pop('PYTHONPATH', None)
+                    first = subprocess.run([str(entry)], check=True, capture_output=True, text=True, env=environment)
+                    self.assertEqual(first.stdout.strip(), 'CANDIDATE_ONE')
+                    module.write_text('def main():\n    print("CANDIDATE_TWO_CHANGED")\n')
+                    second = subprocess.run([str(entry)], check=True, capture_output=True, text=True, env=environment)
+                    self.assertEqual(second.stdout.strip(), 'CANDIDATE_TWO_CHANGED')
+                    with self.assertRaises(FileExistsError), ExitStack() as collision:
+                        regression._bind_source(source, Path('.'), collision,
+                            console_scripts={'local-probe': 'local_candidate:main'})
+                    self.assertTrue(entry.exists())
+                    with self.assertRaises(ValueError), ExitStack() as invalid:
+                        regression._bind_source(source, Path('.'), invalid,
+                            console_scripts={'bad-probe': 'local_candidate:main\nraise SystemExit()'})
+                    self.assertFalse((private / 'bin/bad-probe').exists())
+                self.assertFalse(entry.exists())
+                self.assertFalse(list(purelib.glob('_bench_native_source_*.pth')))
 
     def test_dotenv_console_binds_src_and_cleans_private_files(self) -> None:
         """真实命令入口绑定src候选，并在本次验证结束移除。@return None。"""
@@ -789,6 +854,253 @@ class NativeRegressionTests(unittest.TestCase):
                 self.assertTrue(any(item['outcome'] == 'failed' for item in report['examples']))
                 self.assertEqual([item['want_sha256'] for item in report['examples']],
                     [item['want_sha256'] for item in original[number]])
+
+    def test_official_unittest_entry_preserves_duplicate_ids_and_both_runtime_modes(self) -> None:
+        """真实官方式入口保留两轮同名用例，错误实现、漏轮或虚假模式必须拒绝。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / 'project'
+            package = project / 'sample'
+            tests = package / 'tests'
+            tests.mkdir(parents=True)
+            initial = "MODE = 'c'\nVALUE = 1\n"
+            suite = (
+                'import unittest\nimport sample\n'
+                'class NoExtensionTestSuite(unittest.TestSuite):\n'
+                '    def run(self, result):\n'
+                '        sample.MODE = "python"\n'
+                '        result = super().run(result)\n'
+                '        sample.MODE = "c"\n        return result\n'
+                'class Original(unittest.TestCase):\n'
+                '    def test_value(self):\n        self.assertEqual(sample.VALUE, 1)\n'
+                'def plain():\n    return unittest.TestLoader().loadTestsFromTestCase(Original)\n')
+            entry = (
+                'import sys,unittest\nfrom sample.tests import NoExtensionTestSuite,plain\n'
+                'if __name__ == "__main__":\n'
+                '    result = unittest.TextTestRunner().run(unittest.TestSuite(\n'
+                '        [plain(), NoExtensionTestSuite([plain()])]))\n'
+                '    raise SystemExit(not result.wasSuccessful())\n')
+            script = (
+                'import importlib,sys\nfrom pathlib import Path\n'
+                'import project_native_regression as native\n'
+                'native._simplejson_mode = lambda root,mode: importlib.import_module("sample").MODE == mode\n'
+                'raise SystemExit(native._unittest_worker(Path(sys.argv[1])))\n')
+            environment = dict(os.environ, PYTHONPATH=os.pathsep.join([str(project), str(Path(regression.__file__).parent)]),
+                PYTHONDONTWRITEBYTECODE='1')
+            environment.pop('BENCH_NATIVE_CONTROL', None)
+            for case in ('original', 'wrong-code', 'missing-python', 'wrong-mode', 'missing-c-wiring'):
+                (package / '__init__.py').write_text(initial.replace('VALUE = 1', 'VALUE = 2') if case == 'wrong-code'
+                    else initial.replace("MODE = 'c'", "MODE = 'python'") if case == 'missing-c-wiring' else initial)
+                (tests / '__init__.py').write_text(suite.replace('sample.MODE = "python"', 'sample.MODE = "c"')
+                    if case == 'wrong-mode' else suite)
+                (tests / 'native.py').write_text(entry.replace('[plain(), NoExtensionTestSuite([plain()])]', '[plain()]')
+                    if case == 'missing-python' else entry)
+                evidence = root / case
+                evidence.mkdir()
+                control = {'project': str(project), 'package': 'sample', 'baseline_files': {}, 'documents': {},
+                    'required_nodes': [], 'evidence': str(evidence), 'unittest_entry': 'sample.tests.native'}
+                control_path = root / (case + '.json')
+                control_path.write_text(json.dumps(control))
+                result = subprocess.run([sys.executable, '-c', script, str(control_path)], cwd=project,
+                    env=environment, capture_output=True, text=True, timeout=10)
+                self.assertEqual(result.returncode, 0 if case == 'original' else 1, result.stderr)
+                report = json.loads((evidence / 'unittest-master.json').read_text())
+                if case == 'original':
+                    collection = report['collection']
+                    self.assertEqual(len(collection), 2)
+                    self.assertEqual(collection[0]['raw_id'], collection[1]['raw_id'])
+                    self.assertEqual({row['mode'] for row in collection}, {'c', 'python'})
+                    self.assertEqual(len({row['id'] for row in collection}), 2)
+                    self.assertEqual(report['mode_checks'], {
+                        'c': {'started': 1, 'failed': []}, 'python': {'started': 1, 'failed': []}})
+                elif case == 'wrong-code':
+                    self.assertEqual(len([row for row in report['reports'] if row['outcome'] == 'failed']), 2)
+                else:
+                    self.assertTrue(report['errors'])
+
+    def test_simplejson_mode_rejects_python_file_masquerading_as_binary(self) -> None:
+        """即使导出对象相同，Python替身也不能充当已编译C扩展。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / '_speedups.py'
+            source.write_text('# 合成的Python替身，不是二进制扩展。\n')
+            make_encoder, make_scanner, scanstring = object(), object(), object()
+            encoder = SimpleNamespace(c_make_encoder=make_encoder)
+            scanner = SimpleNamespace(c_make_scanner=make_scanner, make_scanner=make_scanner)
+            decoder = SimpleNamespace(scanstring=scanstring, c_scanstring=scanstring)
+            modules = {'simplejson': SimpleNamespace(encoder=encoder, scanner=scanner, decoder=decoder),
+                'simplejson._speedups': SimpleNamespace(__file__=str(source),
+                    make_encoder=make_encoder, make_scanner=make_scanner)}
+            with patch.dict(sys.modules, modules):
+                with self.assertRaisesRegex(ValueError, '二进制后缀'):
+                    regression._simplejson_mode(root, 'c')
+
+    def test_dynamic_parameter_names_keep_all_real_cases_and_reject_wrong_code(self) -> None:
+        """动态参数显示名变化不漏原测试，实际错误候选仍由完整用例拒绝。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline, candidate = root / 'baseline', root / 'candidate/library'
+            for project in (baseline, candidate):
+                (project / 'sample').mkdir(parents=True)
+                (project / 'sample/__init__.py').write_text('VALUE = 1\n')
+            (baseline / 'test_original.py').write_text(
+                'import os,pytest,sample\n'
+                '@pytest.mark.parametrize("value", ["fixed", os.environ["BENCH_TEST_CLOCK"]+"-1", '
+                'os.environ["BENCH_TEST_CLOCK"]+"-2"])\n'
+                'def test_value(value):\n    assert sample.VALUE == 1\n')
+            suite = {'package': 'sample', 'overlay': True, 'doctests': 0, 'plugins': [],
+                'args': ['test_original.py', '-q', '-p', 'no:cacheprovider'], 'env': {},
+                'parameter_ids': [('test_original.py::test_value', 'value', [1, 2])]}
+            contract = root / 'contract.json'
+            options = SimpleNamespace(project='sample', baseline_root=baseline, candidate_root=None,
+                contract=None, freeze_baseline_contract=contract, evidence_dir=root / 'baseline-evidence', timeout_sec=20)
+            with patch.dict(regression.SUITES, {'sample': suite}), patch.dict(os.environ, {'BENCH_TEST_CLOCK': 'first'}):
+                initial = regression._run(options)
+                self.assertEqual(initial['status'], 'passed')
+                self.assertEqual(initial['collected'], 3)
+                options.contract, options.freeze_baseline_contract = contract, None
+                options.candidate_root, options.evidence_dir = candidate.parent, root / 'changed-clock'
+                with patch.dict(os.environ, {'BENCH_TEST_CLOCK': 'second'}):
+                    accepted = regression._run(options)
+                self.assertEqual(accepted['status'], 'passed')
+                self.assertEqual(accepted['collected'], 3)
+                self.assertTrue(accepted['collection_matches_contract'])
+                self.assertEqual([item['value'] for item in accepted['parameter_identities']['master']], ['second-1', 'second-2'])
+                (candidate / 'sample/__init__.py').write_text('VALUE = 2\n')
+                options.evidence_dir = root / 'wrong-code'
+                rejected = regression._run(options)
+                self.assertEqual(rejected['status'], 'failed')
+                self.assertEqual(rejected['counts']['failed'], 3)
+
+    def test_original_non_strict_xpass_keeps_identity_and_rejects_new_or_missing_xpass(self) -> None:
+        """固定原版的非strictXPASS保留实绩，候选增加或丢失同结果均拒绝。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline, candidate = root / 'baseline', root / 'candidate/library'
+            for source in (baseline, candidate):
+                (source / 'sample').mkdir(parents=True)
+                (source / 'sample/__init__.py').write_text('VALUE = 1\n')
+            (baseline / 'test_original.py').write_text('import pytest,sample\n'
+                '@pytest.mark.xfail(reason="original upstream marker",strict=False)\n'
+                'def test_original_pass():\n    assert sample.VALUE == 1\n'
+                '@pytest.mark.xfail(reason="unrepaired control",strict=False)\n'
+                'def test_still_fails():\n    assert sample.VALUE == 2\n')
+            suite = {'package': 'sample', 'overlay': True, 'doctests': 0, 'plugins': [], 'env': {},
+                'args': ['test_original.py', '-q', '-p', 'no:cacheprovider'],
+                'original_xpassed_nodes': ['test_original.py::test_original_pass']}
+            contract = root / 'contract.json'
+            options = SimpleNamespace(project='sample', baseline_root=baseline, candidate_root=None,
+                contract=None, freeze_baseline_contract=contract, evidence_dir=root / 'baseline-evidence', timeout_sec=20)
+            with patch.dict(regression.SUITES, {'sample': suite}):
+                initial = regression._run(options)
+                self.assertEqual(initial['status'], 'passed')
+                self.assertEqual(initial['counts']['xpassed'], 1)
+                options.contract, options.freeze_baseline_contract = contract, None
+                options.candidate_root, options.evidence_dir = candidate.parent, root / 'correct'
+                self.assertEqual(regression._run(options)['status'], 'passed')
+                (candidate / 'sample/__init__.py').write_text('VALUE = 2\n')
+                options.evidence_dir = root / 'changed-xpass-identity'
+                rejected = regression._run(options)
+                self.assertEqual(rejected['status'], 'failed')
+                self.assertEqual(rejected['counts']['xpassed'], 1)
+                (candidate / 'sample/__init__.py').write_text('VALUE = 0\n')
+                options.evidence_dir = root / 'missing-xpass'
+                missing = regression._run(options)
+                self.assertEqual(missing['status'], 'failed')
+                self.assertEqual(missing['counts']['xpassed'], 0)
+                options.contract, options.freeze_baseline_contract = None, root / 'unexpected-contract.json'
+                options.evidence_dir, options.candidate_root = root / 'unlisted-original', None
+                suite['original_xpassed_nodes'] = []
+                self.assertEqual(regression._run(options)['status'], 'error')
+                self.assertFalse(options.freeze_baseline_contract.exists())
+
+    def test_duplicate_doctest_executions_are_frozen_individually_and_wrong_code_is_rejected(self) -> None:
+        """同ID原生示例每次执行均保留；缺一轮、改代码或新增跳过不能伪造通过。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            baseline, candidate = root / 'baseline', root / 'candidate/library'
+            source = ('VALUE = 1\n'
+                'def check():\n    """\n    >>> check()\n    1\n    """\n    return VALUE\n'
+                'def optional():\n    """\n    >>> print("optional")  # doctest: +SKIP\n    """\n')
+            for project in (baseline, candidate):
+                (project / 'sample').mkdir(parents=True)
+                (project / 'sample/__init__.py').write_text('from .api import check, optional\n')
+                (project / 'sample/api.py').write_text(source)
+            (baseline / 'conftest.py').write_text('from _pytest.doctest import DoctestModule\n'
+                'def pytest_collect_file(file_path, parent):\n'
+                '    if file_path.name == "api.py":\n'
+                '        return DoctestModule.from_parent(parent, path=file_path)\n')
+            (baseline / 'tests/optional').mkdir(parents=True)
+            (baseline / 'tests/optional/conftest.py').write_text('import pytest\n'
+                'pytest.skip("original optional directory", allow_module_level=True)\n')
+            suite = {'package': 'sample', 'overlay': True, 'plugins': [], 'env': {}, 'duplicate_ids': True,
+                'collection_skips': True, 'collection_skip_directories': ['tests/optional'],
+                'args': ['sample', 'tests', '--doctest-modules', '-q', '-p', 'no:cacheprovider'],
+                'skipped_doctests': ['sample/api.py::sample.api.optional[occurrence-1]',
+                    'sample/api.py::sample.api.optional[occurrence-2]']}
+            contract = root / 'contract.json'
+            options = SimpleNamespace(project='sample', baseline_root=baseline, candidate_root=None,
+                contract=None, freeze_baseline_contract=contract, evidence_dir=root / 'baseline-evidence', timeout_sec=20)
+            with patch.dict(regression.SUITES, {'sample': suite}):
+                initial = regression._run(options)
+                self.assertEqual(initial['status'], 'passed', initial)
+                self.assertEqual(initial['collected'], 4)
+                self.assertEqual(initial['counts']['passed'], 2)
+                self.assertEqual(initial['counts']['skipped'], 2)
+                self.assertEqual(initial['duplicate_execution_count'], 4)
+                self.assertEqual(initial['collection_skip_count'], 1)
+                self.assertEqual(initial['xml_testcases'], 5)
+                self.assertEqual(len({row['id'] for row in initial['duplicate_identities']}), 4)
+                self.assertEqual(len({row['original_id'] for row in initial['duplicate_identities']}), 2)
+                options.contract, options.freeze_baseline_contract = contract, None
+                options.candidate_root, options.evidence_dir = candidate.parent, root / 'accepted'
+                accepted = regression._run(options)
+                self.assertEqual(accepted['status'], 'passed', accepted)
+                (candidate / 'sample/api.py').write_text(source.replace('VALUE = 1', 'VALUE = 2'))
+                options.evidence_dir = root / 'wrong-code'
+                rejected = regression._run(options)
+                self.assertEqual(rejected['status'], 'failed')
+                self.assertEqual(rejected['counts']['failed'], 2)
+                (candidate / 'sample/api.py').write_text(source)
+                options.evidence_dir = root / 'missing-execution'
+                suite['args'] = ['sample', 'tests', '-q', '-p', 'no:cacheprovider']
+                missing = regression._run(options)
+                self.assertEqual(missing['status'], 'failed')
+                options.evidence_dir = root / 'unexpected-skip'
+                suite['args'] = ['sample', 'tests', '--doctest-modules', '-q', '-p', 'no:cacheprovider']
+                suite['skipped_doctests'] = []
+                unexpected = regression._run(options)
+                self.assertEqual(unexpected['status'], 'failed')
+
+    def test_offline_system_libraries_reject_changed_bytes_links_and_escape(self) -> None:
+        """共享库只能加载冻结普通原件，拒绝摘要变化、链接与清单越界。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            libraries = root / 'artifacts/tk-libs'
+            libraries.mkdir(parents=True)
+            binary = libraries / 'libsample.so.1'
+            binary.write_bytes(b'frozen shared library bytes')
+            manifest = libraries / 'manifest.json'
+            row = {'path': 'artifacts/tk-libs/libsample.so.1', 'sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
+
+            def specification() -> tuple[str, str]:
+                """保存本次精确清单。@return 相对路径和SHA。"""
+                manifest.write_text(json.dumps({'schema': 1, 'libraries': [row]}))
+                return 'artifacts/tk-libs/manifest.json', hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+            with patch.object(regression, '_OFFLINE_ROOT', root):
+                self.assertEqual(regression._system_libraries(specification())[0]['sha256'], row['sha256'])
+                binary.write_bytes(b'changed')
+                with self.assertRaises(ValueError):
+                    regression._system_libraries(specification())
+                binary.unlink()
+                (root / 'external.so').write_bytes(b'frozen shared library bytes')
+                binary.symlink_to(root / 'external.so')
+                with self.assertRaises(ValueError):
+                    regression._system_libraries(specification())
+                row['path'] = '../external.so'
+                with self.assertRaises(ValueError):
+                    regression._system_libraries(specification())
 
 
 if __name__ == '__main__':

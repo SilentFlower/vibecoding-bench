@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WZ-D01",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The disclosed validJSON/textplain fails MIME policy with415; force bypasses MIME while silent returnsNone. Malformedapplication/json fails decoding with400,alsoNone under silent. Distinguish unsupported media type,invalid JSON and valid JSON null; choose an explicit sender/header/error contract without blanket force/silent acceptance or patching. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

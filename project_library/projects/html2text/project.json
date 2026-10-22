@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "html2text",
+  "title": "html2text文档归档工作场景",
+  "category": "文本转换与归档归属",
+  "description": "文档结构、图像政策、标签回调、Unicode、文档隔离和表格诊断六项只读任务。",
+  "seed_digest": "1a451940c2585086e77570a3c9ba83f41234e8b48825ca4f2fe69a5831407fa5",
+  "environment": "html2text-py312",
+  "source": {
+    "repository": "https://github.com/Alir3z4/html2text",
+    "commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "HT-S01",
+      "title": "文档与图片",
+      "goal": "明确结构和可访问文本",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "HT-U01",
+            "HT-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HT-U01",
+          "kind": "understand",
+          "goal": "确认文档结构与现有列表编号能力",
+          "prompt": "Explain complete report conversion and existing options. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/report.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/HT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "HT-U02",
+          "kind": "understand",
+          "goal": "区分保留图片替代文本与完全忽略",
+          "prompt": "Explain three complete image policies without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/images.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/HT-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "HT-S02",
+      "title": "转换与归档政策",
+      "goal": "采用现有扩展并保留所需原始材料",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "HT-C01",
+            "HT-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HT-C01",
+          "kind": "consult",
+          "goal": "采用现有标签扩展实现明确的标题政策",
+          "prompt": "Advise the bounded callback configuration from complete controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/callback.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/HT-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "HT-C02",
+          "kind": "consult",
+          "goal": "为文本归档明确字符与原始材料政策",
+          "prompt": "Advise exact representation and archive ownership from complete controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/characters.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/HT-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "HT-S03",
+      "title": "批量转换",
+      "goal": "逐文档持有转换器",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "HT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HT-P01",
+          "kind": "plan",
+          "goal": "规划批量转换的逐文档状态隔离",
+          "prompt": "Plan batch document isolation using actual reused/fresh controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/lifecycle.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/HT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "HT-S04",
+      "title": "表格诊断",
+      "goal": "取得完整输入输出与选项",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "HT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "HT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HT-D01",
+          "kind": "diagnose",
+          "goal": "取得完整表格再定位跨度信息丢失",
+          "prompt": "Converted table structure differs from the source. Request complete HTML,options and resulting text before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/HT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "table-conversion-evidence",
+              "when": "The complete HTML,conversion options and resulting text have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/table.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

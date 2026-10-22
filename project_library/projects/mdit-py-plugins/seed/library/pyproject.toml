@@ -1,0 +1,90 @@
+[build-system]
+requires = ["flit_core >=3.4,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "mdit-py-plugins"
+dynamic = ["version"]
+description = "Collection of plugins for markdown-it-py"
+readme = "README.md"
+authors = [{name = "Chris Sewell", email = "chrisj_sewell@hotmail.com"}]
+license = {file = "LICENSE"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Markup",
+]
+keywords = ["markdown", "markdown-it", "lexer", "parser", "development"]
+requires-python = ">=3.10"
+dependencies = ["markdown-it-py>=2.0.0,<5.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/executablebooks/mdit-py-plugins"
+Documentation = "https://mdit-py-plugins.readthedocs.io"
+
+[project.optional-dependencies]
+code_style = ["pre-commit"]
+testing = [
+    "coverage",
+    "pytest",
+    "pytest-cov",
+    "pytest-regressions",
+    "pytest-timeout",
+]
+rtd = [
+    "myst-parser",
+    "sphinx-book-theme",
+]
+
+[tool.flit.module]
+name = "mdit_py_plugins"
+
+[tool.flit.sdist]
+exclude = [
+    "docs/",
+    "tests/",
+]
+
+[tool.ruff.lint]
+extend-select = [
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "I",    # isort
+    "ICN",  # flake8-import-conventions
+    "ISC",  # flake8-implicit-str-concat
+    "N",    # pep8-naming
+    "PERF", # perflint (performance anti-patterns)
+    "PGH",  # pygrep-hooks
+    "PIE",  # flake8-pie
+    "PTH",  # flake8-use-pathlib
+    "RUF",  # Ruff-specific rules
+    "SIM",  # flake8-simplify
+    "UP",   # pyupgrade
+    "T20",  # flake8-print
+]
+extend-ignore = ["ISC001", "N802", "N803", "N806"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**.py" = ["T201"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+
+[tool.mypy]
+show_error_codes = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+strict = true
+
+[tool.pytest.ini_options]
+timeout = 10

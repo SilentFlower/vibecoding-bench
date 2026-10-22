@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DT-C01",
+  "source_commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Defaultbetween excludes both endpoints and returnsJan2,3,4. incTrue includesJan1 through5. The count argument does not cap returned items in this implementation. Define half-open/closed policy and an actual independent limit or bounded selection path;do not treat count1 as a guaranteed bound.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

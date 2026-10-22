@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "incremental_parse_reuses_existing_macros_without_retransforming_prior_entries": true
+  },
+  "resource_profile": "business"
+}

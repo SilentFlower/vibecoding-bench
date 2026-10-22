@@ -1,0 +1,1 @@
+Wrap [A,B] with alive_it. Inspect current before starting; call next twice and then exhaust the same iterator. Try a second iteration and a direct adapter() call. Also call an explicit alive_bar handle after its context closes. Explain when work is counted and the documented lifecycle; no mutation or new resumability API is authorized.

@@ -1,0 +1,1 @@
+Wrap BytesIO(b'ABCDEF') in FileStorage with synthetic.bin;seek the input to2 and save to caller-owned BytesIO. Compare a second save after explicitly seeking input0,and source/destination closed flags before and after FileStorage.close(). Advise complete-byte and stream ownership policy. There is no file path or external upload. No implementation.

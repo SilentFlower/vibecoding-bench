@@ -1,0 +1,6088 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "run": "/root/project/vibecoding-bench/.deploy/project-catalog-hundred/stage-02/mock-batch-009/run-001",
+  "evidence": "/root/project/vibecoding-bench/.deploy/project-catalog-hundred/stage-02/mock-batch-009/run-001/evidence",
+  "snapshot": "archived",
+  "browser_status": "passed",
+  "scope": "独立只读模拟数据审计；不是正式 Check-All 或真实模型质量评估",
+  "summary": {
+    "stage_selected_counts": [
+      12,
+      12,
+      12
+    ],
+    "selected_paths": 36,
+    "unique_tasks": 12,
+    "stored_task_rows": 36,
+    "unselected_task_rows": 0,
+    "instances": 6,
+    "batches": 3,
+    "unique_task_kinds": {
+      "understand": 4,
+      "consult": 4,
+      "plan": 2,
+      "diagnose": 2
+    },
+    "readonly_paths": 36,
+    "selected_modify_paths": 0,
+    "code_acceptances": 0,
+    "unique_modify_targets": 0,
+    "unavailable_paths": 2,
+    "disclosure_deliveries": 4,
+    "runs": 80,
+    "frozen_manifests_verified": 2,
+    "frozen_objects_verified": 146,
+    "private_review_observations": 40,
+    "maximum_work_intervals": 2,
+    "sampled_maximum_holders": 2,
+    "source_accounting_maximum": 2,
+    "answer_dependencies": 0,
+    "evidence_files": 1700
+  },
+  "fixture_hash_observation": "本次只读审计时读取，不宣称是运行前单独封存的配方摘要",
+  "stage_configuration_sha256": "3625f259aab734545e2f911985c9e5696bf1045456aa5315566bea171adb22d0",
+  "fixture_sha256": {
+    "catalog-identity.json": "d89daa9fec3dfbf5eb572c2803c11a6bbe5096b5773ba208a5d6b9efe4485ad2",
+    "recipes.json": "3a21ee0b808742e7f462650ce131a9924829e039c10b7a9fc5abeef5d5e8f731",
+    "recipe-overrides.json": "794c3c83bc2b6853ce0bb648bbd0fec77f996dec6161c5a36ea77d6e74953c08",
+    "stages.json": "3625f259aab734545e2f911985c9e5696bf1045456aa5315566bea171adb22d0",
+    "mock_cli.py": "2de1f288a577033a2ad899e58548c574d2a6996a83e26c845c9d21c47855a9a7"
+  },
+  "role_usage": {
+    "candidate": {
+      "input_tokens": 280,
+      "output_tokens": 440,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "requests": 40,
+      "sources": 40,
+      "known_sources": 40,
+      "known_fields": {
+        "input_tokens": 40,
+        "output_tokens": 40,
+        "cache_read_input_tokens": 40,
+        "cache_creation_input_tokens": 40
+      },
+      "complete": true
+    },
+    "review": {
+      "input_tokens": 280,
+      "output_tokens": 440,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "requests": 40,
+      "sources": 40,
+      "known_sources": 40,
+      "known_fields": {
+        "input_tokens": 40,
+        "output_tokens": 40,
+        "cache_read_input_tokens": 40,
+        "cache_creation_input_tokens": 40
+      },
+      "complete": true
+    }
+  },
+  "code_parent_chain": [],
+  "disclosures": [
+    {
+      "task_id": 12,
+      "task_key": "CS-D01",
+      "branch_id": "translator-evidence",
+      "delivery_id": 23,
+      "consumed_source_ids": [
+        24
+      ],
+      "business_attempt_count": 1
+    },
+    {
+      "task_id": 6,
+      "task_key": "SL-D01",
+      "branch_id": "renderer-evidence",
+      "delivery_id": 26,
+      "consumed_source_ids": [
+        26
+      ],
+      "business_attempt_count": 1
+    },
+    {
+      "task_id": 30,
+      "task_key": "CS-D01",
+      "branch_id": "translator-evidence",
+      "delivery_id": 78,
+      "consumed_source_ids": [
+        77
+      ],
+      "business_attempt_count": 1
+    },
+    {
+      "task_id": 36,
+      "task_key": "SL-D01",
+      "branch_id": "renderer-evidence",
+      "delivery_id": 81,
+      "consumed_source_ids": [
+        79
+      ],
+      "business_attempt_count": 1
+    }
+  ],
+  "answer_dependencies": [],
+  "evidence_inventory_digest": "a27c993f400dfcd0432a5e384c880e87cd01251e33d786c916770604aee9ac19",
+  "capacity_evidence": {
+    "source_accounting_maximum": 2,
+    "source_accounting_overlaps": [],
+    "work_maximum_by_boot": {
+      "cfadecab-01ae-4110-84c1-9b9e6f2d5798": 2
+    },
+    "observed_sampled_holders": 2,
+    "strictly_cleaned_processes": 80,
+    "exact_holder_intervals_reconstructed": false,
+    "limitation": "未持久保存逐holder claim/release事件，不能重建其纳秒区间。source记账尾部包含释放后的取证延迟。",
+    "ordering_evidence": [
+      "account_runtime.py:1030-1077 环境锁/登记锁下先核siblings<cli_limit再登记",
+      "project_review_runtime.py:396-425 claim后才创建execution_configuration/source",
+      "account_runtime.py:1783-1812 先停止私有进程/容器，再release/remove holder",
+      "account_runtime.py:1157-1200 严格退出证明后释放租约并移除holder",
+      "main.py:7035-7069 cleanup后释放sem，再execution_released回调",
+      "project_scenarios.py:831-855 回调核输入/计时后最后写released_at"
+    ]
+  },
+  "real_model_quality_assessed": false,
+  "real_model_calls": 0,
+  "checks": [
+    {
+      "check": "完整运行结果",
+      "status": "passed",
+      "actual": "passed",
+      "error": null
+    },
+    {
+      "check": "已提交验证器的实际加载身份",
+      "status": "passed",
+      "commit": "ada3ff9053d81dda478046571781dcd9de91ec9e",
+      "sha256": "238198d16836e407259db582be26c1c7da895a643fa7d4de76f67c81db6734dc"
+    },
+    {
+      "check": "实际运行目录与内容身份",
+      "status": "passed",
+      "digest": "080732c22fdf782d6e2881a58b831a319ebd7434a9b161717629773227a31768",
+      "fixture_files": 5
+    },
+    {
+      "check": "本批正式去重内容规模",
+      "status": "passed"
+    },
+    {
+      "check": "本批任务可独立进入",
+      "status": "passed",
+      "actual": {}
+    },
+    {
+      "check": "实例冻结内容身份_1",
+      "status": "passed"
+    },
+    {
+      "check": "实例冻结内容身份_2",
+      "status": "passed"
+    },
+    {
+      "check": "实例冻结内容身份_3",
+      "status": "passed"
+    },
+    {
+      "check": "实例冻结内容身份_4",
+      "status": "passed"
+    },
+    {
+      "check": "实例冻结内容身份_5",
+      "status": "passed"
+    },
+    {
+      "check": "实例冻结内容身份_6",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_1",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_2",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_3",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_4",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_5",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_6",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_7",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_8",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_9",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_10",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_11",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_12",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_13",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_14",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_15",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_16",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_17",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_18",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_19",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_20",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_21",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_22",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_23",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_24",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_25",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_26",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_27",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_28",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_29",
+      "status": "passed"
+    },
+    {
+      "check": "场景冻结内容身份_30",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_1",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_2",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_3",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_4",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_5",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_6",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_7",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_8",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_9",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_10",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_11",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_12",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_13",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_14",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_15",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_16",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_17",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_18",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_19",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_20",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_21",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_22",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_23",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_24",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_25",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_26",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_27",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_28",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_29",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_30",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_31",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_32",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_33",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_34",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_35",
+      "status": "passed"
+    },
+    {
+      "check": "任务冻结内容身份_36",
+      "status": "passed"
+    },
+    {
+      "check": "阶段配置与完成记录数量一致",
+      "status": "passed",
+      "definitions": 3,
+      "actual": 3
+    },
+    {
+      "check": "阶段配置数量独立推导_1",
+      "status": "passed",
+      "declared": 12,
+      "derived": 12
+    },
+    {
+      "check": "阶段配置数量独立推导_2",
+      "status": "passed",
+      "declared": 12,
+      "derived": 12
+    },
+    {
+      "check": "阶段配置数量独立推导_3",
+      "status": "passed",
+      "declared": 12,
+      "derived": 12
+    },
+    {
+      "check": "实际选择路径精确匹配阶段入口",
+      "status": "passed",
+      "expected": 36,
+      "actual": 36
+    },
+    {
+      "check": "阶段状态_1",
+      "status": "passed",
+      "selected": 12,
+      "claimed": 12
+    },
+    {
+      "check": "阶段状态_2",
+      "status": "passed",
+      "selected": 12,
+      "claimed": 12
+    },
+    {
+      "check": "阶段状态_3",
+      "status": "passed",
+      "selected": 12,
+      "claimed": 12
+    },
+    {
+      "check": "全部阶段和唯一任务",
+      "status": "passed",
+      "stage_counts": [
+        12,
+        12,
+        12
+      ],
+      "selected_paths": 36,
+      "unique_tasks": 12,
+      "stored_rows": 36,
+      "unselected_rows": 0
+    },
+    {
+      "check": "选中任务终态",
+      "status": "passed",
+      "status_counts": {
+        "passed": 36
+      }
+    },
+    {
+      "check": "公开详情与数据库任务全集一致",
+      "status": "passed",
+      "public_rows": 36,
+      "database_rows": 36
+    },
+    {
+      "check": "任务结果投影_1",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_2",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_3",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_4",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_5",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_6",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_7",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_8",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_9",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_10",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_11",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_12",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_13",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_14",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_15",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_16",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_17",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_18",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_19",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_20",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_21",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_22",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_23",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_24",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_25",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_26",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_27",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_28",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_29",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_30",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_31",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_32",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_33",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_34",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_35",
+      "status": "passed"
+    },
+    {
+      "check": "任务结果投影_36",
+      "status": "passed"
+    },
+    {
+      "check": "材料不可提供的真实业务结果",
+      "status": "passed",
+      "actual": [
+        {
+          "task_id": 18,
+          "task_key": "CS-D01",
+          "result": {
+            "decision": "pass",
+            "feedback_codes": [],
+            "outcome": "insufficient_information"
+          }
+        },
+        {
+          "task_id": 24,
+          "task_key": "SL-D01",
+          "result": {
+            "decision": "pass",
+            "feedback_codes": [],
+            "outcome": "insufficient_information"
+          }
+        }
+      ]
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_iteration_batches",
+      "status": "passed",
+      "rows": 3
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_instances",
+      "status": "passed",
+      "rows": 6
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_scenario_instances",
+      "status": "passed",
+      "rows": 30
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_scenario_tasks",
+      "status": "passed",
+      "rows": 36
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_task_attempts",
+      "status": "passed",
+      "rows": 36
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_task_executions",
+      "status": "passed",
+      "rows": 80
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_execution_sources",
+      "status": "passed",
+      "rows": 80
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_work_segments",
+      "status": "passed",
+      "rows": 80
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_task_deliveries",
+      "status": "passed",
+      "rows": 84
+    },
+    {
+      "check": "保存SQLite与JSON事实_project_evaluation_jobs",
+      "status": "passed",
+      "rows": 40
+    },
+    {
+      "check": "保存SQLite与JSON事实_runs",
+      "status": "passed",
+      "rows": 80
+    },
+    {
+      "check": "来源严格释放及边界",
+      "status": "passed",
+      "sources": 80
+    },
+    {
+      "check": "全部实际输入投递来源_1",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 1
+    },
+    {
+      "check": "全部实际输入投递来源_2",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 2
+    },
+    {
+      "check": "全部实际输入投递来源_3",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 3
+    },
+    {
+      "check": "全部实际输入投递来源_4",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 4
+    },
+    {
+      "check": "全部实际输入投递来源_5",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 5
+    },
+    {
+      "check": "全部实际输入投递来源_6",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 6
+    },
+    {
+      "check": "全部实际输入投递来源_7",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 7
+    },
+    {
+      "check": "全部实际输入投递来源_8",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 8
+    },
+    {
+      "check": "全部实际输入投递来源_9",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 9
+    },
+    {
+      "check": "全部实际输入投递来源_10",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 10
+    },
+    {
+      "check": "全部实际输入投递来源_11",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 11
+    },
+    {
+      "check": "全部实际输入投递来源_12",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 12
+    },
+    {
+      "check": "全部实际输入投递来源_13",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 13
+    },
+    {
+      "check": "全部实际输入投递来源_14",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 14
+    },
+    {
+      "check": "全部实际输入投递来源_15",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 15
+    },
+    {
+      "check": "全部实际输入投递来源_16",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 16
+    },
+    {
+      "check": "全部实际输入投递来源_17",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 17
+    },
+    {
+      "check": "全部实际输入投递来源_18",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 18
+    },
+    {
+      "check": "全部实际输入投递来源_19",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 19
+    },
+    {
+      "check": "全部实际输入投递来源_20",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 20
+    },
+    {
+      "check": "全部实际输入投递来源_21",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 21
+    },
+    {
+      "check": "全部实际输入投递来源_22",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 22
+    },
+    {
+      "check": "全部实际输入投递来源_23",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 24
+    },
+    {
+      "check": "全部实际输入投递来源_24",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 25
+    },
+    {
+      "check": "全部实际输入投递来源_25",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 27
+    },
+    {
+      "check": "全部实际输入投递来源_26",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 28
+    },
+    {
+      "check": "全部实际输入投递来源_27",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 29
+    },
+    {
+      "check": "全部实际输入投递来源_28",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 30
+    },
+    {
+      "check": "全部实际输入投递来源_29",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 31
+    },
+    {
+      "check": "全部实际输入投递来源_30",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 32
+    },
+    {
+      "check": "全部实际输入投递来源_31",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 33
+    },
+    {
+      "check": "全部实际输入投递来源_32",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 34
+    },
+    {
+      "check": "全部实际输入投递来源_33",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 35
+    },
+    {
+      "check": "全部实际输入投递来源_34",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 36
+    },
+    {
+      "check": "全部实际输入投递来源_35",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 37
+    },
+    {
+      "check": "全部实际输入投递来源_36",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 38
+    },
+    {
+      "check": "全部实际输入投递来源_37",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 39
+    },
+    {
+      "check": "全部实际输入投递来源_38",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 40
+    },
+    {
+      "check": "全部实际输入投递来源_39",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 41
+    },
+    {
+      "check": "全部实际输入投递来源_40",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 42
+    },
+    {
+      "check": "全部实际输入投递来源_41",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 43
+    },
+    {
+      "check": "全部实际输入投递来源_42",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 44
+    },
+    {
+      "check": "全部实际输入投递来源_43",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 45
+    },
+    {
+      "check": "全部实际输入投递来源_44",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 46
+    },
+    {
+      "check": "全部实际输入投递来源_45",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 47
+    },
+    {
+      "check": "全部实际输入投递来源_46",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 48
+    },
+    {
+      "check": "全部实际输入投递来源_47",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 49
+    },
+    {
+      "check": "全部实际输入投递来源_48",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 50
+    },
+    {
+      "check": "全部实际输入投递来源_49",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 51
+    },
+    {
+      "check": "全部实际输入投递来源_50",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 52
+    },
+    {
+      "check": "全部实际输入投递来源_51",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 53
+    },
+    {
+      "check": "全部实际输入投递来源_52",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 54
+    },
+    {
+      "check": "全部实际输入投递来源_53",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 55
+    },
+    {
+      "check": "全部实际输入投递来源_54",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 56
+    },
+    {
+      "check": "全部实际输入投递来源_55",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 57
+    },
+    {
+      "check": "全部实际输入投递来源_56",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 58
+    },
+    {
+      "check": "全部实际输入投递来源_57",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 59
+    },
+    {
+      "check": "全部实际输入投递来源_58",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 60
+    },
+    {
+      "check": "全部实际输入投递来源_59",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 61
+    },
+    {
+      "check": "全部实际输入投递来源_60",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 62
+    },
+    {
+      "check": "全部实际输入投递来源_61",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 63
+    },
+    {
+      "check": "全部实际输入投递来源_62",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 64
+    },
+    {
+      "check": "全部实际输入投递来源_63",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 65
+    },
+    {
+      "check": "全部实际输入投递来源_64",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 66
+    },
+    {
+      "check": "全部实际输入投递来源_65",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 67
+    },
+    {
+      "check": "全部实际输入投递来源_66",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 68
+    },
+    {
+      "check": "全部实际输入投递来源_67",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 69
+    },
+    {
+      "check": "全部实际输入投递来源_68",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 70
+    },
+    {
+      "check": "全部实际输入投递来源_69",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 71
+    },
+    {
+      "check": "全部实际输入投递来源_70",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 72
+    },
+    {
+      "check": "全部实际输入投递来源_71",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 73
+    },
+    {
+      "check": "全部实际输入投递来源_72",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 74
+    },
+    {
+      "check": "全部实际输入投递来源_73",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 75
+    },
+    {
+      "check": "全部实际输入投递来源_74",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 76
+    },
+    {
+      "check": "全部实际输入投递来源_75",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 77
+    },
+    {
+      "check": "全部实际输入投递来源_76",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 79
+    },
+    {
+      "check": "全部实际输入投递来源_77",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 80
+    },
+    {
+      "check": "全部实际输入投递来源_78",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 82
+    },
+    {
+      "check": "全部实际输入投递来源_79",
+      "status": "passed",
+      "role": "candidate",
+      "delivery_id": 83
+    },
+    {
+      "check": "全部实际输入投递来源_80",
+      "status": "passed",
+      "role": "review",
+      "delivery_id": 84
+    },
+    {
+      "check": "披露实际消费_23",
+      "status": "passed",
+      "task_id": 12,
+      "task_key": "CS-D01",
+      "branch_id": "translator-evidence",
+      "consumed_source_ids": [
+        24
+      ]
+    },
+    {
+      "check": "披露实际消费_26",
+      "status": "passed",
+      "task_id": 6,
+      "task_key": "SL-D01",
+      "branch_id": "renderer-evidence",
+      "consumed_source_ids": [
+        26
+      ]
+    },
+    {
+      "check": "披露实际消费_78",
+      "status": "passed",
+      "task_id": 30,
+      "task_key": "CS-D01",
+      "branch_id": "translator-evidence",
+      "consumed_source_ids": [
+        77
+      ]
+    },
+    {
+      "check": "披露实际消费_81",
+      "status": "passed",
+      "task_id": 36,
+      "task_key": "SL-D01",
+      "branch_id": "renderer-evidence",
+      "consumed_source_ids": [
+        79
+      ]
+    },
+    {
+      "check": "全部冻结分支已消费",
+      "status": "passed",
+      "expected": [
+        [
+          "CS-D01",
+          "translator-evidence"
+        ],
+        [
+          "SL-D01",
+          "renderer-evidence"
+        ]
+      ],
+      "actual": [
+        [
+          "CS-D01",
+          "translator-evidence"
+        ],
+        [
+          "SL-D01",
+          "renderer-evidence"
+        ]
+      ]
+    },
+    {
+      "check": "逐路径必要材料消费_1",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_2",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_3",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_4",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_5",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_6",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "expected": [
+        "renderer-evidence"
+      ],
+      "actual": [
+        "renderer-evidence"
+      ]
+    },
+    {
+      "check": "逐路径必要材料消费_7",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_8",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_9",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_10",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_11",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_12",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "expected": [
+        "translator-evidence"
+      ],
+      "actual": [
+        "translator-evidence"
+      ]
+    },
+    {
+      "check": "逐路径必要材料消费_13",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_14",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_15",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_16",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_17",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_18",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_19",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_20",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_21",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_22",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_23",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_24",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_25",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_26",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_27",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_28",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_29",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_30",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "expected": [
+        "translator-evidence"
+      ],
+      "actual": [
+        "translator-evidence"
+      ]
+    },
+    {
+      "check": "逐路径必要材料消费_31",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_32",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_33",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_34",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_35",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "expected": [],
+      "actual": []
+    },
+    {
+      "check": "逐路径必要材料消费_36",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "expected": [
+        "renderer-evidence"
+      ],
+      "actual": [
+        "renderer-evidence"
+      ]
+    },
+    {
+      "check": "正常披露不增加业务尝试",
+      "status": "passed",
+      "selected_paths": 36,
+      "actual_attempts": 36,
+      "disclosure_deliveries": 4
+    },
+    {
+      "check": "候选实际执行绑定本任务业务尝试",
+      "status": "passed"
+    },
+    {
+      "check": "只读任务不接受代码检查点",
+      "status": "passed",
+      "readonly_paths": 36
+    },
+    {
+      "check": "全部修改目标及重复入口接受",
+      "status": "passed",
+      "accepted_paths": 0,
+      "targets": {}
+    },
+    {
+      "check": "独立场景基线_1",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_1",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_1",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_1",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_1",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_1",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_2",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_2",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_2",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_2",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_2",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_2",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_3",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_3",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_3",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_3",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_3",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_3",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_4",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_4",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_4",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_4",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_4",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_4",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_5",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_5",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_5",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_5",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_5",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_5",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_6",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_6",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_6",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_6",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_6",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_6",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_7",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_7",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_7",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_7",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_7",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_7",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_8",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_8",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_8",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_8",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_8",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_8",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_9",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_9",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_9",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_9",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_9",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_9",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_10",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_10",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_10",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_10",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_10",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_10",
+      "status": "passed",
+      "decision": "disclose",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_11",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_11",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_11",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_11",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_11",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_11",
+      "status": "passed",
+      "decision": "disclose",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_12",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_12",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_12",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_12",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_12",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_12",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_13",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_13",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_13",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_13",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 3
+    },
+    {
+      "check": "评审来源及冻结回答归属_13",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_13",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_14",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_14",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_14",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_14",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 3
+    },
+    {
+      "check": "评审来源及冻结回答归属_14",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_14",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_15",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_15",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_15",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_15",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_15",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_15",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_16",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_16",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_16",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_16",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_16",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_16",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_17",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_17",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_17",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_17",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_17",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_17",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_18",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_18",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_18",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_18",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_18",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_18",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_19",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_19",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_19",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_19",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_19",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_19",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_20",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_20",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_20",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_20",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_20",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_20",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_21",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_21",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_21",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_21",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_21",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_21",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_22",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_22",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_22",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_22",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_22",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_22",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_23",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_23",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_23",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_23",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_23",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_23",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_24",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_24",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_24",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_24",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_24",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_24",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_25",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_25",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_25",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_25",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_25",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_25",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_26",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_26",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_26",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_26",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_26",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_26",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_27",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_27",
+      "status": "passed",
+      "task_key": "CS-U01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_27",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_27",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_27",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_27",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_28",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_28",
+      "status": "passed",
+      "task_key": "SL-U01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_28",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_28",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_28",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_28",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_29",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_29",
+      "status": "passed",
+      "task_key": "CS-U02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_29",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_29",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_29",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_29",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_30",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_30",
+      "status": "passed",
+      "task_key": "SL-C02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_30",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_30",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_30",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_30",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_31",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_31",
+      "status": "passed",
+      "task_key": "CS-C01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_31",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_31",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_31",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_31",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_32",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_32",
+      "status": "passed",
+      "task_key": "SL-U02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_32",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_32",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_32",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_32",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_33",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_33",
+      "status": "passed",
+      "task_key": "SL-C01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_33",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_33",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_33",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_33",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_34",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_34",
+      "status": "passed",
+      "task_key": "SL-P01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_34",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_34",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_34",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_34",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_35",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_35",
+      "status": "passed",
+      "task_key": "CS-P01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_35",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_35",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_35",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_35",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_36",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_36",
+      "status": "passed",
+      "task_key": "CS-C02",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_36",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_36",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_36",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_36",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_37",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_37",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_37",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_37",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_37",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_37",
+      "status": "passed",
+      "decision": "disclose",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_38",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_38",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_38",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_38",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 1
+    },
+    {
+      "check": "评审来源及冻结回答归属_38",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_38",
+      "status": "passed",
+      "decision": "disclose",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_39",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "parent_job_id": null,
+      "library_files": 27
+    },
+    {
+      "check": "候选真实差异和授权范围_39",
+      "status": "passed",
+      "task_key": "CS-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_39",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_39",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 3
+    },
+    {
+      "check": "评审来源及冻结回答归属_39",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_39",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "独立场景基线_40",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "parent_job_id": null,
+      "library_files": 123
+    },
+    {
+      "check": "候选真实差异和授权范围_40",
+      "status": "passed",
+      "task_key": "SL-D01",
+      "changed_files": []
+    },
+    {
+      "check": "回答来源摘要_40",
+      "status": "passed"
+    },
+    {
+      "check": "完整评审输入和依据摘要_40",
+      "status": "passed",
+      "candidate_file_count": 0,
+      "conversation_rows": 3
+    },
+    {
+      "check": "评审来源及冻结回答归属_40",
+      "status": "passed"
+    },
+    {
+      "check": "评审逐项冻结证据与合法结论_40",
+      "status": "passed",
+      "decision": "pass",
+      "criterion_count": 2
+    },
+    {
+      "check": "成果摘要与接受状态_1",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_2",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_3",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_4",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_5",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_6",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_7",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_8",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_9",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_10",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_11",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_12",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_13",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_14",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_15",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_16",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_17",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_18",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_19",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_20",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_21",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_22",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_23",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_24",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_25",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_26",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_27",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_28",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_29",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_30",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_31",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_32",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_33",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_34",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_35",
+      "status": "passed"
+    },
+    {
+      "check": "成果摘要与接受状态_36",
+      "status": "passed"
+    },
+    {
+      "check": "逐评审隔离观测来源全集",
+      "status": "passed",
+      "observations": 40,
+      "review_sources": 40
+    },
+    {
+      "check": "实际私有评审隔离_4",
+      "status": "passed",
+      "run_id": "6c8ee04ca80c",
+      "job_id": 1,
+      "package_sha256": "2adc01ac29920dea1579ce763aed0498f99fd65e227ae58f6a2477b7b77ed84a",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_6",
+      "status": "passed",
+      "run_id": "4ea95ca9f525",
+      "job_id": 2,
+      "package_sha256": "ac03b7c4ccf464843569671f00f39a5095f726bf9ccf62b4effc2ad245fbc27b",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_8",
+      "status": "passed",
+      "run_id": "2cd052ead20c",
+      "job_id": 3,
+      "package_sha256": "1af5bf5087fd3f095e363ed0d8902492cf3a5c662a8d5bad4b7c340670810651",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_10",
+      "status": "passed",
+      "run_id": "b50814b6a916",
+      "job_id": 4,
+      "package_sha256": "8a660f28585a94dc4f5f30c9af510d14e71df38a22be79cc0aa133e30e229383",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_12",
+      "status": "passed",
+      "run_id": "4a6bd368b178",
+      "job_id": 5,
+      "package_sha256": "6e071e4b18823a540e0caec9792d67af6fc08792d83038db4e147f7c8d699736",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_14",
+      "status": "passed",
+      "run_id": "953547aff85b",
+      "job_id": 6,
+      "package_sha256": "eb57ef1a3493c7aa5da0701893bfcbe2faaaaeda407034acef3bbfa1322faedf",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_16",
+      "status": "passed",
+      "run_id": "282f4a4e64fe",
+      "job_id": 7,
+      "package_sha256": "9f85d74ef5551199d8f4914a642a3636352da8bf4a1a95c664d4c3714292f669",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_18",
+      "status": "passed",
+      "run_id": "9b4fd0da2769",
+      "job_id": 8,
+      "package_sha256": "89b8bb911dbe740857bebdc53b9924f239ac2cb90ea5f2bc0dc4abbba30982eb",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_20",
+      "status": "passed",
+      "run_id": "82d6403f7429",
+      "job_id": 9,
+      "package_sha256": "bda9b4457a8f843912d0075e121d872967b42e47437fb5b85a6869927f04d2a2",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_22",
+      "status": "passed",
+      "run_id": "3f5db5d16cb0",
+      "job_id": 10,
+      "package_sha256": "03018804b1342ee0a9fa1015aeb14f2674281e67b443156d4a7f0e79f8387640",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_23",
+      "status": "passed",
+      "run_id": "d76a0f72acc6",
+      "job_id": 11,
+      "package_sha256": "854e77db005e35dcf06e6573ce13516bf870a8fd41cbf8f7232c541c30939a7b",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_25",
+      "status": "passed",
+      "run_id": "65e551902707",
+      "job_id": 12,
+      "package_sha256": "6de82168ec4bd0a7a7a999e187072737cfb6ccddfa54b4b02c14608508f26b67",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_27",
+      "status": "passed",
+      "run_id": "461f41428611",
+      "job_id": 13,
+      "package_sha256": "758385ca1b305751024f3d047247ab5528715d37e76f1506e2b8c2708c3b36cf",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_28",
+      "status": "passed",
+      "run_id": "851cb6296e94",
+      "job_id": 14,
+      "package_sha256": "6cc8d9387211cf229c09d531cdcda6b6ffb537ffcecff05ab69b60aa38c27329",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_33",
+      "status": "passed",
+      "run_id": "4320dcbb2fbe",
+      "job_id": 15,
+      "package_sha256": "42e5d2f3c4dbec1c6281a7342bffb64a4b796c54f7ac55cdb2fd90c9c543a666",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_35",
+      "status": "passed",
+      "run_id": "e19a34194bfb",
+      "job_id": 16,
+      "package_sha256": "7da5bc58f484c157665d71930ee461389d603df19bfd69466def440376436a2a",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_37",
+      "status": "passed",
+      "run_id": "a31eda010de7",
+      "job_id": 17,
+      "package_sha256": "8eb6078162ac773e48b43a2933aeadbfffea927f09e2073404881dc34fa7764d",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_39",
+      "status": "passed",
+      "run_id": "172a3495c2a4",
+      "job_id": 18,
+      "package_sha256": "2fc014c602310e3d37516386543ee02d142790757b06e68a2233db2f12c0cf25",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_41",
+      "status": "passed",
+      "run_id": "a8aa23931cb2",
+      "job_id": 19,
+      "package_sha256": "cc6c7bc606c93e5ff69b0f11d29d1a8fcc1b570152a974fed8bd10ddaeb06bcd",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_43",
+      "status": "passed",
+      "run_id": "5fcb2b366d87",
+      "job_id": 20,
+      "package_sha256": "007f5ed3b7c6ae874ce4c9fc5d01f996cd76579af71558300a3368b30af1876f",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_45",
+      "status": "passed",
+      "run_id": "4c24619172a0",
+      "job_id": 21,
+      "package_sha256": "a254e634272a4c280271a9a7f8a7f3bf3edf30653ce22277573d55ae922eba47",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_47",
+      "status": "passed",
+      "run_id": "cc46434decf3",
+      "job_id": 22,
+      "package_sha256": "22bd676cfe790351185b28f8efc836c38ac1ec34b3b34e84983030dcdd8657a1",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_49",
+      "status": "passed",
+      "run_id": "4e7c17675329",
+      "job_id": 23,
+      "package_sha256": "dac7433739c1993e699a1a41409e028a1630b659312927d6ea960d375119b740",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_50",
+      "status": "passed",
+      "run_id": "f33408598699",
+      "job_id": 24,
+      "package_sha256": "691b1e5b93a7bff1f6ef4264a9a2e4d25ee000ba755e253f7a56386e6e8b73fd",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_51",
+      "status": "passed",
+      "run_id": "03ab952daf28",
+      "job_id": 25,
+      "package_sha256": "984c14a7514bc2c60d58810556664e1442a810b0b7782d33fbac22d74b9f7243",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_52",
+      "status": "passed",
+      "run_id": "7c069e320a95",
+      "job_id": 26,
+      "package_sha256": "025f178f5fac13ff0db4e5f79205d5d6220f9671975cded825c0e47a1d52c4b3",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_57",
+      "status": "passed",
+      "run_id": "44fdcd3c4822",
+      "job_id": 27,
+      "package_sha256": "7f292e333d932720babb6f61337915eb6d922e0bae9e7b8f49e686c47f3da1c1",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_59",
+      "status": "passed",
+      "run_id": "222eeba56f3f",
+      "job_id": 28,
+      "package_sha256": "67aea28a6dc17d09519f76250a311879c17f0319f04d2d405e9862a6478f2178",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_61",
+      "status": "passed",
+      "run_id": "71c0aa8bb233",
+      "job_id": 29,
+      "package_sha256": "80b4f251caa16a74268e9bc683a0d2bb25752a25a38033d2e061ab1b472a1814",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_63",
+      "status": "passed",
+      "run_id": "15a6b094aa14",
+      "job_id": 30,
+      "package_sha256": "035af9fa0ed677a9dc2ef5b1bd1897f7db5ce30b4a208fc22570065d9dd41b67",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_65",
+      "status": "passed",
+      "run_id": "cba8d51a3db2",
+      "job_id": 31,
+      "package_sha256": "f53f012b2e3456014eeebc086bbb6e5df5fa1009f161f5ed732065e09e946a6c",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_67",
+      "status": "passed",
+      "run_id": "229376e3b6e5",
+      "job_id": 32,
+      "package_sha256": "dacbd1cc3339814077f6f398bafa3fb4d2e0f4f8e59362ce40509618dc7ab0a5",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_69",
+      "status": "passed",
+      "run_id": "2a5e37b1ff15",
+      "job_id": 33,
+      "package_sha256": "7eb98b4ed43c5bb550987157cf017759e4228482aec5260bcdf1ba8dc75e816f",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_71",
+      "status": "passed",
+      "run_id": "3a4e9e26aa98",
+      "job_id": 34,
+      "package_sha256": "2eebe037e865bc42dea7d09af80408858890b4fd90e22c589655729a0668364d",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_73",
+      "status": "passed",
+      "run_id": "6294039d69d8",
+      "job_id": 35,
+      "package_sha256": "38ea9fb2cc0e34e94f32ab81d04cfc0d85a08bcca3662c45964ff10937fe75c2",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_74",
+      "status": "passed",
+      "run_id": "b1fd291c5cc2",
+      "job_id": 36,
+      "package_sha256": "99950508abfc40aba4d5f0a7e309f03a08d8997e4a6eddcaa24c58113a99059d",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_75",
+      "status": "passed",
+      "run_id": "2c9882a9c4ce",
+      "job_id": 37,
+      "package_sha256": "9957c70fe08eebad14226214873b2209d3c26a35eb9e77aed4dc312359b416e1",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_76",
+      "status": "passed",
+      "run_id": "a0e85cced26a",
+      "job_id": 38,
+      "package_sha256": "fd8f87eaf00375d20e9091a1c4d99ba534f5456f026041afeb98bb51c8716ab5",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_78",
+      "status": "passed",
+      "run_id": "491acc5a2e33",
+      "job_id": 39,
+      "package_sha256": "a8df5f34a91af0efddf17e559dc094cc38b0b1d8464d2f469d6e0c62032c2bd8",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "实际私有评审隔离_80",
+      "status": "passed",
+      "run_id": "53c97c6a913d",
+      "job_id": 40,
+      "package_sha256": "8b6057d590665059e192eb38eb70e4e76eb4fd6339411f597b7b46deee0b96ca",
+      "candidate_mount_count": 18
+    },
+    {
+      "check": "原生监督进程严格退出_1",
+      "status": "passed",
+      "source": "run:a610c4c47527:0",
+      "process_pid": 91,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_2",
+      "status": "passed",
+      "source": "run:94834d661506:0",
+      "process_pid": 383,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_3",
+      "status": "passed",
+      "source": "run:969a74c9fe02:0",
+      "process_pid": 753,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_4",
+      "status": "passed",
+      "source": "run:6c8ee04ca80c:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_5",
+      "status": "passed",
+      "source": "run:2587b78d4f19:0",
+      "process_pid": 1470,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_6",
+      "status": "passed",
+      "source": "run:4ea95ca9f525:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_7",
+      "status": "passed",
+      "source": "run:46a17942b199:0",
+      "process_pid": 1939,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_8",
+      "status": "passed",
+      "source": "run:2cd052ead20c:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_9",
+      "status": "passed",
+      "source": "run:b9a90b0eab45:0",
+      "process_pid": 2407,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_10",
+      "status": "passed",
+      "source": "run:b50814b6a916:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_11",
+      "status": "passed",
+      "source": "run:4824695d0be3:0",
+      "process_pid": 2876,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_12",
+      "status": "passed",
+      "source": "run:4a6bd368b178:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_13",
+      "status": "passed",
+      "source": "run:95e61c264822:0",
+      "process_pid": 3345,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_14",
+      "status": "passed",
+      "source": "run:953547aff85b:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_15",
+      "status": "passed",
+      "source": "run:a76eaaed37a8:0",
+      "process_pid": 3813,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_16",
+      "status": "passed",
+      "source": "run:282f4a4e64fe:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_17",
+      "status": "passed",
+      "source": "run:41e3f69663df:0",
+      "process_pid": 4281,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_18",
+      "status": "passed",
+      "source": "run:9b4fd0da2769:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_19",
+      "status": "passed",
+      "source": "run:d34d0e035f2c:0",
+      "process_pid": 4743,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_20",
+      "status": "passed",
+      "source": "run:82d6403f7429:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_21",
+      "status": "passed",
+      "source": "run:decd67bff8ce:0",
+      "process_pid": 5206,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_22",
+      "status": "passed",
+      "source": "run:3f5db5d16cb0:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_23",
+      "status": "passed",
+      "source": "run:d76a0f72acc6:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_24",
+      "status": "passed",
+      "source": "run:4638dd4370f1:0",
+      "process_pid": 5686,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_25",
+      "status": "passed",
+      "source": "run:65e551902707:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_26",
+      "status": "passed",
+      "source": "run:75a05d20eb06:0",
+      "process_pid": 6152,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_27",
+      "status": "passed",
+      "source": "run:461f41428611:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_28",
+      "status": "passed",
+      "source": "run:851cb6296e94:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_29",
+      "status": "passed",
+      "source": "run:a27732902c5f:0",
+      "process_pid": 6631,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_30",
+      "status": "passed",
+      "source": "run:df417d2583c1:0",
+      "process_pid": 6732,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_31",
+      "status": "passed",
+      "source": "run:5c90a9d88728:0",
+      "process_pid": 7530,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_32",
+      "status": "passed",
+      "source": "run:6b97a730ec94:0",
+      "process_pid": 7643,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_33",
+      "status": "passed",
+      "source": "run:4320dcbb2fbe:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_34",
+      "status": "passed",
+      "source": "run:2cf71e31839a:0",
+      "process_pid": 8467,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_35",
+      "status": "passed",
+      "source": "run:e19a34194bfb:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_36",
+      "status": "passed",
+      "source": "run:6e80a98cb372:0",
+      "process_pid": 8936,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_37",
+      "status": "passed",
+      "source": "run:a31eda010de7:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_38",
+      "status": "passed",
+      "source": "run:b5094bc09886:0",
+      "process_pid": 9404,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_39",
+      "status": "passed",
+      "source": "run:172a3495c2a4:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_40",
+      "status": "passed",
+      "source": "run:906f12296d8e:0",
+      "process_pid": 9874,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_41",
+      "status": "passed",
+      "source": "run:a8aa23931cb2:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_42",
+      "status": "passed",
+      "source": "run:7007aff8f300:0",
+      "process_pid": 10334,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_43",
+      "status": "passed",
+      "source": "run:5fcb2b366d87:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_44",
+      "status": "passed",
+      "source": "run:a31c7c9db6db:0",
+      "process_pid": 10803,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_45",
+      "status": "passed",
+      "source": "run:4c24619172a0:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_46",
+      "status": "passed",
+      "source": "run:898f47c95188:0",
+      "process_pid": 11270,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_47",
+      "status": "passed",
+      "source": "run:cc46434decf3:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_48",
+      "status": "passed",
+      "source": "run:8cfe81b10ffe:0",
+      "process_pid": 11738,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_49",
+      "status": "passed",
+      "source": "run:4e7c17675329:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_50",
+      "status": "passed",
+      "source": "run:f33408598699:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_51",
+      "status": "passed",
+      "source": "run:03ab952daf28:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_52",
+      "status": "passed",
+      "source": "run:7c069e320a95:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_53",
+      "status": "passed",
+      "source": "run:1e4ca1a49905:0",
+      "process_pid": 12243,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_54",
+      "status": "passed",
+      "source": "run:89e6b07cab5f:0",
+      "process_pid": 12344,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_55",
+      "status": "passed",
+      "source": "run:41f3ca6f0849:0",
+      "process_pid": 13143,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_56",
+      "status": "passed",
+      "source": "run:7912f56691fe:0",
+      "process_pid": 13256,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_57",
+      "status": "passed",
+      "source": "run:44fdcd3c4822:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_58",
+      "status": "passed",
+      "source": "run:0172cda8a284:0",
+      "process_pid": 14080,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_59",
+      "status": "passed",
+      "source": "run:222eeba56f3f:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_60",
+      "status": "passed",
+      "source": "run:37d8d6f87db0:0",
+      "process_pid": 14548,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_61",
+      "status": "passed",
+      "source": "run:71c0aa8bb233:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_62",
+      "status": "passed",
+      "source": "run:533cad66fe4e:0",
+      "process_pid": 15017,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_63",
+      "status": "passed",
+      "source": "run:15a6b094aa14:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_64",
+      "status": "passed",
+      "source": "run:be10160612c1:0",
+      "process_pid": 15485,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_65",
+      "status": "passed",
+      "source": "run:cba8d51a3db2:0",
+      "process_pid": 6,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_66",
+      "status": "passed",
+      "source": "run:ad9da6ba5369:0",
+      "process_pid": 15951,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_67",
+      "status": "passed",
+      "source": "run:229376e3b6e5:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_68",
+      "status": "passed",
+      "source": "run:6cd87249235c:0",
+      "process_pid": 16418,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_69",
+      "status": "passed",
+      "source": "run:2a5e37b1ff15:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_70",
+      "status": "passed",
+      "source": "run:15acff390e8b:0",
+      "process_pid": 16886,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_71",
+      "status": "passed",
+      "source": "run:3a4e9e26aa98:0",
+      "process_pid": 8,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_72",
+      "status": "passed",
+      "source": "run:4d0726e3ea0f:0",
+      "process_pid": 17351,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_73",
+      "status": "passed",
+      "source": "run:6294039d69d8:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_74",
+      "status": "passed",
+      "source": "run:b1fd291c5cc2:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_75",
+      "status": "passed",
+      "source": "run:2c9882a9c4ce:0",
+      "process_pid": 8,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_76",
+      "status": "passed",
+      "source": "run:a0e85cced26a:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_77",
+      "status": "passed",
+      "source": "run:845a2ec2e5ca:0",
+      "process_pid": 17852,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_78",
+      "status": "passed",
+      "source": "run:491acc5a2e33:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_79",
+      "status": "passed",
+      "source": "run:236ae2bbc0c3:0",
+      "process_pid": 18319,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生监督进程严格退出_80",
+      "status": "passed",
+      "source": "run:53c97c6a913d:0",
+      "process_pid": 7,
+      "cleaned": true,
+      "exit_code": 0
+    },
+    {
+      "check": "原生单调工作区间共享容量",
+      "status": "passed",
+      "maximum_work_by_boot": {
+        "cfadecab-01ae-4110-84c1-9b9e6f2d5798": 2
+      },
+      "reported_sampled_holders": 2,
+      "cleaned_processes": 80
+    },
+    {
+      "check": "原生单调计时片段_1",
+      "status": "passed",
+      "elapsed_sec": 3.428639520003344,
+      "confirmed_sec": 3.428639520003344,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_2",
+      "status": "passed",
+      "elapsed_sec": 4.1805432950059185,
+      "confirmed_sec": 4.1805432950059185,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_3",
+      "status": "passed",
+      "elapsed_sec": 3.4090640939975856,
+      "confirmed_sec": 3.4090640939975856,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_4",
+      "status": "passed",
+      "elapsed_sec": 3.8204463360016234,
+      "confirmed_sec": 3.8204463360016234,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_5",
+      "status": "passed",
+      "elapsed_sec": 3.11655855900608,
+      "confirmed_sec": 3.11655855900608,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_6",
+      "status": "passed",
+      "elapsed_sec": 2.6067151699971873,
+      "confirmed_sec": 2.6067151699971873,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_7",
+      "status": "passed",
+      "elapsed_sec": 3.5243545949924737,
+      "confirmed_sec": 3.5243545949924737,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_8",
+      "status": "passed",
+      "elapsed_sec": 3.4273862919944804,
+      "confirmed_sec": 3.4273862919944804,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_9",
+      "status": "passed",
+      "elapsed_sec": 3.7464466919918777,
+      "confirmed_sec": 3.7464466919918777,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_10",
+      "status": "passed",
+      "elapsed_sec": 3.389789426000789,
+      "confirmed_sec": 3.389789426000789,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_11",
+      "status": "passed",
+      "elapsed_sec": 3.176141018004273,
+      "confirmed_sec": 3.176141018004273,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_12",
+      "status": "passed",
+      "elapsed_sec": 3.566367450999678,
+      "confirmed_sec": 3.566367450999678,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_13",
+      "status": "passed",
+      "elapsed_sec": 3.4785392780031543,
+      "confirmed_sec": 3.4785392780031543,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_14",
+      "status": "passed",
+      "elapsed_sec": 3.313140971993562,
+      "confirmed_sec": 3.313140971993562,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_15",
+      "status": "passed",
+      "elapsed_sec": 2.8488613689987687,
+      "confirmed_sec": 2.8488613689987687,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_16",
+      "status": "passed",
+      "elapsed_sec": 5.87273227100377,
+      "confirmed_sec": 5.87273227100377,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_17",
+      "status": "passed",
+      "elapsed_sec": 4.135185653998633,
+      "confirmed_sec": 4.135185653998633,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_18",
+      "status": "passed",
+      "elapsed_sec": 4.069368083000882,
+      "confirmed_sec": 4.069368083000882,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_19",
+      "status": "passed",
+      "elapsed_sec": 3.4760599290020764,
+      "confirmed_sec": 3.4760599290020764,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_20",
+      "status": "passed",
+      "elapsed_sec": 1.832161124999402,
+      "confirmed_sec": 1.832161124999402,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_21",
+      "status": "passed",
+      "elapsed_sec": 4.043483932997333,
+      "confirmed_sec": 4.043483932997333,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_22",
+      "status": "passed",
+      "elapsed_sec": 3.25874095200561,
+      "confirmed_sec": 3.25874095200561,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_23",
+      "status": "passed",
+      "elapsed_sec": 3.314140877992031,
+      "confirmed_sec": 3.314140877992031,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_24",
+      "status": "passed",
+      "elapsed_sec": 2.7578038459905656,
+      "confirmed_sec": 2.7578038459905656,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_25",
+      "status": "passed",
+      "elapsed_sec": 2.8261528679868206,
+      "confirmed_sec": 2.8261528679868206,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_26",
+      "status": "passed",
+      "elapsed_sec": 4.341023069995572,
+      "confirmed_sec": 4.341023069995572,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_27",
+      "status": "passed",
+      "elapsed_sec": 3.9879545779986074,
+      "confirmed_sec": 3.9879545779986074,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_28",
+      "status": "passed",
+      "elapsed_sec": 4.234576905000722,
+      "confirmed_sec": 4.234576905000722,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_29",
+      "status": "passed",
+      "elapsed_sec": 3.054151845994056,
+      "confirmed_sec": 3.054151845994056,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_30",
+      "status": "passed",
+      "elapsed_sec": 3.3100088979990687,
+      "confirmed_sec": 3.3100088979990687,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_31",
+      "status": "passed",
+      "elapsed_sec": 2.680197882989887,
+      "confirmed_sec": 2.680197882989887,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_32",
+      "status": "passed",
+      "elapsed_sec": 2.8695434969995404,
+      "confirmed_sec": 2.8695434969995404,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_33",
+      "status": "passed",
+      "elapsed_sec": 3.9770456459955312,
+      "confirmed_sec": 3.9770456459955312,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_34",
+      "status": "passed",
+      "elapsed_sec": 2.841259333989001,
+      "confirmed_sec": 2.841259333989001,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_35",
+      "status": "passed",
+      "elapsed_sec": 3.3095678760000737,
+      "confirmed_sec": 3.3095678760000737,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_36",
+      "status": "passed",
+      "elapsed_sec": 2.7309442499972647,
+      "confirmed_sec": 2.7309442499972647,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_37",
+      "status": "passed",
+      "elapsed_sec": 3.2985622069973033,
+      "confirmed_sec": 3.2985622069973033,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_38",
+      "status": "passed",
+      "elapsed_sec": 2.63769740400312,
+      "confirmed_sec": 2.63769740400312,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_39",
+      "status": "passed",
+      "elapsed_sec": 2.977025006999611,
+      "confirmed_sec": 2.977025006999611,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_40",
+      "status": "passed",
+      "elapsed_sec": 2.557519311012584,
+      "confirmed_sec": 2.557519311012584,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_41",
+      "status": "passed",
+      "elapsed_sec": 3.366676452002139,
+      "confirmed_sec": 3.366676452002139,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_42",
+      "status": "passed",
+      "elapsed_sec": 2.5824552229896653,
+      "confirmed_sec": 2.5824552229896653,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_43",
+      "status": "passed",
+      "elapsed_sec": 3.1454606120096287,
+      "confirmed_sec": 3.1454606120096287,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_44",
+      "status": "passed",
+      "elapsed_sec": 2.758422803002759,
+      "confirmed_sec": 2.758422803002759,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_45",
+      "status": "passed",
+      "elapsed_sec": 3.3486641830095323,
+      "confirmed_sec": 3.3486641830095323,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_46",
+      "status": "passed",
+      "elapsed_sec": 2.833533693992649,
+      "confirmed_sec": 2.833533693992649,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_47",
+      "status": "passed",
+      "elapsed_sec": 5.393236657997477,
+      "confirmed_sec": 5.393236657997477,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_48",
+      "status": "passed",
+      "elapsed_sec": 3.214838301995769,
+      "confirmed_sec": 3.214838301995769,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_49",
+      "status": "passed",
+      "elapsed_sec": 1.4659071539936122,
+      "confirmed_sec": 1.4659071539936122,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_50",
+      "status": "passed",
+      "elapsed_sec": 3.9165516779903555,
+      "confirmed_sec": 3.9165516779903555,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_51",
+      "status": "passed",
+      "elapsed_sec": 3.626413769001374,
+      "confirmed_sec": 3.626413769001374,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_52",
+      "status": "passed",
+      "elapsed_sec": 1.4040473709901562,
+      "confirmed_sec": 1.4040473709901562,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_53",
+      "status": "passed",
+      "elapsed_sec": 3.2490213199926075,
+      "confirmed_sec": 3.2490213199926075,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_54",
+      "status": "passed",
+      "elapsed_sec": 3.5787254559982102,
+      "confirmed_sec": 3.5787254559982102,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_55",
+      "status": "passed",
+      "elapsed_sec": 2.571409277006751,
+      "confirmed_sec": 2.571409277006751,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_56",
+      "status": "passed",
+      "elapsed_sec": 2.7381064950022846,
+      "confirmed_sec": 2.7381064950022846,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_57",
+      "status": "passed",
+      "elapsed_sec": 1.859075964006479,
+      "confirmed_sec": 1.859075964006479,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_58",
+      "status": "passed",
+      "elapsed_sec": 3.4904783550009597,
+      "confirmed_sec": 3.4904783550009597,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_59",
+      "status": "passed",
+      "elapsed_sec": 1.8893032729974948,
+      "confirmed_sec": 1.8893032729974948,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_60",
+      "status": "passed",
+      "elapsed_sec": 4.772319672993035,
+      "confirmed_sec": 4.772319672993035,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_61",
+      "status": "passed",
+      "elapsed_sec": 5.175830952008255,
+      "confirmed_sec": 5.175830952008255,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_62",
+      "status": "passed",
+      "elapsed_sec": 3.7715080929920077,
+      "confirmed_sec": 3.7715080929920077,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_63",
+      "status": "passed",
+      "elapsed_sec": 2.22298380000575,
+      "confirmed_sec": 2.22298380000575,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_64",
+      "status": "passed",
+      "elapsed_sec": 4.014116641992587,
+      "confirmed_sec": 4.014116641992587,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_65",
+      "status": "passed",
+      "elapsed_sec": 4.670505774993217,
+      "confirmed_sec": 4.670505774993217,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_66",
+      "status": "passed",
+      "elapsed_sec": 3.36349315699772,
+      "confirmed_sec": 3.36349315699772,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_67",
+      "status": "passed",
+      "elapsed_sec": 3.0113848129985854,
+      "confirmed_sec": 3.0113848129985854,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_68",
+      "status": "passed",
+      "elapsed_sec": 3.503748008995899,
+      "confirmed_sec": 3.503748008995899,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_69",
+      "status": "passed",
+      "elapsed_sec": 4.024521678002202,
+      "confirmed_sec": 4.024521678002202,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_70",
+      "status": "passed",
+      "elapsed_sec": 3.9380920250114286,
+      "confirmed_sec": 3.9380920250114286,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_71",
+      "status": "passed",
+      "elapsed_sec": 3.4120527930062963,
+      "confirmed_sec": 3.4120527930062963,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_72",
+      "status": "passed",
+      "elapsed_sec": 2.9400259440008085,
+      "confirmed_sec": 2.9400259440008085,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_73",
+      "status": "passed",
+      "elapsed_sec": 3.6010893730126554,
+      "confirmed_sec": 3.6010893730126554,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_74",
+      "status": "passed",
+      "elapsed_sec": 4.892681742989225,
+      "confirmed_sec": 4.892681742989225,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_75",
+      "status": "passed",
+      "elapsed_sec": 3.1926520689885365,
+      "confirmed_sec": 3.1926520689885365,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_76",
+      "status": "passed",
+      "elapsed_sec": 3.1109259670047322,
+      "confirmed_sec": 3.1109259670047322,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_77",
+      "status": "passed",
+      "elapsed_sec": 2.605124075009371,
+      "confirmed_sec": 2.605124075009371,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_78",
+      "status": "passed",
+      "elapsed_sec": 4.004212056999677,
+      "confirmed_sec": 4.004212056999677,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "原生单调计时片段_79",
+      "status": "passed",
+      "elapsed_sec": 3.1036330470087705,
+      "confirmed_sec": 3.1036330470087705,
+      "reserved_sec": 60.0
+    },
+    {
+      "check": "原生单调计时片段_80",
+      "status": "passed",
+      "elapsed_sec": 3.380723972004489,
+      "confirmed_sec": 3.380723972004489,
+      "reserved_sec": 180.0
+    },
+    {
+      "check": "角色计量_1_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_1_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_1_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_1_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_2_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_2_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_2_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_2_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_3_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_3_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_3_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_3_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_4_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_4_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_4_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_4_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_5_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_5_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_5_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_5_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_6_candidate",
+      "status": "passed",
+      "sources": 2,
+      "known_sources": 2,
+      "complete": true
+    },
+    {
+      "check": "角色预算_6_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_6_review",
+      "status": "passed",
+      "sources": 2,
+      "known_sources": 2,
+      "complete": true
+    },
+    {
+      "check": "角色预算_6_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_7_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_7_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_7_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_7_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_8_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_8_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_8_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_8_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_9_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_9_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_9_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_9_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_10_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_10_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_10_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_10_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_11_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_11_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_11_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_11_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_12_candidate",
+      "status": "passed",
+      "sources": 2,
+      "known_sources": 2,
+      "complete": true
+    },
+    {
+      "check": "角色预算_12_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_12_review",
+      "status": "passed",
+      "sources": 2,
+      "known_sources": 2,
+      "complete": true
+    },
+    {
+      "check": "角色预算_12_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_13_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_13_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_13_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_13_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_14_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_14_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_14_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_14_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_15_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_15_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_15_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_15_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_16_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_16_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_16_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_16_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_17_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_17_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_17_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_17_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_18_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_18_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_18_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_18_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_19_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_19_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_19_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_19_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_20_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_20_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_20_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_20_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_21_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_21_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_21_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_21_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_22_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_22_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_22_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_22_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_23_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_23_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_23_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_23_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_24_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_24_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_24_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_24_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_25_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_25_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_25_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_25_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_26_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_26_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_26_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_26_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_27_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_27_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_27_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_27_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_28_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_28_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_28_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_28_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_29_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_29_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_29_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_29_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_30_candidate",
+      "status": "passed",
+      "sources": 2,
+      "known_sources": 2,
+      "complete": true
+    },
+    {
+      "check": "角色预算_30_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_30_review",
+      "status": "passed",
+      "sources": 2,
+      "known_sources": 2,
+      "complete": true
+    },
+    {
+      "check": "角色预算_30_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_31_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_31_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_31_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_31_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_32_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_32_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_32_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_32_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_33_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_33_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_33_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_33_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_34_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_34_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_34_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_34_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_35_candidate",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_35_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_35_review",
+      "status": "passed",
+      "sources": 1,
+      "known_sources": 1,
+      "complete": true
+    },
+    {
+      "check": "角色预算_35_review",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_36_candidate",
+      "status": "passed",
+      "sources": 2,
+      "known_sources": 2,
+      "complete": true
+    },
+    {
+      "check": "角色预算_36_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "角色计量_36_review",
+      "status": "passed",
+      "sources": 2,
+      "known_sources": 2,
+      "complete": true
+    },
+    {
+      "check": "角色预算_36_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_1_consult_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_1_consult_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_1_diagnose_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_1_diagnose_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_1_plan_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_1_plan_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_1_understand_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_1_understand_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_2_consult_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_2_consult_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_2_diagnose_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_2_diagnose_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_2_plan_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_2_plan_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_2_understand_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_2_understand_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_3_consult_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_3_consult_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_3_diagnose_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_3_diagnose_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_3_plan_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_3_plan_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_3_understand_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_3_understand_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_4_consult_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_4_consult_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_4_diagnose_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_4_diagnose_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_4_plan_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_4_plan_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_4_understand_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_4_understand_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_5_consult_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_5_consult_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_5_diagnose_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_5_diagnose_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_5_plan_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_5_plan_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_5_understand_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_5_understand_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_6_consult_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_6_consult_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_6_diagnose_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_6_diagnose_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_6_plan_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_6_plan_review",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_6_understand_candidate",
+      "status": "passed"
+    },
+    {
+      "check": "分类角色计量_6_understand_review",
+      "status": "passed"
+    },
+    {
+      "check": "时间片完整结算",
+      "status": "passed",
+      "status_counts": {
+        "settled": 80
+      }
+    },
+    {
+      "check": "冻结回答评审预算_1",
+      "status": "passed",
+      "charged_sec": 3.8204463360016234,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_2",
+      "status": "passed",
+      "charged_sec": 2.6067151699971873,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_3",
+      "status": "passed",
+      "charged_sec": 3.4273862919944804,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_4",
+      "status": "passed",
+      "charged_sec": 3.389789426000789,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_5",
+      "status": "passed",
+      "charged_sec": 3.566367450999678,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_6",
+      "status": "passed",
+      "charged_sec": 3.313140971993562,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_7",
+      "status": "passed",
+      "charged_sec": 5.87273227100377,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_8",
+      "status": "passed",
+      "charged_sec": 4.069368083000882,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_9",
+      "status": "passed",
+      "charged_sec": 1.832161124999402,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_10",
+      "status": "passed",
+      "charged_sec": 3.25874095200561,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_11",
+      "status": "passed",
+      "charged_sec": 3.314140877992031,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_12",
+      "status": "passed",
+      "charged_sec": 2.8261528679868206,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_13",
+      "status": "passed",
+      "charged_sec": 3.9879545779986074,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_14",
+      "status": "passed",
+      "charged_sec": 4.234576905000722,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_15",
+      "status": "passed",
+      "charged_sec": 3.9770456459955312,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_16",
+      "status": "passed",
+      "charged_sec": 3.3095678760000737,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_17",
+      "status": "passed",
+      "charged_sec": 3.2985622069973033,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_18",
+      "status": "passed",
+      "charged_sec": 2.977025006999611,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_19",
+      "status": "passed",
+      "charged_sec": 3.366676452002139,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_20",
+      "status": "passed",
+      "charged_sec": 3.1454606120096287,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_21",
+      "status": "passed",
+      "charged_sec": 3.3486641830095323,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_22",
+      "status": "passed",
+      "charged_sec": 5.393236657997477,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_23",
+      "status": "passed",
+      "charged_sec": 1.4659071539936122,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_24",
+      "status": "passed",
+      "charged_sec": 3.9165516779903555,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_25",
+      "status": "passed",
+      "charged_sec": 3.626413769001374,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_26",
+      "status": "passed",
+      "charged_sec": 1.4040473709901562,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_27",
+      "status": "passed",
+      "charged_sec": 1.859075964006479,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_28",
+      "status": "passed",
+      "charged_sec": 1.8893032729974948,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_29",
+      "status": "passed",
+      "charged_sec": 5.175830952008255,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_30",
+      "status": "passed",
+      "charged_sec": 2.22298380000575,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_31",
+      "status": "passed",
+      "charged_sec": 4.670505774993217,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_32",
+      "status": "passed",
+      "charged_sec": 3.0113848129985854,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_33",
+      "status": "passed",
+      "charged_sec": 4.024521678002202,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_34",
+      "status": "passed",
+      "charged_sec": 3.4120527930062963,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_35",
+      "status": "passed",
+      "charged_sec": 3.6010893730126554,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_36",
+      "status": "passed",
+      "charged_sec": 4.892681742989225,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_37",
+      "status": "passed",
+      "charged_sec": 3.1926520689885365,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_38",
+      "status": "passed",
+      "charged_sec": 3.1109259670047322,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_39",
+      "status": "passed",
+      "charged_sec": 4.004212056999677,
+      "limit_sec": 360
+    },
+    {
+      "check": "冻结回答评审预算_40",
+      "status": "passed",
+      "charged_sec": 3.380723972004489,
+      "limit_sec": 360
+    },
+    {
+      "check": "逻辑评审尝试预算_1_1",
+      "status": "passed",
+      "charged_sec": 3.8204463360016234,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_2_1",
+      "status": "passed",
+      "charged_sec": 2.6067151699971873,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_3_1",
+      "status": "passed",
+      "charged_sec": 3.4273862919944804,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_4_1",
+      "status": "passed",
+      "charged_sec": 3.389789426000789,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_5_1",
+      "status": "passed",
+      "charged_sec": 3.566367450999678,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_6_1",
+      "status": "passed",
+      "charged_sec": 3.313140971993562,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_7_1",
+      "status": "passed",
+      "charged_sec": 5.87273227100377,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_8_1",
+      "status": "passed",
+      "charged_sec": 4.069368083000882,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_9_1",
+      "status": "passed",
+      "charged_sec": 1.832161124999402,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_10_1",
+      "status": "passed",
+      "charged_sec": 3.25874095200561,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_11_1",
+      "status": "passed",
+      "charged_sec": 3.314140877992031,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_12_1",
+      "status": "passed",
+      "charged_sec": 2.8261528679868206,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_13_1",
+      "status": "passed",
+      "charged_sec": 3.9879545779986074,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_14_1",
+      "status": "passed",
+      "charged_sec": 4.234576905000722,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_15_1",
+      "status": "passed",
+      "charged_sec": 3.9770456459955312,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_16_1",
+      "status": "passed",
+      "charged_sec": 3.3095678760000737,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_17_1",
+      "status": "passed",
+      "charged_sec": 3.2985622069973033,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_18_1",
+      "status": "passed",
+      "charged_sec": 2.977025006999611,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_19_1",
+      "status": "passed",
+      "charged_sec": 3.366676452002139,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_20_1",
+      "status": "passed",
+      "charged_sec": 3.1454606120096287,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_21_1",
+      "status": "passed",
+      "charged_sec": 3.3486641830095323,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_22_1",
+      "status": "passed",
+      "charged_sec": 5.393236657997477,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_23_1",
+      "status": "passed",
+      "charged_sec": 1.4659071539936122,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_24_1",
+      "status": "passed",
+      "charged_sec": 3.9165516779903555,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_25_1",
+      "status": "passed",
+      "charged_sec": 3.626413769001374,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_26_1",
+      "status": "passed",
+      "charged_sec": 1.4040473709901562,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_27_1",
+      "status": "passed",
+      "charged_sec": 1.859075964006479,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_28_1",
+      "status": "passed",
+      "charged_sec": 1.8893032729974948,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_29_1",
+      "status": "passed",
+      "charged_sec": 5.175830952008255,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_30_1",
+      "status": "passed",
+      "charged_sec": 2.22298380000575,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_31_1",
+      "status": "passed",
+      "charged_sec": 4.670505774993217,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_32_1",
+      "status": "passed",
+      "charged_sec": 3.0113848129985854,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_33_1",
+      "status": "passed",
+      "charged_sec": 4.024521678002202,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_34_1",
+      "status": "passed",
+      "charged_sec": 3.4120527930062963,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_35_1",
+      "status": "passed",
+      "charged_sec": 3.6010893730126554,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_36_1",
+      "status": "passed",
+      "charged_sec": 4.892681742989225,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_37_1",
+      "status": "passed",
+      "charged_sec": 3.1926520689885365,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_38_1",
+      "status": "passed",
+      "charged_sec": 3.1109259670047322,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_39_1",
+      "status": "passed",
+      "charged_sec": 4.004212056999677,
+      "limit_sec": 180
+    },
+    {
+      "check": "逻辑评审尝试预算_40_1",
+      "status": "passed",
+      "charged_sec": 3.380723972004489,
+      "limit_sec": 180
+    },
+    {
+      "check": "真实推理为零且身份均为替身",
+      "status": "passed",
+      "runs": 80,
+      "real_model_calls": 0,
+      "real_oauth_calls": 0
+    },
+    {
+      "check": "审计前后完整证据字节不变",
+      "status": "passed",
+      "files": 1700
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IF-U01",
+  "source_commit": "99596854bd296af1557db2015cfa98c8104ec155",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The words are children,child,children,children around num1 and reset. num changes persistent implicit count; an explicit count2 overrides it for that call, and num() resets it. Do not treat the engine as stateless.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

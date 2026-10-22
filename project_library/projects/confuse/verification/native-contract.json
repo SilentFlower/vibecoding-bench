@@ -1,0 +1,1519 @@
+{
+  "baseline_digest": "bb81e09b38d2bfd8439708aff6eb979bba06812dcecf58663cc8463f77f47f2b",
+  "collection_skips": [
+    {
+      "id": "test/extra/test_release.py",
+      "line": 11,
+      "outcome": "skipped",
+      "reason": "Skipped: could not import 'extra.release': No module named 'sphinx'"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_argument_overrides_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_boolean_argument_parsed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_missing_optional_argument_not_included",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_nested_destination_clobber",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_nested_destination_clobber_rev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_nested_destination_nested",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_nested_destination_nested_rev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_nested_destination_single",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::ArgparseTest::test_text_argument_parsed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::GenericNamespaceTest::test_nested_namespace",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::GenericNamespaceTest::test_value_added_to_root",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::GenericNamespaceTest::test_value_added_to_subview",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::OptparseTest::test_argument_overrides_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::OptparseTest::test_boolean_argument_parsed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::OptparseTest::test_missing_optional_argument_not_included",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::OptparseTest::test_nested_destination_nested",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::OptparseTest::test_nested_destination_nested_rev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::OptparseTest::test_nested_destination_single",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::OptparseTest::test_text_argument_parsed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::PrettyDumpTest::test_dump_false",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::PrettyDumpTest::test_dump_null",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::PrettyDumpTest::test_dump_ordered_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::PrettyDumpTest::test_dump_sans_defaults",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::PrettyDumpTest::test_dump_short_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::PrettyDumpTest::test_dump_true",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::RedactTest::test_dump_redacted",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::RedactTest::test_dump_redacted_sans_defaults",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::RedactTest::test_dump_unredacted",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::RedactTest::test_no_redaction",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::RedactTest::test_redact_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_dump.py::RedactTest::test_unredact",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::ConfigEnvTest::test_defaults",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::ConfigEnvTest::test_with_prefix",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::ConfigEnvTest::test_with_prefix_and_sep",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::ConfigEnvTest::test_with_sep",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_bool_type_conversion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_handle_lists_bad_list_missing_index",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_handle_lists_bad_list_non_numeric",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_handle_lists_bad_list_non_zero_start",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_handle_lists_good_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_handle_lists_good_list_rev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_handle_lists_nested_lists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_handle_lists_not_a_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_handle_lists_top_level_always_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_lower_already_lowercase",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_lower_applied_after_prefix_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_lower_does_not_alter_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_lower_false",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_nested",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_nested_clobber",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_nested_clobber_rev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_nested_rev",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_null_type_conversion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_number_type_conversion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_bool_conversion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_false",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_nested",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_null_conversion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_number_conversion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_scalar",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_parse_yaml_docs_syntax_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_prefix",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_sep_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_sep_single_underscore_adjacent_seperators",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_env.py::EnvSourceTest::test_unset_lower_config",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::ConfigFilenamesTest::test_no_sources_when_files_missing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::ConfigFilenamesTest::test_search_package",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::EnvVarTest::test_env_var_dir_has_first_priority",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::EnvVarTest::test_env_var_missing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::EnvVarTest::test_env_var_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::LinuxTestCases::test_both_xdg_and_fallback_dirs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::LinuxTestCases::test_fallback_only",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::LinuxTestCases::test_xdg_config_dirs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::LinuxTestCases::test_xdg_matching_fallback_not_duplicated",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::OSXTestCases::test_mac_dirs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::OSXTestCases::test_xdg_config_dirs",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::PrimaryConfigDirTest::test_create_dir_if_none_exists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::PrimaryConfigDirTest::test_do_not_create_dir_if_lower_priority_exists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::PrimaryConfigDirTest::test_return_existing_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::WindowsTestCases::test_dir_from_environ",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_paths.py::WindowsTestCases::test_fallback_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_utils.py::BuildDictTests::test_adjacent_underscores_sep_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_utils.py::BuildDictTests::test_dot_sep_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_utils.py::BuildDictTests::test_dot_sep_keys_clobber",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_utils.py::BuildDictTests::test_dot_sep_keys_no_clobber",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_utils.py::BuildDictTests::test_keep_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_utils.py::BuildDictTests::test_keep_none_with_nested",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_utils.py::BuildDictTests::test_namespaces",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_utils.py::BuildDictTests::test_pure_dicts",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_concrete_float_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_concrete_int_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_concrete_string_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_dict_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_dict_type_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_enum_type_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_float_type_as_tempalte",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_list_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_list_type_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_nested_dict_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_none_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_other_type_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_plain_int_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_plain_string_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_required_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_set_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::AsTemplateTest::test_set_type_as_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::BaseTemplateTest::test_base_template_accepts_any_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::BaseTemplateTest::test_base_template_required",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::BaseTemplateTest::test_base_template_with_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ChoiceTest::test_validate_bad_choice_in_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ChoiceTest::test_validate_bad_choice_in_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ChoiceTest::test_validate_good_choice_in_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ChoiceTest::test_validate_good_choice_in_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_default_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_in_app_dir_non_file_source",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_in_app_dir_overrides_config_source_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_in_source_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_in_source_dir_overrides_in_app_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_relative_to_self",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_relative_to_sibling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_relative_to_sibling_needs_siblings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_relative_to_sibling_needs_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_relative_to_sibling_with_recursion",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_relative_to_working_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_use_config_source_dir",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_with_default_source",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_with_file_source",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_with_non_file_source",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_working_dir_overrides_sibling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_filename_wrong_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::FilenameTest::test_missing_required_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::MappingValuesTest::test_dict_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::MappingValuesTest::test_int_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::MappingValuesTest::test_invalid_item",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::MappingValuesTest::test_missing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::MappingValuesTest::test_wrong_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::NumberTest::test_validate_float_as_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::NumberTest::test_validate_int_as_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::NumberTest::test_validate_string_as_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OneOfTest::test_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OneOfTest::test_validate_bad_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OneOfTest::test_validate_first_good_choice_in_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OneOfTest::test_validate_good_choice_in_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OneOfTest::test_validate_no_choice_in_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_mapping_template_allow_missing_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_mapping_template_allow_missing_no_explicit_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_mapping_template_invalid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_mapping_template_missing_not_allowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_mapping_template_null",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_mapping_template_null_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_mapping_template_null_missing_not_allowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_mapping_template_valid",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_allow_missing_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_allow_missing_no_explicit_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_invalid_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_missing_not_allowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_null",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_null_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_null_missing_not_allowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_null_string_default_override",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_null_string_provides_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::OptionalTest::test_optional_string_valid_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::PathTest::test_default_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::PathTest::test_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::PathTest::test_missing_required_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::PathTest::test_optional_value_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::PathTest::test_path_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::SequenceTest::test_dict_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::SequenceTest::test_int_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::SequenceTest::test_invalid_item",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::SequenceTest::test_missing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::SequenceTest::test_wrong_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StrSeqTest::test_invalid_sequence_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StrSeqTest::test_invalid_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StrSeqTest::test_string_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StrSeqTest::test_string_tuple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StrSeqTest::test_whitespace_separated_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StringTemplateTest::test_check_string_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StringTemplateTest::test_pattern_matching",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StringTemplateTest::test_string_default_shortcut",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StringTemplateTest::test_string_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StringTemplateTest::test_string_template_shortcut",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::StringTemplateTest::test_validate_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::TypeTemplateTest::test_correct_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::TypeTemplateTest::test_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::TypeTemplateTest::test_incorrect_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::TypeTemplateTest::test_missing_required_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_attribute_access",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_default_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_int_default_shortcut",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_int_template_shortcut",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_missing_required_value_raises_error_on_validate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_nested_attribute_access",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_nested_dict_template",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_none_as_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_undeclared_key_ignored_from_input",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_undeclared_key_raises_keyerror",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_validate_individual_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_validate_simple_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_valid.py::ValidConfigTest::test_wrong_type_raises_error_on_validate",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_choice_correct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_choice_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_choice_with_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_choice_with_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_choice_with_enum_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_filename_with_default_source",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_filename_with_file_source",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_filename_with_non_file_source",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_filename_wrong_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_number_float",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_number_int",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_number_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_optional_path[config0-expected_value0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_optional_path[config1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_optional_path[config2-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_pairs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_path",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_str_expanded",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_str_non_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_str_seq_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TestBuiltInValidator::test_as_str_seq_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TypeCheckTest::test_int_type_correct",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TypeCheckTest::test_int_type_incorrect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TypeCheckTest::test_str_type_correct",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_validation.py::TypeCheckTest::test_str_type_incorrect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::ConverstionTest::test_bool_conversion_from_bool",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::ConverstionTest::test_bool_conversion_from_int",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::ConverstionTest::test_str_conversion_from_int",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::ConverstionTest::test_str_conversion_from_str",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_access_dict_replaced",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_add_source",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_access_fall_through",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_access_missing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_access_shadowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_contents_concatenated",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_contents_concatenated_not_replaced",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_items_merged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_items_replaced",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_keys_merged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_keys_replaced",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_values_merged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_dict_values_replaced",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_int_contents_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_list_access_fall_through",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_list_access_missing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_list_access_shadowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_list_and_dict_contents_concatenated",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_list_contents_concatenated",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_list_sequence_shadowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::MultipleSourceTest::test_list_sequence_shadowed_by_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::NameTest::test_int_access_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::NameTest::test_nested_access_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::NameTest::test_root_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::NameTest::test_string_access_name",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SetTest::test_override_list_index",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SetTest::test_override_second_level_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SetTest::test_override_top_level_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SetTest::test_set_missing_top_level_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SetTest::test_set_second_level_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_dict_access",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_dict_contents",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_dict_items",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_dict_iter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_dict_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_dict_sequence_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_dict_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_int_contents",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_int_iter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_list_access",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_list_contents",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_list_iter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_list_keys_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_list_sequence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_missing_index",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_views.py::SingleSourceTest::test_missing_key",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::FileParseTest::test_load_file",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::FileParseTest::test_reload_conf",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::FileParseTest::test_syntax_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::FileParseTest::test_tab_indentation_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_bool_string_to_bool",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_dict_string_unchanged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_dict_unchanged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_empty_string_to_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_invalid_yaml_string_unchanged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_list_string_unchanged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_list_unchanged",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_null_string_to_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_number_string_to_float",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_number_string_to_int",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseAsScalarTest::test_text_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseTest::test_dict_parsed_as_ordereddict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::ParseTest::test_string_beginning_with_percent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::StringParseTest::test_load_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::StringParseTest::test_string_syntax_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_yaml.py::StringParseTest::test_string_tab_indentation_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "confuse",
+  "python": "3.12.15",
+  "schema": 1
+}

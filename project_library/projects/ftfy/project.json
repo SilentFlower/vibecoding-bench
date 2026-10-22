@@ -1,0 +1,278 @@
+{
+  "schema": 2,
+  "project_key": "ftfy",
+  "title": "ftfy文本修整工作场景",
+  "category": "Unicode、归档与解释配置",
+  "description": "修整重放、实体范围、科学规范化、解码、文件导入、不前进诊断和配置修复七项独立任务。",
+  "seed_digest": "e91aae621222bd5b9d71e6a89b818d563be08cc8991a7c69d0b129e7c8954bfb",
+  "environment": "ftfy-py312",
+  "source": {
+    "repository": "https://github.com/rspeer/python-ftfy",
+    "commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FT-S01",
+      "title": "修整与实体范围",
+      "goal": "解释实际变换与分段政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FT-U01",
+            "FT-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FT-U01",
+          "kind": "understand",
+          "goal": "追踪文本修整与现有解释重放",
+          "prompt": "Explain complete repair and replay controls without edits.",
+          "requires": [],
+          "materials": [
+            "materials/replay.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/FT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FT-U02",
+          "kind": "understand",
+          "goal": "明确实体自动模式的分段影响",
+          "prompt": "Explain all complete entity controls and choose explicit scope. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/entities.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/FT-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FT-S02",
+      "title": "科学文本与解码",
+      "goal": "明确含义和输入边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FT-C01",
+            "FT-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FT-C01",
+          "kind": "consult",
+          "goal": "保护科学文本的规范化含义",
+          "prompt": "Advise scientific representation and provenance from both controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/normalization.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/FT-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FT-C02",
+          "kind": "consult",
+          "goal": "明确字节解码与Unicode修整边界",
+          "prompt": "Advise an explicit decoding boundary from complete byte/text controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/decoding.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/FT-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FT-S03",
+      "title": "文件导入方案",
+      "goal": "先解码再按文本行处理",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FT-P01",
+          "kind": "plan",
+          "goal": "规划多字节文本的解码顺序",
+          "prompt": "Plan complete file-ingestion and publication checks. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/file-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/FT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FT-S04",
+      "title": "不前进诊断",
+      "goal": "先取配置再作有界判断",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "FT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FT-D01",
+          "kind": "diagnose",
+          "goal": "先核配置与超时再定位转换不前进",
+          "prompt": "Text conversion does not finish. Request exact text,entrypoint,configuration and timeout behavior before diagnosing. Do not edit or run an unbounded reproduction.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "conversion-budget-evidence",
+              "when": "The exact text,entrypoint,configuration and timeout behavior have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/nonprogress.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "FT-S05",
+      "title": "解释开关修复",
+      "goal": "完整保留调用方的编码修整政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FT-M01"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "FT-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FT-M01",
+          "kind": "modify",
+          "goal": "修复关闭解释时丢失编码配置",
+          "prompt": "Implement only the explicitly authorized complete-config forwarding repair and public regressions. Preserve defaults and all original tests.",
+          "requires": [],
+          "materials": [
+            "materials/explain-repair.md"
+          ],
+          "allowed_paths": [
+            "library/ftfy/__init__.py",
+            "app/test_explain_config.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FT-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/FT-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

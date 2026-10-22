@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SP-P01",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Invalidnegative indent returns1 yet the synthetic in-place file is already empty,because write-open precedes option validation. Plan validation and formatting before publishing a verified temporary output,with explicit failure cleanup,original bytes/metadata preservation and the desired atomicity policy. Do not run on user files,assume exception rollback or patch the CLI in a plan task.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

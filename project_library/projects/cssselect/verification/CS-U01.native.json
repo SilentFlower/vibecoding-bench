@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CS-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "default_scope_includes_context_and_class_matching_uses_whitespace_tokens": true
+  },
+  "resource_profile": "business"
+}

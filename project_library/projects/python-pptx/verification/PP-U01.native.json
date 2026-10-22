@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PP-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "text_frame_newlines_create_paragraphs_while_paragraph_newlines_create_breaks": true
+  },
+  "resource_profile": "business"
+}

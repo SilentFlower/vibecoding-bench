@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JM-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "truth_fallback_differs_from_null_fallback_and_key_presence": true
+  },
+  "resource_profile": "business"
+}

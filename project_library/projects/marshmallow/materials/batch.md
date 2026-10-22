@@ -1,0 +1,1 @@
+Order(many=True).load([{product:A,qty:2},{product:B,qty:-1}]) raises ValidationError. Inspect its messages,data,valid_data. This import must publish no orders unless the whole batch succeeds. Plan complete validation and deliberate publication; partial valid_data is diagnostic and must not be mistaken for an accepted batch or transaction. No implementation.

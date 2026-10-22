@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DT-D01",
+  "source_commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "UnknownsyntheticACME producesUnknownTimezoneWarning and a naive result. Only the supplied trustedUTC+02 mapping justifies tzinfosACME7200 and an aware value. Define explicit mapping/rejection rather than infer a universal abbreviation or silently reinterpret naive asUTC. No patch. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

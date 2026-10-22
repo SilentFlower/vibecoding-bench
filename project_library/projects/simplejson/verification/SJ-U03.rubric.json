@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SJ-U03",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "loads rejects extra data. raw_decode returns the first object and end11, then idx=end decodes the second object through the intervening whitespace and ends at the full text length. A valid prefix followed by garbage also returns its first object/end11. The caller must validate framing, complete consumption and bounded work; a raw prefix decode is not whole-stream acceptance.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

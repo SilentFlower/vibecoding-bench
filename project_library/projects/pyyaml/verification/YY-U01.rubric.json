@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "YY-U01",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "safe_load resolves on toTrue and012 to octal integer10 while quoted on stays text. BaseLoader keeps these scalar values as strings. Quote identifiers or select a deliberate application schema; do not promise YAML1.2 or silently change global resolvers.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

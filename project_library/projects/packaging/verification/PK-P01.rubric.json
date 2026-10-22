@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PK-P01",
+  "source_commit": "1a62a26afe0f4881593e31bed4f7753bd1c8fe27",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both synthetic names parse,with versions1.0 and2.0. Onlypy3-none-any intersects the supplied target tagset. Parsing reads the filename without opening an archive. Plan requirement/name/version and ordered compatibility selection,complete metadata/digest/archive checks and explicit installation ownership; a tagintersection is not proof of archive contents,integrity or successful installation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

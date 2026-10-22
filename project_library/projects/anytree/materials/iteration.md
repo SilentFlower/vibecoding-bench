@@ -1,0 +1,1 @@
+Use the complete tree root -> a -> a1 and root -> b -> b1. Compare PreOrderIter with filter_ excluding namea,stop on namea,andmaxlevel=2. The category export must deliberately decide whether hiding a node also hides its descendants. Explain existing options and root depth; no library changes.

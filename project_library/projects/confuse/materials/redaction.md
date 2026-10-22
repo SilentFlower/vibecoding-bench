@@ -1,0 +1,1 @@
+A read=False synthetic Configuration contains auth.token=PUBLIC_SAMPLE and host=demo. Mark config[auth][token].redact=True. Compare flatten(redact=True), plain flatten(), and get(str) for token. Recommend a deliberate safe projection boundary for diagnostics; no real credential or project change is authorized.

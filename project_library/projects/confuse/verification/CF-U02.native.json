@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CF-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "environment_overlay_is_typed_nested_and_not_refreshed_by_file_reload": true
+  },
+  "resource_profile": "business"
+}

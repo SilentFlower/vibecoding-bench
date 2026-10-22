@@ -1,0 +1,1 @@
+Create Root/root and two Same-tag children with distinct identifiers A andB. Compare get_node(A),get_node(B),get_node(Same),and children(root). Advise stable business ID and display-label ownership; do not assume tag lookup,unique display labels or a path-based identity model. No edits.

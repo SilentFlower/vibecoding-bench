@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DT-U02",
+  "source_commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "dayfirstFalse interpretsJan5;True interpretsMay1. Both parse successfully. Require an explicit source date convention or ask for missing meaning;parse success alone does not establish the intended date or authorize automatic normalization.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WZ-P01",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Before reading the response is lazy. get_data eagerly consumesA,B and generator-finally,converts to a cached sequence,and repeatedget_data does not rerun the generator. The response-close callback runs only whenresponse.close is called. Plan bounded explicit iteration/limits,expected chunk content and deterministic cleanup; full data access is unsuitable for huge/infinite streams. These memory observations do not establish real network timing or backpressure.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

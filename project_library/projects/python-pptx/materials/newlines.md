@@ -1,0 +1,1 @@
+In separate text boxes set TextFrame.text="A\nB\vC" and the first Paragraph.text to the same actual newline/vertical-tab string. Save/reopen and inspect paragraphs and a:br. The export must preserve paragraph boundaries versus soft breaks. Explain each setter and an explicit text representation; no library changes.

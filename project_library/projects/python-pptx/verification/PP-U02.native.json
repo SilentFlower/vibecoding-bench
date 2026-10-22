@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PP-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "placeholder_lookup_uses_template_idx_not_collection_position": true
+  },
+  "resource_profile": "business"
+}

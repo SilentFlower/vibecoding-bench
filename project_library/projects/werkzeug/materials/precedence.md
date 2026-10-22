@@ -1,0 +1,1 @@
+Use CombinedMultiDict([query,form]),where query.qty=['bad','2'] and form.qty=['7']. Compare raw ['qty'],get(type=int),getlist(),and copy(). After copying,replace query.qty with['9']. Advise explicit source precedence and provenance for request validation. A structural snapshot is not a general deep immutable copy. No edits.

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SJ-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "raw_decode_returns_one_value_boundary_and_does_not_validate_the_whole_stream": true
+  },
+  "resource_profile": "business"
+}

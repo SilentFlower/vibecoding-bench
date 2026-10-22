@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-U01",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "TextFrame newline creates paragraphs and vertical-tab creates soft breaks; Paragraph treats both as soft breaks within one paragraph. Controls produce two versus one paragraphs,with returned textA newlineB vertical-tabC versusA vertical-tabB vertical-tabC. Do not flatten these distinctions or claim identical setter behavior.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

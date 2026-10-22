@@ -1,0 +1,1 @@
+Parse <DIV id="a" CLASS="Notice"></DIV> asHTML. Compare GenericTranslator andHTMLTranslator on DIV.Notice,and HTMLTranslator on div.notice. Separately evaluate an uppercase XML DIV/CLASS withHTMLTranslator(xhtml=True). Explain element/attribute-name versus class-value case and choose mode from the actual parser/output; no edits.

@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "python-docx",
+  "title": "python-docx文档交付工作场景",
+  "category": "Word结构与包关系",
+  "description": "模板格式、块顺序、合并表格、日期、批注归属和元数据诊断六项只读任务。",
+  "seed_digest": "8f6283ea6b060afa5dcaf0f591ba531f6353360ebaeb3dfb6272cd58ce26976e",
+  "environment": "python-docx-py312",
+  "source": {
+    "repository": "https://github.com/python-openxml/python-docx",
+    "commit": "e45454602b53e8e572b179ccf1c91093ec9f4ed7",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DX-S01",
+      "title": "模板文本与文档顺序",
+      "goal": "按实际结构提取和理解替换作用域",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DX-U01",
+            "DX-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DX-U01",
+          "kind": "understand",
+          "goal": "核段落替换与运行级格式的作用域",
+          "prompt": "Trace all complete save/reopen formatting controls and explain a compatible filling policy without edits.",
+          "requires": [],
+          "materials": [
+            "materials/text.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DX-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/DX-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DX-U02",
+          "kind": "understand",
+          "goal": "按真实文档顺序提取段落与表格",
+          "prompt": "Meet the complete top-level ordering requirement using existing APIs and saved-package controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/order.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DX-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/DX-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DX-S02",
+      "title": "表格与审计元数据",
+      "goal": "选择合并内容及日期时刻政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DX-C01",
+            "DX-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DX-C01",
+          "kind": "consult",
+          "goal": "避免合并单元格重复计入业务文本",
+          "prompt": "Advise merged-table extraction from the complete grid/identity/XML controls without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/merged.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DX-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/DX-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DX-C02",
+          "kind": "consult",
+          "goal": "为核心日期元数据保留真实时刻",
+          "prompt": "Meet the complete audit-time requirement from actual XML and UTC-normalized controls without edits.",
+          "requires": [],
+          "materials": [
+            "materials/dates.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DX-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/DX-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DX-S03",
+      "title": "批注交付计划",
+      "goal": "明确目标文档归属和关系验收",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DX-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DX-P01",
+          "kind": "plan",
+          "goal": "规划批注的文档归属和关系闭合验收",
+          "prompt": "Plan the complete comment publication requirement using actual saved-package and local-run controls. No implementation or external publication.",
+          "requires": [],
+          "materials": [
+            "materials/comments.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DX-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/DX-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DX-S04",
+      "title": "元数据诊断",
+      "goal": "补齐属性和相关XML再定位异常",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DX-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "DX-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DX-D01",
+          "kind": "diagnose",
+          "goal": "先核属性和XML再诊断元数据读取异常",
+          "prompt": "A document metadata read raises an exception. Request the exact property,error and relevant synthetic core-properties XML before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DX-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "core-property-evidence",
+              "when": "The exact property,error and relevant synthetic core XML are not supplied or declared unavailable,and sufficient reproduction evidence is reasonably requested.",
+              "materials": [
+                "disclosure/empty-date.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

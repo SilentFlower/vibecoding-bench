@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/project-iterations.md", "reason": "真实场景schema2／policy3、逐仓准入、独立回归、材料隔离及统计；按相关节完整读取"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "项目实现与验证质量约束"}
+{"file": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/source-index.json", "reason": "本阶段三十仓精确来源和历史证据；不代表当前准入通过"}
+{"file": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/execution-batches.md", "reason": "本阶段内部执行单位，全部三十仓交付才完成"}

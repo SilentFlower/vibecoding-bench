@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "xlsxwriter",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/xlsxwriter/result.json",
+      "result_sha256": "f653ca6597ad17096e99cdd34b1eaed0098e58ad6b88d37bc163e8b6b9967920",
+      "main_collected": 1787,
+      "counts": {
+        "passed": 1787,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 1787,
+      "xml_skipped": 0,
+      "runner_sha256": "d5af8be492c238351179969c8a5b2099552905cd92d8864174c4f8eda378079c",
+      "contract_sha256": "cc89342eb7c9833a75b93e16e6c0cb1b9e4cf7dfaeb462323e197b1534f6f68c",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

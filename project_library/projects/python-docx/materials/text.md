@@ -1,0 +1,1 @@
+Create a Heading1 paragraph with bold runA and italic runB,then assign paragraph.text=REPLACED. In a separate paragraph,make one bold runOLD and set that run.text=NEW. Save,reopen and inspect runs,paragraph style and XML. Explain replacement scope and a deliberate formatting-aware filling policy; no real template or library edit.

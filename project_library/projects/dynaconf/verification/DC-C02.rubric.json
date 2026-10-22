@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-C02",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "update combines kwargs via data.update(kwargs),so the nonempty supplied mapping gainsOTHER2. Passing dict(original) preserves its top-level original while settings receiveOTHER3. Select an explicit ownership/copy policy,including nested values where needed; a shallow copy is not recursive isolation or a global transaction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

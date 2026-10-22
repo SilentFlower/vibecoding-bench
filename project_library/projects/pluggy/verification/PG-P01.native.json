@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PG-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "historic_replay_needs_owned_snapshot_for_mutable_event_payloads": true
+  },
+  "resource_profile": "business"
+}

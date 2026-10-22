@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-U02",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Environment9000 becomesint9000,false becomesboolFalse,and explicitly quoted009 remainsstr009. Use the exact synthetic prefix and parsing/quoting policy rather than assume all env values are strings or strip meaningful identifier zeroes. No real environment is read.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

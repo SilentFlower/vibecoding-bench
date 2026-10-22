@@ -1,0 +1,159 @@
+[project]
+name = "confuse"
+version = "2.3.0"
+description = "Painless YAML config files"
+authors = [{ name = "Adrian Sampson", email = "adrian@radbox.org" }]
+readme = "README.rst"
+license = "MIT"
+requires-python = ">=3.10"
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "pyyaml",
+    "typing_extensions >= 4.4; python_version < '3.13'",
+]
+
+[dependency-groups]
+dev = [
+    "pytest >= 8.4.2",
+    "pytest-cov >= 7.0.0",
+]
+lint = [
+    "docstrfmt >= 2.0.1",
+    "mypy >= 1.18.2",
+    "ruff >= 0.6.4",
+    "sphinx-lint >= 1.0.0",
+    "types-pyyaml >=6.0.12",
+]
+
+[project.optional-dependencies]
+docs = ["sphinx >= 7.4.7", "sphinx-rtd-theme >= 3.0.2"]
+
+[tool.poetry.group.release.dependencies]
+click = ">=8.1.7"
+tomli = ">=2.0.1"
+
+[project.urls]
+Homepage = "https://github.com/beetbox/confuse"
+Repository = "https://github.com/beetbox/confuse"
+"Bug Tracker" = "https://github.com/beetbox/confuse/issues"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pipx-install]
+poethepoet = ">=0.26"
+poetry = ">=2.1"
+
+[tool.poetry]
+include = [
+    { path = "docs", format = "sdist" },
+    { path = "test", format = "sdist" },
+]
+
+[tool.poe.tasks.bump]
+help = "Bump project version and update relevant files"
+cmd = "python ./extra/release.py bump $version"
+args = { version = { help = "The new version to set", positional = true, required = true } }
+
+[tool.poe.tasks.changelog]
+help = "Print the latest version's changelog in Markdown"
+cmd = "python ./extra/release.py changelog"
+
+[tool.poe.tasks.check-docs-links]
+help = "Check the documentation for broken URLs"
+cmd = "make -C docs linkcheck"
+
+[tool.poe.tasks.check-format]
+help = "Check the code for style issues"
+cmd = "ruff format --check --diff"
+
+[tool.poe.tasks.check-types]
+help = "Check the code for typing issues. Accepts mypy options."
+cmd = "mypy"
+
+[tool.poe.tasks.docs]
+help = "Build documentation"
+args = [{ name = "COMMANDS", positional = true, multiple = true, default = "html" }]
+cmd = "make -C docs $COMMANDS"
+
+[tool.poe.tasks.format]
+help = "Format the codebase"
+cmd = "ruff format"
+
+[tool.poe.tasks.format-docs]
+help = "Format the documentation"
+# TODO: Remove --no-format-python-code-blocks once https://github.com/LilSpazJoekp/docstrfmt/issues/171 is resolved
+cmd = "docstrfmt --no-format-python-code-blocks --preserve-adornments docs *.rst"
+
+[tool.poe.tasks.lint]
+help = "Check the code for linting issues. Accepts ruff options."
+cmd = "ruff check"
+
+[tool.poe.tasks.lint-docs]
+help = "Lint the documentation"
+interpreter = "bash"
+shell = "sphinx-lint --enable all $(git ls-files '*.rst')"
+
+[tool.poe.tasks.test]
+help = "Run tests with pytest"
+cmd = "pytest $OPTS"
+env.OPTS.default = "-p no:cov"
+
+[tool.poe.tasks.test-with-coverage]
+help = "Run tests and record coverage"
+ref = "test"
+# record coverage in confuse package
+# save xml for coverage upload to codecov
+# save html report for local dev use
+# measure coverage across logical branches
+# show which tests cover specific lines in the code (see the HTML report)
+env.OPTS = """
+--cov=confuse
+--cov-report=xml:.reports/coverage.xml
+--cov-report=html:.reports/html
+--cov-branch
+--cov-context=test
+"""
+
+[tool.docstrfmt]
+line-length = 80
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+future-annotations = true
+select = [
+    "E", # pycodestyle
+    "F", # pyflakes
+    "G", # flake8-logging-format
+    "I", # isort
+    "ISC", # flake8-implicit-str-concat
+    "N", # pep8-naming
+    "PT", # flake8-pytest-style
+    "RUF", # ruff
+    "UP", # pyupgrade
+    "TC", # flake8-type-checking
+    "W", # pycodestyle
+]
+ignore = [
+    "TC006", # no need to quote 'cast's since we use 'from __future__ import annotations'
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+parametrize-names-type = "csv"

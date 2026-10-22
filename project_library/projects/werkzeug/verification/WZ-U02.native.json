@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WZ-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "update_appends_pop_discards_all_and_setlist_explicitly_replaces": true
+  },
+  "resource_profile": "business"
+}

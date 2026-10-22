@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PG-P01",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The late plugin seesB from the original mutable event while an application-owned pre-mutation deepcopy control replaysA. Establish bounded owned immutable/deep snapshots at the event boundary,retain them under explicit lifecycle and replay policy,and constrain plugin mutation/trust. Native historic is not a deep-copy,persistent log,transaction or cross-process guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

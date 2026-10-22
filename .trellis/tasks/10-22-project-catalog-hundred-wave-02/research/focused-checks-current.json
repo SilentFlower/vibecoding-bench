@@ -1,0 +1,82 @@
+{
+  "recorded_at": "2026-10-22T01:12:24.413788+00:00",
+  "scope": "实际工具执行后的证据摘要，非完整Check-All",
+  "checks": [
+    {
+      "cwd": "orchestrator",
+      "argv": [
+        "../.deploy/project-catalog-hundred/stage-01/native-adapter-test-venv/bin/python",
+        "-m",
+        "unittest",
+        "test_project_native_regression",
+        "-q"
+      ],
+      "tests": 39,
+      "exit_code": 0,
+      "status": "passed",
+      "files": [
+        "orchestrator/project_native_regression.py",
+        "orchestrator/test_project_native_regression.py"
+      ],
+      "sha256": {
+        "orchestrator/project_native_regression.py": "710a135c7db1712cb59945a3cc2df50f8629be6b0ba2156190dd7fc4e94e396c",
+        "orchestrator/test_project_native_regression.py": "ff739b2e2189fb3a315f8e9c7ddfb1e98057f4bf6c309d8f96c71cf9f3794de9"
+      }
+    },
+    {
+      "cwd": "deploy/v3",
+      "argv": [
+        "python3",
+        "-m",
+        "unittest",
+        "test_manage",
+        "-q"
+      ],
+      "tests": 30,
+      "exit_code": 0,
+      "status": "passed",
+      "files": [
+        "deploy/v3/manage.py",
+        "deploy/v3/test_manage.py",
+        "images/v3/Dockerfile.dockerignore"
+      ],
+      "sha256": {
+        "deploy/v3/manage.py": "091148e2cea09b714b1f8607f8a75f0a9fd8439bc965e6d8487bc80e98bc85f2",
+        "deploy/v3/test_manage.py": "0393188d64dd4e04d48d71d35342b7c708681776a358b42f1a63adffe06222ed",
+        "images/v3/Dockerfile.dockerignore": "905abdaa050e3cb02aac34f460d4cde75b39a599db0a60c44da5bfab96326d99"
+      }
+    },
+    {
+      "cwd": ".",
+      "argv": [
+        ".deploy/project-iteration-repairs/venv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "orchestrator",
+        "-p",
+        "test_project_*.py",
+        "-q"
+      ],
+      "tests": 144,
+      "exit_code": 0,
+      "status": "passed",
+      "elapsed_sec": 123.134,
+      "scope": "实际SDK环境；系统Python缺docker的早次运行不计通过"
+    },
+    {
+      "cwd": ".",
+      "argv": [
+        "python3",
+        "scripts/validate-project-library.py"
+      ],
+      "exit_code": 0,
+      "status": "passed",
+      "projects": 70,
+      "scenarios": 305,
+      "tasks": 543,
+      "catalog_digest": "6e6206d691130f74396a27a1234f9aaa72494f80cefaa7df0e1c596a101238c9"
+    }
+  ]
+}

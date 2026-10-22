@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "HT-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "local_html_conversion_preserves_headings_emphasis_links_and_list_start": true
+  },
+  "resource_profile": "business"
+}

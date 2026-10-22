@@ -1,0 +1,1804 @@
+{
+  "baseline_digest": "21d81cd268bbc7b8565d11e77a962205f248584cb8f30bbb7517c135705361aa",
+  "nodes": [
+    {
+      "id": "test/test_ast_renderer.py::TestAstRenderer::test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_ast_renderer.py::TestAstRenderer::test_footnotes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_ast_renderer.py::TestAstRenderer::test_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestAtxHeading::test_children_with_enclosing_hashes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestAtxHeading::test_heading_in_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestAtxHeading::test_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestAtxHeading::test_not_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestBlockCode::test_parse_indented_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestBlockCode::test_parse_indented_code_with_blank_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestCodeFence::test_code_fence_with_backticks_and_tildes_in_the_info_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestCodeFence::test_fence_code_lazy_continuation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestCodeFence::test_match_fenced_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestCodeFence::test_match_fenced_code_with_tilde",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestCodeFence::test_mixed_code_fence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestCodeFence::test_no_wrapping_newlines_code_fence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestCodeFence::test_not_match_fenced_code_when_only_inline_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestCodeFence::test_unclosed_code_fence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestContains::test_contains",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestDocument::test_auto_splitlines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestDocument::test_store_footnote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFileWrapper::test_anchor_reset",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFileWrapper::test_get_set_pos",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_content_after_title_not_allowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_footnote_followed_by_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_footnotes_may_not_have_too_much_leading_space",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_parse_opening_bracket_as_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_parse_opening_brackets_as_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_parse_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_parse_title_must_be_separated_from_link_destination",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_parse_with_space_in_every_part",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestFootnote::test_parse_with_title",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestHtmlBlock::test_textarea_block_may_contain_blank_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestLeafBlockTokenContentProperty::test_block_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestLeafBlockTokenContentProperty::test_code_fence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestLeafBlockTokenContentProperty::test_html_block",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestList::test_different_markers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestList::test_sublist",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_a_list_item_may_begin_with_at_most_one_blank_line",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_deep_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_empty_list_item_in_the_middle",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_list_items_starting_with_blank_line",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_list_with_code_block",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_loose_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_parse_marker",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_sublist",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_tabbed_list_items",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_tight_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestListItem::test_tokenize",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestParagraph::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestParagraph::test_parse_interrupting_block_tokens",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestParagraph::test_parse_non_interrupting_block_tokens",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestParagraph::test_parse_setext_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestParagraph::test_read",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestParent::test_parent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestQuote::test_lazy_continuation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestQuote::test_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestRemoveToken::test_remove_token_from_processing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestSetextHeading::test_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestSetextHeading::test_next",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTable::test_easy_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTable::test_interrupt_paragraph_option",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTable::test_match_0__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTable::test_match_1__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTable::test_match_2__",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTable::test_not_easy_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTable::test_parse_align",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTable::test_parse_delimiter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTableCell::test_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTableRow::test_easy_table_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTableRow::test_escaped_pipe_in_cell",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTableRow::test_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestTableRow::test_not_really_escaped_pipe_in_cell",
+      "kind": "TestCaseFunction",
+      "outcome": "skipped"
+    },
+    {
+      "id": "test/test_block_token.py::TestTableRow::test_short_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_block_token.py::TestThematicBreak::test_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_convert",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_convert_file_fail",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_convert_file_success",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_import_class_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_import_incomplete_path",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_import_module_error",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_import_readline_fail",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_import_readline_success",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_import_success",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_interactive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_main_to_convert",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_main_to_interactive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_parse_filenames",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_parse_renderer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_cli.py::TestCli::test_print_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_github_wiki.py::TestGithubWiki::test_malformed_input_is_rejected_quickly_0_missing_closing_marker",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_github_wiki.py::TestGithubWiki::test_malformed_input_is_rejected_quickly_1_missing_pipe",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_github_wiki.py::TestGithubWiki::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_github_wiki.py::TestGithubWiki::test_parse_variant_spacing_and_pipes_0__wiki_target_",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_github_wiki.py::TestGithubWiki::test_parse_variant_spacing_and_pipes_1__wiki_target_",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_github_wiki.py::TestGithubWiki::test_parse_variant_spacing_and_pipes_2__a_b_c_",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_github_wiki.py::TestGithubWiki::test_render",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_escape_in_inline_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_escape_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_escape_none_when_whitespaces",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_escape_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_escape_single_chars",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render__basic_blocks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render__lists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render__quotes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_auto_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_block_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_document",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_emphasis",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_escape_sequence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_footnote_image",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_footnote_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_html_block",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_html_span",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_image",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_inline_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_inner",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_link_with_escapes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_link_with_title",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_list_item",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_quote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_strikethrough",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_strong",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_table_cell",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_table_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_render_thematic_break",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_table_empty_cell",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_table_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_jira_renderer.py::TestJiraRenderer::test_table_pipe_in_cell",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_mathjax.py::TestMathJaxRenderer::test_render_html",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_mathjax.py::TestMathJaxRenderer::test_render_math",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_pygments_renderer.py::TestPygmentsRenderer::test_render_fail_on_unsupported_language",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_pygments_renderer.py::TestPygmentsRenderer::test_render_known_language",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_pygments_renderer.py::TestPygmentsRenderer::test_render_no_language_0",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_pygments_renderer.py::TestPygmentsRenderer::test_render_no_language_1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_pygments_renderer.py::TestPygmentsRenderer::test_render_unknown_language",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_scheme.py::TestScheme::test_render",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_toc_renderer.py::TestTocRenderer::test_depth",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_toc_renderer.py::TestTocRenderer::test_filter_conditions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_toc_renderer.py::TestTocRenderer::test_get_toc",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_toc_renderer.py::TestTocRenderer::test_omit_title",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_toc_renderer.py::TestTocRenderer::test_parse_rendered_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_toc_renderer.py::TestTocRenderer::test_render_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_escaping",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render__basic_blocks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render__lists",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render__quotes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_auto_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_emphasis",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_html_block",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_html_span",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_image",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_inline_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_strikethrough",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_strong",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_xwiki_macros_in_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_contrib/test_xwiki20_renderer.py::TestXWiki20Renderer::test_render_xwiki_macros_simple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_deactivate_delimiters",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_delimiter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_delimiter_remove_empty",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_delimiter_remove_left",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_delimiter_remove_right",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_delimiter_remove_right_from_longer_run",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_follows",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_is_control_char",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_match_obj",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_preceded_by",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_shift_whitespace",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_core_tokens.py::TestCoreTokens::test_succeeded_by",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_autolink",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_block_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_block_code_no_language",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_document",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_email_autolink_escapes_href",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_emphasis",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_escape_sequence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_html_block",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_html_span",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_image",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_inline_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_line_break",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_list_item",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_quote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_raw_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_strikethrough",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_strong",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_table_cell",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_table_cell0",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_table_cell1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_table_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_table_with_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_table_without_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRenderer::test_thematic_break",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRendererEscaping::test_email_autolink_escapes_href",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRendererEscaping::test_escape_html_text_0",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRendererEscaping::test_escape_html_text_1",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRendererEscaping::test_escape_html_text_2",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRendererEscaping::test_escape_html_text_3",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRendererEscaping::test_unprocessed_html_tokens_escaped",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRendererFootnotes::test_footnote_image",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_html_renderer.py::TestHtmlRendererFootnotes::test_footnote_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestHtmlEntity::test_html_entity",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestHtmlEntity::test_html_entity_in_link_target",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXFootnotes::test_footnote_image",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXFootnotes::test_footnote_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_autolink_0_page",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_autolink_1_page_3A_with_3A_escape",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_autolink_2_page_target",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_block_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_document",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_emphasis",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_image",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_inline_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_line_break",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_link_0_page",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_link_1_page_3A_with_3A_escape",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_link_2_page_target",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_list_item",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_math",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_quote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_raw_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_strikethrough",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_strong",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_table_cell",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_table_row",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_table_with_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_table_without_header",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_renderer.py::TestLaTeXRenderer::test_thematic_break",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_latex_token.py::TestLaTeXToken::test_span",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_line_numbers.py::TestLineNumbers::test_main",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_paragraph_in_block_quote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_paragraph_in_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_paragraph_with_emphasized_words",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_paragraph_with_hard_line_breaks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_paragraph_with_html_span_on_own_line",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_paragraph_with_inline_code",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_paragraph_with_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_plain_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_tables",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_text_in_link_reference_definition",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownFormatting::test_wordwrap_text_in_setext_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_atx_headings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_blank_lines_following_code_block",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_block_quote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_bulleted_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_code_blocks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_code_span",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_code_span_with_embedded_line_breaks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_direct_rendering_of_block_token",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_direct_rendering_of_span_token",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_emphasized_and_strong",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_empty_document",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_escaped_chars",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_html_block",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_html_span",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_images_and_links",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_line_breaks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_link_reference_definition",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_list_item_indentation_after_leader_normalized",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_list_item_indentation_after_leader_preserved",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_list_item_margin_indentation_normalized",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_list_item_margin_indentation_preserved",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_multiline_fragment",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_numbered_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_paragraphs_and_blank_lines",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_setext_headings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_strikethrough",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_table_escapes_pipes_in_cells",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_table_with_narrow_column",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_table_with_varying_column_counts",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_markdown_renderer.py::TestMarkdownRenderer::test_thematic_break",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_autolink",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_blockcode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_codefence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_document",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_emphasis",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_escapesequence",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_hard_linebreak",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_heading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_htmlblock",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_image",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_inlinecode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_link",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_ordered_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_paragraph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_quote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_rawtext",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_soft_linebreak",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_strikethrough",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_strong",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_subheading",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_table",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_thematicbreak",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_repr.py::TestRepr::test_unordered_list",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestAutoLink::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestContains::test_contains",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestEmphasis::test_emphasis_for_asterisk_without_punctuation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestEmphasis::test_emphasis_with_smart_quote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestEmphasis::test_emphasis_with_straight_quote",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestEmphasis::test_no_emphasis_for_underscore_without_punctuation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestEmphasis::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestEscapeSequence::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestEscapeSequence::test_parse_in_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestHtmlSpan::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestHtmlSpan::test_parse_with_illegal_whitespace",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestImage::test_no_alternative_text",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestImage::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestInlineCode::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestInlineCode::test_parse_in_bold",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestInlineCode::test_parse_in_emphasis",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestInlineCode::test_parse_in_strikethrough",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestInlineCode::test_preserve_escapes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestInlineCode::test_remove_space_if_present_on_both_sides",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestLineBreak::test_parse_hard_break_with_backslash",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestLineBreak::test_parse_hard_break_with_double_blanks",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestLineBreak::test_parse_soft_break",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestLink::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestLink::test_parse_angle_bracketed_inline_link_with_space",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestLink::test_parse_children",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestLink::test_parse_multi_links",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestParent::test_parent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestRawText::test_attribute",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestRawText::test_invalid_html_entities",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestRawText::test_no_children",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestRawText::test_valid_html_entities",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestRemoveToken::test_remove_token_from_processing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestStrikethrough::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestStrikethrough::test_parse_multiple",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestStrong::test_issue_261_asterisk_sequences_do_not_crash",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestStrong::test_overlapping_delimiter_runs_do_not_crash",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestStrong::test_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_span_token.py::TestStrong::test_strong_when_both_delimiter_run_lengths_are_multiples_of_3",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_traverse.py::TestTraverse::test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_traverse.py::TestTraverse::test_with_class_filter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_traverse.py::TestTraverse::test_with_depth_limit",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_traverse.py::TestTraverse::test_with_included_source",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "test/test_traverse.py::TestTraverse::test_with_included_source_and_class_filter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "mistletoe",
+  "python": "3.12.15",
+  "schema": 1,
+  "subtests": [
+    {
+      "context": {
+        "kwargs": {
+          "case": "'**IKXZXPTB****AJFHV *Pbjovp*VSN*'"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "test/test_span_token.py::TestStrong::test_issue_261_asterisk_sequences_do_not_crash",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "case": "'**IKXZXPTB****AJFHV*Pbjovp*'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "test/test_span_token.py::TestStrong::test_issue_261_asterisk_sequences_do_not_crash",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "case": "'Ch******her R**a, Bu*****ly In****nt, j**n ko***ob, ji*yu, M**s, Ch****us, M*'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "test/test_span_token.py::TestStrong::test_issue_261_asterisk_sequences_do_not_crash",
+      "when": "call"
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+Use only synthetic BUSINESS_APP_COUNT=7,BUSINESS_APP_LABEL containingJSON quotes around007,BUSINESS_APP_FEATURE__ENABLED=true andBUSINESS_APP_RAW=not-json. Call config.from_prefixed_env(prefix=BUSINESS_APP) and inspect exact values/types and nesting. Explain existingJSON conversion,double-underscore nesting and raw fallback; do not propose them as missing features. No edits.

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CA-C02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "custom_hooks_are_owned_by_converter_instances_and_global_helpers_remain_separate": true
+  },
+  "resource_profile": "business"
+}

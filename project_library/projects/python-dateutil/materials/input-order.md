@@ -1,0 +1,1 @@
+The complete date text is01/05/2026. Compare parse(dayfirst=False) and parse(dayfirst=True). The importer has not yet established the source date convention. Explain both possible dates and recommend an explicit contract rather than selecting user intent from parse success. No edits.

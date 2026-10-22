@@ -1,0 +1,1 @@
+Resolve {'test':['pytest>=8'],'Dev_Test':[{'include-group':'test'},'ruff',{'include-group':'test'}]} with resolve_dependency_groups(groups,'dev-test'). Advise existing include/name/order behavior and deliberate duplicate/conflict policy. Group expansion is not package dependency solving,installation or artifact verification. No edits.

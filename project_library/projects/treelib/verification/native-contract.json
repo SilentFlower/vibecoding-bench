@@ -1,0 +1,1071 @@
+{
+  "baseline_digest": "0965d3ca3627e4d72c8063cd6358b5b0f99bf4cf4f6327907a00cc289afc68eb",
+  "nodes": [
+    {
+      "id": "tests/test_node.py::NodeCase::test_clone_pointers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_deprecated_methods_warnings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_expanded_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_fpointer_setter_different_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_initialization",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_initialization_auto_identifier",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_initialization_defaults",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_initialization_with_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_is_root",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_lt_comparison",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_multiple_trees",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_node_constants",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_object_as_node_tag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_reset_pointers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_bpointer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_fpointer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_identifier",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_identifier_none_warning",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_initial_tree_id",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_is_leaf",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_predecessor",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_successors_different_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_successors_unsupported_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_tag",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_set_tag_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_tree_wise_is_leaf",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_update_successors",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_update_successors_invalid_mode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_update_successors_modes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_update_successors_none",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node.py::NodeCase::test_update_successors_replace_without_replace_param",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_clone_pointers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_deprecated_methods",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_edge_case_identifiers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_is_leaf_method",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_is_root_method",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_multiple_tree_membership",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_comparison",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_constants",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_copy_operations",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_creation_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_data_handling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_expansion_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_identifier_handling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_string_representation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_tag_handling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_node_with_extreme_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_predecessor_operations",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_reset_pointers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_successor_manipulation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_node_comprehensive.py::NodeComprehensiveTestCase::test_successor_operations",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_add_node_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_advanced_filtering_scenarios",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_all_nodes_itr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_ancestor",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_children",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_create_node_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_display_options_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_edge_cases_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_error_handling_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_expand_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_expand_tree_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_filter_nodes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_from_json_structure",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_from_json_with_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_from_json_with_identifier",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_from_map",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_getitem",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_is_root",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_leaves",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_level",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_link_past_node",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_loop",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_memory_management_scenarios",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_merge",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_merge_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_modify_node_identifier_directly_failed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_modify_node_identifier_recursively",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_modify_node_identifier_root",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_move_node",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_node_relationship_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_nodes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_output_methods_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_parent",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_paste",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_paste_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_paste_duplicate_nodes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_paste_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_paths_to_leaves",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_performance_edge_cases",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_print_backend",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_remove_node",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_remove_subtree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_remove_subtree_whole_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_root_removal",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_rsearch",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_save2file_and_to_graphviz",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_shallow_copy_hermetic_pointers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_shallow_paste",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_show",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_show_data_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_show_without_sorting",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_siblings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_size",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_special_methods_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_subclassing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_subtree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_subtree_and_remove_subtree_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_to_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_constants",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_initialization_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_metrics_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_modification_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_modification_edge_cases",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_queries_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_relationships_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_serialization_edge_cases",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_wise_depth",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_wise_is_root",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_tree_wise_leaves",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_unicode_and_encoding_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree.py::TreeCase::test_update_node_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_ancestor_level_equals_node_level",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_ancestor_root_node",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_ancestor_with_invalid_level",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_clone_method",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_expand_tree_invalid_mode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_expand_tree_with_complex_filter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_expand_tree_with_key_sorting",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_expand_tree_zigzag_mode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_filter_nodes_all_match",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_filter_nodes_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_filter_nodes_empty_result",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_filter_nodes_with_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_is_ancestor_basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_is_ancestor_empty_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_is_ancestor_nonexistent_nodes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_is_ancestor_reverse_relationship",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_is_ancestor_siblings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_large_tree_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_level_empty_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_level_nonexistent_node",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_level_root_node",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_level_with_filter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_nodes_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_nodes_property_empty_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_rsearch_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_rsearch_none_input",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_rsearch_nonexistent_node",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_rsearch_root_node",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_rsearch_with_filter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_save2file_basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_save2file_with_data_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_save2file_with_filter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_save2file_with_parameters",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_size_comprehensive_levels",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_size_invalid_level_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_size_negative_level",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_to_graphviz_custom_shape",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_to_graphviz_default",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_to_graphviz_empty_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_to_graphviz_file_output",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_to_graphviz_special_characters",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_to_graphviz_undirected_graph",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_to_graphviz_with_filter",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_to_graphviz_with_sorting",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_tree_constants",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_comprehensive.py::TreeComprehensiveTestCase::test_unicode_handling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_ancestor_edge_cases",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_circular_reference_prevention",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_duplicate_identifier_handling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_empty_tree_operations",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_extreme_data_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_extremely_long_identifiers_and_tags",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_invalid_node_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_level_edge_cases",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_memory_efficiency_large_operations",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_multiple_root_prevention",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_nonexistent_parent_handling",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_root_operations_edge_cases",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_single_node_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_special_characters_in_identifiers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_unicode_identifiers_and_tags",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_very_deep_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_edge_cases.py::TreeEdgeCasesTestCase::test_very_wide_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_from_json_preserves_falsy_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_from_map_basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_from_map_invalid_input",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_from_map_with_data_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_from_map_with_id_func",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_save2file_comprehensive",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_save2file_different_line_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_save2file_with_data_property",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_save2file_with_identifiers",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_to_json_basic",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_to_json_with_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_io.py::TreeIOTestCase::test_to_json_without_data",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_concurrent_operations_simulation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_filtering_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_large_tree_creation_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_memory_usage_large_tree",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_node_lookup_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_serialization_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_subtree_operations_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_tree_copying_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_tree_modification_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tree_performance.py::TreePerformanceTestCase::test_tree_traversal_performance",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "treelib",
+  "python": "3.12.15",
+  "schema": 1
+}

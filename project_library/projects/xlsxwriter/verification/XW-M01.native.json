@@ -1,0 +1,19 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "XW-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "formula_opt_out_applies_to_braced_array_strings_without_disabling_explicit_formulas": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

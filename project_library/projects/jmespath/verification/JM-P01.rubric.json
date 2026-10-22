@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JM-P01",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use a trusted Functions subclass with @signature and _func_store_key plus explicit Options(custom_functions=instance). Calls with those options produce warehouse-a and reject numeric input, while ordinary calls raise UnknownFunctionError and built-ins still work. Do not monkeypatch global registration or execute untrusted Python; bound expression/data work separately.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

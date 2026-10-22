@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "YY-P01"
+  ],
+  "python_paths": [
+    "library/lib",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "multi_document_iteration_can_fail_after_a_valid_prefix": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,1 @@
+Create a1x2 table containingA,B; merge both cells,save/reopen and inspect iter_cells,text,is_merge_origin,is_spanned,span_width and underlying a:tc identity. Split the origin and inspect the resulting text. Advise content/layout export and reversible-edit policy. Do not assume DOCX cell alias semantics or that split restores original per-cell content. No edits.

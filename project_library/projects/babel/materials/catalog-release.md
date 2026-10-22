@@ -1,0 +1,1 @@
+Create a de Catalog with Hello %(name)s -> Hallo %(other)s,python-format flag,and Review -> Prüfen,fuzzy flag. Compare Catalog.check() and successful write_mo compilation,then GNUTranslations.gettext with default use_fuzzy and True. Plan a release gate for placeholder validity,fuzzy approval and a verified artifact. Do not modify Babel or publish a catalog.

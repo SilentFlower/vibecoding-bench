@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "XW-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "formula_xml_and_cached_values_are_distinct_from_recalculation": true
+  },
+  "resource_profile": "business"
+}

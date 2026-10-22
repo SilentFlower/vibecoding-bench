@@ -1,0 +1,4976 @@
+{
+  "baseline_digest": "05133bb2fc1df50fb129615d3edd12c0efd905585fcaae480f5e392a07d6e648",
+  "nodes": [
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given0-foo.`bar`-syntax-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given1-abs(str)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given10-avg(strings)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given100-a{-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given101-a{foo}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given102-a{foo:-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given103-a{foo: 0-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given104-a{foo:}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given105-a{foo: 0, -syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given106-a{foo: ,}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given107-a{foo: bar}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given108-a{foo: 0}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given109-a.{}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given11-ceil('string')-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given110-a.{foo}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given111-a.{foo:}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given112-a.{foo: ,}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given113-a.{foo: bar, }-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given114-a.{foo: bar, baz}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given115-a.{foo: bar, baz:}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given116-a.{foo: bar, baz: bam, }-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given117-{a: @-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given118-foo ||-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given119-foo.|| bar-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given12-contains(`false`, 'd')-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given120- || foo-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given121-foo || || foo-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given122-foo.[a ||]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given123-\"foo-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given124-foo[ ?bar==`\"baz\"`]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given125-foo[?bar==]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given126-foo[?==]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given127-foo[?==bar]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given128-foo[?bar==baz?]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given129-foo[?bar==`[\"foo`bar\"]`]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given13-ends_with(str, `0`)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given130-foo[?bar<>baz]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given131-foo[?bar^baz]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given132-foo[bar==baz]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given133-bar.`\"anything\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given134-bar.baz.noexists.`\"literal\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given135-foo[*].`\"literal\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given136-foo[*].name.`\"literal\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given137-foo[].name.`\"literal\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given138-foo[].name.`\"literal\"`.`\"subliteral\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given139-foo[*].name.noexist.`\"literal\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given14-floor('string')-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given140-foo[].name.noexist.`\"literal\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given141-twolen[*].`\"foo\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given142-twolen[*].threelen[*].`\"bar\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given143-twolen[].threelen[].`\"bar\"`-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given144-foo[? @ | @-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given145-\"\\\\u\"-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given146-foo.`\"bar\"`-syntax-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given147-foo[8:2:0]-invalid-value-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given148-foo[8:2:0:1]-syntax-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given149-foo[8:2&]-syntax-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given15-floor(str)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given150-foo[2:a:3]-syntax-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given151-foo.`bar`-syntax-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given16-length(`false`)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given17-length(foo)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given18-max(abc)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given19-max(array)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given2-abs(`false`)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given20-min(abc)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given21-min(array)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given22-keys(foo)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given23-keys(strings)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given24-keys(`false`)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given25-values(foo)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given26-join(',', `[\"a\", 0]`)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given27-join(', ', str)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given28-join(`2`, strings)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given29-join('|', decimals)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given3-abs(`1`, `2`)-invalid-arity-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given30-starts_with(str, `0`)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given31-sum(array)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given32-\"to_string\"(`1.0`)-syntax-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given33-sort(array)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given34-sort(abc)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given35-sort(@)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given36-not_null()-invalid-arity-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given37-sort_by(people, &extra)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given38-sort_by(people, &bool)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given39-sort_by(people, &name)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given4-abs()-invalid-arity-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given40-sort_by(people, name)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given41-max_by(people, &bool)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given42-max_by(people, &extra)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given43-min_by(people, &bool)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given44-min_by(people, &extra)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given45-map(&a, badkey)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given46-foo.1-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given47-foo.-11-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given48-foo.-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given49-.foo-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given5-unknown_function(`1`, `2`)-unknown-function-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given50-foo..bar-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given51-foo.bar.-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given52-foo[.]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given53-.-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given54-:-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given55-,-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given56-]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given57-[-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given58-}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given59-{-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given6-avg(array)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given60-)-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given61-(-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given62-((&-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given63-a[-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given64-a]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given65-a][-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given66-!-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given67-@=-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given68-@``-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given69-![!(!-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given7-avg('abc')-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given70-(@-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given71-@(foo)-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given72-\"foo\"(bar)-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given73-.*-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given74-*foo-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given75-*0-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given76-foo[*]bar-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given77-foo[*]*-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given78-*.[0]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given79-foo[#]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given8-avg(foo)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given80-led[*-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given81-[:@]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given82-[:::]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given83-[:@:]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given84-[:1@]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given85-foo[0, 1]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given86-foo.[0]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given87-foo[0, ]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given88-foo[0,-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given89-foo.[a-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given9-avg(@)-invalid-type-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given90-foo[0,, 1]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given91-foo[abc]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given92-foo[abc, def]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given93-foo[abc, 1]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given94-foo[abc, ]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given95-foo.[abc, 1]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given96-foo.[abc, ]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given97-foo.[abc,, def]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given98-foo.[0, 1]-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_error_expression[given99-a{}-syntax-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given0-`foo`-foo-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given1-`foo\\\\\"quote`-foo\"quote-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given10-abs(array[1])-3-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given100-to_number('notanumber')-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given101-to_number(`false`)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given102-to_number(`null`)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given103-to_number(`[0]`)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given104-to_number(`{\"foo\": 0}`)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given105-sort(numbers)-expected105-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given106-sort(strings)-expected106-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given107-sort(decimals)-expected107-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given108-sort(empty_list)-expected108-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given109-not_null(unknown_key, str)-Str-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given11-abs(array[1])-3-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given110-not_null(unknown_key, foo.bar, empty_list, str)-expected110-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given111-not_null(unknown_key, null_key, empty_list, str)-expected111-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given112-not_null(all, expressions, are_null)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given113-numbers[].to_string(@)-expected113-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given114-array[].to_number(@)-expected114-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given115-foo[].not_null(f, e, d, c, b, a)-expected115-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given116-sort_by(people, &age)-expected116-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given117-sort_by(people, &age_str)-expected117-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given118-sort_by(people, &to_number(age_str))-expected118-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given119-sort_by(people, &age)[].name-expected119-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given12-abs(`-24`)-24-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given120-sort_by(people, &age)[].extra-expected120-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given121-sort_by(`[]`, &age)-expected121-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given122-max_by(people, &age)-expected122-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given123-max_by(people, &age_str)-expected123-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given124-max_by(people, &to_number(age_str))-expected124-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given125-max_by(`[]`, &age)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given126-min_by(people, &age)-expected126-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given127-min_by(people, &age_str)-expected127-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given128-min_by(people, &to_number(age_str))-expected128-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given129-min_by(`[]`, &age)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given13-abs(`-24`)-24-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given130-sort_by(people, &age)-expected130-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given131-map(&a, people)-expected131-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given132-map(&c, people)-expected132-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given133-map(&foo, empty)-expected133-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given134-map(&foo.bar, array)-expected134-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given135-map(&foo1.bar, array)-expected135-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given136-map(&foo.bar.baz, array)-expected136-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given137-map(&[], array)-expected137-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given138-foo.bar-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given139-foo-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given14-avg(numbers)-2.75-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given140-*-expected140-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given141-*.*-expected141-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given142-*.foo-expected142-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given143-*[0]-expected143-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given144-[]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given145-[0]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given146-[*]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given147-*.[\"0\"]-expected147-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given148-[*].bar-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given149-[*][0]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given15-avg(empty_list)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given150-foo[0]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given151-foo.[*]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given152-foo.[abc]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given153-foo.[abc, def]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given154-a.{foo: bar}-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given155-a.{foo: bar, baz: bam}-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given156-{\"\\\\\\\\\":{\" \":*}}-expected156-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given157-foo || bar-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given158-foo.[a || b]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given159-foo[?bar==`\"baz\"`]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given16-ceil(`1.2`)-2-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given160-foo[? bar == `\"baz\"` ]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given161-foo[?a.b.c==d.e.f]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given162-foo[?bar==`[0, 1, 2]`]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given163-foo[?bar==`[\"a\", \"b\", \"c\"]`]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given164-foo[?bar==`[\"foo\\\\`bar\"]`]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given165-[?\"\\\\\\\\\">`\"foo\"`]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given166-[?\"\\\\\\\\\" > `\"foo\"`]-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given167-foo-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given168-\"foo\"-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given169-\"\\\\\\\\\"-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given17-ceil(decimals[0])-2-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given170-*||*|*|*-None-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given171-*[]||[*]-expected171-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given172-[*.*]-expected172-syntax.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given173-foo-expected173-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given174-foo.bar-expected174-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given175-foo.bar.baz-correct-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given176-foo\\n.\\nbar\\n.baz-correct-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given177-foo.bar.baz.bad-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given178-foo.bar.bad-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given179-foo.bad-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given18-ceil(decimals[1])-2-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given180-bad-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given181-bad.morebad.morebad-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given182-foo-expected182-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given183-foo.bar-expected183-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given184-one-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given185-two-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given186-three-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given187-one.two-None-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given188-foo.\"1\"-expected188-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given189-foo.\"1\"[0]-one-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given19-ceil(decimals[2])--1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given190-foo.\"-1\"-bar-basic.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given191-outer.foo || outer.bar-foo-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given192-outer.foo||outer.bar-foo-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given193-outer.bar || outer.baz-bar-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given194-outer.bar||outer.baz-bar-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given195-outer.bad || outer.foo-foo-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given196-outer.bad||outer.foo-foo-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given197-outer.foo || outer.bad-foo-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given198-outer.foo||outer.bad-foo-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given199-outer.bad || outer.alsobad-None-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given2-`\\u2713`-\\u2713-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given20-contains('abc', 'a')-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given200-outer.bad||outer.alsobad-None-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given201-outer.empty_string || outer.foo-foo-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given202-outer.nokey || outer.bool || outer.empty_list || outer.empty_string || outer.foo-foo-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given203-True && False-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given204-False && True-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given205-True && True-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given206-False && False-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given207-True && Number-5-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given208-Number && True-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given209-Number && False-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given21-contains('abc', 'd')-False-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given210-Number && EmptyList-expected210-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given211-Number && True-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given212-EmptyList && True-expected212-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given213-EmptyList && False-expected213-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given214-True || False-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given215-True || True-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given216-False || True-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given217-False || False-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given218-Number || EmptyList-5-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given219-Number || True-5-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given22-contains(strings, 'a')-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given220-Number || True && False-5-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given221-(Number || True) && False-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given222-Number || (True && False)-5-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given223-!True-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given224-!False-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given225-!Number-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given226-!EmptyList-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given227-True && !False-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given228-True && !EmptyList-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given229-!False && !EmptyList-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given23-contains(decimals, `1.2`)-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given230-!True && False-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given231-!(True && False)-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given232-!Zero-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given233-!!Zero-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given234-Zero || Number-0-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given235-ZeroFloat || Number-0.0-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given236-one < two-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given237-one <= two-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given238-one == one-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given239-one == two-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given24-contains(decimals, `false`)-False-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given240-one > two-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given241-one >= two-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given242-one != two-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given243-emptylist < one-None-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given244-emptylist < nullvalue-None-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given245-emptylist < boolvalue-None-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given246-one < boolvalue-None-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given247-one < two && three > one-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given248-one < two || three > one-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given249-one < two || three < one-True-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given25-ends_with(str, 'r')-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given250-two < one || three < one-False-boolean.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given251-foo.*.baz | [0]-subkey-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given252-foo.*.baz | [1]-subkey-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given253-foo.*.baz | [2]-subkey-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given254-foo.bar.* | [0]-subkey-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given255-foo.*.notbaz | [*]-expected255-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given256-{\"a\": foo.bar, \"b\": foo.other} | *.baz-expected256-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given257-foo | bar-expected257-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given258-foo | bar | baz-one-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given259-foo|bar| baz-one-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given26-ends_with(str, 'tr')-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given260-not_there | [0]-None-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given261-not_there | [0]-None-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given262-[foo.bar, foo.other] | [0]-expected262-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given263-{\"a\": foo.bar, \"b\": foo.other} | a-expected263-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given264-{\"a\": foo.bar, \"b\": foo.other} | b-expected264-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given265-foo.bam || foo.bar | baz-one-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given266-foo | not_there || bar-expected266-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given267-foo[*].bar[*] | [0][0]-expected267-pipe.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given268-b-True-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given269-c.d-True-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given27-ends_with(str, 'Str')-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given270-a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p.q.r.s-None-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given271-a.b.c.d.e.f.g.h.i.j.k.l.m.n.o.p-True-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given272-not_there || b-True-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given273-a && b && c && d && e && f && g && h && i && j && k && l && m && n && o && p && q && r && s && t && u && v && w && x && y && z-25-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given274-z || y || x || w || v || u || t || s || r || q || p || o || n || m || l || k || j || i || h || g || f || e || d || c || b || a-25-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given275-sum([z, y, x, w, v, u, t, s, r, q, p, o, n, m, l, k, j, i, h, g, f, e, d, c, b, a])-325-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given276-sum([z, sum([y, sum([x, sum([w, sum([v, sum([u, sum([t, sum([s, sum([r, sum([q, sum([p, sum([o, sum([n, sum([m, sum([l, sum([k, sum([j, sum([i, sum([h, sum([g, sum([f, sum([e, sum([d, sum([c, sum([b, a])])])])])])])])])])])])])])])])])])])])])])])])])-325-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given277-[z, y, x, w, v, u, t, s, r, q, p, o, n, m, l, k, j, i, h, g, f, e, d, c, b, a]-expected277-benchmarks.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given278-@-expected278-current.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given279-@.bar-expected279-current.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given28-ends_with(str, 'SStr')-False-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given280-@.foo[0]-expected280-current.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given281-foo.bar[0]-zero-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given282-foo.bar[1]-one-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given283-foo.bar[2]-two-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given284-foo.bar[3]-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given285-foo.bar[-1]-two-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given286-foo.bar[-2]-one-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given287-foo.bar[-3]-zero-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given288-foo.bar[-4]-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given289-foo.bar-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given29-ends_with(str, 'foo')-False-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given290-foo[0].bar-one-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given291-foo[1].bar-two-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given292-foo[2].bar-three-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given293-foo[3].notbar-four-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given294-foo[3].bar-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given295-foo[0]-expected295-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given296-foo[1]-expected296-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given297-foo[2]-expected297-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given298-foo[3]-expected298-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given299-foo[4]-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given3-`foo\\\\\"bar`-foo\"bar-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given30-floor(`1.2`)-1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given300-[0]-one-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given301-[1]-two-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given302-[2]-three-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given303-[-1]-three-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given304-[-2]-two-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given305-[-3]-one-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given306-reservations[].instances[].foo-expected306-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given307-reservations[].instances[].bar-expected307-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given308-reservations[].notinstances[].foo-expected308-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given309-reservations[].notinstances[].foo-expected309-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given31-floor(decimals[0])-1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given310-reservations[].instances[].foo[].bar-expected310-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given311-reservations[].instances[].foo[].baz-expected311-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given312-reservations[].instances[].notfoo[].bar-expected312-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given313-reservations[].instances[].notfoo[].notbar-expected313-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given314-reservations[].notinstances[].foo-expected314-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given315-reservations[].instances[].foo[].notbar-expected315-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given316-reservations[].instances[].bar[].baz-expected316-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given317-reservations[].instances[].baz[].baz-expected317-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given318-reservations[].instances[].qux[].baz-expected318-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given319-reservations[].instances[].qux[].baz[]-expected319-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given32-floor(foo)--1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given320-foo[]-expected320-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given321-foo[][0]-expected321-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given322-foo[][1]-expected322-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given323-foo[][0][0]-expected323-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given324-foo[][2][2]-expected324-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given325-foo[][0][0][100]-expected325-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given326-foo-expected326-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given327-foo[]-expected327-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given328-foo[].bar-expected328-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given329-foo[].bar[]-expected329-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given33-length('abc')-3-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given330-foo[].bar[].baz-expected330-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given331-string[]-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given332-hash[]-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given333-number[]-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given334-nullvalue[]-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given335-string[].foo-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given336-hash[].foo-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given337-number[].foo-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given338-nullvalue[].foo-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given339-nullvalue[].foo[].bar-None-indices.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given34-length('\\u2713foo')-4-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given340-\"foo.bar\"-dot-escape.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given341-\"foo bar\"-space-escape.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given342-\"foo\\\\nbar\"-newline-escape.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given343-\"foo\\\\\"bar\"-doublequote-escape.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given344-\"c:\\\\\\\\\\\\\\\\windows\\\\\\\\path\"-windows-escape.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given345-\"/unix/path\"-unix-escape.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given346-\"\\\\\"\\\\\"\\\\\"\"-threequotes-escape.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given347-\"bar\".\"baz\"-qux-escape.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given348-`\"foo\"`-foo-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given349-`\"\\\\u03a6\"`-\\u03a6-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given35-length('')-0-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given350-`\"\\u2713\"`-\\u2713-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given351-`[1, 2, 3]`-expected351-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given352-`{\"a\": \"b\"}`-expected352-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given353-`true`-True-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given354-`false`-False-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given355-`null`-None-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given356-`0`-0-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given357-`1`-1-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given358-`2`-2-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given359-`3`-3-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given36-length(@)-12-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given360-`4`-4-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given361-`5`-5-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given362-`6`-6-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given363-`7`-7-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given364-`8`-8-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given365-`9`-9-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given366-`\"foo\\\\`bar\"`-foo`bar-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given367-`\"foo\\\\\"bar\"`-foo\"bar-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given368-`\"1\\\\`\"`-1`-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given369-`\"\\\\\\\\\"`.{a:`\"b\"`}-expected369-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given37-length(strings[0])-1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given370-`{\"a\": \"b\"}`.a-b-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given371-`{\"a\": {\"b\": \"c\"}}`.a.b-c-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given372-`[0, 1, 2]`[1]-1-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given373-`  {\"foo\": true}`-expected373-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given374-`{\"foo\": true}   `-expected374-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given375-'foo'-foo-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given376-'  foo  '-  foo  -literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given377-'0'-0-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given378-'newline\\n'-newline\\n-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given379-'\\n'-\\n-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given38-length(str)-3-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given380-'\\u2713'-\\u2713-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given381-'\\U0001d11e'-\\U0001d11e-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given382-'  [foo]  '-  [foo]  -literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given383-'[foo]'-[foo]-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given384-'\\\\u03a6'-\\\\u03a6-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given385-'foo\\\\'bar'-foo'bar-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given386-'\\\\z'-\\\\z-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given387-'\\\\\\\\'-\\\\\\\\-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given388-__L-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given389-\"!\\\\r\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given39-length(array)-6-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given390-Y_1623-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given391-x-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given392-\"\\\\tF\\\\uCebb\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given393-\" \\\\t\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given394-\" \"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given395-v2-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given396-\"\\\\t\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given397-_X-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given398-\"\\\\t4\\\\ud9da\\\\udd15\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given399-v24_W-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given4-`1\\\\``-1`-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given40-length(objects)-2-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given400-\"H\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given401-\"\\\\f\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given402-\"E4\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given403-\"!\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given404-tM-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given405-\" [\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given406-\"R!\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given407-_6W-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given408-\"\\\\uaBA1\\\\r\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given409-tL7-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given41-length(strings[0])-1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given410-\"<<U\\\\t\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given411-\"\\\\ubBcE\\\\ufAfB\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given412-sNA_-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given413-\"9\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given414-\"\\\\\\\\\\\\b\\\\ud8cb\\\\udc83\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given415-\"r\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given416-Q-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given417-_Q__7GL8-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given418-\"\\\\\\\\\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given419-RR9_-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given42-max(numbers)-5-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given420-\"\\\\r\\\\f:\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given421-r7-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given422-\"-\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given423-p9-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given424-__-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given425-\"\\\\b\\\\t\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given426-O_-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given427-_r_8-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given428-_j-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given429-\":\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given43-max(decimals)-1.2-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given430-\"\\\\rB\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given431-Obf-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given432-\"\\\\n\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given433-\"\\\\f\\U000e5333\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given434-\"\\\\\\\\\\\\u4FDc\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given435-\"\\\\r\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given436-m_-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given437-\"\\\\r\\\\fB \"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given438-\"+\\\\\"\\\\\"\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given439-Mg-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given44-max(strings)-c-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given440-\"\\\\\"!\\\\/\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given441-\"7\\\\\"\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given442-\"\\\\\\\\\\U000de8a4S\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given443-\"\\\\\"\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given444-Kl-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given445-\"\\\\b\\\\b\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given446-\">\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given447-hvu-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given448-\"; !\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given449-hU-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given45-max(decimals)-1.2-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given450-\"!I\\\\n\\\\/\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given451-\"\\\\uEEbF\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given452-\"U)\\\\t\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given453-fa0_9-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given454-\"/\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given455-Gy-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given456-\"\\\\b\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given457-\"<\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given458-\"\\\\t\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given459-\"\\\\t&\\\\\\\\\\\\r\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given46-max(empty_list)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given460-\"#\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given461-B__-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given462-\"\\\\nS \\\\n\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given463-Bp-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given464-\",\\\\t;\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given465-B_q-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given466-\"\\\\/+\\\\t\\\\n\\\\b!Z\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given467-\"\\U000c77c7\\\\\\\\ueFAc\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given468-\":\\\\f\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given469-\"\\\\/\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given47-merge(`{}`)-expected47-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given470-_BW_6Hg_Gl-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given471-\"\\U00103c02\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given472-zs1DC-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given473-__434-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given474-\"\\U000f5141\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given475-Z_5-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given476-z_M_-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given477-YU_2-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given478-_0-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given479-\"\\\\b+\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given48-merge(`{}`, `{}`)-expected48-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given480-\"\\\\\"\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given481-D7-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given482-_62L-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given483-\"\\\\tK\\\\t\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given484-\"\\\\n\\\\\\\\\\\\f\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given485-I_-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given486-W_a0_-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given487-BQ-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given488-\"\\\\tX$\\\\uABBb\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given489-Z9-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given49-merge(`{\"a\": 1}`, `{\"b\": 2}`)-expected49-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given490-\"\\\\b%\\\\\"\\U0009e10f\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given491-_F-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given492-\"!,\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given493-\"\\\\\"!\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given494-Hh-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given495-\"&\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given496-\"9\\\\r\\\\\\\\R\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given497-M_k-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given498-\"!\\\\b\\\\n\\U000d1a52\\\\\"\\\\\"\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given499-\"6\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given5-`\\\\\\\\`.{a:`b`}-expected5-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given50-merge(`{\"a\": 1}`, `{\"a\": 2}`)-expected50-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given500-_7-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given501-\"0\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given502-\"\\\\\\\\8\\\\\\\\\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given503-b7eo-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given504-xIUo9-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given505-\"5\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given506-\"?\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given507-sU-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given508-\"VH2&H\\\\\\\\\\\\/\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given509-_C-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given51-merge(`{\"a\": 1, \"b\": 2}`, `{\"a\": 2, \"c\": 3}`, `{\"d\": 4}`)-expected51-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given510-_-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given511-\"<\\\\t\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given512-\"\\\\uD834\\\\uDD1E\"-True-identifiers.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given513-foo.{bar: bar}-expected513-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given514-foo.{\"bar\": bar}-expected514-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given515-foo.{\"foo.bar\": bar}-expected515-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given516-foo.{bar: bar, baz: baz}-expected516-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given517-foo.{\"bar\": bar, \"baz\": baz}-expected517-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given518-{\"baz\": baz, \"qux\\\\\"\": \"qux\\\\\"\"}-expected518-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given519-foo.{bar:bar,baz:baz}-expected519-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given52-min(numbers)--1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given520-foo.{bar: bar,qux: qux}-expected520-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given521-foo.{bar: bar, noexist: noexist}-expected521-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given522-foo.{noexist: noexist, alsonoexist: alsonoexist}-expected522-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given523-foo.badkey.{nokey: nokey, alsonokey: alsonokey}-None-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given524-foo.nested.*.{a: a,b: b}-expected524-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given525-foo.nested.three.{a: a, cinner: c.inner}-expected525-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given526-foo.nested.three.{a: a, c: c.inner.bad.key}-expected526-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given527-foo.{a: nested.one.a, b: nested.two.b}-expected527-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given528-{bar: bar, baz: baz}-expected528-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given529-{bar: bar}-expected529-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given53-min(decimals)--1.5-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given530-{otherkey: bar}-expected530-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given531-{no: no, exist: exist}-expected531-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given532-foo.[bar]-expected532-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given533-foo.[bar,baz]-expected533-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given534-foo.[bar,qux]-expected534-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given535-foo.[bar,noexist]-expected535-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given536-foo.[noexist,alsonoexist]-expected536-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given537-foo.{bar:bar,baz:baz}-expected537-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given538-foo.[bar,baz[0]]-expected538-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given539-foo.[bar,baz[1]]-expected539-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given54-min(empty_list)-None-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given540-foo.[bar,baz[2]]-expected540-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given541-foo.[bar,baz[3]]-expected541-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given542-foo.[bar[0],baz[3]]-expected542-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given543-foo.{bar: bar, baz: baz}-expected543-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given544-foo.[bar,baz]-expected544-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given545-foo.{bar: bar.baz[1],includeme: includeme}-expected545-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given546-foo.{\"bar.baz.two\": bar.baz[1].two, includeme: includeme}-expected546-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given547-foo.[includeme, bar.baz[*].common]-expected547-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given548-foo.[includeme, bar.baz[*].none]-expected548-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given549-foo.[includeme, bar.baz[].common]-expected549-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given55-min(decimals)--1.5-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given550-reservations[*].instances[*].{id: id, name: name}-expected550-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given551-reservations[].instances[].{id: id, name: name}-expected551-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given552-reservations[].instances[].[id, name]-expected552-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given553-foo-expected553-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given554-foo[]-expected554-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given555-foo[].bar-expected555-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given556-foo[].bar[]-expected556-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given557-foo[].bar[].[baz, qux]-expected557-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given558-foo[].bar[].[baz]-expected558-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given559-foo[].bar[].[baz, qux][]-expected559-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given56-min(strings)-a-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given560-foo.[baz[*].bar, qux[0]]-expected560-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given561-foo.[baz[*].[bar, boo], qux[0]]-expected561-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given562-foo.[baz[*].not_there || baz[*].bar, qux[0]]-expected562-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given563-[[*],*]-expected563-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given564-[[*]]-expected564-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given565-missing.{foo: bar}-None-multiselect.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given566-foo.*.baz-expected566-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given567-foo.bar.*-expected567-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given568-foo.*.notbaz-expected568-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given569-foo.*.notbaz[0]-expected569-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given57-type('abc')-string-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given570-foo.*.notbaz[-1]-expected570-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given571-foo.*-expected571-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given572-foo.*.*-expected572-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given573-foo.*.*.*-expected573-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given574-foo.*.*.*.*-expected574-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given575-*.bar-expected575-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given576-*-expected576-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given577-*.sub1-expected577-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given578-*.*-expected578-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given579-*.*.foo[]-expected579-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given58-type(`1.0`)-number-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given580-*.sub1.foo-expected580-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given581-foo[*].bar-expected581-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given582-foo[*].notbar-expected582-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given583-[*]-expected583-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given584-[*].bar-expected584-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given585-[*].notbar-expected585-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given586-foo.bar[*].baz-expected586-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given587-foo.bar[*].baz[0]-expected587-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given588-foo.bar[*].baz[1]-expected588-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given589-foo.bar[*].baz[2]-expected589-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given59-type(`2`)-number-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given590-foo.bar[*].baz[3]-expected590-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given591-foo.bar[*]-expected591-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given592-foo.bar[0]-expected592-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given593-foo.bar[0][0]-one-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given594-foo.bar[0][0][0]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given595-foo.bar[0][0][0][0]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given596-foo[0][0]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given597-foo[*].bar[*].kind-expected597-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given598-foo[*].bar[0].kind-expected598-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given599-foo[*].bar.kind-expected599-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given6-`foo`-foo-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given60-type(`true`)-boolean-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given600-foo[*].bar[0]-expected600-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given601-foo[*].bar[1]-expected601-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given602-foo[*].bar[2]-expected602-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given603-foo[*].bar[0]-expected603-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given604-foo[*][0]-expected604-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given605-foo[*][1]-expected605-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given606-foo[*][0]-expected606-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given607-foo[*][1]-expected607-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given608-foo[*][0][0]-expected608-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given609-foo[*][1][0]-expected609-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given61-type(`false`)-boolean-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given610-foo[*][0][1]-expected610-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given611-foo[*][1][1]-expected611-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given612-foo[*][2]-expected612-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given613-foo[*][2][2]-expected613-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given614-bar[*]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given615-bar[*].baz[*]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given616-string[*]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given617-hash[*]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given618-number[*]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given619-nullvalue[*]-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given62-type(`null`)-null-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given620-string[*].foo-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given621-hash[*].foo-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given622-number[*].foo-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given623-nullvalue[*].foo-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given624-nullvalue[*].foo[*].bar-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given625-string.*-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given626-hash.*-expected626-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given627-number.*-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given628-array.*-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given629-nullvalue.*-None-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given63-type(`[0]`)-array-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given630-*[0]-expected630-wildcard.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given631-foo[].\"\\u2713\"-expected631-unicode.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given632-\"\\u262f\"-True-unicode.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given633-\"\\u266a\\u266b\\u2022*\\xa8*\\u2022.\\xb8\\xb8\\u2764\\xb8\\xb8.\\u2022*\\xa8*\\u2022\\u266b\\u266a\"-True-unicode.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given634-\"\\u2603\"-True-unicode.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given635-bar[0:10]-None-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given636-foo[0:10:1]-expected636-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given637-foo[0:10]-expected637-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given638-foo[0:10:]-expected638-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given639-foo[0::1]-expected639-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given64-type(`{\"a\": \"b\"}`)-object-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given640-foo[0::]-expected640-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given641-foo[0:]-expected641-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given642-foo[:10:1]-expected642-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given643-foo[::1]-expected643-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given644-foo[:10:]-expected644-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given645-foo[::]-expected645-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given646-foo[:]-expected646-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given647-foo[1:9]-expected647-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given648-foo[0:10:2]-expected648-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given649-foo[5:]-expected649-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given65-type(@)-object-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given650-foo[5::2]-expected650-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given651-foo[::2]-expected651-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given652-foo[::-1]-expected652-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given653-foo[1::2]-expected653-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given654-foo[10:0:-1]-expected654-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given655-foo[10:5:-1]-expected655-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given656-foo[8:2:-2]-expected656-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given657-foo[0:20]-expected657-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given658-foo[10:-20:-1]-expected658-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given659-foo[10:-20]-expected659-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given66-sort(keys(objects))-expected66-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given660-foo[-4:-1]-expected660-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given661-foo[:-5:-1]-expected661-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given662-foo[:2].a-expected662-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given663-foo[:2].b-expected663-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given664-foo[:2].a.b-expected664-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given665-bar[::-1].a.b-expected665-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given666-bar[:2].a.b-expected666-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given667-baz[:2].a-None-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given668-[:]-expected668-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given669-[:2].a-expected669-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given67-sort(values(objects))-expected67-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given670-[::-1].a-expected670-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given671-[:2].b-expected671-slice.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given672-foo[?name == 'a']-expected672-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given673-*[?[0] == `0`]-expected673-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given674-foo[?first == last]-expected674-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given675-foo[?first == last].first-expected675-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given676-foo[?age > `25`]-expected676-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given677-foo[?age >= `25`]-expected677-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given678-foo[?age > `30`]-expected678-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given679-foo[?age < `25`]-expected679-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given68-keys(empty_hash)-expected68-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given680-foo[?age <= `25`]-expected680-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given681-foo[?age < `20`]-expected681-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given682-foo[?age == `20`]-expected682-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given683-foo[?age != `20`]-expected683-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given684-foo[?weight > `44.4`]-expected684-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given685-foo[?weight >= `44.4`]-expected685-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given686-foo[?weight > `55.5`]-expected686-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given687-foo[?weight < `44.4`]-expected687-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given688-foo[?weight <= `44.4`]-expected688-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given689-foo[?weight < `33.3`]-expected689-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given69-join(', ', strings)-a, b, c-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given690-foo[?weight == `33.3`]-expected690-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given691-foo[?weight != `33.3`]-expected691-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given692-foo[?top.name == 'a']-expected692-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given693-foo[?top.first == top.last]-expected693-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given694-foo[?top == `{\"first\": \"foo\", \"last\": \"bar\"}`]-expected694-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given695-foo[?key == `true`]-expected695-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given696-foo[?key == `false`]-expected696-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given697-foo[?key == `0`]-expected697-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given698-foo[?key == `1`]-expected698-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given699-foo[?key == `[0]`]-expected699-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given7-`      foo`-foo-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given70-join(', ', strings)-a, b, c-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given700-foo[?key == `{\"bar\": [0]}`]-expected700-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given701-foo[?key == `null`]-expected701-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given702-foo[?key == `[1]`]-expected702-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given703-foo[?key == `{\"a\":2}`]-expected703-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given704-foo[?`true` == key]-expected704-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given705-foo[?`false` == key]-expected705-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given706-foo[?`0` == key]-expected706-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given707-foo[?`1` == key]-expected707-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given708-foo[?`[0]` == key]-expected708-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given709-foo[?`{\"bar\": [0]}` == key]-expected709-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given71-join(',', `[\"a\", \"b\"]`)-a,b-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given710-foo[?`null` == key]-expected710-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given711-foo[?`[1]` == key]-expected711-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given712-foo[?`{\"a\":2}` == key]-expected712-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given713-foo[?key != `true`]-expected713-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given714-foo[?key != `false`]-expected714-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given715-foo[?key != `0`]-expected715-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given716-foo[?key != `1`]-expected716-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given717-foo[?key != `null`]-expected717-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given718-foo[?key != `[1]`]-expected718-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given719-foo[?key != `{\"a\":2}`]-expected719-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given72-join('|', strings)-a|b|c-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given720-foo[?`true` != key]-expected720-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given721-foo[?`false` != key]-expected721-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given722-foo[?`0` != key]-expected722-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given723-foo[?`1` != key]-expected723-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given724-foo[?`null` != key]-expected724-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given725-foo[?`[1]` != key]-expected725-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given726-foo[?`{\"a\":2}` != key]-expected726-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given727-foo[?key == `true`]-expected727-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given728-foo[?key == `false`]-expected728-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given729-foo[?key]-expected729-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given73-join('|', decimals[].to_string(@))-1.01|1.2|-1.5-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given730-foo[? !key]-expected730-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given731-foo[? !!key]-expected731-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given732-foo[? `true`]-expected732-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given733-foo[? `false`]-expected733-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given734-reservations[].instances[?bar==`1`]-expected734-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given735-reservations[*].instances[?bar==`1`]-expected735-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given736-reservations[].instances[?bar==`1`][]-expected736-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given737-foo[?bar==`1`].bar[0]-expected737-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given738-foo[?a==`1`].b.c-expected738-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given739-foo[?name == 'a' || name == 'b']-expected739-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given74-join('|', empty_list)--functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given740-foo[?name == 'a' || name == 'e']-expected740-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given741-foo[?name == 'a' || name == 'b' || name == 'c']-expected741-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given742-foo[?a == `1` && b == `2`]-expected742-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given743-foo[?a == `1` && b == `4`]-expected743-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given744-foo[?c == `3` || a == `1` && b == `4`]-expected744-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given745-foo[?b == `2` || a == `3` && b == `4`]-expected745-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given746-foo[?a == `3` && b == `4` || b == `2`]-expected746-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given747-foo[?(a == `3` && b == `4`) || b == `2`]-expected747-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given748-foo[?((a == `3` && b == `4`)) || b == `2`]-expected748-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given749-foo[?a == `3` && (b == `4` || b == `2`)]-expected749-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given75-reverse(numbers)-expected75-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given750-foo[?a == `3` && ((b == `4` || b == `2`))]-expected750-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given751-foo[?a == `1` || b ==`2` && c == `5`]-expected751-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given752-foo[?(a == `1` || b ==`2`) && c == `5`]-expected752-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given753-foo[?!(a == `1` || b ==`2`)]-expected753-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given754-foo[?key]-expected754-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given755-foo[?!key]-expected755-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given756-foo[?key == `null`]-expected756-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given757-foo[?@ < `5`]-expected757-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given758-foo[?`5` > @]-expected758-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given759-foo[?@ == @]-expected759-filters.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given76-reverse(array)-expected76-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given760-`foo`-foo-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given761-`foo\\\\\"quote`-foo\"quote-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given762-`\\u2713`-\\u2713-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given763-`foo\\\\\"bar`-foo\"bar-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given764-`1\\\\``-1`-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given765-`\\\\\\\\`.{a:`b`}-expected765-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given766-`foo`-foo-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given767-`      foo`-foo-literal.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given77-reverse(`[]`)-expected77-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given78-reverse('')--functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given79-reverse('hello world')-dlrow olleh-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given8-abs(foo)-1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given80-starts_with(str, 'S')-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given81-starts_with(str, 'St')-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given82-starts_with(str, 'Str')-True-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given83-starts_with(str, 'String')-False-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given84-sum(numbers)-11-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given85-sum(decimals)-0.71-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given86-sum(array[].to_number(@))-111-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given87-sum(`[]`)-0-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given88-to_array('foo')-expected88-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given89-to_array(`0`)-expected89-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given9-abs(foo)-1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given90-to_array(objects)-expected90-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given91-to_array(`[1, 2, 3]`)-expected91-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given92-to_array(false)-expected92-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given93-to_string('foo')-foo-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given94-to_string(`1.2`)-1.2-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given95-to_string(`[0, 1]`)-[0,1]-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given96-to_number('1.0')-1.0-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given97-to_number('1e21')-1e+21-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given98-to_number('1.1')-1.1-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_compliance.py::test_expression[given99-to_number('4')-4-functions.json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_custom_functions.py::TestCustomFunctions::test_null_to_nonetype",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_functions.py::TestFunctions::test_can_max_datetimes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_functions.py::TestFunctions::test_error_message_is_pluralized",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_functions.py::TestFunctions::test_singular_in_error_message",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_functions.py::TestFunctions::test_type_error_messages",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_functions.py::TestFunctions::test_variadic_is_pluralized",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_adds_quotes_when_invalid_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_bad_first_character",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_empty_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_field",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_json_escaped_value",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_literal",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_literal_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_literal_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_literal_with_empty_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_literal_with_invalid_json",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_negative_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_number",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_number_expressions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_position_information",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_position_multiple_tokens",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_quoted_identifier",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_space_separated",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_unknown_character",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_lexer.py::TestRegexLexer::test_unknown_character_with_identifier",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestErrorMessages::test_bad_lexer_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestErrorMessages::test_bad_parse",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestErrorMessages::test_bad_parse_error_message",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestErrorMessages::test_bad_parse_error_message_with_multiselect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestErrorMessages::test_bad_unicode_string",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestErrorMessages::test_incomplete_expression_with_missing_paren",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestMergedLists::test_merge_with_indices",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestMergedLists::test_trailing_merged_operator",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParsedResultAddsOptions::test_can_have_ordered_dict",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_complex_or_expression",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_dot_syntax",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_field",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_function_call_with_and_statement",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_index",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_multiple_dots",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_multiselect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_multiselect_subexpressions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_multiselect_with_all_quoted_keys",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_or_expression",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_or_repr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_parse_empty_string_raises_exception",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_quoted_subexpression",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_unicode_literals_escaped",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_wildcard",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParser::test_wildcard_with_children",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserAddsExpressionAttribute::test_expression_available_from_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserCaching::test_cache_purge",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserCaching::test_compile_lots_of_expressions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserCaching::test_thread_safety_of_cache",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_consecutive_escape_sequences",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_escape_sequence_at_end_of_string_not_allowed",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_escape_sequences",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_indices_out_of_bounds",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_multiple_index_wildcards",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_only_wildcard",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_root_indices",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_root_wildcard",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_wildcard_mix_last",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_wildcard_mix_with_indices",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestParserWildcards::test_wildcard_with_multiselect",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestRenderGraphvizFile::test_dot_file_rendered",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parser.py::TestRenderGraphvizFile::test_dot_file_subexpr",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::TestPythonSpecificCases::test_can_compare_strings",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::TestPythonSpecificCases::test_can_handle_decimals_as_numeric_type",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::TestPythonSpecificCases::test_can_handle_long_ints",
+      "kind": "TestCaseFunction",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_search.py::TestSearchOptions::test_can_provide_custom_functions",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_search.py::TestSearchOptions::test_can_provide_dict_cls",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "jmespath",
+  "python": "3.12.15",
+  "schema": 1
+}

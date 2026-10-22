@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FT-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "compatibility_normalization_can_change_a_scientific_exponent": true
+  },
+  "resource_profile": "business"
+}

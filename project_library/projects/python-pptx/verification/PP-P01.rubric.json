@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-P01",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Current replace_data updates both chart cached data and embeddedXLSX; the30,40 controls must agree after save/reopen. Validate package relationships,data and complete save before publication and retain authoritative source values. This operation does not run Office,render pixels or promise formula recalculation; no new chart updater API is needed.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

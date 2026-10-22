@@ -1,0 +1,1 @@
+Use the complete text select 'a;b'; select $$c;d$$;. Compare split defaults and strip_semicolon=True. A local SQL-script inventory must preserve literal content and statement boundaries. Explain existing quote-aware splitting rather than a naive string split. No execution or edits.

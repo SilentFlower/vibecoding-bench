@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CS-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "html_checked_reads_supported_serialized_attributes_not_live_browser_state": true
+  },
+  "resource_profile": "business"
+}

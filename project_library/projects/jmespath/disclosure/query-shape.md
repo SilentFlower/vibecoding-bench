@@ -1,0 +1,1 @@
+Exact expression: records[].id[0]. Input is {"records":[{"id":"A"},{"id":"B"}]}; IDs are strings. Actual result=[]. The requested output is the first projected ID "A", not the first character of each ID. This is a complete synthetic reproduction and grants no library modification.

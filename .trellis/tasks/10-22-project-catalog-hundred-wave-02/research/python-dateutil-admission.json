@@ -1,0 +1,132 @@
+{
+  "project": "python-dateutil",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+  "source_file_count": 120,
+  "license_files": [
+    "seed/library/LICENSE"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 6,
+  "modify_tasks": 0,
+  "non_modify_tasks": 6,
+  "native_baseline": {
+    "project": "python-dateutil",
+    "attempt": 2,
+    "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/python-dateutil/result.json",
+    "result_sha256": "d38400ff7b00472255a1167737d37a2fb196d613016446e637e2e1410f75068c",
+    "main_collected": 5142,
+    "counts": {
+      "passed": 4861,
+      "failed": 0,
+      "error": 0,
+      "skipped": 264,
+      "xfailed": 17,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 5142,
+    "xml_skipped": 281,
+    "runner_sha256": "710a135c7db1712cb59945a3cc2df50f8629be6b0ba2156190dd7fc4e94e396c",
+    "contract_sha256": "ec307d852eb83be761ec1068a11b632aafad3800a9864ccd8ea4df5d19a6fb73",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-DT-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-dateutil/attempt-001/original-DT-C01.json",
+      "sha256": "af22f66f876c48c7467086ef34da4fae8359a01c4f18fc5f925a4f2e080d7d8e",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-DT-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-dateutil/attempt-001/original-DT-C02.json",
+      "sha256": "bcb738b74c174da797193a20d5e640f21c65b95d4e65ec60344943490420eff5",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-DT-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-dateutil/attempt-001/original-DT-P01.json",
+      "sha256": "e7e6a0011609a3fcdd0eea77ca133ee1a4cbd6d827b1f7ac0b0d81ddd51f909f",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-DT-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-dateutil/attempt-001/original-DT-U01.json",
+      "sha256": "d81be215bed41b223e6fe72ce42748e9b2e85c61279ea256ce731d0ed2fb513a",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-DT-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/python-dateutil/attempt-001/original-DT-U02.json",
+      "sha256": "ea488898aa408ad26b933937b0134bf20568647d9d2d06bde9ec554d684a15b0",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/python-dateutil/attempt-001/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v24-en",
+  "formal_digest": "6e6206d691130f74396a27a1234f9aaa72494f80cefaa7df0e1c596a101238c9",
+  "full_delivery_files": 22623,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-015/run-001/evidence/result.json",
+      "sha256": "99fb7271ecf166abfd39da2b9da84c449ae541b2fbd9896cb05e0654952c0bc9"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-015/run-001/cleanup.json",
+      "sha256": "4d76e83de3e367db27ebde77b978544558582ef7caf33f5581a186016ffd2188"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/mock-batch-015-audit.json",
+      "sha256": "0735e792cae0f98d1b0a6d6f58558f3cc902bb2db6e723047a8ee71e489b2630"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-015/browser/run-001/diagnostics/result.json",
+      "sha256": "99736f77f3d983c0fd81d8f3c7644ef63a5030ffa095b6606c81b95872e67ccb"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/delivery-all-thirty.json",
+      "sha256": "c481d815e82e29b6f8b503380cdc867441a214f99f4be1260ed1e59edf30c028"
+    }
+  ]
+}

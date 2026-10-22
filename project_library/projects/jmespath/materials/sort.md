@@ -1,0 +1,1 @@
+Inventory items in order: {id:A,price:"12"},{id:B,price:2},{id:C,price:"bad"},{id:D,price:true},{id:E,price:null}. A numeric-priced report must return B,A, explicitly omit invalid/non-numeric values, and leave the input unchanged. Compare raw sort_by with declared conversion/filtering using existing functions. Do not silently interpret true as1 or introduce a library repair.

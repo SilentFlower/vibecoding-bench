@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SJ-U02",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default duplicate decoding is last-wins and returns qty2. A trusted object_pairs_hook receives the original pairs and can reject duplicates at nested object boundaries while accepting a unique-key document. Ordinary successful parsing alone cannot certify uniqueness; select the explicit policy.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

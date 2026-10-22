@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "XW-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "workbook_is_finalized_only_on_close_before_application_publication": true
+  },
+  "resource_profile": "business"
+}

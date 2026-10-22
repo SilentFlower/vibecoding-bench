@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FT-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explanation_replays_the_observed_conversion_without_recovering_original_bytes": true
+  },
+  "resource_profile": "business"
+}

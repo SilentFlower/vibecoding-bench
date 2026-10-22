@@ -1,0 +1,1 @@
+Compare parse_decimal('30.00',locale='de') and strict=True,including NumberFormatError.suggestions. Control with strict '1.099,98'. A German invoice importer must preserve user intent rather than silently choose a suggested amount. Explain existing options,not a new parser. No implementation.

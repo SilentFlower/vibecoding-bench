@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-D01",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With full evidence the supplied ModuleType instance is outside the filename/module-name input contract and resolves to no loaded settings; silent=False is not universal type rejection. Validate caller argument type and effective expected values and use a supported filename/name. Missing evidence supports insufficient_information,not an unauthorized library repair.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

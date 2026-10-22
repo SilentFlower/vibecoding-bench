@@ -1,0 +1,1 @@
+Compare number_to_words("1e3"),number_to_words("abc"),number_to_words(1000),number_to_words("12.30"). The amount input must be syntactically valid before rendering. Explain actual string-cleaning behavior and advise an explicit accepted numeric grammar/type/range before calling the English renderer. No new strict-parser implementation or invented default guarantee.

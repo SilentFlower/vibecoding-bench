@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DX-P01",
+  "source_commit": "e45454602b53e8e572b179ccf1c91093ec9f4ed7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The foreign run anchors inA while comments are created inB,soA can contain a dangling commentReference without its comments part. Require runs to belong to the target document,validate order/range and saved comment relationships,then publish only the complete accepted artifact. The local-run control has both anchor and part. Native add_comment does not itself enforce cross-document ownership or provide a publication transaction.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

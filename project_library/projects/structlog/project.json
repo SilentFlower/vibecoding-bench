@@ -1,0 +1,249 @@
+{
+  "schema": 2,
+  "project_key": "structlog",
+  "title": "Structlog结构化日志工作场景",
+  "category": "上下文、序列化与出站政策",
+  "description": "绑定归属、请求上下文、领域JSON、测试捕获、嵌套出站及空值诊断六项只读任务。",
+  "seed_digest": "273f7c539952331608373d361fbc8c0adfcccb9adad2ad730fdef24587c2512d",
+  "environment": "structlog-py312",
+  "source": {
+    "repository": "https://github.com/hynek/structlog",
+    "commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+    "license_files": [
+      "seed/library/LICENSE-MIT",
+      "seed/library/LICENSE-APACHE",
+      "seed/library/NOTICE",
+      "seed/library/COPYRIGHT"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SL-S01",
+      "title": "日志上下文",
+      "goal": "明确绑定、调用优先级和请求生命周期",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SL-U01",
+            "SL-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SL-U01",
+          "kind": "understand",
+          "goal": "明确日志绑定与嵌套输入的归属",
+          "prompt": "Trace complete context,call and identity controls without edits.",
+          "requires": [],
+          "materials": [
+            "materials/binding.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SL-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/SL-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SL-C01",
+          "kind": "consult",
+          "goal": "制定请求上下文的优先级和清理政策",
+          "prompt": "Advise request context handling from all complete merge/clear controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/context.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SL-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/SL-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SL-S02",
+      "title": "JSON序列化",
+      "goal": "选择领域和精度政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SL-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SL-C02",
+          "kind": "consult",
+          "goal": "为领域对象和金额选择显式JSON政策",
+          "prompt": "Advise the complete financial log schema using current serializer/default controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/serialization.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SL-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/SL-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SL-S03",
+      "title": "测试证据",
+      "goal": "明确捕获器覆盖范围",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SL-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SL-U02",
+          "kind": "understand",
+          "goal": "核日志捕获是否实际覆盖业务处理器",
+          "prompt": "Explain the complete capture controls and testing scope without edits.",
+          "requires": [],
+          "materials": [
+            "materials/capture.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SL-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/SL-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SL-S04",
+      "title": "出站计划",
+      "goal": "完整处理链验收后交付",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SL-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SL-P01",
+          "kind": "plan",
+          "goal": "规划嵌套日志数据的出站验收",
+          "prompt": "Plan the complete schema,ownership and publication requirement from actual rendering controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/publication.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SL-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/SL-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SL-S05",
+      "title": "空值诊断",
+      "goal": "取得完整事件与renderer设置",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SL-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "SL-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SL-D01",
+          "kind": "diagnose",
+          "goal": "先核事件和渲染选项再定位空值丢失",
+          "prompt": "A log field disappears. Request the exact event mapping,renderer configuration and output before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SL-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "renderer-evidence",
+              "when": "The exact event mapping,renderer configuration and observed output are not supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/none.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

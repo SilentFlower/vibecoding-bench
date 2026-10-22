@@ -1,0 +1,1 @@
+At the pinned version use SpecifierSet('>=1.2.3'). Compare contains('1.5a1'),filter(['1.3','1.5a1']),filter(['1.2','1.5a1']),prereleases=True and explicitFalse. An offline mirror must choose a documented prerelease policy over the complete available candidate set. Explain current behavior without importing older packaging assumptions. No implementation.

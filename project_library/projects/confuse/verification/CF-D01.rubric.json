@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CF-D01",
+  "source_commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The displayed value alone does not establish its actual type or parsing path. Ask for source construction and the template. With complete evidence distinguish the dictionary string from parsed YAML numeric data and give an explicit source/validation policy. Missing evidence supports insufficient_information, not an invented parser fix.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,271 @@
+{
+  "schema": 2,
+  "project_key": "alive-progress",
+  "title": "Alive Progress批处理工作场景",
+  "category": "命令行进度与任务收尾",
+  "description": "真实计数、迭代时点、重放通知、定时输出和合法假值回调七项独立任务。",
+  "seed_digest": "3372655235bf9d9a886de638e6ad1418068c20f289c659f067cf396b73d3f22f",
+  "environment": "alive-progress-py312",
+  "source": {
+    "repository": "https://github.com/rsalmei/alive-progress",
+    "commit": "69d9bf0aba6276e2434a3a595cceca55040d64d7",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "AP-S01",
+      "title": "批处理计数协议",
+      "goal": "明确跳过、有效处理量和绝对进度",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AP-U01",
+            "AP-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AP-U01",
+          "kind": "understand",
+          "goal": "区分迁移进度和有效处理量",
+          "prompt": "Trace the complete local migration controls. Explain skipped position versus processed work without inventing a public processed property or editing files.",
+          "requires": [],
+          "materials": [
+            "materials/counts.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AP-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/AP-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AP-U02",
+          "kind": "understand",
+          "goal": "正确接入外部绝对百分比",
+          "prompt": "Trace all manual updates and give the exact current values. State the remaining application validation responsibility without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/manual.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AP-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/AP-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AP-S02",
+      "title": "迭代和通知归属",
+      "goal": "明确消费时点及重放通知去重责任",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AP-U03",
+            "AP-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AP-U03",
+          "kind": "understand",
+          "goal": "追踪迭代消费时点和句柄生命周期",
+          "prompt": "Explain the complete iterator and closed-handle controls, including their actual counts and legal lifecycle. Do not change files.",
+          "requires": [],
+          "materials": [
+            "materials/iterator.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AP-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/AP-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AP-P01",
+          "kind": "plan",
+          "goal": "规划可重放通知的进度归属",
+          "prompt": "Plan the complete duplicate-notification requirement. Show the existing counter observation and clear application ownership for identities, terminal states and retention without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/events.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AP-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/AP-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AP-S03",
+      "title": "定时任务显示",
+      "goal": "按实际非终端行为选择安静输出",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AP-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AP-C01",
+          "kind": "consult",
+          "goal": "让定时任务安静输出并保留计数",
+          "prompt": "Meet the complete quiet scheduled-output requirement with current options. Explain the non-TTY, receipt and disable distinction using observed controls; no implementation.",
+          "requires": [],
+          "materials": [
+            "materials/output.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AP-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/AP-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AP-S04",
+      "title": "完成回调",
+      "goal": "基于复现诊断并按明确授权修复",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AP-D01",
+            "AP-M01"
+          ]
+        },
+        {
+          "id": "inspect_only",
+          "task_ids": [
+            "AP-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "AP-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "AP-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AP-D01",
+          "kind": "diagnose",
+          "goal": "核对完成标注缺失的完整复现",
+          "prompt": "A local batch consumed its expected items, but its configured final annotation is missing. Ask for the exact iterator usage, callback definition and whether normal exhaustion occurred before diagnosing. Request local reproduction evidence when needed. No code changes are authorized.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AP-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete_reproduction",
+              "when": "The user is asked for the exact iterator and callback definition or an equivalent complete local reproduction.",
+              "materials": [
+                "disclosure/finalize-run.md"
+              ],
+              "setup": [],
+              "activate_tasks": []
+            }
+          ]
+        },
+        {
+          "id": "AP-M01",
+          "kind": "modify",
+          "goal": "让合法假值回调完成一次收尾",
+          "prompt": "Implement only the explicitly authorized callback repair and public regressions in the supplied complete material. Preserve original tests and every listed lifecycle boundary.",
+          "requires": [],
+          "materials": [
+            "materials/finalize-repair.md"
+          ],
+          "allowed_paths": [
+            "library/alive_progress/core/progress.py",
+            "app/test_finalize.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AP-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/AP-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

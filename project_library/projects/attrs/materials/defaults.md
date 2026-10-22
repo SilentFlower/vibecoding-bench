@@ -1,0 +1,1 @@
+Compare tags:list=attrs.field(default=[]) against tags:list=attrs.field(factory=list) using two fresh instances and one append. Then explicitly pass the same supplied list to two factory-backed instances. The caller needs independently owned tags,including explicit input. Explain a compatible ownership/copy policy; no library modification.

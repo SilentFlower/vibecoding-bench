@@ -1,0 +1,1 @@
+Parse the intentionally incomplete text select from,inspect Statement.get_type,and format keyword_case=upper. The input gate needs syntactically valid SQL for a declared database dialect. Explain exactly what successful classification/formatting establishes and advise a separate appropriate validation boundary. Do not execute SQL or implement a validator.

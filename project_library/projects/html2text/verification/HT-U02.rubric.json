@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HT-U02",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default emits![Revenue chart](figure.png); images_to_alt retainsRevenue chart without the image URL;ignore_images omits the image and its alt. Choose the archive accessibility policy explicitly. These modes do not fetch or describe missing image content.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DT-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "monthly_recurrence_skips_invalid_dates_while_relative_month_arithmetic_clamps": true
+  },
+  "resource_profile": "business"
+}

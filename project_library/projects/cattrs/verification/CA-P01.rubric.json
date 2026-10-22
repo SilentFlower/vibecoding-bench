@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-P01",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Detailed validation preserves both$.customer_id and$.items[0].quantity throughClassValidationError/transform_error. Aggregate per-row errors with stable paths,validate every complete candidate before application publication,and keep unstructuring separate from domain validation. Define ownership and side-effect policy; no universal rollback of constructors/hooks/external writes is promised.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

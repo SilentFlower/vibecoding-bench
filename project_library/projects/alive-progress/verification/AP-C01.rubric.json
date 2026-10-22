@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AP-C01",
+  "source_commit": "69d9bf0aba6276e2434a3a595cceca55040d64d7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Non-TTY does not itself suppress the final receipt: the first stream contains the shipment title and2/2. disableTrue and receiptFalse controls have empty streams here, and all counts remain2. Select explicit quiet-display options; do not equate non-TTY detection with no output or assume counting stops when display is disabled.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

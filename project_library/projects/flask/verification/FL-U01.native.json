@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FL-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "cookie_clients_preserve_session_while_each_standalone_request_gets_fresh_locals": true
+  },
+  "resource_profile": "business"
+}

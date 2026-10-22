@@ -1,0 +1,1 @@
+select(value) is marked firstresult=True. A normal Primary returns the value unchanged;a trylast Fallback records its call and returns FALLBACK. Compare valuesFalse,0,None. The application treats False and0 as valid choices. Explain actual result/stop semantics and compatible plugin return policy without implementation.

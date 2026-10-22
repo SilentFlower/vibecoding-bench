@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CA-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "structuring_coerces_values_and_extra_key_rejection_is_a_separate_option": true
+  },
+  "resource_profile": "business"
+}

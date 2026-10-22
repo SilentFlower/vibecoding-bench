@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TL-U02",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default traversal sorts tags and yieldsroot,a,leaf,b; sortingFalse preservesroot,b,a,leaf. Filter excludinga also prunesleaf,yieldingroot,b. Select order and pruning deliberately; this filter does not merely hide the parent while retaining its descendants.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

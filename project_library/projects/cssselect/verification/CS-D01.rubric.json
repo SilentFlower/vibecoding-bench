@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CS-D01",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With full evidence selector_to_xpath defaults to ignoring a parsed pseudo_element whilecss_to_xpath requests translation and rejects unsupported pseudo-elements. Explicitly reject/account for parsed pseudo-elements at the caller; XPath1 selects real nodes and cannot supply generatedbefore content. Missing evidence supports insufficient_information and no speculative patch.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

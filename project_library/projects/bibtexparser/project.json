@@ -1,0 +1,254 @@
+{
+  "schema": 2,
+  "project_key": "bibtexparser",
+  "title": "BibTeXParser文献整理工作场景",
+  "category": "导入、作者与派生文献归属",
+  "description": "重复账目、已有宏、组织作者、快照、写出归属、引用继承和失败块诊断七项只读任务。",
+  "seed_digest": "f9de251eb3b2f2fbf1aabf5d953df25526fa7f2d7c8aa52d0f1a20d5f3be976c",
+  "environment": "bibtexparser-py312",
+  "source": {
+    "repository": "https://github.com/sciunto-org/python-bibtexparser",
+    "commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BT-S01",
+      "title": "文献导入账目",
+      "goal": "完整记录输入与已有宏能力",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-U01",
+            "BT-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-U01",
+          "kind": "understand",
+          "goal": "为重复文献导入保留完整失败账目",
+          "prompt": "Explain all complete duplicate import controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/duplicates.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BT-U02",
+          "kind": "understand",
+          "goal": "确认增量导入已支持已有字符串宏",
+          "prompt": "Explain complete incremental identities and macro resolution. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/macros.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BT-S02",
+      "title": "作者与审计归属",
+      "goal": "采用现有姓名变换并明确快照",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-U03",
+            "BT-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-U03",
+          "kind": "understand",
+          "goal": "采用现有组织作者识别与非原位变换",
+          "prompt": "Explain the author controls and copying boundary. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/authors.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-U03.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BT-C01",
+          "kind": "consult",
+          "goal": "明确文献索引与审计快照归属",
+          "prompt": "Advise snapshot ownership from both mutation controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/snapshot.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BT-S03",
+      "title": "写出与引用继承",
+      "goal": "区分原始材料和派生交付",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-C02",
+            "BT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-C02",
+          "kind": "consult",
+          "goal": "为写出性能选择明确的对象归属",
+          "prompt": "Advise reuse/copy policy from actual default and all-inplace controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/writing.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BT-P01",
+          "kind": "plan",
+          "goal": "规划引用继承与来源保留",
+          "prompt": "Plan complete crossref inheritance requirements from original behavior. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/crossref-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/BT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BT-S04",
+      "title": "失败块写出诊断",
+      "goal": "核原始输入与失败块来源",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "BT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BT-D01",
+          "kind": "diagnose",
+          "goal": "先核失败块来源再定位写出异常",
+          "prompt": "Bibliography writing fails. Request construction/parse inputs,failed_blocks including raw provenance,writer options and exception before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "failed-block-provenance",
+              "when": "The exact inputs/construction,failed blocks with raw provenance,writer options and exception have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/unwritable.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

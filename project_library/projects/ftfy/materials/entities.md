@@ -1,0 +1,1 @@
+The complete input is "plain &amp;\n<b>HTML</b>\nafter &amp;" with actual newlines. Compare fix_text default,fix_and_explain on the whole string,and fix_text(unescape_html=True). Explain the automatic entity policy and segmentation; the caller needs an explicit document/entity scope. No implementation.

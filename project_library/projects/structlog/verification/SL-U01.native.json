@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SL-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "binding_copies_context_shallowly_and_call_values_override_without_rebinding": true
+  },
+  "resource_profile": "business"
+}

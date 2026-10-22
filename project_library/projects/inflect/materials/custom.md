@@ -1,0 +1,1 @@
+A report needs the exact acronym plural URLs. Compare default plural_noun("URL") with a trusted engine.defnoun("URL","URLs",case="preserve") scoped to its own engine. Keep ordinary child->children and a fresh engine as controls. Use current custom-rule support without a new case-preservation API or global monkeypatch.

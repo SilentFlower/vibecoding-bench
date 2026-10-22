@@ -1,0 +1,1 @@
+An inventory receives version strings v1.0,1.0.0 and1.0+ABC_1. Compare Version equality,hashes and str values,including the local version versus plain1.0. Advise which original text and normalized/comparison identity should be retained for provenance and deduplication. No edits.

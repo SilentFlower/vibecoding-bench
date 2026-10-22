@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JM-C02",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Raw sort_by encounters incompatible key types and raises JMESPathTypeError. Explicitly filter failed to_number results and sort by the converted numeric key, yielding B,A. Boolean values are not accepted as numbers by to_number. The original data remains unchanged; declare the omission policy rather than silently coercing invalid data.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

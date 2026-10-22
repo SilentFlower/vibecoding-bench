@@ -1,0 +1,1 @@
+Complete reproduction: config=Configuration("synthetic-scenario",read=False);config.set({"retries":"3"});config["retries"].get(int). It raises a configuration type error. The value is a Python string supplied by a dictionary, not a YAML-parsed environment scalar. A separate actual integer3 passes. No repair is authorized.

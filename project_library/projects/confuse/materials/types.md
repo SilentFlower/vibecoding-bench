@@ -1,0 +1,1 @@
+Use a synthetic dictionary source with fraction=3.9,text="3",flag=true. Compare get(int) for each. The caller needs a strict bounded worker count and must not silently accept Boolean input or truncate a fraction. Explain actual template behavior and an explicit raw-type/bounds or trusted custom Template conversion policy. No library implementation is requested.

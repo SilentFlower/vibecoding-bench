@@ -1,0 +1,1 @@
+Document={records:[{id:A},{},{id:null},{id:0},{id:false}]}. Compare records[*].id with map(&id, records). The export must choose whether it preserves source row positions or omits missing/null IDs, while retaining valid zero/false values. No project changes are authorized.

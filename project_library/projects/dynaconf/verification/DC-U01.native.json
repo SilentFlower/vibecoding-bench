@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DC-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "local_environment_layers_inherit_defaults_and_using_env_restores_context": true
+  },
+  "resource_profile": "business"
+}

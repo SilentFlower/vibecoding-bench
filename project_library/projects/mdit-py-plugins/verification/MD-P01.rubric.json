@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MD-P01",
+  "source_commit": "519953da0a394a92534bc27580f4e7415462df44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "gfm_plugin composes syntax and explicitly lacks tag filtering; html=True preserves the script tag while html=False escapes authorHTML and still allows generated task inputs. Select explicit parser/link/output policy and inspect the complete result before publishing. No claim of a sanitizer,script execution or universal safety from enablingGFM; current core4.2.0 meets this plugin>=4.1 requirement.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

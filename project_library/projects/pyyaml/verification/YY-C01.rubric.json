@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "YY-C01",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "SafeLoader rejects the unknown warehouse tag; BaseLoader returns scalarA but is not a typed business validator. Safe loading accepts the empty-SKU/negative-quantity mapping. Choose basic tag policy and validate types/ranges/business schema and bounded work separately; safe loading does not itself supply them.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

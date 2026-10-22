@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PP-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "replace_data_updates_chart_cache_and_embedded_workbook_without_office_recalculation": true
+  },
+  "resource_profile": "business"
+}

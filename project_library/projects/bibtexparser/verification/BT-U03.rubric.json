@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-U03",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "SeparateCoAuthors gives Doe, Jane and {Research and Dev} as two authors,keeping the braced organization together. MergeCoAuthors restores the original combined value. Explicit non-inplace transforms leave the original library unchanged. This is existing bracket-aware splitting,not proof of universal name validity or cultural name inference.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

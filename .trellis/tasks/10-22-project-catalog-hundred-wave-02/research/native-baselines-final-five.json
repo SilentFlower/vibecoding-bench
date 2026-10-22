@@ -1,0 +1,175 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "bibtexparser",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/bibtexparser/result.json",
+      "result_sha256": "a24ba1be0cadc28e4971574ed4e31fdd5d74004c7df983ef1987f118af4b053a",
+      "main_collected": 2831,
+      "counts": {
+        "passed": 2819,
+        "failed": 0,
+        "error": 0,
+        "skipped": 12,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 2831,
+      "xml_skipped": 12,
+      "runner_sha256": "332c782b777a1c24e647d133a86154140a92760a68e59ae791084540191420a1",
+      "contract_sha256": "2ba804c6899c988d30c905221e5ad70ae1c6f98156e24768c4fa03622001d7a7",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "treelib",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/treelib/result.json",
+      "result_sha256": "67bb3fa9959804c80de3e42f8b541c9a06f5512995a040583198f105a61d27cf",
+      "main_collected": 211,
+      "counts": {
+        "passed": 211,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 211,
+      "xml_skipped": 0,
+      "runner_sha256": "332c782b777a1c24e647d133a86154140a92760a68e59ae791084540191420a1",
+      "contract_sha256": "6e95d3ee86e4ff2615ebff763e6c097058d4e8eeb3d09db81fbe4b4fde5fc99b",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "sqlparse",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/sqlparse/result.json",
+      "result_sha256": "db64305cf07925bb27951184d1a59281e881775dca80745b0e34097df8a86ea3",
+      "main_collected": 509,
+      "counts": {
+        "passed": 506,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 2,
+        "xpassed": 1,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 509,
+      "xml_skipped": 2,
+      "runner_sha256": "710a135c7db1712cb59945a3cc2df50f8629be6b0ba2156190dd7fc4e94e396c",
+      "contract_sha256": "d4dd3f28b89236928642950315d75a1facf7456c2b7f9d7381ad7b8b0d3f2d8a",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "python-dateutil",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/python-dateutil/result.json",
+      "result_sha256": "d38400ff7b00472255a1167737d37a2fb196d613016446e637e2e1410f75068c",
+      "main_collected": 5142,
+      "counts": {
+        "passed": 4861,
+        "failed": 0,
+        "error": 0,
+        "skipped": 264,
+        "xfailed": 17,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 5142,
+      "xml_skipped": 281,
+      "runner_sha256": "710a135c7db1712cb59945a3cc2df50f8629be6b0ba2156190dd7fc4e94e396c",
+      "contract_sha256": "ec307d852eb83be761ec1068a11b632aafad3800a9864ccd8ea4df5d19a6fb73",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "ftfy",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/ftfy/result.json",
+      "result_sha256": "2ebf60fa1ab7bb1b7d0ca3033cffccb874f56267267d8a2e580bd03f3b45a580",
+      "main_collected": 368,
+      "counts": {
+        "passed": 358,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 10,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 22,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 368,
+      "xml_skipped": 10,
+      "runner_sha256": "332c782b777a1c24e647d133a86154140a92760a68e59ae791084540191420a1",
+      "contract_sha256": "4bffd773b1968cf3cc3211ddc64b9d03ebb82c598ca413fb10611fbe23a6788d",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "SJ-M01",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Complete input parsing must precede opening a named output for writing. Invalid input leaves existing output bytes untouched and a valid same-path invocation formats successfully. Preserve separate-file/stdin/stdout formatting, Decimal behavior, four-space sorted output/newline and original tests across both C and pure-Python. Change only tool.py and app/test_tool_output.py; do not claim general atomicity on write failures.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

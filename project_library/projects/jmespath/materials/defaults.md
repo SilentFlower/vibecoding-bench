@@ -1,0 +1,1 @@
+Document={zero:0,disabled:false,label:""}. Compare field || `99` with not_null(field, `99`) for each field. Separately distinguish an absent qty from qty:null using the available key API; ordinary qty lookup returns null for both. Define fallback policy without changing the library.

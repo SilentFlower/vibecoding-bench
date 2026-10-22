@@ -1,0 +1,1 @@
+Compare join([ant,bee,fly]),join(["blue, green",red,gold]),join([A,B]),and join(None). Explain punctuation and empty controls for human-readable summaries. This output is not a reversible CSV encoding; choose a real structured format for machine interchange. No implementation.

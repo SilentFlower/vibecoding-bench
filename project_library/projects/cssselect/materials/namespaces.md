@@ -1,0 +1,1 @@
+The completeXML is <root xmlns="urn:local" xmlns:o="urn:other"><item id="a"/><o:item id="b"/></root>. Translate d|item ando|item,then evaluate with explicit XPath mappingsd=urn:local,o=urn:other. Compare bareitem and missing namespace mapping. Advise namespace-preserving queries rather than prefix-text comparison or namespace stripping. No edits.

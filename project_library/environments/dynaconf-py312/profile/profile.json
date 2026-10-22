@@ -1,0 +1,437 @@
+{
+  "schema": 1,
+  "id": "dynaconf-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "asgiref==3.12.1",
+    "asttokens==3.0.2",
+    "attrs==26.1.0",
+    "blinker==1.9.0",
+    "boto3==1.43.116",
+    "botocore==1.43.116",
+    "cachetools==7.2.4",
+    "certifi==2026.10.19",
+    "charset-normalizer==3.5.2",
+    "click==8.5.0",
+    "colorama==0.4.6",
+    "commentjson==0.9.0",
+    "configobj==5.0.9",
+    "coverage==7.16.2",
+    "distlib==0.4.4",
+    "Django==6.1.2",
+    "django-debug-toolbar==4.3.0",
+    "execnet==2.1.2",
+    "executing==2.3.0",
+    "filelock==4.2.4",
+    "Flask==3.1.3",
+    "hvac==2.4.0",
+    "idna==3.20",
+    "ipython==9.17.1",
+    "ipython_pygments_lexers==1.1.1",
+    "itsdangerous==2.2.0",
+    "jedi==0.20.1",
+    "Jinja2==3.1.6",
+    "jmespath==1.1.0",
+    "lark-parser==0.7.8",
+    "mando==0.7.1",
+    "MarkupSafe==3.0.4",
+    "matplotlib-inline==0.2.2",
+    "parso==0.8.7",
+    "pexpect==4.9.0",
+    "platformdirs==4.13.5",
+    "prompt_toolkit==3.0.53",
+    "psutil==7.2.2",
+    "ptyprocess==0.7.0",
+    "pure_eval==0.2.4",
+    "pyproject-api==1.12.0",
+    "pytest-cov==7.1.0",
+    "pytest-docker==3.2.6",
+    "pytest-mock==3.17.0",
+    "pytest-xdist==3.8.0",
+    "python-dateutil==2.9.0.post0",
+    "python-discovery==1.6.4",
+    "python-dotenv==1.2.4",
+    "radon==6.0.1",
+    "redis==8.1.0",
+    "requests==2.34.2",
+    "s3transfer==0.19.3",
+    "six==1.17.0",
+    "sqlparse==0.6.0",
+    "stack-data==0.6.3",
+    "toml==0.10.2",
+    "tomli_w==1.2.0",
+    "tox==4.67.1",
+    "traitlets==5.16.1",
+    "typing_extensions==4.16.0",
+    "urllib3==2.8.0",
+    "virtualenv==21.14.12",
+    "wcwidth==0.9.3",
+    "Werkzeug==3.1.9"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 180,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/asgiref-3.12.1-py3-none-any.whl",
+      "digest": "fe386d1c2bff7259ea95929266d12a8cf9a8b5a1c2598402967d8792e7a7c094",
+      "size": 25478
+    },
+    {
+      "path": "artifacts/asttokens-3.0.2-py3-none-any.whl",
+      "digest": "9da13157f5b28becde0bd374fc677dcd3c290614264eff096f167c469cd9f933",
+      "size": 28702
+    },
+    {
+      "path": "artifacts/attrs-26.1.0-py3-none-any.whl",
+      "digest": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+      "size": 67548
+    },
+    {
+      "path": "artifacts/blinker-1.9.0-py3-none-any.whl",
+      "digest": "ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc",
+      "size": 8458
+    },
+    {
+      "path": "artifacts/boto3-1.43.116-py3-none-any.whl",
+      "digest": "9dca4dbd464b189041b27b5a02280bd5e02c3051bebf6bd03cd0e47aaf558030",
+      "size": 140042
+    },
+    {
+      "path": "artifacts/botocore-1.43.116-py3-none-any.whl",
+      "digest": "92f1efe8434183f08f91a61478925f5f8d23082024556f269f916477040e26f4",
+      "size": 16111072
+    },
+    {
+      "path": "artifacts/cachetools-7.2.4-py3-none-any.whl",
+      "digest": "4cfbebf3eec4040d2073b19c460511ad47eef7b852dbf9a0d385099b4dafa31e",
+      "size": 18571
+    },
+    {
+      "path": "artifacts/certifi-2026.10.19-py3-none-any.whl",
+      "digest": "42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b",
+      "size": 136464
+    },
+    {
+      "path": "artifacts/charset_normalizer-3.5.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "3d31298449090ab8d47b7b1b2a555ff73cac7ed438a08b7ac160980c7ebed649",
+      "size": 257601
+    },
+    {
+      "path": "artifacts/click-8.5.0-py3-none-any.whl",
+      "digest": "255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360",
+      "size": 125251
+    },
+    {
+      "path": "artifacts/colorama-0.4.6-py2.py3-none-any.whl",
+      "digest": "4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6",
+      "size": 25335
+    },
+    {
+      "path": "artifacts/commentjson-0.9.0-py3-none-any.whl",
+      "digest": "8a222b87f388697d4112d89847a87a2aa57eb40f77c857dac29853e627c3a7b2",
+      "size": 12148
+    },
+    {
+      "path": "artifacts/configobj-5.0.9-py2.py3-none-any.whl",
+      "digest": "1ba10c5b6ee16229c79a05047aeda2b55eb4e80d7c7d8ecf17ec1ca600c79882",
+      "size": 35615
+    },
+    {
+      "path": "artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d",
+      "size": 258571
+    },
+    {
+      "path": "artifacts/distlib-0.4.4-py2.py3-none-any.whl",
+      "digest": "cf09d55b1e85a89576b036aeb71550bfd68320f3f21761ca329eadadad918638",
+      "size": 472099
+    },
+    {
+      "path": "artifacts/django-6.1.2-py3-none-any.whl",
+      "digest": "141efee6ec64d1db6db90683bf734c550102450f444fb099063b0be1bd27d991",
+      "size": 8420684
+    },
+    {
+      "path": "artifacts/django_debug_toolbar-4.3.0-py3-none-any.whl",
+      "digest": "e09b7dcb8417b743234dfc57c95a7c1d1d87a88844abd13b4c5387f807b31bf6",
+      "size": 223656
+    },
+    {
+      "path": "artifacts/execnet-2.1.2-py3-none-any.whl",
+      "digest": "67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec",
+      "size": 40708
+    },
+    {
+      "path": "artifacts/executing-2.3.0-py3-none-any.whl",
+      "digest": "736e859c9f8701f11fcf516856f26f562e04776387824b43a35a1dfe21c84122",
+      "size": 29393
+    },
+    {
+      "path": "artifacts/filelock-4.2.4-py3-none-any.whl",
+      "digest": "301241438c57936ef93f4243a94f2559022268bfcf9b375a9a72eb0f8db8358e",
+      "size": 162475
+    },
+    {
+      "path": "artifacts/flask-3.1.3-py3-none-any.whl",
+      "digest": "f4bcbefc124291925f1a26446da31a5178f9483862233b23c0c96a20701f670c",
+      "size": 103424
+    },
+    {
+      "path": "artifacts/hvac-2.4.0-py3-none-any.whl",
+      "digest": "008db5efd8c2f77bd37d2368ea5f713edceae1c65f11fd608393179478649e0f",
+      "size": 155921
+    },
+    {
+      "path": "artifacts/idna-3.20-py3-none-any.whl",
+      "digest": "ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c",
+      "size": 69583
+    },
+    {
+      "path": "artifacts/ipython-9.17.1-py3-none-any.whl",
+      "digest": "6d1645743cfd1a07eb695d85aa2b5fa66721f8cbae9431d4049f7084bbf06509",
+      "size": 639038
+    },
+    {
+      "path": "artifacts/ipython_pygments_lexers-1.1.1-py3-none-any.whl",
+      "digest": "a9462224a505ade19a605f71f8fa63c2048833ce50abc86768a0d81d876dc81c",
+      "size": 8074
+    },
+    {
+      "path": "artifacts/itsdangerous-2.2.0-py3-none-any.whl",
+      "digest": "c6242fc49e35958c8b15141343aa660db5fc54d4f13a1db01a3f5891b98700ef",
+      "size": 16234
+    },
+    {
+      "path": "artifacts/jedi-0.20.1-py2.py3-none-any.whl",
+      "digest": "0fb16d86c4a4c73c37ba518c77419975e30fcc620658a8d14fbb5720cdd34142",
+      "size": 4885980
+    },
+    {
+      "path": "artifacts/jinja2-3.1.6-py3-none-any.whl",
+      "digest": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67",
+      "size": 134899
+    },
+    {
+      "path": "artifacts/jmespath-1.1.0-py3-none-any.whl",
+      "digest": "a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64",
+      "size": 20419
+    },
+    {
+      "path": "artifacts/lark_parser-0.7.8-py2.py3-none-any.whl",
+      "digest": "aea87c119eea711e5e7cce621cc9d2e05ab892a31f2f1b60ce0f7e3228592f98",
+      "size": 62603
+    },
+    {
+      "path": "artifacts/mando-0.7.1-py2.py3-none-any.whl",
+      "digest": "26ef1d70928b6057ee3ca12583d73c63e05c49de8972d620c278a7b206581a8a",
+      "size": 28149
+    },
+    {
+      "path": "artifacts/markupsafe-3.0.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "8e124f974786f831d6043728e38296969d3579db8896fe004682f5758e613581",
+      "size": 22985
+    },
+    {
+      "path": "artifacts/matplotlib_inline-0.2.2-py3-none-any.whl",
+      "digest": "3c821cf1c209f59fb2d2d64abbf5b23b67bcb2210d663f9918dd851c6da1fcf6",
+      "size": 9534
+    },
+    {
+      "path": "artifacts/parso-0.8.7-py2.py3-none-any.whl",
+      "digest": "a8926eb2a1b915486941fdbd31e86a4baf88fe8c210f25f2f35ecec5b574ca1c",
+      "size": 107025
+    },
+    {
+      "path": "artifacts/pexpect-4.9.0-py2.py3-none-any.whl",
+      "digest": "7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523",
+      "size": 63772
+    },
+    {
+      "path": "artifacts/platformdirs-4.13.5-py3-none-any.whl",
+      "digest": "53d3ec4280b815c1e0b02edad7f9ee8fda1ba9c0865dd9c2e6e63849ce82fc1e",
+      "size": 32779
+    },
+    {
+      "path": "artifacts/prompt_toolkit-3.0.53-py3-none-any.whl",
+      "digest": "01c0891d7f9237d5e339f7d3e42cdae80b7534abb1c7c0e3352efba6231492f2",
+      "size": 392288
+    },
+    {
+      "path": "artifacts/psutil-7.2.2-cp36-abi3-manylinux2010_x86_64.manylinux_2_12_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "076a2d2f923fd4821644f5ba89f059523da90dc9014e85f8e45a5774ca5bc6f9",
+      "size": 155560
+    },
+    {
+      "path": "artifacts/ptyprocess-0.7.0-py2.py3-none-any.whl",
+      "digest": "4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35",
+      "size": 13993
+    },
+    {
+      "path": "artifacts/pure_eval-0.2.4-py3-none-any.whl",
+      "digest": "96cae060a313cfaad51bb761278bfb0e62dc0248d9315a81173752dc546cd37a",
+      "size": 11893
+    },
+    {
+      "path": "artifacts/pyproject_api-1.12.0-py3-none-any.whl",
+      "digest": "1d3cbf37ac4c3a40940e09cbd4374608d25cdd89e6019f7e06fc285afd3ab467",
+      "size": 14055
+    },
+    {
+      "path": "artifacts/pytest_cov-7.1.0-py3-none-any.whl",
+      "digest": "a0461110b7865f9a271aa1b51e516c9a95de9d696734a2f71e3e78f46e1d4678",
+      "size": 22876
+    },
+    {
+      "path": "artifacts/pytest_docker-3.2.6-py3-none-any.whl",
+      "digest": "aeabb385eeb4898bbab46fe13b7762df31da6a5cf446d0a6746cb00b69cea0b2",
+      "size": 8752
+    },
+    {
+      "path": "artifacts/pytest_mock-3.17.0-py3-none-any.whl",
+      "digest": "1b82aa4b37137248bd687055e109723debeb07b489de1565297dc9589c5f2d6b",
+      "size": 11248
+    },
+    {
+      "path": "artifacts/pytest_xdist-3.8.0-py3-none-any.whl",
+      "digest": "202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88",
+      "size": 46396
+    },
+    {
+      "path": "artifacts/python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
+      "digest": "a8b2bc7bffae282281c8140a97d3aa9c14da0b136dfe83f850eea9a5f7470427",
+      "size": 229892
+    },
+    {
+      "path": "artifacts/python_discovery-1.6.4-py3-none-any.whl",
+      "digest": "530179cc51a1816d512b15635b3dc931295ae12efb183783ad31190a5d425d2b",
+      "size": 39385
+    },
+    {
+      "path": "artifacts/python_dotenv-1.2.4-py3-none-any.whl",
+      "digest": "42269a8a5b3fd54ffa6f3d84b18abed50064717576b4ecf03dc4a55d8aa04fdc",
+      "size": 23266
+    },
+    {
+      "path": "artifacts/radon-6.0.1-py2.py3-none-any.whl",
+      "digest": "632cc032364a6f8bb1010a2f6a12d0f14bc7e5ede76585ef29dc0cecf4cd8859",
+      "size": 52784
+    },
+    {
+      "path": "artifacts/redis-8.1.0-py3-none-any.whl",
+      "digest": "a4fe1aac3d3b3cc791d4b3d5931c5a956045dc951ee74d1c913ee3ac4d2ee9fb",
+      "size": 560618
+    },
+    {
+      "path": "artifacts/requests-2.34.2-py3-none-any.whl",
+      "digest": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+      "size": 73075
+    },
+    {
+      "path": "artifacts/s3transfer-0.19.3-py3-none-any.whl",
+      "digest": "24eb7535804306355e31c952a90022bf5b2f9d760f9a11062c7493a217c08553",
+      "size": 90252
+    },
+    {
+      "path": "artifacts/six-1.17.0-py2.py3-none-any.whl",
+      "digest": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "size": 11050
+    },
+    {
+      "path": "artifacts/sqlparse-0.6.0-py3-none-any.whl",
+      "digest": "b861c0288ce2fa56209a9a6412d2e066ac664b3873b89c26c9d8415e8e32996f",
+      "size": 50070
+    },
+    {
+      "path": "artifacts/stack_data-0.6.3-py3-none-any.whl",
+      "digest": "d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695",
+      "size": 24521
+    },
+    {
+      "path": "artifacts/toml-0.10.2-py2.py3-none-any.whl",
+      "digest": "806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b",
+      "size": 16588
+    },
+    {
+      "path": "artifacts/tomli_w-1.2.0-py3-none-any.whl",
+      "digest": "188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90",
+      "size": 6675
+    },
+    {
+      "path": "artifacts/tox-4.67.1-py3-none-any.whl",
+      "digest": "23d614cb703e1f7bd39e00c046d4c261b63fb9986e185134c6be2f93531d9726",
+      "size": 238078
+    },
+    {
+      "path": "artifacts/traitlets-5.16.1-py3-none-any.whl",
+      "digest": "f775618166caa0396c8e337099240f2bd3e5e917d203b2e6fbe21a58d3cb1f6b",
+      "size": 86211
+    },
+    {
+      "path": "artifacts/typing_extensions-4.16.0-py3-none-any.whl",
+      "digest": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "size": 45571
+    },
+    {
+      "path": "artifacts/urllib3-2.8.0-py3-none-any.whl",
+      "digest": "0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3",
+      "size": 135717
+    },
+    {
+      "path": "artifacts/virtualenv-21.14.12-py3-none-any.whl",
+      "digest": "7820aeaef23f1f59a96458edfc7f9d3deac937155718de15f1c9a64471e15551",
+      "size": 5556824
+    },
+    {
+      "path": "artifacts/wcwidth-0.9.3-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+      "digest": "9ab8bfee107e08de09e15f9f6afb9fe0f64c8d64fd296d0d8557bafe71ea3f93",
+      "size": 770047
+    },
+    {
+      "path": "artifacts/werkzeug-3.1.9-py3-none-any.whl",
+      "digest": "6392e50c78460ba618e5b21f08a71f59c99ce99cdc6cf6e3dd7e6ccca8754fab",
+      "size": 228700
+    }
+  ],
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "verification_status": "verified_target_runtime"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PK-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "wheel_filename_parsing_and_tag_intersection_do_not_open_or_verify_archives": true
+  },
+  "resource_profile": "business"
+}

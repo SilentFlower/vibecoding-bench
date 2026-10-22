@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DX-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "paragraph_text_replaces_runs_while_run_text_preserves_its_formatting": true
+  },
+  "resource_profile": "business"
+}

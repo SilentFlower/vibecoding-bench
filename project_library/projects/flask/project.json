@@ -1,0 +1,246 @@
+{
+  "schema": 2,
+  "project_key": "flask",
+  "title": "Flask本地Web工作场景",
+  "category": "请求状态与配置交付",
+  "description": "会话、消息消费、JSON精度、环境输入、配置发布和路由诊断六项只读任务。",
+  "seed_digest": "1d5e0441fa0daa712cc3941baaae1d71e7f5c52b1ca60485c0ea556621224286",
+  "environment": "flask-py312",
+  "source": {
+    "repository": "https://github.com/pallets/flask",
+    "commit": "d086db856be187255b8ec61ef409357393020f32",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FL-S01",
+      "title": "请求与消息",
+      "goal": "核客户端状态和消息消费",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FL-U01",
+            "FL-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FL-U01",
+          "kind": "understand",
+          "goal": "区分会话持久状态与请求局部状态",
+          "prompt": "Trace all complete process-local client controls and explain ownership without edits.",
+          "requires": [],
+          "materials": [
+            "materials/session.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FL-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/FL-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "FL-U02",
+          "kind": "understand",
+          "goal": "明确闪存类别过滤后的实际消费",
+          "prompt": "Explain complete successive-request and same-request filter controls without edits.",
+          "requires": [],
+          "materials": [
+            "materials/flashes.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FL-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/FL-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FL-S02",
+      "title": "JSON合同",
+      "goal": "明确时间精度和金额类型",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FL-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FL-C01",
+          "kind": "consult",
+          "goal": "为审计日期和金额选择显式JSON格式",
+          "prompt": "Advise the complete precision/type requirement using existing extension points. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/json.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FL-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/FL-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FL-S03",
+      "title": "环境配置",
+      "goal": "复用现有嵌套和JSON解析",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FL-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FL-C02",
+          "kind": "consult",
+          "goal": "复用已有环境变量JSON与嵌套加载",
+          "prompt": "Advise the complete synthetic configuration import using current behavior. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/environment.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FL-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/FL-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FL-S04",
+      "title": "配置发布计划",
+      "goal": "完整候选验证后发布",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FL-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FL-P01",
+          "kind": "plan",
+          "goal": "规划配置加载的完整验证与原子发布",
+          "prompt": "Plan the complete all-or-nothing configuration requirement from actual partial-write controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/config-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FL-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/FL-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "FL-S05",
+      "title": "路由诊断",
+      "goal": "核注册失败后的实际映射",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "FL-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "FL-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FL-D01",
+          "kind": "diagnose",
+          "goal": "先核完整路由注册再定位异常后的错派",
+          "prompt": "A route dispatches unexpectedly after registration failed. Request exact rules/endpoints,view functions,error and resulting url_map/response before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/FL-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "route-evidence",
+              "when": "Exact registrations,view functions,error and resulting map/response are not supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/endpoint.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DT-P01",
+  "source_commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Existingxafter(count2,incTrue) yieldsJan2 andJan3 without materializing the whole rule. Plan explicit horizon/count,endpoint/timezone and data-version policy,cancellation/resource ownership and complete output validation before publishing. It iterates to the start and is not a constant-time jump or universal infinite-stream protection. No new iterator API is needed.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

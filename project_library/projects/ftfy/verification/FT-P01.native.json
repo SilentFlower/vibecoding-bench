@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FT-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "byte_line_iteration_precedes_multibyte_decoding_and_text_stream_control_succeeds": true
+  },
+  "resource_profile": "business"
+}

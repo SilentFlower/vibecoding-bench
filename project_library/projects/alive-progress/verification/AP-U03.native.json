@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AP-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "iterator_counts_after_resumption_and_is_single_use": true
+  },
+  "resource_profile": "business"
+}

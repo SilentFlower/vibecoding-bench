@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MT-D01",
+  "source_commit": "ebf9ae4e9279f3d8c79b7cf2710f7e73ea6438a7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With the complete disclosure explain title omission leaves no included headings and the current toc implementation indexes an empty token list. Separate caller policy or an explicitly authorized later empty-result repair from this diagnosis. Missing input/options support insufficient_information rather than blaming the parser or encoding.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

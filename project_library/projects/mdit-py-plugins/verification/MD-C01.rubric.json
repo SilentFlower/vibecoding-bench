@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MD-C01",
+  "source_commit": "519953da0a394a92534bc27580f4e7415462df44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default generated checkboxes are disabled; enabled=True already makes them interactive and preserves checked state fromMarkdown. html=False disables author rawHTML but does not suppress trusted generated checkbox tokens. Durable state,event handlers and authorization belong to the application; do not propose an already-existing enable option as a new plugin feature.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

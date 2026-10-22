@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-P01",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The first dev validation binds when.envs toDEV; sharing that mutable conditional validator can incorrectly skipprod validation,whereas a fresh conditional validator rejects negativeprodPORT. Own validators per intended configuration/environment or explicitly bind their policy,validate a complete separate settings candidate and publish only on success. Do not reuse cross-environment mutable instances or claim transaction/concurrency guarantees.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

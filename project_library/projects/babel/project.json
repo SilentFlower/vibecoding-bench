@@ -1,0 +1,232 @@
+{
+  "schema": 2,
+  "project_key": "babel",
+  "title": "Babel区域化交付工作场景",
+  "category": "金额、预约与翻译发布",
+  "description": "金额精度、区域输入、数字符号、时区、翻译发布和日期解析诊断六项只读任务。",
+  "seed_digest": "3ce71deff56aa14e35ba197981380780abca30f57b4008106a4200ef0099a756",
+  "environment": "babel-py312",
+  "source": {
+    "repository": "https://github.com/python-babel/babel",
+    "commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/babel/locale-data/LICENSE.unicode"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BA-S01",
+      "title": "财务金额输入与显示",
+      "goal": "明确精度和用户意图",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BA-U01",
+            "BA-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BA-U01",
+          "kind": "understand",
+          "goal": "明确金额显示精度与核算精度",
+          "prompt": "Explain all complete precision controls and the existing options. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/money.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BA-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/BA-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BA-U02",
+          "kind": "understand",
+          "goal": "识别区域金额歧义与现有严格模式",
+          "prompt": "Explain complete strict/lenient controls and how to preserve invoice input intent. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/inputs.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BA-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/BA-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BA-S02",
+      "title": "区域数字和预约",
+      "goal": "明确显示合同与时区含义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BA-C01",
+            "BA-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BA-C01",
+          "kind": "consult",
+          "goal": "区分数字符号和数字字形",
+          "prompt": "Advise a complete digit display policy from the actual roundtrip and glyph controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/digits.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BA-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/BA-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "BA-C02",
+          "kind": "consult",
+          "goal": "为预约输入明确时区含义",
+          "prompt": "Advise wall-time interpretation from both fixed-offset controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/timezone.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BA-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/BA-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BA-S03",
+      "title": "翻译发布",
+      "goal": "校验与编译分别验收",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BA-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BA-P01",
+          "kind": "plan",
+          "goal": "规划翻译目录校验与发布门槛",
+          "prompt": "Plan the complete release requirements from check/compile/fuzzy controls. No implementation or publication.",
+          "requires": [],
+          "materials": [
+            "materials/catalog-release.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BA-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/BA-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "BA-S04",
+      "title": "日期导入诊断",
+      "goal": "取得原始输入后诊断",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "BA-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "BA-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BA-D01",
+          "kind": "diagnose",
+          "goal": "先取得完整日期解析合同",
+          "prompt": "Date import raises an exception. Request exact text,locale,format and exception before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/BA-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "date-parser-evidence",
+              "when": "The exact date text,locale,format and exception have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/date.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-C02",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The explicitly registered hook affects only its converter and rejectsstring2 andboolTrue while acceptingint2. The independent converter and module helper retain their original coercionstring2 toint2. Own customization per converter,declare exact bool/type rules and avoid mutating shared global helpers; a hook system already exists.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BA-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "naive_datetime_is_assumed_utc_before_explicit_display_conversion": true
+  },
+  "resource_profile": "business"
+}

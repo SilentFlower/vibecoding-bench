@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SP-C02",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Private initialization and add_keywords classifyBUSINESSXYZ asKeyword;defaulttokenize remainsName before and after. This existing scopedlexer does not reconfigure the defaultsingleton. Top-levelparse/format currently use thatdefault and do not accept an invented lexer argument;scope token processing or explicitly plan integration rather than claim private configuration automatically propagates.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

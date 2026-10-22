@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SJ-D01",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only consumed evidence and distinguish shell redirection, path aliasing, invalid input and write failures until the reproduction is known. With the complete supplied case, explain opening named output before parsing as the cause. Missing evidence supports insufficient_information without inventing an I/O repair.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

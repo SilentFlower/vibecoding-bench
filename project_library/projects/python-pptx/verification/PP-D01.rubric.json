@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-D01",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With full evidence from_string parses fixed first-two/next-two/remainder slices and validates numeric channels,so five or some seven digit inputs may be accepted and normalized. A strict caller should explicitly enforce exactly six ASCII hexadecimal digits. Missing evidence supports insufficient_information,not a library patch or claiming all malformed values are rejected.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

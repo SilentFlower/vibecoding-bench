@@ -1,0 +1,10 @@
+{
+  "scope": "当前固定源码宿主独立诊断观察，非目标容器测试集合",
+  "module": "/root/project/vibecoding-bench/.deploy/project-catalog-hundred/stage-02/drafts/projects/python-dateutil/seed/library/src/dateutil/__init__.py",
+  "plain": "2026-01-02T10:00:00",
+  "warning_types": [
+    "UnknownTimezoneWarning"
+  ],
+  "explicit_mapping": "2026-01-02T10:00:00+02:00",
+  "offset_seconds": 7200.0
+}

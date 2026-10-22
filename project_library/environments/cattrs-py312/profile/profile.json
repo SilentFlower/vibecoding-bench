@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "id": "cattrs-py312",
+  "adapter": "python-native",
+  "platform": "linux-amd64",
+  "python": "3.12.15",
+  "requirements": [
+    "iniconfig==2.3.1",
+    "packaging==26.3",
+    "pluggy==1.7.0",
+    "Pygments==2.21.0",
+    "pytest==9.1.1",
+    "attrs==26.1.0",
+    "cbor2==6.1.5",
+    "coverage==7.16.2",
+    "dnspython==2.9.0",
+    "execnet==2.1.2",
+    "hypothesis==6.170.5",
+    "immutables==0.21",
+    "msgpack==1.2.3",
+    "msgspec==0.22.0",
+    "orjson==3.13.0",
+    "py-cpuinfo2==10.1.1",
+    "pymongo==4.19.0",
+    "pytest-benchmark==5.3.0",
+    "pytest-xdist==3.8.0",
+    "PyYAML==6.0.3",
+    "sortedcontainers==2.4.0",
+    "tomli_w==1.2.0",
+    "tomlkit==0.15.2",
+    "typing_extensions==4.16.0",
+    "ujson==6.0.0"
+  ],
+  "business": {
+    "timeout_sec": 30,
+    "memory_mb": 256,
+    "pids_limit": 64
+  },
+  "regression": {
+    "timeout_sec": 600,
+    "memory_mb": 512,
+    "pids_limit": 64
+  },
+  "artifacts": [
+    {
+      "path": "artifacts/iniconfig-2.3.1-py3-none-any.whl",
+      "digest": "9121e2c1fdb355232495be3194c8dfe87ccc2d5dee45947b78e68f499790d7a7",
+      "size": 7552
+    },
+    {
+      "path": "artifacts/packaging-26.3-py3-none-any.whl",
+      "digest": "d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c",
+      "size": 129956
+    },
+    {
+      "path": "artifacts/pluggy-1.7.0-py3-none-any.whl",
+      "digest": "7dd7b0d8832ba3cb632c306926ded123429211b83641b35dc5c41ad2d34f9bec",
+      "size": 27082
+    },
+    {
+      "path": "artifacts/pygments-2.21.0-py3-none-any.whl",
+      "digest": "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+      "size": 1250147
+    },
+    {
+      "path": "artifacts/pytest-9.1.1-py3-none-any.whl",
+      "digest": "37a86b45efb9a47a61a36449063e8e18d0cab3161329fc099eb21783169c4f0c",
+      "size": 386536
+    },
+    {
+      "path": "artifacts/attrs-26.1.0-py3-none-any.whl",
+      "digest": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+      "size": 67548
+    },
+    {
+      "path": "artifacts/cbor2-6.1.5-cp312-cp312-manylinux_2_28_x86_64.whl",
+      "digest": "b70d7c47ea84d456034d2be02e89d92eef7044cfcedf6f05058e21d4452f0fef",
+      "size": 463316
+    },
+    {
+      "path": "artifacts/coverage-7.16.2-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+      "digest": "5375ebd99038021b35e99dc88255022912c06565d316212f4a576e4b08d30f5d",
+      "size": 258571
+    },
+    {
+      "path": "artifacts/dnspython-2.9.0-py3-none-any.whl",
+      "digest": "9a4aedb833c3c1b49214d04d44d3032ab7a9135f7c1d29a549b4ff78fd82fda9",
+      "size": 354822
+    },
+    {
+      "path": "artifacts/execnet-2.1.2-py3-none-any.whl",
+      "digest": "67fba928dd5a544b783f6056f449e5e3931a5c378b128bc18501f7ea79e296ec",
+      "size": 40708
+    },
+    {
+      "path": "artifacts/hypothesis-6.170.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "83a29bd457f5aad739bc22b15cc295545c9372a254d6be77f253eae2908e5e5a",
+      "size": 1163728
+    },
+    {
+      "path": "artifacts/immutables-0.21-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "dad7c0c74b285cc0e555ec0e97acbdc6f1862fcd16b99abd612df3243732e741",
+      "size": 104864
+    },
+    {
+      "path": "artifacts/msgpack-1.2.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "ede33b2892ceb976283e009ad12fa1834cfdf1f9c43ee9c97849fc588d00a618",
+      "size": 472998
+    },
+    {
+      "path": "artifacts/msgspec-0.22.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "99c401861c5bb3a57f7d6423ea7ed4352cd57aa3f04f4fbe9f3e3e4564a10f08",
+      "size": 230377
+    },
+    {
+      "path": "artifacts/orjson-3.13.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "digest": "bceadfd314bd238f584fc229a4bbaf0e573597e7a026dec5429fbf29fd66c641",
+      "size": 130612
+    },
+    {
+      "path": "artifacts/py_cpuinfo2-10.1.1-py3-none-any.whl",
+      "digest": "adc53396bfb206e6498d078ec2ab407f85799ecd819584ac36a8f80a2d4d762d",
+      "size": 23791
+    },
+    {
+      "path": "artifacts/pymongo-4.19.0-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "a5af9e52dfd18224474d5f54817ef2cbf06e313d100772a4a72aea8394037941",
+      "size": 1058052
+    },
+    {
+      "path": "artifacts/pytest_benchmark-5.3.0-py3-none-any.whl",
+      "digest": "920ab1dfcffa718d49aa15ba144c7e357bda59216a0dc308016cc1c7236f719d",
+      "size": 48401
+    },
+    {
+      "path": "artifacts/pytest_xdist-3.8.0-py3-none-any.whl",
+      "digest": "202ca578cfeb7370784a8c33d6d05bc6e13b4f25b5053c30a152269fd10f0b88",
+      "size": 46396
+    },
+    {
+      "path": "artifacts/pyyaml-6.0.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc",
+      "size": 807870
+    },
+    {
+      "path": "artifacts/sortedcontainers-2.4.0-py2.py3-none-any.whl",
+      "digest": "a163dcaede0f1c021485e957a39245190e74249897e2ae4b2aa38595db237ee0",
+      "size": 29575
+    },
+    {
+      "path": "artifacts/tomli_w-1.2.0-py3-none-any.whl",
+      "digest": "188306098d013b691fcadc011abd66727d3c414c571bb01b1a174ba8c983cf90",
+      "size": 6675
+    },
+    {
+      "path": "artifacts/tomlkit-0.15.2-py3-none-any.whl",
+      "digest": "05562412163a3037b94497385fb7f9204c637bc605af7a48199e41cf2272f437",
+      "size": 52225
+    },
+    {
+      "path": "artifacts/typing_extensions-4.16.0-py3-none-any.whl",
+      "digest": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "size": 45571
+    },
+    {
+      "path": "artifacts/ujson-6.0.0-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl",
+      "digest": "e9359bfd0efd12593f0db40ccb2d1497284401da207f1d6a1783718313201b21",
+      "size": 56411
+    }
+  ],
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "verification_status": "verified_target_runtime"
+}

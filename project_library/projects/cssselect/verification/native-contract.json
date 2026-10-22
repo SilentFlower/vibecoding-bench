@@ -1,0 +1,1229 @@
+{
+  "baseline_digest": "79a0f3d1d9b994140b1aeb6057ebedef66427e88ac9baff94990c1bbfc17ba88",
+  "nodes": [
+    {
+      "id": "docs/index.rst::line:20,column:1",
+      "kind": "SybilItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/index.rst::line:21,column:1",
+      "kind": "SybilItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/index.rst::line:26,column:1",
+      "kind": "SybilItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/index.rst::line:35,column:1",
+      "kind": "SybilItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/index.rst::line:36,column:1",
+      "kind": "SybilItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "docs/index.rst::line:41,column:1",
+      "kind": "SybilItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_add_name_test",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_argument_types",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_css_export",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_html_non_ascii_attribute_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_html_non_ascii_element_names",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_html_non_ascii_lang",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_input_preprocessing",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_lang",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_parse_errors",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_parser",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_pseudo_elements",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_quoting",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_select",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_select_complex_negation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_select_shakespeare",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_select_with_default_namespace",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_select_with_namespace",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_combinations",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_series",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_specificity",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_tokenizer",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_translation",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_translation_customization_api",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_unicode",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_unicode_escapes",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cssselect.py::TestCssselect::test_xpath_pseudo_elements",
+      "kind": "TestCaseFunction",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-cov",
+      "module": "pytest_cov.plugin",
+      "module_sha256": "7cc8a14b8cc8effa886c40fdfa058459d89686d62c53fea6721750e722a60f40",
+      "version": "7.1.0"
+    }
+  ],
+  "project": "cssselect",
+  "python": "3.12.15",
+  "schema": 1,
+  "subtests": [
+    {
+      "context": {
+        "kwargs": {
+          "selector": "'item[*|label^=\"prefix\"][*|label$=\"token\"]'"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_combinations",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "selector": "'item:not([*|label^=\"prefix\"])'"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_combinations",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "selector": "'item:is([*|label^=\"prefix\"])'"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_combinations",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "selector": "'root:has(> item[*|label$=\"token\"]) > item#second'"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_combinations",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "selector": "'item[*|label=\"äbc\" i]'"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_combinations",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "selector": "'item[*|label=\"Äbc\" i]'"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_combinations",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "selector": "'item[*|label=\"Äbc\" s]'"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_combinations",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "''",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "''",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "''",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "''",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "''",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' i'",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' i'",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' i'",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' i'",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' i'",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' s'",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' s'",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' s'",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 13,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' s'",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 14,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "flag": "' s'",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 15,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_empty_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 1,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "''",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 2,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 3,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 4,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' i'",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 5,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 6,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 7,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' s'",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 8,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'='"
+        },
+        "msg": null
+      },
+      "ordinal": 9,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 10,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "''",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 11,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 12,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 13,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' i'",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 14,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 15,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 16,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' s'",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 17,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'~='"
+        },
+        "msg": null
+      },
+      "ordinal": 18,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 19,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "''",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 20,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 21,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 22,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' i'",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 23,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 24,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 25,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' s'",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 26,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'|='"
+        },
+        "msg": null
+      },
+      "ordinal": 27,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 28,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "''",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 29,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 30,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 31,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' i'",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 32,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 33,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 34,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' s'",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 35,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'^='"
+        },
+        "msg": null
+      },
+      "ordinal": 36,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 37,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "''",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 38,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 39,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 40,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' i'",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 41,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 42,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 43,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' s'",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 44,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'$='"
+        },
+        "msg": null
+      },
+      "ordinal": 45,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 46,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "''",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 47,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "''",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 48,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 49,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' i'",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 50,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' i'",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 51,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 52,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'label'",
+          "flag": "' s'",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 53,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    },
+    {
+      "context": {
+        "kwargs": {
+          "first": "'{urn:a}label'",
+          "flag": "' s'",
+          "operator": "'*='"
+        },
+        "msg": null
+      },
+      "ordinal": 54,
+      "outcome": "passed",
+      "parent_nodeid": "tests/test_cssselect.py::TestCssselect::test_select_with_wildcard_attribute_values",
+      "when": "call"
+    }
+  ]
+}

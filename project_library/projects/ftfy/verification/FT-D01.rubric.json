@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FT-D01",
+  "source_commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The supplied zero max_decode_length leavespos unchanged in the segment loop. Distinguish this nonprogress from a large positive bounded segment;advise a positive caller input contract or separately authorized repair. Keep the bounded subprocess observation distinct from a performance guarantee. No patch or unbounded call is authorized. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

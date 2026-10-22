@@ -1,0 +1,1 @@
+First parse @string{J={Journal}} and @article{old,title={Retained}}. Then parse @article{new,journal=J,title={Added}} into that existing Library. Compare library identity,old entry identity/value,new journal and macro count. Explain the existing incremental behavior without proposing macro seeding as a missing feature. No edits.

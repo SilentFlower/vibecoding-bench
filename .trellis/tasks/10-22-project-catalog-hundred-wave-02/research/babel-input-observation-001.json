@@ -1,0 +1,14 @@
+{
+  "scope": "固定源码宿主独立观察，未冒充目标容器验证",
+  "lenient": "3000",
+  "strict_suggestions": [
+    "3.000",
+    "30"
+  ],
+  "numeric_control": "1099.98",
+  "date_error": "IndexError: list index out of range",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "module": "babel/numbers.py",
+  "module_sha256": "337e7466b9a6e08d67f873a9b224e0e6426a31aa9dbd56c00eb90542ac6d7522",
+  "note": "实际建议去除小数尾零；源码docstring示例仍显示30,00。首轮独立期望失败保留。"
+}

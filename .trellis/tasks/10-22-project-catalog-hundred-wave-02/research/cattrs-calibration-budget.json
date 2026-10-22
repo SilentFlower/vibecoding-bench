@@ -1,0 +1,9 @@
+{
+  "project": "cattrs",
+  "historical_wall_sec": 220.013,
+  "runner_supported_timeout_max_sec": 1800,
+  "selected_regression_timeout_sec": 600,
+  "memory_mb": 512,
+  "pids_limit": 64,
+  "reason": "完整历史集合217秒，当前先预留600秒测量；不删Hypothesis测试、不改examples／deadline、不增账号角色资源或并发"
+}

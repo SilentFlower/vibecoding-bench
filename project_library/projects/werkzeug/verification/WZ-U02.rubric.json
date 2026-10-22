@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WZ-U02",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "update appends4 to2,3. pop returns2 and removes the entire key including3,4. setlist explicitly replaces values with5,6; poplist returns and removes the entire list. Choose desired behavior explicitly; pop is not queue consumption of one value.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

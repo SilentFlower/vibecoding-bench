@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BA-C02",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Naive10:00 is assumedUTC and displays12:00 atUTC+02; awareUTC+02 wall10:00 displays10:00. Define meaning and attach the correct timezone before display,including an explicit DST ambiguity policy for real named zones. These controls use fixed offsets and do not validate DST or alter the originalnaive object.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

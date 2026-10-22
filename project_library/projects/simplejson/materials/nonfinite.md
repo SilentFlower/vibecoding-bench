@@ -1,0 +1,1 @@
+Compare default dumps([NaN]) and loads("NaN"), explicit allow_nan=True, and ignore_nan=True. The receiving interface requires ordinary interoperable JSON and a declared policy for missing/non-finite metrics. Explain acceptance versus rejection or null replacement and information loss. Only synthetic local values are authorized.

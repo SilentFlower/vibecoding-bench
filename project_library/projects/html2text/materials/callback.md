@@ -1,0 +1,1 @@
+For <h1>Report</h1><p><strong>Done</strong></p>,set tag_callback(instance,tag,attrs,start). For h1,start emits TITLE: through instance.o;both h1 boundaries returnTrue. Other tags returnFalse. Compare with default conversion. Advise a bounded custom heading policy using this existing extension,without proposing a duplicate callback API. No edits.

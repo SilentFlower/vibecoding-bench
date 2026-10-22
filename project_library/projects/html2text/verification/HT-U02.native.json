@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "HT-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "image_alt_retention_and_omission_are_distinct_existing_policies": true
+  },
+  "resource_profile": "business"
+}

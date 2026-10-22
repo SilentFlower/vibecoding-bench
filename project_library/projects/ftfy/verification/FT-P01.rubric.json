@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FT-P01",
+  "source_commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "fix_file iterates binary lines before decoding eachline; UTF-16 codeunits can be split and the supplied input raisesUnicodeDecodeError. Decoding the complete payload first and iterating a text stream preserves both lines. Plan known-encoding text streaming/incremental decoder ownership,explicit error policy and complete output/provenance checks before publication. A line generator alone is not safe multibyte decoding; no library repair is authorized here.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

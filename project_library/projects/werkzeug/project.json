@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "werkzeug",
+  "title": "Werkzeug请求与流交付工作场景",
+  "category": "重复输入、上传与导出资源",
+  "description": "重复数量、合并消费、来源优先级、上传流、惰性响应和JSON诊断六项只读任务。",
+  "seed_digest": "20196468560946592fd785befc8b92ca41b397d4f98cc79c4ecc5c52ba87b9ec",
+  "environment": "werkzeug-py312",
+  "source": {
+    "repository": "https://github.com/pallets/werkzeug",
+    "commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "WZ-S01",
+      "title": "表单数量与合并",
+      "goal": "完整保留重复输入并明确消费政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WZ-U01",
+            "WZ-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WZ-U01",
+          "kind": "understand",
+          "goal": "核重复数量与转换失败的完整账目",
+          "prompt": "Explain all complete controls and account for raw invalid items. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/quantities.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WZ-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/WZ-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "WZ-U02",
+          "kind": "understand",
+          "goal": "明确多选值合并与消费政策",
+          "prompt": "Explain existing append,replace and removal semantics from complete controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/merge.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WZ-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/WZ-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WZ-S02",
+      "title": "请求来源",
+      "goal": "明确优先级和快照边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WZ-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WZ-C01",
+          "kind": "consult",
+          "goal": "为请求来源建立明确优先级",
+          "prompt": "Advise raw/converted source precedence and snapshot scope from all controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/precedence.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WZ-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/WZ-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WZ-S03",
+      "title": "文件与导出资源",
+      "goal": "明确流范围与关闭归属",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WZ-C02",
+            "WZ-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WZ-C02",
+          "kind": "consult",
+          "goal": "明确上传字节范围与流关闭归属",
+          "prompt": "Advise complete upload bytes and resource ownership from both saves. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/upload.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WZ-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/WZ-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "WZ-P01",
+          "kind": "plan",
+          "goal": "规划惰性导出验证与资源清理",
+          "prompt": "Plan bounded stream verification from actual generator and close events. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/stream-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WZ-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/WZ-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "WZ-S04",
+      "title": "JSON请求诊断",
+      "goal": "取得完整输入合同",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "WZ-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "WZ-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WZ-D01",
+          "kind": "diagnose",
+          "goal": "先取完整请求再定位JSON失败",
+          "prompt": "A JSON endpoint rejects a request. Request exact body,Content-Type,get_json options and exception/status before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/WZ-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "request-json-evidence",
+              "when": "The exact body,Content-Type,get_json options and exception/status have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/json.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

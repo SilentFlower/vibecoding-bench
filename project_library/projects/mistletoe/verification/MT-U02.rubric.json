@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MT-U02",
+  "source_commit": "ebf9ae4e9279f3d8c79b7cf2710f7e73ea6438a7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "include_source emits the root at depth0 with parentNone,then Heading and Paragraph at depth1 in breadth-first order. Strong is at depth2 with its real Paragraph parent; depth1 filtering omits it. Existing Token.parent and traversal already supply these relations; do not invent precise source-character spans or a new parent feature.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

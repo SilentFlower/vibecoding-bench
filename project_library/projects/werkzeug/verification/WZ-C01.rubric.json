@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WZ-C01",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Raw lookup yields querybad; convertedget tries thatfirst value then falls through to form7,not querysecond2. getlist concatenatesbad,2,7. Combined object remains live after querychanges9; copy is a mutable MultiDict retaining prior structural values. Preserve provenance and explicit duplicate/source rules rather than equating typed and raw precedence or promising deep immutability.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

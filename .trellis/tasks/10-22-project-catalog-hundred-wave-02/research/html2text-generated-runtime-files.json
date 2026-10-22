@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "project": "html2text",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "origin": {
+    "kind": "preserved-original-scm-build-output",
+    "version": "0.1.dev1+g5cf85510a",
+    "version_tuple": [
+      0,
+      1,
+      "dev1",
+      "g5cf85510a"
+    ],
+    "commit_id": "g5cf85510a",
+    "historical_metadata": ".deploy/github-100-research/resume-text/html2text/venv/lib/python3.12/site-packages/html2text-0.1.dev1+g5cf85510a.dist-info/METADATA",
+    "historical_metadata_sha256": "3cc39d37c29572cf5424cbf4a1535c99cdc63079c42e56a90edeba926864ff85",
+    "pinned_pyproject_sha256": "a60a03e3a294ce29aa3410cd02e97f14d41419a6efe5fcae1a178d472f30569f",
+    "scope": "上游SCM工具实际生成的版本模块原文；不改写版本、不另装实现、不声称本次重建"
+  },
+  "files": [
+    {
+      "path": "html2text/_version.py",
+      "sha256": "5bf5ebd1c7ee95e8e6b85efeb3a3418b736ba22fc0dfa7125cb56c7fba2702bb",
+      "size": 561,
+      "git_mode": null,
+      "git_blob": null,
+      "snapshot_mode": "100644",
+      "representation": "preserved-upstream-generated-runtime-file"
+    }
+  ],
+  "file_count": 1,
+  "bytes": 561,
+  "rebuilt_in_current_run": false,
+  "scope": "保留先前实际构建原件并逐SHA复核；当前镜像原生及业务准入另验，不把生成物说成Git跟踪源码"
+}

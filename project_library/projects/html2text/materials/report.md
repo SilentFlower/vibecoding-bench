@@ -1,0 +1,1 @@
+Convert the complete local HTML <h1>Report</h1><p><strong>Done</strong> <a href="guide.md">Guide</a></p><ol start="3"><li>A</li><li>B</li></ol> with HTML2Text(baseurl="https://docs.example.test/team/",bodywidth=0). Explain the retained structure,relative-link resolution and existing list-start support. No network fetch or edits.

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SP-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "statement_type_and_successful_formatting_do_not_validate_sql_grammar": true
+  },
+  "resource_profile": "business"
+}

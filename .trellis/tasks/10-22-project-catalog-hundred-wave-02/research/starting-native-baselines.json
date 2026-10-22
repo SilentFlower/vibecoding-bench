@@ -1,0 +1,174 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "alive-progress",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/alive-progress/result.json",
+      "result_sha256": "e5c94dd0ce5caeec14db229772357e2099cd7fa779c1769638cd2f2ec9ed2b82",
+      "main_collected": 563,
+      "counts": {
+        "passed": 563,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 563,
+      "xml_skipped": 0,
+      "runner_sha256": "1dbafdf3306907abf4558bf959b4f62392da888f07cade1f2c98eb76eee1dcbb",
+      "contract_sha256": "cadbca8cf83ad142b61976d36377bf5785f07df7f1721e84ac40d8629721d1a8",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "jmespath",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/jmespath/result.json",
+      "result_sha256": "53e1f03307dc8c0667b549e693de8766b59dfd1036d4ca45c80ce66df703772b",
+      "main_collected": 992,
+      "counts": {
+        "passed": 991,
+        "failed": 0,
+        "error": 0,
+        "skipped": 1,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 992,
+      "xml_skipped": 1,
+      "runner_sha256": "1dbafdf3306907abf4558bf959b4f62392da888f07cade1f2c98eb76eee1dcbb",
+      "contract_sha256": "eece3efd80c4d1100b1898e22ef893d6c186e9213cf8b060096c7e3760849238",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "confuse",
+      "attempt": 1,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/confuse/result.json",
+      "result_sha256": "56a112a4ad1b7e2c4bcf1a15fe17a270032275e2ff8136b6c71cc90dc996989b",
+      "main_collected": 299,
+      "counts": {
+        "passed": 299,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 1,
+      "xml_testcases": 300,
+      "xml_skipped": 1,
+      "runner_sha256": "1dbafdf3306907abf4558bf959b4f62392da888f07cade1f2c98eb76eee1dcbb",
+      "contract_sha256": "44f83fa579f3b0d0d965a965594de51f3346e53712643f53d12ee056e922fb22",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    },
+    {
+      "project": "simplejson",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/simplejson/result.json",
+      "result_sha256": "9e268aa3ac5831a061b0824d0aa7f7cd8815bf76e23e2a9560c4d94e9e15dd6c",
+      "main_collected": 562,
+      "counts": {
+        "passed": 486,
+        "failed": 0,
+        "error": 0,
+        "skipped": 76,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 0,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 562,
+      "xml_skipped": 76,
+      "runner_sha256": "3cec0c15194adde991f55e61c08a336c1a925769b78cbe2bf41ea94ca1693e59",
+      "contract_sha256": "450655c3186d5b652610b0ffd7474b58d6262adf50c0ed1cf105b4baad69b18e",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成",
+      "native_build": {
+        "command": [
+          "/work/python/bin/python",
+          "setup.py",
+          "build_ext",
+          "--inplace",
+          "--force"
+        ],
+        "returncode": 0,
+        "elapsed_sec": 2.085569740011124,
+        "inputs": {
+          "setup.py": "742e6ccce4df1c0f658c81116af0b10205299917ad2a83e82191ac1adde6b847",
+          "simplejson/_speedups.c": "f3ceab208f345913006dd0c1b70d9e694873525b72cc86dacf9439396e1a2716",
+          "simplejson/_speedups_scan.h": "74a26675a66e4a230ba2b1ca65ad07ce1b6d2a4d5c8b9ed4f7ce452beb17e5da"
+        },
+        "extension": "simplejson/_speedups.cpython-312-x86_64-linux-gnu.so",
+        "extension_sha256": "69648190c3e1cd01b78e26ab5b6b7d771c9c0286f88c080eb031dc1648b7388b",
+        "implementation_installed": false,
+        "force_rebuilt_from_candidate": true
+      },
+      "native_mode_checks": {
+        "master": {
+          "c": {
+            "failed": [],
+            "started": 281
+          },
+          "python": {
+            "failed": [],
+            "started": 281
+          }
+        }
+      },
+      "unittest_entry": "simplejson.tests._cibw_runner"
+    }
+  ]
+}

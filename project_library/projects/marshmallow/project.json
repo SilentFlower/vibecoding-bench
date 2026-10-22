@@ -1,0 +1,272 @@
+{
+  "schema": 2,
+  "project_key": "marshmallow",
+  "title": "Marshmallow订单验收工作场景",
+  "category": "模式校验与数据投影",
+  "description": "字段方向、未知值、部分更新、批次失败和日期类型七项独立任务。",
+  "seed_digest": "c402cbe09e2ee1685bf11a424495e3d3c1acacc05fe98e43e6f482a6cb45c50a",
+  "environment": "marshmallow-py312",
+  "source": {
+    "repository": "https://github.com/marshmallow-code/marshmallow",
+    "commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MM-S01",
+      "title": "输入和输出视图",
+      "goal": "按真实方向理解字段映射和校验",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MM-U01",
+            "MM-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MM-U01",
+          "kind": "understand",
+          "goal": "追踪外部键和单向字段投影",
+          "prompt": "Trace all complete Credentials controls and explain the exact load/dump mappings. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/names.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MM-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/MM-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MM-U02",
+          "kind": "understand",
+          "goal": "区分序列化与业务输入校验",
+          "prompt": "Trace the complete Order dump/load controls and state where validation runs. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/validation.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MM-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/MM-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MM-S02",
+      "title": "请求与部分更新",
+      "goal": "选择未知字段和缺失字段政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MM-C01",
+            "MM-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MM-C01",
+          "kind": "consult",
+          "goal": "为请求未知字段选择显式政策",
+          "prompt": "Advise the declared request-field requirement using the complete unknown-policy controls, without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/unknown.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MM-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/MM-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MM-C02",
+          "kind": "consult",
+          "goal": "明确部分更新对缺失字段的作用",
+          "prompt": "Explain each complete partial-load control and advise a compatible PATCH boundary. No code or data changes.",
+          "requires": [],
+          "materials": [
+            "materials/partial.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MM-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/MM-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MM-S03",
+      "title": "订单批次验收",
+      "goal": "规划整批校验后的发布归属",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MM-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MM-P01",
+          "kind": "plan",
+          "goal": "规划整批导入的验收后发布",
+          "prompt": "Plan the all-or-nothing batch requirement from complete actual errors and valid_data. No implementation or database action.",
+          "requires": [],
+          "materials": [
+            "materials/batch.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MM-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/MM-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MM-S04",
+      "title": "日期输入诊断",
+      "goal": "先补齐真实类型再定位行为",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MM-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "MM-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MM-D01",
+          "kind": "diagnose",
+          "goal": "先核日期输入类型再定位时间残留",
+          "prompt": "A calendar-date result unexpectedly contains time. Request the field declaration, actual Python input type/value and caller reproduction before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MM-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "date-input",
+              "when": "The field and actual Python input type/value are not supplied or declared unavailable, and a complete reproduction is reasonably requested.",
+              "materials": [
+                "disclosure/date-input.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "MM-S05",
+      "title": "日期字段修复",
+      "goal": "按明确合同拒绝时间对象",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MM-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MM-M01",
+          "kind": "modify",
+          "goal": "拒绝日期字段隐式接受时间对象",
+          "prompt": "Implement only the explicit Date rejection contract and public regressions, preserving every stated compatibility boundary.",
+          "requires": [],
+          "materials": [
+            "materials/date-repair.md"
+          ],
+          "allowed_paths": [
+            "library/src/marshmallow/fields.py",
+            "app/test_date.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MM-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/MM-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FL-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "flash_filtering_does_not_preserve_unshown_categories_for_the_next_request": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "YY-C02",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "safe_load gives qty2 while composed nodes retain both qty pairs. Python equality also collapses resolved BooleanTrue and integer1 keys to one entry with last value. Define scoped semantic-key checking and merge handling before accepting the document; a final mapping or raw-string-only duplicate check cannot prove the required policy. Do not silently patch global constructors.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

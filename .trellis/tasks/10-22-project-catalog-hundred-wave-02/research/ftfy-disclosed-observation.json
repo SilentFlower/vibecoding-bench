@@ -1,0 +1,8 @@
+{
+  "scope": "当前固定源码有界宿主子进程诊断观察，非目标容器集合",
+  "source_commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+  "max_decode_length": 0,
+  "timeout_sec": 1,
+  "timed_out": true,
+  "child_killed_and_reaped": true
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "HT-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "unfinished_quiet_state_can_cross_document_calls_and_fresh_instances_isolate_it": true
+  },
+  "resource_profile": "business"
+}

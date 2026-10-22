@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "XW-U01",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both cells contain SUM3,4 formula XML; the default cache is0 and explicit cache is7. XlsxWriter writes formula/cache data and does not calculate it. A non-recalculating reader can show0; choose a deliberate cache/recalculation contract without claiming an Office engine ran or patching the library.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

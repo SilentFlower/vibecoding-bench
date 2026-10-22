@@ -1,0 +1,1 @@
+A synthetic @attrs.frozen Snapshot has tags:list=attrs.field(factory=list). Append LOCAL through snapshot.tags,then separately attempt snapshot.tags=[]. The business wants an immutable published value. Explain shallow frozen behavior,explicit immutable representation and ownership policy without promising recursive freezing or implementing a repair.

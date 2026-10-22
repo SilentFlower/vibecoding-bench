@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CA-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "detailed_errors_keep_nested_paths_and_support_validate_before_application_publication": true
+  },
+  "resource_profile": "business"
+}

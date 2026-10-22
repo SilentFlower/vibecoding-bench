@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SJ-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "json_syntax_acceptance_does_not_validate_the_business_schema": true
+  },
+  "resource_profile": "business"
+}

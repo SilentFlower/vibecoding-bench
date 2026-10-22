@@ -1,0 +1,279 @@
+{
+  "status": "passed",
+  "source_image": "sha256:7c48875a811ddc23a58b615f72f4772b54333c497cf28ab31df8b8729d93aa58",
+  "real_model_calls": 0,
+  "target_image_replaced": false,
+  "source": ".deploy/github-100-research/text-formats/tqdm/tk-system-image.json",
+  "libraries": [
+    {
+      "soname": "libtk8.6.so",
+      "path": "/usr/lib/x86_64-linux-gnu/libtk8.6.so",
+      "sha256": "67abed0cbae50d5159abf0a4f4d39a81dfcb2f07aae8ea20d789a7a261a61543",
+      "size": 1513288,
+      "package": "libtk8.6:amd64",
+      "version": "8.6.13-2",
+      "copyright_path": "/usr/share/doc/libtk8.6/copyright",
+      "artifact": "artifacts/tk-libs/libtk8.6.so"
+    },
+    {
+      "soname": "libtcl8.6.so",
+      "path": "/usr/lib/x86_64-linux-gnu/libtcl8.6.so",
+      "sha256": "022f9e481fd90f4007f132c241ee2d2aabca1b340c3681be022ff68690291aac",
+      "size": 1852968,
+      "package": "libtcl8.6:amd64",
+      "version": "8.6.13+dfsg-2",
+      "copyright_path": "/usr/share/doc/libtcl8.6/copyright",
+      "artifact": "artifacts/tk-libs/libtcl8.6.so"
+    },
+    {
+      "soname": "libXft.so.2",
+      "path": "/usr/lib/x86_64-linux-gnu/libXft.so.2.3.6",
+      "sha256": "38ba00e2a6173c472d056548e27a7403fa7677c9e5cd2cda58a2f7a9243d65fb",
+      "size": 101856,
+      "package": "libxft2:amd64",
+      "version": "2.3.6-1",
+      "copyright_path": "/usr/share/doc/libxft2/copyright",
+      "artifact": "artifacts/tk-libs/libXft.so.2"
+    },
+    {
+      "soname": "libfontconfig.so.1",
+      "path": "/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.0",
+      "sha256": "eba9fe8895df08cb98d6a294825132a52b65b53f4f1bce26bb3f6ee6ac6b16ec",
+      "size": 306112,
+      "package": "libfontconfig1:amd64",
+      "version": "2.14.1-4",
+      "copyright_path": "/usr/share/doc/libfontconfig1/copyright",
+      "artifact": "artifacts/tk-libs/libfontconfig.so.1"
+    },
+    {
+      "soname": "libX11.so.6",
+      "path": "/usr/lib/x86_64-linux-gnu/libX11.so.6.4.0",
+      "sha256": "688d7edc1a02a0e7993722d57a42821b22435e249071554625a5ec4784787d3d",
+      "size": 1318408,
+      "package": "libx11-6:amd64",
+      "version": "2:1.8.4-2+deb12u2",
+      "copyright_path": "/usr/share/doc/libx11-6/copyright",
+      "artifact": "artifacts/tk-libs/libX11.so.6"
+    },
+    {
+      "soname": "libXss.so.1",
+      "path": "/usr/lib/x86_64-linux-gnu/libXss.so.1.0.0",
+      "sha256": "6528937e7cb205fd279c08780dfb3845d6ca35de151ed3c9c8d39f3eab6b782b",
+      "size": 14528,
+      "package": "libxss1:amd64",
+      "version": "1:1.2.3-1",
+      "copyright_path": "/usr/share/doc/libxss1/copyright",
+      "artifact": "artifacts/tk-libs/libXss.so.1"
+    },
+    {
+      "soname": "libfreetype.so.6",
+      "path": "/usr/lib/x86_64-linux-gnu/libfreetype.so.6.18.3",
+      "sha256": "5c691e2297772f84647dc07392a1a5d682ff4a190b057df34cd26bd2c4a27179",
+      "size": 821160,
+      "package": "libfreetype6:amd64",
+      "version": "2.12.1+dfsg-5+deb12u4",
+      "copyright_path": "/usr/share/doc/libfreetype6/copyright",
+      "artifact": "artifacts/tk-libs/libfreetype.so.6"
+    },
+    {
+      "soname": "libXrender.so.1",
+      "path": "/usr/lib/x86_64-linux-gnu/libXrender.so.1.3.0",
+      "sha256": "5cd723d723504af24d297cf9bc87156c0e023f4becbee2ce8432555cbaa73836",
+      "size": 47608,
+      "package": "libxrender1:amd64",
+      "version": "1:0.9.10-1.1",
+      "copyright_path": "/usr/share/doc/libxrender1/copyright",
+      "artifact": "artifacts/tk-libs/libXrender.so.1"
+    },
+    {
+      "soname": "libexpat.so.1",
+      "path": "/usr/lib/x86_64-linux-gnu/libexpat.so.1.8.10",
+      "sha256": "453732cb225bc46f9337066d782118d24194bccee4c85b59eccf7e8714b5e62f",
+      "size": 178280,
+      "package": "libexpat1:amd64",
+      "version": "2.5.0-1+deb12u4",
+      "copyright_path": "/usr/share/doc/libexpat1/copyright",
+      "artifact": "artifacts/tk-libs/libexpat.so.1"
+    },
+    {
+      "soname": "libxcb.so.1",
+      "path": "/usr/lib/x86_64-linux-gnu/libxcb.so.1.1.0",
+      "sha256": "35e218293d7c1f65b765337b92c6425f3495e80f5973058d8847fa08258cb97e",
+      "size": 166824,
+      "package": "libxcb1:amd64",
+      "version": "1.15-1",
+      "copyright_path": "/usr/share/doc/libxcb1/copyright",
+      "artifact": "artifacts/tk-libs/libxcb.so.1"
+    },
+    {
+      "soname": "libXext.so.6",
+      "path": "/usr/lib/x86_64-linux-gnu/libXext.so.6.4.0",
+      "sha256": "32471a718f4cfef053aae4b84154ebb34ad16996d5db5dd6254e41e5fb36079e",
+      "size": 81568,
+      "package": "libxext6:amd64",
+      "version": "2:1.3.4-1+b1",
+      "copyright_path": "/usr/share/doc/libxext6/copyright",
+      "artifact": "artifacts/tk-libs/libXext.so.6"
+    },
+    {
+      "soname": "libpng16.so.16",
+      "path": "/usr/lib/x86_64-linux-gnu/libpng16.so.16.39.0",
+      "sha256": "8a6b5ae14e223d7c01bf09988ea9631c38fd5c898df6d330c343654b76414897",
+      "size": 219056,
+      "package": "libpng16-16:amd64",
+      "version": "1.6.39-2+deb12u6",
+      "copyright_path": "/usr/share/doc/libpng16-16/copyright",
+      "artifact": "artifacts/tk-libs/libpng16.so.16"
+    },
+    {
+      "soname": "libbrotlidec.so.1",
+      "path": "/usr/lib/x86_64-linux-gnu/libbrotlidec.so.1.0.9",
+      "sha256": "928b2613f2d3d73f78bc05c81d79c04cef7e196564f733c0ffdf893602d83aaa",
+      "size": 47264,
+      "package": "libbrotli1:amd64",
+      "version": "1.0.9-2+b6",
+      "copyright_path": "/usr/share/doc/libbrotli1/copyright",
+      "artifact": "artifacts/tk-libs/libbrotlidec.so.1"
+    },
+    {
+      "soname": "libXau.so.6",
+      "path": "/usr/lib/x86_64-linux-gnu/libXau.so.6.0.0",
+      "sha256": "833aa73cf8f645330907d5923fcbf380e0895ab2551d522b41b0308747a51e27",
+      "size": 14496,
+      "package": "libxau6:amd64",
+      "version": "1:1.0.9-1",
+      "copyright_path": "/usr/share/doc/libxau6/copyright",
+      "artifact": "artifacts/tk-libs/libXau.so.6"
+    },
+    {
+      "soname": "libXdmcp.so.6",
+      "path": "/usr/lib/x86_64-linux-gnu/libXdmcp.so.6.0.0",
+      "sha256": "911ecd1cf42f310e788652f2719803bb4632e077b6e292af31b876c836bba264",
+      "size": 22728,
+      "package": "libxdmcp6:amd64",
+      "version": "1:1.1.2-3",
+      "copyright_path": "/usr/share/doc/libxdmcp6/copyright",
+      "artifact": "artifacts/tk-libs/libXdmcp.so.6"
+    },
+    {
+      "soname": "libbrotlicommon.so.1",
+      "path": "/usr/lib/x86_64-linux-gnu/libbrotlicommon.so.1.0.9",
+      "sha256": "d0dd623a89c3cd7c085757e41c940a39916a571a9b22b50bd736accd3f3aec53",
+      "size": 137376,
+      "package": "libbrotli1:amd64",
+      "version": "1.0.9-2+b6",
+      "copyright_path": "/usr/share/doc/libbrotli1/copyright",
+      "artifact": "artifacts/tk-libs/libbrotlicommon.so.1"
+    },
+    {
+      "soname": "libbsd.so.0",
+      "path": "/usr/lib/x86_64-linux-gnu/libbsd.so.0.11.7",
+      "sha256": "c34693b27401e6e74d7ac32184c79bfb0cca936d3b1be990d435124a6a5686f5",
+      "size": 84840,
+      "package": "libbsd0:amd64",
+      "version": "0.11.7-2",
+      "copyright_path": "/usr/share/doc/libbsd0/copyright",
+      "artifact": "artifacts/tk-libs/libbsd.so.0"
+    },
+    {
+      "soname": "libmd.so.0",
+      "path": "/usr/lib/x86_64-linux-gnu/libmd.so.0.0.5",
+      "sha256": "9e8462f7650da0b39ecfe1680fa87fe393f0710b324250931ab36fa0135b14cc",
+      "size": 47312,
+      "package": "libmd0:amd64",
+      "version": "1.0.4-2",
+      "copyright_path": "/usr/share/doc/libmd0/copyright",
+      "artifact": "artifacts/tk-libs/libmd.so.0"
+    }
+  ],
+  "ldd": "\tlinux-vdso.so.1 (0x00007ffd9d39f000)\n\tlibtk8.6.so => /lib/x86_64-linux-gnu/libtk8.6.so (0x000074360c43f000)\n\tlibtcl8.6.so => /lib/x86_64-linux-gnu/libtcl8.6.so (0x000074360c27a000)\n\tlibc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x000074360c098000)\n\tlibXft.so.2 => /lib/x86_64-linux-gnu/libXft.so.2 (0x000074360c07e000)\n\tlibfontconfig.so.1 => /lib/x86_64-linux-gnu/libfontconfig.so.1 (0x000074360c033000)\n\tlibX11.so.6 => /lib/x86_64-linux-gnu/libX11.so.6 (0x000074360beef000)\n\tlibXss.so.1 => /lib/x86_64-linux-gnu/libXss.so.1 (0x000074360beea000)\n\tlibm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x000074360be0a000)\n\tlibz.so.1 => /lib/x86_64-linux-gnu/libz.so.1 (0x000074360bdeb000)\n\t/lib64/ld-linux-x86-64.so.2 (0x000074360c5c5000)\n\tlibfreetype.so.6 => /lib/x86_64-linux-gnu/libfreetype.so.6 (0x000074360bd21000)\n\tlibXrender.so.1 => /lib/x86_64-linux-gnu/libXrender.so.1 (0x000074360bd12000)\n\tlibexpat.so.1 => /lib/x86_64-linux-gnu/libexpat.so.1 (0x000074360bce6000)\n\tlibxcb.so.1 => /lib/x86_64-linux-gnu/libxcb.so.1 (0x000074360bcbc000)\n\tlibXext.so.6 => /lib/x86_64-linux-gnu/libXext.so.6 (0x000074360bca7000)\n\tlibpng16.so.16 => /lib/x86_64-linux-gnu/libpng16.so.16 (0x000074360bc71000)\n\tlibbrotlidec.so.1 => /lib/x86_64-linux-gnu/libbrotlidec.so.1 (0x000074360bc64000)\n\tlibXau.so.6 => /lib/x86_64-linux-gnu/libXau.so.6 (0x000074360bc5d000)\n\tlibXdmcp.so.6 => /lib/x86_64-linux-gnu/libXdmcp.so.6 (0x000074360ba00000)\n\tlibbrotlicommon.so.1 => /lib/x86_64-linux-gnu/libbrotlicommon.so.1 (0x000074360bc3a000)\n\tlibbsd.so.0 => /lib/x86_64-linux-gnu/libbsd.so.0 (0x000074360bc24000)\n\tlibmd.so.0 => /lib/x86_64-linux-gnu/libmd.so.0 (0x000074360bc17000)\n",
+  "os_release": "PRETTY_NAME=\"Debian GNU/Linux 12 (bookworm)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"12\"\nVERSION=\"12 (bookworm)\"\nVERSION_CODENAME=bookworm\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+  "licenses": {
+    "libtk8.6": {
+      "artifact": "artifacts/licenses/libtk8.6-copyright",
+      "sha256": "55756939bc322e1ddb187794a0deb8bdf72349ecba34b429446782cd04ea4cef",
+      "size": 3657
+    },
+    "libtcl8.6": {
+      "artifact": "artifacts/licenses/libtcl8.6-copyright",
+      "sha256": "e925aa8863f0c9eda3625ce2cb16c0d5017fca248c5bd6af97006df5d9c6199c",
+      "size": 7062
+    },
+    "libxft2": {
+      "artifact": "artifacts/licenses/libxft2-copyright",
+      "sha256": "5960983c962c864d7d73eae6bb9b3b06c1940a23fc6d22ce10ef0f0cde8fd48d",
+      "size": 1438
+    },
+    "libfontconfig1": {
+      "artifact": "artifacts/licenses/libfontconfig1-copyright",
+      "sha256": "b215a61cdd3e62b5b17cc28b1852c78acb3dd38be0fb30706f7efc050dba91db",
+      "size": 1301
+    },
+    "libx11-6": {
+      "artifact": "artifacts/licenses/libx11-6-copyright",
+      "sha256": "0b380a7fd5b2228f26e9585e56f14812efd3350f3df307507d2bc055dfd8de3e",
+      "size": 47102
+    },
+    "libxss1": {
+      "artifact": "artifacts/licenses/libxss1-copyright",
+      "sha256": "3ebbe713ac6980aefc18dcf407c94f51bbf02852463294bbb6dc1ee1f9fad9c3",
+      "size": 2679
+    },
+    "libfreetype6": {
+      "artifact": "artifacts/licenses/libfreetype6-copyright",
+      "sha256": "70a7a0a06e6440777417f6875476cb712b03943010abed1c32297798c8cc8ed8",
+      "size": 25069
+    },
+    "libxrender1": {
+      "artifact": "artifacts/licenses/libxrender1-copyright",
+      "sha256": "ed2a78123a5076b4f11da38cb1ffb85b5cb9fdc26b5746c517b1d7e7a9029704",
+      "size": 2252
+    },
+    "libexpat1": {
+      "artifact": "artifacts/licenses/libexpat1-copyright",
+      "sha256": "60919fe1a156395ff14511bb6ff79756c50ade2fff59ac60c9bae1d8a7fe6292",
+      "size": 1756
+    },
+    "libxcb1": {
+      "artifact": "artifacts/licenses/libxcb1-copyright",
+      "sha256": "4f7cb9db6bf6542f5417e3d674c780d3a5fd12291a54d63054fb576ee0cfae80",
+      "size": 1781
+    },
+    "libxext6": {
+      "artifact": "artifacts/licenses/libxext6-copyright",
+      "sha256": "bc57e445ca1d9fe082c8d54189dd411ff26caa8552c9c63d44ea06a982f32124",
+      "size": 10421
+    },
+    "libpng16-16": {
+      "artifact": "artifacts/licenses/libpng16-16-copyright",
+      "sha256": "68bd3997355bc44ccb97ff5e2bb146360e762c7d9c721945a4fabf77d1349e4a",
+      "size": 12976
+    },
+    "libbrotli1": {
+      "artifact": "artifacts/licenses/libbrotli1-copyright",
+      "sha256": "24a64e5bb83d0960d1835696a1e23c0896ad6055b0ca47c66ab0eb9a766324b1",
+      "size": 1354
+    },
+    "libxau6": {
+      "artifact": "artifacts/licenses/libxau6-copyright",
+      "sha256": "118dd263a7b91c8f21c489f949bf13281dff9e766deea92b829dac4dce66601a",
+      "size": 1224
+    },
+    "libxdmcp6": {
+      "artifact": "artifacts/licenses/libxdmcp6-copyright",
+      "sha256": "1bcbb50f8603fe8b86d330bfa460b772ea04fbd3c70e4499f0768b5340b9fd6e",
+      "size": 1265
+    },
+    "libbsd0": {
+      "artifact": "artifacts/licenses/libbsd0-copyright",
+      "sha256": "00fd7be5d907a6bcc409a80f2d565f508673db4761d54623691f89ae3aa20fc7",
+      "size": 23960
+    },
+    "libmd0": {
+      "artifact": "artifacts/licenses/libmd0-copyright",
+      "sha256": "4365ef6255ad553fce69dd4bc0e093472c5d0e41b8ea493a545cc926ce171aa6",
+      "size": 8018
+    }
+  },
+  "container_removed": true
+}

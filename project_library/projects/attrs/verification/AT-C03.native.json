@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AT-C03"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "repr_and_metadata_do_not_implicitly_redact_asdict_exports": true
+  },
+  "resource_profile": "business"
+}

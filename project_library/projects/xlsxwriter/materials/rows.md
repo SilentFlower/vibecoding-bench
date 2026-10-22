@@ -1,0 +1,1 @@
+With constant_memory=True and no in_memory option, write row0 col0 A,then row1 col0 B,then row0 col1 LATE. Close and inspect return codes and cells. Explain forward-row requirements and how to restructure column-major data into row-major output; do not claim a late write succeeded just because close succeeded. No implementation.

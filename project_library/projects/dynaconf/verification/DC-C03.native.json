@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DC-C03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "validate_all_already_returns_or_raises_the_complete_registered_error_set": true
+  },
+  "resource_profile": "business"
+}

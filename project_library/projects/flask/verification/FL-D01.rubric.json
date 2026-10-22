@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FL-D01",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With full evidence add_url_rule appends/new before detecting a duplicate endpoint with a different view,so the new rule can dispatch to oldviewA. Prevalidate endpoint ownership or discard/rebuild the failed app and validate the complete map; catchingAssertionError is not rollback. Missing evidence supports insufficient_information and no unauthorized Flask patch.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

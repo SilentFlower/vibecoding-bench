@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PG-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "ordinary_hooks_use_declared_priority_and_drop_only_none_results": true
+  },
+  "resource_profile": "business"
+}

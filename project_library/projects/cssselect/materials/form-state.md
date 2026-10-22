@@ -1,0 +1,1 @@
+The complete staticHTML has checked checkboxidchecked,unchecked checkboxidplain,text inputidtext carryingchecked,and selectedoptionidselected. Compare HTMLTranslator andGenericTranslator :checked. The scraper needs submitted-choice metadata from a saved document. Explain supported attribute semantics versus browser runtime state; no browser is used or library modified.

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AP-D01",
+  "source_commit": "69d9bf0aba6276e2434a3a595cceca55040d64d7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Use only consumed evidence. Request the exact callback and iteration lifecycle; before disclosure do not guess a defect. With the complete supplied reproduction, identify the relevant callback-selection condition and contrast the normal-function control. If reproduction cannot be provided, state the unresolved alternatives and stop without a repair.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

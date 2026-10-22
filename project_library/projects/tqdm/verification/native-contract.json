@@ -1,0 +1,923 @@
+{
+  "baseline_digest": "2e7045b8eeb66f3e17022b1914ba2af0d2a058def5b939ee841f3e44aa8b21c5",
+  "nodes": [
+    {
+      "id": "tests/tests_asyncio.py::test_as_completed[0.1]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_asyncio.py::test_async_iterable",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_asyncio.py::test_break",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_asyncio.py::test_coroutine_send",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_asyncio.py::test_gather",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_asyncio.py::test_gather_exceptions",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_asyncio.py::test_generators",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_asyncio.py::test_nested",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_asyncio.py::test_range",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_chunksize_warning[iterables0-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_chunksize_warning[iterables1-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_chunksize_warning[iterables2-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_chunksize_warning[iterables3-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_chunksize_warning[iterables4-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_chunksize_warning[iterables5-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_chunksize_warning[iterables6-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_chunksize_warning[iterables7-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_concurrent_map[interpreter_map]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_concurrent_map[process_map]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_concurrent_map[thread_map]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_concurrent_map_unknown_len[interpreter_map]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_concurrent_map_unknown_len[process_map]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_concurrent_map_unknown_len[thread_map]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_interpreter_map_lock",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/tests_concurrent.py::test_min_map_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib.py::test_enumerate[tqdm_kwargs0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib.py::test_enumerate[tqdm_kwargs1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib.py::test_enumerate_numpy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib.py::test_map[tqdm_kwargs0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib.py::test_map[tqdm_kwargs1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib.py::test_zip[tqdm_kwargs0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib.py::test_zip[tqdm_kwargs1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestGetFirstFoundConsoleLoggingHandler::test_should_return_none_for_no_handlers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestGetFirstFoundConsoleLoggingHandler::test_should_return_none_for_stream_handler_not_stdout_or_stderr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestGetFirstFoundConsoleLoggingHandler::test_should_return_none_without_stream_handler",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestGetFirstFoundConsoleLoggingHandler::test_should_return_stream_handler_if_stream_is_stderr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestGetFirstFoundConsoleLoggingHandler::test_should_return_stream_handler_if_stream_is_stdout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestRedirectLoggingToTqdm::test_should_add_and_remove_tqdm_handler",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestRedirectLoggingToTqdm::test_should_inherit_console_handler_filters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestRedirectLoggingToTqdm::test_should_inherit_console_logger_formatter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestRedirectLoggingToTqdm::test_should_not_remove_stream_handlers_not_for_stdout_or_stderr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestRedirectLoggingToTqdm::test_should_remove_and_restore_console_handlers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmLoggingHandler::test_should_call_handle_error_if_exception_was_thrown",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmLoggingHandler::test_should_call_tqdm_write",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmLoggingHandler::test_should_not_swallow_certain_exceptions[KeyboardInterrupt]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmLoggingHandler::test_should_not_swallow_certain_exceptions[SystemExit]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmWithLoggingRedirect::test_should_add_and_remove_handler_from_custom_logger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmWithLoggingRedirect::test_should_add_and_remove_handler_from_root_logger_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmWithLoggingRedirect::test_should_format_message",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmWithLoggingRedirect::test_should_not_fail_with_logger_without_console_handler",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_contrib_logging.py::TestTqdmWithLoggingRedirect::test_use_root_logger_by_default_and_write_to_custom_tqdm",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_dask.py::test_dask",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_gui.py::test_gui_import",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_itertools.py::test_batched",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_itertools.py::test_chain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_itertools.py::test_combinations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_itertools.py::test_combinations_with_replacement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_itertools.py::test_permutations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_itertools.py::test_product",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_keras.py::test_keras",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/tests_main.py::test_comppath",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_main.py::test_exceptions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_main.py::test_main_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_main.py::test_main_import",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_main.py::test_main_log[DEBUG-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_main.py::test_main_log[INFO-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_main.py::test_main_misc_options",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_main.py::test_manpath",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_main.py::test_pipes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_notebook.py::test_notebook_disabled_description",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_pandas.py::test_pandas_apply_args_deprecation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_pandas.py::test_pandas_data_frame",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_pandas.py::test_pandas_deprecation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_pandas.py::test_pandas_groupby_apply",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_pandas.py::test_pandas_leave",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_pandas.py::test_pandas_rolling_expanding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_pandas.py::test_pandas_series",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_pandas.py::test_pandas_setup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_rich.py::test_rich_fraction_column_no_total",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_rich.py::test_rich_no_total",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_rlock.py::test_rlock_creation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_synchronisation.py::test_imap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_synchronisation.py::test_monitor_atexit_does_not_deadlock_on_stuck_get_lock",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_synchronisation.py::test_monitor_thread",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_synchronisation.py::test_monitoring_and_cleanup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_synchronisation.py::test_monitoring_multi",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_synchronisation.py::test_threadpool",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tk.py::test_tk_import",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_ANSI_escape_codes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_SI_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_SI_unit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_ascii_autodetect",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_ascii_bar",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_auto[auto]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_auto[autonotebook]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_autodisable_nonTTY",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_autoenable_TTY",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_bar_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_bar_formatspec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_big_min_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_bool[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_bool[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_clear_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_close",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_close_after_stream_closed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_closed_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_cmp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_colour[#beefed-\\x1b[38;2;190;239;237m]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_colour[blue-\\x1b[34m]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_colour_unknown",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_contains",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_custom_bar[ #]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_custom_bar[ .oO0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_custom_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_delay",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_deprecated_gui[iter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_deprecated_gui[update]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_deprecated_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_deprecation_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_disable",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_disabled_refresh",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_disabled_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_disabled_reset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_disabled_unpause",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_dynamic_min_iters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_ema",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_eta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_external_write",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_file_output",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_file_redirection",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_float_totals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_format_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_format_meter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_format_num",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_gui_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_infinite_total",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_initial",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_iterate_over_csv_rows",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_leave_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_len",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_max_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_min_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_min_iters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_native_string_io_for_default_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_no_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_nototal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_numeric_unit_scale",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_position",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_postfix",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_postfix_direct",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_refresh",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_reset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_reset_inf",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_reversed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_screen_shape",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_set_description",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_smoothed_dynamic_min_iters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_smoothed_dynamic_min_iters_with_min_interval",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_smoothing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_threading",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_trange",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_unicode_bar",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_unicode_string_io_for_specified_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_unpause",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_wrapattr[bytes]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_wrapattr[iters]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_write",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_write_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_write_other_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_write_stdout_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_tqdm.py::test_write_stdout_stderr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_utils.py::test_envwrap",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_utils.py::test_envwrap_annotations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_utils.py::test_envwrap_deprecated",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_utils.py::test_envwrap_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/tests_version.py::test_version",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-asyncio",
+      "module": "pytest_asyncio.plugin",
+      "module_sha256": "ba47c25a4a22b117891e9214940729c41af936d3dafbb18b4284de8a88ed3375",
+      "version": "1.4.0"
+    },
+    {
+      "distribution": "pytest-timeout",
+      "module": "pytest_timeout",
+      "module_sha256": "a0bd61d881212d27a922b8fa008b79270a55bcbec467f948d2423a152d37233a",
+      "version": "2.4.0"
+    }
+  ],
+  "project": "tqdm",
+  "python": "3.12.15",
+  "schema": 1
+}

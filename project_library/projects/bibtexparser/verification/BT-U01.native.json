@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "duplicate_parse_keys_preserve_first_entry_and_explicit_failed_block_evidence": true
+  },
+  "resource_profile": "business"
+}

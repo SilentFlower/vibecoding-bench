@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "YY-U02",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "base,left,right reference the same list; appendingB through left changes right. The separate one-element list references itself. YAML can construct shared or recursive graphs, not only independent JSON trees. Use deliberate ownership/cycle-aware bounded traversal or explicit application rejection; no unbounded expansion.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

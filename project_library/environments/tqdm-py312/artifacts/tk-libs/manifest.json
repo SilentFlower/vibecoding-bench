@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "libraries": [
+    {
+      "path": "artifacts/tk-libs/libtk8.6.so",
+      "sha256": "67abed0cbae50d5159abf0a4f4d39a81dfcb2f07aae8ea20d789a7a261a61543"
+    },
+    {
+      "path": "artifacts/tk-libs/libtcl8.6.so",
+      "sha256": "022f9e481fd90f4007f132c241ee2d2aabca1b340c3681be022ff68690291aac"
+    },
+    {
+      "path": "artifacts/tk-libs/libXft.so.2",
+      "sha256": "38ba00e2a6173c472d056548e27a7403fa7677c9e5cd2cda58a2f7a9243d65fb"
+    },
+    {
+      "path": "artifacts/tk-libs/libfontconfig.so.1",
+      "sha256": "eba9fe8895df08cb98d6a294825132a52b65b53f4f1bce26bb3f6ee6ac6b16ec"
+    },
+    {
+      "path": "artifacts/tk-libs/libX11.so.6",
+      "sha256": "688d7edc1a02a0e7993722d57a42821b22435e249071554625a5ec4784787d3d"
+    },
+    {
+      "path": "artifacts/tk-libs/libXss.so.1",
+      "sha256": "6528937e7cb205fd279c08780dfb3845d6ca35de151ed3c9c8d39f3eab6b782b"
+    },
+    {
+      "path": "artifacts/tk-libs/libfreetype.so.6",
+      "sha256": "5c691e2297772f84647dc07392a1a5d682ff4a190b057df34cd26bd2c4a27179"
+    },
+    {
+      "path": "artifacts/tk-libs/libXrender.so.1",
+      "sha256": "5cd723d723504af24d297cf9bc87156c0e023f4becbee2ce8432555cbaa73836"
+    },
+    {
+      "path": "artifacts/tk-libs/libexpat.so.1",
+      "sha256": "453732cb225bc46f9337066d782118d24194bccee4c85b59eccf7e8714b5e62f"
+    },
+    {
+      "path": "artifacts/tk-libs/libxcb.so.1",
+      "sha256": "35e218293d7c1f65b765337b92c6425f3495e80f5973058d8847fa08258cb97e"
+    },
+    {
+      "path": "artifacts/tk-libs/libXext.so.6",
+      "sha256": "32471a718f4cfef053aae4b84154ebb34ad16996d5db5dd6254e41e5fb36079e"
+    },
+    {
+      "path": "artifacts/tk-libs/libpng16.so.16",
+      "sha256": "8a6b5ae14e223d7c01bf09988ea9631c38fd5c898df6d330c343654b76414897"
+    },
+    {
+      "path": "artifacts/tk-libs/libbrotlidec.so.1",
+      "sha256": "928b2613f2d3d73f78bc05c81d79c04cef7e196564f733c0ffdf893602d83aaa"
+    },
+    {
+      "path": "artifacts/tk-libs/libXau.so.6",
+      "sha256": "833aa73cf8f645330907d5923fcbf380e0895ab2551d522b41b0308747a51e27"
+    },
+    {
+      "path": "artifacts/tk-libs/libXdmcp.so.6",
+      "sha256": "911ecd1cf42f310e788652f2719803bb4632e077b6e292af31b876c836bba264"
+    },
+    {
+      "path": "artifacts/tk-libs/libbrotlicommon.so.1",
+      "sha256": "d0dd623a89c3cd7c085757e41c940a39916a571a9b22b50bd736accd3f3aec53"
+    },
+    {
+      "path": "artifacts/tk-libs/libbsd.so.0",
+      "sha256": "c34693b27401e6e74d7ac32184c79bfb0cca936d3b1be990d435124a6a5686f5"
+    },
+    {
+      "path": "artifacts/tk-libs/libmd.so.0",
+      "sha256": "9e8462f7650da0b39ecfe1680fa87fe393f0710b324250931ab36fa0135b14cc"
+    }
+  ]
+}

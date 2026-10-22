@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-C01",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "entries_dict copies the mapping,so clearing it leaves the library index intact. Its Entry objects remain shared; changing the retained title changes the library. Choose a suitable deep/immutable/serialized snapshot policy for audit retention; a copied index is not an isolated object graph.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

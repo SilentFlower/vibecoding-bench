@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AP-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "non_tty_receipt_is_distinct_from_disabled_display": true
+  },
+  "resource_profile": "business"
+}

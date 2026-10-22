@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "FL-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "default_json_dates_use_http_seconds_and_decimals_are_strings": true
+  },
+  "resource_profile": "business"
+}

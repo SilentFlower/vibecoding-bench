@@ -1,0 +1,97 @@
+[build-system]
+requires = [
+	"setuptools>=77",
+	"setuptools_scm[toml]>=3.4.1",
+	# jaraco/skeleton#174
+	"coherent.licensed",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inflect"
+authors = [
+	{ name = "Paul Dyson", email = "pwdyson@yahoo.com" },
+]
+maintainers = [
+	{ name = "Jason R. Coombs", email = "jaraco@jaraco.com" },
+]
+description = "Correctly generate plurals, singular nouns, ordinals, indefinite articles" # convert numbers to words
+readme = "README.rst"
+classifiers = [
+	"Development Status :: 5 - Production/Stable",
+	"Intended Audience :: Developers",
+	"Programming Language :: Python :: 3",
+	"Programming Language :: Python :: 3 :: Only",
+	"Natural Language :: English",
+	"Operating System :: OS Independent",
+	"Topic :: Software Development :: Libraries :: Python Modules",
+	"Topic :: Text Processing :: Linguistic",
+]
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+	"jaraco.functools",
+	"more_itertools >= 8.5.0",
+	"typeguard >= 4.0.1",
+]
+keywords = [
+	"plural",
+	"inflect",
+	"participle",
+]
+dynamic = ["version"]
+
+[project.urls]
+Source = "https://github.com/jaraco/inflect"
+
+[project.optional-dependencies]
+test = [
+	# upstream
+	"pytest >= 6, != 8.1.*",
+
+	# local
+	"pygments",
+]
+
+doc = [
+	# upstream
+	"sphinx >= 3.5",
+	"jaraco.packaging >= 9.3",
+	"rst.linker >= 1.9",
+	"furo",
+	"sphinx-lint",
+
+	# tidelift
+	"jaraco.tidelift >= 1.4",
+
+	# local
+]
+
+check = [
+	"pytest-checkdocs >= 2.14",
+	"pytest-ruff >= 0.2.1; sys_platform != 'cygwin'",
+]
+
+cover = [
+	"pytest-cov",
+]
+
+enabler = [
+	"pytest-enabler >= 3.4",
+]
+
+type = [
+	# upstream
+	
+	# Exclude PyPy from type checks (python/mypy#20454 jaraco/skeleton#187)
+	"pytest-mypy >= 1.0.1; platform_python_implementation != 'PyPy'",
+
+	# local
+]
+
+
+[tool.setuptools_scm]
+
+
+[tool.pytest-enabler.mypy]
+# Disabled due to jaraco/skeleton#143

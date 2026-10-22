@@ -1,0 +1,247 @@
+{
+  "schema": 2,
+  "project_key": "cssselect",
+  "title": "CSS选择器查询工作场景",
+  "category": "HTML/XML本地查询",
+  "description": "局部范围、命名空间、HTML模式、静态表单、能力准入和伪元素诊断六项只读任务。",
+  "seed_digest": "1175124842cac78ebeadc0a97112754cb386f78d06dad744b7f691443d25ef2e",
+  "environment": "cssselect-py312",
+  "source": {
+    "repository": "https://github.com/scrapy/cssselect",
+    "commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/AUTHORS"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CS-S01",
+      "title": "局部选择",
+      "goal": "明确上下文和类词边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CS-U01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CS-U01",
+          "kind": "understand",
+          "goal": "明确局部选择的上下文与类词边界",
+          "prompt": "Explain all complete XPath result controls and an explicit caller scope policy. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/scope.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CS-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CS-U01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CS-S02",
+      "title": "XML命名空间",
+      "goal": "保留URI语义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CS-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CS-U02",
+          "kind": "understand",
+          "goal": "按命名空间URI查询XML业务元素",
+          "prompt": "Meet the complete namespace query requirement using current XPath mappings without edits.",
+          "requires": [],
+          "materials": [
+            "materials/namespaces.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CS-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CS-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CS-S03",
+      "title": "HTML快照",
+      "goal": "按解析模式核名称及表单属性",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CS-C01",
+            "CS-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CS-C01",
+          "kind": "consult",
+          "goal": "选择与实际解析树一致的大小写模式",
+          "prompt": "Advise query mode from all complete HTML/XML case controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/html-mode.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CS-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CS-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CS-C02",
+          "kind": "consult",
+          "goal": "界定静态表单快照的选择状态",
+          "prompt": "Advise static saved-document extraction from the complete :checked controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/form-state.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CS-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CS-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CS-S04",
+      "title": "过滤器准入计划",
+      "goal": "明确支持范围和失败语义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CS-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CS-P01",
+          "kind": "plan",
+          "goal": "规划过滤器能力准入与显式失败",
+          "prompt": "Plan predictable filter admission using the complete supported/unsupported controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/query-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CS-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CS-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CS-S05",
+      "title": "伪元素诊断",
+      "goal": "取得精确入口和结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CS-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CS-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CS-D01",
+          "kind": "diagnose",
+          "goal": "先核转换入口再定位伪元素差异",
+          "prompt": "Pseudo-element queries behave differently between callers. Request the exact selector,translator entry point/options and result/error before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CS-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "translator-evidence",
+              "when": "The exact selector,entry point/options and observed result/error are not supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/pseudo-element.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

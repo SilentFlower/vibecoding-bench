@@ -1,0 +1,1 @@
+The completeXML is <main id="root" class="active"><p id="a" class="active wide"/><p id="b" class="inactive"/></main>. Evaluate GenericTranslator.css_to_xpath for .active,p.active,p:not(.active) relative to that main element. Explain default descendant-or-self scope and class-token semantics; the caller must decide whether the context itself is eligible. No edits.

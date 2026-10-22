@@ -1,0 +1,1 @@
+For total=10 and manual=True, call bar(.5), bar(.2), bar(-.1), bar(1.2). Separately call bar(.2) with manual=True and no total. Give actual current values and who must enforce a business 0..100% range. No files may change.

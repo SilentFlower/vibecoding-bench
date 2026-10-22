@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SL-P01",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "RawJSON retainsnestedtoken and rendersbytes through repr; serialization is not redaction or recursive business normalization. Define schema-aware nested redaction,explicit bytes/amount handling and copy/ownership boundaries before finalrenderer,then test complete accepted outputs and failures before shipping. Do not mutate caller data silently or claim universal sanitization; no external shipment is authorized.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

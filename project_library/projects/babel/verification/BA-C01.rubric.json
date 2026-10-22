@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BA-C01",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "ar_EG default produces1٬099٫98 with Arabic separators and ASCII digit glyphs; latn produces1,099.98. Matching parse roundtrips1099.98. numbering_system controls symbols here,not digit substitution. Explicitly select a glyph/rendering policy if needed without inventing an existing option or changing numerical values.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

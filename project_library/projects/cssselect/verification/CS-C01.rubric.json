@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CS-C01",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "HTML parsing lowercases element/attribute names; HTMLTranslator default matches DIV.Notice by normalizing names while GenericTranslator uppercaseDIV finds none. Class valueNotice remains case-sensitive,so div.notice finds none. xhtml=True preserves XML name case. Choose mode from the actual tree and preserve business values.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

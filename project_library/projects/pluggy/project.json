@@ -1,0 +1,269 @@
+{
+  "schema": 2,
+  "project_key": "pluggy",
+  "title": "Pluggy库存插件工作场景",
+  "category": "本地插件协议与事件归属",
+  "description": "优先级、假值、默认参数、初始化、子集、历史快照和命名空间诊断七项只读任务。",
+  "seed_digest": "90900fd2711011cb346c5e68cbe30fc63cef817f0005b758f4d816ca2c80f493",
+  "environment": "pluggy-py312",
+  "source": {
+    "repository": "https://github.com/pytest-dev/pluggy",
+    "commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PG-S01",
+      "title": "渲染调用协议",
+      "goal": "解释优先级和首个非None结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PG-U01",
+            "PG-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PG-U01",
+          "kind": "understand",
+          "goal": "追踪调用优先级和无结果实现",
+          "prompt": "Trace the complete plugin registration case and separate execution order from collected results. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/order.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PG-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PG-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PG-C01",
+          "kind": "consult",
+          "goal": "为首个结果协议保留合法假值",
+          "prompt": "Meet the complete choice requirement with current firstresult behavior and an explicit None policy. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/first.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PG-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PG-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PG-S02",
+      "title": "插件初始化",
+      "goal": "明确默认参数与未知钩子验收",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PG-U02",
+            "PG-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PG-U02",
+          "kind": "understand",
+          "goal": "追踪协议默认参数和兼容实现",
+          "prompt": "Trace the complete default and explicit-prefix calls and explain current signature compatibility. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/defaults.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PG-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PG-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PG-C02",
+          "kind": "consult",
+          "goal": "在初始化阶段显式核未知钩子",
+          "prompt": "Advise initialization validation from the complete ordinary/optional controls without edits or distribution discovery.",
+          "requires": [],
+          "materials": [
+            "materials/pending.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PG-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PG-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PG-S03",
+      "title": "报告插件选择",
+      "goal": "使用已有局部排除视图",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PG-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PG-U03",
+          "kind": "understand",
+          "goal": "按报告排除插件而不改变注册表",
+          "prompt": "Meet the complete subset requirement with actual existing calls and registry observations. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/subset.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PG-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/PG-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PG-S04",
+      "title": "历史事件计划",
+      "goal": "在重放前明确载荷快照归属",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PG-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PG-P01",
+          "kind": "plan",
+          "goal": "规划可变历史事件的快照归属",
+          "prompt": "Plan stable event replay from the complete nested-mutation and owned-copy controls. No implementation or external write.",
+          "requires": [],
+          "materials": [
+            "materials/history.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PG-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PG-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PG-S05",
+      "title": "本地插件诊断",
+      "goal": "补齐命名空间和注册证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PG-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PG-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PG-D01",
+          "kind": "diagnose",
+          "goal": "先核标记命名空间再定位空调用结果",
+          "prompt": "A registered local plugin yields no render result. Request exact manager/marker declarations,method and registration before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PG-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "plugin-markers",
+              "when": "The exact manager/marker names,method and registration are not supplied or declared unavailable,and a complete local reproduction is reasonably requested.",
+              "materials": [
+                "disclosure/markers.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

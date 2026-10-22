@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FL-U02",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Filtering success returnsOK but initial retrieval pops all flashes fromsession,so next request seesnone,including unshownwarning. Same-request cached messages still allow both category filters. Choose explicit application queue/persistence policy for selective later-page consumption; category_filter is a presentation filter,not selective dequeue.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

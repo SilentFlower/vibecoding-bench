@@ -1,0 +1,1 @@
+Convert <p>A&nbsp;B &copy;</p><script>secret</script><style>.x{color:red}</style> with fresh default and unicode_snob=True converters,bodywidth0. The archive must distinguish readable conversion from a source-faithful retained artifact. Advise explicit Unicode/NBSP/entity policies and preservation of original HTML when needed. No edits.

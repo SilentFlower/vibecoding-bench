@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SP-D01",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The suppliedFalse token is a nonemptystring and type=bool yieldsTrue;the default omission yieldsFalse. Distinguish argument conversion from formatter/database behavior. Use a deliberate current caller/default policy or separately authorized explicit boolean parsing;do not invent a supported --no flag or patch without authorization. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

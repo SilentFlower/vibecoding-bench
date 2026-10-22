@@ -1,0 +1,1 @@
+For the same Order schema, input is {product:A,qty:2,extra:opaque}. Compare default RAISE,EXCLUDE,INCLUDE. The receiving API accepts only declared request fields. Recommend an explicit policy and state that included extra values have no declared field validation. Do not silently change the library or globally accept unknown fields.

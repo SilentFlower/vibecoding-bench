@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CS-U01",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The default prefix is descendant-or-self,so.active selectsroot anda; p.active selectsa andp:not(.active) selectsb. Class matching tests whitespace-separated tokens,not the substringactive ininactive. Explicitly decide whether context-self qualifies; do not assume descendant-only scoping.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

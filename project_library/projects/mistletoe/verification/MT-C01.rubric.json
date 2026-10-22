@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MT-C01",
+  "source_commit": "ebf9ae4e9279f3d8c79b7cf2710f7e73ea6438a7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Defaults pass the raw b tags; process_html_tokensFalse escapes them as text. The explicit javascript link target remains in both outputs,so raw-HTML token control does not establish link-scheme validation or complete sanitization. Choose a trusted separate URL/HTML acceptance boundary as required; do not claim browser execution or a verified vulnerability identifier.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

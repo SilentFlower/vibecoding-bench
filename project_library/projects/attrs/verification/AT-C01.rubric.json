@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AT-C01",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "frozen rejects field rebinding withFrozenInstanceError but permits mutation through a stored list. Choose immutable nested values and explicit ownership/copy boundaries; do not claim recursive freezing or automatic thread-safe snapshots.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

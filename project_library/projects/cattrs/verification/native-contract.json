@@ -1,0 +1,5398 @@
+{
+  "baseline_digest": "73ada398515716e743956c425dba377d44f0fead12946e0cdfef6ee42b88d6c0",
+  "nodes": [
+    {
+      "id": "tests/preconf/test_msgspec_cpython.py::test_basic_structs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_msgspec_cpython.py::test_dump_hook",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_msgspec_cpython.py::test_get_loads_hook",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_msgspec_cpython.py::test_simple_classes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_msgspec_cpython.py::test_unstructure_passthrough",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_msgspec_cpython.py::test_unstructure_pt_mappings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_msgspec_cpython.py::test_unstructure_pt_product_types",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_pyyaml.py::test_pyyaml",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_pyyaml.py::test_pyyaml_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_pyyaml.py::test_pyyaml_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_pyyaml.py::test_pyyaml_dates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/preconf/test_pyyaml.py::test_pyyaml_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_edge_cases",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_nested_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Both-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Structure-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-False-Unstructure-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Both-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Structure-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[BaseConverter-True-Unstructure-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Both-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Structure-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-False-Unstructure-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Both-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Structure-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-None-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-None-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-_structure-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-_structure-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-_structure-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-_undefined-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-_undefined-_undefined]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_class_methods.py::test_not_nested[Converter-True-Unstructure-_undefined-_unstructure]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_circular_reference[with-subclasses-and-tagged-union]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_circular_reference[with-subclasses]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_circular_reference[wo-subclasses]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_cycles_classes_2[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_cycles_classes_2[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_cyclic_classes[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_cyclic_classes[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_dataclasses[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_dataclasses[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_dataclasses_slots[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_dataclasses_slots[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_diamond_inheritance[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_diamond_inheritance[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_no_parent_classes[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_no_parent_classes[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_omit_if_default_with_discriminator_override[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_omit_if_default_with_discriminator_override[configure_tagged_union]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_overrides[with-union-strategy-child1-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_overrides[with-union-strategy-child2-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_overrides[with-union-strategy-grandchild-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_overrides[with-union-strategy-parent-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_overrides[wo-union-strategy-child1-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_overrides[wo-union-strategy-child2-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_overrides[wo-union-strategy-grandchild-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_overrides[wo-union-strategy-parent-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_parents_with_generics[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_parents_with_generics[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_parents_with_generics_tagged_union[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_parents_with_generics_tagged_union[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structure_as_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_unstructuring_unknown_subclass",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-child1-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-child2-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-grandchild-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-non-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-non-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-non-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-non-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-parent-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-and-tagged-union-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-child1-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-child2-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-grandchild-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-non-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-non-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-non-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-non-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-parent-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[with-subclasses-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-child1-only]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-child2-only]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-grandchild-only]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-non-union-compose-child]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-non-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-non-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-non-union-container]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-parent-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_inheritance[wo-subclasses-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_structuring_with_subclasses_argument",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_subclasses_in_struct_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-child1-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-child2-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-grandchild-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-non-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-non-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-non-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-non-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-parent-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-and-tagged-union-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-child1-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-child2-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-grandchild-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-non-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-non-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-non-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-non-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-parent-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[with-subclasses-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-child1-only]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-child2-only]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-grandchild-only]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-non-union-compose-child]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-non-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-non-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-non-union-container]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-parent-only]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-union-compose-child]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-union-compose-grandchild]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-union-compose-parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unstructuring_with_inheritance[wo-subclasses-union-container]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unsupported_class[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_include_subclasses.py::test_unsupported_class[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member_validation[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member_validation[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member_validation[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member_validation[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member_with_tag[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member_with_tag[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member_with_tag[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_default_member_with_tag[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_defaults[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_defaults[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_defaults[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_defaults[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_forbid_extra_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_forbid_extra_keys_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_nested_sequence_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_generator[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_generator[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_generator[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_generator[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_generator_dict[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_generator_dict[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_generator_dict[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_generator_dict[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_name[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_name[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_name[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions.py::test_tag_name[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions_695.py::test_recursive_type_alias[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions_695.py::test_recursive_type_alias[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions_695.py::test_type_alias[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions_695.py::test_type_alias[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions_695.py::test_type_alias[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_tagged_unions_695.py::test_type_alias[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_int_is_float[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_int_is_float[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_int_is_float[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_int_is_float[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_int_is_not_float[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_int_is_not_float[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_int_is_not_float[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_int_is_not_float[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_literals[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_literals[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_literals[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_literals[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_multiple_spillover[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_multiple_spillover[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_multiple_spillover[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_multiple_spillover[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_only_primitives[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_only_primitives[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_only_primitives[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_only_primitives[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_skip_optionals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_spillover[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_spillover[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_spillover[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough.py::test_spillover[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough_695.py::test_type_alias_union_member[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough_695.py::test_type_alias_union_member[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough_695.py::test_type_alias_union_member[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/strategies/test_union_passthrough_695.py::test_type_alias_union_member[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_attrs[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_attrs[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_dataclasses[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_dataclasses[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_hooks[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_hooks[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_namedtuple[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_namedtuple[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_omit_if_default[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_omit_if_default[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_precedence[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_precedence[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_typeddict[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_annotated_override_typeddict[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_overrides_attribute_populated[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_annotated_overrides.py::test_overrides_attribute_populated[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_extended_any[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_extended_any[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_extended_any[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_extended_any[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructure_optional_any[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructure_optional_any[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructure_optional_any[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructure_optional_any[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructuring_any[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructuring_any[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructuring_any[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructuring_any[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructuring_dict_of_any[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructuring_dict_of_any[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructuring_dict_of_any[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_any.py::test_unstructuring_dict_of_any[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_310_optional_field_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_310_union_field_roundtrip_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_310_union_field_roundtrip_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_nested_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_nested_roundtrip_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_optional_field_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_simple_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_simple_roundtrip_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_union_field_roundtrip_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_baseconverter.py::test_union_field_roundtrip_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_abstract_set_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_mapping_unstructure_direct[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_mapping_unstructure_direct[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_mapping_unstructure_to[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_mapping_unstructure_to[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_set_overriding[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_set_overriding[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_set_overriding[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_set_overriding[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_abstract_sets[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_abstract_sets[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_abstract_sets[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_abstract_sets[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_abstract_sets_override[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_abstract_sets_override[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_abstract_sets_override[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_abstract_sets_override[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_mut_sequences[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_mut_sequences[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_mut_sequences[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_mut_sequences[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_sequences[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_sequences[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_sequences[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_sequences[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_sequences_override[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_sequences_override[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_sequences_override[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structure_sequences_override[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structuring_immutables_map[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cols.py::test_structuring_immutables_map[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_310_optional_field_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_annotated_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_annotated_with_typing_extensions_attrs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_calling_back",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_decorators[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_decorators[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_decorators[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_decorators[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_default_structure_fallback[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_default_structure_fallback[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_dict_roundtrip_with_alias",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_fallback_chaining[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_fallback_chaining[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_forbid_extra_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_forbid_extra_keys_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_forbid_extra_keys_nested_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factories_with_converter_methods[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factories_with_converter_methods[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factories_with_converter_methods[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factories_with_converter_methods[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factories_with_converters[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factories_with_converters[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factories_with_converters[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factories_with_converters[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factory_decorators[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factory_decorators[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factory_decorators[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factory_decorators[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factory_decorators_with_converters[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factory_decorators_with_converters[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factory_decorators_with_converters[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_factory_decorators_with_converters[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_getting[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_getting[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_getting[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_hook_getting[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_legacy_structure_fallbacks[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_legacy_structure_fallbacks[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_nested_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_nested_roundtrip_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_omit_default_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_omit_default_with_attrs_converter_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_optional_field_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_overriding_generated_structure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_overriding_generated_structure_hook_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_overriding_generated_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_overriding_generated_unstructure_hook_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_seq_of_bare_classes_structure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_seq_of_simple_classes_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_simple_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_simple_roundtrip_defaults",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_simple_roundtrip_defaults_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_simple_roundtrip_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_simple_roundtrip_with_extra_keys_forbidden",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_structure_fallbacks[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_structure_fallbacks[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_type_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_unstructure_fallbacks[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_unstructure_fallbacks[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_use_alias[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter.py::test_use_alias[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_gen_hook_priority[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_gen_hook_priority[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_gen_hook_priority[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_gen_hook_priority[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[BaseConverter-False-Hashable]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[BaseConverter-False-Iterable0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[BaseConverter-False-Iterable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[BaseConverter-False-Reversible]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[BaseConverter-True-Hashable]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[BaseConverter-True-Iterable0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[BaseConverter-True-Iterable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[BaseConverter-True-Reversible]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[Converter-False-Hashable]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[Converter-False-Iterable0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[Converter-False-Iterable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[Converter-False-Reversible]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[Converter-True-Hashable]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[Converter-True-Iterable0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[Converter-True-Iterable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_collections_abc[Converter-True-Reversible]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[BaseConverter-False-Hashable]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[BaseConverter-False-Iterable0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[BaseConverter-False-Iterable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[BaseConverter-False-Reversible]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[BaseConverter-True-Hashable]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[BaseConverter-True-Iterable0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[BaseConverter-True-Iterable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[BaseConverter-True-Reversible]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[Converter-False-Hashable]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[Converter-False-Iterable0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[Converter-False-Iterable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[Converter-False-Reversible]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[Converter-True-Hashable]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[Converter-True-Iterable0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[Converter-True-Iterable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inherit_typing[Converter-True-Reversible]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inheritance[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inheritance[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inheritance[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_converter_inheritance.py::test_inheritance[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_col_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_copy[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_copy[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_copy_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_copy_func_hooks[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_copy_func_hooks[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_copy_hooks[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_copy_hooks[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_deepcopy[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_deepcopy[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_copy.py::test_detailed_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses_in_attrs[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses_in_attrs[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses_in_attrs[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses_in_attrs[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses_in_container[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses_in_container[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses_in_container[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_dataclasses_in_container[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_kw_only_propagation[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_kw_only_propagation[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_kw_only_propagation[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dataclasses.py::test_kw_only_propagation[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_defaultdicts.py::test_collection_defaultdicts[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_defaultdicts.py::test_collection_defaultdicts[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_defaultdicts.py::test_factory[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_defaultdicts.py::test_factory[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_defaultdicts.py::test_typing_defaultdicts[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_defaultdicts.py::test_typing_defaultdicts[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicts.py::test_any_keys[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicts.py::test_any_keys[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicts.py::test_any_keys[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicts.py::test_any_keys[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicts.py::test_any_values[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicts.py::test_any_values[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicts.py::test_any_values[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dicts.py::test_any_values[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_converter_no_literals[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_converter_no_literals[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_converter_no_literals[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_converter_no_literals[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_dataclasses[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_dataclasses[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_dataclasses[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_dataclasses[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_dataclasses_literals[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_dataclasses_literals[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_dataclasses_literals[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_dataclasses_literals[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_default_no_literals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_default_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_disambiguate_from_discriminated_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_disambiguation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_disambiguation_is_order_independent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_edge_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_fallback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_field_renaming[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_field_renaming[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_field_renaming[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_field_renaming[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_input_not_mapping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_explicit_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[BaseConverter-False--dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[BaseConverter-False--define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[BaseConverter-False-type-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[BaseConverter-False-type-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[BaseConverter-True--dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[BaseConverter-True--define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[BaseConverter-True-type-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[BaseConverter-True-type-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[Converter-False--dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[Converter-False--define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[Converter-False-type-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[Converter-False-type-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[Converter-True--dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[Converter-True--define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[Converter-True-type-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming[Converter-True-type-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming_different_attributes[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming_different_attributes[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming_different_attributes[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming_different_attributes[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming_different_keys[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming_different_keys[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming_different_keys[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_disambiguators.py::test_literal_field_renaming_different_keys[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_enums.py::test_enum_failure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_enums.py::test_structure_complex_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_enums.py::test_structuring_enums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_enums.py::test_unstructure_complex_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_errors.py::test_errors_pickling[BaseValidationError-err_args4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_errors.py::test_errors_pickling[ClassValidationError-err_args6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_errors.py::test_errors_pickling[ForbiddenExtraKeysError-err_args1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_errors.py::test_errors_pickling[ForbiddenExtraKeysError-err_args2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_errors.py::test_errors_pickling[ForbiddenExtraKeysError-err_args3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_errors.py::test_errors_pickling[IterableValidationError-err_args5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_errors.py::test_errors_pickling[StructureHandlerNotFoundError-err_args0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_factory_hooks.py::test_snake_to_camel[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_factory_hooks.py::test_snake_to_camel[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_final.py::test_structure_bare_final[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_final.py::test_structure_bare_final[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_final.py::test_structure_final[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_final.py::test_structure_final[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_final.py::test_unstructure_bare_final[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_final.py::test_unstructure_bare_final[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_final.py::test_unstructure_final[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_final.py::test_unstructure_final[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_function_dispatch.py::test_function_clears_cache_after_function_added",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_function_dispatch.py::test_function_dispatch",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_function_dispatch.py::test_function_dispatch_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen.py::test_linecache_dedup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen.py::test_no_linecache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen.py::test_structure_linecache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen.py::test_unstructure_linecache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_collections.py::test_structure_hetero_tuple[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_collections.py::test_structure_hetero_tuple[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_collections.py::test_structure_hetero_tuple_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_collections.py::test_structuring_mappings[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_collections.py::test_structuring_mappings[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_collections.py::test_unstructure_hetero_tuple_to_tuple[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_collections.py::test_unstructure_hetero_tuple_to_tuple[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_alias_implicit_rename[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_alias_implicit_rename[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_alias_implicit_rename[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_alias_implicit_rename[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_alias_keys[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_alias_keys[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_alias_keys[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_alias_keys[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_detailed_validation_from_converter[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_detailed_validation_from_converter[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_detailed_validation_from_converter[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_detailed_validation_from_converter[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_fields_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_forbid_extra_keys_from_baseconverter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_forbid_extra_keys_from_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_individual_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_field_override[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_field_override[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_field_override[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_field_override[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_no_structure_hook[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_no_structure_hook[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_no_structure_hook[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_no_structure_hook[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_overridden[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_overridden[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_overridden[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_init_false_overridden[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_nodefs_generated_unstructuring",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_nodefs_generated_unstructuring_cl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-False-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-False-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-False-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-False-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-None-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-None-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-None-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-None-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-True-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-True-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-True-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-True-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-base-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-base-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-base-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[False-base-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-False-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-False-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-False-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-False-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-None-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-None-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-None-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-None-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-True-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-True-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-True-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-True-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-base-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-base-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-base-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[None-base-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-False-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-False-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-False-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-False-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-None-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-None-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-None-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-None-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-True-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-True-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-True-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-True-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-base-False-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-base-False-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-base-True-dataclass]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter[True-base-True-define]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter_attribute_overrides[False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter_attribute_overrides[False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter_attribute_overrides[True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omit_if_default_from_converter_attribute_overrides[True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting_none[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting_none[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting_none[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting_none[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting_structure[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_omitting_structure[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_overriding_struct_hook[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_overriding_struct_hook[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_overriding_struct_hook[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_overriding_struct_hook[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_overriding_unstruct_hook[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_overriding_unstruct_hook[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_overriding_unstruct_hook[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_overriding_unstruct_hook[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_prefer_converters_from_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_renaming",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_renaming_forbid_extra_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_renaming_to_key_with_special_characters[a\"b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_renaming_to_key_with_special_characters[a'] or 1 or ['b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_renaming_to_key_with_special_characters[it's]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_type_names_with_quotes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_unmodified_generated_structuring",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict.py::test_unmodified_generated_unstructuring",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict_563.py::test_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gen_dict_563.py::test_roundtrip_dc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_39_structure_generics_with_cols[False-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_39_structure_generics_with_cols[False-str-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_39_structure_generics_with_cols[True-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_39_structure_generics_with_cols[True-str-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_deeply_nested_generics_gen[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_deeply_nested_generics_gen[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_deeply_nested_generics_gen[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_deeply_nested_generics_gen[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[BaseConverter-False-List-str-int-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[BaseConverter-False-int-str-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[BaseConverter-False-str-str-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[BaseConverter-True-List-str-int-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[BaseConverter-True-int-str-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[BaseConverter-True-str-str-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[Converter-False-List-str-int-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[Converter-False-int-str-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[Converter-False-str-str-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[Converter-True-List-str-int-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[Converter-True-int-str-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_able_to_structure_generics[Converter-True-str-str-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_deep_copy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_generate_typeddict_mapping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_nongeneric_protocols[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_nongeneric_protocols[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_nongeneric_protocols[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_nongeneric_protocols[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_raises_if_no_generic_params_supplied[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_raises_if_no_generic_params_supplied[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_raises_if_no_generic_params_supplied[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_raises_if_no_generic_params_supplied[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_roundtrip_generic_with_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_deque_of_generic_unions[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_deque_of_generic_unions[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_deque_of_generic_unions[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_deque_of_generic_unions[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_generics_with_cols[False-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_generics_with_cols[False-str-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_generics_with_cols[True-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_generics_with_cols[True-str-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_list_of_generic_unions[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_list_of_generic_unions[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_list_of_generic_unions[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_list_of_generic_unions[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[BaseConverter-False-List-str-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[BaseConverter-False-Sequence-str-str-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[BaseConverter-False-TClass-str-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[BaseConverter-True-List-str-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[BaseConverter-True-Sequence-str-str-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[BaseConverter-True-TClass-str-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[Converter-False-List-str-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[Converter-False-Sequence-str-str-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[Converter-False-TClass-str-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[Converter-True-List-str-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[Converter-True-Sequence-str-str-result2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics[Converter-True-TClass-str-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics_with_cols[False-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics_with_cols[False-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics_with_cols[True-int-result0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_nested_generics_with_cols[True-int-result1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_unions_of_generics[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_unions_of_generics[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_unions_of_generics[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_structure_unions_of_generics[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_deeply_nested_generics[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_deeply_nested_generics[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_deeply_nested_generics_list[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_deeply_nested_generics_list[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_generic_attrs[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_generic_attrs[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_generic_inheritance[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_generic_inheritance[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_optional[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_optional[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_protocol[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics.py::test_unstructure_protocol[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_604.py::test_unstructure_optional[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_604.py::test_unstructure_optional[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_649.py::test_generics_with_stringified_annotations",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_generic_type_alias[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_generic_type_alias[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_generic_type_alias[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_generic_type_alias[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_simple_generic_roundtrip[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_simple_generic_roundtrip[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_simple_generic_roundtrip[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_simple_generic_roundtrip[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_simple_generic_roundtrip_dc[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_simple_generic_roundtrip_dc[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_simple_generic_roundtrip_dc[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_simple_generic_roundtrip_dc[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_alias_with_children[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_alias_with_children[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_alias_with_children[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_alias_with_children[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases_overwrite_base_hooks[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases_overwrite_base_hooks[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases_overwrite_base_hooks[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases_overwrite_base_hooks[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases_simple_hooks[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases_simple_hooks[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases_simple_hooks[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_695.py::test_type_aliases_simple_hooks[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_696.py::test_structure_typevar_default[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_696.py::test_structure_typevar_default[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_696.py::test_unstructure_iterable[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_696.py::test_unstructure_iterable[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_nested.py::test_structure_nested_roundtrip[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generics_nested.py::test_structure_nested_roundtrip[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_helpers.py::test_assert_only_unstructured_fails_for_attrs_classes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_helpers.py::test_assert_only_unstructured_passes_for_primitives",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_literals.py::test_unstructure_literal[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_literals.py::test_unstructure_literal[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_literals.py::test_unstructure_literal[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_literals.py::test_unstructure_literal[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_literals.py::test_unstructure_literal_with_enum[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_literals.py::test_unstructure_literal_with_enum[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_literals.py::test_unstructure_literal_with_enum[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_literals.py::test_unstructure_literal_with_enum[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_multistrategy_dispatch.py::test_multistrategy_dispatch_conflict_class_wins",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_multistrategy_dispatch.py::test_multistrategy_dispatch_register_cls",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_multistrategy_dispatch.py::test_multistrategy_dispatch_register_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_newtypes.py::test_newtype_structure_hooks[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_newtypes.py::test_newtype_structure_hooks[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_newtypes.py::test_newtype_structure_hooks[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_newtypes.py::test_newtype_structure_hooks[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_newtypes.py::test_newtype_unstructure_hooks[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_newtypes.py::test_newtype_unstructure_hooks[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_newtype_modern_optionals[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_newtype_modern_optionals[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_newtype_optionals[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_newtype_optionals[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_optional_any[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_optional_any[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_optional_any[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_optional_any[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_override_optional[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_override_optional[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_override_optional[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_optionals.py::test_override_optional[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_bson",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_bson_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_bson_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_bson_efficient_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_bson_native_enums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_bson_objectid",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_bson_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_cbor2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_cbor2_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_cbor2_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_cbor2_efficient_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_cbor2_native_enums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_cbor2_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts[make_converter0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts[make_converter1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts[make_converter2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts[make_converter3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts[make_converter4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts[make_converter5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts_cbor2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts_msgspec",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts_orjson",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_literal_dicts_tomllib",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgpack",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgpack_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgpack_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgpack_efficient_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgpack_native_enums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgpack_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgspec_efficient_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgspec_json_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgspec_json_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgspec_json_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_msgspec_native_enums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_naive_datetimes_are_unstructured_as_utc[make_converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_naive_datetimes_are_unstructured_as_utc_cbor2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_orjson",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_orjson_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_orjson_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_orjson_efficient_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_orjson_native_enums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_orjson_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_stdlib_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_stdlib_json_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_stdlib_json_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_stdlib_json_efficient_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_stdlib_json_native_enums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_stdlib_json_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_stdlib_json_unions_with_spillover",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_tomlkit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_tomlkit_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_tomlkit_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_tomlkit_date_strings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_tomlkit_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_tomllib_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_tomllib_converter_dumps",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_tomllib_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_ujson",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_ujson_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_ujson_converter_unstruct_collection_overrides",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_ujson_efficient_enum",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_ujson_native_enums",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_preconf.py::test_ujson_unions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_recursive.py::test_simple_recursive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_nested_roundtrip[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_nested_roundtrip[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_self_roundtrip[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_self_roundtrip[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_self_roundtrip_dataclass[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_self_roundtrip_dataclass[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_self_roundtrip_namedtuple[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_self_roundtrip_namedtuple[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_self_roundtrip_typeddict[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_self_roundtrip_typeddict[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_subclass_roundtrip[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_subclass_roundtrip[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_subclass_roundtrip_dataclass[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_self.py::test_subclass_roundtrip_dataclass[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_stringifying_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_stringifying_lists_of_opt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_stringifying_sets",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_stringifying_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structure_hook_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structure_union_edge_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_dicts_opts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_hetero_tuples",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_lists_of_opt",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_optional_primitives",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_primitive_union_hook",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_primitives",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_seqs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_seqs_to_deque",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_sets",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_structuring_unsupported",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure.py::test_subclass_registration_is_honored",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_fallback_to_attrib_converters[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_fallback_to_attrib_converters[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_fallback_to_attrib_converters[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_fallback_to_attrib_converters[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal_enum[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal_enum[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal_error[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal_error[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal_multiple[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal_multiple[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal_multiple_error[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_literal_multiple_error[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_multitier_discriminator_union[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_multitier_discriminator_union[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_prefers_attrib_converters[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_prefers_attrib_converters[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_simple_from_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_simple_from_dict_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_typing_extensions_literal[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_typing_extensions_literal[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_union_explicit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_structure_attrs.py::test_structure_union_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tests.py::test_gen_attr_names",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_dict_namedtuples_detailed_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_dict_nametuples_forbid_extra_keys[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_dict_nametuples_forbid_extra_keys[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_named_tuple_predicate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_recursive_dict_nametuples[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_recursive_dict_nametuples[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_simple_dict_nametuples[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_simple_dict_nametuples[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_simple_hetero_tuples[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_simple_hetero_tuples[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_simple_typed_namedtuples[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_simple_typed_namedtuples[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_structuring_invalid_tuples[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_structuring_invalid_tuples[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_structuring_invalid_tuples[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_structuring_invalid_tuples[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples.py::test_type_names_with_quotes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples_563.py::test_simple_dict_nametuples[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tuples_563.py::test_simple_dict_nametuples[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_deep_generics",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_detailed_validation_from_converter[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_detailed_validation_from_converter[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_detailed_validation_from_converter[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_detailed_validation_from_converter[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_extra_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_forbid_extra_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_forbid_extra_keys_from_baseconverter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_forbid_extra_keys_from_converter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_forwardref[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_forwardref[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_gen_attr_names",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_generics",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_generics_with_unbound",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_int_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_key_with_single_quote_roundtrip[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_key_with_single_quote_roundtrip[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_nondict_input",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_not_required",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_omit",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_override_entire_hooks[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_override_entire_hooks[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_override_entire_hooks[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_override_entire_hooks[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_recursive_generation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_rename",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_required",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_required_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_simple_nontotal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_typeddicts.py::test_simple_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unions.py::test_310_custom_union_toplevel_roundtrip[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unions.py::test_310_custom_union_toplevel_roundtrip[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unions.py::test_custom_union_clsfield_roundtrip[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unions.py::test_custom_union_clsfield_roundtrip[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unions.py::test_custom_union_toplevel_roundtrip[BaseConverter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unions.py::test_custom_union_toplevel_roundtrip[Converter]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_attrs_asdict_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_attrs_astuple_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_enum_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_mapping_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_seq_of_simple_classes_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_seq_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_set_unstructure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_unstructure_hook_func[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_unstructure_hook_func[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_unstructure_hook_func[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_unstructure_hook_func[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure.py::test_unstructure_hooks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure_collections.py::test_collection_unstructure_override_mapping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure_collections.py::test_collection_unstructure_override_seq",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure_collections.py::test_collection_unstructure_override_set",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_unstructure_collections.py::test_counter_unstructure_applies_key_hook",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_attribute_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_class_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_custom_error_fn",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_custom_error_fn_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_extra_keys_are_sorted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_mapping_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_other_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_sequence_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_typeddict_attribute_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_v.py::test_untyped_class_errors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_class_note_grouping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_class_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_counter_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_deque_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_error_derive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_external_class_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_frozenset_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_hetero_tuple_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_homo_tuple_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_iterable_note_grouping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_list_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_mapping_validation[BaseConverter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_mapping_validation[BaseConverter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_mapping_validation[Converter-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_mapping_validation[Converter-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_notes_pickling",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_validation.py::test_set_validation",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "hypothesis",
+      "module": "_hypothesis_pytestplugin",
+      "module_sha256": "5b8df643a5394e86bfe608b710ff2534ac74f7192f4f81faa091356ad426f182",
+      "version": "6.170.5"
+    },
+    {
+      "distribution": "pytest-benchmark",
+      "module": "pytest_benchmark.plugin",
+      "module_sha256": "9185f4049d310155e2dd3100f03fec8f35dab99eca5e0224f2f7d9cc7d015744",
+      "version": "5.3.0"
+    }
+  ],
+  "project": "cattrs",
+  "python": "3.12.15",
+  "schema": 1
+}

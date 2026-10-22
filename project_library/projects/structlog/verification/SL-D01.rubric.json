@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SL-D01",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With full evidence ordered drop_missing usesNone as both missing sentinel and explicit value,so countNone is dropped whilezero0 stays. drop_missing=False renders both missing andexplicitNone; a compatible caller policy must distinguish absence/null deliberately. Missing evidence supports insufficient_information and no unauthorized library repair.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

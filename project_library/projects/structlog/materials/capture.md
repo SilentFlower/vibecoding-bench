@@ -1,0 +1,1 @@
+Globally configure a processor replacing top-level token with[REDACTED]. Log only SYNTHETIC_SECRET insidecapture_logs(),then insidecapture_logs(processors=[redactor]). Inspect captures and restored configuration. Explain what each test proves about the actual processor chain and how to validate production redaction; no edits or remote logs.

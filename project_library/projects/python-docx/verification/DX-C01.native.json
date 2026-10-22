@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DX-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "merged_cells_repeat_layout_positions_but_have_one_underlying_xml_cell": true
+  },
+  "resource_profile": "business"
+}

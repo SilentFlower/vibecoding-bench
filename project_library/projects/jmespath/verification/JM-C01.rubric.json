@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "JM-C01",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "JMESPath treats numeric0 as truth-like, so || controls give0,99,99. not_null preserves0,false,empty string. Lookup cannot distinguish absent qty from explicit null, while contains(keys(@),qty-as-string) can test presence. Match the business fallback policy; do not import Python truthiness or conflate null and absence.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

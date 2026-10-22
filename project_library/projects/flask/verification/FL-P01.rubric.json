@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FL-P01",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Sorted loading writesA_FIRST1 andDATABASE1 before DATABASE__HOST fails because the parent is aninteger. Nativefrom_prefixed_env leaves those writes; it provides no rollback. Build a separately owned candidate,validate complete nested types/schema,then publish only on success with explicit copy and concurrency policy. A shallow config copy alone need not isolate nested objects.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

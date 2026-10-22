@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PG-U03",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The subset returnsA:X while the full hook still returnsB:X,A:X and B remains registered. subset_hook_caller is a call-specific exclusion view,not unregister or a global mode change. Use that current scoped API instead of inventing registry mutation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

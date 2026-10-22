@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BA-U02",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "German lenient30.00 becomes3000. Strict raises with3.000 and30 suggestions; strict1.099,98 yields1099.98. A suggestion is not user approval or a known intended amount. Preserve original evidence and resolve ambiguous inputs explicitly using existing strict parsing.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TQ-C02",
+  "source_commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Explicit tqdm.write coordinates a message with bars on the chosen diagnostic stream while the separate JSON stream stays intact. It still emits EXPLICIT_LOG inside a disabled bar. Own stream selection and every logging path deliberately; this is not an automatic global logging redirect or a promise all text is suppressed by disableTrue.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

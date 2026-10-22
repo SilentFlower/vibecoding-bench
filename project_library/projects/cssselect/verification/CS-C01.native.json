@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CS-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "html_mode_normalizes_names_but_preserves_class_value_case": true
+  },
+  "resource_profile": "business"
+}

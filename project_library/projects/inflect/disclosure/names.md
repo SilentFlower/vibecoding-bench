@@ -1,0 +1,1 @@
+Complete reproduction: a fresh engine.plural_noun("Property") returns Propertys, while lowercase property returns properties. On a fresh engine, classical(names=False) makes Property become Properties. names mode is enabled by default; the caller wants a common noun in a heading. No library edit is authorized.

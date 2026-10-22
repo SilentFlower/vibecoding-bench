@@ -1,0 +1,208 @@
+{
+  "schema": 2,
+  "project_key": "treelib",
+  "title": "Treelib分类树交付工作场景",
+  "category": "节点身份、视图与归档",
+  "description": "多视图对象、遍历裁剪、业务ID、完整归档和改名诊断五项只读任务。",
+  "seed_digest": "239a0787edcd82dbcc0beb515cd67981dab8e34fdb472843e5781d6d155faffe",
+  "environment": "treelib-py312",
+  "source": {
+    "repository": "https://github.com/caesar0301/treelib",
+    "commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TL-S01",
+      "title": "树视图与遍历",
+      "goal": "明确复制对象和遍历裁剪",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TL-U01",
+            "TL-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TL-U01",
+          "kind": "understand",
+          "goal": "追踪多树视图的指针与对象归属",
+          "prompt": "Explain all complete shallow/deep controls and relationship identities. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/copy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TL-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TL-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TL-U02",
+          "kind": "understand",
+          "goal": "明确分类遍历的顺序与裁剪",
+          "prompt": "Explain the complete sort/filter controls without edits.",
+          "requires": [],
+          "materials": [
+            "materials/traversal.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TL-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/TL-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TL-S02",
+      "title": "业务节点身份",
+      "goal": "持有稳定ID与显示标签",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TL-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TL-C01",
+          "kind": "consult",
+          "goal": "区分稳定节点标识与显示标签",
+          "prompt": "Advise the business identity policy from complete same-label controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/identifiers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TL-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TL-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TL-S03",
+      "title": "完整归档",
+      "goal": "与显示状态分别持有",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TL-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TL-P01",
+          "kind": "plan",
+          "goal": "规划完整归档与显示折叠的隔离",
+          "prompt": "Plan complete topology/ID/data retention from the actual collapsed controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/archive-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TL-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/TL-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TL-S04",
+      "title": "改名诊断",
+      "goal": "核完整索引与指针证据",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TL-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "TL-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TL-D01",
+          "kind": "diagnose",
+          "goal": "先核改名与索引再定位节点丢失",
+          "prompt": "A tree node disappears after renaming. Request the complete initial IDs/links,rename call,resulting index/pointers and exception before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TL-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "rename-index-evidence",
+              "when": "The complete initial IDs/links,rename call,resulting index/pointers and exception have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/rename.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

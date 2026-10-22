@@ -1,0 +1,19 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SJ-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "cli_parses_before_opening_output_and_allows_inplace_formatting": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

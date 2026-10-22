@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TQ-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "updates_are_deltas_and_total_does_not_cap_the_counter": true
+  },
+  "resource_profile": "business"
+}

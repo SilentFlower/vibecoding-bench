@@ -1,0 +1,1 @@
+Complete reproduction: with TocRenderer() as renderer,render Document("# Stock\n"),then access renderer.toc. omit_title is the defaultTrue,so no included heading remains and items[0] raisesIndexError. An independent control containing a ## Shelf heading has an included section. No malformed Markdown or input encoding error is involved. Diagnosis alone grants no edit.

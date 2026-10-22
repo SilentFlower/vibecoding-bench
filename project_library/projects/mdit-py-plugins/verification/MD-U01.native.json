@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MD-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "one_parse_preserves_hidden_raw_front_matter_for_explicit_metadata_loading": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,1 @@
+Use DTSTART=datetime(2026,1,31). Compare rrule(MONTHLY,count=3,dtstart=DTSTART),successive relativedelta(months=1),and one relativedelta(months=2). A subscription schedule must choose whether invalid month-end days are skipped or clamped and what count means. Explain actual controls without assuming these are equivalent calendar operations. No implementation.

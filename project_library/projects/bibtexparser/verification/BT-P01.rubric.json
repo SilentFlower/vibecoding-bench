@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-P01",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The child retains crossrefp but has no inherited title before or after default writing/reparse. String-macro interpolation does not implement crossref inheritance. Define parent lookup,child precedence,missing/cyclic references,provenance and complete validation before publication; distinguish original and resolved views. Do not claim an existing resolver or implement one in a plan task.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

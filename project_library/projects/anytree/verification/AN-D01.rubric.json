@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AN-D01",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With full evidence defaultDictExporter accesses__dict__,which the suppliedLightNodeMixin slot-only node lacks. Tree relationship support does not imply that attribute representation. Choose an explicit slot-aware snapshot/adapter or reviewed subclass; do not claim attriter automatically provides node access or modify the library. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

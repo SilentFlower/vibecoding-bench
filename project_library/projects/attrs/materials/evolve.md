@@ -1,0 +1,1 @@
+Record has _token:str=attrs.field(alias="token"),tags:list=factory(list),cache:list=attrs.field(init=False,factory=list). Construct tokenA,tags[tag],append OLD to cache,then attrs.evolve(record,token="B"). Also try _token="C". Explain initialization aliases,container identity and cache regeneration; define a deliberate deep/shallow-copy policy. No edits.

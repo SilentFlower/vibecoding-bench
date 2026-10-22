@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SJ-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "default_duplicate_keys_are_last_wins_and_pairs_hook_can_reject_them": true
+  },
+  "resource_profile": "business"
+}

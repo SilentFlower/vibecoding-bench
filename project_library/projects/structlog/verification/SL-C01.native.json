@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SL-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "contextvars_merge_fills_missing_keys_without_overriding_bound_or_call_values": true
+  },
+  "resource_profile": "business"
+}

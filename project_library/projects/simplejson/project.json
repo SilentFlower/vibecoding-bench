@@ -1,0 +1,307 @@
+{
+  "schema": 2,
+  "project_key": "simplejson",
+  "title": "SimpleJSON数据交换工作场景",
+  "category": "JSON精度与文件格式化",
+  "description": "实际候选C与纯Python双模式下的金额、标识、严格政策、消息边界和CLI八项独立任务。",
+  "seed_digest": "2112b7802ed21a5cf2f6aa67b1924fc63f3d741ee5c101d2fbf92ddee021f249",
+  "environment": "simplejson-py312",
+  "source": {
+    "repository": "https://github.com/simplejson/simplejson",
+    "commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SJ-S01",
+      "title": "金额和标识交换",
+      "goal": "按明确的数字表示协议生成发票JSON",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SJ-U01",
+            "SJ-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-U01",
+          "kind": "understand",
+          "goal": "明确金额解析和序列化的数值表示",
+          "prompt": "Trace the complete invoice representation controls in both supported engines. Distinguish observed local Decimal preservation from a downstream monetary contract; no edits.",
+          "requires": [],
+          "materials": [
+            "materials/money.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SJ-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SJ-C01",
+          "kind": "consult",
+          "goal": "为大整数标识选择互通协议",
+          "prompt": "Meet the complete exact-identifier requirement using existing serialization options. Give actual wire types and producer/consumer obligations without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/identifiers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SJ-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SJ-S02",
+      "title": "外部JSON政策",
+      "goal": "明确非有限值与重复字段的解析政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SJ-C02",
+            "SJ-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-C02",
+          "kind": "consult",
+          "goal": "为非有限指标选择显式JSON政策",
+          "prompt": "Explain all complete non-finite controls and choose an interoperable declared policy without changing files.",
+          "requires": [],
+          "materials": [
+            "materials/nonfinite.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SJ-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SJ-U02",
+          "kind": "understand",
+          "goal": "追踪重复字段及钩子的实际作用",
+          "prompt": "Trace top-level/nested duplicate and unique-key controls. Explain the chosen trusted hook boundary without library changes.",
+          "requires": [],
+          "materials": [
+            "materials/duplicates.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SJ-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SJ-S03",
+      "title": "消息边界",
+      "goal": "区分完整文档与单值前缀解析",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SJ-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-U03",
+          "kind": "understand",
+          "goal": "区分单值解析边界和整段消息验收",
+          "prompt": "Trace the complete concatenated-value and trailing-data controls with exact boundaries. Explain caller framing obligations without implementing transport code.",
+          "requires": [],
+          "materials": [
+            "materials/framing.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SJ-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SJ-S04",
+      "title": "订单验收计划",
+      "goal": "把JSON语法和业务发布边界分开",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SJ-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-P01",
+          "kind": "plan",
+          "goal": "规划语法解析后的订单验收",
+          "prompt": "Plan the complete order-ingestion requirement with explicit parsing, business-validation and publication boundaries. Do not implement or invent parser schema methods.",
+          "requires": [],
+          "materials": [
+            "materials/validation.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SJ-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SJ-S05",
+      "title": "本地格式化文件",
+      "goal": "基于实际复现诊断并修复输出截断",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SJ-D01",
+            "SJ-M01"
+          ]
+        },
+        {
+          "id": "inspect_only",
+          "task_ids": [
+            "SJ-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "SJ-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        },
+        {
+          "id": "modify_direct",
+          "task_ids": [
+            "SJ-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-D01",
+          "kind": "diagnose",
+          "goal": "先核CLI参数和路径再定位输出丢失",
+          "prompt": "A local JSON formatting command failed and an existing output file lost its contents. Request exact CLI arguments, synthetic input and the input/output path relationship before diagnosing. No repair is authorized.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SJ-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "cli-reproduction",
+              "when": "The exact CLI arguments, synthetic input bytes and path relationship have not been supplied or declared unavailable, and a complete local reproduction is reasonably requested.",
+              "materials": [
+                "disclosure/cli-reproduction.md"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SJ-M01",
+          "kind": "modify",
+          "goal": "避免CLI在输入错误时截断已有输出",
+          "prompt": "Implement only the explicitly authorized parse-before-output-open repair and public regressions. Preserve all listed CLI and engine compatibility boundaries.",
+          "requires": [],
+          "materials": [
+            "materials/cli-repair.md"
+          ],
+          "allowed_paths": [
+            "library/simplejson/tool.py",
+            "app/test_tool_output.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SJ-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

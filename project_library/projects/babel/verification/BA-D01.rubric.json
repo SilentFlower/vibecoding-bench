@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BA-D01",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The supplied textual-month call is outside the pinned numeric-only parser implementation; numeric-group indexing causes the observed IndexError,while the numeric control succeeds. Localization formatting does not imply parsing textual month names. Advise explicit input normalization or a separately selected parser without patching. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

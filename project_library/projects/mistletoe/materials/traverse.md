@@ -1,0 +1,1 @@
+Parse # Stock then Text **bold**. Inspect traverse(document,include_source=True),traverse(document,klass=Strong),and the same class filter with depth=1. Explain breadth-first order,root depth,parent records and Token.parent. Use existing traversal for a bounded AST audit rather than inventing a missing parent API or source-character span. No edits.

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "WZ-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "combined_raw_and_converted_precedence_differ_and_copy_freezes_structure": true
+  },
+  "resource_profile": "business"
+}

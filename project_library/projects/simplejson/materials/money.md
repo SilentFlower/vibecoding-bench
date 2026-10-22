@@ -1,0 +1,1 @@
+An invoice body contains {"amount":1.2300}. Compare ordinary loads with loads(use_decimal=True), then serialize and reparse the explicit Decimal. Explain observed local numeric representation and what downstream consumers must still agree on. No library edit, real invoice or arbitrary currency rounding policy is authorized.

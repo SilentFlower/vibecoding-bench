@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DT-C02",
+  "source_commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The spring02:30 does not exist;resolve_imaginary falls forward by the offset transition to03:30-04:00. Fall01:30 is ambiguous andfold0/1 have distinct offsets. Existing helpers expose these facts but cannot choose business/user intent;define reject/confirm/shift/fold policy and retain timezone/data provenance. Do not propose gap detection as missing or assume any repair is always correct.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

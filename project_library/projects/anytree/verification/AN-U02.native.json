@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AN-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "iterator_filter_omits_nodes_while_stop_prunes_subtrees_and_root_is_level_one": true
+  },
+  "resource_profile": "business"
+}

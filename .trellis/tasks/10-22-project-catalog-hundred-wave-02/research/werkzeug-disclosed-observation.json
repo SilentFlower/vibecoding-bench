@@ -1,0 +1,37 @@
+{
+  "scope": "当前完整固定源码宿主独立诊断观察，不冒充目标容器集合",
+  "module": "/root/project/vibecoding-bench/.deploy/project-catalog-hundred/stage-02/drafts/projects/werkzeug/seed/library/src/werkzeug/__init__.py",
+  "cases": [
+    {
+      "content_type": "text/plain",
+      "body": "{\"quantity\":2}",
+      "default": {
+        "error": "UnsupportedMediaType",
+        "status": 415
+      },
+      "silent": {
+        "value": null
+      },
+      "force": {
+        "value": {
+          "quantity": 2
+        }
+      }
+    },
+    {
+      "content_type": "application/json",
+      "body": "{broken",
+      "default": {
+        "error": "BadRequest",
+        "status": 400
+      },
+      "silent": {
+        "value": null
+      },
+      "force": {
+        "error": "BadRequest",
+        "status": 400
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PG-U01",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Results are first:X,B:X,A:X; ordinary hooks run in reverse registration order within their priority,with tryfirst before and trylast after. Last still executes but its None is omitted. Do not promise alphabetical or arbitrary dependency-graph ordering.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

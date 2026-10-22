@@ -1,0 +1,219 @@
+{
+  "schema": 2,
+  "project_key": "xlsxwriter",
+  "title": "XlsxWriter库存报表工作场景",
+  "category": "Excel包生成与交付",
+  "description": "以最终ZIP/XML核公式缓存、文本类型、行序、内存选择、发布及公式禁用六项独立任务。",
+  "seed_digest": "c0c06f90a56b44cabee5c41f2ae37b3d52a34f7542d13936123dac2eddf5098b",
+  "environment": "xlsxwriter-py312",
+  "source": {
+    "repository": "https://github.com/jmcnamara/XlsxWriter",
+    "commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "XW-S01",
+      "title": "库存单元格类型",
+      "goal": "正确解释公式缓存和字面标识",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XW-U01",
+            "XW-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-U01",
+          "kind": "understand",
+          "goal": "区分公式与缓存值和实际重算",
+          "prompt": "Trace the complete saved-package formula/cache controls and explain the downstream display without edits.",
+          "requires": [],
+          "materials": [
+            "materials/formulas.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XW-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "XW-C01",
+          "kind": "consult",
+          "goal": "保留标识和表达式外观文本的类型",
+          "prompt": "Meet the complete literal export requirement with existing APIs and actual saved cell types. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/identifiers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XW-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "XW-S02",
+      "title": "大报表模式选择",
+      "goal": "核行序限制和表格功能",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XW-U02",
+            "XW-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-U02",
+          "kind": "understand",
+          "goal": "追踪常量内存模式的行序限制",
+          "prompt": "Trace exact write codes and final cells for the complete row-order case. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/rows.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XW-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "XW-C02",
+          "kind": "consult",
+          "goal": "为表格功能选择合适内存模式",
+          "prompt": "Advise the complete table/memory requirement from actual warning,codes and package controls without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/memory.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XW-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "XW-S03",
+      "title": "报表交付计划",
+      "goal": "完整关闭与验收后再发布",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XW-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-P01",
+          "kind": "plan",
+          "goal": "规划完整工作簿验收后发布",
+          "prompt": "Plan the stated publication requirement from complete pre/post-close package checks. No implementation or external write.",
+          "requires": [],
+          "materials": [
+            "materials/publication.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XW-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "XW-S04",
+      "title": "通用公式转换修复",
+      "goal": "按既有选项保留数组外观文本",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "XW-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-M01",
+          "kind": "modify",
+          "goal": "让通用写入的公式禁用覆盖数组字符串",
+          "prompt": "Implement only the explicit generic-conversion opt-out contract and saved-package public regressions. Preserve defaults,explicit APIs and original tests.",
+          "requires": [],
+          "materials": [
+            "materials/optout-repair.md"
+          ],
+          "allowed_paths": [
+            "library/xlsxwriter/worksheet.py",
+            "app/test_formula_optout.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/XW-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

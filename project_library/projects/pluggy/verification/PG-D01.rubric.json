@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PG-D01",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ask for marker/project namespaces and complete registration evidence rather than infer execution failure from an empty result. With disclosure explain warehouse versus other marker mismatch and the matching control. Missing evidence supports insufficient_information without patching discovery or loading real plugins.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

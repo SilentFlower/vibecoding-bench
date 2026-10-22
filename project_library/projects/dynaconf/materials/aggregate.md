@@ -1,0 +1,1 @@
+Create local PORT=-1 with noNAME. Register Validator(PORT,gte=0) and Validator(NAME,must_exist=True). Compare validators.validate_all(raise_error=False) with the default raising variant and inspect ValidationError.details. Advise an existing aggregate diagnostics flow; no new API,automatic rollback claim or library changes.

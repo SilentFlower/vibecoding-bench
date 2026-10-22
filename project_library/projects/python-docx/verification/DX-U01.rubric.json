@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DX-U01",
+  "source_commit": "e45454602b53e8e572b179ccf1c91093ec9f4ed7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Paragraph.text replaces all runs with one run whose direct bold/italic are None (inherited); paragraph-level style remains, so effective formatting may still come from that style. Run.text preserves that run formatting in the separate bold control. Use deliberate run-aware/template filling with explicit cross-run policy rather than assume whole-paragraph assignment preserves rich formatting or invent a missing setter.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

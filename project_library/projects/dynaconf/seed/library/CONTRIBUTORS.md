@@ -1,0 +1,35 @@
+# Top Contributors: dynaconf/dynaconf
+Shout out to our top contributors!
+
+- [rochacbruno](https://github.com/rochacbruno)
+- [pedro-psb](https://github.com/pedro-psb)
+- [douglas](https://github.com/douglas)
+- [dependabot-preview[bot]](https://github.com/apps/dependabot-preview)
+- [jperras](https://github.com/jperras)
+- [janw](https://github.com/janw)
+- [mitches-got-glitches](https://github.com/mitches-got-glitches)
+- [hilam](https://github.com/hilam)
+- [dependabot[bot]](https://github.com/apps/dependabot)
+- [VaultVulp](https://github.com/VaultVulp)
+- [rsnyman](https://github.com/rsnyman)
+- [wgordon17](https://github.com/wgordon17)
+- [EdwardCuiPeacock](https://github.com/EdwardCuiPeacock)
+- [dgarcia360](https://github.com/dgarcia360)
+- [sirex](https://github.com/sirex)
+- [kedark3](https://github.com/kedark3)
+- [jyejare](https://github.com/jyejare)
+- [ilitotor](https://github.com/ilitotor)
+- [gpkc](https://github.com/gpkc)
+- [JacobCallahan](https://github.com/JacobCallahan)
+- [jorenretel](https://github.com/jorenretel)
+- [cassiobotaro](https://github.com/cassiobotaro)
+- [mirekdlugosz](https://github.com/mirekdlugosz)
+- [adevore](https://github.com/adevore)
+- [mspinelli](https://github.com/mspinelli)
+- [Riverfount](https://github.com/Riverfount)
+- [tanalam2411](https://github.com/tanalam2411)
+- [chobeat](https://github.com/chobeat)
+- [obaranov](https://github.com/obaranov)
+
+
+_Last updated: Fri, 05 Jul 24 06:09:33 +0000_

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AN-C01",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Same-named siblings are allowed. get selects the first matching child; glob exposes both,and reversing child order changesget result without changing business keys. Enforce unique path attributes or use an explicit stable-ID/multi-match policy. A path by name is not automatically a unique business identity or an ambiguity check.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

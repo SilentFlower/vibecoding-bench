@@ -1,0 +1,1 @@
+Create Configuration("synthetic-scenario",read=False). add defaults{db:{host:base,port:5432},workers:1},then set overlay{db:{host:override}}. Compare config[db].get(), config[db][port].get(int), and config.flatten()[db]. Explain source priority versus mapping projection. No files may change or automatically discovered user configuration be read.

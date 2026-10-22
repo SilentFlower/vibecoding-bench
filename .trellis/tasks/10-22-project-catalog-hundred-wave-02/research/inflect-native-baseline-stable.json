@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "projects": [
+    {
+      "project": "inflect",
+      "attempt": 2,
+      "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/inflect/result.json",
+      "result_sha256": "10b94ac324151a0198d625863e18e296ddf916fd8eb180bcfe2b66f1c35a69f2",
+      "main_collected": 291,
+      "counts": {
+        "passed": 275,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0,
+        "xfailed": 16,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "strict_doctest_nodes": 10,
+      "subtest_count": 0,
+      "collection_skip_count": 0,
+      "xml_testcases": 291,
+      "xml_skipped": 16,
+      "runner_sha256": "3edb4206910fbcb92a5aa6ce698011f0de75e451c4ba078f40c1e122a3325bb5",
+      "contract_sha256": "76c903346773b81ae8459d269d664b1e2e20a0020b0952d76d03fb581c69bb68",
+      "business": {
+        "timeout_sec": 30,
+        "memory_mb": 256,
+        "pids_limit": 64
+      },
+      "regression": {
+        "timeout_sec": 180,
+        "memory_mb": 512,
+        "pids_limit": 64
+      },
+      "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+    }
+  ]
+}

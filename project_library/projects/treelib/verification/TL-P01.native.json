@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TL-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "collapsed_display_state_can_omit_existing_descendants_from_serialized_tree": true
+  },
+  "resource_profile": "business"
+}

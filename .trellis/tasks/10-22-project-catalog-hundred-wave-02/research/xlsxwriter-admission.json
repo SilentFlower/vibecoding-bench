@@ -1,0 +1,182 @@
+{
+  "project": "xlsxwriter",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "source_file_count": 3003,
+  "license_files": [
+    "seed/library/LICENSE.txt"
+  ],
+  "scenarios": 4,
+  "unique_tasks": 6,
+  "modify_tasks": 1,
+  "non_modify_tasks": 5,
+  "native_baseline": {
+    "project": "xlsxwriter",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/xlsxwriter/result.json",
+    "result_sha256": "f653ca6597ad17096e99cdd34b1eaed0098e58ad6b88d37bc163e8b6b9967920",
+    "main_collected": 1787,
+    "counts": {
+      "passed": 1787,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 1787,
+    "xml_skipped": 0,
+    "runner_sha256": "d5af8be492c238351179969c8a5b2099552905cd92d8864174c4f8eda378079c",
+    "contract_sha256": "cc89342eb7c9833a75b93e16e6c0cb1b9e4cf7dfaeb462323e197b1534f6f68c",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 11,
+  "native_evidence": [
+    {
+      "case": "original-XW-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/original-XW-C01.json",
+      "sha256": "d8475134c32fbfa6ac7d0eaf47ae5eb9c05b963d87901bf648064259500a92f4",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-XW-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/original-XW-C02.json",
+      "sha256": "f5d186d3ff674ffa504a53c163403f8d9407b6a6098e932f0d0aa853feaebdac",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-XW-M01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/original-XW-M01.json",
+      "sha256": "3ccc9f080684b469f6479e2be57482f5871a64e7b3c4faeea029be271bbc0b50",
+      "expectation_met": true,
+      "expected": "failed",
+      "actual_status": "failed"
+    },
+    {
+      "case": "original-XW-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/original-XW-P01.json",
+      "sha256": "5f0d4bc9c85b7d1a5b86baa565eb22cd4d4ed242760e7a0e9863fafb329525c0",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-XW-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/original-XW-U01.json",
+      "sha256": "3b396ebe8bd41a4f8cab8a678668deaf77ab0a2ff26f6d21614c2848dff09184",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-XW-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/original-XW-U02.json",
+      "sha256": "4d392ee89d3bf58ab7b3a5a05aa0ee7e7abd2eff361400c1f880b58652e446e1",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "public-tests-original",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/public-tests-original.json",
+      "sha256": "8006fabbe8c4f58b4d235a6994456b7a5632b0912ed3579253b32fd923e62b44",
+      "expectation_met": true,
+      "expected": "failed",
+      "actual_status": "failed"
+    },
+    {
+      "case": "public-tests-reference",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/public-tests-reference.json",
+      "sha256": "7f7c6bca273db34c61c2edfa64808f9368701aa64b47934efd5d469f4f611e08",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "reference-XW-M01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/reference-XW-M01.json",
+      "sha256": "68af0aad782fc3df6cbaad8414eb5e236431981dcd6edeeddd082abc1213089c",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "reference-full-regression",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/reference-full-regression.json",
+      "sha256": "4164cacbe8a203a707bd05d9988257f1d5ce544e1951ccfdef36160bb66bbb39",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "wrong-xlsxwriter-disable-array-detection",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/wrong-xlsxwriter-disable-array-detection.json",
+      "sha256": "86c85739636f05e446842be102ffd72e40e4d0226e3bb0df309d707190fbfe06",
+      "expectation_met": true,
+      "expected": "failed",
+      "actual_status": "failed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/xlsxwriter/attempt-001/summary.json",
+      "sha256": "e647900489a84905043d2678010c7957b426b89ee9ff5fdab9a71e930b95aca8",
+      "passed": true
+    }
+  ],
+  "reference_changed_paths": [
+    "app/test_formula_optout.py",
+    "library/xlsxwriter/worksheet.py"
+  ],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v18-en",
+  "formal_digest": "228bde2d77b578b64bd2e5e2d260ad5db8268c6139f539b97e5252378c3a2425",
+  "full_delivery_files": 16052,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-005/run-001/evidence/result.json",
+      "sha256": "c943d11924a5ad4e24d1508adc8c8be1e6e62b505fabf010742ec2b9868970be"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-005/run-001/cleanup.json",
+      "sha256": "81b65ab29b1fa26c10cc5c1e860a246847e704b2401cc7eec4c6b6a73a8b85c0"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/mock-batch-005-audit.json",
+      "sha256": "2d712495f6cb5e4962d7778e5c24e663630a58a53bb7b54ab7049ab6d0cf65b7"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-005/browser/run-001/diagnostics/result.json",
+      "sha256": "954c2942a6cac4a67c6bbb74d7aea2df872b80cfb0c7e5a5bf33ce7e6e5382c6"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/delivery-first-ten.json",
+      "sha256": "1e1c9f202bc7536060de23ee09a147c3fe095aad10115e38a9d7d1ae13105c73"
+    }
+  ]
+}

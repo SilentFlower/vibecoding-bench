@@ -1,0 +1,160 @@
+{
+  "project": "mdit-py-plugins",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "519953da0a394a92534bc27580f4e7415462df44",
+  "source_file_count": 135,
+  "license_files": [
+    "seed/library/LICENSE",
+    "seed/library/mdit_py_plugins/front_matter/LICENSE",
+    "seed/library/mdit_py_plugins/footnote/LICENSE",
+    "seed/library/mdit_py_plugins/admon/LICENSE",
+    "seed/library/mdit_py_plugins/container/LICENSE",
+    "seed/library/mdit_py_plugins/deflist/LICENSE",
+    "seed/library/mdit_py_plugins/texmath/LICENSE",
+    "seed/library/mdit_py_plugins/tasklists/__init__.py",
+    "seed/app/DJOT-MIT.txt",
+    "seed/app/CC-BY-SA-4.0.txt",
+    "seed/app/GFM-ATTRIBUTION.md"
+  ],
+  "scenarios": 5,
+  "unique_tasks": 6,
+  "modify_tasks": 0,
+  "non_modify_tasks": 6,
+  "native_baseline": {
+    "project": "mdit-py-plugins",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/mdit-py-plugins/result.json",
+    "result_sha256": "a88357d763eb2aaf3c8c2fcd1d5a70530d3496135e46dfe686584d11f34da1a8",
+    "main_collected": 511,
+    "counts": {
+      "passed": 511,
+      "failed": 0,
+      "error": 0,
+      "skipped": 0,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 511,
+    "xml_skipped": 0,
+    "runner_sha256": "8427114908f90aed68fc0143a471756c82943b33e62dda3e08aafdca49f6fdde",
+    "contract_sha256": "5a306329ab941904e9590b7d0ef7b2d85db9c236f6d280beea24dcb274c36ffc",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-MD-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-001/original-MD-C01.json",
+      "sha256": "20e718fbe3242ae09d455e4e41cafc8e420c0b476aa0d461ae8f256a152b904a",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-MD-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-001/original-MD-C02.json",
+      "sha256": "5319ed40140444d02ab6700b94fd2e279d3ae34b57363978dd15fe1377a2c13a",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-MD-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-001/original-MD-P01.json",
+      "sha256": "3313a640902330aa87b83a5d6d01f0c9bb37cf3d96af320b775d4d5a888dca94",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-MD-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-004/original-MD-U01.json",
+      "sha256": "758f48c53fc2fe1a29393d42271497ffa483dc6986aeaa247c998d03f16ad5a9",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-MD-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-001/original-MD-U02.json",
+      "sha256": "4e4bc7119f0921dad6c80107548c12fe5a5fe70c0910e27bfe87c0f7aaa886f3",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-001/summary.json",
+      "sha256": "a3e57b475129809f3035df806bd6bcce846f840ffdceb5733945a82658c14e44",
+      "passed": false
+    },
+    {
+      "attempt": 2,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-002/summary.json",
+      "sha256": "1dd8a0ee64e393c10ff272ceefe89c857f1222b46974aab318a97c5ded0f42fa",
+      "passed": false
+    },
+    {
+      "attempt": 3,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-003/summary.json",
+      "sha256": "1dd8a0ee64e393c10ff272ceefe89c857f1222b46974aab318a97c5ded0f42fa",
+      "passed": false
+    },
+    {
+      "attempt": 4,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/mdit-py-plugins/attempt-004/summary.json",
+      "sha256": "90cab01bf568a25c966d314771592b8f3b29f2b56a9c62ed59b068dc53b9a1c4",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v21-en",
+  "formal_digest": "964ba18fbb9ab7e1a7fe6c9c47f6793dc1ac08324e9671d9e0cf1cb3b7b3add9",
+  "full_delivery_files": 19089,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-008/run-001/evidence/result.json",
+      "sha256": "8a11df37e211c5031e430e27c0b07ab5f7dc7583e5d1b951fd36b677a4547fc1"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-008/run-001/cleanup.json",
+      "sha256": "8b10c119c2ed94a9e84ce8f980454c8fd2caba64fe761158fe3ac9d2911df81a"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/mock-batch-008-audit.json",
+      "sha256": "05b898e155ebe1ce051e451da55a7ea61fcac80725519a20da8e5ad2f4862e27"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-008/browser/run-001/diagnostics/result.json",
+      "sha256": "852f8dc9d5a90c0e52474638839de2d4505708ba53cf676e77dc255266dc611d"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/delivery-first-sixteen.json",
+      "sha256": "5c1cd647e3132476e04ec1b741817402f26296a3da06b249bcbfdee17612864d"
+    }
+  ]
+}

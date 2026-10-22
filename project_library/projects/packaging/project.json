@@ -1,0 +1,234 @@
+{
+  "schema": 2,
+  "project_key": "packaging",
+  "title": "Packaging离线包交付工作场景",
+  "category": "版本、目标与归档验收",
+  "description": "版本身份、预发布、目标环境、依赖组、离线候选和元数据诊断六项只读任务。",
+  "seed_digest": "c61d48502cfe0ce10acb74f8516f15f32e6c657f567bb7e8a13bb5e7ddad3e34",
+  "environment": "packaging-py312",
+  "source": {
+    "repository": "https://github.com/pypa/packaging",
+    "commit": "1a62a26afe0f4881593e31bed4f7753bd1c8fe27",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/LICENSE.APACHE",
+      "seed/library/LICENSE.BSD",
+      "seed/library/src/packaging/licenses/__init__.py"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PK-S01",
+      "title": "离线版本清单",
+      "goal": "明确身份和预发布选择",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PK-U01",
+            "PK-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PK-U01",
+          "kind": "understand",
+          "goal": "区分包版本比较与原始标识",
+          "prompt": "Explain the complete identity controls and provenance policy. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/identity.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PK-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PK-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PK-U02",
+          "kind": "understand",
+          "goal": "明确预发布筛选的候选集合语义",
+          "prompt": "Explain all prerelease controls using this pinned version. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/prereleases.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PK-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PK-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PK-S02",
+      "title": "目标与依赖组",
+      "goal": "持有明确目标并使用现有能力",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PK-C01",
+            "PK-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PK-C01",
+          "kind": "consult",
+          "goal": "为跨平台筛选持有完整目标环境",
+          "prompt": "Advise target environment and evaluation context from both controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/target.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PK-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PK-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PK-C02",
+          "kind": "consult",
+          "goal": "采用现有依赖组展开并明确重复政策",
+          "prompt": "Advise group expansion from the complete inputs without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/groups.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PK-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PK-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PK-S03",
+      "title": "离线交付方案",
+      "goal": "筛选与归档验收分别完成",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PK-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PK-P01",
+          "kind": "plan",
+          "goal": "规划离线候选与真实归档的分别验收",
+          "prompt": "Plan the complete target selection and archive checks. No implementation or installation.",
+          "requires": [],
+          "materials": [
+            "materials/wheel-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PK-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PK-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PK-S04",
+      "title": "元数据诊断",
+      "goal": "取得原文与完整分组错误",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PK-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PK-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PK-D01",
+          "kind": "diagnose",
+          "goal": "先取得元数据与分组异常再诊断",
+          "prompt": "Package metadata validation fails. Request exact bytes,validation options and complete grouped errors before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PK-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "metadata-validation-evidence",
+              "when": "The exact metadata bytes,validation options and grouped errors have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/metadata.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

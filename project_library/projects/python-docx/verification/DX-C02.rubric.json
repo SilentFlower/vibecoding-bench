@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DX-C02",
+  "source_commit": "e45454602b53e8e572b179ccf1c91093ec9f4ed7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Pinned assignment writes the supplied wall clock10 as10Z instead of converting UTC+8 to02Z; reopening therefore changes the instant. Normalize aware values explicitly to UTC before assignment and define a deliberate naive-value policy. Do not claim native timezone conversion or silently strip timezone as equivalent.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

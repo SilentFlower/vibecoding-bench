@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "WZ-U01",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "get converts only the firstbad value and returns99 on failure. getlist(type=int) silently omitsbad andNone,returning[2,3]. Flat mapping keepsbad only; flat=False retains all four raw values. Conversion success is not complete validation; retain raw evidence and deliberate per-item diagnostics.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

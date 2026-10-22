@@ -1,0 +1,14 @@
+coverage==7.16.2
+freezegun==1.5.5
+iniconfig==2.3.1
+Jinja2==3.1.6
+MarkupSafe==3.0.4
+packaging==26.3
+pluggy==1.7.0
+Pygments==2.21.0
+pytest==9.1.1
+pytest-cov==7.1.0
+python-dateutil==2.9.0.post0
+pytz==2026.5
+setuptools==81.0.0
+six==1.17.0

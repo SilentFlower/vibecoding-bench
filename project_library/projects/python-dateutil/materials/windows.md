@@ -1,0 +1,1 @@
+Create five DAILY occurrences from2026-01-01. Compare between(Jan1,Jan5,count=1) with default inc and inc=True. A billing report wants a documented closed/open endpoint policy and bounded output. Explain the actual endpoints and whether count limits this method; do not rely on its name alone. No implementation.

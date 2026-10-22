@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PK-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "prerelease_selection_depends_on_candidate_set_and_explicit_policy": true
+  },
+  "resource_profile": "business"
+}

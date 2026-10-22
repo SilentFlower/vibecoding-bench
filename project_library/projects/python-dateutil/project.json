@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "python-dateutil",
+  "title": "Dateutil账期与预约工作场景",
+  "category": "日历政策、时区与有限交付",
+  "description": "月末账期、日期约定、时间窗口、DST预约、有限日历和时区诊断六项只读任务。",
+  "seed_digest": "217058e8e1fe1dc0d86478ce10c39e3b2b7df50ee44ac90303f12c1f148b85ec",
+  "environment": "python-dateutil-py312",
+  "source": {
+    "repository": "https://github.com/dateutil/dateutil",
+    "commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DT-S01",
+      "title": "账期与日期输入",
+      "goal": "明确日历政策和来源约定",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DT-U01",
+            "DT-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DT-U01",
+          "kind": "understand",
+          "goal": "为月末账期选择明确的日历政策",
+          "prompt": "Explain all complete month-end controls and count meaning. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/month-end.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/DT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DT-U02",
+          "kind": "understand",
+          "goal": "先确定日期来源约定再接受解析",
+          "prompt": "Explain both complete numeric date interpretations without inventing intent. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/input-order.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/DT-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DT-S02",
+      "title": "账期窗口与预约",
+      "goal": "明确端点和DST意图",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DT-C01",
+            "DT-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DT-C01",
+          "kind": "consult",
+          "goal": "明确账期端点与结果上限的真实合同",
+          "prompt": "Advise the billing window policy from both complete controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/windows.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/DT-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DT-C02",
+          "kind": "consult",
+          "goal": "采用现有DST能力并确认预约意图",
+          "prompt": "Advise explicit gap/repeated-time policy from complete frozen-data controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/dst.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/DT-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DT-S03",
+      "title": "有限日历交付",
+      "goal": "持有明确停止条件",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DT-P01",
+          "kind": "plan",
+          "goal": "规划有限预约流与明确的停止条件",
+          "prompt": "Plan the bounded feed using existing next-occurrence controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/feed-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/DT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DT-S04",
+      "title": "时区诊断",
+      "goal": "取得原始含义后解释",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "DT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DT-D01",
+          "kind": "diagnose",
+          "goal": "先取时区含义再诊断无偏移时间",
+          "prompt": "Parsed timestamp has no timezone. Request exact text,parser options,warnings/result and source timezone meaning before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "timestamp-meaning-evidence",
+              "when": "The exact timestamp,parser options,warnings/result and source timezone meaning have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/timezone.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

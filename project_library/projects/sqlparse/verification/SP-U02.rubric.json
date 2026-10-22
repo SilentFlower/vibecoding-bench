@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SP-U02",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The incomplete selectfrom input can parse,classify asSELECT and format asSELECT FROM. sqlparse is non-validating;these results do not prove valid database grammar,semantics or safe execution. Define a dialect-appropriate validation boundary separately and do not claim the parser has accepted the query for execution.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

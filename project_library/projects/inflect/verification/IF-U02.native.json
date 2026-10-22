@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "IF-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "number_words_are_not_a_strict_numeric_input_parser": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-U02",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "parse_string returns the supplied Library,retains the old entry object and value,and resolves the new journal through the existing J macro without adding another macro. Existing entries are not transformed again. Do not propose this supported seeding behavior as a missing feature or assume all prior entries are rerun through the new stack.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

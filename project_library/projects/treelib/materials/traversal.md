@@ -1,0 +1,1 @@
+Use Root/root with children inserted B/b then A/a,and Leaf/leaf belowa. Compare expand_tree defaults,sorting=False and filter excludinga. A category export must explicitly decide order and whether hiding a parent prunes descendants. Explain these existing controls without transferring another tree library semantics. No implementation.

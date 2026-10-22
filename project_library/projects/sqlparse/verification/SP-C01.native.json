@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SP-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "identifier_display_alias_and_lexical_parent_are_distinct_from_resolved_lineage": true
+  },
+  "resource_profile": "business"
+}

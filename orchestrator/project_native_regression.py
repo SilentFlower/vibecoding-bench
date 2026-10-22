@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+from collections import Counter
 from contextlib import ExitStack
 import doctest
 import hashlib
@@ -190,6 +191,131 @@ SUITES = {
     'dpath': {'package': 'dpath', 'overlay': True, 'doctests': 0, 'framework': 'nose2',
         'args': ['--no-user-config', '--plugin', 'nose2.plugins.junitxml', '--junit-xml'],
         'plugins': [], 'env': {}},
+    'alive-progress': {'package': 'alive_progress', 'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'jmespath': {'package': 'jmespath', 'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'confuse': {'package': 'confuse', 'overlay': True, 'doctests': 0, 'collection_skips': True,
+        'args': ['test', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'simplejson': {'package': 'simplejson', 'overlay': True, 'doctests': 0,
+        'framework': 'unittest', 'unittest_entry': 'simplejson.tests._cibw_runner',
+        'test_roots': ['simplejson/tests'], 'build_ext': True, 'plugins': [], 'env': {}},
+    'marshmallow': {'package': 'marshmallow', 'implementation_dir': 'src/marshmallow', 'import_root': 'src',
+        'overlay': True, 'doctests': 0,
+        'parameter_ids': [('tests/test_deserialization.py::TestFieldDeserialization::test_invalid_datetime_deserialization',
+            'in_value', [9, 10])],
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'inflect': {'package': 'inflect', 'overlay': True,
+        'args': ['.', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'pyyaml': {'package': 'yaml', 'implementation_dir': 'lib/yaml', 'import_root': 'lib',
+        'overlay': True, 'doctests': 0,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'tqdm': {'package': 'tqdm', 'overlay': True, 'doctests': 0,
+        'args': ['-k', 'not perf', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-asyncio', 'pytest_asyncio.plugin'), ('pytest-timeout', 'pytest_timeout')],
+        'system_libraries': ('artifacts/tk-libs/manifest.json',
+            '49c900fb25eafea5aa64e501d28b120f259488c6bdbb460bf214ad4308125787'),
+        'env': {'OPENBLAS_NUM_THREADS': '1', 'OMP_NUM_THREADS': '1', 'MPLBACKEND': 'Agg'}},
+    'pluggy': {'package': 'pluggy', 'implementation_dir': 'src/pluggy', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('pluggy', '1.7.1.dev6+g0224f79fc'),
+        'project_urls': True,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'xlsxwriter': {'package': 'xlsxwriter', 'overlay': True, 'doctests': 0,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'mistletoe': {'package': 'mistletoe', 'overlay': True, 'doctests': 0, 'subtests': True,
+        'args': ['test', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'python-docx': {'package': 'docx', 'implementation_dir': 'src/docx', 'import_root': 'src',
+        'overlay': True, 'doctests': 0,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'python-pptx': {'package': 'pptx', 'implementation_dir': 'src/pptx', 'import_root': 'src',
+        'overlay': True, 'doctests': 0,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'mdit-py-plugins': {'package': 'mdit_py_plugins', 'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-regressions', 'pytest_regressions.plugin'),
+            ('pytest-datadir', 'pytest_datadir.plugin'), ('pytest-timeout', 'pytest_timeout')], 'env': {}},
+    'attrs': {'package': 'attr', 'implementation_dir': 'src/attr', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('attrs', '26.1.1.dev81'),
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin')], 'env': {}},
+    'dynaconf': {'package': 'dynaconf', 'overlay': True, 'doctests': 0,
+        'distribution': ('dynaconf', '3.3.0.dev0'), 'console_scripts': True,
+        'args': ['-m', 'not integration', 'tests', '--cov-config', 'pyproject.toml', '--cov=dynaconf',
+            '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin'), ('pytest-mock', 'pytest_mock')], 'env': {}},
+    'cssselect': {'package': 'cssselect', 'overlay': True, 'doctests': 0, 'subtests': True,
+        'args': ['cssselect', 'tests', 'docs', '--cov=cssselect', '--cov-report=term-missing',
+            '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-cov', 'pytest_cov.plugin')], 'env': {}},
+    'structlog': {'package': 'structlog', 'implementation_dir': 'src/structlog', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('structlog', '0.1.dev1'),
+        'project_urls': True, 'license_expression': True, 'metadata_fields': True,
+        'args': ['tests', '--randomly-seed=0', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-asyncio', 'pytest_asyncio.plugin'), ('time-machine', 'time_machine'),
+            ('pytest-randomly', 'pytest_randomly')], 'env': {}},
+    'cattrs': {'package': 'cattrs', 'implementation_dir': 'src/cattrs', 'import_root': 'src',
+        'overlay': True, 'doctests': 0,
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin'), ('pytest-benchmark', 'pytest_benchmark.plugin')], 'env': {}},
+    'flask': {'package': 'flask', 'implementation_dir': 'src/flask', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('Flask', '3.2.0.dev0'), 'console_scripts': True,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'babel': {'package': 'babel', 'overlay': True, 'duplicate_ids': True, 'collection_skips': True,
+        'collection_skip_directories': ['tests/benchmarks'],
+        'distribution': ('Babel', '2.18.0'),
+        'entry_points': {'console_scripts': {'pybabel': 'babel.messages.frontend:main'},
+            'distutils.commands': {'compile_catalog': 'babel.messages.setuptools_frontend:compile_catalog',
+                'extract_messages': 'babel.messages.setuptools_frontend:extract_messages',
+                'init_catalog': 'babel.messages.setuptools_frontend:init_catalog',
+                'update_catalog': 'babel.messages.setuptools_frontend:update_catalog'},
+            'distutils.setup_keywords': {'message_extractors': 'babel.messages.setuptools_frontend:check_message_extractors'},
+            'babel.checkers': {'num_plurals': 'babel.messages.checkers:num_plurals',
+                'python_format': 'babel.messages.checkers:python_format'},
+            'babel.extractors': {'ignore': 'babel.messages.extract:extract_nothing',
+                'python': 'babel.messages.extract:extract_python', 'javascript': 'babel.messages.extract:extract_javascript'}},
+        'console_scripts': {'pybabel': 'babel.messages.frontend:main'},
+        'skipped_doctests': ['babel/numbers.py::babel.numbers.format_number[occurrence-1]',
+            'babel/numbers.py::babel.numbers.format_number[occurrence-2]'],
+        'args': ['tests', 'babel', '--doctest-modules', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [], 'env': {}},
+    'anytree': {'package': 'anytree', 'implementation_dir': 'src/anytree', 'import_root': 'src',
+        'overlay': True,
+        'args': ['src/anytree', 'tests', 'docs', '-o',
+            'addopts=--doctest-modules --doctest-glob=docs/*.rst --ignore-glob=tests/testdata/* --log-level=INFO',
+            '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('test2ref', 'test2ref._pytest_plugin')], 'env': {}},
+    'werkzeug': {'package': 'werkzeug', 'implementation_dir': 'src/werkzeug', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('Werkzeug', '3.2.0.dev0'),
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('pytest-timeout', 'pytest_timeout')], 'env': {}},
+    'html2text': {'package': 'html2text', 'overlay': True, 'doctests': 0,
+        'distribution': ('html2text', '0.1.dev1+g5cf85510a'), 'console_scripts': True,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'packaging': {'package': 'packaging', 'implementation_dir': 'src/packaging', 'import_root': 'src',
+        'overlay': True, 'doctests': 0, 'distribution': ('packaging', '26.4.dev0'),
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin')], 'env': {}},
+    'bibtexparser': {'package': 'bibtexparser', 'overlay': True, 'doctests': 0,
+        'distribution': ('bibtexparser', '2.1.0'),
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [], 'env': {}},
+    'treelib': {'package': 'treelib', 'overlay': True, 'doctests': 0,
+        'distribution': ('treelib', '1.8.0'),
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'sqlparse': {'package': 'sqlparse', 'overlay': True, 'doctests': 0,
+        'distribution': ('sqlparse', '0.6.1.dev0'), 'console_scripts': True,
+        'original_xpassed_nodes': ['tests/test_regressions.py::test_issue484_comments_and_newlines'],
+        'args': ['tests', '-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
+    'python-dateutil': {'package': 'dateutil', 'implementation_dir': 'src/dateutil', 'import_root': 'src',
+        'overlay': True, 'doctests': 0,
+        'args': ['tests', 'docs', '-q', '-ra', '-p', 'no:cacheprovider'],
+        'plugins': [('hypothesis', '_hypothesis_pytestplugin'), ('pytest-cov', 'pytest_cov.plugin')],
+        'env': {'HYPOTHESIS_STORAGE_DIRECTORY': '/work/hypothesis', 'TZ': 'America/New_York',
+            'PYTHONTZPATH': '/work/python/lib/python3.12/site-packages/tzdata/zoneinfo',
+            'TZDIR': '/work/python/lib/python3.12/site-packages/tzdata/zoneinfo'}},
+    'ftfy': {'package': 'ftfy', 'implementation_dir': 'ftfy', 'overlay': True,
+        'distribution': ('ftfy', '6.3.1'), 'console_scripts': True,
+        'args': ['-q', '-ra', '-p', 'no:cacheprovider'], 'plugins': [], 'env': {}},
 }
 _STATE: dict = {}
 
@@ -370,8 +496,9 @@ print(json.dumps(documents))
         return json.loads(completed.stdout)
     documents = {}
     paths = (['__init__.py', 'default_handlers.py'] if package == 'frontmatter'
-        else ['__init__.py'] if package == 'tabulate'
-        else ['__init__.py', 'validate.py'] if package == 'configobj' else [])
+        else ['__init__.py'] if package in ('tabulate', 'inflect')
+        else ['__init__.py', 'validate.py'] if package == 'configobj'
+        else ['__init__.py', 'encoder.py', 'decoder.py'] if package == 'simplejson' else [])
     for relative in paths:
         tree = ast.parse((baseline / package / relative).read_text(encoding='utf-8'))
         names = {}
@@ -423,7 +550,9 @@ def _plugins(suite: dict) -> list[dict]:
 
 def _bind_source(project: Path, import_root: Path, cleanup: ExitStack, *, console: bool = False,
         distribution: tuple[str, str] | None = None, executables: list[tuple[str, str, str]] | None = None,
-        entry_points: dict[str, dict[str, str]] | None = None, license_expression: str | None = None) -> dict:
+        entry_points: dict[str, dict[str, str]] | None = None, license_expression: str | None = None,
+        project_urls: dict[str, str] | None = None, console_scripts: dict[str, str] | None = None,
+        metadata_fields: dict[str, str] | None = None) -> dict:
     """绑定独占验证环境的子进程源码与固定入口。
 
     :param project: 控制端构建的测试树。
@@ -434,6 +563,9 @@ def _bind_source(project: Path, import_root: Path, cleanup: ExitStack, *, consol
     :param executables: 固定离线工具的名称、制品相对路径和SHA，仅复制到本次独占venv。
     :param entry_points: 从冻结原版配置读取的分发入口，不执行构建或安装另一份实现。
     :param license_expression: 从冻结原版pyproject读取的SPDX许可声明，不覆盖上游原始许可文件。
+    :param project_urls: 冻结原版声明的项目链接，仅写入本次私有分发元数据。
+    :param console_scripts: 冻结原版声明的命令行入口，仅在独占venv中绑定真实候选模块。
+    :param metadata_fields: 冻结原版的Summary和Author-email，拒绝其他字段及多行值。
     :return: 实际绑定及可执行文件摘要；拒绝共享或系统解释器。
     """
     private_venv = Path(sys.prefix).resolve()
@@ -463,6 +595,17 @@ def _bind_source(project: Path, import_root: Path, cleanup: ExitStack, *, consol
             + '\nName: ' + name + '\nVersion: ' + version + '\n')
         if license_expression is not None:
             text += 'License-Expression: ' + license_expression + '\n'
+        for label, value in (metadata_fields or {}).items():
+            if (label not in ('Summary', 'Author-email') or not isinstance(value, str) or not value
+                    or any(character in value for character in '\r\n\x00')):
+                raise ValueError('固定分发描述元数据无效')
+            text += label + ': ' + value + '\n'
+        # 部分上游兼容API读取首个Project-URL，必须保留原配置的声明顺序。
+        for label, url in (project_urls or {}).items():
+            if (not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]*', label) or not isinstance(url, str)
+                    or not re.fullmatch(r'https?://[^\s]+', url)):
+                raise ValueError('固定项目链接元数据无效')
+            text += 'Project-URL: ' + label + ', ' + url + '\n'
         metadata.write_text(text, encoding='utf-8')
         result['distribution'] = {'name': name, 'version': version, 'path': str(metadata_root),
             'metadata_sha256': hashlib.sha256(metadata.read_bytes()).hexdigest(), 'implementation_installed': False}
@@ -501,6 +644,20 @@ def _bind_source(project: Path, import_root: Path, cleanup: ExitStack, *, consol
         entry.chmod(0o755)
         result.setdefault('executables', []).append({'name': name, 'artifact': relative,
             'sha256': checksum, 'path': str(entry), 'system_installation': False})
+    for name, target in sorted((console_scripts or {}).items()):
+        if (not re.fullmatch(r'[A-Za-z0-9_.-]+', name) or not isinstance(target, str)
+                or not re.fullmatch(r'[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*:[A-Za-z_]\w*', target)):
+            raise ValueError('固定源码命令行入口无效')
+        module, function = target.split(':')
+        entry = private_venv / 'bin' / name
+        # 入口脚本和.pth只存在于本次私有环境；子进程仍执行受控候选源码。
+        script = '#!' + sys.executable + '\nfrom ' + module + ' import ' + function + '\nraise SystemExit(' + function + '())\n'
+        with entry.open('x', encoding='utf-8') as output:
+            cleanup.callback(entry.unlink, missing_ok=True)
+            output.write(script)
+        entry.chmod(0o755)
+        result.setdefault('source_console_scripts', []).append({'name': name, 'target': target,
+            'path': str(entry), 'sha256': hashlib.sha256(entry.read_bytes()).hexdigest(), 'system_installation': False})
     if console:
         entry = private_venv / 'bin/dotenv'
         if entry.exists() or entry.is_symlink():
@@ -604,6 +761,36 @@ def pytest_ignore_collect(collection_path: Path, config) -> bool | None:
 def pytest_collection_modifyitems(session, config, items) -> None:
     """按冻结节点保留原有集合，不用新增测试充数。@param session 会话。@param config 配置。@param items 节点。@return None。"""
     state = _state()
+    # 上游两项用当前时间生成参数ID；按冻结位置命名，实际参数和值仍原样执行并另存证据。
+    identities = []
+    for prefix, parameter, positions in state['control'].get('parameter_ids', []):
+        for item in items:
+            if item.nodeid.split('[', 1)[0] != prefix:
+                continue
+            callspec = item.callspec
+            position = callspec.indices[parameter]
+            if position not in positions:
+                continue
+            original = item.nodeid
+            item._nodeid = prefix + '[' + parameter + '-case-' + str(position) + ']'
+            identities.append({'id': item.nodeid, 'original_id': original,
+                'parameter': parameter, 'position': position, 'value': callspec.params[parameter]})
+    if identities:
+        state['parameter_identities'] = identities
+    if state['control'].get('duplicate_ids'):
+        originals = [(item, item.nodeid) for item in items]
+        frequencies, occurrences = Counter(nodeid for _, nodeid in originals), Counter()
+        duplicates = []
+        for item, original in originals:
+            if frequencies[original] < 2:
+                continue
+            occurrences[original] += 1
+            item._nodeid = original + '[occurrence-' + str(occurrences[original]) + ']'
+            duplicates.append({'id': item.nodeid, 'original_id': original,
+                'occurrence': occurrences[original], 'kind': type(item).__name__,
+                'path': str(item.path.relative_to(Path(state['control']['project']))),
+                'parent': item.parent.nodeid})
+        state['duplicate_identities'] = duplicates
     required = state['control']['required_nodes']
     if required:
         selected = [item for item in items if item.nodeid in required]
@@ -772,6 +959,31 @@ def _nose2_worker(control_path: Path) -> int:
     return state['exit_code']
 
 
+def _simplejson_mode(project: Path, mode: str) -> bool:
+    """核官方双轮入口的真实加速器接线，不能用构建变量代替加载证明。
+
+    :param project: 本次受控并已编译的候选树。
+    :param mode: 官方suite的c或python上下文。
+    :return: 编码、扫描与解码路径是否均符合当前轮次。
+    """
+    from simplejson import decoder, encoder, scanner
+    from simplejson._speedups import make_encoder, make_scanner
+
+    extension = importlib.import_module('simplejson._speedups')
+    origin = Path(extension.__file__).resolve()
+    suffix = sysconfig.get_config_var('EXT_SUFFIX')
+    if (not origin.is_relative_to(project.resolve()) or not origin.is_file()
+            or not isinstance(suffix, str) or origin.name != '_speedups' + suffix):
+        raise ValueError('Simplejson扩展来源或当前解释器的二进制后缀不符')
+    if mode == 'c':
+        return (encoder.c_make_encoder is make_encoder and scanner.c_make_scanner is make_scanner
+            and scanner.make_scanner is make_scanner and decoder.scanstring is decoder.c_scanstring)
+    if mode == 'python':
+        return (encoder.c_make_encoder is None and scanner.make_scanner is scanner.py_make_scanner
+            and decoder.scanstring is decoder.py_scanstring)
+    raise ValueError('未知Simplejson原生执行模式')
+
+
 def _unittest_worker(control_path: Path) -> int:
     """沿上游unittest发现入口执行真实用例，保留逐项结果和导入来源。
 
@@ -783,25 +995,49 @@ def _unittest_worker(control_path: Path) -> int:
     control = state['control']
     try:
         pytest_sessionstart(None)
-        suite = unittest.defaultTestLoader.discover(control['discover'])
+        identities = {}
+        official_entry = control.get('unittest_entry')
 
-        def collect(tests) -> None:
-            """在运行消耗suite前冻结真实节点。@param tests 原生套件。@return None。"""
+        def collect(tests, mode: str = 'c') -> None:
+            """记录真实suite上下文，保留双轮中相同原始ID。@param tests 原生套件。@param mode 当前轮次。@return None。"""
+            if (official_entry and type(tests).__module__ == control['package'] + '.tests'
+                    and type(tests).__name__ == 'NoExtensionTestSuite'):
+                mode = 'python'
             for test in tests:
                 if isinstance(test, unittest.TestSuite):
-                    collect(test)
+                    collect(test, mode)
                 else:
-                    state['collection'].append({'id': test.id(), 'kind': 'UnittestCase'})
+                    identifier = mode + '::' + test.id() if official_entry else test.id()
+                    if id(test) in identities:
+                        raise ValueError('同一原生用例对象不能被重复注册')
+                    identities[id(test)] = identifier
+                    row = {'id': identifier, 'kind': 'UnittestCase'}
+                    if official_entry:
+                        row.update(raw_id=test.id(), mode=mode)
+                    state['collection'].append(row)
 
-        collect(suite)
+        def node_id(test) -> str:
+            """以实际对象映射当前轮次，不按重复原始ID猜测。@param test 当前用例。@return 冻结身份。"""
+            return identities.get(id(test), 'unmapped::' + test.id()) if official_entry else test.id()
 
         class RecordingResult(unittest.TextTestResult):
             """保留原生TextTestResult行为，并把实际回调写成统一逐节点报告。"""
 
             def _record(self, test, outcome: str, reason: str = '', wasxfail: bool = False) -> None:
                 """记录原生结果。@param test 原用例。@param outcome 结果。@param reason 原因。@param wasxfail 预期失败。@return None。"""
-                state['reports'].append({'id': test.id(), 'when': 'call', 'outcome': outcome,
+                state['reports'].append({'id': node_id(test), 'when': 'call', 'outcome': outcome,
                     'wasxfail': wasxfail, 'reason': reason[-2048:]})
+
+            def startTest(self, test) -> None:
+                """每例开始时核官方切换后的实际路径。@param test 当前原生用例。@return None。"""
+                super().startTest(test)
+                if official_entry:
+                    mode = node_id(test).split('::', 1)[0]
+                    checks = state.setdefault('mode_checks', {}).setdefault(mode, {'started': 0, 'failed': []})
+                    checks['started'] += 1
+                    if not _simplejson_mode(Path(control['project']), mode):
+                        checks['failed'].append(node_id(test))
+                        state['errors'].append('native_mode_wiring:' + node_id(test))
 
             def addSuccess(self, test) -> None:
                 """记录真实通过。@param test 原用例。@return None。"""
@@ -850,10 +1086,50 @@ def _unittest_worker(control_path: Path) -> int:
                 root = control['project']
                 context = {'msg': None if subtest._message is _subtest_msg_sentinel else str(subtest._message).replace(root, '$PROJECT'),
                     'kwargs': {key: repr(value).replace(root, '$PROJECT') for key, value in subtest.params.items()}}
-                state['reports'].append({'id': test.id(), 'when': 'call', 'outcome': outcome,
+                state['reports'].append({'id': node_id(test), 'when': 'call', 'outcome': outcome,
                     'wasxfail': False, 'reason': reason[-2048:], 'subtest_context': context})
 
-        result = unittest.TextTestRunner(verbosity=2, resultclass=RecordingResult).run(suite)
+        if official_entry:
+            # 调用上游官方main，保留NoExtensionTestSuite的真实切换及index.rst，观察器只换结果记录类。
+            if not _simplejson_mode(Path(control['project']), 'c'):
+                raise ValueError('官方入口开始前C扩展接线不完整')
+            original_runner, original_arguments = unittest.TextTestRunner, sys.argv
+            results = []
+
+            class RecordingRunner(original_runner):
+                """在上游runner消费suite前取证，继承其全部运行行为。"""
+
+                def __init__(self, *args, **kwargs):
+                    """保留上游参数并记录真实结果。@param args 上游位置参数。@param kwargs 上游关键字参数。@return None。"""
+                    kwargs['resultclass'] = RecordingResult
+                    super().__init__(*args, **kwargs)
+
+                def run(self, suite):
+                    """执行官方构造的完整两轮suite。@param suite 上游集合。@return 原生运行结果。"""
+                    collect(suite)
+                    result = super().run(suite)
+                    results.append(result)
+                    return result
+
+            try:
+                unittest.TextTestRunner = RecordingRunner
+                sys.argv = [official_entry, control['project']]
+                try:
+                    runpy.run_module(official_entry, run_name='__main__', alter_sys=True)
+                except SystemExit as error:
+                    if error.code not in (None, 0):
+                        state['errors'].append('official_unittest_exit:' + str(error.code))
+            finally:
+                unittest.TextTestRunner, sys.argv = original_runner, original_arguments
+            if len(results) != 1 or {row.get('mode') for row in state['collection']} != {'c', 'python'}:
+                raise ValueError('官方原生入口没有完整执行C和纯Python两轮')
+            result = results[0]
+            if not _simplejson_mode(Path(control['project']), 'c'):
+                state['errors'].append('official_unittest_restore_wiring')
+        else:
+            suite = unittest.defaultTestLoader.discover(control['discover'])
+            collect(suite)
+            result = unittest.TextTestRunner(verbosity=2, resultclass=RecordingResult).run(suite)
         nodes = [item['id'] for item in state['collection']]
         if any(report['id'] not in nodes for report in state['reports']):
             state['errors'].append('unmapped_unittest_fixture_result')
@@ -992,6 +1268,89 @@ def _fixture_aliases(baseline: Path, project: Path, suite: dict) -> list[dict]:
     return result
 
 
+def _build_native_extension(project: Path, suite: dict, environment: dict, evidence: Path, timeout: int) -> dict:
+    """从实际候选源码强制构建固定扩展，不复用安装包或候选预编译文件。
+
+    :param project: 冻结控制与候选实现组合的私有树。
+    :param suite: 已审核的固定套件。
+    :param environment: 本次独占venv的受控环境。
+    :param evidence: 不覆盖的证据目录。
+    :param timeout: 计入原生总时限的剩余秒数。
+    :return: 构建命令、源码和实际扩展的摘要。
+    """
+    if suite['package'] != 'simplejson' or not project.resolve().is_relative_to(_WORK_ROOT.resolve()):
+        raise ValueError('原生扩展仅允许已审核套件及现有/work可执行临时树')
+    command = [sys.executable, 'setup.py', 'build_ext', '--inplace', '--force']
+    started = time.monotonic()
+    with (evidence / 'build-stdout.log').open('wb') as out, (evidence / 'build-stderr.log').open('wb') as err:
+        process = subprocess.Popen(command, cwd=project,
+            env={**environment, 'REQUIRE_SPEEDUPS': '1', 'DISABLE_SPEEDUPS': '0'},
+            stdout=out, stderr=err, start_new_session=True)
+        try:
+            returncode = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait(timeout=10)
+            raise RuntimeError('实际候选C扩展构建超时')
+    if returncode != 0:
+        raise RuntimeError('实际候选C扩展构建失败：' + _tail(evidence / 'build-stderr.log', 2048))
+    suffix = sysconfig.get_config_var('EXT_SUFFIX')
+    if not isinstance(suffix, str) or not suffix or '/' in suffix:
+        raise ValueError('当前解释器扩展后缀无效')
+    extension = project / 'simplejson' / ('_speedups' + suffix)
+    if not extension.is_file() or extension.is_symlink():
+        raise ValueError('实际候选扩展构建未生成匹配当前解释器的文件')
+    inputs = ['setup.py', 'simplejson/_speedups.c', 'simplejson/_speedups_scan.h']
+    return {'command': command, 'returncode': returncode, 'elapsed_sec': time.monotonic() - started,
+        'inputs': {name: hashlib.sha256((project / name).read_bytes()).hexdigest() for name in inputs},
+        'extension': str(extension.relative_to(project)),
+        'extension_sha256': hashlib.sha256(extension.read_bytes()).hexdigest(),
+        'implementation_installed': False, 'force_rebuilt_from_candidate': True}
+
+
+def _system_libraries(specification: tuple[str, str]) -> list[dict]:
+    """核固定离线共享库原件，仅供本次子进程动态加载。
+
+    :param specification: 私有runner冻结的清单路径与SHA。
+    :return: 已核共享库路径和SHA，不写系统目录或替换目标镜像。
+    """
+    relative, checksum = specification
+
+    def checked(name: str, expected: str) -> tuple[Path, bytes]:
+        """核本次只读制品路径及摘要。@param name 路径。@param expected SHA。@return 文件及字节。"""
+        path = Path(name)
+        if (path.is_absolute() or '..' in path.parts or path.parts[:2] != ('artifacts', 'tk-libs')
+                or len(path.parts) != 3 or not re.fullmatch(r'[0-9a-f]{64}', expected)):
+            raise ValueError('离线系统库路径或摘要无效')
+        source = _OFFLINE_ROOT / path
+        if (source.is_symlink() or not source.is_file()
+                or any((_OFFLINE_ROOT / Path(*path.parts[:index])).is_symlink() for index in (1, 2))
+                or not source.resolve().is_relative_to(_OFFLINE_ROOT.resolve())):
+            raise ValueError('离线系统库缺失或沿链接越界')
+        contents = source.read_bytes()
+        if hashlib.sha256(contents).hexdigest() != expected:
+            raise ValueError('离线系统库摘要不符')
+        return source, contents
+
+    _, contents = checked(relative, checksum)
+    manifest = json.loads(contents)
+    if (not isinstance(manifest, dict) or manifest.get('schema') != 1
+            or not isinstance(manifest.get('libraries'), list) or not manifest['libraries']):
+        raise ValueError('离线系统库清单无效')
+    result, seen = [], set()
+    for item in manifest['libraries']:
+        source, _ = checked(item['path'], item['sha256'])
+        if (not re.fullmatch(r'lib[A-Za-z0-9_.+-]+\.so(?:\.[0-9]+)*', source.name)
+                or source.name in seen):
+            raise ValueError('离线系统库名称重复或无效')
+        seen.add(source.name)
+        result.append({'path': str(source), 'artifact': item['path'], 'sha256': item['sha256']})
+    return result
+
+
 def _run(options) -> dict:
     """构建并执行可信测试树。@param options 已验证命令参数。@return 最终报告。"""
     suite = SUITES[options.project]
@@ -1009,6 +1368,10 @@ def _run(options) -> dict:
         raise RuntimeError('原生回归环境已变，必须先校准同平台原版 contract')
     if framework in ('unittest', 'nose2') and contract is not None and contract.get('framework') != framework:
         raise ValueError('原生框架必须使用同入口校准的冻结合同')
+    if suite.get('unittest_entry') and contract is not None and contract.get('unittest_entry') != suite['unittest_entry']:
+        raise ValueError('官方原生入口必须使用同完整入口校准的冻结合同')
+    if suite.get('unittest_entry') and contract is not None and not contract.get('unittest_contexts'):
+        raise ValueError('官方双轮入口的冻结合同缺少原始身份与模式上下文')
     if suite.get('supplementary') and contract is not None and not contract.get('supplementary'):
         raise ValueError('冻结合同缺少上游补充原生入口')
     if suite.get('collection_skips') and contract is not None and 'collection_skips' not in contract:
@@ -1019,7 +1382,8 @@ def _run(options) -> dict:
     if evidence.exists() and any(evidence.iterdir()):
         raise ValueError('回归证据目录非空，拒绝覆盖原始当轮')
     evidence.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='bench-native-regression-') as directory, ExitStack() as runtime_cleanup:
+    with tempfile.TemporaryDirectory(prefix='bench-native-regression-',
+            dir=_WORK_ROOT if suite.get('build_ext') else None) as directory, ExitStack() as runtime_cleanup:
         scratch = Path(directory)
         project, control_root = scratch / 'project', scratch / 'control'
         control_root.mkdir()
@@ -1040,13 +1404,20 @@ def _run(options) -> dict:
         if suite.get('subtests'):
             control['subtests'] = True
         if framework == 'unittest':
-            control['discover'] = suite['discover']
+            if suite.get('unittest_entry'):
+                control['unittest_entry'] = suite['unittest_entry']
+            else:
+                control['discover'] = suite['discover']
         if framework == 'nose2':
             control['nose2_args'] = suite['args']
         if suite.get('supplementary'):
             control['supplementary'] = suite['supplementary']
         if suite.get('collection_skips'):
             control['collection_skips'] = True
+        if suite.get('parameter_ids'):
+            control['parameter_ids'] = suite['parameter_ids']
+        if suite.get('duplicate_ids'):
+            control['duplicate_ids'] = True
         control_path = control_root / 'control.json'
         _save(control_path, control)
         shutil.copyfile(Path(__file__), control_root / '_bench_native_regression_control.py')
@@ -1055,18 +1426,33 @@ def _run(options) -> dict:
         source_binding = {'mode': 'controlled-pythonpath'}
         if options.project in ('typer', 'python-dotenv') or suite.get('distribution'):
             project_metadata = (tomllib.loads((baseline / 'pyproject.toml').read_text(encoding='utf-8'))['project']
-                if suite.get('entry_points') or suite.get('license_expression') else {})
-            entry_points = project_metadata['entry-points'] if suite.get('entry_points') else None
+                if any(suite.get(key) is True for key in ('entry_points', 'license_expression', 'project_urls', 'console_scripts', 'metadata_fields')) else {})
+            entry_points = (suite['entry_points'] if isinstance(suite.get('entry_points'), dict)
+                else project_metadata['entry-points'] if suite.get('entry_points') else None)
+            metadata_fields = ({'Summary': project_metadata['description'],
+                'Author-email': ', '.join(person['name'] + ' <' + person['email'] + '>'
+                    for person in project_metadata['authors'])} if suite.get('metadata_fields') else None)
             source_binding = _bind_source(project, import_root, runtime_cleanup,
                 console=options.project == 'python-dotenv', distribution=suite.get('distribution'),
                 executables=suite.get('executables'), entry_points=entry_points,
-                license_expression=project_metadata['license'] if suite.get('license_expression') else None)
+                license_expression=project_metadata['license'] if suite.get('license_expression') else None,
+                project_urls=project_metadata['urls'] if suite.get('project_urls') else None,
+                console_scripts=(suite['console_scripts'] if isinstance(suite.get('console_scripts'), dict)
+                    else project_metadata['scripts'] if suite.get('console_scripts') else None),
+                metadata_fields=metadata_fields)
         environment = dict(os.environ)
         for key in ['PYTEST_ADDOPTS', 'PYTEST_PLUGINS', 'PYTHONPATH', 'PYTHONHOME', 'PYTHONSTARTUP']:
             environment.pop(key, None)
         environment.update(PYTEST_DISABLE_PLUGIN_AUTOLOAD='1', PYTHONDONTWRITEBYTECODE='1',
             PYTHONNOUSERSITE='1', PYTHONPATH=os.pathsep.join([str(control_root), str(project / import_root)]),
             HOME=str(home), XDG_CONFIG_HOME=str(home / '.config'), BENCH_NATIVE_CONTROL=str(control_path), **suite['env'])
+        if suite.get('system_libraries'):
+            libraries = _system_libraries(suite['system_libraries'])
+            environment['LD_LIBRARY_PATH'] = str(_OFFLINE_ROOT / 'artifacts/tk-libs')
+            source_binding['system_libraries'] = libraries
+        started = time.monotonic()
+        build = (_build_native_extension(project, suite, environment, evidence, options.timeout_sec)
+            if suite.get('build_ext') else None)
         if framework in ('unittest', 'nose2'):
             argv = [sys.executable, str(control_root / '_bench_native_regression_control.py'),
                 '--' + framework + '-worker', str(control_path)]
@@ -1079,13 +1465,12 @@ def _run(options) -> dict:
         execution_argv = (['bash', '-c', '"$@"; result=$?; exit "$result"', 'bench-native', *argv]
             if options.project == 'typer' else argv)
         stdout, stderr = evidence / 'stdout.log', evidence / 'stderr.log'
-        started = time.monotonic()
         timed_out = False
         with stdout.open('wb') as out, stderr.open('wb') as err:
             try:
                 process = subprocess.Popen(execution_argv, cwd=working_directory, env=environment, stdout=out, stderr=err,
                     start_new_session=True)
-                returncode = process.wait(timeout=options.timeout_sec)
+                returncode = process.wait(timeout=max(0.001, options.timeout_sec - (time.monotonic() - started)))
             except subprocess.TimeoutExpired:
                 # 只终止本次创建的 pytest 进程组，避免 xdist worker 留在证据目录继续写入。
                 try:
@@ -1138,23 +1523,33 @@ def _run(options) -> dict:
         collection_skips = sorted(workers[0].get('collection_skips', []), key=lambda item: item['id']) if suite.get('collection_skips') else []
         if suite.get('collection_skips'):
             consistent = consistent and all(sorted(state.get('collection_skips', []), key=lambda item: item['id']) == collection_skips for state in workers)
+            allowed_directories = suite.get('collection_skip_directories', [])
             consistent = (consistent and len({item['id'] for item in collection_skips}) == len(collection_skips)
-                and all(item['id'].split('::')[0] in baseline_files and item['id'] not in node_ids for item in collection_skips))
+                and all((item['id'].split('::')[0] in baseline_files
+                    or item['id'] in allowed_directories and item['id'] + '/conftest.py' in baseline_files)
+                    and item['id'] not in node_ids for item in collection_skips))
         xml = ET.parse(evidence / 'junit.xml').getroot() if (evidence / 'junit.xml').is_file() else None
         xml_cases = len(list(xml.iter('testcase'))) if xml is not None else 0
         xml_bad = len(list(xml.iter('failure'))) + len(list(xml.iter('error'))) if xml is not None else 1
         xml_skipped = len(list(xml.iter('skipped'))) if xml is not None else 0
-        nodes = [{**item, 'outcome': outcomes[item['id']]} for item in collection]
+        # 内容schema要求节点恰为三个字段；模式和原始ID另存，不能扩张既有节点合同。
+        nodes = [{'id': item['id'], 'kind': item['kind'], 'outcome': outcomes[item['id']]} for item in collection]
         subtests = _subtest_results(reports, node_ids) if suite.get('subtests') else None
         collection_errors = [error for state in states for error in state['errors']]
         # 新套件在当前镜像校准真实集合，候选随后必须逐节点匹配；不把历史数量写成准入结果。
         expected_counts = {name: suite[name] for name in ['passed', 'skipped', 'xfailed'] if name in suite}
+        # 上游非strict xfail可能在固定原版已通过；只保留逐名核实的原身份，候选不得增加或改变。
+        original_xpasses = suite.get('original_xpassed_nodes', [])
+        xpasses_match = (len(original_xpasses) == len(set(original_xpasses))
+            and {node for node, outcome in outcomes.items() if outcome == 'xpassed'} == set(original_xpasses))
         valid = (returncode == 0 and not timed_out and consistent and not collection_errors and xml_bad == 0
             and 0 < len(node_ids) == len(set(node_ids)) == suite.get('total', len(node_ids))
             and xml_cases == len(node_ids) + len(collection_skips)
             and xml_skipped == counts['skipped'] + counts['xfailed'] + len(collection_skips)
-            and len(doctests) == suite.get('doctests', len(doctests)) and all(outcomes[node] == 'passed' for node in doctests)
-            and not any(counts[key] for key in ['failed', 'error', 'xpassed', 'unexecuted'])
+            and len(doctests) == suite.get('doctests', len(doctests))
+            and all(outcomes[node] == 'passed' or outcomes[node] == 'skipped' and node in suite.get('skipped_doctests', [])
+                for node in doctests)
+            and not any(counts[key] for key in ['failed', 'error', 'unexecuted']) and xpasses_match
             and all(counts[key] == value for key, value in expected_counts.items()))
         if options.project == 'typer':
             parent_executable = master['process']['parent_executable'] if master else None
@@ -1170,8 +1565,20 @@ def _run(options) -> dict:
         if framework in ('unittest', 'nose2'):
             skips = [{'id': report['id'], 'reason': report['reason']}
                 for report in reports if report['outcome'] == 'skipped']
+            if suite.get('unittest_entry'):
+                # 官方工厂按文件系统顺序构造两轮，跳过表按身份规范化，不改变执行或丢弃条目。
+                skips.sort(key=lambda item: item['id'])
             frozen.update(framework=framework, unittest_skips=skips)
             valid = valid and (contract is None or skips == contract.get('unittest_skips'))
+        if suite.get('unittest_entry'):
+            frozen['unittest_entry'] = suite['unittest_entry']
+            frozen['unittest_contexts'] = [{'id': item['id'], 'raw_id': item['raw_id'], 'mode': item['mode']}
+                for item in collection]
+            mode_checks = {state['worker']: state.get('mode_checks', {}) for state in states}
+            valid = (valid and bool(mode_checks) and all(set(checks) == {'c', 'python'}
+                and all(item['started'] > 0 and not item['failed'] for item in checks.values())
+                for checks in mode_checks.values())
+                and (contract is None or frozen['unittest_contexts'] == contract.get('unittest_contexts')))
         if suite.get('supplementary'):
             frozen['supplementary'] = [{'entry': item['entry'], 'examples': item['examples']} for item in supplements]
             valid = (valid and all(item['status'] == 'passed' and item['examples'] for item in supplements)
@@ -1179,6 +1586,12 @@ def _run(options) -> dict:
         if suite.get('collection_skips'):
             frozen['collection_skips'] = collection_skips
             valid = valid and (contract is None or collection_skips == contract.get('collection_skips'))
+        if suite.get('duplicate_ids'):
+            duplicate_identities = workers[0].get('duplicate_identities', [])
+            frozen['duplicate_identities'] = duplicate_identities
+            valid = (valid and bool(duplicate_identities)
+                and all(state.get('duplicate_identities') == duplicate_identities for state in workers)
+                and (contract is None or duplicate_identities == contract.get('duplicate_identities')))
         if subtests is not None:
             frozen['subtests'] = subtests
         if options.freeze_baseline_contract and valid:
@@ -1191,7 +1604,8 @@ def _run(options) -> dict:
             'cwd': str(working_directory), 'returncode': returncode,
             'elapsed_sec': time.monotonic() - started, 'timed_out': timed_out, 'counts': counts,
             'collected': len(node_ids), 'strict_doctest_count': len(doctests),
-            'collection_digest': _digest(collection), 'result_digest': _digest(nodes),
+            'collection_digest': _digest([{'id': item['id'], 'kind': item['kind']} for item in collection]),
+            'result_digest': _digest(nodes),
             'collection_matches_contract': nodes == contract['nodes'] if contract else None,
             'worker_collections_consistent': consistent, 'collection_errors': collection_errors,
             'xml_testcases': xml_cases, 'xml_failures_and_errors': xml_bad, 'xml_skipped': xml_skipped, 'overlay': overlay,
@@ -1215,6 +1629,19 @@ def _run(options) -> dict:
                 collection_skips_match_contract=collection_skips == contract['collection_skips'] if contract else None)
         if aliases:
             report['fixture_aliases'] = aliases
+        if suite.get('parameter_ids'):
+            report['parameter_identities'] = {state['worker']: state.get('parameter_identities', []) for state in states}
+        if suite.get('duplicate_ids'):
+            report.update(duplicate_identities=duplicate_identities,
+                duplicate_execution_count=len(duplicate_identities),
+                doctest_counts={name: sum(outcomes[node] == name for node in doctests)
+                    for name in ['passed', 'skipped', 'xfailed', 'failed', 'unexecuted']})
+        if build is not None:
+            report['native_build'] = build
+        if suite.get('unittest_entry'):
+            report.update(unittest_entry=suite['unittest_entry'], native_mode_checks=mode_checks,
+                unittest_contexts_match_contract=(frozen['unittest_contexts'] == contract['unittest_contexts']
+                    if contract else None))
         _save(evidence / 'summary.json', report)
         return report
 

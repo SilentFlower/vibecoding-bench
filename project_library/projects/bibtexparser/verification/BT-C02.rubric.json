@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-C02",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default writing copies through the default unparse stack and leaves titleOriginal unchanged. Explicit all-inplace default stack emits equivalent text but mutates the original title to{Original}. Choose ownership and reuse deliberately; do not promise universal nonmutation for arbitrary custom middleware or treat inplace as a transparent performance flag.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

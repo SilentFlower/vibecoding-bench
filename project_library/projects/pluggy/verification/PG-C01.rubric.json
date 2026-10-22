@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PG-C01",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "firstresult stops on False and integer0 and returns each unchanged. Only None permits fallback,which runs once for the None control. A plugin must returnNone for no decision; Python falsiness is not the protocol stop condition.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SL-U01",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "bind creates a new top-level context,child component does not enterbase,and per-call batch overrides output without rebinding either context. Context copies are shallow: the nested supplied payload remains shared,including captured values. Define immutable/copied event payload ownership instead of promising deep snapshots.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+For SELECT p.name AS display FROM people p;,inspect the top-level Identifier values get_real_name,get_parent_name,get_alias and get_name. A report wants physical source-column lineage. Advise which facts are lexical and which require scope/schema/dialect-aware resolution; do not equate output alias with physical column identity. No implementation or database access.

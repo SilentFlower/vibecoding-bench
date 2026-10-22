@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AT-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "factory_separates_defaults_but_explicit_mutable_inputs_remain_shared": true
+  },
+  "resource_profile": "business"
+}

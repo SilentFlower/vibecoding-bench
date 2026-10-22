@@ -1,0 +1,1 @@
+For Order, compare load({},partial=True),load({qty:3},partial=("sku",)),load({qty:null},partial=True),load({qty:-1},partial=True),and load({qty:3},partial=("qty",)). Explain missing versus present invalid fields and application-owned PATCH merge/complete-state validation. partial is not an unconditional bypass and no database write is authorized.

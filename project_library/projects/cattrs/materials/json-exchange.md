@@ -1,0 +1,1 @@
+Exchange is an attrs class containing list[Product],awareUTC created=datetime(2026,4,3,10,1,2),and attachment=b"hello". Use cattrs.preconf.json.make_converter().dumps/loads and inspect parsedJSON. The other service needs a documented binary/date wire format and roundtrip. Explain currentISO8601 andbase85 hooks,not assumedUTF8 orbase64; no new serializer or library changes.

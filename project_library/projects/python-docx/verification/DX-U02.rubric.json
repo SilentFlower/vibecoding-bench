@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DX-U02",
+  "source_commit": "e45454602b53e8e572b179ccf1c91093ec9f4ed7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "paragraphs returnsA,B and tables returns the single table; iter_inner_content preserves ParagraphA,TableT,ParagraphB order. Use this current top-level iterator and explicitly plan recursion/revision scope separately; do not zip unrelated lists or promise all content containers are included.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

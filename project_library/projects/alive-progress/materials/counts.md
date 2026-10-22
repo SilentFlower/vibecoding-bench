@@ -1,0 +1,1 @@
+A local migration has total=5. The caller reports two completed items with bar(2), then one skipped item with bar(1, skipped=True). Explain position versus processed work used for rate. Inspect the supplied implementation; processed is internal, not a promised public handle attribute. No code changes are authorized.

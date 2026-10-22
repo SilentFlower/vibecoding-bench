@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AN-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "same_name_siblings_are_ambiguous_and_get_selects_the_first_child": true
+  },
+  "resource_profile": "business"
+}

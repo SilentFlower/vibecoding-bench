@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SJ-U01",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ordinary loads produces a float; explicit use_decimalTrue produces Decimal1.2300 and retains its exponent through local Decimal serialization/reparse. The encoded value is numeric, not an automatic currency schema or universal cross-consumer scale guarantee. Define rounding, units and consumer numeric policy separately.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-D01",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "With complete evidence both classes share requiredx and have no literal/unique-key discriminator,so automatic selection is ambiguous despite different coercible value annotations. Choose an explicit compatible tag using existingconfigure_tagged_union or a deliberate caller hook; do not guess a class by arbitrary trial or modify cattrs. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

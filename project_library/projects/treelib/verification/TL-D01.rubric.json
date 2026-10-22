@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TL-D01",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The disclosed destination ID already exists. update_node overwrites its index and rewrites the old ID to the same destination in parent pointers,leaving a lost indexed object and duplicate pointers. Prevalidate unique IDs and retain evidence;reconstruct a consistent tree from a trusted snapshot rather than assume rollback or delete arbitrary pointers. No patch. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

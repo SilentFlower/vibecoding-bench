@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DT-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "between_endpoint_inclusion_is_explicit_and_count_is_not_an_output_limit": true
+  },
+  "resource_profile": "business"
+}

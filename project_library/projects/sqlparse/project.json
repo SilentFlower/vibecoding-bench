@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "sqlparse",
+  "title": "sqlparse脚本文本工作场景",
+  "category": "文本边界、来源与文件保真",
+  "description": "脚本切分、非验证分类、标识来源、独立词法、文件保护和参数诊断六项只读任务。",
+  "seed_digest": "d37122bccc79465b5b8dc580995fa4ffcb267bf4cbba047b5a302d45a8c63ec6",
+  "environment": "sqlparse-py312",
+  "source": {
+    "repository": "https://github.com/andialbrecht/sqlparse",
+    "commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SP-S01",
+      "title": "脚本边界与语法边界",
+      "goal": "明确文本解析的实际保证",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SP-U01",
+            "SP-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SP-U01",
+          "kind": "understand",
+          "goal": "保留脚本字面量与真实语句边界",
+          "prompt": "Explain both complete splitting controls without execution or edits.",
+          "requires": [],
+          "materials": [
+            "materials/split.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SP-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/SP-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SP-U02",
+          "kind": "understand",
+          "goal": "区分SQL分类与语法验收",
+          "prompt": "Explain successful parse/type/format results and their limits. No execution or edits.",
+          "requires": [],
+          "materials": [
+            "materials/validation.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SP-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/SP-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SP-S02",
+      "title": "来源与词法扩展",
+      "goal": "明确局部语义及集成范围",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SP-C01",
+            "SP-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SP-C01",
+          "kind": "consult",
+          "goal": "明确输出别名与真实来源解析的差别",
+          "prompt": "Advise lineage boundaries from the complete identifier controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/identifiers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SP-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/SP-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "SP-C02",
+          "kind": "consult",
+          "goal": "采用现有独立词法器并明确集成范围",
+          "prompt": "Advise scoped token configuration from both private/default controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/lexer.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SP-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/SP-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SP-S03",
+      "title": "本地文件交付",
+      "goal": "格式化失败保留原件",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SP-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SP-P01",
+          "kind": "plan",
+          "goal": "规划格式化失败时的原文件保护",
+          "prompt": "Plan complete local validation/output publication from the synthetic file control. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/file-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SP-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/SP-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "SP-S04",
+      "title": "参数诊断",
+      "goal": "取得真实argv与解析结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "SP-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "SP-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SP-D01",
+          "kind": "diagnose",
+          "goal": "先取完整参数再诊断布尔选项",
+          "prompt": "A CLI false option appears enabled. Request exact argv tokens,parser/CLI version,parsed options and output before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/SP-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "cli-argument-evidence",
+              "when": "The exact argv tokens,parser/CLI version,parsed options and output have not been supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/boolean.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

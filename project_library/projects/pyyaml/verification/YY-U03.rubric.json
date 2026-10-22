@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "YY-U03",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Reparsed values match but the comment disappears, sort_keysTrue reorders keys and the emitted presentation differs. PyYAML semantic serialization is not a source-preserving edit. Retain original text or deliberately choose a presentation-aware editing system, with review and validation; do not claim comments/quotes/order survive automatically.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AN-C02",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Importer copies the top-level mapping before removingchildren,but nested payload values remain referenced. Export creates structural dictionaries yet exported.payload,node.payload and source.payload share the same nested object; appendingB changes all. Choose suitable deep/immutable ownership or a documented serialization boundary; top-level copying alone is not an immutable snapshot.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

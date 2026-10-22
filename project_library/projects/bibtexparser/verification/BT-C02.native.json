@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "default_writing_preserves_input_while_explicit_all_inplace_stack_mutates_representation": true
+  },
+  "resource_profile": "business"
+}

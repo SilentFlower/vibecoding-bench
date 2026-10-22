@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "MM-M01",
+  "source_commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Date rejects datetime values with normal ValidationError, never converts/truncates them, while genuine date identity, date subclasses, valid strings/custom formats/None policy/schema error keys and DateTime remain supported. Only fields.py and app/test_date.py change; preserve original tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

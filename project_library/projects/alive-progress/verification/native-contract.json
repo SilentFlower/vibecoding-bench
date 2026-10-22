@@ -1,0 +1,2831 @@
+{
+  "baseline_digest": "b22be80b0dd2d3495d115c5d1508bca8330d0e243a2aeed1cc18a25ac4f582d3",
+  "nodes": [
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->---0.5-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->---0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--0.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--0.15-False-| >        |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--0.15-True-| >!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--0.5-False-|     >    |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--0.5-True-|     >!   |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--0.85-False-|        > |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--0.85-True-|        >!|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--1.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--1.0-True-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--1.5-False-|          x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->--1.5-True-|          x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123--0.5-False-|0123012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-0.0-False-|0123012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-0.15-False-|0>23012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-0.15-True-|0>!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-0.5-False-|01230>2301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-0.5-True-|01230>!   |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-0.85-False-|01230123>1|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-0.85-True-|01230123>!|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-1.0-False-|0123012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-1.0-True-|0123012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-1.5-False-|0123012301x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[->-0123-1.5-True-|0123012301x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>---0.5-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>---0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--0.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--0.15-False-|%>        |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--0.15-True-|%>!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--0.5-False-|   @#$%>  |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--0.5-True-|   @#$%>! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--0.85-False-|        @#|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--0.85-True-|        @#!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--1.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--1.0-True-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--1.5-False-|          x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[-@#$%>--1.5-True-|          x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=----0.5-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=----0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---0.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---0.15-False-|==        |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---0.15-True-|==!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---0.5-False-|=====     |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---0.5-True-|=====!    |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---0.85-False-|========  |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---0.85-True-|========! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=---1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.--0.5-False-|..........|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-0.0-False-|..........|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-0.15-False-|==........|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-0.15-True-|==!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-0.5-False-|=====.....|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-0.5-True-|=====!    |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-0.85-False-|========..|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-0.85-True-|========! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=--.-1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->---0.5-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->---0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--0.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--0.15-False-|=>        |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--0.15-True-|=>!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--0.5-False-|=====>    |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--0.5-True-|=====>!   |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--0.85-False-|========> |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--0.85-True-|========>!|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->--1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123--0.5-False-|0123012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-0.0-False-|0123012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-0.15-False-|=>23012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-0.15-True-|=>!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-0.5-False-|=====>2301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-0.5-True-|=====>!   |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-0.85-False-|========>1|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-0.85-True-|========>!|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=->-0123-1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>---0.5-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>---0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--0.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--0.15-False-|%>        |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--0.15-True-|%>!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--0.5-False-|===@#$%>  |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--0.5-True-|===@#$%>! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--0.85-False-|========@#|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--0.85-True-|========@#!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[=-@#$%>--1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=----0.5-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=----0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---0.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---0.15-False-|=_        |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---0.15-True-|=_!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---0.5-False-|=====     |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---0.5-True-|=====!    |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---0.85-False-|========- |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---0.85-True-|========-!|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=---1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.--0.5-False-|..........|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-0.0-False-|..........|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-0.15-False-|=_........|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-0.15-True-|=_!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-0.5-False-|=====.....|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-0.5-True-|=====!    |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-0.85-False-|========-.|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-0.85-True-|========-!|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=--.-1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->---0.5-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->---0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--0.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--0.15-False-|->        |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--0.15-True-|->!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--0.5-False-|====_>    |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--0.5-True-|====_>!   |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--0.85-False-|========_>|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--0.85-True-|========_>!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->--1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123--0.5-False-|0123012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-0.0-False-|0123012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-0.15-False-|->23012301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-0.15-True-|->!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-0.5-False-|====_>2301|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-0.5-True-|====_>!   |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-0.85-False-|========_>|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-0.85-True-|========_>!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=->-0123-1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>---0.5-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>---0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--0.0-False-|          |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--0.15-False-|$%>       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--0.15-True-|$%>!      |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--0.5-False-|==_@#$%>  |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--0.5-True-|==_@#$%>! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--0.85-False-|=======-@#|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--0.85-True-|=======-@#!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_draw[_-=-@#$%>--1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_error[params0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_error[params1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[--0.5-False-|0123456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-0.0-False-|0123456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-0.15-False-|%>23456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-0.15-True-|%>!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-0.5-False-|012@#$%>89|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-0.5-True-|012@#$%>! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-0.85-False-|01234567@#|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-0.85-True-|01234567@#!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-1.0-False-|0123456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-1.0-True-|0123456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-1.5-False-|0123456789x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[-1.5-True-|0123456789x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=--0.5-False-|0123456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-0.0-False-|0123456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-0.15-False-|%>23456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-0.15-True-|%>!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-0.5-False-|===@#$%>89|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-0.5-True-|===@#$%>! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-0.85-False-|========@#|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-0.85-True-|========@#!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[=-1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[\\U0001f63a--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[\\U0001f63a-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[\\U0001f63a-0.15-True-|%>!       |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[\\U0001f63a-0.5-True-| \\U0001f63aX@#$%>! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[\\U0001f63a-0.85-True-|\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aX@#!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[\\U0001f63a-1.0-True-|\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aX|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[\\U0001f63a-1.5-True-|\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aXx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=--0.5-False-|0123456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-0.0-False-|0123456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-0.15-False-|$%>3456789|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-0.15-True-|$%>!      |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-0.5-False-|==_@#$%>89|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-0.5-True-|==_@#$%>! |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-0.85-False-|=======-@#|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-0.85-True-|=======-@#!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-1.0-False-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-1.0-True-|==========|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-1.5-False-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-=-1.5-True-|==========x]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-\\U0001f63a--0.5-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-\\U0001f63a-0.0-True-|!         |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-\\U0001f63a-0.15-True-|$%>!      |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-\\U0001f63a-0.5-True-| _@#$%>!  |]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-\\U0001f63a-0.85-True-|\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aX@#!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-\\U0001f63a-1.0-True-|\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aX|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_bar_tip_background[_-\\U0001f63a-1.5-True-|\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aX\\U0001f63aXx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_unknown_bar[False-|1234567890|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_bars.py::test_unknown_bar[True-|aaaaaaaaaa|]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner[inputs0-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner[inputs1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner[inputs2-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner_custom[inputs0-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner_custom[inputs1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner_custom[inputs2-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner_with_pivot[inputs0-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner_with_pivot[inputs1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_alongside_spinner_with_pivot[inputs2-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[2-None-~-False-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[2-None-~-True-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[3-1-_-True-expected8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[3-None-+-False-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[3-None-+-True-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[4-None- -False-expected7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[4-None- -True-expected6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[5-2-_-False-expected9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[None-None-None-False-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_bouncing_spinner[None-None-None-True-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_delayed_spinner[3-1-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_delayed_spinner[4-2-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_frame_spinner[a\\nb-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_frame_spinner[abc-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_frame_spinner[frames2-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_frame_spinner[frames3-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_frame_spinner[frames4-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_frame_spinner[frames5-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[2-None-~-False-False-expected7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[2-None-~-False-True-expected6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[2-None-~-True-False-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[2-None-~-True-True-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[3-None-~-False-False-expected11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[3-None-~-False-True-expected10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[3-None-~-True-False-expected9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[3-None-~-True-True-expected8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[4-1-_-True-True-expected16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[4-2-_-True-False-expected17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[4-None- -False-False-expected15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[4-None- -False-True-expected14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[4-None- -True-False-expected13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[4-None- -True-True-expected12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[None-None- -False-False-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[None-None- -False-True-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[None-None- -True-False-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_scrolling_spinner[None-None- -True-True-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_sequential_spinner[inputs0-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_sequential_spinner[inputs1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_sequential_spinner[inputs2-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_sequential_spinner_no_intermix[inputs0-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_sequential_spinner_no_intermix[inputs1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_spinners.py::test_sequential_spinner_no_intermix[inputs2-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_extract_exactly_n_chars[-<>-<>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_extract_exactly_n_chars[None-<>-<>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_extract_exactly_n_chars[a-----a--]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_extract_exactly_n_chars[ab-!!!-ab!]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_extract_exactly_n_chars[ab-$$-ab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_extract_exactly_n_chars[abc-##-ab]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_overlay_sliding_window[1-contents0-4-False-0-expected_60]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_overlay_sliding_window[1-contents1-4-True-0-expected_61]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_overlay_sliding_window[2-contents2-2-False-0-expected_62]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_overlay_sliding_window[3-contents3-4-True-0-expected_63]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_overlay_sliding_window[4-contents4-6-False--2-expected_64]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_round_even[2-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_round_even[2.9-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_round_even[3-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_round_even[3.1-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_sliding_window_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_spinner_player",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_split_options[-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_split_options[None-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_split_options[ok-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_split_options[param3-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_split_options[param4-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_split_options[param5-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_spread_weighted[12-naturals3-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_spread_weighted[14-naturals2-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_spread_weighted[2-naturals0-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_spread_weighted[8-naturals1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[0-contents0-1-False-0-expected_60]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[0-contents1-1-True-0-expected_61]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[0-contents2-1-False--2-expected_62]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[0-contents3-1-True-1-expected_63]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[0-contents4-4-True-7-expected_64]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents10-1-False-0-expected_610]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents11-1-True-0-expected_611]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents12-1-False--2-expected_612]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents13-1-True-1-expected_613]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents14-4-True-7-expected_614]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents5-1-False-0-expected_65]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents6-1-True-0-expected_66]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents7-1-False--2-expected_67]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents8-1-True-1-expected_68]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/animations/test_utils.py::test_static_sliding_window[1-contents9-4-True-7-expected_69]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[-5.0--5.0-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[-5.0-0.0-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[-5.0-10.0-60.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[1000000000000000.0--5.0-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[1000000000000000.0-0.0-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[1000000000000000.0-1000000000000000.0-60.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[1000000000000000.0-2000000000000.0-expected10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[1e+30--5.0-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[1e+30-0.0-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[1e+30-1e+25-expected14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[1e+30-1e+30-60.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[20.0--5.0-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[20.0-0.0-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[20.0-20.0-60.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_calibrate[20.0-9.0-expected6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_custom[0.1-10.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_custom[1.0-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_custom[10.0-0.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_calibration.py::test_custom[600.0-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_bool_input_factory[-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_bool_input_factory[0-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_bool_input_factory[1-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_bool_input_factory[False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_bool_input_factory[None-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_bool_input_factory[True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_bool_input_factory[asd-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_creation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global[config_params9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_error[config_params_error9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_global_theme[config_params9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local[config_params9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_config_local_error[config_params_error9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[1.2345-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[None-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[any text-any text]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[param3-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[param5-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[text apple}}-text apple}}]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[text {kiwi} text-text {kiwi} text]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[text {mango} text-expected15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[text {{apple-text {{apple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[text {{text-text {{text]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[text {{text}}-text {{text}}]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[{kiwi}-{kiwi}]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_format_input_factory[{mango}-expected14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_int_input_factory[100-110--1-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_int_input_factory[100-110-100-100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_int_input_factory[100-110-110-110]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_int_input_factory[100-110-111-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_style_input_factory[artifact_super_cool_compiler_assembler_factory-artifact_super_cool_compiler_assembler_factory0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_style_input_factory[artifact_super_cool_compiler_assembler_factory-artifact_super_cool_compiler_assembler_factory1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_style_input_factory[name_1-artifact_super_cool_compiler_assembler_factory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_style_input_factory[name_2-artifact_super_cool_compiler_assembler_factory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_style_input_factory_error[artifact_super_cool_compiler_assembler_factory]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_style_input_factory_error[banana]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_configuration.py::test_style_input_factory_error[func_not_style]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_can_be_disabled",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_bytes_stdout[print_data0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_bytes_stdout[print_data1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_bytes_stdout[print_data2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_bytes_stdout[print_data3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_multiple_lines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_stdout[print_data0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_stdout[print_data1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_stdout[print_data2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_captures_stdout[print_data3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_do_clear_line_on_stdout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_do_not_flicker_screen_when_logging",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_hook_manager_flush",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_install",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_hook_manager.py::test_uninstall",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[False-False-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[False-False-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[False-False-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[False-False-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[False-True-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[False-True-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[False-True-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[False-True-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[True-False-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[True-False-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[True-False-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[True-False-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[True-True-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[True-True-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[True-True-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_bar[True-True-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_it[False-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_it[False-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_it[False-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_it[False-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_it[True-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_it[True-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_it[True-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress.py::test_progress_it[True-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_gated_properties",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-0--]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-0-None-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-0-c-c]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-0-cool bar title-cool bar title]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-1-- ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-1-None- ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-1-\\U0001f63a-\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-1-c-c]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-1-cool bar title-\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-14-cool bar title-cool bar title]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-15-cool bar title\\U0001f63a-cool bar title\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-16-cool bar title\\U0001f63a-cool bar title\\U0001f63a]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-16-cool bar title\\U0001f63a\\U0001f63a-cool bar title \\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-16-cool bar title\\U0001f63aa-cool bar title \\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-2-\\U0001f63a-\\U0001f63a]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-20-cool bar title-cool bar title      ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[None-5-cool bar title-cool\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[on config-0--]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[on config-0-None-on config]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[on config-0-cool bar title-cool bar title]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[on config-1-- ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/core/test_progress_util.py::test_render_title[on config-1-None-\\u2026]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_print_cells[fragments0-10-4-\\rok 1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_print_cells[fragments1-4-4-\\rok 1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_print_cells[fragments2-3-3-\\rok ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_print_cells[fragments3-3-3-\\rok1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_print_cells[fragments4-1-1-\\ro]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_print_cells[fragments5-3-1-\\rrog\\x1b[K\\n1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_print_cells[fragments6-3-3-\\rrog\\x1b[K\\n123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_print_cells_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_double[\\U0001f63a-\\U0001f63aX]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_double[\\U0001f63a\\U0001f63a-\\U0001f63aX\\U0001f63aX]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_double[\\U0001f63aok\\U0001f63a-\\U0001f63aXok\\U0001f63aX]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_double[ok-ok]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[ \\n -   ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[ \\r -   ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[None-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[\\n \\n-   ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[\\n- ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[\\nasd- asd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[\\nasd1\\n \\r \\nasd2\\r- asd1     asd2 ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[\\r \\n-   ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[\\r- ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[a text-a text]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[asd1 \\nasd2-asd1  asd2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[asd1 \\r\\nasd2-asd1  asd2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[asd1\\nasd2-asd1 asd2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_normal_chars[asd\\n-asd ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_wide_chars[\\U0001f63a \\n \\U0001f63a-\\U0001f63aX   \\U0001f63aX]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_wide_chars[\\U0001f63a-\\U0001f63aX]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_wide_chars[\\U0001f63a\\nasd-\\U0001f63aX asd]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_wide_chars[\\n \\U0001f63a\\n\\U0001f63a-  \\U0001f63aX \\U0001f63aX]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_wide_chars[\\n\\U0001f63a- \\U0001f63aX]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_wide_chars[\\nasd1\\U0001f63a\\n\\U0001f63a\\n\\n\\rasd2\\r- asd1\\U0001f63aX \\U0001f63aX asd2 ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_wide_chars[asd1\\rasd2\\U0001f63a-asd1 asd2\\U0001f63aX]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_cells.py::test_sanitize_text_wide_chars[asd\\U0001f63a\\n-asd\\U0001f63aX ]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_gen_simple_exponential_smoothing_eta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_simple_eta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[1.4-conf0-1s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[1.4-conf1-1.4s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[1.45-conf2-1.4s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[1.5-conf3-2s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[1.5-conf4-1.5s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[1.55-conf5-1.6s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[119.5-conf8-2:00]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[119.5-conf9-1:59.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[119.95-conf10-2:00.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[120.1-conf11-2:00]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[120.1-conf12-2:00.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[4000-conf13-1:06:40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[4000-conf14-1:06:40.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[61.4-conf6-1:01]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_elapsed_text[61.4-conf7-1:01.4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_eta_text[-0.1-?]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_eta_text[-1000.0-?]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_eta_text[0.0-~0s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/utils/test_timing.py::test_to_eta_text[10.0-~10s]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "alive-progress",
+  "python": "3.12.15",
+  "schema": 1
+}

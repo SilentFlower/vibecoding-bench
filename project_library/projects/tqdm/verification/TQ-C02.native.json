@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TQ-C02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "explicit_write_coordinates_display_but_is_not_disabled_with_the_bar": true
+  },
+  "resource_profile": "business"
+}

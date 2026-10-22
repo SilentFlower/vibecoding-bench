@@ -1,0 +1,269 @@
+{
+  "schema": 2,
+  "project_key": "attrs",
+  "title": "attrs数据对象工作场景",
+  "category": "输入、快照与公开导出",
+  "description": "转换、工厂归属、浅冻结、演化副本、嵌套脱敏、发布和定义阶段诊断七项只读任务。",
+  "seed_digest": "7ca0146f6e7a6ca478a29d8963632afa6e12b9a3e4d43c69e70a387e4f28b60f",
+  "environment": "attrs-py312",
+  "source": {
+    "repository": "https://github.com/python-attrs/attrs",
+    "commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "AT-S01",
+      "title": "输入与对象归属",
+      "goal": "核转换及容器身份",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AT-U01",
+            "AT-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AT-U01",
+          "kind": "understand",
+          "goal": "明确类型注解与运行时输入转换",
+          "prompt": "Trace the complete annotated and explicitly converted input controls; explain runtime guarantees without edits.",
+          "requires": [],
+          "materials": [
+            "materials/inputs.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/AT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AT-U02",
+          "kind": "understand",
+          "goal": "分清默认工厂与显式输入的对象归属",
+          "prompt": "Explain all complete default and explicit-input identity controls and a caller ownership policy. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/defaults.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/AT-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AT-S02",
+      "title": "快照和演化",
+      "goal": "明确冻结与副本的作用域",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AT-C01",
+            "AT-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AT-C01",
+          "kind": "consult",
+          "goal": "为不可变快照选择完整的数据表示",
+          "prompt": "Advise immutable publication from the complete nested-list and rebinding controls without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/frozen.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/AT-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "AT-C02",
+          "kind": "consult",
+          "goal": "在演化副本中保留明确的初始化语义",
+          "prompt": "Explain the supplied alias,identity and init=False controls and advise compatible copying. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/evolve.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AT-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/AT-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AT-S03",
+      "title": "公开导出",
+      "goal": "显式执行嵌套导出政策",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AT-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AT-C03",
+          "kind": "consult",
+          "goal": "让公开导出显式应用嵌套脱敏政策",
+          "prompt": "Meet the complete synthetic export requirement using current filters; no library changes.",
+          "requires": [],
+          "materials": [
+            "materials/export.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AT-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/AT-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AT-S04",
+      "title": "区间发布计划",
+      "goal": "验证完整值再发布",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AT-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AT-P01",
+          "kind": "plan",
+          "goal": "规划完整区间验证后的原子发布",
+          "prompt": "Plan publication using the complete mutation and replacement controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/publication.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AT-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/AT-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "AT-S05",
+      "title": "声明异常诊断",
+      "goal": "按精确类声明定位问题",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "AT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "AT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AT-D01",
+          "kind": "diagnose",
+          "goal": "先取得类声明再定位定义阶段异常",
+          "prompt": "A model declaration raises before request handling. Request the full minimal declaration,decorator options and exact exception before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/AT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "declaration-evidence",
+              "when": "The minimal class declaration,decorator options and exact exception are not supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/order.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

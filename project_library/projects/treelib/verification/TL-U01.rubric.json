@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TL-U01",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Shallow Tree shares Node objects and data but keeps relationships by tree_id,so moving leaf changes only that view. Tag and nested data edits are shared. Deep=True produces independent nodes/data for the tested graph. Distinguish relationship views from object snapshots; do not promise universal transactional or concurrent safety.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

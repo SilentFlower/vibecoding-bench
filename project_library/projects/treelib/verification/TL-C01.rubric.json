@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TL-C01",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "A andB identify different nodes with the same Same tag. get_node uses the identifier;get_nodeSame returnsNone. Own stable IDs independently of editable/nonunique display labels and preserve them in interchange. Do not invent automatic tag/path lookup or a display-name uniqueness guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

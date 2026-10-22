@@ -1,0 +1,2561 @@
+{
+  "baseline_digest": "390e4ca222c9ae0acbaf078a7eb373e94c470e6c0c2a54f159603c9318fc19cd",
+  "nodes": [
+    {
+      "id": "tests/test_cli.py::test_cli_error_handling_continues",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_cli_inplace_with_stdin_fails",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_cli_main_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_cli_multiple_files_with_inplace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_cli_multiple_files_without_inplace_fails",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_cli_outfile_with_multiple_files_fails",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_cli_single_file_inplace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_encoding_output_file[encoding_gbk.sql-gbk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_encoding_output_file[encoding_utf8.sql-utf-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_encoding_stdin[encoding_gbk.sql-gbk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_encoding_stdin[encoding_utf8.sql-utf-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_encoding_stdout[encoding_gbk.sql-gbk]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_encoding_stdout[encoding_utf8.sql-utf-8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_invalid_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_invalid_choice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_invalid_infile",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_invalid_outfile",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_main_help",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_parser_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_script",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_stdout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_valid_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dos_prevention.py::TestDoSPrevention::test_deeply_nested_groups_limited",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dos_prevention.py::TestDoSPrevention::test_large_tuple_list_performance",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dos_prevention.py::TestDoSPrevention::test_nested_case_within_cap_under_1s",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dos_prevention.py::TestDoSPrevention::test_nested_paren_within_cap_under_1s",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dos_prevention.py::TestDoSPrevention::test_normal_sql_still_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dos_prevention.py::TestDoSPrevention::test_reasonable_tuple_list_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dos_prevention.py::TestDoSPrevention::test_very_large_token_list_limited",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_identifiercase",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_identifiercase_invalid_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_identifiercase_quotes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_keywordcase",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_keywordcase_invalid_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_notransform_of_quoted_crlf",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_preserve_ws",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_strip_comments_invalid_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_strip_comments_multi",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_strip_comments_preserves_hint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_strip_comments_preserves_linebreak",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_strip_comments_preserves_whitespace",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_strip_comments_single",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_strip_ws",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormat::test_strip_ws_invalid_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_case2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_duplicate_linebreaks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_identifier_and_functions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_identifier_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_identifier_list_comment_first",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_identifier_list_with_functions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_identifier_list_with_wrap_after",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_insert_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_join",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_keywordfunctions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_keywords",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_keywords_between",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_long_identifier_list_with_functions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_nested_identifier_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_parenthesis",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_stmts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindent::test_where",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindentAligned::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindentAligned::test_case_statement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindentAligned::test_case_statement_with_between",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindentAligned::test_group_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindentAligned::test_group_by_subquery",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindentAligned::test_joins",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestFormatReindentAligned::test_window_functions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestOutputFormat::test_invalid_option",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestOutputFormat::test_php",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestOutputFormat::test_php_escapes_backslashes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestOutputFormat::test_python",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestOutputFormat::test_python_escapes_backslashes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestOutputFormat::test_python_multiple_statements",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestOutputFormat::test_python_multiple_statements_with_formatting",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_format.py::TestOutputFormat::test_sql",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestSpacesAroundOperators::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestSpacesAroundOperators::test_bools",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestSpacesAroundOperators::test_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::TestSpacesAroundOperators::test_wildcard_vs_mult",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_compact[case when foo then 1 else bar end-case\\n    when foo then 1\\n    else bar\\nend-case when foo then 1 else bar end]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_format_column_ordering",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_format_json_ops",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_format_right_margin",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_format.py::test_format_right_margin_invalid_option[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_format_right_margin_invalid_option[ten]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_having_produces_newline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_strip_ws_removes_trailing_ws_in_groups",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_truncate_strings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_truncate_strings_doesnt_truncate_identifiers[select \"verrrylongcolumn\" from \"foo\"]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_truncate_strings_doesnt_truncate_identifiers[select verrrylongcolumn from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_truncate_strings_invalid_option2[-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_truncate_strings_invalid_option2[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_format.py::test_truncate_strings_invalid_option2[bar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_aliased_column_without_as",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_aliased_function_without_as",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_aliased_literal_without_as",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_begin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_compare_expr[select a from b where c < current_timestamp - interval '1 day'-Token-TypedLiteral]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_compare_expr[select a from b where c < d + e-Identifier-Identifier]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_compare_expr[select a from b where c < d + interval '1 day'-Identifier-TypedLiteral]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_compare_expr[select a from b where c < d + interval '6' month-Identifier-TypedLiteral]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_floats",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_functions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_keywords",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_parenthesis",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[!=]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[!~~]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[<=]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[<]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[=]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[>=]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[ILIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[LIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[NOT ILIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[NOT LIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[~]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_strings[~~]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_comparison_with_typed_literal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_forloops[FOREACH]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_forloops[FOR]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_group_identifier_list[foo, bar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_group_identifier_list[sum(a) as x, b as y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_group_identifier_list[sum(a), sum(b)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_group_identifier_list[sum(a)/count(b) as x, y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_group_identifier_list[sum(a)::integer as x, y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_group_identifier_list[sum(a)::integer, b]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_group_identifier_list[sum(a)::integer/count(b) as x, y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_alias",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_alias_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_alias_ctas",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_alias_ctas_lowercase_as",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_alias_returns_none[foo.bar]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_alias_returns_none[x / y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_alias_returns_none[x > y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_alias_returns_none[x, y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_as_cte",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_assignment[foo := 1;]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_assignment[foo := 1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_comparison_exclude",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_create_table",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_function_not_in",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifer_as[foo as (select *)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifer_as[foo as(select *)]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_as_invalid",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_invalid",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_invalid_in_middle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_list",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_list_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_list_other",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_list_subquery",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_list_with_inline_comments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_list_with_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_name_wildcard",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifier_wildcard",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifiers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_identifiers_with_operators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_idlist_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_nested_identifier_with_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_operation[foo + 100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_operation[foo*100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_operation[foo+100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_parenthesis",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_subquery_no_parens",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_typecast[select (current_database())::information_schema.sql_identifier-information_schema.sql_identifier]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_typecast[select foo::integer from bar-integer]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_typed_literal[x > DATE '2020-01-01']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_typed_literal[x > TIMESTAMP '2020-01-01 00:00:00']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_varchar",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_where",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_where_union[select 1 where 1 = 2 union all select 2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_grouping_where_union[select 1 where 1 = 2 union select 2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_identifier_consumes_ordering",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_identifier_with_op_trailing_ws",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_identifier_with_operators",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_identifier_with_string_literals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_into_kw_ends_where_clause",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_keyword_followed_by_parenthesis",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_like_and_ilike_comparison",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_nested_begin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_nested_for",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_qualified_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_returning_kw_ends_where_clause",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_simple_identifiers[1 as f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_simple_identifiers[1/2 as f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_simple_identifiers[1/2 f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_simple_identifiers[1<2 as f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_simple_identifiers[1<2 f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_simple_identifiers[foo as f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_simple_identifiers[foo f]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_grouping.py::test_statement_get_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_keywords.py::TestSQLREGEX::test_float_numbers[-.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_keywords.py::TestSQLREGEX::test_float_numbers[-1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_keywords.py::TestSQLREGEX::test_float_numbers[-1.]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_keywords.py::TestSQLREGEX::test_float_numbers[.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_keywords.py::TestSQLREGEX::test_float_numbers[1.0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_keywords.py::TestSQLREGEX::test_float_numbers[1.]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_2d_array_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_aliased_array_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_array_index_function_result",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_array_literal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_configurable_keywords",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_configurable_regex",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_dbldollar_as_literal[$$foo$$-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_dbldollar_as_literal[$A$ foo $B$-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_dbldollar_as_literal[$_$ foo $token$bar$token$ baz$_$-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_dbldollar_as_literal[$_$foo$_$-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_dbldollar_as_literal[$token$ foo $token$-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_double_precision_is_builtin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_double_quotes_are_identifiers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_from_subquery",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_get_real_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_get_real_name_multi_part_dotted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_get_token_at_offset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[#-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[#>>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[#>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[->>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[->]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[-]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[<@]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[@>]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_json_operators[||]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_names_and_special_names[##foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_names_and_special_names[#foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_names_and_special_names[@foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_names_and_special_names[foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_non_ascii",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parenthesis",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_access_symbol",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_casted_params",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_child_of",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_div_operator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_float[.51]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_float[.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_float[1.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_float[12.5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_function_param_single_literal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_function_parameter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_has_ancestor",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_keyword_like_identifier",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_modulo_not_placeholder",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_multistatement",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_nested_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_newlines[select\\n*from foo;]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_newlines[select\\r*from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_newlines[select\\r\\n*from foo\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_newlines[select\\r\\n*from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_placeholder[select * from foo where user = $a-$a]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_placeholder[select * from foo where user = %s-%s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_placeholder[select * from foo where user = :1-:1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_placeholder[select * from foo where user = :name-:name]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_placeholder[select * from foo where user = ?-?]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_square_brackets_notation_isnt_too_greedy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_square_brackets_notation_isnt_too_greedy2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_tokenize",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_parse_within",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_placeholder[%(foo)s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_placeholder[%s]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_placeholder[:1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_placeholder[:foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_placeholder[?]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_pprint",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_psql_quotation_marks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_quoted_identifier",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_regexp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_regexp_binary",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_schema_qualified_array_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_scientific_numbers[1.988e33-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_scientific_numbers[1e-12-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_scientific_numbers[6.67428E-8-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_scientific_numbers[e1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_simple_1d_array_index",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_single_line_comments[select 1 # foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_single_line_comments[select 1 -- foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_single_quotes_are_strings",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_single_quotes_with_linebreaks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_sqlite_identifiers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_stmt_tokens_parents",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_typed_array_definition",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_valid_identifier_names[1_data]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_valid_identifier_names[\\u696d\\u8005\\u540d\\u7a31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_valid_identifier_names[_foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_valid_identifier_names[foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_parse.py::test_wildcard_multiplication",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_alter_table_row_format_issue773",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_as_in_parentheses_indents",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_between_leading_dot_float_issue601[a BETWEEN .03 AND .06]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_between_leading_dot_float_issue601[a between .03 and .06]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_comment_between_cte_clauses_issue632",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_comment_encoding_when_reindent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_copy_issue672",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_dont_alias_keywords",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_except_formatting",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_format_accepts_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_format_invalid_where_clause",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue13",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue186_get_type",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue190_open_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue193_splitting_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue194_splitting_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue207_runaway_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue212_py2unicode",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue213_leadingws",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue227_gettype_cte",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue26[-- hello]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue26[--\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue26[--]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue26[--hello\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue26[--hello]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue284_as_grouping[AS]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue284_as_grouping[SELECT x AS]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue315_utf8_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue322_concurrently_is_keyword",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue34[CREATE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue34[create]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue35",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue359_index_error_assignments[SELECT @min_price:=MIN(price), @max_price:=MAX(price) FROM shop;]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue359_index_error_assignments[SELECT @min_price:=MIN(price), @max_price:=MAX(price) FROM shop]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue38",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue39",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue40",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue469_copy_as_psql_command",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue484_comments_and_newlines",
+      "kind": "Function",
+      "outcome": "xpassed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue485_split_multi",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue489_tzcasts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue562_tzcasts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_alias-z-select \"x\".\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_alias-z-select \"x\".\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_alias-z-select \"x\".y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_alias-z-select \"x\".y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_alias-z-select x.\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_alias-z-select x.\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_alias-z-select x.y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_alias-z-select x.y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_name-z-select \"x\".\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_name-z-select \"x\".\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_name-z-select \"x\".y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_name-z-select \"x\".y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_name-z-select x.\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_name-z-select x.\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_name-z-select x.y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_name-z-select x.y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_parent_name-x-select \"x\".\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_parent_name-x-select \"x\".\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_parent_name-x-select \"x\".y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_parent_name-x-select \"x\".y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_parent_name-x-select x.\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_parent_name-x-select x.\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_parent_name-x-select x.y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_parent_name-x-select x.y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_real_name-y-select \"x\".\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_real_name-y-select \"x\".\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_real_name-y-select \"x\".y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_real_name-y-select \"x\".y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_real_name-y-select x.\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_real_name-y-select x.\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_real_name-y-select x.y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_real_name-y-select x.y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_typecast-text-select \"x\".\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_typecast-text-select \"x\".\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_typecast-text-select \"x\".y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_typecast-text-select \"x\".y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_typecast-text-select x.\"y\"::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_typecast-text-select x.\"y\"::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_typecast-text-select x.y::text as \"z\" from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue78[get_typecast-text-select x.y::text as z from foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue83",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue9",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_issue90",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_keyword_before_qualified_name_still_grouped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_materialized_view_issue752",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_max_recursion",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_null_with_as",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_parse_sql_with_binary",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_primary_key_issue740",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_splitting_at_and_backticks_issue588",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_stream",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_regressions.py::test_token_next_doesnt_ignore_skip_cm",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_anonymous_begin_end_case_inline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_anonymous_begin_end_for",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_backslash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_begin_end_procedure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_begin_end_semicolons",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_begin_transaction",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_begin_transaction_formatted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_begintag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_begintag_2",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_casewhen",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_casewhen_procedure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_comment_end_of_line",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_comment_with_umlaut",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_create_function[function.sql]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_create_function[function_psql.sql]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_create_function[function_psql2.sql]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_create_function[function_psql3.sql]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_create_function[function_psql4.sql]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_cursor_declare",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_dashcomments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_dashcomments_eol[select foo; -- comment\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_dashcomments_eol[select foo; -- comment\\r\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_dashcomments_eol[select foo; -- comment\\r]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_dashcomments_eol[select foo; -- comment]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_dropif",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_encoding_parsestream",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_for_update_in_begin_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_go[SELECT * FROM foo;\\nGO-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_go[USE foo;\\nGO 2\\nSELECT 1;-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_go[USE foo;\\nGO\\nSELECT 1;\\nGO-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_if_exists_in_begin_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_if_function",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_ignores_empty_newlines",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_multiple_case_in_begin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_multiple_for_loops_in_begin_end",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_mysql_handler_for",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_procedural_case_end_case",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_quotes_with_new_line",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_semicolon",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_standalone_for_update",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_stream",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_strip_semicolon[  select * from foo;\\n\\nselect * from bar;\\n\\n\\n\\n-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_strip_semicolon[select * from foo-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_strip_semicolon[select * from foo; select * from bar;-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_strip_semicolon[select * from foo;-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_strip_semicolon[select * from foo\\n\\n;  bar-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_strip_semicolon_procedure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_split.py::test_split_unicode_parsestream",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_cli_commands",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[-- $$\\nDO $$ BEGIN NULL; END $$-expected6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[-- /*\\n/* c */ SELECT 1-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[SELECT \"/*\" FROM t; /* c */ SELECT 1-expected4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[SELECT $$$$-expected8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[SELECT $$$a$$-expected9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[SELECT '$$' FROM t, $$x$$-expected5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[SELECT '$t$' FROM t, $t$x$t$-expected7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[SELECT '*/' FROM t; /* c */ SELECT 1-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[SELECT '/*' FROM t; /* c */ SELECT 1-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_delimiters_in_strings_and_comments[SELECT '/*+' FROM t; /*+ h */ SELECT 1-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_like_and_ilike_parsed_as_comparisons[ILIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_like_and_ilike_parsed_as_comparisons[LIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_like_and_ilike_parsed_as_comparisons[NOT    ILIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_like_and_ilike_parsed_as_comparisons[NOT   LIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_like_and_ilike_parsed_as_comparisons[NOT ILIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_like_and_ilike_parsed_as_comparisons[NOT LIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_near_like_and_ilike_parsed_appropriately[LIKEaaa]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_near_like_and_ilike_parsed_appropriately[NOTILIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_near_like_and_ilike_parsed_appropriately[NOTLIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_near_like_and_ilike_parsed_appropriately[aaILIKEbb]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_near_like_and_ilike_parsed_appropriately[bILIKE]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_endifloop[END   IF]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_endifloop[END   LOOP]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_endifloop[END IF]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_endifloop[END LOOP]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_endifloop[END\\t\\nIF]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_endifloop[END\\t\\nLOOP]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_group_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_identifiers[FOO]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_identifiers[Foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_identifiers[foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_identifiers[v$name]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[CROSS JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[FULL OUTER JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[INNER JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[LEFT INNER JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[LEFT JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[LEFT OUTER JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[NATURAL JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_join[STRAIGHT JOIN]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order[ASC NULLS FIRST]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order[ASC NULLS LAST]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order[ASC]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order[DESC NULLS FIRST]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order[DESC NULLS LAST]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order[DESC]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order[NULLS FIRST]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order[NULLS LAST]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_order_by",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_tzcast[AT TIME ZONE 'UTC']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_union",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_parse_window_as",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_single_quotes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_stream_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_stream_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_token_flatten",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_token_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_token_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenize_backticks",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenize_inline_keywords",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenize_linebreaks[foo\\nbar\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenize_linebreaks[foo\\r\\nbar\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenize_linebreaks[foo\\r\\nbar\\r\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenize_linebreaks[foo\\rbar\\r]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenize_negative_numbers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenize_simple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenlist_first",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenlist_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tokenize.py::test_tokenlist_token_matching",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_remove_quotes[\"foo\"-foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_remove_quotes['foo'-foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_remove_quotes[None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::test_remove_quotes[`foo`-foo]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    }
+  ],
+  "project": "sqlparse",
+  "python": "3.12.15",
+  "schema": 1
+}

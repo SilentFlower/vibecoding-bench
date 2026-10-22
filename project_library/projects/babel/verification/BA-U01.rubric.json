@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BA-U01",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "JPY default uses currency precision and yields ¥1,100; currency_digits=False yields ¥1,099.98. Decimal default rounds1.2346 to1.235,while decimal_quantization=False retains1.2346. Inputs stay unchanged; display formatting is not an accounting ledger/rounding policy.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

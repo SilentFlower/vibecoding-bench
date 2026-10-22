@@ -1,0 +1,31 @@
+{
+  "id": "project-catalog-hundred-wave-02",
+  "name": "project-catalog-hundred-wave-02",
+  "title": "百项目扩容第2阶段：30项目真实场景内容包",
+  "description": "将alive-progress、jmespath、confuse、simplejson、marshmallow、inflect、tqdm、pyyaml、pluggy、xlsxwriter、mistletoe、python-docx、python-pptx、mdit-py-plugins、dynaconf、attrs、cssselect、structlog、cattrs、flask、babel、anytree、werkzeug、html2text、packaging、bibtexparser、treelib、sqlparse、python-dateutil、ftfy逐仓转为真实场景内容包，阶段内小批制作与验收，覆盖母任务剩余九十仓目标的一部分；本次auto-loop仅本地提交。",
+  "status": "in_progress",
+  "dev_type": "backend",
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-22",
+  "completedAt": null,
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-22-project-catalog-hundred",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

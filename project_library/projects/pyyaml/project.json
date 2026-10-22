@@ -1,0 +1,269 @@
+{
+  "schema": 2,
+  "project_key": "pyyaml",
+  "title": "PyYAML配置接收工作场景",
+  "category": "YAML对象图与流验收",
+  "description": "纯Python候选下的类型、标签、别名、呈现、重复键、流发布及诊断七项只读任务。",
+  "seed_digest": "245f8c4ec4a01892d314baeaedf844750dfc9b9431110439f03eadeb65a77fa7",
+  "environment": "pyyaml-py312",
+  "source": {
+    "repository": "https://github.com/yaml/pyyaml",
+    "commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "YY-S01",
+      "title": "配置标量和标签",
+      "goal": "选择明确类型与构造边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "YY-U01",
+            "YY-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "YY-U01",
+          "kind": "understand",
+          "goal": "追踪配置隐式标量的实际类型",
+          "prompt": "Trace the complete scalar controls and explain an explicit identifier/Boolean policy without edits.",
+          "requires": [],
+          "materials": [
+            "materials/types.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/YY-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/YY-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "YY-C01",
+          "kind": "consult",
+          "goal": "选择标签政策并保留业务校验边界",
+          "prompt": "Meet the complete basic-config requirement using current loader behavior; no unsafe constructors or edits.",
+          "requires": [],
+          "materials": [
+            "materials/tags.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/YY-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/YY-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "YY-S02",
+      "title": "共享配置对象",
+      "goal": "按对象图理解别名和修改传播",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "YY-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "YY-U02",
+          "kind": "understand",
+          "goal": "识别别名共享对象和循环图",
+          "prompt": "Trace only the complete bounded alias controls and explain mutation/traversal ownership. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/aliases.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/YY-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/YY-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "YY-S03",
+      "title": "人工配置编辑",
+      "goal": "核值往返与呈现保真要求",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "YY-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "YY-U03",
+          "kind": "understand",
+          "goal": "区分值往返和源文档保真",
+          "prompt": "Explain the complete load/dump controls against the exact presentation requirement. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/presentation.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/YY-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/YY-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "YY-S04",
+      "title": "配置接收与发布",
+      "goal": "规划重复键和完整流验收",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "YY-C02",
+            "YY-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "YY-C02",
+          "kind": "consult",
+          "goal": "规划重复语义键的接收政策",
+          "prompt": "Advise duplicate rejection using the complete mapping/node controls. Keep construction, resolved keys and merge policy explicit, without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/duplicates.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/YY-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/YY-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "YY-P01",
+          "kind": "plan",
+          "goal": "规划多文档整段验收后发布",
+          "prompt": "Plan the complete stream requirement from actual lazy iteration and failure timing. No implementation or external effects.",
+          "requires": [],
+          "materials": [
+            "materials/stream.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/YY-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/YY-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "YY-S05",
+      "title": "文档诊断",
+      "goal": "补齐完整证据再定位错误",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "YY-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "YY-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "YY-D01",
+          "kind": "diagnose",
+          "goal": "先核完整文档和错误位置再诊断",
+          "prompt": "A configuration import failed near a row reference. Request complete synthetic YAML, the actual exception and mark before selecting a cause. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/YY-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "marked-parser",
+              "when": "The complete YAML text, exception and mark have not been supplied or declared unavailable, and a complete reproduction is reasonably requested.",
+              "materials": [
+                "disclosure/parser.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

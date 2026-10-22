@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CS-P01",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The supported direct-childhas query selects a; the pinned parser rejects scope insidehas withSelectorSyntaxError. Validate exact supported syntax/translation,choose documented rejection or explicit alternate query,then evaluate independent expected results. Keep syntax errors distinct from an empty successful selection and do not claim a complete browserCSS engine.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

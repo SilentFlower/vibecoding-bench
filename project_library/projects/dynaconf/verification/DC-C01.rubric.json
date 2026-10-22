@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-C01",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Appending3 to one evaluated read changes that local list but a second read remains1,2 with a different identity. Explicit settings.set on NESTED.items persists1,2,3. Plan deliberate replacement and validation; do not treat evaluated boxed lists as a guaranteed persistent live view or invent automatic write-through.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

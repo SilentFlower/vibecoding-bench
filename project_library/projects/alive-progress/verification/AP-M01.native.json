@@ -1,0 +1,19 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AP-M01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "falsey_finalizer_runs_once_with_compatibility_controls": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

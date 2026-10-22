@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HT-C01",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The existingtag_callback runs before default tag dispatch. ReturningTrue for bothh1 boundaries replaces that dispatch; explicitinstance.o emitsTITLE: while text handling still suppliesReport. ReturningFalse letsstrong keep**Done**. Scope the callback and both boundaries carefully; it does not automatically sanitize,skip arbitrary descendant text or preserve all HTML semantics.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "PP-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "frame_replacement_discards_direct_run_formatting_while_run_replacement_preserves_it": true
+  },
+  "resource_profile": "business"
+}

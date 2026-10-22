@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MM-C01",
+  "source_commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default RAISE rejects extra; EXCLUDE discards it and INCLUDE passes its raw value through. Choose explicit rejection or the declared exclusion policy; INCLUDE is not validation for undeclared values or an automatic safe request schema.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

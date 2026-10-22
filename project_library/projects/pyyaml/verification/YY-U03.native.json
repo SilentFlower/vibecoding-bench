@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "YY-U03"
+  ],
+  "python_paths": [
+    "library/lib",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "dump_round_trip_preserves_values_not_original_presentation": true
+  },
+  "resource_profile": "business"
+}

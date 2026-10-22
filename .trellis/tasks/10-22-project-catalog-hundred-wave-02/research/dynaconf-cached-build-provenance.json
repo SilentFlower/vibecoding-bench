@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "artifacts": [
+    {
+      "wheel": "commentjson-0.9.0-py3-none-any.whl",
+      "wheel_sha256": "8a222b87f388697d4112d89847a87a2aa57eb40f77c857dac29853e627c3a7b2",
+      "source_archive": ".deploy/project-catalog-hundred/stage-02/dependency-preparation/dynaconf/cached-build-provenance-001/commentjson-0.9.0.tar.gz",
+      "source_sha256": "42f9f231d97d93aff3286a4dc0de39bfd91ae823d1d9eba9fa901fe0c7113dd4",
+      "source_url": "https://files.pythonhosted.org/packages/c0/76/c4aa9e408dbacee3f4de8e6c5417e5f55de7e62fb5a50300e1233a2c9cb5/commentjson-0.9.0.tar.gz",
+      "build_scope": "复用已有pip缓存构建wheel，原sdist重新下载核SHA；不宣称本轮重新构建或逐字节可重现构建。"
+    },
+    {
+      "wheel": "lark_parser-0.7.8-py2.py3-none-any.whl",
+      "wheel_sha256": "aea87c119eea711e5e7cce621cc9d2e05ab892a31f2f1b60ce0f7e3228592f98",
+      "source_archive": ".deploy/project-catalog-hundred/stage-02/dependency-preparation/dynaconf/cached-build-provenance-001/lark-parser-0.7.8.tar.gz",
+      "source_sha256": "26215ebb157e6fb2ee74319aa4445b9f3b7e456e26be215ce19fdaaa901c20a4",
+      "source_url": "https://files.pythonhosted.org/packages/34/b8/aa7d6cf2d5efdd2fcd85cf39b33584fe12a0f7086ed451176ceb7fb510eb/lark-parser-0.7.8.tar.gz",
+      "build_scope": "复用已有pip缓存构建wheel，原sdist重新下载核SHA；不宣称本轮重新构建或逐字节可重现构建。"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DC-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "nested_list_reads_are_not_a_persistent_mutation_view": true
+  },
+  "resource_profile": "business"
+}

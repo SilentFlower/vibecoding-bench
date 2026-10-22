@@ -1,0 +1,27 @@
+{
+  "scope": "当前固定源码宿主独立argv解析观察，未执行SQL",
+  "module": "/root/project/vibecoding-bench/.deploy/project-catalog-hundred/stage-02/drafts/projects/sqlparse/seed/library/sqlparse/__init__.py",
+  "comma_first": true,
+  "compact": true,
+  "defaults": {
+    "filename": [
+      "sample.sql"
+    ],
+    "outfile": null,
+    "inplace": false,
+    "keyword_case": null,
+    "identifier_case": null,
+    "output_format": null,
+    "strip_comments": false,
+    "reindent": false,
+    "indent_width": 2,
+    "indent_after_first": false,
+    "indent_columns": false,
+    "reindent_aligned": false,
+    "use_space_around_operators": false,
+    "wrap_after": 0,
+    "comma_first": false,
+    "compact": false,
+    "encoding": "utf-8"
+  }
+}

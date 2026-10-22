@@ -1,0 +1,11 @@
+{
+  "files": [
+    {
+      "path": "project_library/projects/flask/seed/library/tests/test_apps/.env",
+      "sha256": "3739562018bb8d8aeddbb540fb4c53e61af5385fb4d3b613e784057c3129ccc0",
+      "git_blob": "0890b615f109a3685a820c8948d74f4fab6c96c0",
+      "source_commit": "d086db856be187255b8ec61ef409357393020f32"
+    }
+  ],
+  "scope": "完整30仓固定Git来源筛查；延续既有精确路径和SHA机制"
+}

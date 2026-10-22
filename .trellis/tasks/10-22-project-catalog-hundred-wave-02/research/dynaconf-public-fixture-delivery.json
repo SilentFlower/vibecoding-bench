@@ -1,0 +1,386 @@
+{
+  "scope": "固定公开Git测试夹具；只扩当前既有精确路径与SHA例外，无泛化.env豁免",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "files": [
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests/.env",
+      "sha256": "5c3cc246f660d747b5e4941403b45417a22707abea4f3e5dadecf4725eb3fbc7",
+      "git_blob": "4684cd4438b97c50cc30419955a93726755f27d8"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/1000_django_attribute_error/flab/.env",
+      "sha256": "e62ccfcf912f860db8cd4b8740c556d5c9bbad47a6dd6d4d3ee1262359f9f303",
+      "git_blob": "558aba75645c15c3e6ade969b45ca4abb1f49b0d"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/160_path_traversal_fixed/.env",
+      "sha256": "a9b9a1244196b0fe2149c93bccad4f00a6ca8bf7d29f3a682c2a5a9068bf42d8",
+      "git_blob": "4f7c53e86c81a0535309f58938e822148887be13"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/166_renamed_global_env/.env",
+      "sha256": "0229f7106eee0bd601c3fa39c3de1a41971b987bf23b0a383db4d5925d680306",
+      "git_blob": "2af0eb3f7aeaa269cb4fdbb3bb7bd268d9fb60e6"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/169_renamed_settings_module/.env",
+      "sha256": "e84d120432819718be12a0a10e2e0d3fd49545876cd10e873bc4a6f345c55bde",
+      "git_blob": "49c507c5528bc4535167f8623b9f9dcf3f9eea7b"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/182_multiple_locations/.env",
+      "sha256": "d4eb6ec91dd0d24ea2a7ef86c777b468b0793a2c5a16fbb83e877a76aac36e2a",
+      "git_blob": "b22c23e10430d7a748c8b7f900539be3b9ccad97"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/184_ipython/.env",
+      "sha256": "9ffe566fe25f5f9e9b19f2ab91b087ebfe9fef1082941bbce1f8d11400d86387",
+      "git_blob": "9c7617625a8356d004776c67589e117243d38f27"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/251_dotted_unexistent/.env",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/266_envvar_from_env_override/.env",
+      "sha256": "49005ce7e9f1f46c93b733a264d56cba7e4597fb4d903f01b73f3c9556adacc0",
+      "git_blob": "c681860d0fceb75f509ca4fdce35ccb4dc389e26"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/288_null_values/.env",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/306_merge_replace/.env",
+      "sha256": "691936f8ca331c4f3d7009cbd014f95f8d209cf567b7f46f9889a809cd4f29df",
+      "git_blob": "17ecf378d269642c31356b6a66970d1e56aa338c"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/325_flask_dot_env/.env",
+      "sha256": "9eeb72df365e38d96f31a5b19d3e0ee10f281f2f298804d47086e8a75ae97561",
+      "git_blob": "512e636746c384815b853823949d43328d0b4980"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/392_evaluate_nested_structures/.env",
+      "sha256": "1c3fb8ac784b1c8b6f39f4ff84c4c062c36150f773958e914fe63df5065a0d0c",
+      "git_blob": "32c4098ae6a47bd54ae0328646d3bc7f0cc3c7bd"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/445_casting/.env",
+      "sha256": "f24ec21448bcda7101281e886add47b28ff17ecb029dc243187996c25c4db083",
+      "git_blob": "6491d5416aba827e9f55d6728df68fc110ab572e"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/449_django_lazy_path/.env",
+      "sha256": "4932857a4ec6e345c34b530700b2202481adfac420f74796b7f5e15e199db7a4",
+      "git_blob": "2f81b98cadeb6b3b1a77c338e23f18cd48f91c0e"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/709_yaml_merge_with_env/.env",
+      "sha256": "26a9bc4e3b771bd2d2958b302e57f214108ff9d9b8015bfd083a7e0b8dfbe425",
+      "git_blob": "c643462c2925d5e187580b70115185d14aa8761b"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/720_load_dotenv/.env",
+      "sha256": "9fb182573df36d42a8b77ce7c515b48f3499e5c2feb609b6af8e625e832189ce",
+      "git_blob": "3dc813e7022a99bca593e71a6a965d41b17e689f"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/722_docs_example/.env",
+      "sha256": "957bb29c65b70164bb403b5bf811d51c08bb026d5b37bbd5c9da7fbdd17a2761",
+      "git_blob": "d96deb4a8b65561e4e7216719f8d67e86290a056"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/869_order_break_parsing/.env",
+      "sha256": "8f9040d468d689f9934a8a656ca785e914647e3a189e887c4359e45496a6d47a",
+      "git_blob": "10907b83d6119e7b64cd53bc5a037060d71d07f1"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/905_item_duplication_in_list/.env",
+      "sha256": "c89405332a78bf9e65bca90701f60cdd27053143d3bc9a2c3c97792b9890843a",
+      "git_blob": "8e2981d26e9ca14f678fa8e931f9353d74938752"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/issues/976_True_False/.env",
+      "sha256": "473b8e8350d254cb005cc67be4cac06bda12956fb8e7ca828425263a3b08cecc",
+      "git_blob": "87ee495dc5160711e627bb409f4029d8f7196dfb"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/app/.env",
+      "sha256": "777264dd18df422f8f794521bfa9d4df6cdee25e92232c8f1ce636a342939152",
+      "git_blob": "7723d5e3e405c9aae25871ad543ebbebf045884a"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/app_with_dotenv/.env",
+      "sha256": "dd3ac49c2cbfda9301488d9425e6edee7c2caf5245547c5929d75c22369ecf88",
+      "git_blob": "bbfddcc0d31f4e04d0c02f6cb3f66b135984167a"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/cli_override_argparse/.env",
+      "sha256": "0135c01d8fad3a5477cb375ae264a1e81626a3d12f1a1b6c13430d2a0f5f0c1b",
+      "git_blob": "5709991c2c146d2d286078d0ad6e1c11b8835f58"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/click_override_generic/.env",
+      "sha256": "0135c01d8fad3a5477cb375ae264a1e81626a3d12f1a1b6c13430d2a0f5f0c1b",
+      "git_blob": "5709991c2c146d2d286078d0ad6e1c11b8835f58"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/click_override_strict/.env",
+      "sha256": "0135c01d8fad3a5477cb375ae264a1e81626a3d12f1a1b6c13430d2a0f5f0c1b",
+      "git_blob": "5709991c2c146d2d286078d0ad6e1c11b8835f58"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/common-encoding/.env",
+      "sha256": "b4a0a86f86306fc14a142b417f45764d75132fff17beb8def426864d885ab517",
+      "git_blob": "5efe634e4acdca72f5db33a4d7f66821d7cf3c1b"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/common/.env",
+      "sha256": "2ca58783ea2282fe761a9ce7bd21a8897fee85b265186a065f734e09773aa826",
+      "git_blob": "cf1eb040b3018f9f12bff28916997d52be01b20a"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/configure/.env",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/custom_loader/.env",
+      "sha256": "604fec6743fb6b1db43136024026e0ca71df11fdc0e9f10046860cbc7f5995ba",
+      "git_blob": "3083e2b4a56003d67b59d65a3611053c3162df17"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/django_example/.env",
+      "sha256": "47e710094502b1d017cde94894653b2b68b9d34f10c3dc456a7947284d2d7372",
+      "git_blob": "e5c65987bc412f560ba1b268040822490625fbee"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/django_example_compat/config/.env",
+      "sha256": "1b853d29356f6dc86627b414f6945e1f4894b2d7309e4c28d6fdf99e834aa91e",
+      "git_blob": "96c3ccfa5dcaca3aa5604dabf0f0166991dc9585"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/django_pytest/.env",
+      "sha256": "5779d55a759783a5f8079440516e9825ae454dd1985d955ecf21711d4a7fa865",
+      "git_blob": "54302b4acbd27544ff629cb5faf956c5c848182d"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/django_pytest_pure/.env",
+      "sha256": "5779d55a759783a5f8079440516e9825ae454dd1985d955ecf21711d4a7fa865",
+      "git_blob": "54302b4acbd27544ff629cb5faf956c5c848182d"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/dotenv_loaded_if_enabled/.env",
+      "sha256": "fa5cf748bd367b3dabe85045d1273bb0b1dcc9ceaf8c9f4bb60717adf586eb89",
+      "git_blob": "1acdb517683aec3049bc30f19a2aa9cbdb0620f7"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/dotenv_not_loaded_by_default/.env",
+      "sha256": "fa5cf748bd367b3dabe85045d1273bb0b1dcc9ceaf8c9f4bb60717adf586eb89",
+      "git_blob": "1acdb517683aec3049bc30f19a2aa9cbdb0620f7"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/dunder/.env",
+      "sha256": "68de277b7faac289daddce616619cb8c5c4fdc7576303a5019294fcac09ca14c",
+      "git_blob": "43b4d2cb9a84602b349fe1458c0c7e1df160afc6"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/dynaconf_merge/.env",
+      "sha256": "a0ea99115067c7650fcbc8818be325163e36e3846a2374ef2839014d6d824ef5",
+      "git_blob": "cf4df8e461fad96675fe37662837e093903320d1"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/envless_mode/.env",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/envs/.env",
+      "sha256": "0135c01d8fad3a5477cb375ae264a1e81626a3d12f1a1b6c13430d2a0f5f0c1b",
+      "git_blob": "5709991c2c146d2d286078d0ad6e1c11b8835f58"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/envvar_prefix/.env",
+      "sha256": "18c5c779c2829542389819287f0c984c875358d9e839aba5ad360c9550dc8478",
+      "git_blob": "619b279c2ef34a59a72875320479779bb05ed399"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_commentjson/.env",
+      "sha256": "5f9b2db8725ff94f0044b2014207940e467dfd1e8cda03f9e795902d2c618cf0",
+      "git_blob": "1a2e7211b81adc7595c7b57dfa307e8aab82bd51"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_dotenv/.env",
+      "sha256": "e30fe4b9213098276e35cc6feb3eb0272b320d790dd1183465289249f0fd7402",
+      "git_blob": "f39fd50e9e04b8c02e85802bc90a483540b37723"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_ini/.env",
+      "sha256": "dcf76abbc07bf6beb82a4a36dfb4ba5a03a96b0faedb4f4e0a95db6ba8ae807b",
+      "git_blob": "e39a84fcc1b35e3f852a84064d7eda3bc41d82bf"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_json/.env",
+      "sha256": "5f9b2db8725ff94f0044b2014207940e467dfd1e8cda03f9e795902d2c618cf0",
+      "git_blob": "1a2e7211b81adc7595c7b57dfa307e8aab82bd51"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_toml/.env",
+      "sha256": "2d4bcf2d190e07c22851f6ea5abe1849d7fd07614ed7eb908e009081610bbfcd",
+      "git_blob": "388ad4fd52428b560a50215e26a46f5db6f8cf43"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/flask_with_yaml/.env",
+      "sha256": "69153361d3fb50521ad5397496fcd63947516c9cb26283bb0cb7d69d3d64e612",
+      "git_blob": "68a1e88a5218f613e13f39e5c316db6148e82bba"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/format/.env",
+      "sha256": "987c3d50275cdb9d2e6823f5c1b88b14dbefd8306393d80d969de9498e96e873",
+      "git_blob": "de0f81de5aacb527955fd09e34cc2451f9fd3c62"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/full_test/.env",
+      "sha256": "a33c054fd2411de64c598b95772568b0cb002030a779c0b4134a8f515b77a897",
+      "git_blob": "77f080ddf4b7f5d6eb624b7ef9e08ea624131a9d"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/get_fresh/.env",
+      "sha256": "013f1cdd3bb493ecb44e6b7de45c12e49cd824549b60ce88675426506c92e1cb",
+      "git_blob": "51d186c57697558db876bc55763717e55f0451cc"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/ignore_unknown_envvars/.env",
+      "sha256": "a095f1b4ee7ec5afd2b0c3460d2e6e2addeff92fd1915d8de2da335a1a69d92a",
+      "git_blob": "07547d090c5d8d17adbe461e8ca58aa8c0f8e510"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/includes/.env",
+      "sha256": "8bdf408c5501870c23a73d95b9126bd1fd0f1cfea8df164815772c25ed692a68",
+      "git_blob": "4fb6b8554648e3d429df62088d7ae50c00dc5082"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/inspect_load_file/.env",
+      "sha256": "64b306e5c39312aac90264977abd64595d958c3449c31d6a18357b400665719a",
+      "git_blob": "8466aa6866a8581586fa7bf41562af70b5c9578f"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/jenkins_secrets_file/.env",
+      "sha256": "6dd40a0c163bd54ea642e63b862fc4ccaa19985a77a4f6c46f287d3d4384fb6e",
+      "git_blob": "87d71d7b819a4d980dcda0eb16554221adafbbb3"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/lower_read/.env",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/merge_enabled/.env",
+      "sha256": "a7697a76bcaae02abc275224488fb26faa831557f4dde7a2e541b3aa0f5699ec",
+      "git_blob": "304a3380b3ee8dd46eed5d23223e5f38bde0ff9d"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/multiple_folders/.env",
+      "sha256": "1a1aa200b1b7a07eaa458850629cf2b00e3e6d764c23e9fd86a78d266dc016f1",
+      "git_blob": "a55bc6680420c6125384d45e2634f0d2633900fb"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/multiple_sources/.env",
+      "sha256": "d4f7af5f3402082ff774aad637160177d13f36969c1f36dcd075535e72ba00c7",
+      "git_blob": "6f64d48360b61b7d79e5735ab52caf578a5710f9"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/new_merge/.env",
+      "sha256": "23f6540b77c6a73e90b853ec7038a4d6693daeb203c66e43f77ef4d6327b690c",
+      "git_blob": "cc0fa99f91720f9175cdfd0bca2fc38907f219f9"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/overriding/.env",
+      "sha256": "ed6d3329b9cc48f000b596a6a73ac2b02f57f6b7426bdd5e9152272cd372a5b8",
+      "git_blob": "89552de1e558fb29e29cb97978650ae4b7027057"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/project_root/.env",
+      "sha256": "52adfb8982be5c8de00b9f7235e2de524c7d5e47c7b726ee013ce90f3d7d9d0a",
+      "git_blob": "d4e05eb35d71ec7e5f0bc76709a436180eaf2dbc"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/pytest_example_app/.env",
+      "sha256": "49005ce7e9f1f46c93b733a264d56cba7e4597fb4d903f01b73f3c9556adacc0",
+      "git_blob": "c681860d0fceb75f509ca4fdce35ccb4dc389e26"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/pytest_example_app/flask/.env",
+      "sha256": "49005ce7e9f1f46c93b733a264d56cba7e4597fb4d903f01b73f3c9556adacc0",
+      "git_blob": "c681860d0fceb75f509ca4fdce35ccb4dc389e26"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/redis_example/.env",
+      "sha256": "710efa7d556f1172ad51de9ee153847f90ee38327afda7cc0638c89623279998",
+      "git_blob": "de5f25f75befb9babf33bfeecbe1f6822b8c283a"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/settings_file/.env",
+      "sha256": "8ddf66fb8d7fa9e591b23ba1632f3ecb52b0d483c3cf3ce39b12032ebe68a109",
+      "git_blob": "256bbe469712d9936dc945edf6cb9713bd6b1e52"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/simple/.env",
+      "sha256": "e62ccfcf912f860db8cd4b8740c556d5c9bbad47a6dd6d4d3ee1262359f9f303",
+      "git_blob": "558aba75645c15c3e6ade969b45ca4abb1f49b0d"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/specific_settings_files/.env",
+      "sha256": "29b9e102a1e2b581dffb52c4e34f767e6d6e231cfc90b7f607ec4ff307814024",
+      "git_blob": "f5d7754e7d21142a2c94f3f4973ed2727f33ee06"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/toml_with_secrets/.env",
+      "sha256": "0992caaadfe002b46e00273e92892011cc4ec9502d25431412ed279cacb89e42",
+      "git_blob": "489102588ebba56662d73549a90a21ebc8474956"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/validators_with_python/.env",
+      "sha256": "4437bd40a1d9bcd916663d5595994eab50ff1b3878c0fa6aa2ed672af23fb34f",
+      "git_blob": "54babfbb5c83c8b3eda1024d107ad61e5a4a342b"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/validators_with_toml/.env",
+      "sha256": "e62ccfcf912f860db8cd4b8740c556d5c9bbad47a6dd6d4d3ee1262359f9f303",
+      "git_blob": "558aba75645c15c3e6ade969b45ca4abb1f49b0d"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/vault/.env",
+      "sha256": "52405048c114c1aa8b0d36171e7d4edad25fdd4cf88aa2c60094679b94e4d288",
+      "git_blob": "2b3b9164e12591c8392be5814cabd9650c5386eb"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/vault_userpass/.env",
+      "sha256": "3bd6c1109997ef027781aed231b3df3294e8ffffbee912706ffdb4879cc9ddbf",
+      "git_blob": "eda21a4b80f69840e7a4b97de66a763fc8090e31"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/legacy/yaml_example_extra/.env",
+      "sha256": "0a32f4b57721bd92cffa3a6476f04a1d3a57256676bd8e743d9e45bf568cf5f9",
+      "git_blob": "4a0f240322cc4ac47b84cafde15efb2924f9e260"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/typed/insert/.env",
+      "sha256": "73b186119c0fa30eb8c78c657677b16c81a9a51cd787e01db16ecbd49fa9d3a2",
+      "git_blob": "76f785054408b05ace91a2eadfda3908e4c11a83"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/typed/multiple_env_prefixes/.env",
+      "sha256": "3791bbb81301bae0152fc29883f47819169c1fcfacb75aaa25b0012bdbfcf2ed",
+      "git_blob": "5c4dc2a36aed3d5bb9b81b8bcea1e93eff22ce91"
+    },
+    {
+      "path": "project_library/projects/dynaconf/seed/library/tests_functional/typed/typed_with_dotenv_toml_secrets_validator_condition/.env",
+      "sha256": "732727f96268ea4f43da98dfe138190db42d511b0ec5e2a2c2452d4ead64132e",
+      "git_blob": "bd76a26935627841110153c94b693f60a8ad8531"
+    }
+  ]
+}

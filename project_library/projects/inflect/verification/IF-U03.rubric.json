@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IF-U03",
+  "source_commit": "99596854bd296af1557db2015cfa98c8104ec155",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Three plain items use comma and Oxford conjunction; embedded comma makes semicolon separators. Two items use A and B and None gives empty text. It is human formatting without CSV quoting/round-trip guarantees; choose an actual structured format for machine data.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

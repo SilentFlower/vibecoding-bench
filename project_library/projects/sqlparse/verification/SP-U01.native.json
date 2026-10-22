@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SP-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "statement_splitting_keeps_quoted_semicolons_and_can_remove_delimiters": true
+  },
+  "resource_profile": "business"
+}

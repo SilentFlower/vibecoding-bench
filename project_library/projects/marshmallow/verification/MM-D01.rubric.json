@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MM-D01",
+  "source_commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Ask for field/input types first. With disclosed evidence explain datetime is a date subtype and the common temporal isinstance shortcut returns the original object. Do not assume a date-string parser bug or select a truncation policy without authorization. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

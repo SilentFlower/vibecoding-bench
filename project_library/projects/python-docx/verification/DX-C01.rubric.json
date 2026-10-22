@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DX-C01",
+  "source_commit": "e45454602b53e8e572b179ccf1c91093ec9f4ed7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Two layout positions reference the same underlying cell with grid_span2 and textA newlineB,while the row contains one w:tc. Choose whether exporting layout slots or unique logical cell content and handle spans/omitted positions explicitly. A grid-slot list is not automatically a list of distinct cells or a universal rectangular matrix.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

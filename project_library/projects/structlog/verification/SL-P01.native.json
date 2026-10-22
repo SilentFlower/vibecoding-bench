@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SL-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "json_rendering_does_not_implicitly_redact_or_recursively_decode_business_values": true
+  },
+  "resource_profile": "business"
+}

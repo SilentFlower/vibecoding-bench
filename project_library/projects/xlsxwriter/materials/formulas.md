@@ -1,0 +1,1 @@
+Generate a synthetic workbook with write_formula(A1,"=SUM(3,4)") using default cache and A2 using explicit cached value7. Close and inspect sheet XML formula and cached value elements. A downstream non-recalculating reader displays0. Explain actual package contents and recalculation responsibility; no Excel/LibreOffice engine was run and no library patch is requested.

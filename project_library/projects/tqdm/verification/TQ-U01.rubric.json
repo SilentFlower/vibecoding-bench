@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TQ-U01",
+  "source_commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Immediately after yieldingA n is0,afterB it is1,and exhaustion reaches2; closed update is ignored. disableTrue still yields both values but n stays its initial0. Explain post-yield accounting and do not claim a disabled bar is a reliable business counter.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

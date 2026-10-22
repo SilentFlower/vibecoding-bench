@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "IF-C01",
+  "source_commit": "99596854bd296af1557db2015cfa98c8104ec155",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Current rules give an hour,a university,an MRI. Count2 gives 2 hour and does not pluralize the noun automatically. Use the declared English vocabulary/pronunciation policy, not just a first-letter vowel check or a universal NLP guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

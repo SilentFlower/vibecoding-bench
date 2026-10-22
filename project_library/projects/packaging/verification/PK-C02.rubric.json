@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PK-C02",
+  "source_commit": "1a62a26afe0f4881593e31bed4f7753bd1c8fe27",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Existing resolution normalizesDev_Test todev-test and expands includes in order,retainingpytest>=8,ruff,pytest>=8. It does not deduplicate,solve all transitive dependencies or install packages. Define duplicate/conflict treatment separately while retaining provenance; do not propose include resolution as a missing feature.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

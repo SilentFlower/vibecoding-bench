@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MT-U01",
+  "source_commit": "ebf9ae4e9279f3d8c79b7cf2710f7e73ea6438a7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both inherited content reads expose the last parsed Beta state,while child text and actual HTML retain Alpha and Beta separately. Traverse/render child text for the intended chapter index; do not confuse the pinned class parse state with a per-node text snapshot or claim all heading rendering is broken.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

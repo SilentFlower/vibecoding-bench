@@ -1,0 +1,1 @@
+The hookspec render(value,prefix="APP") has one implementation render(value,prefix="PLUGIN") and a shorter implementation accepting onlyvalue. Call valueX first with no prefix and then explicit prefixEXPLICIT. Explain protocol defaults and accepted argument pruning using actual outputs,not an invented requirement that all signatures match exactly. No edits.

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MT-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "traverse_is_breadth_first_and_reports_existing_parent_depth": true
+  },
+  "resource_profile": "business"
+}

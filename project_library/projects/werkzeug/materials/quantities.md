@@ -1,0 +1,1 @@
+Use MultiDict([('qty','bad'),('qty','2'),('qty',None),('qty','3')]). Compare get(default=99,type=int),getlist(type=int),to_dict() and to_dict(flat=False). A batch quantity importer must account for every original item. Explain the existing conversion and flattening contracts; no edits.

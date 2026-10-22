@@ -1,0 +1,1 @@
+Construct tqdm([A,B],file=StringIO(),mininterval=0,miniters=1). Inspect n immediately after each next and after exhaustion, then update(4) after close. Separately iterate the same values with disable=True and inspect n. Explain iterator-yield timing and counting when disabled; do not infer accepted business records from the display. No edits.

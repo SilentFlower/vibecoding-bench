@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CF-U02",
+  "source_commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The default overlay lowercases/nests keys, parses scalar port5432 and builds the sequential[A,B]list, but leaves the flow collection text as a string. parse_yaml_docsTrue parses that payload into a list. Configuration.reload reloads YamlSource only, so the existing environment overlay stays5432 after the environment changes; a fresh EnvSource sees6000. Do not promise automatic environment refresh.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "DC-U01",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "production inherits Local and overridesport9000; sequential using_env(default) temporarily shows8000 and exits back toproduction9000. Use the current context API deliberately and distinguish restoration from concurrent environment isolation or atomic publication.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

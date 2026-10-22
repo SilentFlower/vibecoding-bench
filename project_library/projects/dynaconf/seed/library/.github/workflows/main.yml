@@ -1,0 +1,84 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [master]
+    paths-ignore: # run if anything different from these is modified
+      - "docs/**"
+      - "mkdocs.yml"
+
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - "docs/**"
+      - "mkdocs.yml"
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# When a Push is made on an existing branch/PR
+# it cancels any pre running job and
+# let only the latest executing
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  linter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Upgrade PIP
+        run: pip install --user --upgrade pip
+      - name: Install and lint
+        run: make clean install run-pre-commit
+
+  build:
+    needs: linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # build requires the lowerbound python we support
+          python-version: "3.9"
+      - name: Upgrade PIP
+        run: pip install --user --upgrade pip
+      - name: Install build dependencies
+        run: pip install --user ".[release]"
+      - name: Build wheel
+        run: make dist
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynaconf_dist
+          path: dist/
+          if-no-files-found: "error"
+          overwrite: true
+          retention-days: 1
+  
+  tests:
+    needs: build
+    uses: ./.github/workflows/test.yml
+    with:
+      python_minimal: '["3.9", "3.13"]'
+      python_full: '["3.9", "3.10", "3.11", "3.12", "3.13"]'
+      python_latest: '3.13'
+    secrets: inherit
+
+  checkpoint:
+    runs-on: ubuntu-latest
+    needs:
+      - linter
+      - build
+      - tests
+    steps:
+      - name: All tests has passed
+        run: echo "All tests has passed"

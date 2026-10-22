@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AN-U02",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "filter_ excludes a itself but still yieldsa1; stop at a prunesa anda1. maxlevel2 includesroot,a,b because root islevel1. Choose hide-versus-prune behavior explicitly rather than treating filter_ as subtree pruning.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

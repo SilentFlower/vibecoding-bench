@@ -1,0 +1,135 @@
+{
+  "project": "structlog",
+  "stage": "formal_registered_local_verified",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "source_file_count": 123,
+  "license_files": [
+    "seed/library/LICENSE-MIT",
+    "seed/library/LICENSE-APACHE",
+    "seed/library/NOTICE",
+    "seed/library/COPYRIGHT"
+  ],
+  "scenarios": 5,
+  "unique_tasks": 6,
+  "modify_tasks": 0,
+  "non_modify_tasks": 6,
+  "native_baseline": {
+    "project": "structlog",
+    "attempt": 1,
+    "result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/structlog/result.json",
+    "result_sha256": "0b7a45728892ed76e97544014b0524fa25686f08b56c8c21d87353f90243f1dd",
+    "main_collected": 949,
+    "counts": {
+      "passed": 928,
+      "failed": 0,
+      "error": 0,
+      "skipped": 21,
+      "xfailed": 0,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "strict_doctest_nodes": 0,
+    "subtest_count": 0,
+    "collection_skip_count": 0,
+    "xml_testcases": 949,
+    "xml_skipped": 21,
+    "runner_sha256": "037082662ddf7b6c74db126abe13a7e6684586cfc9ae5225fc42551f942b5268",
+    "contract_sha256": "875696882bcef71537789d32bd0d57635a32e168fa7d45c0ecb964126e374b98",
+    "business": {
+      "timeout_sec": 30,
+      "memory_mb": 256,
+      "pids_limit": 64
+    },
+    "regression": {
+      "timeout_sec": 180,
+      "memory_mb": 512,
+      "pids_limit": 64
+    },
+    "scope": "当前Linux/CPython3.12镜像的完整上游入口，不代表业务、产品链或模型完成"
+  },
+  "verified_unique_native_cases": 5,
+  "native_evidence": [
+    {
+      "case": "original-SL-C01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/structlog/attempt-001/original-SL-C01.json",
+      "sha256": "2d5c2b7c6f15efd064c9415d1ea6fbf752433756c81e3e744e672ca9a0e1edbe",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-SL-C02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/structlog/attempt-001/original-SL-C02.json",
+      "sha256": "54c052ce2bac7757da88d7274ea7413d5af1f86ffd6cb6a304b5e2c6ff19ef3c",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-SL-P01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/structlog/attempt-001/original-SL-P01.json",
+      "sha256": "454efc6834918f76f06b5c56b5e66b573fd3544c1a3a2029b2479e4146025d0b",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-SL-U01",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/structlog/attempt-001/original-SL-U01.json",
+      "sha256": "e8cc7a706a1ae19e192e8e3f16f23466c17a96aff258b2d5de9ea2efbf390aa7",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    },
+    {
+      "case": "original-SL-U02",
+      "evidence": ".deploy/project-catalog-hundred/stage-02/business/structlog/attempt-001/original-SL-U02.json",
+      "sha256": "8e4c118d9fdd71a839f8e1a11e5aaef7b22d3959b4b3161bd865db448a45360a",
+      "expectation_met": true,
+      "expected": "passed",
+      "actual_status": "passed"
+    }
+  ],
+  "native_attempt_history": [
+    {
+      "attempt": 1,
+      "summary": ".deploy/project-catalog-hundred/stage-02/business/structlog/attempt-001/summary.json",
+      "sha256": "3aa8a967451965a884a5e8607076b01ff33de6eb71aaab3cd27397ea90174b7a",
+      "passed": true
+    }
+  ],
+  "additional_original_native": [],
+  "reference_changed_paths": [],
+  "formal_registered": true,
+  "mock_status": "passed",
+  "pending": [],
+  "real_model_calls": 0,
+  "production_status": "not_deployed",
+  "failed_attempts_retained": true,
+  "scope": "完整原生与业务独立期望通过；产品链、页面及正式交付另验，不代表真实模型质量",
+  "formal_version": "real-project-scenarios-v22-en",
+  "formal_digest": "c1b35d9949df70610a26f26c5f0924b727120e80651e6fd91e562c75aec157fd",
+  "full_delivery_files": 19812,
+  "mock_evidence": [
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-009/run-001/evidence/result.json",
+      "sha256": "b8de62f4f4a96f5559dd5753d2d37d03a825ccc504ee42596f7adfc2e4b5c62c"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-009/run-001/cleanup.json",
+      "sha256": "daaec0fcc5f82d67582432d97acb0cee7ee1d646f8cf0841329a5a88eea98be7"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/mock-batch-009-audit.json",
+      "sha256": "23f0d95896171a16a552f37ebd9d974adcbc89701b5cd1cb1291a7b848dcec85"
+    },
+    {
+      "path": ".deploy/project-catalog-hundred/stage-02/mock-batch-009/browser/run-001/diagnostics/result.json",
+      "sha256": "b160ca91a0fefe25174db7e74a94d0a8e690364c78657da14486bc46f6f0618c"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/delivery-first-twenty.json",
+      "sha256": "f54a85b5bd1f6db47608508080380812f04fc70ec7669117a7c11137d88b4f04"
+    }
+  ]
+}

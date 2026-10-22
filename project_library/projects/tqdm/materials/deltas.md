@@ -1,0 +1,1 @@
+An external transfer reports absolute completed counts5 then8 with total10. Compare calling update(5),update(8) against update(5),update(8-5). Separately update(12) against total10. State actual n and whether total clamps it. Advise explicit delta/monotonic/retry handling at the caller without a new API or library edit.

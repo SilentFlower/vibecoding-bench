@@ -1,0 +1,16 @@
+{
+  "scope": "当前固定源码宿主独立诊断观察，非目标容器测试集合",
+  "module": "/root/project/vibecoding-bench/.deploy/project-catalog-hundred/stage-02/drafts/projects/treelib/seed/library/treelib/__init__.py",
+  "indexed_ids": [
+    "b",
+    "leaf",
+    "root"
+  ],
+  "root_children": [
+    "b",
+    "b"
+  ],
+  "old_B_still_indexed": false,
+  "new_b_tag": "A",
+  "leaf_parent": "b"
+}

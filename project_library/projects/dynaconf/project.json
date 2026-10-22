@@ -1,0 +1,276 @@
+{
+  "schema": 2,
+  "project_key": "dynaconf",
+  "title": "Dynaconf本地配置工作场景",
+  "category": "环境分层与验证归属",
+  "description": "分层、环境类型、嵌套更新、输入所有权、聚合诊断、验证生命周期和加载诊断七项只读任务。",
+  "seed_digest": "2513ff7a692ec7b8fd95d9dcef270b9cb9af3103072cc4fa88bb444b3a5d8345",
+  "environment": "dynaconf-py312",
+  "source": {
+    "repository": "https://github.com/dynaconf/dynaconf",
+    "commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/vendor_licenses/box-LICENSE.txt",
+      "seed/library/vendor_licenses/click-LICENSE.rst",
+      "seed/library/vendor_licenses/python-dotenv-LICENSE.txt",
+      "seed/library/vendor_licenses/ruamel.yaml-LICENSE.txt",
+      "seed/library/vendor_licenses/toml-LICENSE.txt",
+      "seed/library/vendor_licenses/tomli-LICENSE.txt",
+      "seed/library/dynaconf/vendor/vendor.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DC-S01",
+      "title": "环境输入与分层",
+      "goal": "区分环境选择和类型解析",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-U01",
+            "DC-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-U01",
+          "kind": "understand",
+          "goal": "核本地环境分层与顺序上下文恢复",
+          "prompt": "Explain the complete temporary-file environment controls without edits.",
+          "requires": [],
+          "materials": [
+            "materials/layers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DC-U02",
+          "kind": "understand",
+          "goal": "明确环境变量的类型与字符串保真",
+          "prompt": "Trace complete synthetic environment values and Python types; no implementation.",
+          "requires": [],
+          "materials": [
+            "materials/environment.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DC-S02",
+      "title": "输入与更新归属",
+      "goal": "显式替换并保留调用方记录",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-C01",
+            "DC-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-C01",
+          "kind": "consult",
+          "goal": "使用显式赋值持久更新嵌套列表",
+          "prompt": "Advise the complete persistent-update requirement from actual list identity and replacement controls. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/lists.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "DC-C02",
+          "kind": "consult",
+          "goal": "保留配置导入记录的调用方所有权",
+          "prompt": "Advise preserving the complete supplied input record with the current API. No library changes.",
+          "requires": [],
+          "materials": [
+            "materials/update.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DC-S03",
+      "title": "聚合诊断",
+      "goal": "复用完整校验结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-C03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-C03",
+          "kind": "consult",
+          "goal": "复用现有聚合校验形成完整诊断",
+          "prompt": "Advise diagnostics using the complete two-error controls and existing API; no edits.",
+          "requires": [],
+          "materials": [
+            "materials/aggregate.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-C03.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-C03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DC-S04",
+      "title": "验证生命周期计划",
+      "goal": "明确环境归属并验证后发布",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-P01",
+          "kind": "plan",
+          "goal": "规划条件验证器的环境归属与发布",
+          "prompt": "Plan validation lifecycle and publication from the complete shared/fresh validator controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/validators.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "DC-S05",
+      "title": "配置加载诊断",
+      "goal": "先确认参数类型与有效结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "DC-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "DC-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-D01",
+          "kind": "diagnose",
+          "goal": "先核加载参数类型再诊断配置未生效",
+          "prompt": "A config load applies no values without an error. Request the exact argument and type,options and resulting effective settings before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/DC-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "load-input-evidence",
+              "when": "The exact load_file argument/type,options and effective result are not supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/load-input.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

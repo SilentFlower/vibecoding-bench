@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HT-U01",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The local conversion keeps# Report,**Done**,resolvesGuide to the syntheticbaseurl,and emits3.A/4.B using the existingol start support. bodywidth0 disables wrapping. It converts markup without browser layout or resource fetching; no new list-start feature is needed.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

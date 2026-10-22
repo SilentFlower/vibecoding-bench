@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CS-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "supported_has_queries_execute_and_unsupported_scope_is_an_error_not_no_matches": true
+  },
+  "resource_profile": "business"
+}

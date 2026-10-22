@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AN-U01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "reparenting_moves_identity_and_original_cycle_duplicate_guards_preserve_the_tested_tree": true
+  },
+  "resource_profile": "business"
+}

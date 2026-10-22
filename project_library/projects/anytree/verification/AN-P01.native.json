@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AN-P01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "json_preview_changes_a_shared_dictionary_exporter_depth_and_requires_owned_scope": true
+  },
+  "resource_profile": "business"
+}

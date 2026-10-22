@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HT-C02",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "DefaultNBSP becomesordinaryspace andcopy becomes(C); unicode_snob retainsNBSP and©. script/style content is omitted under both. This is readable conversion,not reversible source preservation; keep originalHTML separately when source fidelity matters and select an explicit Unicode/spacing policy. Do not claim browser rendering or a complete sanitizer guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

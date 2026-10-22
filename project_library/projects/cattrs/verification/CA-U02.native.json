@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CA-U02"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "json_preconfiguration_roundtrips_nested_types_iso_dates_and_base85_bytes": true
+  },
+  "resource_profile": "business"
+}

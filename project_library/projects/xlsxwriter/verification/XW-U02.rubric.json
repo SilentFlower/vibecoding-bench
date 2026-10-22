@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "XW-U02",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "First writes succeed; returning to an already flushed row gives-1 and LATE is absent from the final package. Emit forward row-major data or select the appropriate normal mode,check every write result,and do not use successful close as proof every requested cell was accepted.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TL-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "business_identifiers_are_distinct_from_nonunique_display_tags": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "python-pptx",
+  "title": "python-pptx演示包工作场景",
+  "category": "模板结构与图表交付",
+  "description": "换行、格式、占位符、合并网格、图表交付及颜色诊断六项只读任务。",
+  "seed_digest": "a2197493f0686d969fdb97fed7605d2856b83846bebefa7c34267abf0721a530",
+  "environment": "python-pptx-py312",
+  "source": {
+    "repository": "https://github.com/scanny/python-pptx",
+    "commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PP-S01",
+      "title": "模板文本",
+      "goal": "区分文本边界与格式作用域",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PP-U01",
+            "PP-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PP-U01",
+          "kind": "understand",
+          "goal": "保留演示文本的段落与软换行",
+          "prompt": "Trace the complete two-setter save/reopen controls and explain a faithful export policy without edits.",
+          "requires": [],
+          "materials": [
+            "materials/newlines.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PP-C01",
+          "kind": "consult",
+          "goal": "为模板替换保留明确的运行级格式",
+          "prompt": "Advise rich-text filling from the complete frame and run replacement controls; no implementation.",
+          "requires": [],
+          "materials": [
+            "materials/formatting.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PP-S02",
+      "title": "模板槽位与表格",
+      "goal": "识别占位符键与网格内容",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PP-U02",
+            "PP-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PP-U02",
+          "kind": "understand",
+          "goal": "按模板占位符键读取业务槽位",
+          "prompt": "Explain the complete sparse-index template control and a compatible role lookup policy. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/placeholders.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-U02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "PP-C02",
+          "kind": "consult",
+          "goal": "区分演示表格网格与合并后的文本归属",
+          "prompt": "Advise export and reversible-edit policy using all complete merge/split controls without edits.",
+          "requires": [],
+          "materials": [
+            "materials/merge.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PP-S03",
+      "title": "图表交付计划",
+      "goal": "核缓存和嵌入数据一致性",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PP-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PP-P01",
+          "kind": "plan",
+          "goal": "规划图表缓存与嵌入工作簿一致交付",
+          "prompt": "Plan the complete chart update requirement from actual saved-package controls. No implementation or publication.",
+          "requires": [],
+          "materials": [
+            "materials/chart.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/PP-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PP-S04",
+      "title": "颜色导入诊断",
+      "goal": "先取得精确输入与结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "PP-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "PP-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PP-D01",
+          "kind": "diagnose",
+          "goal": "按完整颜色字面定位规范化差异",
+          "prompt": "Color imports normalize unexpectedly. Request exact input literals,called API and observed results/errors before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/PP-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "color-evidence",
+              "when": "Exact input literals,the called color API and observed result/error are not supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/colors.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CF-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "priority_lookup_and_flatten_have_distinct_mapping_shapes": true
+  },
+  "resource_profile": "business"
+}

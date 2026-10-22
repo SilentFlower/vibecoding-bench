@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BA-P01",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Catalog.check already reports the placeholder mismatch. write_mo can still compile that invalid translation; successful compilation is not successful validation. Fuzzy Review is excluded by default and included only with use_fuzzy=True. Define independent validation,reviewed fuzzy policy,complete artifact checks and publication ownership. Do not duplicate an existing validator or equate compilation with correctness.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

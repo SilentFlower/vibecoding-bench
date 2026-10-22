@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MD-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "anchor_uniqueness_is_per_parse_and_default_levels_stop_at_two": true
+  },
+  "resource_profile": "business"
+}

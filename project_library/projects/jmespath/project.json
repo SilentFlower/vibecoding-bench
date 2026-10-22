@@ -1,0 +1,280 @@
+{
+  "schema": 2,
+  "project_key": "jmespath",
+  "title": "JMESPath业务查询工作场景",
+  "category": "JSON投影与查询语言",
+  "description": "真实投影、默认、价格排序、共享结果、受信函数和嵌套JSON比较七项独立任务。",
+  "seed_digest": "0ae4b57756cc847d9d8471515c6304711de220bfce1b2afacfe5a867bc1ce570",
+  "environment": "jmespath-py312",
+  "source": {
+    "repository": "https://github.com/jmespath/jmespath.py",
+    "commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "JM-S01",
+      "title": "发货标识投影",
+      "goal": "按真实数据形状理解导出并诊断空结果",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JM-U01",
+            "JM-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "JM-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "JM-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-U01",
+          "kind": "understand",
+          "goal": "按导出要求保留或省略空值位置",
+          "prompt": "Trace both complete projection controls and explain exact results, including zero/false values. Do not edit files.",
+          "requires": [],
+          "materials": [
+            "materials/projection.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JM-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JM-D01",
+          "kind": "diagnose",
+          "goal": "核对空查询结果的表达式和数据形状",
+          "prompt": "A shipment ID export unexpectedly returns no IDs. Request the exact expression, a complete synthetic payload, field types and desired result before diagnosing. No library change is authorized.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JM-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "complete_query",
+              "when": "The user is asked for the exact expression and actual payload or an equivalent complete query reproduction.",
+              "materials": [
+                "disclosure/query-shape.md"
+              ],
+              "setup": [],
+              "activate_tasks": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "JM-S02",
+      "title": "库存默认和排序",
+      "goal": "按明确空值政策生成数值报表",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JM-C01",
+            "JM-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-C01",
+          "kind": "consult",
+          "goal": "为零值布尔值和缺失选择默认策略",
+          "prompt": "Meet the complete fallback and key-presence requirement using existing functions. Give exact control results and a clear policy without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/defaults.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JM-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "JM-C02",
+          "kind": "consult",
+          "goal": "显式转换混合价格后做数值排序",
+          "prompt": "Build the requested report with existing query functions and state how invalid prices are handled. Preserve input ownership; no library edits.",
+          "requires": [],
+          "materials": [
+            "materials/sort.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JM-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JM-S03",
+      "title": "查询结果归属",
+      "goal": "避免修改共享字面结果污染后续调用",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JM-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-U02",
+          "kind": "understand",
+          "goal": "识别编译字面结果的共享引用",
+          "prompt": "Trace all supplied literal-result ownership controls and explain a safe caller boundary. Do not modify the library or claim universal copying.",
+          "requires": [],
+          "materials": [
+            "materials/ownership.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JM-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JM-S04",
+      "title": "受信业务函数",
+      "goal": "用显式选项提供有类型边界的扩展",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JM-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-P01",
+          "kind": "plan",
+          "goal": "用受信选项隔离业务查询函数",
+          "prompt": "Plan the complete scoped warehouse-function requirement using the existing extension API. Include typed inputs, built-ins, ownership and trust boundaries without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/functions.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JM-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "JM-S05",
+      "title": "JSON差异筛选",
+      "goal": "在明确授权范围内修复嵌套比较",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "JM-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-M01",
+          "kind": "modify",
+          "goal": "修复嵌套JSON比较混淆布尔和数字",
+          "prompt": "Implement only the explicitly authorized recursive comparator repair and public regressions. Preserve every listed compatibility boundary and all frozen original tests.",
+          "requires": [],
+          "materials": [
+            "materials/equality-repair.md"
+          ],
+          "allowed_paths": [
+            "library/jmespath/visitor.py",
+            "app/test_json_equality.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/JM-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

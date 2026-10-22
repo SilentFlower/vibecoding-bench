@@ -1,0 +1,17 @@
+certifi==2026.10.19
+cffi==2.1.1
+charset-normalizer==3.5.2
+cryptography==50.0.2
+ephemeral-port-reserve==1.1.4
+idna==3.20
+iniconfig==2.3.1
+MarkupSafe==3.0.4
+packaging==26.3
+pluggy==1.7.0
+pycparser==3.11
+Pygments==2.21.0
+pytest==9.1.1
+pytest-timeout==2.4.0
+requests==2.34.2
+urllib3==2.8.0
+watchdog==6.0.0

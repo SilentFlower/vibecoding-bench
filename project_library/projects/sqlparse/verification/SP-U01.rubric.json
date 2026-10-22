@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SP-U01",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Both semicolons inside quoted strings remain inside their statements. Defaultsplit returns two statements with delimiters;strip_semicolonTrue removes only the trailing statement delimiters,not the internal literal semicolons. Use existing quote-aware splitting for the declared source rather than naive string splitting or a claim of execution/semantic validation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

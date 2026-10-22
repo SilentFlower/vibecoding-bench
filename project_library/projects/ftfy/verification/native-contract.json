@@ -1,0 +1,1856 @@
+{
+  "baseline_digest": "ed350437e078c4a8abc8ed41408e99d9a0ad4e2e258a7d9941a1f9dd9962dc96",
+  "nodes": [
+    {
+      "id": "ftfy/__init__.py::ftfy.apply_plan",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/__init__.py::ftfy.explain_unicode",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/__init__.py::ftfy.fix_encoding",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/__init__.py::ftfy.fix_encoding_and_explain",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/__init__.py::ftfy.fix_text",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/bad_codecs/__init__.py::ftfy.bad_codecs",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/bad_codecs/sloppy.py::ftfy.bad_codecs.sloppy",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/bad_codecs/utf8_variants.py::ftfy.bad_codecs.utf8_variants",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.decode_escapes",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.fix_character_width",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.fix_latin_ligatures",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.fix_line_breaks",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.fix_surrogates",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.remove_bom",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.remove_terminal_escapes",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.uncurl_quotes",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/fixes.py::ftfy.fixes.unescape_html",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/formatting.py::ftfy.formatting.character_width",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/formatting.py::ftfy.formatting.display_center",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/formatting.py::ftfy.formatting.display_ljust",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/formatting.py::ftfy.formatting.display_rjust",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "ftfy/formatting.py::ftfy.formatting.monospaced_width",
+      "kind": "DoctestItem",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_bytes.py::test_guess_bytes[No\\xebl\\nCoward]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_bytes.py::test_guess_bytes[Ren\\xe9e\\nFleming]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_bytes.py::test_guess_bytes[Se\\xf1or\\nCardgage]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_bytes.py::test_guess_bytes[\\u20ac \\u2022 \\xa3 \\u2022 \\xa5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_bytes.py::test_guess_bytes[\\xbfQu\\xe9?]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_bytes.py::test_guess_bytes_null",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_bytes.py::test_incomplete_sequences",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_characters.py::test_byte_order_mark",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_characters.py::test_color_escapes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_characters.py::test_control_chars",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_characters.py::test_ohio_flag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_characters.py::test_possible_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_characters.py::test_surrogates",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_characters.py::test_welsh_flag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_alternate_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_guess_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_same_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_stdin",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_cli.py::test_wrong_encoding",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_encodings.py::test_cesu8",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_encodings.py::test_russian_crash",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entities.py::test_entities",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_entities.py::test_old_parameter_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case0]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case1]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case2]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case3]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case4]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case5]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case6]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case7]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case8]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_failing_json_example[test_case9]",
+      "kind": "Function",
+      "outcome": "xfailed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case101]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case102]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case103]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case104]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case105]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case106]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case107]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case108]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case109]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case110]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case111]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case112]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case113]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case114]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case115]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case116]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case117]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case118]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case119]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case120]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case121]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case122]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case124]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case125]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case126]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case127]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case128]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case129]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case130]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case131]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case132]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case133]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case134]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case135]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case136]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case137]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case138]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case139]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case140]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case141]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case142]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case143]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case144]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case145]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case146]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case147]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case148]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case149]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case150]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case28]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case29]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case33]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case34]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case35]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case36]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case37]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case38]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case39]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case41]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case43]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case44]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case45]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case46]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case47]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case48]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case49]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case51]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case52]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case53]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case54]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case55]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case56]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case57]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case58]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case59]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case60]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case61]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case62]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case63]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case64]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case65]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case66]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case67]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case68]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case69]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case70]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case71]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case72]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case73]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case74]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case75]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case76]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case77]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case78]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case79]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case80]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case81]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case82]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case83]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case84]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case85]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case86]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case87]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case88]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case89]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case90]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case91]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case92]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case93]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case94]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case95]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case96]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case97]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case98]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case99]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_json_example[test_case9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case100]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case101]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case102]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case103]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case104]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case105]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case106]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case107]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case108]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case109]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case110]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case111]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case112]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case113]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case114]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case115]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case116]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case117]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case118]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case119]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case11]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case120]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case121]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case122]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case123]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case124]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case125]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case126]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case127]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case128]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case129]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case12]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case130]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case131]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case132]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case133]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case134]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case135]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case136]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case137]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case138]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case139]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case13]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case140]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case141]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case142]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case143]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case144]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case145]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case146]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case147]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case148]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case149]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case14]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case150]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case151]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case152]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case153]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case154]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case155]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case156]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case157]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case158]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case159]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case160]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case16]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case17]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case18]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case19]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case22]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case23]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case24]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case25]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case26]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case27]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case28]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case29]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case31]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case32]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case33]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case34]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case35]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case36]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case37]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case38]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case39]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case41]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case42]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case43]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case44]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case45]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case46]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case47]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case48]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case49]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case51]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case52]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case53]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case54]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case55]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case56]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case57]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case58]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case59]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case60]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case61]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case62]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case63]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case64]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case65]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case66]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case67]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case68]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case69]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case70]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case71]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case72]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case73]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case74]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case75]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case76]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case77]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case78]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case79]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case80]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case81]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case82]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case83]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case84]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case85]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case86]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case87]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case88]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case89]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case90]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case91]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case92]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case93]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case94]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case95]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case96]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case97]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case98]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case99]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_examples_in_json.py::test_well_formed_example[test_case9]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "66993a5e3905005e0981159b4794d10b1adacf341a58a44d696ad2c4442dcdc6",
+      "version": "8.4.2"
+    }
+  ],
+  "project": "ftfy",
+  "python": "3.12.15",
+  "schema": 1
+}

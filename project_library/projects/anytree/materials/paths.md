@@ -1,0 +1,1 @@
+Create two same-named siblings same under root,with stable business keys A andB. Compare Resolver(name).get(root,/root/same),glob on the same path,and get after reversing root.children. The business lookup must be unambiguous. Advise unique path attributes or explicit ID/multi-match policy; do not claim names are automatically unique or that get detects ambiguity. No edits.

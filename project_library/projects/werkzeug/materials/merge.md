@@ -1,0 +1,1 @@
+Start qty=['2','3']; update with qty=['4'],inspect all values,then pop qty and inspect membership. Compare setlist replacement and poplist. Advise deliberate merge/replacement/consumption policy for a multi-select form; do not treat pop as consuming just one item. No implementation.

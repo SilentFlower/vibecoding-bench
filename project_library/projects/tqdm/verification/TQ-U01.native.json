@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TQ-U01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "iteration_updates_after_yield_and_disabled_counter_stays_initial": true
+  },
+  "resource_profile": "business"
+}

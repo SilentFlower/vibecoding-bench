@@ -1,0 +1,303 @@
+{
+  "schema": 2,
+  "project_key": "inflect",
+  "title": "Inflect英语报表工作场景",
+  "category": "英语文本与引擎状态",
+  "description": "计数、冠词、缩写、列表、读数、隔离、诊断及模式修复八项独立任务。",
+  "seed_digest": "115ebda0c55acccbc49c9787a1263aef82c179b4aacc8126a972067ef244873d",
+  "environment": "inflect-py312",
+  "source": {
+    "repository": "https://github.com/jaraco/inflect",
+    "commit": "99596854bd296af1557db2015cfa98c8104ec155",
+    "license_files": [
+      "seed/app/LICENSE-inflect-build.txt",
+      "seed/app/inflect-attribution.md"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "IF-S01",
+      "title": "通知文案",
+      "goal": "明确计数状态并选择当前冠词",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IF-U01",
+            "IF-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-U01",
+          "kind": "understand",
+          "goal": "追踪持久计数和显式覆盖",
+          "prompt": "Trace the complete fresh-engine count sequence and explain ownership without edits.",
+          "requires": [],
+          "materials": [
+            "materials/count.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IF-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IF-C01",
+          "kind": "consult",
+          "goal": "选择英语冠词并核计数边界",
+          "prompt": "Meet the complete notification examples with current article support, without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/articles.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IF-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IF-S02",
+      "title": "报表文本格式",
+      "goal": "使用当前大小写规则和人工列表格式",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IF-C02",
+            "IF-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-C02",
+          "kind": "consult",
+          "goal": "保留报表缩写的指定复数大小写",
+          "prompt": "Meet the complete URLs requirement using existing trusted custom-rule support. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/custom.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IF-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-C02.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IF-U03",
+          "kind": "understand",
+          "goal": "追踪人工列表标点的选择",
+          "prompt": "Trace the complete join controls and explain the human versus structured interchange requirement without edits.",
+          "requires": [],
+          "materials": [
+            "materials/join.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IF-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IF-S03",
+      "title": "金额读数",
+      "goal": "在文本渲染前确定数值验收",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IF-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-U02",
+          "kind": "understand",
+          "goal": "识别读数渲染与数值校验的差异",
+          "prompt": "Trace all complete number-rendering inputs and explain a deliberate validation boundary. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/numbers.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IF-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "IF-S04",
+      "title": "报表隔离与诊断",
+      "goal": "规划引擎归属并按证据解释词形",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IF-P01",
+            "IF-D01"
+          ]
+        },
+        {
+          "id": "diagnose_only",
+          "task_ids": [
+            "IF-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "IF-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-P01",
+          "kind": "plan",
+          "goal": "规划报表引擎的状态归属",
+          "prompt": "Plan report isolation using the complete count/mode controls. Do not implement a service.",
+          "requires": [],
+          "materials": [
+            "materials/ownership.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IF-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-P01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "IF-D01",
+          "kind": "diagnose",
+          "goal": "先核大小写和模式再诊断异常复数",
+          "prompt": "A heading plural looks wrong. Request the exact word/case, engine setup, classical modes and count before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IF-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "word-and-modes",
+              "when": "The exact input/case, count and engine modes are not supplied or declared unavailable, and a complete reproduction is reasonably requested.",
+              "materials": [
+                "disclosure/names.md"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "IF-S05",
+      "title": "模式更新修复",
+      "goal": "失败前验证全部键并保持原状态",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "IF-M01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-M01",
+          "kind": "modify",
+          "goal": "避免未知模式键导致部分状态更新",
+          "prompt": "Implement only the explicitly authorized key-prevalidation repair, public regressions and change fragment. Preserve accepted modes/values and original tests.",
+          "requires": [],
+          "materials": [
+            "materials/classical-repair.md"
+          ],
+          "allowed_paths": [
+            "library/inflect/__init__.py",
+            "app/test_classical.py",
+            "library/newsfragments/+classical-validation.bugfix.rst"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/IF-M01.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-M01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

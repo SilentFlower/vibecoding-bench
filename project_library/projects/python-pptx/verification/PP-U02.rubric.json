@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PP-U02",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "SlidePlaceholders iterates in idx order but __getitem__ looks up the template idx as a key. With0,7,len2,index1 raisesKeyError whilekey7 succeeds. Discover/map template roles using actual placeholder_format.idx and validate required roles rather than enumerate and index by list position.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-U02",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The stdlibJSON preconfigured converter already handles nested attrs classes,ISO8601 aware datetimes andbase85 bytes. Document exact wire types/encoding and verify roundtrip; bytes are not automaticallyUTF8/base64 and these capabilities need no new serializerAPI.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

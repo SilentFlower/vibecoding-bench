@@ -1,0 +1,609 @@
+{
+  "status": "passed",
+  "scope": "当前实际基线原件记录的镜像、配置限额和清理；配置内存不是RSS峰值",
+  "distinct_image_ids": [
+    "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+  ],
+  "items": [
+    {
+      "project": "alive-progress",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 6.06136,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/alive-progress/result.json",
+      "baseline_result_sha256": "e5c94dd0ce5caeec14db229772357e2099cd7fa779c1769638cd2f2ec9ed2b82"
+    },
+    {
+      "project": "jmespath",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 6.328374,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/jmespath/result.json",
+      "baseline_result_sha256": "53e1f03307dc8c0667b549e693de8766b59dfd1036d4ca45c80ce66df703772b"
+    },
+    {
+      "project": "confuse",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 4.750875,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/confuse/result.json",
+      "baseline_result_sha256": "56a112a4ad1b7e2c4bcf1a15fe17a270032275e2ff8136b6c71cc90dc996989b"
+    },
+    {
+      "project": "simplejson",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 7.0032,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-005/simplejson/result.json",
+      "baseline_result_sha256": "9aa4f0a8176fac967141ff3c3357b27313067b33510d88b3046456095da57d9c"
+    },
+    {
+      "project": "marshmallow",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 7.946499,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/marshmallow/result.json",
+      "baseline_result_sha256": "db15884514e914dc11daac771513c2697ac16e9b772dd6ffa150e2875eeda1d8"
+    },
+    {
+      "project": "inflect",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 8.601995,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/inflect/result.json",
+      "baseline_result_sha256": "10b94ac324151a0198d625863e18e296ddf916fd8eb180bcfe2b66f1c35a69f2"
+    },
+    {
+      "project": "tqdm",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 16.48893,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/tqdm/result.json",
+      "baseline_result_sha256": "34177e0530f04876e40ba4fe218003e0c2144cbaefb489fb7c80626d66add881"
+    },
+    {
+      "project": "pyyaml",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 8.40986,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/pyyaml/result.json",
+      "baseline_result_sha256": "e5372d9d4ada2458f3b4804e4a7b7aa8f86468512d5b9d8be9a5decdf5af5c55"
+    },
+    {
+      "project": "pluggy",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 5.484703,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/pluggy/result.json",
+      "baseline_result_sha256": "b74905a1829253d59af0b14f6046dd11ae53ff249e80154383d1eb1b3328f053"
+    },
+    {
+      "project": "xlsxwriter",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 25.177128,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/xlsxwriter/result.json",
+      "baseline_result_sha256": "f653ca6597ad17096e99cdd34b1eaed0098e58ad6b88d37bc163e8b6b9967920"
+    },
+    {
+      "project": "mistletoe",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 6.836346,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/mistletoe/result.json",
+      "baseline_result_sha256": "62adc348a16d5bd85e023ce529161334b51217f484e62597912cabf3b9db4ee7"
+    },
+    {
+      "project": "python-docx",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 18.987031,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/python-docx/result.json",
+      "baseline_result_sha256": "5b99e7cd1a325ef031b3915fc84705d7dd04f4882f95afcd1d4a1482efba534b"
+    },
+    {
+      "project": "python-pptx",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 30.866175,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/python-pptx/result.json",
+      "baseline_result_sha256": "29052bb8bc292669fc02facd0107976ce3c0d8415c1d73be251008cb5e415cc2"
+    },
+    {
+      "project": "mdit-py-plugins",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 9.584421,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/mdit-py-plugins/result.json",
+      "baseline_result_sha256": "a88357d763eb2aaf3c8c2fcd1d5a70530d3496135e46dfe686584d11f34da1a8"
+    },
+    {
+      "project": "dynaconf",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 88.692703,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/dynaconf/result.json",
+      "baseline_result_sha256": "4be27cb8764d2719e3b0ecbeb8f4ec0eeb6c8aaa123785c5c0d8a5a1720437e3"
+    },
+    {
+      "project": "attrs",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 31.203292,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/attrs/result.json",
+      "baseline_result_sha256": "7c2fdf20d89984708de8a406d385b636c08754c4538d06f9eda48d75fdc502cf"
+    },
+    {
+      "project": "cssselect",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 11.159356,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/cssselect/result.json",
+      "baseline_result_sha256": "5c15bc04bd13885efa87503a6c4a5585916a2048430e4a6214522e2f2aff2730"
+    },
+    {
+      "project": "structlog",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 15.09188,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/structlog/result.json",
+      "baseline_result_sha256": "0b7a45728892ed76e97544014b0524fa25686f08b56c8c21d87353f90243f1dd"
+    },
+    {
+      "project": "cattrs",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 600,
+      "runner_timeout_sec": 570,
+      "elapsed_sec": 297.669232,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/cattrs/result.json",
+      "baseline_result_sha256": "85f149e461f964845f4df1997d3e663c8e18bb8c125b39e678b6ebd52e74a2eb"
+    },
+    {
+      "project": "flask",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 10.061302,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/flask/result.json",
+      "baseline_result_sha256": "f4f53fe6be8cd6af702744cef61f49372f78f87e0d35a194e961cf197d770508"
+    },
+    {
+      "project": "babel",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 52.209203,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-003/babel/result.json",
+      "baseline_result_sha256": "9314d1da92840732ec1982f6cce8871d66761e120928863b49ee24e07bf5a66c"
+    },
+    {
+      "project": "anytree",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 20.316442,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/anytree/result.json",
+      "baseline_result_sha256": "85425ccc8d70d140531d97567568efa3325c8c2da43e8e7d226f7b6c1bd326a4"
+    },
+    {
+      "project": "werkzeug",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 35.052727,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/werkzeug/result.json",
+      "baseline_result_sha256": "36230e09ce90a4e24399b664fdbd225fa9287bed449ccdc3c3ebe2273f810633"
+    },
+    {
+      "project": "html2text",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 26.800195,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/html2text/result.json",
+      "baseline_result_sha256": "5060c22141fc4aac70bfbcffc020072a4850a9e49b5282378a0b939c232293bd"
+    },
+    {
+      "project": "packaging",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 1073741824,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 600,
+      "runner_timeout_sec": 570,
+      "elapsed_sec": 81.483289,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-003/packaging/result.json",
+      "baseline_result_sha256": "a8d7120d71e992888e16e5c9f1eac91cde0a1f247ffd074ecbc81e1a76c88b5d"
+    },
+    {
+      "project": "bibtexparser",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 25.589595,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/bibtexparser/result.json",
+      "baseline_result_sha256": "a24ba1be0cadc28e4971574ed4e31fdd5d74004c7df983ef1987f118af4b053a"
+    },
+    {
+      "project": "treelib",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 11.834236,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/treelib/result.json",
+      "baseline_result_sha256": "67bb3fa9959804c80de3e42f8b541c9a06f5512995a040583198f105a61d27cf"
+    },
+    {
+      "project": "sqlparse",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 23.720432,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/sqlparse/result.json",
+      "baseline_result_sha256": "db64305cf07925bb27951184d1a59281e881775dca80745b0e34097df8a86ea3"
+    },
+    {
+      "project": "python-dateutil",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 79.528387,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-002/python-dateutil/result.json",
+      "baseline_result_sha256": "d38400ff7b00472255a1167737d37a2fb196d613016446e637e2e1410f75068c"
+    },
+    {
+      "project": "ftfy",
+      "image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+      "repository_digests": [
+        "ghcr.io/silentflower/vibebench-v3-account@sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216"
+      ],
+      "configured_memory_bytes": 536870912,
+      "configured_swap_bytes": 0,
+      "pids_limit": 64,
+      "regression_timeout_sec": 180,
+      "runner_timeout_sec": 150,
+      "elapsed_sec": 11.103524,
+      "network": "none",
+      "user": "1000:1000",
+      "root_read_only": true,
+      "account_credentials_mounted": false,
+      "container_removed": true,
+      "baseline_result": ".deploy/project-catalog-hundred/stage-02/calibration/attempt-001/ftfy/result.json",
+      "baseline_result_sha256": "2ebf60fa1ab7bb1b7d0ca3033cffccb874f56267267d8a2e580bd03f3b45a580"
+    }
+  ]
+}

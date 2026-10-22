@@ -1,0 +1,2589 @@
+{
+  "baseline_digest": "a982858bfc1d8550400f74ea235ff0d83073a1fe3453d1bbf72812d79271ac9f",
+  "nodes": [
+    {
+      "id": "tests/test_admon.py::test_all[119-Consecutive admonitions-!!! note\\n\\n!!! warning\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n</div>\\n<div class=\"admonition warning\">\\n<p class=\"admonition-title\">Warning</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[134-Marker may be indented up to 3 chars-   !!! note\\n       content\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p>content</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[14-Could contain block elements too-!!! note\\n    ### heading\\n\\n    -----------\\n\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<h3>heading</h3>\\n<hr>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[146-But that's a code block-    !!! note\\n        content\\n-<pre><code>!!! note\\n    content\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[157-Some more indent checks-  !!! note\\n   not a code block\\n\\n    code block\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n</div>\\n<p>not a code block</p>\\n<pre><code>code block\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[173-Type could be adjacent to marker-!!!note\\n   xxx\\n\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p>xxx</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[186-Type could be adjacent to marker and content may be shifted up to 3 chars-!!!note\\n      xxx\\n\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p>xxx</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[199-Or several spaces apart-!!!     note\\n        xxx\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p>xxx</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[2-Simple admonition-!!! note\\n    *content*\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p><em>content</em></p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[211-Admonitions self-close at the end of the document-!!! note\\n    xxx\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p>xxx</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[223-They could be nested in lists-- !!! note\\n      - a\\n      - b\\n- !!! warning\\n      - c\\n      - d\\n-<ul>\\n<li>\\n<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<ul>\\n<li>a</li>\\n<li>b</li>\\n</ul>\\n</div>\\n</li>\\n<li>\\n<div class=\"admonition warning\">\\n<p class=\"admonition-title\">Warning</p>\\n<ul>\\n<li>c</li>\\n<li>d</li>\\n</ul>\\n</div>\\n</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[255-Or in blockquotes-> !!! note\\n>     xxx\\n>     > yyy\\n>     zzz\\n>\\n-<blockquote>\\n<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p>xxx</p>\\n<blockquote>\\n<p>yyy\\nzzz</p>\\n</blockquote>\\n</div>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[276-Renders unknown admonition type-!!! unknown title\\n    content\\n-<div class=\"admonition unknown\">\\n<p class=\"admonition-title\">title</p>\\n<p>content</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[288-Does not render-!!!\\n    content\\n-<p>!!!\\ncontent</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[299-MKdocs Closed Collapsible Sections-??? note\\n    content\\n-<div class=\"admonition note is-collapsible collapsible-closed\">\\n<p class=\"admonition-title\">Note</p>\\n<p>content</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[30-Shows custom title-!!! note Custom title\\n\\n    Some text\\n\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Custom title</p>\\n<p>Some text</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[311-MKdocs Open Collapsible Sections-???+ note\\n    content\\n-<div class=\"admonition note is-collapsible collapsible-open\">\\n<p class=\"admonition-title\">Note</p>\\n<p>content</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[322-Indented by 4 spaces-    ??? note\\n        content\\n-<pre><code>??? note\\n    content\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[332-Indented by 4 spaces, DISABLE-CODEBLOCKS-    ??? note\\n        content\\n-<div class=\"admonition note is-collapsible collapsible-closed\">\\n<p class=\"admonition-title\">Note</p>\\n<p>content</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[44-Shows no title-!!! note \"\"\\n    Some text\\n\\n-<div class=\"admonition note\">\\n<p>Some text</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[56-Removes extra quotes from the title-!!! danger \"Don't try this at home\"\\n    ...\\n\\n-<div class=\"admonition danger\">\\n<p class=\"admonition-title\">Don't try this at home</p>\\n<p>...</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[69-Parse additional classes to support Python markdown (https://github.com/executablebooks/mdit-py-plugins/issues/93#issuecomment-1601822723)-!!! a b c d inline-classes   \"Note: note about \"foo\"\" \\n    ...\\n\\n-<div class=\"admonition a b c d inline-classes\">\\n<p class=\"admonition-title\">Note: note about &quot;foo&quot;</p>\\n<p>...</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[82-Closes block after 2 empty lines-!!! note \\n    Some text\\n\\n\\n    A code block\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p>Some text</p>\\n</div>\\n<pre><code>A code block\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_all[99-Nested blocks-!!! note\\n    !!! note\\n        Some text\\n            \\n            code block\\n-<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<div class=\"admonition note\">\\n<p class=\"admonition-title\">Note</p>\\n<p>Some text</p>\\n<pre><code>code block\\n</code></pre>\\n</div>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_plugin_parse[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_plugin_parse[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_admon.py::test_plugin_parse[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_custom_renderer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[1-equation environment:-\\\\begin{equation}\\na = 1\\n\\\\end{equation}\\n-<div class=\"math amsmath\">\\n\\\\begin{equation}\\na = 1\\n\\\\end{equation}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[101-align* environment:-\\\\begin{align*}\\na = 1\\n\\\\end{align*}\\n-<div class=\"math amsmath\">\\n\\\\begin{align*}\\na = 1\\n\\\\end{align*}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[114-alignat environment:-\\\\begin{alignat}\\na = 1\\n\\\\end{alignat}\\n-<div class=\"math amsmath\">\\n\\\\begin{alignat}\\na = 1\\n\\\\end{alignat}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[127-alignat* environment:-\\\\begin{alignat*}\\na = 1\\n\\\\end{alignat*}\\n-<div class=\"math amsmath\">\\n\\\\begin{alignat*}\\na = 1\\n\\\\end{alignat*}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[14-equation environment on one line:-\\\\begin{equation}a = 1\\\\end{equation}\\n-<div class=\"math amsmath\">\\n\\\\begin{equation}a = 1\\\\end{equation}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[140-flalign environment:-\\\\begin{flalign}\\na = 1\\n\\\\end{flalign}\\n-<div class=\"math amsmath\">\\n\\\\begin{flalign}\\na = 1\\n\\\\end{flalign}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[153-flalign* environment:-\\\\begin{flalign*}\\na = 1\\n\\\\end{flalign*}\\n-<div class=\"math amsmath\">\\n\\\\begin{flalign*}\\na = 1\\n\\\\end{flalign*}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[166-equation environment, with before/after paragraphs:-before\\n\\\\begin{equation}\\na = 1\\n\\\\end{equation}\\nafter\\n-<p>before</p>\\n<div class=\"math amsmath\">\\n\\\\begin{equation}\\na = 1\\n\\\\end{equation}\\n</div>\\n<p>after</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[183-equation environment, in list:-- \\\\begin{equation}\\n  a = 1\\n  \\\\end{equation}\\n-<ul>\\n<li>\\n<div class=\"math amsmath\">\\n\\\\begin{equation}\\na = 1\\n\\\\end{equation}\\n</div>\\n</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[200-equation environment, in block quote:-> \\\\begin{matrix}\\n> -0.707 &  0.408 &  0.577 \\\\\\\\\\n> -0.707 & -0.408 & -0.577 \\\\\\\\\\n> -0.    & -0.816 &  0.577\\n> \\\\end{matrix}\\n\\n> \\\\begin{equation}\\na = 1\\n\\\\end{equation}\\n-<blockquote>\\n<div class=\"math amsmath\">\\n\\\\begin{matrix}\\n-0.707 &amp;  0.408 &amp;  0.577 \\\\\\\\\\n-0.707 &amp; -0.408 &amp; -0.577 \\\\\\\\\\n-0.    &amp; -0.816 &amp;  0.577\\n\\\\end{matrix}\\n</div>\\n</blockquote>\\n<blockquote>\\n<div class=\"math amsmath\">\\n\\\\begin{equation}\\na = 1\\n\\\\end{equation}\\n</div>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[23-equation* environment:-\\\\begin{equation*}\\na = 1\\n\\\\end{equation*}\\n-<div class=\"math amsmath\">\\n\\\\begin{equation*}\\na = 1\\n\\\\end{equation*}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[230-`alignat` environment and HTML escaping-\\\\begin{alignat}{3}\\n    & d   = \\\\frac{1}{1 + 0.2316419x}  \\\\quad && a_1  = 0.31938153   \\\\quad && a_2 = -0.356563782 \\\\\\\\\\n    & a_3 = 1.781477937               \\\\quad && a_4  = -1.821255978 \\\\quad && a_5 = 1.330274429\\n\\\\end{alignat}\\n-<div class=\"math amsmath\">\\n\\\\begin{alignat}{3}\\n    &amp; d   = \\\\frac{1}{1 + 0.2316419x}  \\\\quad &amp;&amp; a_1  = 0.31938153   \\\\quad &amp;&amp; a_2 = -0.356563782 \\\\\\\\\\n    &amp; a_3 = 1.781477937               \\\\quad &amp;&amp; a_4  = -1.821255978 \\\\quad &amp;&amp; a_5 = 1.330274429\\n\\\\end{alignat}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[245-`alignat*` environment and HTML escaping-\\\\begin{alignat*}{3}\\n& m   \\\\quad && \\\\text{m\\xf3dulo}            \\\\quad && m>0\\\\\\\\\\n& a   \\\\quad && \\\\text{multiplicador}     \\\\quad && 0<a<m\\\\\\\\\\n& c   \\\\quad && \\\\text{constante aditiva} \\\\quad && 0\\\\leq c<m\\\\\\\\\\n& x_0 \\\\quad && \\\\text{valor inicial}     \\\\quad && 0\\\\leq x_0 <m\\n\\\\end{alignat*}\\n-<div class=\"math amsmath\">\\n\\\\begin{alignat*}{3}\\n&amp; m   \\\\quad &amp;&amp; \\\\text{m\\xf3dulo}            \\\\quad &amp;&amp; m&gt;0\\\\\\\\\\n&amp; a   \\\\quad &amp;&amp; \\\\text{multiplicador}     \\\\quad &amp;&amp; 0&lt;a&lt;m\\\\\\\\\\n&amp; c   \\\\quad &amp;&amp; \\\\text{constante aditiva} \\\\quad &amp;&amp; 0\\\\leq c&lt;m\\\\\\\\\\n&amp; x_0 \\\\quad &amp;&amp; \\\\text{valor inicial}     \\\\quad &amp;&amp; 0\\\\leq x_0 &lt;m\\n\\\\end{alignat*}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[264-Indented by 4 spaces-    \\\\begin{equation}\\n    a = 1\\n    \\\\end{equation}\\n-<pre><code>\\\\begin{equation}\\na = 1\\n\\\\end{equation}\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[276-Indented by 4 spaces, DISABLE-CODEBLOCKS-    \\\\begin{equation}\\n    a = 1\\n    \\\\end{equation}\\n-<div class=\"math amsmath\">\\n\\\\begin{equation}\\na = 1\\n\\\\end{equation}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[36-multline environment:-\\\\begin{multline}\\na = 1\\n\\\\end{multline}\\n-<div class=\"math amsmath\">\\n\\\\begin{multline}\\na = 1\\n\\\\end{multline}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[49-multline* environment:-\\\\begin{multline*}\\na = 1\\n\\\\end{multline*}\\n-<div class=\"math amsmath\">\\n\\\\begin{multline*}\\na = 1\\n\\\\end{multline*}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[62-gather environment:-\\\\begin{gather}\\na = 1\\n\\\\end{gather}\\n-<div class=\"math amsmath\">\\n\\\\begin{gather}\\na = 1\\n\\\\end{gather}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[75-gather* environment:-\\\\begin{gather*}\\na = 1\\n\\\\end{gather*}\\n-<div class=\"math amsmath\">\\n\\\\begin{gather*}\\na = 1\\n\\\\end{gather*}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_fixtures[88-align environment:-\\\\begin{align}\\na = 1\\n\\\\end{align}\\n-<div class=\"math amsmath\">\\n\\\\begin{align}\\na = 1\\n\\\\end{align}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_amsmath.py::test_plugin_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_anchors.py::test_fixtures[1-basic (max level 2):-# H1\\n\\n## H2\\n\\n### H3\\n-<h1 id=\"h1\">H1</h1>\\n<h2 id=\"h2\">H2</h2>\\n<h3>H3</h3>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_anchors.py::test_fixtures[14-space:-# a b  c\\n-<h1 id=\"a-b--c\">a b  c</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_anchors.py::test_fixtures[21-characters:-# a,b\\\\c\\u03b2\\xca\\n-<h1 id=\"abc\\u03b2\\xea\">a,b\\\\c\\u03b2\\xca</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_anchors.py::test_fixtures[28-emoji:-# \\U0001f680a\\n-<h1 id=\"a\">\\U0001f680a</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_anchors.py::test_fixtures[35-html entity:-# foo&amp;bar\\n-<h1 id=\"foobar\">foo&amp;bar</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_anchors.py::test_fixtures[42-uniqueness:-# a\\n# a\\n## a\\n-<h1 id=\"a\">a</h1>\\n<h1 id=\"a-1\">a</h1>\\n<h2 id=\"a-2\">a</h2>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_anchors.py::test_fixtures[53-standard (permalink after):-# a\\n-<h1 id=\"a\">a <a class=\"header-anchor\" href=\"#a\">\\xb6</a></h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_anchors.py::test_fixtures[60-standard (permalink before):-# a\\n-<h1 id=\"a\"><a class=\"header-anchor\" href=\"#a\">\\xb6</a> a</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[1-block with preceding text is not a block-{#a .a b=c} a\\n-<p>{#a .a b=c} a</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[104-ignore if space-![a](b) {#id key=\"*\"}\\n-<p><img src=\"b\" alt=\"a\"> {#id key=&quot;*&quot;}</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[111-ignore if text-![a](b)b{#id key=\"*\"}\\n-<p><img src=\"b\" alt=\"a\">b{#id key=&quot;*&quot;}</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[118-multi-line-![a](b){\\n    #id .a\\n    b=c\\n    }\\nmore\\n-<p><img src=\"b\" alt=\"a\" id=\"id\" b=\"c\" class=\"a\">\\nmore</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[130-merging attributes-![a](b){#a .a}{.b class=x other=h}{#x class=\"x g\" other=a}\\n-<p><img src=\"b\" alt=\"a\" id=\"x\" class=\"a b x x g\" other=\"a\"></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[137-spans: simple-[a]{#id .b}c\\n-<p><span id=\"id\" class=\"b\">a</span>c</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[144-spans: end of inline before attrs-[a]\\n-<p>[a]</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[15-block basic-{#a .a c=1}\\na\\n-<p id=\"a\" c=\"1\" class=\"a\">a</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[151-spans: space between brace and attrs-[a] {.b}\\n-<p>[a] {.b}</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[158-spans: escaped span start-\\\\[a]{.b}\\n-<p>[a]{.b}</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[165-spans: escaped span end-[a\\\\]{.b}\\n-<p>[a]{.b}</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[172-spans: escaped span attribute-[a]\\\\{.b}\\n-<p>[a]{.b}</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[179-spans: nested text syntax-[*a*]{.b}c\\n-<p><span class=\"b\"><em>a</em></span>c</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[186-spans: nested span-*[a]{.b}c*\\n-<p><em><span class=\"b\">a</span>c</em></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[193-spans: multi-line-x [a\\nb]{#id\\nb=c} y\\n-<p>x <span id=\"id\" b=\"c\">a\\nb</span> y</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[203-spans: nested spans-[[a]{.b}]{.c}\\n-<p><span class=\"c\"><span class=\"b\">a</span></span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[210-spans: short link takes precedence over span-[a]{#id .b}\\n\\n[a]: /url\\n-<p><a href=\"/url\" id=\"id\" class=\"b\">a</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[219-spans: long link takes precedence over span-[a][a]{#id .b}\\n\\n[a]: /url\\n-<p><a href=\"/url\" id=\"id\" class=\"b\">a</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[228-spans: link inside span-[[a]]{#id .b}\\n\\n[a]: /url\\n-<p><span id=\"id\" class=\"b\"><a href=\"/url\">a</a></span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[23-multiple blocks-{#a .a c=1} \\n\\n {#b .b c=2}\\na\\n-<p id=\"b\" c=\"2\" class=\"a b\">a</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[237-spans: merge attributes-[a]{#a .a}{#b .a .b other=c}{other=d}\\n-<p><span id=\"b\" class=\"a b\" other=\"d\">a</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[244-Indented by 4 spaces-    {#a .a b=c}\\n    # head\\n-<pre><code>{#a .a b=c}\\n# head\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[254-Indented by 4 spaces, DISABLE-CODEBLOCKS-    {#a .a b=c}\\n    # head\\n-<h1 id=\"a\" b=\"c\" class=\"a\">head</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[33-block list-{#a .a c=1}\\n- a\\n-<ul id=\"a\" c=\"1\" class=\"a\">\\n<li>a</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[43-block quote-{#a .a c=1}\\n> a\\n-<blockquote id=\"a\" c=\"1\" class=\"a\">\\n<p>a</p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[53-block fence-{#a .b c=1}\\n```python\\na = 1\\n```\\n-<pre><code id=\"a\" c=\"1\" class=\"b language-python\">a = 1\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[64-block after paragraph-a\\n{#a .a c=1}\\n-<p>a\\n{#a .a c=1}</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[74-simple reference link-[text *emphasis*](a){#id .a}\\n-<p><a href=\"a\" id=\"id\" class=\"a\">text <em>emphasis</em></a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[8-block no preceding-{#a .a c=1}\\n-\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[81-simple definition link-[a][]{#id .b}\\n\\n[a]: /url\\n-<p><a href=\"/url\" id=\"id\" class=\"b\">a</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[90-simple image-![a](b){#id .a b=c}\\n-<p><img src=\"b\" alt=\"a\" id=\"id\" b=\"c\" class=\"a\"></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs[97-simple inline code-`a`{#id .a b=c}\\n-<p><code id=\"id\" b=\"c\" class=\"a\">a</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_attrs.py::test_attrs_allowed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[113--:::\\n\\n  \\n:::\\n-<pre><code>\\n  \\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[127--:::\\n:::\\n-<pre><code></code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[137-- :::\\n aaa\\naaa\\n:::\\n-<pre><code>aaa\\naaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[151--  :::\\naaa\\n  aaa\\naaa\\n  :::\\n-<pre><code>aaa\\naaa\\naaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[167--   :::\\n   aaa\\n    aaa\\n  aaa\\n   :::\\n-<pre><code>aaa\\n aaa\\naaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[18--::\\nfoo\\n::\\n-<p>::\\nfoo\\n::</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[183--    :::\\n    aaa\\n    :::\\n-<pre><code>:::\\naaa\\n:::\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[197--:::\\naaa\\n  :::\\n-<pre><code>aaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[209--   :::\\naaa\\n  :::\\n-<pre><code>aaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[221--:::\\naaa\\n    :::\\n-<pre><code>aaa\\n    :::\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[234--::: :::\\naaa\\n-<pre><code class=\"block-:::\" >aaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[245--foo\\n:::\\nbar\\n:::\\nbaz\\n-<p>foo</p>\\n<pre><code>bar\\n</code></pre>\\n<p>baz</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[261--:::ruby\\ndef foo(x)\\n  return 3\\nend\\n:::\\n-<pre><code class=\"block-ruby\" >def foo(x)\\n  return 3\\nend\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[277--::::;\\n::::\\n-<pre><code class=\"block-;\" ></code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[287--::: aa :::\\nfoo\\n-<pre><code class=\"block-aa\" >foo\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[298--:::\\n::: aaa\\n:::\\n-<pre><code>::: aaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[31--:::\\naaa\\n~~~\\n:::\\n-<pre><code>aaa\\n~~~\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[312--:::\\n::: aaa\\n:::\\n-<pre><code>::: aaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[323-Ending marker could be longer-::::: name :::::\\n  hello world\\n::::::::::::::::\\n-<pre><code class=\"block-name\" >  hello world\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[333-Nested blocks-::::: name\\n:::: name\\nxxx\\n::::\\n:::::\\n-<pre><code class=\"block-name\" >:::: name\\nxxx\\n::::\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[347-Name could be adjacent to marker-:::name\\nxxx\\n:::\\n-<pre><code class=\"block-name\" >xxx\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[357-They should terminate paragraphs-blah blah\\n::: name\\ncontent\\n:::\\n-<p>blah blah</p>\\n<pre><code class=\"block-name\" >content\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[369-They could be nested in lists- -  ::: name\\n    - xxx\\n    :::\\n-<ul>\\n<li>\\n<pre><code class=\"block-name\" >- xxx\\n</code></pre>\\n</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[383-Or in blockquotes-> ::: name\\n> xxx\\n>> yyy\\n> zzz\\n> :::\\n-<blockquote>\\n<pre><code class=\"block-name\" >xxx\\n&gt; yyy\\nzzz\\n</code></pre>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[399-List indentation quirks- -  ::: name\\n    xxx\\n    yyy\\n   :::\\n\\n -  ::: name\\n    xxx\\n   yyy\\n   :::\\n-<ul>\\n<li>\\n<pre><code class=\"block-name\" >xxx\\nyyy\\n</code></pre>\\n</li>\\n</ul>\\n<pre><code>\\n-  ::: name\\n xxx\\nyyy\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[4--:::\\n<\\n >\\n:::\\n-<pre><code>&lt;\\n &gt;\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[426-Indented by 4 spaces-    :::name\\n    foo\\n    :::\\n-<pre><code>:::name\\nfoo\\n:::\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[438-Indented by 4 spaces, DISABLE-CODEBLOCKS-    :::name\\n    foo\\n    :::\\n-<pre><code class=\"block-name\" >foo\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[45--:::\\naaa\\n```\\n:::\\n-<pre><code>aaa\\n```\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[59--::::\\naaa\\n:::\\n::::::\\n-<pre><code>aaa\\n:::\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[73--:::\\n-<pre><code></code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[82--:::::\\n\\n:::\\naaa\\n-<pre><code>\\n:::\\naaa\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_fixtures[97--> :::\\n> aaa\\n\\nbbb\\n-<blockquote>\\n<pre><code>aaa\\n</code></pre>\\n</blockquote>\\n<p>bbb</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_colon_fence.py::test_plugin_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[103-But that's a code block-    ::: name\\n    content\\n    :::\\n-<pre><code>::: name\\ncontent\\n:::\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[116-Some more indent checks-  ::: name\\n   not a code block\\n\\n    code block\\n  :::\\n-<div class=\"name\">\\n<p>not a code block</p>\\n<pre><code>code block\\n</code></pre>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[13-Delimiters too short-:: name\\n*content*\\n::\\n-<p>:: name\\n<em>content</em>\\n::</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[132-Name could be adjacent to marker-:::name\\nxxx\\n:::\\n-<div class=\"name\">\\n<p>xxx</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[144-Or several spaces apart-:::    name\\nxxx\\n:::\\n-<div class=\"name\">\\n<p>xxx</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[156-It could contain params-::: name arg=123 foo=456\\nxxx\\n:::\\n-<div class=\"name\">\\n<p>xxx</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[168-But closing marker can't-::: name\\nxxx\\n::: arg=123\\n-<div class=\"name\">\\n<p>xxx\\n::: arg=123</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[181-This however isn't a valid one-::: namename\\nxxx\\n:::\\n-<p>::: namename\\nxxx\\n:::</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[193-Containers self-close at the end of the document-::: name\\nxxx\\n-<div class=\"name\">\\n<p>xxx</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[2-Simple container-::: name\\n*content*\\n:::\\n-<div class=\"name\">\\n<p><em>content</em></p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[204-They should terminate paragraphs-blah blah\\n::: name\\ncontent\\n:::\\n-<p>blah blah</p>\\n<div class=\"name\">\\n<p>content</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[218-They could be nested in lists- -  ::: name\\n    - xxx\\n    :::\\n-<ul>\\n<li>\\n<div class=\"name\">\\n<ul>\\n<li>xxx</li>\\n</ul>\\n</div>\\n</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[236-Or in blockquotes-> ::: name\\n> xxx\\n>> yyy\\n> zzz\\n> :::\\n-<blockquote>\\n<div class=\"name\">\\n<p>xxx</p>\\n<blockquote>\\n<p>yyy\\nzzz</p>\\n</blockquote>\\n</div>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[25-Could contain block elements too-::: name\\n### heading\\n\\n-----------\\n:::\\n-<div class=\"name\">\\n<h3>heading</h3>\\n<hr>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[256-List indentation quirks- -  ::: name\\n    xxx\\n    yyy\\n   :::\\n\\n -  ::: name\\n    xxx\\n   yyy\\n   :::\\n-<ul>\\n<li>\\n<div class=\"name\">\\n<p>xxx\\nyyy</p>\\n</div>\\n</li>\\n</ul>\\n<p>:::</p>\\n<ul>\\n<li>\\n<div class=\"name\">\\n<p>xxx</p>\\n</div>\\n</li>\\n</ul>\\n<p>yyy\\n:::</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[289-Indented by 4 spaces-    ::: name\\n    content\\n    :::\\n-<pre><code>::: name\\ncontent\\n:::\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[301-Indented by 4 spaces, DISABLE-CODEBLOCKS-    ::: name\\n    content\\n    :::\\n-<div class=\"name\">\\n<p>content</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[40-Ending marker could be longer-::::: name :::::\\n  hello world\\n::::::::::::::::\\n-<div class=\"name\">\\n<p>hello world</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[52-Nested blocks-::::: name\\n:::: name\\nxxx\\n::::\\n:::::\\n-<div class=\"name\">\\n<div class=\"name\">\\n<p>xxx</p>\\n</div>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[68-Incorrectly nested blocks-:::: name\\nthis block is closed with 5 markers below\\n\\n::::: name\\nauto-closed block\\n\\n:::::\\n::::\\n-<div class=\"name\">\\n<p>this block is closed with 5 markers below</p>\\n<div class=\"name\">\\n<p>auto-closed block</p>\\n</div>\\n</div>\\n<p>::::</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_all[89-Marker could be indented up to 3 spaces-   ::: name\\n   content\\n    :::\\n   :::\\n-<div class=\"name\">\\n<p>content\\n:::</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_no_new_line_issue",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_container.py::test_plugin_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[107-List is tight iff all dts are tight:-Term 1\\n: foo\\n: bar\\n\\nTerm 2\\n: foo\\n\\n: bar\\n-<dl>\\n<dt>Term 1</dt>\\n<dd>\\n<p>foo</p>\\n</dd>\\n<dd>\\n<p>bar</p>\\n</dd>\\n<dt>Term 2</dt>\\n<dd>\\n<p>foo</p>\\n</dd>\\n<dd>\\n<p>bar</p>\\n</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[137-Regression test (first paragraphs shouldn't be tight):-Term 1\\n: foo\\n\\n  bar\\nTerm 2\\n: foo\\n-<dl>\\n<dt>Term 1</dt>\\n<dd>\\n<p>foo</p>\\n<p>bar\\nTerm 2</p>\\n</dd>\\n<dd>\\n<p>foo</p>\\n</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[160--# test\\n  : just a paragraph with a colon\\n-<h1>test</h1>\\n<p>: just a paragraph with a colon</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[170--test\\n  : foo\\n      : bar\\n          : baz\\n      : bar\\n  : foo\\n-<dl>\\n<dt>test</dt>\\n<dd>\\n<dl>\\n<dt>foo</dt>\\n<dd>\\n<dl>\\n<dt>bar</dt>\\n<dd>baz</dd>\\n</dl>\\n</dd>\\n<dd>bar</dd>\\n</dl>\\n</dd>\\n<dd>foo</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[198-Regression test, tabs-Term 1\\n  :\\t\\tcode block\\n-<dl>\\n<dt>Term 1</dt>\\n<dd>\\n<pre><code>code block\\n</code></pre>\\n</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[213-Regression test (blockquote inside deflist)-foo\\n: > bar\\n: baz\\n-<dl>\\n<dt>foo</dt>\\n<dd>\\n<blockquote>\\n<p>bar</p>\\n</blockquote>\\n</dd>\\n<dd>baz</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[231-Coverage, 1 blank line-test\\n\\n-<p>test</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[240-Coverage, 2 blank lines-test\\n\\n\\n-<p>test</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[249-Indented by 4 spaces-    Term 1\\n\\n    : Definition 1\\n-<pre><code>Term 1\\n\\n: Definition 1\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[261-Indented by 4 spaces, DISABLE-CODEBLOCKS-    Term 1\\n\\n    : Definition 1\\n-<dl>\\n<dt>Term 1</dt>\\n<dd>Definition 1</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[3--Term 1\\n\\n: Definition 1\\n\\nTerm 2 with *inline markup*\\n\\n: Definition 2\\n\\n      { some code, part of Definition 2 }\\n\\n  Third paragraph of definition 2.\\n-<dl>\\n<dt>Term 1</dt>\\n<dd>\\n<p>Definition 1</p>\\n</dd>\\n<dt>Term 2 with <em>inline markup</em></dt>\\n<dd>\\n<p>Definition 2</p>\\n<pre><code>{ some code, part of Definition 2 }\\n</code></pre>\\n<p>Third paragraph of definition 2.</p>\\n</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[33--Term 1\\n\\n:   Definition\\nwith lazy continuation.\\n\\n    Second paragraph of the definition.\\n-<dl>\\n<dt>Term 1</dt>\\n<dd>\\n<p>Definition\\nwith lazy continuation.</p>\\n<p>Second paragraph of the definition.</p>\\n</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[53--Term 1\\n  ~ Definition 1\\n\\nTerm 2\\n  ~ Definition 2a\\n  ~ Definition 2b\\n-<dl>\\n<dt>Term 1</dt>\\n<dd>Definition 1</dd>\\n<dt>Term 2</dt>\\n<dd>Definition 2a</dd>\\n<dd>Definition 2b</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[72--Term 1\\n  :    paragraph\\n\\nTerm 2\\n  :     code block\\n-<dl>\\n<dt>Term 1</dt>\\n<dd>paragraph</dd>\\n<dt>Term 2</dt>\\n<dd>\\n<pre><code>code block\\n</code></pre>\\n</dd>\\n</dl>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_all[92--Non-term 1\\n  :\\n\\nNon-term 2\\n  :   \\n-<p>Non-term 1\\n:</p>\\n<p>Non-term 2\\n:</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_deflist.py::test_plugin_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_block_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_custom_renderer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[1-single dollar-$\\n-<p>$</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[108-Inline multi-line with newline (valid=False)-a $a\\n\\n\\\\not=1$ b\\n-<p>a $a</p>\\n<p>\\\\not=1$ b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[118-single block equation, greek index (valid=True)-$$e_\\\\\\\\alpha$$\\n-<div class=\"math block\">\\ne_\\\\\\\\alpha\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[127-display equation on its own single line. (valid=True)-$$1+1=2$$\\n-<div class=\"math block\">\\n1+1=2\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[136-display equation with number on its own single line. (valid=True)-$$1+1=2$$ (2)\\n-<div id=\"2\" class=\"math block\">\\n<a href=\"#2\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\n1+1=2\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[146-inline equation followed by block equation. (valid=True)-${e}_x$\\n\\n$$e_\\\\\\\\alpha$$\\n-<p><span class=\"math inline\">{e}_x</span></p>\\n<div class=\"math block\">\\ne_\\\\\\\\alpha\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[15-single character inline equation. (valid=True)-$a$\\n-<p><span class=\"math inline\">a</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[158-underline tests (valid=True)-$$c{\\\\\\\\bold e}_x = a{\\\\\\\\bold e}_\\\\\\\\alpha - b\\\\\\\\tilde{\\\\\\\\bold e}_\\\\\\\\alpha$$\\n-<div class=\"math block\">\\nc{\\\\\\\\bold e}_x = a{\\\\\\\\bold e}_\\\\\\\\alpha - b\\\\\\\\tilde{\\\\\\\\bold e}_\\\\\\\\alpha\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[168-after closing $ or both is allowed. (valid=True)-a$1+1=2$\\n$1+1=2$b\\nc$x$d\\n-<p>a<span class=\"math inline\">1+1=2</span>\\n<span class=\"math inline\">1+1=2</span>b\\nc<span class=\"math inline\">x</span>d</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[179-following dollar character '$' is allowed. (valid=True)-$x$ $\\n-<p><span class=\"math inline\">x</span> $</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[186-consecutive inline equations. (valid=True)-$x$ $y$\\n-<p><span class=\"math inline\">x</span> <span class=\"math inline\">y</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[193-inline equation after '-' sign in text. (valid=True)-so-what is $x$\\n-<p>so-what is <span class=\"math inline\">x</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[200-display equation with line breaks. (valid=True)-$$\\n1+1=2\\n$$\\n-<div class=\"math block\">\\n1+1=2\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[211-multiple equations (valid=True)-$$\\na = 1\\n$$\\n\\n$$\\nb = 2\\n$$\\n-<div class=\"math block\">\\na = 1\\n</div>\\n<div class=\"math block\">\\nb = 2\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[22-inline equation with single greek character (valid=True)-$\\\\\\\\varphi$\\n-<p><span class=\"math inline\">\\\\\\\\varphi</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[229-display equation with blank lines. (valid=False)-$$\\n1+1=2\\n\\n$$\\n-<p>$$\\n1+1=2</p>\\n<p>$$</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[241-equation followed by a labelled equation (valid=True)-$$\\na = 1\\n$$\\n\\n$$\\nb = 2\\n$$ (1)\\n-<div class=\"math block\">\\na = 1\\n</div>\\n<div id=\"1\" class=\"math block\">\\n<a href=\"#1\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\nb = 2\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[260-multiline equation. (valid=True)-$$\\\\\\\\begin{matrix}\\n f & = & 2 + x + 3 \\\\\\\\\\n & = & 5 + x\\n\\\\\\\\end{matrix}$$\\n-<div class=\"math block\">\\n\\\\\\\\begin{matrix}\\n f &amp; = &amp; 2 + x + 3 \\\\\\\\\\n &amp; = &amp; 5 + x\\n\\\\\\\\end{matrix}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[275-vector equation. (valid=True)-$$\\\\\\\\begin{pmatrix}x_2 \\\\\\\\\\\\\\\\ y_2 \\\\\\\\end{pmatrix} =\\n\\\\\\\\begin{pmatrix} A & B \\\\\\\\\\\\\\\\ C & D \\\\\\\\end{pmatrix}\\\\\\\\cdot\\n\\\\\\\\begin{pmatrix} x_1 \\\\\\\\\\\\\\\\ y_1 \\\\\\\\end{pmatrix}$$\\n-<div class=\"math block\">\\n\\\\\\\\begin{pmatrix}x_2 \\\\\\\\\\\\\\\\ y_2 \\\\\\\\end{pmatrix} =\\n\\\\\\\\begin{pmatrix} A &amp; B \\\\\\\\\\\\\\\\ C &amp; D \\\\\\\\end{pmatrix}\\\\\\\\cdot\\n\\\\\\\\begin{pmatrix} x_1 \\\\\\\\\\\\\\\\ y_1 \\\\\\\\end{pmatrix}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[288-display equation with equation number. (valid=True)-$$f(x) = x^2 - 1$$ (1)\\n-<div id=\"1\" class=\"math block\">\\n<a href=\"#1\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\nf(x) = x^2 - 1\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[29-simple equation starting and ending with numbers. (valid=True)-$1+1=2$\\n-<p><span class=\"math inline\">1+1=2</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[298-inline equation following code section. (valid=True)-`code`$a-b$\\n-<p><code>code</code><span class=\"math inline\">a-b</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[305-equation following code block. (valid=True)-```\\ncode\\n```\\n$$a+b$$\\n-<pre><code>code\\n</code></pre>\\n<div class=\"math block\">\\na+b\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[319-numbered equation following code block. (valid=True)-```\\ncode\\n```\\n$$a+b$$(1)\\n-<pre><code>code\\n</code></pre>\\n<div id=\"1\" class=\"math block\">\\n<a href=\"#1\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\na+b\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[334-Equations in list. (valid=True)-1. $1+2$\\n2. $2+3$\\n    1. $3+4$\\n-<ol>\\n<li><span class=\"math inline\">1+2</span></li>\\n<li><span class=\"math inline\">2+3</span>\\n<ol>\\n<li><span class=\"math inline\">3+4</span></li>\\n</ol>\\n</li>\\n</ol>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[350-Inline sum. (valid=True)-$\\\\\\\\sum\\\\_{i=1}^n$\\n-<p><span class=\"math inline\">\\\\\\\\sum\\\\_{i=1}^n</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[357-Sum without equation number. (valid=True)-$$\\\\\\\\sum\\\\_{i=1}^n$$\\n-<div class=\"math block\">\\n\\\\\\\\sum\\\\_{i=1}^n\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[36-simple equation including special html character. (valid=True)-$1+1<3$\\n-<p><span class=\"math inline\">1+1&lt;3</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[366-Sum with equation number. (valid=True)-$$\\\\\\\\sum\\\\_{i=1}\\\\^n$$ (2)\\n-<div id=\"2\" class=\"math block\">\\n<a href=\"#2\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\n\\\\\\\\sum\\\\_{i=1}\\\\^n\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[376-equation number always vertically aligned. (valid=True)-$${\\\\\\\\bold e}(\\\\\\\\varphi) = \\\\\\\\begin{pmatrix}\\n\\\\\\\\cos\\\\\\\\varphi\\\\\\\\\\\\\\\\\\\\\\\\sin\\\\\\\\varphi\\n\\\\\\\\end{pmatrix}$$ (3)\\n-<div id=\"3\" class=\"math block\">\\n<a href=\"#3\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\n{\\\\\\\\bold e}(\\\\\\\\varphi) = \\\\\\\\begin{pmatrix}\\n\\\\\\\\cos\\\\\\\\varphi\\\\\\\\\\\\\\\\\\\\\\\\sin\\\\\\\\varphi\\n\\\\\\\\end{pmatrix}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[390-inline equations in blockquote. (valid=True)-> see $a = b + c$\\n> $c^2=a^2+b^2$ (2)\\n> $c^2=a^2+b^2$\\n-<blockquote>\\n<p>see <span class=\"math inline\">a = b + c</span>\\n<span class=\"math inline\">c^2=a^2+b^2</span> (2)\\n<span class=\"math inline\">c^2=a^2+b^2</span></p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[403-display equation in blockquote. (valid=True)-> formula\\n>\\n> $$ a+b=c$$ (2)\\n>\\n> in blockquote.\\n-<blockquote>\\n<p>formula</p>\\n<div id=\"2\" class=\"math block\">\\n<a href=\"#2\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\na+b=c\\n</div>\\n<p>in blockquote.</p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[421-mixed syntax:-$$\\na=1 \\\\\\\\\\nb=2\\n$$ (abc)\\n\\n- ab $c=1$ d\\n-<div id=\"abc\" class=\"math block\">\\n<a href=\"#abc\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\na=1 \\\\\\\\\\nb=2\\n</div>\\n<ul>\\n<li>ab <span class=\"math inline\">c=1</span> d</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[43-equation including backslashes. (valid=True)-$a \\\\\\\\backslash$\\n-<p><span class=\"math inline\">a \\\\\\\\backslash</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[441-dollar '$' characters. (valid=True)-\\\\\\\\$1+1=2$\\n$1+1=2\\\\\\\\$\\n-<p>\\\\<span class=\"math inline\">1+1=2</span>\\n<span class=\"math inline\">1+1=2\\\\\\\\</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[450-empty line between text and display formula is required. (valid=False)-some text\\n \\\\$\\\\\\\\$a+b=c\\\\$\\\\$\\n-<p>some text\\n$\\\\$a+b=c$$</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[460-or before closing $ is not allowed. (valid=False)-$ $\\n$ x$\\n$x $\\n-<p>$ $\\n$ x$\\n$x $</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[471-new line in blockquote block (valid=False):-> \\\\$\\\\$ a+b\\\\n=c\\\\$\\\\$\\n-<blockquote>\\n<p>$$ a+b\\\\n=c$$</p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[480-math-escaping: escaped start $:-\\\\$p_2 = $a\\n-<p>$p_2 = $a</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[487-math-escaping: escaped end $:-$p_2 = \\\\$a\\n-<p>$p_2 = $a</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[494-math-escaping: internal escaped $:-$p_2 = \\\\$1$\\n-<p><span class=\"math inline\">p_2 = \\\\$1</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[50-use of currency symbol, i.e. digits before/after opening/closing (valid=True)-3$1+2$ $1+2$3\\n-<p>3$1+2$ $1+2$3</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[501-math-escaping: double-escaped start $:-\\\\\\\\$p_2 = 1$\\n-<p>\\\\<span class=\"math inline\">p_2 = 1</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[508-math-escaping: double-escaped end $:-$p_2 = \\\\\\\\$a\\n-<p><span class=\"math inline\">p_2 = \\\\\\\\</span>a</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[515-Inline double-dollar start:-$$a=1$$ b\\n-<p><div class=\"math inline\">a=1</div> b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[522-Inline double-dollar end:-a $$a=1$$\\n-<p>a <div class=\"math inline\">a=1</div></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[529-Inline double-dollar enclosed:-a $$a=1$$ (1) b\\n-<p>a <div class=\"math inline\">a=1</div> (1) b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[536-Inline double-dollar, escaped:-a \\\\$$a=1$$ b\\n-<p>a $<span class=\"math inline\">a=1</span>$ b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[543-Inline mixed single/double dollars:-Hence, for $\\\\alpha \\\\in (0, 1)$,\\n$$\\n  \\\\mathbb P (\\\\alpha \\\\bar{X} \\\\ge \\\\mu) \\\\le \\\\alpha;\\n$$\\ni.e., $[\\\\alpha \\\\bar{X}, \\\\infty)$ is a lower 1-sided $1-\\\\alpha$ confidence bound for $\\\\mu$.\\n-<p>Hence, for <span class=\"math inline\">\\\\alpha \\\\in (0, 1)</span>,\\n<div class=\"math inline\">\\\\mathbb P (\\\\alpha \\\\bar{X} \\\\ge \\\\mu) \\\\le \\\\alpha;</div>\\ni.e., <span class=\"math inline\">[\\\\alpha \\\\bar{X}, \\\\infty)</span> is a lower 1-sided <span class=\"math inline\">1-\\\\alpha</span> confidence bound for <span class=\"math inline\">\\\\mu</span>.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[556-display equation with label containing whitespace. (valid=True)-$$1+1=2$$ (a b)\\n-<div id=\"a-b\" class=\"math block\">\\n<a href=\"#a-b\" class=\"mathlabel\" title=\"Permalink to this equation\">\\xb6</a>\\n1+1=2\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[567-Indented by 4 spaces-    $$a$$\\n-<pre><code>$$a$$\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[57-use of currency symbol (valid=True)-If you solve $1+2$ you get $3\\n-<p>If you solve <span class=\"math inline\">1+2</span> you get $3</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[575-Indented by 4 spaces, DISABLE-CODEBLOCKS-    $$a$$\\n-<div class=\"math block\">\\na\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[64-inline fraction (valid=True)-$\\\\\\\\frac{1}{2}$\\n-<p><span class=\"math inline\">\\\\\\\\frac{1}{2}</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[71-inline column vector (valid=True)-$\\\\\\\\begin{pmatrix}x\\\\\\\\\\\\\\\\y\\\\\\\\end{pmatrix}$\\n-<p><span class=\"math inline\">\\\\\\\\begin{pmatrix}x\\\\\\\\\\\\\\\\y\\\\\\\\end{pmatrix}</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[78-inline bold vector notation (valid=True)-${\\\\\\\\tilde\\\\\\\\bold e}_\\\\\\\\alpha$\\n-<p><span class=\"math inline\">{\\\\\\\\tilde\\\\\\\\bold e}_\\\\\\\\alpha</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[8-double-dollar-$$\\n-<p>$$</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[85-exponentiation (valid=True)-$a^{b}$\\n-<p><span class=\"math inline\">a^{b}</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[92-conjugate complex (valid=True)-$a^\\\\*b$ with $a^\\\\*$\\n-<p><span class=\"math inline\">a^\\\\*b</span> with <span class=\"math inline\">a^\\\\*</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_dollarmath_fixtures[99-Inline multi-line (valid=True)-a $a\\n\\\\not=1$ b\\n-<p>a <span class=\"math inline\">a\\n\\\\not=1</span> b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_inline_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dollarmath.py::test_plugin_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[1-Docutils_example]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[112-choose_smallest_indent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[130-Empty_name:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[137-Whitespace_only_name:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[144-Name_markup:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[154-Content_paragraph_markup:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[166-Body_list:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[192-Body_code_block]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[214-Body_blockquote:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[240-Body_fence:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[256-Following_blocks:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[312-In_list:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[330-In_blockquote:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[368-Indented_by_4_spaces]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[378-Indented_by_4_spaces,_DISABLE-CODEBLOCKS]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[392-Multiple_fields_in_list_item:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[418-Multiple_fields_in_list_item_with_body_continuation:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[441-Multiple_fields_in_list_item_with_multi-paragraph_body:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[45-Body_alignment:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[465-Field_list_in_nested_list:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[491-Nested_field_list_(body_on_next_line):]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[514-Nested_field_list_(inline_body):]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_all[536-Double_nested_field_list:]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_field_list.py::test_plugin_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[104--Here is an inline note.^[Inlines notes are easier to write, since\\nyou don't have to pick an identifier and move down to type the\\nnote.]\\n-<p>Here is an inline note.<sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>Inlines notes are easier to write, since\\nyou don't have to pick an identifier and move down to type the\\nnote. <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[124--foo^[ *bar* ]\\n-<p>foo<sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p> <em>bar</em>  <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[139-Duplicate footnotes:-[^xxxxx] [^xxxxx]\\n\\n[^xxxxx]: foo\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup> <sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1:1\">[1:1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>foo <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a> <a href=\"#fnref1:1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[157--[^xxxxx] [^yyyyy]\\n\\n[^xxxxx]: foo\\n    ---\\n\\n[^yyyyy]: foo\\n   ---\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup> <sup class=\"footnote-ref\"><a href=\"#fn2\" id=\"fnref2\">[2]</a></sup></p>\\n<hr>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><h2>foo</h2>\\n <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></li>\\n<li id=\"fn2\" class=\"footnote-item\"><p>foo <a href=\"#fnref2\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[182--[^xxxxx] [^yyyyy]\\n\\n[^xxxxx]:       foo\\n\\n[^yyyyy]:        foo\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup> <sup class=\"footnote-ref\"><a href=\"#fn2\" id=\"fnref2\">[2]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>foo <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n<li id=\"fn2\" class=\"footnote-item\"><pre><code>foo\\n</code></pre>\\n <a href=\"#fnref2\" class=\"footnote-backref\">\\u21a9</a></li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[2-Pandoc example:-Here is a footnote reference,[^1] and another.[^longnote]\\n\\n[^1]: Here is the footnote.\\n\\n[^longnote]: Here's one with multiple blocks.\\n\\n    Subsequent paragraphs are indented to show that they\\nbelong to the previous footnote.\\n\\n        { some.code }\\n\\n    The whole paragraph can be indented, or just the first\\n    line.  In this way, multi-paragraph footnotes work like\\n    multi-paragraph list items.\\n\\nThis paragraph won't be part of the note, because it\\nisn't indented.\\n-<p>Here is a footnote reference,<sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup> and another.<sup class=\"footnote-ref\"><a href=\"#fn2\" id=\"fnref2\">[2]</a></sup></p>\\n<p>This paragraph won't be part of the note, because it\\nisn't indented.</p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>Here is the footnote. <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n<li id=\"fn2\" class=\"footnote-item\"><p>Here's one with multiple blocks.</p>\\n<p>Subsequent paragraphs are indented to show that they\\nbelong to the previous footnote.</p>\\n<pre><code>{ some.code }\\n</code></pre>\\n<p>The whole paragraph can be indented, or just the first\\nline.  In this way, multi-paragraph footnotes work like\\nmulti-paragraph list items. <a href=\"#fnref2\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[203-Indents for the first line (tabs):-[^xxxxx]\\n\\n[^xxxxx]:\\t\\tfoo\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>foo <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[220-Security 1-[^__proto__]\\n\\n[^__proto__]: blah\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>blah <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[237-Security 2-[^hasOwnProperty]\\n\\n[^hasOwnProperty]: blah\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>blah <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[254-Should allow links in inline footnotes-Example^[this is another example https://github.com]\\n-<p>Example<sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>this is another example https://github.com <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[268-Nested blocks:-[^a]\\n\\n[^a]: abc\\n\\n    def\\nhij\\n\\n    - list\\n\\n    > block\\n\\nterminates here\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<p>terminates here</p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>abc</p>\\n<p>def\\nhij</p>\\n<ul>\\n<li>list</li>\\n</ul>\\n<blockquote>\\n<p>block</p>\\n</blockquote>\\n <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[302-Empty lines after blockquote+footnote (markdown-it-py#133)-> b [^1]\\n\\nSome text\\n\\n> c\\n\\n[^1]: d\\n\\n\\n-<blockquote>\\n<p>b <sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n</blockquote>\\n<p>Some text</p>\\n<blockquote>\\n<p>c</p>\\n</blockquote>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>d <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[331-Newline after footnote identifier-[^a]\\n\\n[^a]:\\nb\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<p>b</p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"> <a href=\"#fnref1\" class=\"footnote-backref\"><-</a></li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[348-Indented by 4 spaces-    [^1]\\n\\n    [^1]: footnote\\n-<pre><code>[^1]\\n\\n[^1]: footnote\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[360-Indented by 4 spaces, DISABLE-CODEBLOCKS-    [^1]\\n\\n    [^1]: footnote\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>footnote <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[376-refs with no definition standard-[^1]  [^1]\\n-<p>[^1]  [^1]</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[383-refs with no definition, ALWAYS_MATCH-REFS-[^1]  [^1]\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup>  <sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1:1\">[1:1]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"> <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a> <a href=\"#fnref1:1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[46--[^1][^2][^3]\\n\\n[^1]: foo\\n[^2]: bar\\n[^3]: baz\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup><sup class=\"footnote-ref\"><a href=\"#fn2\" id=\"fnref2\">[2]</a></sup><sup class=\"footnote-ref\"><a href=\"#fn3\" id=\"fnref3\">[3]</a></sup></p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>foo <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n<li id=\"fn2\" class=\"footnote-item\"><p>bar <a href=\"#fnref2\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n<li id=\"fn3\" class=\"footnote-item\"><p>baz <a href=\"#fnref3\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[69-They could be inside blockquotes, and are lazy:-[^foo]\\n\\n> [^foo]: bar\\nbaz\\n-<p><sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup></p>\\n<blockquote></blockquote>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>bar\\nbaz <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_all[90--[^ foo]: bar baz\\n\\n[^foo\\n]: bar baz\\n-<p>[^ foo]: bar baz</p>\\n<p>[^foo\\n]: bar baz</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_footnote_def",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_footnote_inline",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_footnote_ref",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_footnote_tail",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_footnote.py::test_plugin_render",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_all[13-should parse basic front matter:----\\nx: 1\\n---\\n# Head\\n-\\n<h1>Head</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_all[2-should parse empty front matter:----\\n---\\n# Head\\n-\\n<h1>Head</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_all[24-should parse until triple dots:----\\nx: 1\\n...\\n# Head\\n-\\n<h1>Head</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_all[35-should parse front matter with indentation:----\\ntitle: Associative arrays\\npeople:\\n    name: John Smith\\n    age: 33\\nmorePeople: { name: Grace Jones, age: 21 }\\n---\\n# Head\\n-\\n<h1>Head</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_all[50-should ignore spaces after front matter delimiters:----   \\ntitle: Associative arrays\\npeople:\\n    name: John Smith\\n    age: 33\\nmorePeople: { name: Grace Jones, age: 21 }\\n---   \\n# Head\\n-\\n<h1>Head</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_all[65-should ignore front matter with less than 3 opening dashes:---\\nx: 1\\n--\\n# Head\\n-<h2>--\\nx: 1</h2>\\n<h1>Head</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_all[77-should require front matter have matching number of opening and closing dashes:-----\\nx: 1\\n---\\n# Head\\n-<hr>\\n<h2>x: 1</h2>\\n<h1>Head</h1>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_short_source",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_front_matter.py::test_token",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[1-GFM: table-| foo | bar |\\n| --- | --- |\\n| baz | bim |\\n-<table>\\n<thead>\\n<tr>\\n<th>foo</th>\\n<th>bar</th>\\n</tr>\\n</thead>\\n<tbody>\\n<tr>\\n<td>baz</td>\\n<td>bim</td>\\n</tr>\\n</tbody>\\n</table>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[113-GFM: dollar math inline-Euler's formula: $e^{i\\\\pi} + 1 = 0$\\n-<p>Euler's formula: <span class=\"math inline\">e^{i\\\\pi} + 1 = 0</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[120-GFM: dollar math block-$$\\nx = \\\\frac{-b \\\\pm \\\\sqrt{b^2 - 4ac}}{2a}\\n$$\\n-<div class=\"math block\">\\nx = \\\\frac{-b \\\\pm \\\\sqrt{b^2 - 4ac}}{2a}\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[23-GFM: strikethrough (double tilde)-~~hello~~\\n-<p><s>hello</s></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[30-GFM: strikethrough (single tilde)-~hello~\\n-<p><s>hello</s></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[37-GFM: autolink www-www.example.com\\n-<p><a href=\"http://www.example.com\">www.example.com</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[44-GFM: autolink protocol-https://example.com\\n-<p><a href=\"https://example.com\">https://example.com</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[51-GFM: autolink email-user@example.com\\n-<p><a href=\"mailto:user@example.com\">user@example.com</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[58-GFM: task list-- [x] done\\n- [ ] todo\\n-<ul class=\"contains-task-list\">\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"\" type=\"checkbox\" checked=\"\"> done</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"\" type=\"checkbox\"> todo</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[69-GFM: alert-> [!NOTE]\\n> This is a note.\\n-<div class=\"markdown-alert markdown-alert-note\">\\n<p class=\"markdown-alert-title\">Note</p>\\n<p>This is a note.</p>\\n</div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[80-GFM: combined features-Check out https://example.com for more info.\\n\\n~~old~~ and ~also old~\\n\\n- [x] visited www.example.com\\n- [ ] email user@example.com\\n-<p>Check out <a href=\"https://example.com\">https://example.com</a> for more info.</p>\\n<p><s>old</s> and <s>also old</s></p>\\n<ul class=\"contains-task-list\">\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"\" type=\"checkbox\" checked=\"\"> visited <a href=\"http://www.example.com\">www.example.com</a></li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"\" type=\"checkbox\"> email <a href=\"mailto:user@example.com\">user@example.com</a></li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm.py::test_gfm_fixtures[97-GFM: footnotes-Here is a footnote[^1].\\n\\n[^1]: Footnote content.\\n-<p>Here is a footnote<sup class=\"footnote-ref\"><a href=\"#fn1\" id=\"fnref1\">[1]</a></sup>.</p>\\n<hr class=\"footnotes-sep\">\\n<section class=\"footnotes\">\\n<ol class=\"footnotes-list\">\\n<li id=\"fn1\" class=\"footnote-item\"><p>Footnote content. <a href=\"#fnref1\" class=\"footnote-backref\">\\u21a9\\ufe0e</a></p>\\n</li>\\n</ol>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[1-GFM autolink: www basic (spec 622)-www.commonmark.org\\n-<p><a href=\"http://www.commonmark.org\">www.commonmark.org</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[126-GFM autolink: xmpp resource (spec 634)-xmpp:foo@bar.baz/txt\\n\\nxmpp:foo@bar.baz/txt@bin\\n\\nxmpp:foo@bar.baz/txt@bin.com\\n-<p><a href=\"xmpp:foo@bar.baz/txt\">xmpp:foo@bar.baz/txt</a></p>\\n<p><a href=\"xmpp:foo@bar.baz/txt@bin\">xmpp:foo@bar.baz/txt@bin</a></p>\\n<p><a href=\"xmpp:foo@bar.baz/txt@bin.com\">xmpp:foo@bar.baz/txt@bin.com</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[139-GFM autolink: trailing delimiters-http://google.com/he<lp\\nmailto:bob@google.co<m\\nbob@google.co<m\\n\\nhttp://google.com/(business)\\nhttp://google.com/(business))\\n\\nhttp://google.com/other_\\n-<p><a href=\"http://google.com/he\">http://google.com/he</a>&lt;lp\\n<a href=\"mailto:bob@google.co\">mailto:bob@google.co</a>&lt;m\\n<a href=\"mailto:bob@google.co\">bob@google.co</a>&lt;m</p>\\n<p><a href=\"http://google.com/(business)\">http://google.com/(business)</a>\\n<a href=\"http://google.com/(business)\">http://google.com/(business)</a>)</p>\\n<p><a href=\"http://google.com/other\">http://google.com/other</a>_</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[15-GFM autolink: trailing punctuation (spec 624)-Visit www.commonmark.org.\\n\\nVisit www.commonmark.org/a.b.\\n-<p>Visit <a href=\"http://www.commonmark.org\">www.commonmark.org</a>.</p>\\n<p>Visit <a href=\"http://www.commonmark.org/a.b\">www.commonmark.org/a.b</a>.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[158-GFM autolink: integration with other syntax-**www.example.com**\\n\\n*https://example.com*\\n-<p><strong><a href=\"http://www.example.com\">www.example.com</a></strong></p>\\n<p><em><a href=\"https://example.com\">https://example.com</a></em></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[168-GFM autolink: not inside links-[http://example.com](http://example.com)\\n[mailto:bob@example.com](https://example.com)\\n[bob@example.com](https://example.com)\\n-<p><a href=\"http://example.com\">http://example.com</a>\\n<a href=\"https://example.com\">mailto:bob@example.com</a>\\n<a href=\"https://example.com\">bob@example.com</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[179-GFM autolink: preceded by letter (no match)-awww.example.com\\nahttps://example.com\\namailto:bob@example.com\\n-<p>awww.example.com\\nahttps://example.com\\namailto:bob@example.com</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[190-GFM autolink: email plus in local part-hello@mail+xyz.example\\n\\nhello+xyz@mail.example\\n-<p>hello@mail+xyz.example</p>\\n<p><a href=\"mailto:hello+xyz@mail.example\">hello+xyz@mail.example</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[200-GFM autolink: angle bracket autolink still works-<http://www.example.com>www.example.com\\n-<p><a href=\"http://www.example.com\">http://www.example.com</a>www.example.com</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[207-GFM autolink: non-match cases-example.com\\n\\nwww.\\n\\n@example.com\\n-<p>example.com</p>\\n<p>www.</p>\\n<p>@example.com</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[220-GFM autolink: xmpp no second slash-xmpp:foo@bar.baz/txt/bin\\n-<p><a href=\"xmpp:foo@bar.baz/txt\">xmpp:foo@bar.baz/txt</a>/bin</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[25-GFM autolink: parentheses balancing (spec 625)-www.google.com/search?q=Markup+(business)\\n\\nwww.google.com/search?q=Markup+(business)))\\n\\n(www.google.com/search?q=Markup+(business))\\n\\n(www.google.com/search?q=Markup+(business)\\n-<p><a href=\"http://www.google.com/search?q=Markup+(business)\">www.google.com/search?q=Markup+(business)</a></p>\\n<p><a href=\"http://www.google.com/search?q=Markup+(business)\">www.google.com/search?q=Markup+(business)</a>))</p>\\n<p>(<a href=\"http://www.google.com/search?q=Markup+(business)\">www.google.com/search?q=Markup+(business)</a>)</p>\\n<p>(<a href=\"http://www.google.com/search?q=Markup+(business)\">www.google.com/search?q=Markup+(business)</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[41-GFM autolink: interior parens only (spec 626)-www.google.com/search?q=(business))+ok\\n-<p><a href=\"http://www.google.com/search?q=(business))+ok\">www.google.com/search?q=(business))+ok</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[48-GFM autolink: entity reference exclusion (spec 627)-www.google.com/search?q=commonmark&hl=en\\n\\nwww.google.com/search?q=commonmark&hl;\\n-<p><a href=\"http://www.google.com/search?q=commonmark&amp;hl=en\">www.google.com/search?q=commonmark&amp;hl=en</a></p>\\n<p><a href=\"http://www.google.com/search?q=commonmark\">www.google.com/search?q=commonmark</a>&amp;hl;</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[58-GFM autolink: less-than ends autolink (spec 628)-www.commonmark.org/he<lp\\n-<p><a href=\"http://www.commonmark.org/he\">www.commonmark.org/he</a>&lt;lp</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[65-GFM autolink: http/https (spec 629)-http://commonmark.org\\n\\n(Visit https://encrypted.google.com/search?q=Markup+(business))\\n-<p><a href=\"http://commonmark.org\">http://commonmark.org</a></p>\\n<p>(Visit <a href=\"https://encrypted.google.com/search?q=Markup+(business)\">https://encrypted.google.com/search?q=Markup+(business)</a>)</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[75-GFM autolink: bare email (spec 630)-foo@bar.baz\\n-<p><a href=\"mailto:foo@bar.baz\">foo@bar.baz</a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[8-GFM autolink: www with path (spec 623)-Visit www.commonmark.org/help for more information.\\n-<p>Visit <a href=\"http://www.commonmark.org/help\">www.commonmark.org/help</a> for more information.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[82-GFM autolink: email local part (spec 632 modified)-a.b-c-d@a.b\\n\\na.b-c-d@a.b.\\n\\na.b-c-d@a.b-\\n\\na.b-c-d@a.b_\\n-<p><a href=\"mailto:a.b-c-d@a.b\">a.b-c-d@a.b</a></p>\\n<p><a href=\"mailto:a.b-c-d@a.b\">a.b-c-d@a.b</a>.</p>\\n<p>a.b-c-d@a.b-</p>\\n<p>a.b-c-d@a.b_</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_gfm_autolink.py::test_gfm_autolink_fixtures[98-GFM autolink: mailto/xmpp protocol (spec 633)-mailto:foo@bar.baz\\n\\nmailto:a.b-c_d@a.b\\n\\nmailto:a.b-c_d@a.b.\\n\\nmailto:a.b-c_d@a.b/\\n\\nmailto:a.b-c_d@a.b-\\n\\nmailto:a.b-c_d@a.b_\\n\\nxmpp:foo@bar.baz\\n\\nxmpp:foo@bar.baz.\\n-<p><a href=\"mailto:foo@bar.baz\">mailto:foo@bar.baz</a></p>\\n<p><a href=\"mailto:a.b-c_d@a.b\">mailto:a.b-c_d@a.b</a></p>\\n<p><a href=\"mailto:a.b-c_d@a.b\">mailto:a.b-c_d@a.b</a>.</p>\\n<p><a href=\"mailto:a.b-c_d@a.b\">mailto:a.b-c_d@a.b</a>/</p>\\n<p>mailto:a.b-c_d@a.b-</p>\\n<p>mailto:a.b-c_d@a.b_</p>\\n<p><a href=\"xmpp:foo@bar.baz\">xmpp:foo@bar.baz</a></p>\\n<p><a href=\"xmpp:foo@bar.baz\">xmpp:foo@bar.baz</a>.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[105-Comment terminates other blocks:-a\\n% abc\\n- b\\n% abc\\n> c\\n% abc\\n-<p>a</p>\\n<!-- abc --><ul>\\n<li>b</li>\\n</ul>\\n<!-- abc --><blockquote>\\n<p>c</p>\\n</blockquote>\\n<!-- abc -->\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[124-Multiline comment:-a\\n% abc\\n%   def\\n- b\\n%  abc\\n%def\\n> c\\n%abc\\n%\\n%def\\n-<p>a</p>\\n<!-- abc\\ndef --><ul>\\n<li>b</li>\\n</ul>\\n<!-- abc\\ndef --><blockquote>\\n<p>c</p>\\n</blockquote>\\n<!-- abc\\n\\ndef -->\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[152-Indented by 4 spaces-    +++\\n\\n    % abc\\n\\n    (a)=\\n-<pre><code>+++\\n\\n% abc\\n\\n(a)=\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[16-Block Break Too Few Markers:-++\\n-<p>++</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[168-Indented by 4 spaces, DISABLE-CODEBLOCKS-    +++\\n\\n    % abc\\n\\n    (a)=\\n-<hr class=\"myst-block\">\\n<!-- abc --><div class=\"myst-target\"><a href=\"#a\">(a)=</a></div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[2-Block Break:-+++\\n-<hr class=\"myst-block\">\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[23-Block Break terminates other blocks:-a\\n+++\\n- b\\n+++\\n> c\\n+++\\n-<p>a</p>\\n<hr class=\"myst-block\">\\n<ul>\\n<li>b</li>\\n</ul>\\n<hr class=\"myst-block\">\\n<blockquote>\\n<p>c</p>\\n</blockquote>\\n<hr class=\"myst-block\">\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[44-Target:-(a)=\\n-<div class=\"myst-target\"><a href=\"#a\">(a)=</a></div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[51-Target characters:-(a bc   |@<>*./_-+:)=\\n-<div class=\"myst-target\"><a href=\"#a bc   |@<>*./_-+:\">(a bc   |@<>*./_-+:)=</a></div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[58-Empty target:-()=\\n-<p>()=</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[65-Escaped target:-\\\\(a)=\\n-<p>(a)=</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[72-Indented target:-  (a)= \\n-<div class=\"myst-target\"><a href=\"#a\">(a)=</a></div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[79-Target terminates other blocks:-a\\n(a-b)=\\n- b\\n(a b)=\\n> c\\n(a)=\\n-<p>a</p>\\n<div class=\"myst-target\"><a href=\"#a-b\">(a-b)=</a></div><ul>\\n<li>b</li>\\n</ul>\\n<div class=\"myst-target\"><a href=\"#a b\">(a b)=</a></div><blockquote>\\n<p>c</p>\\n</blockquote>\\n<div class=\"myst-target\"><a href=\"#a\">(a)=</a></div>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[9-Block Break Split Markers:- + +   + + xfsdfsdf\\n-<hr class=\"myst-block\">\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_all[98-Comment:-% abc\\n-<!-- abc -->\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_block_token",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_block.py::test_comment_token",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[106-Role at start with trailing backslash (#62):-{foo}`ar`\\\\\\n-<p><code class=\"myst role\">{foo}[ar]</code>\\\\</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[113-Escaped role backslash:-\\\\{foo}`x`\\n-<p>{foo}<code>x</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[120-Escaped double backslash before role (#62):-\\\\\\\\{foo}`x`\\n-<p>\\\\<code class=\"myst role\">{foo}[x]</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[16-Surrounding Text:-a {abc}`xyz` b\\n-<p>a <code class=\"myst role\">{abc}[xyz]</code> b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[2-Basic:-{abc}`xyz`\\n-<p><code class=\"myst role\">{abc}[xyz]</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[23-New lines:-{abc}`xy\\nz` `d\\ne`\\n-<p><code class=\"myst role\">{abc}[xy z]</code> <code>d e</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[32-In Code:-`` {abc}`xyz` ``\\n-<p><code>{abc}`xyz`</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[39-Empty content:-{name}`` a\\n-<p>{name}`` a</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[46-Surrounding Code:-`a` {abc}`xyz` `b`\\n-<p><code>a</code> <code class=\"myst role\">{abc}[xyz]</code> <code>b</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[53-In list:-- {abc}`xyz`\\n-<ul>\\n<li><code class=\"myst role\">{abc}[xyz]</code></li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[62-In Quote:-> {abc}`xyz` b\\n-<blockquote>\\n<p><code class=\"myst role\">{abc}[xyz]</code> b</p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[71-Multiple ticks:-{abc}``xyz``\\n-<p><code class=\"myst role\">{abc}[xyz]</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[78-Inner tick:-{abc}``x`yz``\\n-<p><code class=\"myst role\">{abc}[x`yz]</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[85-Unbalanced ticks:-{abc}``xyz`\\n-<p>{abc}``xyz`</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[9-Multiple:-{abc}`xyz`{def}`uvw`\\n-<p><code class=\"myst role\">{abc}[xyz]</code><code class=\"myst role\">{def}[uvw]</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[92-Space in name:-{ab c}`xyz`\\n-<p>{ab c}<code>xyz</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_all[99-Escaped:-\\\\{abc}`xyz`\\n-<p>{abc}<code>xyz</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_myst_role.py::test_basic",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[103-Space between sign and number (not captured):-\\xa7 1\\n-<p>\\xa7 1</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[110-Followed by ASCII letter, single level (not captured):-\\xa71a\\n-<p>\\xa71a</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[117-Followed by ASCII letter, nested (not captured):-\\xa71.2b\\n-<p>\\xa71.2b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[124-Backslash-escaped (not captured):-\\\\\\xa71\\n-<p>\\\\\\xa71</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[131-Escaped backslash before ref (captured):-\\\\\\\\\\xa71\\n-<p>\\\\<span class=\"section-ref\">\\xa71</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[138-Followed by non-digit, non-space char (not captured):-\\xa7x and \\xa7.5\\n-<p>\\xa7x and \\xa7.5</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[145-Leading zeros preserved in content (meta numbers are normalized):-\\xa701.02\\n-<p><span class=\"section-ref\">\\xa701.02</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[152-In a heading:-## About \\xa72\\n-<h2>About <span class=\"section-ref\">\\xa72</span></h2>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[159-Non-ASCII letter after ref does not block match:-\\u89c1\\xa73\\u7ae0\\n-<p>\\u89c1<span class=\"section-ref\">\\xa73</span>\\u7ae0</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[16-At start and end of a paragraph:-\\xa71 opens and closes \\xa72\\n-<p><span class=\"section-ref\">\\xa71</span> opens and closes <span class=\"section-ref\">\\xa72</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[2-Basic single-level:-See \\xa71 for details.\\n-<p>See <span class=\"section-ref\">\\xa71</span> for details.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[23-Multiple refs and a range:-Compare \\xa71.1-\\xa71.4 and also \\xa72\\n-<p>Compare <span class=\"section-ref\">\\xa71.1</span>-<span class=\"section-ref\">\\xa71.4</span> and also <span class=\"section-ref\">\\xa72</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[30-Adjacent refs:-\\xa71\\xa72\\n-<p><span class=\"section-ref\">\\xa71</span><span class=\"section-ref\">\\xa72</span></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[37-Trailing period:-See \\xa71.\\n-<p>See <span class=\"section-ref\">\\xa71</span>.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[44-Parenthesised:-(\\xa72)\\n-<p>(<span class=\"section-ref\">\\xa72</span>)</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[51-Trailing comma:-\\xa73, and more\\n-<p><span class=\"section-ref\">\\xa73</span>, and more</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[58-Trailing possessive apostrophe:-\\xa74.3's rules\\n-<p><span class=\"section-ref\">\\xa74.3</span>'s rules</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[65-Inside emphasis:-*important: \\xa72.1*\\n-<p><em>important: <span class=\"section-ref\">\\xa72.1</span></em></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[72-Inside link text:-[see \\xa71](https://example.com)\\n-<p><a href=\"https://example.com\">see <span class=\"section-ref\">\\xa71</span></a></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[79-Inside inline code (not captured):-`\\xa71`\\n-<p><code>\\xa71</code></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[86-Inside fenced code block (not captured):-```\\n\\xa71\\n```\\n-<pre><code>\\xa71\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[9-Nested number:-See \\xa71.2.3 for details.\\n-<p>See <span class=\"section-ref\">\\xa71.2.3</span> for details.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_all[96-Bare section sign (not captured):-just a \\xa7 here\\n-<p>just a \\xa7 here</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_runtime_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_section_ref.py::test_token",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[0-.-~foo\\\\~\\n-<p>~foo~</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[12--~foo\\\\ bar\\\\ baz~\\n-<p><sub>foo bar baz</sub></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[18--~\\\\ foo\\\\ ~\\n-<p><sub> foo </sub></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[24--~foo\\\\\\\\\\\\\\\\\\\\\\\\\\\\ bar~\\n-<p><sub>foo\\\\\\\\\\\\ bar</sub></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[30--~foo\\\\\\\\\\\\\\\\\\\\\\\\ bar~\\n-<p>~foo\\\\\\\\\\\\ bar~</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[36--**~foo~ bar**\\n-<p><strong><sub>foo</sub> bar</strong></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[44-coverage-*~f\\n-<p>*~f</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[51-Basic:-H~2~O\\n-<p>H<sub>2</sub>O</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[58-Spaces:-H~2 O~2\\n-<p>H~2 O~2</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[6--~foo bar~\\n-<p>~foo bar~</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[65-Escaped:-H\\\\~2\\\\~O\\n-<p>H~2~O</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all[72-Nested:-a~b~c~d~e\\n-<p>a<sub>b</sub>c<sub>d</sub>e</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all_strikethrough[1-Strikethrough versus subscript:-~~strikethrough~~versus~subscript~\\n-<p><s>strikethrough</s>versus<sub>subscript</sub></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all_strikethrough[24-Strikethrough in subscript (beginning):-~~~strikethrough~~subscript~\\nThis ends up being rendered as a code block, but that's expected.\\nHence, it has to be closed with `~~~`\\n~~~\\nOnly then will the following text be rendered as it is intended.\\nWe cannot use `~~~strikethrough~~subscript~` at the beginning of a line.\\n-<pre><code class=\"language-strikethrough~~subscript~\">This ends up being rendered as a code block, but that's expected.\\nHence, it has to be closed with `~~~`\\n</code></pre>\\n<p>Only then will the following text be rendered as it is intended.\\nWe cannot use <code>~~~strikethrough~~subscript~</code> at the beginning of a line.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all_strikethrough[40-Subscript in strikethrough (end):-~~strikethrough~subscript~~~\\n-<p><s>strikethrough<sub>subscript</sub></s></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all_strikethrough[47-Strikethrough in subscript (end):-TODO: ~subscript~~strikethrough~~~\\n-<p>TODO: <sub>subscript</sub><sub>strikethrough</sub>~~</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all_strikethrough[54-Subscript in strikethrough:-~~strikethrough~subscript~strikethrough~~\\n-<p><s>strikethrough<sub>subscript</sub>strikethrough</s></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all_strikethrough[61-Strikethrough in subscript:-TODO: ~subscript~~strikethrough~~subscript~\\nThis should have beeen similar to *emphasised**strong**emphasised*.\\n-<p>TODO: <sub>subscript</sub><sub>strikethrough</sub><sub>subscript</sub>\\nThis should have beeen similar to <em>emphasised<strong>strong</strong>emphasised</em>.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_subscript.py::test_all_strikethrough[8-Subscript in strikethrough (beginning):-~~~subscript~strikethrough~~\\nThis ends up being rendered as a code block, but that's expected.\\nHence, it has to be closed with `~~~`\\n~~~\\nOnly then will the following text be rendered as it is intended.\\nWe cannot use `~~~subscript~strikethrough~~` at the beginning of a line.\\n-<pre><code class=\"language-subscript~strikethrough~~\">This ends up being rendered as a code block, but that's expected.\\nHence, it has to be closed with `~~~`\\n</code></pre>\\n<p>Only then will the following text be rendered as it is intended.\\nWe cannot use <code>~~~subscript~strikethrough~~</code> at the beginning of a line.</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[1-Basic (space):-{{ block }}\\n\\na {{ inline }} b\\n-<div class=\"substitution\" text=\"block\" />\\n<p>a <span class=\"substitution\" text=\"inline\" /> b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[105-Tables:-| | |\\n|-|-|\\n|{{a}}|{{b}} c|\\n-<table>\\n<thead>\\n<tr>\\n<th></th>\\n<th></th>\\n</tr>\\n</thead>\\n<tbody>\\n<tr>\\n<td><span class=\"substitution\" text=\"a\" /></td>\\n<td><span class=\"substitution\" text=\"b\" /> c</td>\\n</tr>\\n</tbody>\\n</table>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[11-Basic (no space):-{{block}}\\n\\na {{inline}} b\\n-<div class=\"substitution\" text=\"block\" />\\n<p>a <span class=\"substitution\" text=\"inline\" /> b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[21-Same line:-{{a}}{{b}}\\n-<p><span class=\"substitution\" text=\"a\" /><span class=\"substitution\" text=\"b\" /></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[28-No closing:-{{ a\\n\\n{{b}\\n\\n{{c} }\\n-<p>{{ a</p>\\n<p>{{b}</p>\\n<p>{{c} }</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[41-Inside code-`{{ a }}`\\n\\n```python\\n{{b}}\\n```\\n-<p><code>{{ a }}</code></p>\\n<pre><code class=\"language-python\">{{b}}\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[54-New line:-{{a}}\\n{{b}}\\n-<div class=\"substitution\" text=\"a\" />\\n<div class=\"substitution\" text=\"b\" />\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[63-Blocks:-- {{a}}\\n\\n> {{b}}\\n\\n1. {{c}}\\n-<ul>\\n<li>\\n<div class=\"substitution\" text=\"a\" />\\n</li>\\n</ul>\\n<blockquote>\\n<div class=\"substitution\" text=\"b\" />\\n</blockquote>\\n<ol>\\n<li>\\n<div class=\"substitution\" text=\"c\" />\\n</li>\\n</ol>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_fixtures[86-Inline:-- {{a}} x\\n\\n> {{b}} y\\n\\n1. {{c}} z\\n-<ul>\\n<li><span class=\"substitution\" text=\"a\" /> x</li>\\n</ul>\\n<blockquote>\\n<p><span class=\"substitution\" text=\"b\" /> y</p>\\n</blockquote>\\n<ol>\\n<li><span class=\"substitution\" text=\"c\" /> z</li>\\n</ol>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_substitution.py::test_tokens",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_superscript.py::test_superscript_fixtures[0--^test^\\n-<p><sup>test</sup></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_superscript.py::test_superscript_fixtures[12--2^4 + 3^5\\n-<p>2^4 + 3^5</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_superscript.py::test_superscript_fixtures[18--^foo~bar^baz^bar~foo^\\n-<p><sup>foo~bar</sup>baz<sup>bar~foo</sup></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_superscript.py::test_superscript_fixtures[24--^\\\\ foo\\\\ ^\\n-<p><sup> foo </sup></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_superscript.py::test_superscript_fixtures[30--^foo\\\\\\\\\\\\\\\\\\\\\\\\\\\\ bar^\\n-<p><sup>foo\\\\\\\\\\\\ bar</sup></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_superscript.py::test_superscript_fixtures[36--^foo\\\\\\\\\\\\\\\\\\\\\\\\ bar^\\n-<p>^foo\\\\\\\\\\\\ bar^</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_superscript.py::test_superscript_fixtures[42--**^foo^ bar**\\n-<p><strong><sup>foo</sup> bar</strong></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_superscript.py::test_superscript_fixtures[6--^foo\\\\^\\n-<p>^foo^</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tasklists.py::test_all[111-Tab after task list item marker-+ [x]\\titem 1\\n+ [ ]\\t\\titem 2\\n-<ul class=\"contains-task-list\">\\n<li class=\"task-list-item\">\\titem 1</li>\\n<li class=\"task-list-item\">\\t\\titem 2</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tasklists.py::test_all[122-Form feed after task list item marker-+ [x]\\x0citem 1\\n+ [ ]\\x0c\\x0citem 2\\n-<ul class=\"contains-task-list\">\\n<li class=\"task-list-item\">\\x0citem 1</li>\\n<li class=\"task-list-item\">\\x0c\\x0citem 2</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tasklists.py::test_all[20---   [ ] unchecked todo item 1\\n- [ ]\\n- [  ] not a todo item 2\\n- [ x] not a todo item 3\\n- [x ] not a todo item 4\\n- [ x ] not a todo item 5\\n-   [x] todo item 6\\n\\n-<ul class=\"contains-task-list\">\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> unchecked todo item 1</li>\\n<li>[ ]</li>\\n<li>[  ] not a todo item 2</li>\\n<li>[ x] not a todo item 3</li>\\n<li>[x ] not a todo item 4</li>\\n<li>[ x ] not a todo item 5</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" checked=\"checked\" disabled=\"disabled\" type=\"checkbox\"> todo item 6</li>\\n</ul>\\n\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tasklists.py::test_all[3--- [ ] unchecked item 1\\n- [ ] unchecked item 2\\n- [ ] unchecked item 3\\n- [x] checked item 4\\n-<ul class=\"contains-task-list\">\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> unchecked item 1</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> unchecked item 2</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> unchecked item 3</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" checked=\"checked\" disabled=\"disabled\" type=\"checkbox\"> checked item 4</li>\\n</ul>\\n\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tasklists.py::test_all[44--# Test 1\\n\\n1. foo\\n   * [ ] nested unchecked item 1\\n   * not a todo item 2\\n   * not a todo item 3\\n   * [x] nested checked item 4\\n2. bar\\n3. spam\\n\\n# Test 2\\n\\n- foo\\n  - [ ] nested unchecked item 1\\n  - [ ] nested unchecked item 2\\n  - [x] nested checked item 3\\n  - [X] nested checked item 4\\n\\n\\n-<h1>Test 1</h1>\\n<ol>\\n<li>foo\\n<ul class=\"contains-task-list\">\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> nested unchecked item 1</li>\\n<li>not a todo item 2</li>\\n<li>not a todo item 3</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" checked=\"checked\" disabled=\"disabled\" type=\"checkbox\"> nested checked item 4</li>\\n</ul>\\n</li>\\n<li>bar</li>\\n<li>spam</li>\\n</ol>\\n<h1>Test 2</h1>\\n<ul>\\n<li>foo\\n<ul class=\"contains-task-list\">\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> nested unchecked item 1</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> nested unchecked item 2</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" checked=\"checked\" disabled=\"disabled\" type=\"checkbox\"> nested checked item 3</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" checked=\"checked\" disabled=\"disabled\" type=\"checkbox\"> nested checked item 4</li>\\n</ul>\\n</li>\\n</ul>\\n\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tasklists.py::test_all[94--1. [x] checked ordered 1\\n2. [ ] unchecked ordered 2\\n3. [x] checked ordered 3\\n4. [ ] unchecked ordered 4\\n\\n-<ol class=\"contains-task-list\">\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" checked=\"checked\" disabled=\"disabled\" type=\"checkbox\"> checked ordered 1</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> unchecked ordered 2</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" checked=\"checked\" disabled=\"disabled\" type=\"checkbox\"> checked ordered 3</li>\\n<li class=\"task-list-item\"><input class=\"task-list-item-checkbox\" disabled=\"disabled\" type=\"checkbox\"> unchecked ordered 4</li>\\n</ol>\\n\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tasklists.py::test_plugin_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_block_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[1-single character inline equation. (valid=True)-\\\\(a\\\\)\\n-<p><eq>a</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[104-single block equation, greek index (valid=True)-\\\\[e_\\\\\\\\alpha\\\\]\\n-<section>\\n<eqn>e_\\\\\\\\alpha</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[113-display equation on its own single line. (valid=True)-\\\\[1+1=2\\\\]\\n-<section>\\n<eqn>1+1=2</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[122-inline equation followed by block equation. (valid=True)-\\\\({e}_x\\\\)\\n\\n\\\\[e_\\\\\\\\alpha\\\\]\\n-<p><eq>{e}_x</eq></p>\\n<section>\\n<eqn>e_\\\\\\\\alpha</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[134-underline tests (valid=True)-\\\\[c{\\\\\\\\bold e}_x = a{\\\\\\\\bold e}_\\\\\\\\alpha - b\\\\\\\\tilde{\\\\\\\\bold e}_\\\\\\\\alpha\\\\]\\n-<section>\\n<eqn>c{\\\\\\\\bold e}_x = a{\\\\\\\\bold e}_\\\\\\\\alpha - b\\\\\\\\tilde{\\\\\\\\bold e}_\\\\\\\\alpha</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[144-after closing $ or both is allowed. (valid=True)-a\\\\(1+1=2\\\\)\\n\\\\(1+1=2\\\\)b\\nc\\\\(x\\\\)d\\n-<p>a<eq>1+1=2</eq>\\n<eq>1+1=2</eq>b\\nc<eq>x</eq>d</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[15-simple equation starting and ending with numbers. (valid=True)-\\\\(1+1=2\\\\)\\n-<p><eq>1+1=2</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[155-following dollar character '$' is allowed. (valid=True)-\\\\(x\\\\) $\\n-<p><eq>x</eq> $</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[162-consecutive inline equations. (valid=True)-\\\\(x\\\\) \\\\(y\\\\)\\n-<p><eq>x</eq> <eq>y</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[169-inline equation after '-' sign in text. (valid=True)-so-what is \\\\(x\\\\)\\n-<p>so-what is <eq>x</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[176-display equation with line breaks. (valid=True)-\\\\[\\n1+1=2\\n\\\\]\\n-<section>\\n<eqn>\\n1+1=2\\n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[189-multiple equations (valid=True)-\\\\[\\na = 1\\n\\\\]\\n\\n\\\\[\\nb = 2\\n\\\\]\\n-<section>\\n<eqn>\\na = 1\\n</eqn>\\n</section>\\n<section>\\n<eqn>\\nb = 2\\n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[211-equation followed by a labelled equation (valid=True)-\\\\[\\na = 1\\n\\\\]\\n\\n\\\\[\\nb = 2\\n\\\\] (1)\\n-<section>\\n<eqn>\\na = 1\\n</eqn>\\n</section>\\n<section>\\n<eqn>\\nb = 2\\n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[22-simple equation including special html character. (valid=True)-\\\\(1+1<3\\\\)\\n-<p><eq>1+1<3</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[233-multiline equation. (valid=True)-\\\\[\\\\\\\\begin{matrix}\\n f & = & 2 + x + 3 \\\\\\\\ \\n & = & 5 + x \\n\\\\\\\\end{matrix}\\\\]\\n-<section>\\n<eqn>\\\\\\\\begin{matrix}\\n f & = & 2 + x + 3 \\\\\\\\ \\n & = & 5 + x \\n\\\\\\\\end{matrix}</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[248-vector equation. (valid=True)-\\\\[\\\\\\\\begin{pmatrix}x_2 \\\\\\\\\\\\\\\\ y_2 \\\\\\\\end{pmatrix} = \\n\\\\\\\\begin{pmatrix} A & B \\\\\\\\\\\\\\\\ C & D \\\\\\\\end{pmatrix}\\\\\\\\cdot\\n\\\\\\\\begin{pmatrix} x_1 \\\\\\\\\\\\\\\\ y_1 \\\\\\\\end{pmatrix}\\\\]\\n-<section>\\n<eqn>\\\\\\\\begin{pmatrix}x_2 \\\\\\\\\\\\\\\\ y_2 \\\\\\\\end{pmatrix} = \\n\\\\\\\\begin{pmatrix} A & B \\\\\\\\\\\\\\\\ C & D \\\\\\\\end{pmatrix}\\\\\\\\cdot\\n\\\\\\\\begin{pmatrix} x_1 \\\\\\\\\\\\\\\\ y_1 \\\\\\\\end{pmatrix}</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[261-display equation with equation number. (valid=True)-\\\\[f(x) = x^2 - 1\\\\] (1)\\n-<section>\\n<eqn>f(x) = x^2 - 1</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[270-inline equation following code section. (valid=True)-`code`\\\\(a-b\\\\)\\n-<p><code>code</code><eq>a-b</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[277-equation following code block. (valid=True)-```\\ncode\\n```\\n\\\\[a+b\\\\]\\n-<pre><code>code\\n</code></pre>\\n<section>\\n<eqn>a+b</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[29-equation including backslashes. (valid=True)-\\\\(a \\\\\\\\backslash\\\\)\\n-<p><eq>a \\\\\\\\backslash</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[291-numbered equation following code block. (valid=True)-```\\ncode\\n```\\n\\\\[a+b\\\\](1)\\n-<pre><code>code\\n</code></pre>\\n<section>\\n<eqn>a+b</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[305-Equations in list. (valid=True)-1. \\\\(1+2\\\\)\\n2. \\\\(2+3\\\\)\\n    1. \\\\(3+4\\\\)\\n-<ol>\\n<li><eq>1+2</eq></li>\\n<li><eq>2+3</eq>\\n<ol>\\n<li><eq>3+4</eq></li>\\n</ol>\\n</li>\\n</ol>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[321-Inline sum. (valid=True)-\\\\(\\\\\\\\sum\\\\_{i=1}^n\\\\)\\n-<p><eq>\\\\\\\\sum\\\\_{i=1}^n</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[328-Sum without equation number. (valid=True)-\\\\[\\\\\\\\sum\\\\_{i=1}^n\\\\]\\n-<section>\\n<eqn>\\\\\\\\sum\\\\_{i=1}^n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[337-Sum with equation number. (valid=True)-\\\\[\\\\\\\\sum\\\\_{i=1}\\\\^n\\\\] \\\\(2\\\\)\\n-<section>\\n<eqn>\\\\\\\\sum\\\\_{i=1}\\\\^n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[346-equation number always vertically aligned. (valid=True)-\\\\[{\\\\\\\\bold e}(\\\\\\\\varphi) = \\\\\\\\begin{pmatrix}\\n\\\\\\\\cos\\\\\\\\varphi\\\\\\\\\\\\\\\\\\\\\\\\sin\\\\\\\\varphi\\n\\\\\\\\end{pmatrix}\\\\] (3)\\n-<section>\\n<eqn>{\\\\\\\\bold e}(\\\\\\\\varphi) = \\\\\\\\begin{pmatrix}\\n\\\\\\\\cos\\\\\\\\varphi\\\\\\\\\\\\\\\\\\\\\\\\sin\\\\\\\\varphi\\n\\\\\\\\end{pmatrix}</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[359-inline equations in blockquote. (valid=True)-> see \\\\(a = b + c\\\\) \\n> \\\\(c^2=a^2+b^2\\\\) (2) \\n> \\\\(c^2=a^2+b^2\\\\) \\n-<blockquote>\\n<p>see <eq>a = b + c</eq>\\n<eq>c^2=a^2+b^2</eq> (2)\\n<eq>c^2=a^2+b^2</eq></p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[36-use of currency symbol (valid=True)-You get 3$ if you solve \\\\(1+2\\\\)\\n-<p>You get 3$ if you solve <eq>1+2</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[372-display equation in blockquote. (valid=True)-> formula\\n>\\n> \\\\[ a+b=c\\\\] (2)\\n>\\n> in blockquote. \\n-<blockquote>\\n<p>formula</p>\\n<section>\\n<eqn> a+b=c</eqn>\\n</section>\\n<p>in blockquote.</p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[389-Indented by 4 spaces-    \\\\[\\n    a = 1\\n    \\\\]\\n-<pre><code>\\\\[\\na = 1\\n\\\\]\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[401-Indented by 4 spaces, DISABLE-CODEBLOCKS-    \\\\[\\n    a = 1\\n    \\\\]\\n-<section>\\n<eqn>\\n    a = 1\\n    </eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[43-use of currency symbol (valid=True)-If you solve \\\\(1+2\\\\) you get $3\\n-<p>If you solve <eq>1+2</eq> you get $3</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[50-inline fraction (valid=True)-\\\\(\\\\\\\\frac{1}{2}\\\\)\\n-<p><eq>\\\\\\\\frac{1}{2}</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[57-inline column vector (valid=True)-\\\\(\\\\\\\\begin{pmatrix}x\\\\\\\\\\\\\\\\y\\\\\\\\end{pmatrix}\\\\)\\n-<p><eq>\\\\\\\\begin{pmatrix}x\\\\\\\\\\\\\\\\y\\\\\\\\end{pmatrix}</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[64-inline bold vector notation (valid=True)-\\\\({\\\\\\\\tilde\\\\\\\\bold e}_\\\\\\\\alpha\\\\)\\n-<p><eq>{\\\\\\\\tilde\\\\\\\\bold e}_\\\\\\\\alpha</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[71-exponentiation (valid=True)-\\\\(a^{b}\\\\)\\n-<p><eq>a^{b}</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[78-conjugate complex (valid=True)-\\\\(a^\\\\*b\\\\) with \\\\(a^\\\\*\\\\)\\n-<p><eq>a^\\\\*b</eq> with <eq>a^\\\\*</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[8-inline equation with single greek character (valid=True)-\\\\(\\\\\\\\varphi\\\\)\\n-<p><eq>\\\\\\\\varphi</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[85-Inline multi-line (valid=True)-a \\\\(a\\n\\\\not=1\\\\) b\\n-<p>a <eq>a\\n\\\\not=1</eq> b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_bracket_fixtures[94-Inline multi-line with newline (valid=False)-a \\\\(a\\n\\n\\\\not=1\\\\) b\\n-<p>a (a</p>\\n<p>\\\\not=1) b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[1-single character inline equation. (valid=True)-$a$\\n-<p><eq>a</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[104-single block equation, greek index (valid=True)-$$e_\\\\\\\\alpha$$\\n-<section>\\n<eqn>e_\\\\\\\\alpha</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[113-display equation on its own single line. (valid=True)-$$1+1=2$$\\n-<section>\\n<eqn>1+1=2</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[122-inline equation followed by block equation. (valid=True)-${e}_x$\\n\\n$$e_\\\\\\\\alpha$$\\n-<p><eq>{e}_x</eq></p>\\n<section>\\n<eqn>e_\\\\\\\\alpha</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[134-underline tests (valid=True)-$$c{\\\\\\\\bold e}_x = a{\\\\\\\\bold e}_\\\\\\\\alpha - b\\\\\\\\tilde{\\\\\\\\bold e}_\\\\\\\\alpha$$\\n-<section>\\n<eqn>c{\\\\\\\\bold e}_x = a{\\\\\\\\bold e}_\\\\\\\\alpha - b\\\\\\\\tilde{\\\\\\\\bold e}_\\\\\\\\alpha</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[144-after closing $ or both is allowed. (valid=True)-a$1+1=2$\\n$1+1=2$b\\nc$x$d\\n-<p>a<eq>1+1=2</eq>\\n<eq>1+1=2</eq>b\\nc<eq>x</eq>d</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[15-simple equation starting and ending with numbers. (valid=True)-$1+1=2$\\n-<p><eq>1+1=2</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[155-following dollar character '$' is allowed. (valid=True)-$x$ $ \\n-<p><eq>x</eq> $</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[162-consecutive inline equations. (valid=True)-$x$ $y$\\n-<p><eq>x</eq> <eq>y</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[169-inline equation after '-' sign in text. (valid=True)-so-what is $x$\\n-<p>so-what is <eq>x</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[176-display equation with line breaks. (valid=True)-$$\\n1+1=2\\n$$\\n-<section>\\n<eqn>\\n1+1=2\\n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[189-multiple equations (valid=True)-$$\\na = 1\\n$$\\n\\n$$\\nb = 2\\n$$\\n-<section>\\n<eqn>\\na = 1\\n</eqn>\\n</section>\\n<section>\\n<eqn>\\nb = 2\\n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[211-equation followed by a labelled equation (valid=True)-$$\\na = 1\\n$$\\n\\n$$\\nb = 2\\n$$ (1)\\n-<section>\\n<eqn>\\na = 1\\n</eqn>\\n</section>\\n<section>\\n<eqn>\\nb = 2\\n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[22-simple equation including special html character. (valid=True)-$1+1<3$\\n-<p><eq>1+1<3</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[233-multiline equation. (valid=True)-$$\\\\\\\\begin{matrix}\\n f & = & 2 + x + 3 \\\\\\\\ \\n & = & 5 + x \\n\\\\\\\\end{matrix}$$\\n-<section>\\n<eqn>\\\\\\\\begin{matrix}\\n f & = & 2 + x + 3 \\\\\\\\ \\n & = & 5 + x \\n\\\\\\\\end{matrix}</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[248-vector equation. (valid=True)-$$\\\\\\\\begin{pmatrix}x_2 \\\\\\\\\\\\\\\\ y_2 \\\\\\\\end{pmatrix} = \\n\\\\\\\\begin{pmatrix} A & B \\\\\\\\\\\\\\\\ C & D \\\\\\\\end{pmatrix}\\\\\\\\cdot\\n\\\\\\\\begin{pmatrix} x_1 \\\\\\\\\\\\\\\\ y_1 \\\\\\\\end{pmatrix}$$\\n-<section>\\n<eqn>\\\\\\\\begin{pmatrix}x_2 \\\\\\\\\\\\\\\\ y_2 \\\\\\\\end{pmatrix} = \\n\\\\\\\\begin{pmatrix} A & B \\\\\\\\\\\\\\\\ C & D \\\\\\\\end{pmatrix}\\\\\\\\cdot\\n\\\\\\\\begin{pmatrix} x_1 \\\\\\\\\\\\\\\\ y_1 \\\\\\\\end{pmatrix}</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[261-display equation with equation number. (valid=True)-$$f(x) = x^2 - 1$$ (1)\\n-<section>\\n<eqn>f(x) = x^2 - 1</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[270-inline equation following code section. (valid=True)-`code`$a-b$\\n-<p><code>code</code><eq>a-b</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[277-equation following code block. (valid=True)-```\\ncode\\n```\\n$$a+b$$\\n-<pre><code>code\\n</code></pre>\\n<section>\\n<eqn>a+b</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[29-equation including backslashes. (valid=True)-$a \\\\\\\\backslash$\\n-<p><eq>a \\\\\\\\backslash</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[291-numbered equation following code block. (valid=True)-```\\ncode\\n```\\n$$a+b$$(1)\\n-<pre><code>code\\n</code></pre>\\n<section>\\n<eqn>a+b</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[305-Equations in list. (valid=True)-1. $1+2$\\n2. $2+3$\\n    1. $3+4$\\n-<ol>\\n<li><eq>1+2</eq></li>\\n<li><eq>2+3</eq>\\n<ol>\\n<li><eq>3+4</eq></li>\\n</ol>\\n</li>\\n</ol>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[321-Inline sum. (valid=True)-$\\\\\\\\sum\\\\_{i=1}^n$\\n-<p><eq>\\\\\\\\sum\\\\_{i=1}^n</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[328-Sum without equation number. (valid=True)-$$\\\\\\\\sum\\\\_{i=1}^n$$\\n-<section>\\n<eqn>\\\\\\\\sum\\\\_{i=1}^n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[337-Sum with equation number. (valid=True)-$$\\\\\\\\sum\\\\_{i=1}\\\\^n$$ \\\\(2\\\\)\\n-<section>\\n<eqn>\\\\\\\\sum\\\\_{i=1}\\\\^n</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[346-equation number always vertically aligned. (valid=True)-$${\\\\\\\\bold e}(\\\\\\\\varphi) = \\\\\\\\begin{pmatrix}\\n\\\\\\\\cos\\\\\\\\varphi\\\\\\\\\\\\\\\\\\\\\\\\sin\\\\\\\\varphi\\n\\\\\\\\end{pmatrix}$$ (3)\\n-<section>\\n<eqn>{\\\\\\\\bold e}(\\\\\\\\varphi) = \\\\\\\\begin{pmatrix}\\n\\\\\\\\cos\\\\\\\\varphi\\\\\\\\\\\\\\\\\\\\\\\\sin\\\\\\\\varphi\\n\\\\\\\\end{pmatrix}</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[359-inline equations in blockquote. (valid=True)-> see $a = b + c$ \\n> $c^2=a^2+b^2$ (2) \\n> $c^2=a^2+b^2$ \\n-<blockquote>\\n<p>see <eq>a = b + c</eq>\\n<eq>c^2=a^2+b^2</eq> (2)\\n<eq>c^2=a^2+b^2</eq></p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[36-use of currency symbol (valid=True)-You get 3$ if you solve $1+2$\\n-<p>You get 3$ if you solve <eq>1+2</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[372-display equation in blockquote. (valid=True)-> formula\\n>\\n> $$ a+b=c$$ (2)\\n>\\n> in blockquote. \\n-<blockquote>\\n<p>formula</p>\\n<section>\\n<eqn> a+b=c</eqn>\\n</section>\\n<p>in blockquote.</p>\\n</blockquote>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[389-mixed syntax:-$$\\na=1 \\\\\\\\\\nb=2\\n$$ (abc)\\n\\n- ab $c=1$ d\\n-<section>\\n<eqn>\\na=1 \\\\\\\\\\nb=2\\n</eqn>\\n</section>\\n<ul>\\n<li>ab <eq>c=1</eq> d</li>\\n</ul>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[410-dollar '$' characters. (valid=True)-\\\\\\\\$1+1=2$\\n$1+1=2\\\\\\\\$\\n-<p>\\\\$1+1=2$\\n$1+1=2\\\\$</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[419-empty line between text and display formula is required. (valid=False)-some text\\n \\\\$\\\\\\\\$a+b=c\\\\$\\\\$\\n-<p>some text\\n$\\\\$a+b=c$$</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[429-or before closing $ is not allowed. (valid=False)-$ $\\n$ x$\\n$x $\\n-<p>$ $\\n$ x$\\n$x $</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[43-use of currency symbol (valid=True)-If you solve $1+2$ you get $3\\n-<p>If you solve <eq>1+2</eq> you get $3</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[441-Indented by 4 spaces-    $$a$$\\n-<pre><code>$$a$$\\n</code></pre>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[449-Indented by 4 spaces, DISABLE-CODEBLOCKS-    $$a$$\\n-<section>\\n<eqn>a</eqn>\\n</section>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[50-inline fraction (valid=True)-$\\\\\\\\frac{1}{2}$\\n-<p><eq>\\\\\\\\frac{1}{2}</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[57-inline column vector (valid=True)-$\\\\\\\\begin{pmatrix}x\\\\\\\\\\\\\\\\y\\\\\\\\end{pmatrix}$\\n-<p><eq>\\\\\\\\begin{pmatrix}x\\\\\\\\\\\\\\\\y\\\\\\\\end{pmatrix}</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[64-inline bold vector notation (valid=True)-${\\\\\\\\tilde\\\\\\\\bold e}_\\\\\\\\alpha$\\n-<p><eq>{\\\\\\\\tilde\\\\\\\\bold e}_\\\\\\\\alpha</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[71-exponentiation (valid=True)-$a^{b}$\\n-<p><eq>a^{b}</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[78-conjugate complex (valid=True)-$a^\\\\*b$ with $a^\\\\*$\\n-<p><eq>a^\\\\*b</eq> with <eq>a^\\\\*</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[8-inline equation with single greek character (valid=True)-$\\\\\\\\varphi$\\n-<p><eq>\\\\\\\\varphi</eq></p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[85-Inline multi-line (valid=True)-a $a\\n\\\\not=1$ b\\n-<p>a <eq>a\\n\\\\not=1</eq> b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_dollar_fixtures[94-Inline multi-line with newline (valid=False)-a $a\\n\\n\\\\not=1$ b\\n-<p>a $a</p>\\n<p>\\\\not=1$ b</p>\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_inline_func",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_texmath.py::test_plugin_parse",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wordcount.py::test_all[1-syntax (text)-one two\\nthree four\\n\\n- five six\\n\\n> seven eight\\n\\n[nine ten](link)\\n-{\\n  \"minutes\": 0,\\n  \"text\": [\\n    \"one two\",\\n    \"three four\",\\n    \"five six\",\\n    \"seven eight\",\\n    \"nine ten\"\\n  ],\\n  \"words\": 10\\n}\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wordcount.py::test_all[25-non-words-Geeksforgeeks,    is best @# Computer Science Portal.!!!\\n-{\\n  \"minutes\": 0,\\n  \"words\": 6\\n}\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_wordcount.py::test_all[35-lore ipsum-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent imperdiet hendrerit dictum. Etiam diam turpis, cursus in varius dignissim, imperdiet nec nibh. Nulla nec finibus dui. Phasellus fermentum venenatis placerat. Donec ut dui in sem rhoncus molestie. Sed auctor sem dapibus augue varius facilisis. Maecenas at suscipit dolor. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Vestibulum ornare dui ac tristique ultricies. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Quisque arcu erat, ultricies ac lorem at, semper ornare nisl.\\n\\nDonec massa magna, commodo et ultrices ac, rutrum non nulla. Nunc fermentum fringilla ultrices. Morbi ante nibh, accumsan ac viverra quis, gravida rutrum mi. Integer lobortis, purus id laoreet ornare, sapien odio placerat massa, vel vestibulum dolor ante id mi. Donec ex leo, ultricies non ante eget, pharetra dictum orci. Interdum et malesuada fames ac ante ipsum primis in faucibus. Maecenas vitae tortor ut nisi cursus egestas. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Morbi et nunc posuere, pharetra est aliquet, iaculis libero. Aliquam leo nibh, posuere eget eros a, convallis bibendum nibh. Phasellus vulputate bibendum lacus sit amet varius. Integer ut rutrum dolor, ac finibus neque. Maecenas ultrices pretium augue vitae mollis. Fusce semper lorem eu mauris iaculis pulvinar.\\n\\nMorbi ac pretium nunc, ac faucibus enim. Duis consequat nibh metus, at sodales sem luctus nec. Donec id finibus ante. Duis tincidunt vulputate efficitur. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Aenean porttitor augue consectetur, feugiat odio in, rutrum velit. Aliquam et mi lacinia, efficitur nisl nec, rutrum mauris. Mauris efficitur eros in maximus tempor. Suspendisse potenti. Quisque cursus non libero in faucibus. Etiam dignissim urna vel nibh feugiat, at vehicula dui vulputate.\\n\\nPraesent malesuada arcu quis neque condimentum vestibulum. Aliquam pretium eleifend neque, eget vulputate erat faucibus at. Quisque egestas nunc ac hendrerit fringilla. Vestibulum at tristique lacus, eget placerat risus. Aenean a metus ullamcorper, eleifend ante ut, feugiat lacus. Proin eget semper purus, ac vehicula nisl. Suspendisse eu mi enim. Nullam aliquam purus eu orci iaculis suscipit. Mauris dapibus non neque eu hendrerit. Sed eros purus, finibus ut ex ac, ultricies luctus enim. Quisque non lacus arcu. Ut dictum mauris ac tristique pulvinar. Aenean ut nisl massa. Donec nec dui scelerisque, egestas arcu sit amet, tempor eros.\\n\\nDonec sit amet faucibus tellus. Cras auctor mi id quam rhoncus, eget porttitor magna ultrices. Sed tristique ut augue in facilisis. Duis in finibus diam. In hac habitasse platea dictumst. Vestibulum in pulvinar orci. Sed a justo cursus enim ultrices egestas sed sit amet leo. Donec sed auctor urna. Praesent vitae dapibus ipsum. Nulla facilisi. Pellentesque non nisi sem. Sed ac mi rutrum, blandit purus ut, facilisis ipsum.\\n-{\\n  \"minutes\": 2,\\n  \"words\": 458\\n}\\n]",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-regressions",
+      "module": "pytest_regressions.plugin",
+      "module_sha256": "7e83d5310ed88bfb5f1ba7b771c9e7b652c27890990e05cb244120c0c8bcca7f",
+      "version": "2.11.0"
+    },
+    {
+      "distribution": "pytest-datadir",
+      "module": "pytest_datadir.plugin",
+      "module_sha256": "9ea98c47db71061dbfcfe3d3b87920c89c079130f3b60cb4d59868d658046052",
+      "version": "1.8.0"
+    },
+    {
+      "distribution": "pytest-timeout",
+      "module": "pytest_timeout",
+      "module_sha256": "a0bd61d881212d27a922b8fa008b79270a55bcbec467f948d2423a152d37233a",
+      "version": "2.4.0"
+    }
+  ],
+  "project": "mdit-py-plugins",
+  "python": "3.12.15",
+  "schema": 1
+}

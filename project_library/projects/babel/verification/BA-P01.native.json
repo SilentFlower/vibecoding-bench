@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BA-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "catalog_validation_is_separate_from_compilation_and_fuzzy_release_policy": true
+  },
+  "resource_profile": "business"
+}

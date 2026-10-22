@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "existing_author_middleware_preserves_braced_organization_and_copy_policy": true
+  },
+  "resource_profile": "business"
+}

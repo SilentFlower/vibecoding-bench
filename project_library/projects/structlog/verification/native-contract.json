@@ -1,0 +1,4779 @@
+{
+  "baseline_digest": "a226d33fcbe98f5556dbadb2078d12b32ad03cce863f7a38b2cbb6e5026128a5",
+  "nodes": [
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_additional_ignores",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_all_parameters",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_async[AsyncBoundLogger-info]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_async[BoundLogger-ainfo]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_async_native_logger",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[None-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[None-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[None-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[None-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[None-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[None-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[None-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[None-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings1-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings1-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings1-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings1-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings1-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings1-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings1-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings1-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings10-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings10-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings10-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings10-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings10-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings10-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings10-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings10-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings11-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings11-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings11-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings11-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings11-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings11-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings11-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings11-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings12-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings12-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings12-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings12-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings12-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings12-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings12-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings12-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings13-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings13-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings13-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings13-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings13-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings13-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings13-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings13-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings2-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings2-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings2-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings2-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings2-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings2-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings2-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings2-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings3-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings3-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings3-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings3-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings3-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings3-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings3-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings3-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings4-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings4-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings4-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings4-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings4-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings4-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings4-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings4-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings5-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings5-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings5-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings5-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings5-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings5-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings5-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings5-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings6-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings6-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings6-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings6-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings6-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings6-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings6-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings6-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings7-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings7-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings7-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings7-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings7-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings7-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings7-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings7-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings8-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings8-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings8-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings8-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings8-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings8-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings8-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings8-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings9-logging-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings9-logging-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings9-logging-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings9-logging-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings9-structlog-common-with-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings9-structlog-common-without-pre]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings9-structlog-everywhere]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_e2e[parameter_strings9-structlog-shared]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_pickeable_callsite_parameter_adder",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[None-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[None-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings1-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings1-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings10-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings10-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings11-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings11-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings12-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings12-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings13-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings13-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings2-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings2-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings3-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings3-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings4-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings4-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings5-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings5-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings6-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings6-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings7-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings7-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings8-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings8-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings9-logging]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_processor[parameter_strings9-structlog]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_qual_module_structlog",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_qual_name_logging_origin_absent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestCallsiteParameterAdder::test_qual_name_structlog",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_exception_on_py3",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_handles_exc_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_nop_if_no_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_own_exc_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_prints_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_removes_exc_info_after_printing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_removes_exception_after_printing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_stdout_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestExceptionPrettyPrinter::test_uses_exception_formatter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestFigureOutExcInfo::test_obtains_exc_info_on_True[1.1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestFigureOutExcInfo::test_obtains_exc_info_on_True[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestFigureOutExcInfo::test_obtains_exc_info_on_True[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestFigureOutExcInfo::test_py3_exception_no_traceback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestRenameKey::test_rename_once",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestRenameKey::test_rename_twice",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestRenameKey::test_replace_by_key_is_optional",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestStackInfoRenderer::test_additional_ignores",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestStackInfoRenderer::test_adds_stack_if_asked",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestStackInfoRenderer::test_removes_stack_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestStackInfoRenderer::test_renders_correct_stack",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestUnicodeDecoder::test_bytes_nop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestUnicodeDecoder::test_decodes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestUnicodeDecoder::test_passes_arguments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestUnicodeEncoder::test_bytes_nop",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestUnicodeEncoder::test_encodes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_processors.py::TestUnicodeEncoder::test_passes_arguments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_custom_formatter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_exception_without_traceback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_format_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_formats_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_gets_exc_info_on_bool",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_no_exception[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_no_exception[ei1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_nop[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_nop[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_nop[]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestFormatExcInfo::test_nop_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestJSONRenderer::test_FallbackEncoder_falls_back",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestJSONRenderer::test_FallbackEncoder_handles_ThreadLocalDictWrapped_dicts",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestJSONRenderer::test_custom_fallback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestJSONRenderer::test_renders_json",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestJSONRenderer::test_serializer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestJSONRenderer::test_simplejson",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_order_complete",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_order_extra",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_order_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_order_missing_dropped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_order_sorted_missing_dropped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_random_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_repr_native_str[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_repr_native_str[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestKeyValueRenderer::test_sort_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_bool_as_flag",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_empty_event_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_equal_sign_or_space_in_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_escaping[I want to render this \\\\\"string\\\\\" with logfmtrenderer-\"I want to render this \\\\\\\\\\\\\"string\\\\\\\\\\\\\" with logfmtrenderer\"]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_escaping[a\"quote-\"a\\\\\"quote\"]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_escaping[a\\\\slash with space or a\"quote-\"a\\\\\\\\slash with space or a\\\\\"quote\"]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_escaping[a\\\\slash-a\\\\slash]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_invalid_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_newline_in_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_order_complete",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_order_extra",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_order_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_order_missing_dropped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_order_sorted_missing_dropped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_random_order",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_reference_format",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestLogfmtRenderer::test_sort_keys",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestMaybeTimeStamper::test_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestMaybeTimeStamper::test_overwrite",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestMaybeTimeStamper::test_overwrite_custom_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_adds_Z_to_iso",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_apply_time_machine_after_instantiation",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_disallows_non_utc_unix_timestamps",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_formats",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_inserts_formatted_local",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_inserts_formatted_utc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_inserts_utc_unix_timestamp_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_key_can_be_specified",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_local",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[0-None-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[0-None-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[0-None-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[0-None-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[0-other-key-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[0-other-key-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[0-other-key-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[0-other-key-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[1-None-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[1-None-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[1-None-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[1-None-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[1-other-key-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[1-other-key-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[1-other-key-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[1-other-key-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[2-None-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[2-None-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[2-None-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[2-None-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[2-other-key-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[2-other-key-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[2-other-key-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[2-other-key-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[3-None-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[3-None-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[3-None-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[3-None-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[3-other-key-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[3-other-key-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[3-other-key-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[3-other-key-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[4-None-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[4-None-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[4-None-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[4-None-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[4-other-key-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[4-other-key-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[4-other-key-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[4-other-key-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[5-None-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[5-None-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[5-None-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[5-None-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[5-other-key-False-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[5-other-key-False-None]",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[5-other-key-True-%Y]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_pickle[5-other-key-True-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/processors/test_renderers.py::TestTimeStamper::test_tz_aware",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_bind_keeps_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_binds_independently",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_comparison",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_new_clears_state",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_new_keeps_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_try_unbind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_try_unbind_fail",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_unbind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestBinding::test_unbind_fail",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_chain_does_not_swallow_all_exceptions",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_copies_context_before_processing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_event_empty_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_last_processor_returns_bytearray",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_last_processor_returns_bytes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_last_processor_returns_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_last_processor_returns_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_last_processor_returns_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProcessing::test_last_processor_returns_unknown_value",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_base.py::TestProxying::test_processor_raising_DropEvent_silently_aborts_chain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_argument_takes_precedence_over_configuration[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_argument_takes_precedence_over_configuration[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_bind_binds_new_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_bind_doesnt_cache_logger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_bind_honors_initial_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_does_not_cache_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_emphemeral",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_falls_back_to_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_honors_wrapper_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_honors_wrapper_from_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_new_binds_only_initial_values_explicit_ctx_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_new_binds_only_initial_values_implicit_ctx_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_pickle[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_pickle[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_pickle[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_pickle[3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_pickle[4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_pickle[5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_prefers_args_over_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_rebinds_bind_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_returns_bound_logger_on_bind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_returns_bound_logger_on_new",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_returns_bound_logger_on_try_unbind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestBoundLoggerLazyProxy::test_unbind_unbinds_from_initial_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestConfigure::test_configure_all",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestConfigure::test_configure_sets_is_configured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestConfigure::test_configures_logger_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestConfigure::test_get_config_is_configured",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestConfigure::test_just_context_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestConfigure::test_just_processors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestConfigure::test_reset",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestFunctions::test_configure_once_issues_warning_on_repeated_call",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestFunctions::test_empty_processors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestFunctions::test_get_logger_configures_according_to_config",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestFunctions::test_get_logger_passes_positional_arguments_to_logger_factory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestFunctions::test_wrap_passes_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::TestFunctions::test_wrap_returns_proxy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_default_context_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_lazy_logger_context_is_initial_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_lazy_logger_is_an_instance_of_bindable_logger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_config.py::test_lazy_logger_is_not_detected_as_abstract_method",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestBoundContextvars::test_as_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestBoundContextvars::test_cleanup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestBoundContextvars::test_cleanup_conflict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestBoundContextvars::test_nesting_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestBoundContextvars::test_preserve_independent_bind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_bind",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_clear",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_clear_without_bind",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_get_merged_merges_context",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_get_only_gets_structlog_without_deleted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_merge_overrides_bind",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_merge_works_without_bind",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_multiple_binds",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_nested_async_bind",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_parallel_binds",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_reset",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_unbind",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_contextvars.py::TestContextvars::test_unbind_not_bound",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestBetterTraceback::test_default",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dev.py::TestBetterTraceback::test_deprecation_warning",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dev.py::TestBetterTraceback::test_does_not_blow_up",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_colorama_colors_false",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_colorama_force_colors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_columns_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_columns_warns_about_meaningless_arguments",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_detects_default_column",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_does_not_modify_styles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_enforces_presence_of_exactly_one_default_formatter",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_event_key_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_event_renamed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_event_stringified",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_everything[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_everything[exception]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_everything[tuple]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_exc_info_bool",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_exc_info_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_exc_info_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_exception_formatter_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_exception_rendered",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_init_accepts_overriding_levels",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_initializes_colorama_on_windows_with_force_colors",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_key_values",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_key_values_unsorted",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_level",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_logger_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_logger_name_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_missing_colorama",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_no_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pad_event_to_param",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[0-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[0-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[0-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[0-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[1-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[1-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[1-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[1-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[2-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[2-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[2-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[2-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[3-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[3-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[3-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[3-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[4-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[4-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[4-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[4-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[5-False-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[5-False-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[5-True-False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_pickle[5-True-True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_plain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_raises_system_error_on_windows_without_colorama",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_repr_native_str[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_repr_native_str[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_returns_colorful_styles_when_colors_true",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_returns_plain_styles_when_colors_false",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_sort_keys_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_stack_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_timestamp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_timestamp_key_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRenderer::test_timestamp_renamed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_level_styles_roundtrip",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_no_color_selects_no_rich_color_system",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_pad_event_deprecation_warning",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_pad_event_to_param_raises_value_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_repr_native_str_property",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_roundtrip_pad_event_to",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_roundtrip_pad_level",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_same_force_colors_value_resets_level_styles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_same_value_resets_level_styles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_set_level_styles_none_resets_to_defaults[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_set_level_styles_none_resets_to_defaults[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_toggle_colors_preserves_custom_rich_traceback_formatter[False-True-custom_formatter0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_toggle_colors_preserves_custom_rich_traceback_formatter[True-False-custom_formatter1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_toggle_colors_resets_custom_level_styles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_toggle_colors_updates_styles_and_levels",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_toggle_force_colors_resets_custom_level_styles",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestConsoleRendererProperties::test_toggle_force_colors_updates_styles_and_levels",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestGetActiveConsoleRenderer::test_multiple_console_renderers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestGetActiveConsoleRenderer::test_no_console_renderer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestGetActiveConsoleRenderer::test_ok",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestLogLevelColumnFormatter::test_no_style",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestPad::test_negative",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestPad::test_normal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestRichTracebackFormatter::test_code_width_support[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestRichTracebackFormatter::test_code_width_support[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestRichTracebackFormatter::test_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestRichTracebackFormatter::test_does_not_blow_up",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestRichTracebackFormatter::test_width_minus_one",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestSetExcInfo::test_already_set[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestSetExcInfo::test_already_set[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestSetExcInfo::test_already_set[ei2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestSetExcInfo::test_set_it",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::TestSetExcInfo::test_wrong_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_dev.py::test_rich_traceback_formatter_no_rich",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_frames.py::TestFindFirstAppFrameAndName::test_ignores_structlog_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFindFirstAppFrameAndName::test_ignoring_of_additional_frame_names_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFindFirstAppFrameAndName::test_stacklevel",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFindFirstAppFrameAndName::test_stacklevel_capped",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFindFirstAppFrameAndName::test_tolerates_f_back_is_None",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFindFirstAppFrameAndName::test_tolerates_missing_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFindFirstAppFrameAndName::test_tolerates_name_explicitly_None_manyframe",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFindFirstAppFrameAndName::test_tolerates_name_explicitly_None_oneframe",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFormatException::test_formats",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFormatException::test_no_trailing_nl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFormatException::test_returns_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFormatStack::test_formats",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFormatStack::test_no_trailing_nl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_frames.py::TestFormatStack::test_returns_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generic.py::TestGenericBoundLogger::test_caches",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generic.py::TestGenericBoundLogger::test_deepcopy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generic.py::TestGenericBoundLogger::test_pickle[3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generic.py::TestGenericBoundLogger::test_pickle[4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_generic.py::TestGenericBoundLogger::test_pickle[5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_aexception_dict_args",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_aexception_positional_args",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_alog_exact_level",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_alog_interp",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_alog_interp_dict",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_alog_no_args",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_alog_one_below",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_contextvars_merged[aexception-args0]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_contextvars_merged[ainfo-args1]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_contextvars_merged[alog-args2]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_exact_level",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_exception",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_exception_passed",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_exception_true",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_filtered_interp",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_no_args",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_one_below",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_async_pos_args",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_exact_level",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_exception_dict_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_exception_pass_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_exception_passed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_exception_positional_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_filter_bound_below_missing_event_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_filter_bound_exact_missing_event_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_filtered_interp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_get_effective_level",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_is_enabled_for",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_log_exact_level",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_log_interp",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_log_interp_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_log_level_str",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_log_one_below",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_log_percent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_no_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_one_below",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_pickle[10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_pickle[20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_pickle[30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_pickle[40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_pickle[50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_native.py::TestNativeFilteringLogger::test_pos_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_deepcopy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_deepcopy_no_stdout",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_deepcopy_preserves_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_lock",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_name_attribute",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_name_defaults_to_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[0-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[0-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[0-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[1-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[1-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[2-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[2-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[2-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[3-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[3-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[3-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[4-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[4-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[4-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[5-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[5-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle[5-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_not_stdout_stderr[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_not_stdout_stderr[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_not_stdout_stderr[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_not_stdout_stderr[3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_not_stdout_stderr[4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_not_stdout_stderr[5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_preserves_name[0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_preserves_name[1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_preserves_name[2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_preserves_name[3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_preserves_name[4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_pickle_preserves_name[5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_prints_to_correct_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_prints_to_stdout_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_stdlib_methods_support[critical]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_stdlib_methods_support[debug]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_stdlib_methods_support[error]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_stdlib_methods_support[exception]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_stdlib_methods_support[info]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_stdlib_methods_support[warn]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_stdlib_methods_support[warning]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLogger::test_unpickle_from_old_state_sets_name_to_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLoggerFactory::test_does_not_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLoggerFactory::test_extra_args_ignored",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLoggerFactory::test_name_defaults_to_none",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLoggerFactory::test_passes_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestBytesLoggerFactory::test_passes_name_from_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_deepcopy[PrintLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_deepcopy[WriteLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_deepcopy_no_stdout[PrintLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_deepcopy_no_stdout[WriteLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_lock[PrintLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_lock[WriteLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-0-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-0-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-0-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-1-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-1-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-2-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-2-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-2-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-3-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-3-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-3-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-4-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-4-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-4-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-5-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-5-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[PrintLogger-5-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-0-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-0-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-0-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-1-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-1-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-2-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-2-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-2-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-3-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-3-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-3-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-4-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-4-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-4-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-5-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-5-file1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle[WriteLogger-5-file2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[PrintLogger-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[PrintLogger-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[PrintLogger-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[PrintLogger-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[PrintLogger-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[PrintLogger-5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[WriteLogger-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[WriteLogger-1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[WriteLogger-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[WriteLogger-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[WriteLogger-4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_pickle_not_stdout_stderr[WriteLogger-5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_prints_to_correct_file[PrintLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_prints_to_correct_file[WriteLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_prints_to_stdout_by_default[PrintLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_prints_to_stdout_by_default[WriteLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_repr[PrintLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_repr[WriteLogger]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[PrintLogger-critical]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[PrintLogger-debug]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[PrintLogger-error]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[PrintLogger-exception]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[PrintLogger-info]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[PrintLogger-warn]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[PrintLogger-warning]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[WriteLogger-critical]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[WriteLogger-debug]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[WriteLogger-error]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[WriteLogger-exception]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[WriteLogger-info]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[WriteLogger-warn]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdlib_methods_support[WriteLogger-warning]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestLoggers::test_stdout_monkeypatch",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestPrintLoggerFactory::test_does_not_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestPrintLoggerFactory::test_ignores_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestPrintLoggerFactory::test_passes_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestWriteLoggerFactory::test_does_not_cache",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestWriteLoggerFactory::test_ignores_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::TestWriteLoggerFactory::test_passes_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::test_write_locks_released_on_gc[BytesLogger-wb]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::test_write_locks_released_on_gc[PrintLogger-w]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_output.py::test_write_locks_released_on_gc[WriteLogger-w]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_packaging.py::TestLazyImports::test_import_does_not_load_asyncio",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_packaging.py::TestLegacyMetadataHack::test_description",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_packaging.py::TestLegacyMetadataHack::test_does_not_exist",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_packaging.py::TestLegacyMetadataHack::test_email",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_packaging.py::TestLegacyMetadataHack::test_uri",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_packaging.py::TestLegacyMetadataHack::test_version",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevel::test_log_level_added",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevel::test_log_level_alias_normalized[exception-error]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevel::test_log_level_alias_normalized[warn-warning]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevelNumber::test_log_level_number_added[critical-50]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevelNumber::test_log_level_number_added[debug-10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevelNumber::test_log_level_number_added[error-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevelNumber::test_log_level_number_added[exception-40]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevelNumber::test_log_level_number_added[info-20]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevelNumber::test_log_level_number_added[notset-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevelNumber::test_log_level_number_added[warn-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLogLevelNumber::test_log_level_number_added[warning-30]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLoggerName::test_logger_name_added",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLoggerName::test_logger_name_added_with_bytes_logger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLoggerName::test_logger_name_added_with_record",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAddLoggerName::test_logger_name_none_with_unnamed_bytes_logger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_bind_unbind",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_correct_level_fatal",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_correct_levels[critical]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_correct_levels[debug]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_correct_levels[error]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_correct_levels[exception]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_correct_levels[info]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_correct_levels[warn]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_correct_levels[warning]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_exception",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_exception_do_not_overwrite",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_integration",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_log_method",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_protocol",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestAsyncBoundLogger::test_sync_bl",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_aexception_exc_info_explicit",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_aexception_exc_info_true",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_alog",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_async_log_methods[critical]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_async_log_methods[debug]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_async_log_methods[error]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_async_log_methods[info]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_async_log_methods[warning]",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_async_log_methods_special_cases",
+      "kind": "Coroutine",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_exception_exc_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_exception_exc_info_override",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_get_effective_level",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_is_enabled_for",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_positional_args_proxied",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_bind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_log",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_new",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_to_correct_method[critical]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_to_correct_method[debug]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_to_correct_method[error]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_to_correct_method[exception]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_to_correct_method[info]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_to_correct_method[warning]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_to_correct_method_special_cases",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_try_unbind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_proxies_unbind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_attributes[disabled]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_attributes[handlers]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_attributes[level]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_attributes[name]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_attributes[parent]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_attributes[propagate]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[addHandler-method_args0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[callHandlers-method_args3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[findCaller-method_args8]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[getChild-method_args10]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[getEffectiveLevel-method_args6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[handle-method_args4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[hasHandlers-method_args2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[isEnabledFor-method_args7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[makeRecord-method_args9]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[removeHandler-method_args1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestBoundLogger::test_stdlib_passthrough_methods[setLevel-method_args5]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[allow1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[allow2-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[allow3-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[allow4-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[allow5-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[allow6-misses6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[allow7-misses7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra[allow8-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[None-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[allow1-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[allow2-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[allow3-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[allow4-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[allow5-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[allow6-misses6]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[allow7-misses7]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_add_extra_e2e[allow8-None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestExtraAdder::test_no_record",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestFilterByLevel::test_filters_lower_levels",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestFilterByLevel::test_passes_higher_levels",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestLoggerFactory::test_deduces_correct_caller",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestLoggerFactory::test_deduces_correct_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestLoggerFactory::test_find_caller",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestLoggerFactory::test_ignores_frames",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestLoggerFactory::test_no_stack_info_by_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestLoggerFactory::test_positional_argument_avoids_guessing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestLoggerFactory::test_sets_correct_logger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestLoggerFactory::test_stack_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestPositionalArgumentsFormatter::test_args_removed_if_empty",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestPositionalArgumentsFormatter::test_formats_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestPositionalArgumentsFormatter::test_formats_tuple",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestPositionalArgumentsFormatter::test_nop_no_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestPositionalArgumentsFormatter::test_positional_args_retained",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_clears_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_foreign_chain_can_pass_dictionaries_without_excepting",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_foreign_delegate",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_foreign_pre_chain",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_foreign_pre_chain_add_logger_name",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_foreign_pre_chain_filter_by_level",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_foreign_pre_chain_gets_exc_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_foreign_pre_chain_sys_exc_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_formatter_unsets_exc_info[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_formatter_unsets_exc_info[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_formatter_unsets_stack_info[False]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_formatter_unsets_stack_info[True]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_log_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_logrecord_exc_info",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_native",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_native_logger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_no_renderer",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_non_string_message_warning",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_other_handlers_get_original_record",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_pass_foreign_args_true_sets_positional_args_key",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_processor_and_processors",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_remove_processors_meta",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestProcessorFormatter::test_use_get_message_false",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogArgsAndKwargs::test_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogArgsAndKwargs::test_integration",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogArgsAndKwargs::test_pass_kwargs_from_event_dict_as_kwargs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogArgsAndKwargs::test_pass_positional_args_from_event_dict_as_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogArgsAndKwargs::test_pass_remaining_event_dict_as_extra",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogKwargs::test_add_extra_event_dict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogKwargs::test_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogKwargs::test_handles_special_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::TestRenderToLogKwargs::test_integration_special_kw",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::test_recreate_defaults[45]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_stdlib.py::test_recreate_defaults[None]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCaptureLogs::test_captures_bound_logers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCaptureLogs::test_captures_log_level_mapping",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCaptureLogs::test_captures_logs",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCaptureLogs::test_restores_processors_on_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCaptureLogs::test_restores_processors_on_success",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCaptureLogs::test_uses_processors_arg_and_restores_on_success",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCapturingLogger::test_captures",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCapturingLogger::test_factory_caches",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestCapturingLogger::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLogger::test_return_logger",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLogger::test_stdlib_methods_support[critical]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLogger::test_stdlib_methods_support[debug]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLogger::test_stdlib_methods_support[error]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLogger::test_stdlib_methods_support[exception]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLogger::test_stdlib_methods_support[info]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLogger::test_stdlib_methods_support[warn]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLogger::test_stdlib_methods_support[warning]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLoggerFactory::test_builds_returnloggers",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLoggerFactory::test_caches",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_testing.py::TestReturnLoggerFactory::test_ignores_args",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestAsImmutable::test_converts_proxy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestAsImmutable::test_does_not_affect_global",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestAsImmutable::test_idempotency",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestBoundThreadlocal::test_as_decorator",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestBoundThreadlocal::test_cleanup",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestBoundThreadlocal::test_cleanup_conflict",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestBoundThreadlocal::test_nesting_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestBoundThreadlocal::test_preserve_independent_bind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestNewThreadLocal::test_alias",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestNewThreadLocal::test_bind_and_merge",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestNewThreadLocal::test_clear",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestNewThreadLocal::test_get_context_no_context",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestNewThreadLocal::test_get_merged",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestNewThreadLocal::test_merge_works_without_bind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestNewThreadLocal::test_multiple_binds",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestNewThreadLocal::test_unbind_threadlocal",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_context_is_global_to_thread",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_del",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_delattr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_delattr_missing",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_init_with_itself_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_is_greenlet_local",
+      "kind": "Function",
+      "outcome": "skipped"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_is_thread_local",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_iter_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_new_class",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_non_dunder_proxy_works",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestThreadLocalDict::test_wrap_returns_distinct_classes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestTmpBind::test_bind",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestTmpBind::test_bind_exc",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_threadlocal.py::TestTmpBind::test_tmp_bind_lazy",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::TestLogException::test_log_explicit_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::TestLogException::test_log_implicit_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::TestLogException::test_no_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_exception_cycle",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_exception_dict_transformer_locals_max_accept_none_argument[kwargs0-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_exception_dict_transformer_locals_max_accept_none_argument[kwargs1-local_variable1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_exception_groups",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_filename_not_a_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_filename_with_bracket",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_exception_groups",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_locals_max_string",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_max_frames[2-3-1-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_max_frames[3-3-1-2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_max_frames[4-4--1-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_max_frames[5-4--1-0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_suppress_without_file",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_value_error[kwargs0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_value_error[kwargs1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_value_error[kwargs2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_value_error[kwargs3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_value_error[kwargs4]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_traceback_with_notes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_tracebacks_skip_sunder_dunder[False-False-expected0]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_tracebacks_skip_sunder_dunder[False-True-expected2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_tracebacks_skip_sunder_dunder[True-False-expected1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_tracebacks_skip_sunder_dunder[True-True-expected3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_tracebacks_suppress[file]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_json_tracebacks_suppress[json]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_raise_hide_cause",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_raise_nested",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_raise_no_msg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_raise_with_cause",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_raise_with_cause_no_tb",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_recursive",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_reraise_error_from_exception_group",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_safe_str_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_save_str[3-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_save_str[spam-spam]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_show_locals",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_simple_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_simple_exception_with_notes",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_syntax_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr[3-None-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr[bacon-3-'bac'+2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr[bacon-4-'baco'+1]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr[bacon-5-'bacon']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr[data7-10-\"['spam', '\"+15]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr[password-None-*******]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr[spam-None-'spam']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr[spam-None-b'spam']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_error",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[False-bacon-3-'bac'+2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[False-data8-4-\"['sp\"+21]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[True-3-None-3]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[True-bacon-3-'bac'+2]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[True-bacon-5-'bacon']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[True-data6-4-['spam', 'eggs', 'baco'+1]]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[True-password-None-*******]",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[True-spam-None-'spam']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_tracebacks.py::test_to_repr_rich[True-spam-None-b'spam']",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestBoundLogger::test_errVanilla",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestBoundLogger::test_errWithFailure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestBoundLogger::test_msg",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestEventAdapter::test_EventAdapterFormatsLog",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestEventAdapter::test_allKeywords",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestEventAdapter::test_catchesConflictingEventAnd_why",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestEventAdapter::test_noFailure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestEventAdapter::test_noFailureWithKeyword",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestEventAdapter::test_transforms_whyIntoEvent",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestEventAdapter::test_worksUsualCase",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestExtractStuffAndWhy::test_extractFailsOnTwoFailures",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestExtractStuffAndWhy::test_failsOnConflictingEventAnd_why",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestExtractStuffAndWhy::test_handlesFailures",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestExtractStuffAndWhy::test_handlesMissingFailure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONObserverWrapper::test_IsAnObserver",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONObserverWrapper::test_callsWrappedObserver",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONObserverWrapper::test_jsonifiesPlainLogEntries",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONObserverWrapper::test_leavesStructLogAlone",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONRenderer::test_dumpsKWsAreHandedThrough",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONRenderer::test_handlesFailure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONRenderer::test_handlesMissingFailure",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONRenderer::test_msgWorksToo",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestJSONRenderer::test_setsStructLogField",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestPlainFileLogObserver::test_isLogObserver",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestPlainFileLogObserver::test_writesOnlyMessageWithLF",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestPlainJSONStdOutLogger::test_isLogObserver",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::TestReprWrapper::test_repr",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_twisted.py::test_LoggerFactory",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::TestGetProcessname::test_changed",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::TestGetProcessname::test_default",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::TestGetProcessname::test_exception",
+      "kind": "Function",
+      "outcome": "passed"
+    },
+    {
+      "id": "tests/test_utils.py::TestGetProcessname::test_no_multiprocessing",
+      "kind": "Function",
+      "outcome": "passed"
+    }
+  ],
+  "plugins": [
+    {
+      "distribution": "pytest",
+      "module": "pytest",
+      "module_sha256": "ee37885c9583f843390684dfb496907f87a0905128e7a3cf4ad227f49ff34c2d",
+      "version": "9.1.1"
+    },
+    {
+      "distribution": "pytest-asyncio",
+      "module": "pytest_asyncio.plugin",
+      "module_sha256": "ba47c25a4a22b117891e9214940729c41af936d3dafbb18b4284de8a88ed3375",
+      "version": "1.4.0"
+    },
+    {
+      "distribution": "time-machine",
+      "module": "time_machine",
+      "module_sha256": "23bde9f53bbaf57aab948a9d4d2fa1114d61f50e0122f46972584ca1eea23df6",
+      "version": "3.5.1"
+    },
+    {
+      "distribution": "pytest-randomly",
+      "module": "pytest_randomly",
+      "module_sha256": "9f41da2590e77bba015c7efaf1b10f2c990d161202387d4467f91acc11cc6453",
+      "version": "5.0.0"
+    }
+  ],
+  "project": "structlog",
+  "python": "3.12.15",
+  "schema": 1
+}

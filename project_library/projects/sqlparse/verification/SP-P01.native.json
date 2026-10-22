@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "SP-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "inplace_destination_is_truncated_before_invalid_formatter_options_are_reported": true
+  },
+  "resource_profile": "business"
+}

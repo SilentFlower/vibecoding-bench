@@ -1,0 +1,1 @@
+Parse @article{a,author={Doe, Jane and {Research and Dev}},title={Report}}. Use SeparateCoAuthors and MergeCoAuthors with allow_inplace_modification=False. Compare individual author values,organization braces and original library. Explain existing organization-aware splitting and copy scope; a simple split on and is insufficient. No implementation.

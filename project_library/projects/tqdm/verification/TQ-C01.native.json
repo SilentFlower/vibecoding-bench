@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "TQ-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "non_tty_output_and_disable_counter_policy_are_explicit": true
+  },
+  "resource_profile": "business"
+}

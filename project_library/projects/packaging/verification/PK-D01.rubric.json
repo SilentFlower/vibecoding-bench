@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PK-D01",
+  "source_commit": "1a62a26afe0f4881593e31bed4f7753bd1c8fe27",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The supplied invalidVersion andRequires-Python each produce field-specific InvalidMetadata in the group. Correct or reject the actual source fields according to their version/specifier contracts and verify the validcontrol. validate=False defers per-attribute checks,not a repair or successful validation. Do not patch packaging or install anything. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

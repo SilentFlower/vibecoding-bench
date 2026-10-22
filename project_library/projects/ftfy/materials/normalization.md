@@ -1,0 +1,1 @@
+A scientific field contains the Unicode text10³. Compare fix_text with normalization=NFC and NFKC. Advise a deliberate normalization and original-provenance policy before publishing structured scientific values. Do not assume compatibility normalization preserves numeric meaning. No edits.

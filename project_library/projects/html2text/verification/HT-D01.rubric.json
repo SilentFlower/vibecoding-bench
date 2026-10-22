@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HT-D01",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The completecolspan2 sample is flattened into oneheadercell and tworowcells; default dispatch ignores spanattributes. bypass_tables reconstructs tags without the originalcolspan,so it is not a lossless solution. Distinguish missing spansemantics from missingtext; advise an explicitly selected flattening/expansion policy or separate source retention. No patch. Missing evidence supports insufficient_information.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

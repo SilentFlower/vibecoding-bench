@@ -1,0 +1,216 @@
+{
+  "schema": 2,
+  "project_key": "tqdm",
+  "title": "tqdm后台处理工作场景",
+  "category": "进度显示与业务完成",
+  "description": "计数时点、外部增量、非终端输出、日志分流、异步结果和发布六项只读任务。",
+  "seed_digest": "41b4635313eeebe48cc6a55189d16c1d1e1c50b5c28c9d9cb1ef241069fd22b2",
+  "environment": "tqdm-py312",
+  "source": {
+    "repository": "https://github.com/tqdm/tqdm",
+    "commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+    "license_files": [
+      "seed/library/LICENCE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TQ-S01",
+      "title": "迭代与外部进度",
+      "goal": "正确解释计数时点和增量",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TQ-U01",
+            "TQ-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQ-U01",
+          "kind": "understand",
+          "goal": "追踪迭代计数与禁用后的状态",
+          "prompt": "Trace every complete iteration/close control and distinguish yield timing from accepted work, without edits.",
+          "requires": [],
+          "materials": [
+            "materials/iteration.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TQ-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/TQ-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TQ-U02",
+          "kind": "understand",
+          "goal": "把外部绝对进度换算为增量",
+          "prompt": "Trace all complete update controls and advise the caller policy without changing code.",
+          "requires": [],
+          "materials": [
+            "materials/deltas.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TQ-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/TQ-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TQ-S02",
+      "title": "后台报告输出",
+      "goal": "明确显示和日志流的归属",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TQ-C01",
+            "TQ-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQ-C01",
+          "kind": "consult",
+          "goal": "为定时报告选择输出与计数政策",
+          "prompt": "Meet the scheduled report requirement using actual non-TTY/disable controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/terminal.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TQ-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/TQ-C01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "TQ-C02",
+          "kind": "consult",
+          "goal": "把人工日志与结构化输出分流",
+          "prompt": "Use the complete stream/write controls to advise a current compatible output policy. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/logging.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TQ-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/TQ-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TQ-S03",
+      "title": "并发结果理解",
+      "goal": "区分完成顺序与业务异常",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TQ-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQ-U03",
+          "kind": "understand",
+          "goal": "区分异步完成顺序和结果顺序",
+          "prompt": "Trace complete event-controlled gather cases and explain exception values and caller acceptance without edits.",
+          "requires": [],
+          "materials": [
+            "materials/async.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TQ-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/TQ-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TQ-S04",
+      "title": "导入验收计划",
+      "goal": "把遍历、接受和发布分开计量",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "TQ-P01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQ-P01",
+          "kind": "plan",
+          "goal": "规划进度之外的业务验收与发布",
+          "prompt": "Plan the declared import requirement from the complete traversal/acceptance controls, without implementation or external writes.",
+          "requires": [],
+          "materials": [
+            "materials/acceptance.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/TQ-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/TQ-P01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

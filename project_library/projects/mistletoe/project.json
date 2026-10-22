@@ -1,0 +1,212 @@
+{
+  "schema": 2,
+  "project_key": "mistletoe",
+  "title": "Mistletoe知识库文档工作场景",
+  "category": "Markdown AST与多格式语义",
+  "description": "章节提取、树遍历、HTML政策、回写语义和目录诊断五项只读任务。",
+  "seed_digest": "1ea71b0e16b21720e806b85746d34c05407f3752844b0f6c14cd1ae1f3f113bd",
+  "environment": "mistletoe-py312",
+  "source": {
+    "repository": "https://github.com/miyuchina/mistletoe",
+    "commit": "ebf9ae4e9279f3d8c79b7cf2710f7e73ea6438a7",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/app/CC-BY-SA-4.0.txt",
+      "seed/app/markdown-original-license.html",
+      "seed/app/jquery-original-MIT.txt",
+      "seed/app/fixture-attribution.md"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MT-S01",
+      "title": "章节和语法树审计",
+      "goal": "按节点真实数据理解标题与遍历",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MT-U01",
+            "MT-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MT-U01",
+          "kind": "understand",
+          "goal": "按真实子节点提取章节标题",
+          "prompt": "Trace all complete Heading fields and HTML controls and explain a reliable per-node text source. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/headings.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MT-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/MT-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "MT-U02",
+          "kind": "understand",
+          "goal": "理解语法树遍历的顺序与父关系",
+          "prompt": "Trace complete traversal/filter/depth controls using the actual current AST. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/traverse.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MT-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/MT-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MT-S02",
+      "title": "预览输出政策",
+      "goal": "明确HTML与链接接收边界",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MT-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MT-C01",
+          "kind": "consult",
+          "goal": "明确HTML透传和链接政策的边界",
+          "prompt": "Advise the complete preview requirement from actual output text and current options,without executing HTML or changing the library.",
+          "requires": [],
+          "materials": [
+            "materials/html-policy.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MT-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/MT-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MT-S03",
+      "title": "知识库迁移",
+      "goal": "核Markdown往返的真实语义",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MT-U03"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MT-U03",
+          "kind": "understand",
+          "goal": "核Markdown回写是否保持原语义",
+          "prompt": "Trace complete entity-derived and backslash-protected round-trip controls and explain migration acceptance without implementation.",
+          "requires": [],
+          "materials": [
+            "materials/roundtrip.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MT-U03.rubric.json",
+            "semantic": true,
+            "native": "verification/MT-U03.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "MT-S04",
+      "title": "目录诊断",
+      "goal": "先补齐输入和renderer选项",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "MT-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "MT-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MT-D01",
+          "kind": "diagnose",
+          "goal": "先核文档与选项再诊断目录异常",
+          "prompt": "A Markdown table-of-contents access fails. Request exact Markdown,renderer/options and failing access before selecting a cause. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/MT-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "toc-reproduction",
+              "when": "The complete Markdown,renderer/options and failing property access are not supplied or declared unavailable,and a complete reproduction is reasonably requested.",
+              "materials": [
+                "disclosure/toc.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "schema": 2,
+  "project_key": "cattrs",
+  "title": "cattrs类型交换工作场景",
+  "category": "线缆合同与批量验证",
+  "description": "输入转换、嵌套JSON、字段别名、实例钩子、错误聚合和联合类型诊断六项只读任务。",
+  "seed_digest": "529912f8e69fe08d4c619d2cd8a4590b85a6a7f0b2a6149c05e5d9d64855628f",
+  "environment": "cattrs-py312",
+  "source": {
+    "repository": "https://github.com/python-attrs/cattrs",
+    "commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CA-S01",
+      "title": "输入与线缆合同",
+      "goal": "明确转换、未知字段与公开字段名",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-U01",
+            "CA-C01"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-U01",
+          "kind": "understand",
+          "goal": "区分数据转换与未知字段校验",
+          "prompt": "Explain complete default/strict-extra intake controls without edits.",
+          "requires": [],
+          "materials": [
+            "materials/intake.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-U01.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-U01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CA-C01",
+          "kind": "consult",
+          "goal": "选择与公开协议一致的字段别名政策",
+          "prompt": "Advise the complete wire-key contract from actual converter controls. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/aliases.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-C01.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-C01.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CA-S02",
+      "title": "JSON交换",
+      "goal": "保留嵌套类型和明确编码",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-U02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-U02",
+          "kind": "understand",
+          "goal": "核嵌套JSON交换的日期和二进制格式",
+          "prompt": "Explain complete parsedJSON and typed roundtrip controls using the existing preconfiguration. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/json-exchange.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "explained"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-U02.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-U02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CA-S03",
+      "title": "实例策略",
+      "goal": "隔离严格转换钩子",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-C02"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-C02",
+          "kind": "consult",
+          "goal": "按转换器实例隔离严格类型策略",
+          "prompt": "Advise the complete strict-type/ownership requirement using existing hooks. No edits.",
+          "requires": [],
+          "materials": [
+            "materials/hooks.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "advice_no_code_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-C02.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-C02.native.json"
+          },
+          "branches": []
+        }
+      ]
+    },
+    {
+      "id": "CA-S04",
+      "title": "诊断与批量交付",
+      "goal": "取得类型证据并先验证完整批次",
+      "default_entry": "normal",
+      "entries": [
+        {
+          "id": "normal",
+          "task_ids": [
+            "CA-P01",
+            "CA-D01"
+          ]
+        },
+        {
+          "id": "unavailable",
+          "task_ids": [
+            "CA-D01"
+          ],
+          "materials": [
+            "disclosure/unavailable.md"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CA-P01",
+          "kind": "plan",
+          "goal": "规划完整批量校验与可定位错误交付",
+          "prompt": "Plan complete-row/batch acceptance from actual nested errors and the valid control. No implementation.",
+          "requires": [],
+          "materials": [
+            "materials/diagnostic-plan.md"
+          ],
+          "allowed_paths": [],
+          "outcomes": [
+            "planned_without_library_change"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-P01.rubric.json",
+            "semantic": true,
+            "native": "verification/CA-P01.native.json"
+          },
+          "branches": []
+        },
+        {
+          "id": "CA-D01",
+          "kind": "diagnose",
+          "goal": "先核联合类型再定位分派歧义",
+          "prompt": "Union structuring fails. Request the exact target classes/union,converter configuration,payload and exception before diagnosing. No edits.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [],
+          "outcomes": [
+            "diagnosed_or_information_requested",
+            "insufficient_information"
+          ],
+          "max_turns": 4,
+          "evaluation": {
+            "version": 1,
+            "rubric": "verification/CA-D01.rubric.json",
+            "semantic": true
+          },
+          "branches": [
+            {
+              "id": "union-evidence",
+              "when": "Exact target classes/union,converter configuration,payload and exception are not supplied or declared unavailable,and sufficient evidence is reasonably requested.",
+              "materials": [
+                "disclosure/union.md"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

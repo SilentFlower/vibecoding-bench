@@ -1,0 +1,7 @@
+{
+  "scope": "当前完整固定源码宿主独立诊断观察，不冒充目标容器集合",
+  "module": "/root/project/vibecoding-bench/.deploy/project-catalog-hundred/stage-02/drafts/projects/html2text/seed/library/html2text/__init__.py",
+  "source": "<table><tr><th colspan=\"2\">Total</th></tr><tr><td>A</td><td>B</td></tr></table>",
+  "ordinary": "Total  \n---  \nA| B\n",
+  "bypass_tables": "<table>  \n<tr>  \n<th>\n\nTotal\n</th></tr>  \n<tr>  \n<td>\n\nA\n</td>  \n<td>\n\nB\n</td></tr></table>\n"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "JM-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "trusted_custom_function_uses_explicit_options_without_global_registration": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,1 @@
+The exact reproduction calls fields.Date().deserialize(datetime.datetime(2026,4,3,23,59)). It returns the same datetime object. A genuine datetime.date and an ISO date string are separate successful controls. The input did not arrive as a JSON string. Diagnosis alone does not authorize edits.

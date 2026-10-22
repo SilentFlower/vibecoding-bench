@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-C01",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Constructor aliasquantity does not automatically select converter dictionary keys: default uses_quantity whileuse_alias=True usesquantity for both directions. Both constructAliased(2). Configure existing alias policy explicitly and preserve compatibility; underscore fields are not an automatic redaction mechanism.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

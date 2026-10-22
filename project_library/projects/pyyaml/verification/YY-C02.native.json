@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "YY-C02"
+  ],
+  "python_paths": [
+    "library/lib",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "duplicate_pairs_remain_in_nodes_but_constructed_mapping_is_last_wins": true
+  },
+  "resource_profile": "business"
+}

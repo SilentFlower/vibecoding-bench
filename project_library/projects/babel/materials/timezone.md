@@ -1,0 +1,1 @@
+Use datetime(2026,1,2,10,0) without tzinfo and the same wall time with fixed UTC+02:00. Render both with format_datetime and explicit UTC+02:00,pattern yyyy-MM-dd HH:mm,en_US. The appointment input means local wall time. Advise where timezone meaning and DST ambiguity must be resolved. These fixed-offset controls do not test DST. No implementation.

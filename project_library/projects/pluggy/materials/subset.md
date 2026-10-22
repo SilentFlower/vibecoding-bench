@@ -1,0 +1,1 @@
+Register ordinary render pluginsA thenB. Make subset_hook_caller("render",remove_plugins=[B]) and invoke it with valueX. Then invoke the original full hook and inspect get_plugin("B"). Meet a per-report exclusion requirement without unregistering plugins,global registry changes or a new API. No edits.

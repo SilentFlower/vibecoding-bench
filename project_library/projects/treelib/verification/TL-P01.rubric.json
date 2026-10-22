@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TL-P01",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "to_dict uses node.expanded and omitsleaf whenA iscollapsed,even though direct lookup/traversal still containleaf. with_identifier/data retain those attributes on emitted nodes but do not force all descendants;the data mapping also remains referenced. Own a complete snapshot independent of display collapse,choose copy/serialization policy and verify all expected IDs,links and payloads before publication.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

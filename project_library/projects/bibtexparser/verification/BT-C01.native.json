@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "BT-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "entry_index_mapping_is_copied_but_entry_and_field_objects_remain_shared": true
+  },
+  "resource_profile": "business"
+}

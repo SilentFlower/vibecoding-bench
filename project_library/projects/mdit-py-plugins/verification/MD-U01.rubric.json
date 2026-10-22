@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "MD-U01",
+  "source_commit": "519953da0a394a92534bc27580f4e7415462df44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "front_matter stores raw hidden token content and source map0..4; it neither parsesYAML nor automatically places typed metadata into env. Explicitly load/validate the raw metadata and render the same tokens with the same options/env; BodyHTML remains while metadata is hidden. No second parse or new metadataAPI is required.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,1 @@
+Exact local invocation uses two paths: bad.json contains {"broken": ; out.json initially contains KEEP_OUTPUT followed by a newline. The CLI exits nonzero with a JSON parse error and out.json becomes empty. No shell redirection was used. No output permission or disk-space failure occurred. These are synthetic files; diagnosis alone grants no repair authorization.

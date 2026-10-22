@@ -1,0 +1,1 @@
+Use the exact Unicode input FranÃ§ais &amp; 中文 followed by CRLF and Ｈｅｌｌｏ ﬁle. Compare fix_text,fix_and_explain and apply_plan on the original text. Keep normal中文 as a control. Explain existing repair and replay capability and distinguish a recorded transformation from recovery of the original bytes or guaranteed intended wording. No edits.

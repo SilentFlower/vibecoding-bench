@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "FL-C02",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The current loader producesint7,str007,nestedFEATURE.ENABLED boolTrue,and rawnot-json whenJSON parsing fails. Existingfrom_prefixed_env already supportsJSON and double-underscore nesting. Preserve explicit quoting and schema/type validation instead of implementing duplicate parsers or treating every value as a string.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

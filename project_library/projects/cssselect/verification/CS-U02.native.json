@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CS-U02"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "xpath_namespace_mapping_matches_uri_and_bare_names_do_not_match_default_namespace": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "CF-C01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "integer_template_truncates_and_is_not_a_strict_integer_parser": true
+  },
+  "resource_profile": "business"
+}

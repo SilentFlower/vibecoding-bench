@@ -1,0 +1,1 @@
+Convert <p>A<img src="figure.png" alt="Revenue chart">B</p> using three fresh converters: defaults,images_to_alt=True,and ignore_images=True. A text archive needs a deliberate accessible image policy. Explain emitted Markdown versus retained alt versus full omission; no downloading or implementation.

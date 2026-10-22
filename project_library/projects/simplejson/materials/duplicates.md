@@ -1,0 +1,1 @@
+A partner document contains {"qty":1,"qty":2}; a second has the same duplicate inside line. Compare default decoding with a trusted object_pairs_hook that rejects repeated field names at each object. Preserve a legitimate unique-key control. Choose the duplicate policy explicitly; do not treat ordinary successful parsing as proof the partner sent unique keys.

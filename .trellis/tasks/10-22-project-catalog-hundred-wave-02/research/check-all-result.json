@@ -1,0 +1,77 @@
+{
+  "status": "strict-pass",
+  "task": ".trellis/tasks/10-22-project-catalog-hundred-wave-02",
+  "run_id": "auto-20261021191233",
+  "check_profile": {
+    "context": "auto-loop",
+    "requested_depth": "auto",
+    "effective_depth": "full",
+    "confidence": "high",
+    "reasons": [
+      "可信原生执行、候选绑定与源码交付跨独立行为边界，需完整三件套及数据流审查"
+    ]
+  },
+  "route": {
+    "mode": "check-all-inline",
+    "source": "route-prefs"
+  },
+  "requirements": {
+    "AC1/R1/R8": "三十仓固定来源、全部原Git字节及执行位、许可、正式准入逐项复核，source-index与formal-summary一致",
+    "AC2/R2/R3/R6": "134场景192独立任务，184非修改/8修改；逐仓任务表、材料/授权/合法结果、正反验收与英文模型指令/中文页面；唯一码按项目/场景作用域，原研究路线不当作已实施",
+    "AC3/R4": "98924完整主执行、204独立业务/候选路径；skip/xfail/原始sqlparse唯一xpass/doctest/subtest/collector skip分开；实际UID/网络/镜像及候选导入身份；8修改原版失败/参考通过/错候选拒绝/累计完整回归",
+    "AC4/R5": "15批真实Scheduler/driver/独立评审/native，562选择路径，22代码接受（8唯一目标），8953浏览器检查/480截图；页面/API/SQLite、材料、角色、尝试/预算/计量与私有隔离对账；真实模型/OAuth为0",
+    "AC5/R7": "当前完整22623文件Git导出沿正式受限恢复后与Docker COPY相等，旧11373文件字节/执行位不变；历史读取由144项目回归覆盖；失败保存、临时资源清理"
+  },
+  "assumptions": {
+    "API": "未修改API/DTO；新增内容沿现有schema2/policy3真实运行",
+    "ComponentContext": "N/A，未修改组件或容器生命周期",
+    "DataHistory": "未修改持久化schema；历史release/坏catalog读取测试及旧内容完整对账通过",
+    "DataFlow": "固定Git/离线制品→ProjectLibrary→Scheduler/driver→candidate/review/native→API/SQLite/UI，逐批实际摘要映射与独立审计通过；Git checkout-index→同正式构建受限字节恢复→Docker COPY证明齐全"
+  },
+  "verification": [
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/focused-checks-current.json",
+      "sha256": "714cccea9e2b82602081178f50a787d95d0183c317dc5119163712b8a685f89f"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/all-thirty-native-summary.json",
+      "sha256": "e0fb61d997feb546fbcb99f8442a3249da99e6749e44411d86473e5272a65061"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/all-thirty-native-runtime-identities.json",
+      "sha256": "e7fbbc34e50db3a54dd17a679c7ca301bf6f9521ac776ebbd94f6fa767f57fd5"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/all-thirty-formal-summary.json",
+      "sha256": "2470984fb6960bb4c2f9c82e62c7098df66f2fea218d1f463d3b6338f39248fd"
+    },
+    {
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/research/delivery-all-thirty.json",
+      "sha256": "c481d815e82e29b6f8b503380cdc867441a214f99f4be1260ed1e59edf30c028"
+    }
+  ],
+  "findings": {
+    "CHK": [],
+    "FBK": []
+  },
+  "doc_remediation": [
+    {
+      "id": "DOC-001",
+      "type": "task-status",
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/implement.md",
+      "change": "按实际原件同步已完成准备/全部小批/准入状态与精确统计，规范/提交/Close不提前记成功"
+    },
+    {
+      "id": "DOC-002",
+      "type": "brief-stale",
+      "path": ".trellis/tasks/10-22-project-catalog-hundred-wave-02/brief.md",
+      "change": "同步实际三十仓/累计目录及Git原始检出与生产恢复边界"
+    }
+  ],
+  "risks": [],
+  "not_assessed": [
+    "真实模型质量",
+    "生产发布或部署"
+  ],
+  "protected_runtime_sha256": "ddd9685802108ffcb9d66e67356bb9b42115d68eaea070b718f21144a2426684"
+}

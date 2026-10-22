@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "BT-U01",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Parsing retains First as the indexed entry and stores Second as a DuplicateBlockKeyBlock with raw text and ignore_error_block. There are two blocks but one valid entry. Inspect failed_blocks and reconcile all original inputs; absence of an exception is not complete successful ingestion. Do not silently overwrite or drop a citation.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

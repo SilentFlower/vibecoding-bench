@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "PG-U02",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The fuller implementation receives APP by spec default and EXPLICIT on explicit override; the shorter implementation receives only value and still works. Results retain normal order. Protocol default values and accepted argument pruning support compatible evolution; do not insist all signatures are identical or claim the implementation PLUGIN default wins over the spec default.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

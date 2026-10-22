@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "CA-U01",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Default structure converts quantitystring2 intointeger2 and ignoresextra. forbid_extra_keys=True rejectsextra throughForbiddenExtraKeysError in aClassValidationError but still converts string2 whenextra is absent. Unknown-key rejection is separate from coercion and domain validation; explicit policies/hooks are required for stricter business types.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "AT-C01"
+  ],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "frozen_prevents_rebinding_but_does_not_deep_freeze_nested_values": true
+  },
+  "resource_profile": "business"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "DC-P01"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "conditional_validators_bind_environment_state_and_need_explicit_lifecycle_ownership": true
+  },
+  "resource_profile": "business"
+}

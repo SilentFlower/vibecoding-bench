@@ -1,0 +1,1 @@
+Use Decimal('1099.98') and format_currency with JPY,en_US,with currency_digits default and False. Separately compare format_decimal(Decimal('1.2346'),en_US) with decimal_quantization default and False. The invoice needs a deliberate display and accounting precision policy. Explain the controls and unchanged input; no edits.

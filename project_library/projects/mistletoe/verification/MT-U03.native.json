@@ -1,0 +1,15 @@
+{
+  "script": "verification/native_observe.py",
+  "args": [
+    "MT-U03"
+  ],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "markdown_rewrite_can_change_escaped_literal_semantics": true
+  },
+  "resource_profile": "business"
+}

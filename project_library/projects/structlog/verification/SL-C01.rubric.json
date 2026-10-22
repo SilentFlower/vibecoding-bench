@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "SL-C01",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "merge_contextvars uses setdefault: boundtrace wins over global,per-calltrace wins overbound,and missingregion is filled fromcontext. Clearing removescontext-localregion while boundtrace remains. Bind/clear/reset deliberately at request boundaries and define propagation across tasks/threads explicitly; no global override or automatic universal propagation guarantee.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task_id": "IF-M01",
+  "source_commit": "99596854bd296af1557db2015cfa98c8104ec155",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Any unknown classical key raises existing error with previous state unchanged, for all/specific options and every keyword order. Normal no-argument/all/specific overrides and value/count/custom-rule semantics remain compatible. Only __init__.py,app/test_classical.py and the named fragment may change.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

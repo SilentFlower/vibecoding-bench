@@ -1,0 +1,1 @@
+Use separate non-TTY StringIO streams for tqdm([1,2]) with default disable=False,disable=None,and disable=True. Exhaust each and inspect emitted text and n. The scheduled report needs an explicit quiet policy and a separate business count. Explain detection/defaults and do not promise disabled display still updates the tqdm counter. No edits.

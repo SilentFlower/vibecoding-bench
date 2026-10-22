@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "HT-P01",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "An unclosedscript leavesquiet1. A laterhandle on thatsame converter omitsVisible,while a fresh converter emitsit. finish clears output buffers but does not prove a complete parser/state reset. Own a converter per independentdocument,validate required output and handle malformedinput explicitly before publication. The observed case does not prove every possible malformed-input failure or authorize a library patch.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

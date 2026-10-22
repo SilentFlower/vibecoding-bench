@@ -1,0 +1,1 @@
+An English notification needs articles for hour,university,MRI. Compare a(word) for each and a("hour",2). Advise current word-specific pronunciation rules; do not simply check the first vowel letter, promise arbitrary-language NLP, or assume a count2 call pluralizes the noun automatically. No edits.

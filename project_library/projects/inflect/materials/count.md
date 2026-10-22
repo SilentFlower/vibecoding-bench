@@ -1,0 +1,1 @@
+On one fresh engine, call plural_noun("child"),num(1),plural_noun("child"),plural_noun("child",2),num(),plural_noun("child"). Explain the exact words, persistent count, explicit override and reset. No implementation or shared service is authorized.

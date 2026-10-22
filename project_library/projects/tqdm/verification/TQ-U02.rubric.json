@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "TQ-U02",
+  "source_commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "update takes deltas:5 then8 yields13,whereas5 then3 yields8. total10 does not clamp update12. Track the accepted prior absolute observation and deliberate monotonic/retry policy; do not infer completion validation or add an invented absolute-update API.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}

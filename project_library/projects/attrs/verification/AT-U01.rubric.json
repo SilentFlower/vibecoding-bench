@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "task_id": "AT-U01",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "An annotation alone preserves the string7. Explicit converter=int runs before the int validator during initialization and default mutable assignment; assignment8 yields integer8 and invalid input raisesValueError with prior8 preserved. Do not infer validators from annotations.",
+      "evidence": []
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer."
+}
