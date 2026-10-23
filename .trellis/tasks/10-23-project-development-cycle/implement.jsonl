@@ -1,0 +1,5 @@
+{"file":".trellis/spec/vibecoding-bench/backend/project-iterations.md","reason":"既有内容、同会话、原生验收、资源交接和真实项目准入合同"}
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"开发者原账号、CLI作业归属、资源及严格释放约束"}
+{"file":".trellis/spec/vibecoding-bench/backend/database-guidelines.md","reason":"幂等持久化、额度等待、恢复与停止优先级"}
+{"file":".trellis/tasks/10-23-project-development-cycle/research/current-design.md","reason":"实际代码边界、内容计数和已确认简化接法"}
+{"file":".trellis/tasks/10-23-project-development-cycle/research/provider-verification.md","reason":"外接主备准确模型名、已测请求格式与受保护配置位置"}

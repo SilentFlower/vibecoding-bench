@@ -1,0 +1,6 @@
+{"file":".trellis/spec/vibecoding-bench/backend/project-iterations.md","reason":"核历史兼容、完整任务计数、同会话、来源和原生独立验收"}
+{"file":".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md","reason":"核资源门禁、停止恢复和会话归属保持"}
+{"file":".trellis/spec/vibecoding-bench/backend/logging-guidelines.md","reason":"核外部凭据、请求与模型用量的日志边界"}
+{"file":".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md","reason":"核既有页面转义、生命周期和跨主题状态展示"}
+{"file":".trellis/tasks/10-23-project-development-cycle/research/dialogue-and-recovery-proposal.md","reason":"核真实对话分支、失败返工、五类中断恢复及重复投递"}
+{"file":".trellis/tasks/10-23-project-development-cycle/research/provider-verification.md","reason":"区分已完成连通、尚待模拟的降级与完整业务证据"}
