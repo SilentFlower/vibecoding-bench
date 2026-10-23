@@ -1677,6 +1677,8 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-summary-card:last-child { padding-right: 0; border-right: 0; }
 .projects-target-state { margin: 9px 0 6px; color: var(--running); font-size: 11px; }
 .projects-target strong { display: block; font-size: 15px; line-height: 1.6; }
+/* 总览只保留三行摘要，避免长报告挤占运行信息；全文仍在 Pi 交互中查看。 */
+#projects-activity { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 .projects-metric { display: block; margin: 12px 0; color: var(--text); font-size: 22px; line-height: 1.4; }
 .projects-progress { width: 100%; height: 6px; border: 0; background: var(--surface-3); accent-color: var(--success); }
 .projects-progress::-webkit-progress-bar { background: var(--surface-3); }
