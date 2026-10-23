@@ -94,6 +94,7 @@
             <label><span class="lbl">给 Pi 的业务指南</span><textarea name="instructions" rows="4" maxlength="12000" placeholder="例如：先调查并讨论方案，确认后实施；优先完成一个目标，再换项目。"></textarea></label>
             <label><span class="lbl">授权项目池</span><input id="projects-filter" type="search" placeholder="搜索项目研究"></label>
             <p class="hint" id="projects-research-count"></p>
+            <div class="view-actions"><button class="btn btn-sm" type="button" id="projects-select-all" title="选择全部项目，包含当前搜索隐藏的项目">全选</button><button class="btn btn-sm" type="button" id="projects-clear-all" title="清空全部项目的选择">清空</button><span class="hint" id="projects-selected-count" role="status"></span></div>
             <div id="projects-projects" class="projects-choices"></div>
             <button class="btn btn-primary" type="submit">保存项目池与指南</button>
           </form>
@@ -115,11 +116,6 @@
         </div>
       </div>
       <details id="projects-research" class="batch-panel"><summary id="projects-research-title">项目研究</summary><pre id="projects-research-body" class="projects-document"></pre></details>
-      <details class="batch-panel"><summary>旧 Projects 只读历史</summary>
-        <p class="hint">旧批次、执行和成果原样保留。这里的状态是历史记录，新工作由 Pi 接管。</p>
-        <button type="button" class="btn btn-sm" id="projects-legacy-load">读取旧批次</button>
-        <div id="projects-legacy-list"></div><pre id="projects-legacy-detail" class="projects-document"></pre>
-      </details>
     </section>
   </template>
 
@@ -782,7 +778,7 @@
     </div>
   </div>
 
-  <script src="projects.js?v=20261023-pi-projects"></script>
+  <script src="projects.js?v=20261024-project-selection"></script>
   <script src="app.js?v=20261023-pi-projects"></script>
 </body>
 </html>

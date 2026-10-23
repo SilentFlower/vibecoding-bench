@@ -42,6 +42,9 @@ window.ProjectsUI = (() => {
       await api('/settings/project-requester', {method: 'DELETE'}); await loadModel();
     });
     $('#projects-filter').oninput = paintCatalog;
+    $('#projects-select-all').onclick = () => paintCatalog(catalog.map(item => item.project_key));
+    $('#projects-clear-all').onclick = () => paintCatalog([]);
+    $('#projects-projects').onchange = paintSelectionCount;
     $('#projects-account').onchange = event => selectAccount(Number(event.target.value));
     document.querySelectorAll('[data-pi-action]').forEach(button => {
       button.onclick = () => perform(async () => {
@@ -50,7 +53,6 @@ window.ProjectsUI = (() => {
         updateAgents(result); paintState(); await loadReconciliation();
       });
     });
-    $('#projects-legacy-load').onclick = () => perform(loadLegacy);
     try {
       const values = await Promise.all([api('/projects'), api('/projects/catalog'), api('/accounts')]);
       if (current !== revision) return;
@@ -153,6 +155,7 @@ window.ProjectsUI = (() => {
         <span><strong>${escape(item.project_key)}</strong><small class="muted">${item.ready ? `${item.objectives.length} 项工程目标` : '研究资料'}</small></span></label>
         <button type="button" class="btn btn-sm" data-research="${escape(item.project_key)}">研究</button></div>`;
     }).join('') || '<p class="hint">暂无项目研究资料。</p>';
+    paintSelectionCount();
     document.querySelectorAll('[data-research]').forEach(button => {
       button.onclick = () => perform(async () => {
         const selectedRevision = revision;
@@ -164,6 +167,16 @@ window.ProjectsUI = (() => {
         $('#projects-research').open = true;
       });
     });
+  }
+
+  /**
+   * 汇总完整授权池，单项勾选时保留当前焦点和滚动位置。
+   * @return {void}
+   */
+  function paintSelectionCount() {
+    const keys = new Set(Array.from(document.querySelectorAll('[name=project_key]:checked')).map(item => item.value));
+    const executable = catalog.filter(item => keys.has(item.project_key) && item.ready).length;
+    $('#projects-selected-count').textContent = `已选 ${keys.size} 个 · ${executable} 个可执行`;
   }
 
   /**
@@ -297,24 +310,6 @@ window.ProjectsUI = (() => {
       models: form.elements.models.value.split('\n').map(value => value.trim()).filter(Boolean),
     })});
     await loadModel(); feedback('Pi 模型配置已保存；在途控制者保留原配置，暂停后恢复即可采用新配置。');
-  }
-
-  /**
-   * 读取旧批次及成果，不提供任何旧架构的执行操作。
-   * @return {Promise<void>} 只读历史加载完成。
-   */
-  async function loadLegacy() {
-    const current = revision;
-    const rows = await api('/project-iteration-batches');
-    if (current !== revision) return;
-    $('#projects-legacy-list').innerHTML = rows.map(item => `<button class="btn btn-sm" type="button" data-legacy="${item.id}">${escape(item.name)} · #${item.id}</button>`).join(' ') || '<p class="hint">暂无旧批次。</p>';
-    document.querySelectorAll('[data-legacy]').forEach(button => {
-      button.onclick = () => perform(async () => {
-        const batch = await api('/project-iteration-batches/' + button.dataset.legacy);
-        if (current !== revision) return;
-        $('#projects-legacy-detail').textContent = JSON.stringify(batch, null, 2);
-      });
-    });
   }
 
   return {mount, unmount};

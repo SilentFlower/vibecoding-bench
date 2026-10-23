@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from websockets.asyncio.client import connect
 
@@ -41,7 +41,7 @@ class BrowserCatalog(CatalogFixture):
 
 
 async def verify(evidence: Path) -> dict:
-    """核对配置保存、Pi 生命周期、SSE、只读历史和手机布局。
+    """核对项目池全选清空、配置保存、Pi 生命周期、SSE 和手机布局。
 
     :param evidence: 截图与检查报告目录。
     :return: 实际检查结果。
@@ -62,6 +62,18 @@ async def verify(evidence: Path) -> dict:
     configuration.save('https://example.invalid/v1', ['test-model'], 'browser-private-key')
     application = FastAPI()
     application.include_router(projects_router(lambda: fixture.service))
+    requested_paths = []
+
+    @application.middleware('http')
+    async def record_requests(request: Request, call_next):
+        """记录请求路径，验证新页面不再读取旧项目接口。
+
+        :param request: 本地浏览器请求。
+        :param call_next: 当前请求的后续处理器。
+        :return: 原请求响应。
+        """
+        requested_paths.append(request.url.path)
+        return await call_next(request)
 
     @application.get('/api/accounts')
     def accounts():
@@ -83,16 +95,6 @@ async def verify(evidence: Path) -> dict:
         """保存测试配置。:param body: 页面表单。:return: 脱敏结果。"""
         configuration.save(body['base_url'], body['models'], body.get('api_key'))
         return configuration.public()
-
-    @application.get('/api/project-iteration-batches')
-    def legacy():
-        """保留旧批次只读入口。:return: 合成旧记录。"""
-        return [{'id': 19, 'name': '历史批次'}]
-
-    @application.get('/api/project-iteration-batches/{batch_id}')
-    def legacy_detail(batch_id: int):
-        """读取旧状态。:param batch_id: 旧 ID。:return: 保留记录。"""
-        return {'id': batch_id, 'name': '历史批次', 'status': 'active', 'instances': []}
 
     @application.get('/api/topics')
     def topics():
@@ -167,11 +169,33 @@ async def verify(evidence: Path) -> dict:
                 await rpc('Page.navigate', {'url': f'http://127.0.0.1:{port}/#projects'}, session)
                 await until('document.querySelectorAll("[name=project_key]").length === 2')
                 await evaluate('document.querySelector("#projects-account").value="1";document.querySelector("#projects-account").dispatchEvent(new Event("change"));')
-                await evaluate('document.querySelector("[name=project_key][value=example]").checked=true;document.querySelector("[name=instructions]").value="按实际交互完整指挥";document.querySelector("#projects-agent-form").requestSubmit();')
+                await evaluate('document.querySelector("#projects-filter").value="example";document.querySelector("#projects-filter").dispatchEvent(new Event("input"));')
+                assert await evaluate('document.querySelectorAll(".projects-choice:not(.hidden)").length === 1 && document.querySelector("[name=project_key][value=other]").closest(".projects-choice").classList.contains("hidden")')
+                await evaluate('document.querySelector("#projects-select-all").click()')
+                await until('document.querySelectorAll("[name=project_key]:checked").length === 2 && document.querySelector("#projects-selected-count").textContent.includes("已选 2 个")')
+                assert await evaluate('document.querySelector("[name=project_key][value=other]").checked && document.querySelector("[name=project_key][value=other]").closest(".projects-choice").classList.contains("hidden")')
+                await evaluate('document.querySelector("#projects-agent-form").requestSubmit()')
+                await until('document.querySelector("#projects-feedback").textContent.includes("已保存")')
+                assert json.loads(fixture.service._one('SELECT project_keys_json FROM projects_agents WHERE account_id=1')['project_keys_json']) == ['example', 'other']
+                await rpc('Page.reload', session=session)
+                await until('document.querySelectorAll("[name=project_key]:checked").length === 2 && document.querySelector("#projects-selected-count").textContent.includes("已选 2 个")')
+                await evaluate('document.querySelector("#projects-filter").value="example";document.querySelector("#projects-filter").dispatchEvent(new Event("input"));document.querySelector("#projects-clear-all").click();')
+                await until('document.querySelectorAll("[name=project_key]:checked").length === 0 && document.querySelector("#projects-selected-count").textContent.includes("已选 0 个")')
+                assert await evaluate('document.querySelectorAll(".projects-choice:not(.hidden)").length === 1 && !document.querySelector("[name=project_key][value=other]").checked')
+                await evaluate('document.querySelector("[name=project_key][value=example]").click()')
+                await until('document.querySelector("#projects-selected-count").textContent.includes("已选 1 个")')
+                await evaluate('document.querySelector("#projects-filter").value="";document.querySelector("#projects-filter").dispatchEvent(new Event("input"));document.querySelector("[name=project_key][value=other]").click();')
+                await until('document.querySelector("#projects-selected-count").textContent.includes("已选 2 个")')
+                await evaluate('document.querySelector("[name=project_key][value=other]").click()')
+                await until('document.querySelector("#projects-selected-count").textContent.includes("已选 1 个")')
+                await evaluate('document.querySelector("[name=instructions]").value="按实际交互完整指挥";document.querySelector("#projects-agent-form").requestSubmit();')
                 await until('document.querySelector("#projects-feedback").textContent.includes("已保存")')
                 record = fixture.service._one('SELECT * FROM projects_agents WHERE account_id=1')
                 assert json.loads(record['project_keys_json']) == ['example']
                 assert record['instructions'] == '按实际交互完整指挥'
+                await rpc('Page.reload', session=session)
+                await until('document.querySelectorAll("[name=project_key]:checked").length === 1 && document.querySelector("[name=project_key][value=example]").checked && document.querySelector("#projects-selected-count").textContent.includes("已选 1 个")')
+                assert await evaluate('document.querySelector("[name=instructions]").value === "按实际交互完整指挥" && !document.querySelector("[name=project_key][value=other]").checked')
                 await until('document.querySelector("[data-work]") !== null')
                 await evaluate('document.querySelector("[data-work]").click()')
                 await until('document.querySelector("[data-submission]") !== null')
@@ -193,10 +217,7 @@ async def verify(evidence: Path) -> dict:
                 await until('document.querySelector("#projects-feedback").textContent.includes("模型配置已保存")')
                 assert configuration.agent_configuration()['api_key'] == 'browser-private-key'
                 assert 'api_key' not in configuration.public()
-                await evaluate('document.querySelector("#projects-legacy-load").closest("details").open=true;document.querySelector("#projects-legacy-load").click()')
-                await until('document.querySelector("[data-legacy]") !== null')
-                await evaluate('document.querySelector("[data-legacy]").click()')
-                await until('document.querySelector("#projects-legacy-detail").textContent.includes("历史批次")')
+                assert not await evaluate('!!document.querySelector("[id^=projects-legacy], [data-legacy]") || document.querySelector("#projects-agent-form").closest("section.view").textContent.includes("旧 Projects 只读历史")')
                 for width, height, theme, name in ((1280, 900, 'dark', 'desktop'), (390, 844, 'light', 'mobile')):
                     await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False}, session)
                     await evaluate(f'document.documentElement.dataset.theme="{theme}"')
@@ -208,8 +229,12 @@ async def verify(evidence: Path) -> dict:
                 await evaluate('location.hash="#topics"')
                 await until('window.projectStreams.length > 0 && window.projectStreams.every(value => value.wasClosed)')
                 assert not errors, errors
+                legacy_paths = ('/api/project-catalog', '/api/project-iteration-batches', '/api/project-instances',
+                    '/api/project-step-attempts', '/api/project-iterations-stream')
+                assert not any(path.startswith(legacy_paths) for path in requested_paths), '新页面仍请求旧项目接口'
         result = {'status': 'passed', 'checks': ['真实表单与SQLite保存', 'Pi启动暂停', 'SSE事件及切页关闭',
-            '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '旧历史只读', '1280暗色与390亮色布局']}
+            '筛选时全选覆盖全部项目', '筛选时清空全部项目', '单选实时更新已选数量', '项目池保存重载回显',
+            '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '无旧历史入口及请求', '1280暗色与390亮色布局']}
         (evidence / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
         return result
     finally:
