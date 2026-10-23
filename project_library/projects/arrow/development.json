@@ -1,0 +1,63 @@
+{
+  "project_key": "arrow",
+  "category": "日期锚点、时区与区间",
+  "seed_digest": "619dfb275eb2c21802cc68803fe7daf7ed4fcdce583f938f29db7136b5bc47e3",
+  "environment": "arrow-py312",
+  "source": {
+    "repository": "https://github.com/arrow-py/arrow",
+    "commit": "2224255c4acc594d734cef0bbc83360452a67983",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "schema": 3,
+  "title": "Arrow时间导入与报表开发任务",
+  "description": "固定真实源码上的完整工程任务：调查、方案确认、实施、公开失败测试与完整上游回归。",
+  "scenarios": [
+    {
+      "id": "AR-S01-DEV",
+      "title": "固定偏移完整匹配并统一拒绝非法分量",
+      "goal": "固定偏移完整匹配并统一拒绝非法分量",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "AR-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AR-M01-DEV",
+          "kind": "modify",
+          "goal": "固定偏移完整匹配并统一拒绝非法分量",
+          "prompt": "We need a real development change in this pinned project. First inspect the supplied contract, reproduction and actual source; explain the relevant call path and edge cases, ask any necessary clarification questions, and propose a concrete compatibility and test plan. Wait for my confirmation before editing. Continue implementation and validation fixes in this same conversation and workspace. The following is the eventual delivery scope, not permission to skip investigation or plan agreement:\n\nMake TzinfoParser fixed-offset parsing consume the complete expression, reject hours >=24 or minutes >=60, and raise ParserError for invalid string expressions. Preserve supported bare forms, signed zero, UTC/local/IANA zones and legacy UTC wrappers, including the existing unclosed wrapper and Windows-like description forms.\n\nRead materials/development-contract.md for the exact public contract. Deliver meaningful original-failing public tests in the authorized new test file. Keep original tests, controls, dependencies and unrelated behavior unchanged.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-reproducer.py"
+          ],
+          "allowed_paths": [
+            "library/arrow/parser.py",
+            "library/tests/test_development_timezone_parser.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/AR-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/AR-M01-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/AR-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,88 @@
+--- a/library/arrow/parser.py
++++ b/library/arrow/parser.py
+@@ -888,7 +888,7 @@
+     """
+ 
+     _TZINFO_RE: ClassVar[Pattern[str]] = re.compile(
+-        r"^(?:\(UTC)*([\+\-])?(\d{2})(?:\:?(\d{2}))?"
++        r"([+\-])?([0-9]{2})(?::?([0-9]{2}))?"
+     )
+ 
+     @classmethod
+@@ -911,7 +911,15 @@
+             tzinfo = timezone.utc
+ 
+         else:
+-            iso_match = cls._TZINFO_RE.match(tzinfo_string)
++            expression = tzinfo_string
++            if expression.startswith("(UTC"):
++                expression = expression[4:]
++                if ")" in expression:
++                    expression, _, label = expression.partition(")")
++                    # 保留历史带城市说明的括号形式，但不吞掉偏移后的任意后缀。
++                    if label and (not label.startswith(" ") or not label[1:]):
++                        expression = ""
++            iso_match = cls._TZINFO_RE.fullmatch(expression)
+ 
+             if iso_match:
+                 sign: Optional[str]
+@@ -923,12 +931,14 @@
+                 if sign == "-":
+                     seconds *= -1
+ 
+-                tzinfo = timezone(timedelta(seconds=seconds))
++                # timezone 仅检查总偏移；独立检查分量，避免 03:99 被归一为 04:39。
++                if int(hours) < 24 and int(minutes or 0) < 60:
++                    tzinfo = timezone(timedelta(seconds=seconds))
+ 
+             else:
+                 try:
+                     tzinfo = ZoneInfo(tzinfo_string)
+-                except ZoneInfoNotFoundError:
++                except (ZoneInfoNotFoundError, ValueError):
+                     tzinfo = None
+ 
+         if tzinfo is None:
+--- /dev/null
++++ b/library/tests/test_development_timezone_parser.py
+@@ -0,0 +1,40 @@
++"""固定偏移完整匹配与兼容边界的公开回归。"""
++from datetime import datetime, timedelta
++import unittest
++from arrow.parser import ParserError, TzinfoParser
++
++class TestDevelopmentTimezoneParser(unittest.TestCase):
++    """保护配置解析合同。@return 测试实例。"""
++    def test_rejects_suffixes_and_component_overflow(self):
++        """非法字符串统一报ParserError。@return None。"""
++        values = ['+03:00.34','+03:99','-02:60','+24:00','-99','+030','+03:',
++            '+03:00 ',' 03','+03garbage','','NoSuch/LocalZone','+٠٣:٠٠']
++        for value in values:
++            with self.subTest(value=value), self.assertRaises(ParserError):
++                TzinfoParser.parse(value)
++
++    def test_supported_bare_forms_and_boundaries(self):
++        """合法两位数、正负零与23小时边界保持。@return None。"""
++        for value in ['03','+03','0300','+0300','03:00','+03:00']:
++            self.assertEqual(TzinfoParser.parse(value).utcoffset(None),timedelta(hours=3))
++        self.assertEqual(TzinfoParser.parse('-0330').utcoffset(None),-timedelta(hours=3,minutes=30))
++        for value in ['00','+0000','-00:00']:
++            self.assertEqual(TzinfoParser.parse(value).utcoffset(None),timedelta(0))
++        self.assertEqual(TzinfoParser.parse('+23:59').utcoffset(None),timedelta(hours=23,minutes=59))
++
++    def test_legacy_wrappers(self):
++        """保留已有括号及说明格式，拒绝畸形包装。@return None。"""
++        for value in ['(UTC+01:00','(UTC+01:00)','(UTC+01:00) Amsterdam, Berlin', '(UTC-0130) Example']:
++            expected = -timedelta(hours=1,minutes=30) if '-0130' in value else timedelta(hours=1)
++            self.assertEqual(TzinfoParser.parse(value).utcoffset(None),expected)
++        for value in ['(UTC+01:00.34','(UTC+01:00)junk','(UTC(UTC+01:00','(UTC)','(UTC+01:00) ']:
++            with self.subTest(value=value), self.assertRaises(ParserError):
++                TzinfoParser.parse(value)
++
++    def test_named_zones_preserved(self):
++        """UTC、本地及IANA时区仍可用。@return None。"""
++        for value in ['utc','UTC','Z']:
++            self.assertEqual(TzinfoParser.parse(value).utcoffset(None),timedelta(0))
++        self.assertIsNotNone(TzinfoParser.parse('local'))
++        named = TzinfoParser.parse('US/Pacific')
++        self.assertEqual(datetime(2024,1,1,tzinfo=named).utcoffset(),-timedelta(hours=8))

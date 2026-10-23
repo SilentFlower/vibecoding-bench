@@ -2607,7 +2607,10 @@ function bindShortcuts() {
     if (e.key === '/') {
       e.preventDefault();
       if (currentTab() === 'projects') {
-        $('#projects-filter')?.focus();
+        const filter = $('#projects-filter');
+        const settings = filter?.closest('details');
+        if (settings) settings.open = true;
+        filter?.focus();
         return;
       }
       if (currentTab() !== 'topics') location.hash = '#topics';

@@ -1,0 +1,63 @@
+{
+  "project_key": "agate",
+  "category": "类型化表格与分析",
+  "seed_digest": "7a4bd0306e3cfb1e669fa928b7cd293938cba41b07db8637c2bc1a0a3d0d110b",
+  "environment": "agate-py312",
+  "source": {
+    "repository": "https://github.com/wireservice/agate",
+    "commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "schema": 3,
+  "title": "Agate数据分析开发任务",
+  "description": "固定真实源码上的完整工程任务：调查、方案确认、实施、公开失败测试与完整上游回归。",
+  "scenarios": [
+    {
+      "id": "AG-S01-DEV",
+      "title": "连接键解析保持实际右列身份",
+      "goal": "连接键解析保持实际右列身份",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "AG-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AG-M01-DEV",
+          "kind": "modify",
+          "goal": "连接键解析保持实际右列身份",
+          "prompt": "We need a real development change in this pinned project. First inspect the supplied contract, reproduction and actual source; explain the relevant call path and edge cases, ask any necessary clarification questions, and propose a concrete compatibility and test plan. Wait for my confirmation before editing. Continue implementation and validation fixes in this same conversation and workspace. The following is the eventual delivery scope, not permission to skip investigation or plan agreement:\n\nFix Table.join right-key resolution for positional and mixed composite identifiers, including negative column indices, and prevent equal-valued right columns from causing the wrong key column to be omitted. Preserve name keys, callable keys, explicit columns, unmatched/required matching and full_outer behavior.\n\nRead materials/development-contract.md for the exact public contract. Deliver meaningful original-failing public tests in the authorized new test file. Keep original tests, controls, dependencies and unrelated behavior unchanged.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-reproducer.py"
+          ],
+          "allowed_paths": [
+            "library/agate/table/join.py",
+            "library/tests/test_development_join_keys.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/AG-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/AG-M01-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/AG-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

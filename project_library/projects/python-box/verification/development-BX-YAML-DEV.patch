@@ -1,0 +1,95 @@
+--- a/library/box/box.py
++++ b/library/box/box.py
+@@ -49,6 +49,30 @@
+ NO_DEFAULT = object()
+ # a sentinel object for indicating when to skip adding a new namespace, allowing `None` keys
+ NO_NAMESPACE = object()
++
++
++def _yaml_native_data(value, memo=None):
++    """为YAML构造独立原生容器，保留共享引用并避免解冻源配置。
++
++    :param value: 原配置值。
++    :param memo: 本次序列化已转换的容器身份。
++    :return: YAML后端可处理的映射、序列或原标量。
++    """
++    if memo is None:
++        memo = {}
++    if not isinstance(value, (dict, list, tuple)):
++        return value
++    if id(value) in memo:
++        return memo[id(value)]
++    if isinstance(value, dict):
++        output = {}
++        memo[id(value)] = output
++        output.update((key, _yaml_native_data(item, memo)) for key, item in value.items())
++    else:
++        output = []
++        memo[id(value)] = output
++        output.extend(_yaml_native_data(item, memo) for item in value)
++    return output
+ 
+ 
+ def _is_ipython():
+@@ -1036,7 +1060,7 @@
+             :return: string of YAML (if no filename provided)
+             """
+             return _to_yaml(
+-                self.to_dict(),
++                _yaml_native_data(self),
+                 filename=filename,
+                 default_flow_style=default_flow_style,
+                 encoding=encoding,
+--- /dev/null
++++ b/library/test/test_development_frozen_yaml.py
+@@ -0,0 +1,40 @@
++"""公开回归：冻结配置内的序列和Box可以无损导出YAML。"""
++from pathlib import Path
++from tempfile import TemporaryDirectory
++import pytest
++from box import Box, BoxError
++
++
++def test_frozen_nested_list_roundtrip():
++    """嵌套冻结序列必须导出普通YAML数据。@return None。"""
++    source = {'services': [{'name': 'api', 'ports': [80, 443]}, {'name': 'worker', 'ports': []}]}
++    config = Box(source, frozen_box=True)
++    assert Box.from_yaml(config.to_yaml()).to_dict() == source
++
++
++def test_nested_sequence_file_roundtrip_and_unicode():
++    """真实文件输出保留多层序列与中文。@return None。"""
++    source = {'routes': [[{'city': '杭州'}], [], [None, False, 0]]}
++    config = Box(source, frozen_box=True)
++    with TemporaryDirectory() as root:
++        filename = Path(root) / 'settings.yml'
++        config.to_yaml(filename=filename)
++        assert Box.from_yaml(filename=filename).to_dict() == source
++
++
++def test_serialization_does_not_unfreeze_source():
++    """导出成功后源配置仍拒绝根和嵌套修改。@return None。"""
++    config = Box({'items': [{'value': 3}]}, frozen_box=True)
++    config.to_yaml()
++    with pytest.raises(BoxError):
++        config['new'] = 1
++    with pytest.raises(BoxError):
++        config['items'][0]['value'] = 4
++
++
++def test_ordinary_yaml_remains_compatible():
++    """普通配置的YAML和JSON行为保持。@return None。"""
++    source = {'settings': {'enabled': True}, 'names': ['a', 'b']}
++    config = Box(source)
++    assert Box.from_yaml(config.to_yaml()).to_dict() == source
++    assert Box.from_json(config.to_json()).to_dict() == source
+--- /dev/null
++++ b/library/docs/development-bx-yaml-dev.md
+@@ -0,0 +1,7 @@
++# 冻结嵌套配置的YAML导出不再泄漏Box对象
++
++固定源码：https://github.com/cdgriffith/Box @ a4c10e977b574114613431394b30412b50aaacce。
++
++Repair Box.to_yaml for frozen configurations whose lists become tuples containing nested Box objects. Export those nested mappings and sequences as native YAML data through the existing backend, for both strings and files, without unfreezing or mutating the source. Preserve nested values, Unicode, empty sequences, None/bool/numbers, ordinary YAML and JSON behavior, caller serialization options, and meaningful backend errors. YAML sequences may use native lists; do not change to_dict/to_json or global YAML representers, monkeypatch the parser, or weaken frozen mutation guards.
++
++公开测试见同目录 development-tests.py。请在授权测试路径交付能在原版失败的回归，不修改现有测试控制或依赖；文档路径需说明行为、边界和兼容政策。私有验收独立执行，公开样例不代表全部边界。

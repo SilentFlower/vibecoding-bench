@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "task_id": "BA-M01-DEV",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add format_datetime_to_parts(datetime=None, format=\"yyyy-MM-dd\", tzinfo=None, locale=None) for explicit LDML patterns, returning ordered {type, field, value} dictionaries. type is the original LDML symbol or literal; field is the repeated source token or None; value is localized output. Concatenation must exactly equal format_datetime for that explicit pattern. Preserve all public-contract compatibility controls and pass the complete frozen upstream suite.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Deliver a real implementation change only within the two authorized paths. Do not modify original tests, dependencies, test configuration, locale data or protected verification. Cite actual implementation evidence.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized new test file that fail on the pinned original and pass after the implementation. Cover the public normal and boundary cases; protected controller verification does not replace delivered tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct implementations and evidence grounded in the public contract; do not match wording or a reference patch."
+}

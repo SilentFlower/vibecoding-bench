@@ -1,0 +1,109 @@
+--- a/library/portion/func.py
++++ b/library/portion/func.py
+@@ -74,7 +74,7 @@
+     return klass()
+ 
+ 
+-def iterate(interval, step, *, base=None, reverse=False):
++def iterate(interval, step, *, base=None, reverse=False, checked=False, max_items=None):
+     """
+     Iterate on the (discrete) values of given interval.
+ 
+@@ -100,8 +100,18 @@
+     :param step: step between values, or a callable that returns the next value.
+     :param base: a (pure) callable that accepts a bound and returns an initial value.
+     :param reverse: set to True for descending order.
++    :param checked: 是否要求每次实际步进按请求方向严格推进。
++    :param max_items: 整条流的最大输出数；None不限，0不执行回调。
+     :return: a lazy iterator.
+     """
++    if type(checked) is not bool:
++        raise TypeError("checked must be a boolean")
++    if max_items is not None and (type(max_items) is not int or max_items < 0):
++        raise ValueError("max_items must be a nonnegative integer or None")
++    if max_items == 0:
++        return
++    produced = 0
++
+     if base is None:
+ 
+         def base(x):
+@@ -122,7 +132,16 @@
+         def include(v, i):
+             return v > i.lower or (i.left is Bound.CLOSED and v >= i.lower)
+ 
+-    step = step if callable(step) else partial(operator.add, step)
++    raw_step = step if callable(step) else partial(operator.add, step)
++
++    def advance(value):
++        """按实际完成值验证推进，不能凭静态步长符号猜测日期或用户回调。@param value 当前值。@return 下一值。"""
++        following = raw_step(value)
++        if checked and not (following < value if reverse else following > value):
++            raise ValueError("step must strictly progress in the requested direction")
++        return following
++
++    step = advance
+ 
+     value = base(interval.lower if not reverse else interval.upper)
+     if (value == -inf and not reverse) or (value == inf and reverse):
+@@ -136,4 +155,8 @@
+ 
+         while include(value, i):
+             yield value
++            produced += 1
++            # 总量计数跨片段保留；达到上限后不再执行可能有副作用的步进回调。
++            if max_items is not None and produced >= max_items:
++                return
+             value = step(value)
+--- /dev/null
++++ b/library/tests/test_development_checked_iterate.py
+@@ -0,0 +1,39 @@
++"""公开回归：按需校验迭代进度，并用全局数量上限保护调用者。"""
++from datetime import date, timedelta
++from itertools import islice
++import portion as P
++import pytest
++
++
++def test_checked_rejects_stagnation_and_wrong_direction():
++    """静止或反向步进必须有限失败，开放端点跳过也受保护。@return None。"""
++    for interval, step, reverse in ((P.closed(1, 3), 0, False), (P.open(1, 3), lambda x: x, False),
++        (P.closed(1, 3), 1, True), (P.closed(1, 3), -1, False)):
++        with pytest.raises(ValueError):
++            list(P.iterate(interval, step, reverse=reverse, checked=True))
++
++
++def test_limit_counts_across_disjoint_parts_and_reverse():
++    """数量上限作用整条区间流，不在每个片段重新计数。@return None。"""
++    interval = P.closed(0, 2) | P.closed(10, 12)
++    assert list(P.iterate(interval, 1, checked=True, max_items=4)) == [0, 1, 2, 10]
++    assert list(P.iterate(interval, -1, reverse=True, checked=True, max_items=4)) == [12, 11, 10, 2]
++
++
++def test_zero_limit_does_not_evaluate_callbacks_and_rejects_bad_limits():
++    """零项不做业务回调，非法上限不会被隐式转整数。@return None。"""
++    calls = []
++    assert list(P.iterate(P.closed(1, 4), lambda value: calls.append(value),
++        base=lambda value: calls.append(value), checked=True, max_items=0)) == []
++    assert calls == []
++    for limit in (-1, True, 1.5):
++        with pytest.raises((ValueError, TypeError)):
++            list(P.iterate(P.closed(1, 4), 1, max_items=limit))
++
++
++def test_date_callable_and_legacy_default_are_preserved():
++    """日期用实际完成值判断进度，默认不擅自收紧原行为。@return None。"""
++    first = date(2026, 1, 2)
++    assert list(P.iterate(P.closed(first, first + timedelta(days=2)),
++        lambda value: value + timedelta(days=1), checked=True)) == [first, first + timedelta(days=1), first + timedelta(days=2)]
++    assert list(islice(P.iterate(P.closed(1, 4), 0), 3)) == [1, 1, 1]
+--- /dev/null
++++ b/library/docs/development-checked-iterate.md
+@@ -0,0 +1,7 @@
++# 安全的区间采样
++
++固定源码：https://github.com/AlexandreDecan/portion @ 622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44。
++
++Extend the actual portion.iterate API with keyword-only checked=False and max_items=None. With checked=True, each evaluated numeric or callable step must strictly advance in the requested direction; reject a zero/stagnating/wrong-direction step with ValueError, including while skipping an open starting boundary. max_items is a nonnegative integer excluding bool, limits total yielded values across disjoint atomic parts, and 0 must return without invoking base or step. Stop at the limit without an extra step call. Keep default legacy behavior, lazy finite prefixes of unbounded intervals, custom date steps and bases, reverse ordering, existing callback exceptions, all original tests and specialized create_api exports. Do not use wall clocks, background threads or eager enumeration to simulate a limit.
++
++公开复现见 development-tests.py。请将有意义的原版失败回归交付到 library/tests/test_development_checked_iterate.py，补充兼容文档。固定源码的分发版本为2.7.0-pre1；独立验收沿用原生可信绑定入口提供版本元数据，不安装另一份实现。

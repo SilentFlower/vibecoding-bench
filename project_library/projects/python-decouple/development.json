@@ -1,0 +1,64 @@
+{
+  "schema": 3,
+  "project_key": "python-decouple",
+  "title": "兼容UTF-8配置文件首BOM且保留真实值",
+  "category": "应用配置与输入语义",
+  "description": "固定真实源码上的完整工程交付：调查、方案确认、实施、公开回归与独立验收。",
+  "seed_digest": "c19a29c30e6315ecbb6d5430415edfe0151cf8fc69be2eb2b2045f147195e8f6",
+  "environment": "python-decouple-py312",
+  "source": {
+    "repository": "https://github.com/HBNetwork/python-decouple",
+    "commit": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DC-BOM-DEV-SCENE",
+      "title": "兼容UTF-8配置文件首BOM且保留真实值",
+      "goal": "兼容UTF-8配置文件首BOM且保留真实值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DC-BOM-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-BOM-DEV",
+          "kind": "modify",
+          "goal": "兼容UTF-8配置文件首BOM且保留真实值",
+          "prompt": "We need a complete development change in this pinned real project. Inspect the actual implementation and public reproduction first, explain the call path and edge cases, ask clarification questions, propose a compatibility-conscious plan and wait for my confirmation before editing. Then implement and validate within the same conversation and workspace. The eventual delivery contract is:\n\nMake RepositoryEnv and RepositoryIni accept an optional UTF-8 BOM only at the start of a UTF-8 encoded file, including standard UTF-8 codec aliases and utf-8-sig. Handle empty/BOM-only files and a BOM before a comment. Preserve every later U+FEFF in keys or values, existing Config precedence/casts/defaults, explicitly requested non-UTF8 encodings, and decoding errors. Apply the policy at the actual repository file-reading boundaries, not by global string replacement or modifying os.environ.\n\nDeliver implementation, meaningful original-failing public tests at library/tests/test_development_bom.py, and a concise compatibility document at library/docs/development-dc-bom-dev.md. Do not modify frozen original tests, dependency metadata, test controls, or any other paths.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-tests.py"
+          ],
+          "allowed_paths": [
+            "library/decouple.py",
+            "library/tests/test_development_bom.py",
+            "library/docs/development-dc-bom-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DC-BOM-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-BOM-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DC-BOM-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

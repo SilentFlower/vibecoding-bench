@@ -1,0 +1,97 @@
+--- a/library/babel/dates.py
++++ b/library/babel/dates.py
+@@ -764,6 +764,39 @@
+         )
+     else:
+         return parse_pattern(format).apply(datetime, locale)
++
++
++def format_datetime_to_parts(
++    datetime: _Instant = None,
++    format: str = 'yyyy-MM-dd',
++    tzinfo: datetime.tzinfo | None = None,
++    locale: Locale | str | None = None,
++) -> list[dict[str, str | None]]:
++    """将显式 LDML 模式格式化为可独立样式化的有序字段。
++
++    :param datetime: 与 format_datetime 相同的日期时间或时间戳；None 使用当前时刻。
++    :param format: 显式 LDML 模式；预定义格式名不在本接口范围内。
++    :param tzinfo: 显示时采用的目标时区。
++    :param locale: Locale 对象或区域标识，默认采用 LC_TIME。
++    :return: 含 type、field、value 的新列表；连接 value 等于原字符串接口。
++    """
++    if not isinstance(format, str):
++        raise TypeError('format must be an explicit LDML pattern string')
++    if format in ('full', 'long', 'medium', 'short'):
++        raise ValueError('format must be an explicit LDML pattern')
++    # 先复用原模式校验，避免分段接口悄悄接受原接口拒绝的字段宽度。
++    parse_pattern(format)
++    instant = _ensure_datetime_tzinfo(_get_datetime(datetime), tzinfo)
++    formatter = DateTimeFormat(instant, Locale.parse(locale or LC_TIME))
++    parts = []
++    for token_type, token_value in tokenize_pattern(format):
++        if token_type == 'chars':
++            parts.append({'type': 'literal', 'field': None, 'value': token_value})
++        else:
++            char, count = token_value
++            field = char * count
++            parts.append({'type': char, 'field': field, 'value': str(formatter[field])})
++    return parts
+ 
+ 
+ def format_time(
+--- /dev/null
++++ b/library/tests/test_development_datetime_parts.py
+@@ -0,0 +1,52 @@
++"""显式日期时间分段的公开功能回归。"""
++from datetime import date, datetime, timezone
++import unittest
++from babel import Locale, dates
++
++class TestDevelopmentDatetimeParts(unittest.TestCase):
++    """保护分段输出与字符串接口一致。@return 测试实例。"""
++    def test_fields_and_literals_have_exact_metadata(self):
++        """月份可单独样式化且保留原token。@return None。"""
++        value = datetime(2024,4,3,15,6,7,tzinfo=timezone.utc)
++        parts = dates.format_datetime_to_parts(value,"MMMM d 'at' HH:mm",locale='en_US')
++        self.assertEqual(parts[0],{'type':'M','field':'MMMM','value':'April'})
++        self.assertEqual(parts[1],{'type':'literal','field':None,'value':' '})
++        self.assertEqual(''.join(part['value'] for part in parts),dates.format_datetime(value,"MMMM d 'at' HH:mm",locale='en_US'))
++        self.assertTrue(all(set(part)=={'type','field','value'} for part in parts))
++
++    def test_quoting_unicode_repetition_and_percent(self):
++        """引号、重复字段、百分号与Unicode不损失。@return None。"""
++        value = datetime(2024,2,29,23,5,1,123456,tzinfo=timezone.utc)
++        patterns = ["yyyy'年'M'月'd'日' EEEE", "yyyy '/' yy", "'it''s' HH '100%'", "HH:mm:ss.SSSSSS XXX", "'only literal'", '', "yyyy 'unfinished"]
++        for locale in ('en_US','zh_CN','de_DE'):
++            for pattern in patterns:
++                with self.subTest(locale=locale,pattern=pattern):
++                    parts = dates.format_datetime_to_parts(value,pattern,locale=locale)
++                    self.assertEqual(''.join(part['value'] for part in parts),dates.format_datetime(value,pattern,locale=locale))
++        repeated = dates.format_datetime_to_parts(value,'y y',locale='en_US')
++        self.assertEqual([part['field'] for part in repeated if part['type']!='literal'],['y','y'])
++        self.assertEqual(dates.format_datetime_to_parts(value,'',locale='en_US'),[])
++
++    def test_timezone_locale_and_input_normalization(self):
++        """时区转换及多种输入复用原实现。@return None。"""
++        values = [datetime(2024,1,2,1,tzinfo=timezone.utc), datetime(2024,1,2,1), date(2024,1,2), 1704157200]
++        pattern = 'yyyy-MM-dd HH:mm zzzz XXX'
++        for value in values:
++            parts = dates.format_datetime_to_parts(value,pattern,tzinfo=dates.get_timezone('US/Pacific'),locale=Locale.parse('fr_FR'))
++            expected = dates.format_datetime(value,pattern,tzinfo=dates.get_timezone('US/Pacific'),locale='fr_FR')
++            self.assertEqual(''.join(part['value'] for part in parts),expected)
++            self.assertTrue(any(part['type']=='z' for part in parts))
++
++    def test_errors_and_fresh_return_containers(self):
++        """拒绝范围外模式且返回容器互不污染。@return None。"""
++        value = datetime(2024,1,2)
++        for name in ('short','medium','long','full'):
++            with self.assertRaises(ValueError):
++                dates.format_datetime_to_parts(value,name,locale='en_US')
++        with self.assertRaises(TypeError):
++            dates.format_datetime_to_parts(value,None,locale='en_US')
++        with self.assertRaises(ValueError):
++            dates.format_datetime_to_parts(value,'MMMMMM',locale='en_US')
++        first = dates.format_datetime_to_parts(value,locale='en_US')
++        first[0]['value']='modified'
++        self.assertEqual(dates.format_datetime_to_parts(value,locale='en_US')[0]['value'],'2024')

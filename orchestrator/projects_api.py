@@ -66,7 +66,7 @@ def projects_router(service) -> APIRouter:
     @router.get('')
     def overview() -> dict:
         """读取全部账号控制状态。:return: 公开控制摘要。"""
-        return owner().state()
+        return owner().view()
 
     @router.get('/catalog')
     def catalog() -> dict:
@@ -158,7 +158,7 @@ def projects_router(service) -> APIRouter:
                 records = current.events(account_id, cursor)
                 if records:
                     cursor = records[-1]['id']
-                state = current.state(account_id)
+                state = current.view(account_id)
                 encoded = json.dumps(state, ensure_ascii=False)
                 if records or encoded != previous:
                     yield {'event': 'update', 'id': str(cursor),

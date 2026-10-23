@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "task_id": "AR-M01-DEV",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Make TzinfoParser fixed-offset parsing consume the complete expression, reject hours >=24 or minutes >=60, and raise ParserError for invalid string expressions. Preserve supported bare forms, signed zero, UTC/local/IANA zones and legacy UTC wrappers, including the existing unclosed wrapper and Windows-like description forms. Preserve all public-contract compatibility controls and pass the complete frozen upstream suite.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Deliver a real implementation change only within the two authorized paths. Do not modify original tests, dependencies, test configuration, locale data or protected verification. Cite actual implementation evidence.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized new test file that fail on the pinned original and pass after the implementation. Cover the public normal and boundary cases; protected controller verification does not replace delivered tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct implementations and evidence grounded in the public contract; do not match wording or a reference patch."
+}

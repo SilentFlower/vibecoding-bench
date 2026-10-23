@@ -1,0 +1,19 @@
+{
+  "script": "verification/development_native.py",
+  "args": [],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "shared_depth_isolated": true,
+    "write_and_depth_order": true,
+    "custom_exporter_preserved": true,
+    "exception_preserves_configuration": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema": 3,
+  "project_key": "python-box",
+  "title": "冻结嵌套配置的YAML导出不再泄漏Box对象",
+  "category": "配置对象与字段治理",
+  "description": "固定真实源码上的完整工程交付：调查、方案确认、实施、公开回归与独立验收。",
+  "seed_digest": "5286c17ca75866756e7ba0fc5ca17b93cd80f2cb556fa5d6c60908714cb746f1",
+  "environment": "python-box-py312",
+  "source": {
+    "repository": "https://github.com/cdgriffith/Box",
+    "commit": "a4c10e977b574114613431394b30412b50aaacce",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BX-YAML-DEV-SCENE",
+      "title": "冻结嵌套配置的YAML导出不再泄漏Box对象",
+      "goal": "冻结嵌套配置的YAML导出不再泄漏Box对象",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BX-YAML-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-YAML-DEV",
+          "kind": "modify",
+          "goal": "冻结嵌套配置的YAML导出不再泄漏Box对象",
+          "prompt": "We need a complete development change in this pinned real project. Inspect the actual implementation and public reproduction first, explain the call path and edge cases, ask clarification questions, propose a compatibility-conscious plan and wait for my confirmation before editing. Then implement and validate within the same conversation and workspace. The eventual delivery contract is:\n\nRepair Box.to_yaml for frozen configurations whose lists become tuples containing nested Box objects. Export those nested mappings and sequences as native YAML data through the existing backend, for both strings and files, without unfreezing or mutating the source. Preserve nested values, Unicode, empty sequences, None/bool/numbers, ordinary YAML and JSON behavior, caller serialization options, and meaningful backend errors. YAML sequences may use native lists; do not change to_dict/to_json or global YAML representers, monkeypatch the parser, or weaken frozen mutation guards.\n\nDeliver implementation, meaningful original-failing public tests at library/test/test_development_frozen_yaml.py, and a concise compatibility document at library/docs/development-bx-yaml-dev.md. Do not modify frozen original tests, dependency metadata, test controls, or any other paths.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-tests.py"
+          ],
+          "allowed_paths": [
+            "library/box/box.py",
+            "library/test/test_development_frozen_yaml.py",
+            "library/docs/development-bx-yaml-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BX-YAML-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-YAML-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BX-YAML-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TZ-PAD-DEV",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair partition and partition_all so any ordinary string, specifically the pinned implementation's '__no__pad__' literal, remains real data and can also be an explicitly supplied padding value. Missing slots must be recognized by an unambiguous internal identity marker, never by comparing business values. Preserve tuple batches, default truncation for partition, partial final groups for partition_all, lazy finite prefixes of infinite input, existing at-most-one-batch lookahead, original invalid-__len__ diagnostics, top-level/curried APIs, and all existing frozen tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests at library/toolz/tests/test_development_padding.py that fail on the pinned original and pass after the authorized implementation. Cite the delivered source and tests; preserve all original tests and frozen upstream controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Change only the authorized implementation, new public test and documentation paths. Preserve compatibility and pass the complete frozen native regression. Use actual source and execution facts, not claims or reference wording.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct implementations backed by actual behavior; do not match reference text or verbosity."
+}

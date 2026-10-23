@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "task_id": "AG-M01-DEV",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix Table.join right-key resolution for positional and mixed composite identifiers, including negative column indices, and prevent equal-valued right columns from causing the wrong key column to be omitted. Preserve name keys, callable keys, explicit columns, unmatched/required matching and full_outer behavior. Preserve all public-contract compatibility controls and pass the complete frozen upstream suite.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Deliver a real implementation change only within the two authorized paths. Do not modify original tests, dependencies, test configuration, locale data or protected verification. Cite actual implementation evidence.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized new test file that fail on the pinned original and pass after the implementation. Cover the public normal and boundary cases; protected controller verification does not replace delivered tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct implementations and evidence grounded in the public contract; do not match wording or a reference patch."
+}

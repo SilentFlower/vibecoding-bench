@@ -3,8 +3,8 @@
   "legacy_version": "real-project-scenarios-v37-en",
   "legacy_catalog_sha256": "36da8ec27deff2ae9a56e4557f4a30775ddca4c7e9a1e3eb795933d00109633e",
   "reviewed_projects": 100,
-  "executable_projects": 30,
-  "complete_tasks": 36,
+  "executable_projects": 40,
+  "complete_tasks": 46,
   "projects": [
     {
       "project_key": "python-frontmatter",
@@ -1415,7 +1415,7 @@
     },
     {
       "project_key": "python-decouple",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/HBNetwork/python-decouple",
         "commit": "0573e6f96637f08fb4cb85e0552f0622d36827d4",
@@ -1428,7 +1428,16 @@
         "research/github-projects/python-decouple.md",
         "research/github-projects/python-decouple-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "兼容UTF-8配置文件首BOM且保留真实值",
+          "id": "DC-BOM-DEV",
+          "legacy_changes": [],
+          "native": "verification/DC-BOM-DEV.native.json",
+          "type": "feature",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "DC-U01",
@@ -1494,7 +1503,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "click",
@@ -2420,7 +2429,7 @@
     },
     {
       "project_key": "toolz",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/pytoolz/toolz",
         "commit": "451af60dec590a6010e2babdbf391ea8f815122f",
@@ -2433,7 +2442,16 @@
         "research/github-projects/toolz.md",
         "research/github-projects/toolz-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "修复分批占位字符串与真实业务文本冲突",
+          "id": "TZ-PAD-DEV",
+          "legacy_changes": [],
+          "native": "verification/TZ-PAD-DEV.native.json",
+          "type": "bug",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "TZ-U01",
@@ -2492,7 +2510,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "jsonschema",
@@ -2658,7 +2676,7 @@
     },
     {
       "project_key": "agate",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/wireservice/agate",
         "commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
@@ -2671,7 +2689,16 @@
         "research/github-projects/agate.md",
         "research/github-projects/agate-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "连接键解析保持实际右列身份",
+          "id": "AG-M01-DEV",
+          "legacy_changes": [],
+          "native": "verification/AG-M01-DEV.native.json",
+          "type": "bug",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "AG-U01",
@@ -2737,7 +2764,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "csvkit",
@@ -2817,7 +2844,7 @@
     },
     {
       "project_key": "python-box",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/cdgriffith/Box",
         "commit": "a4c10e977b574114613431394b30412b50aaacce",
@@ -2830,7 +2857,16 @@
         "research/github-projects/python-box.md",
         "research/github-projects/python-box-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "冻结嵌套配置的YAML导出不再泄漏Box对象",
+          "id": "BX-YAML-DEV",
+          "legacy_changes": [],
+          "native": "verification/BX-YAML-DEV.native.json",
+          "type": "bug",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "BX-U01",
@@ -2889,7 +2925,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "rich",
@@ -3114,7 +3150,7 @@
     },
     {
       "project_key": "backoff",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/litl/backoff",
         "commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
@@ -3127,7 +3163,16 @@
         "research/github-projects/backoff.md",
         "research/github-projects/backoff-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "统一有限重试耗尽时的放弃政策",
+          "id": "BF-EXHAUST-DEV",
+          "legacy_changes": [],
+          "native": "verification/BF-EXHAUST-DEV.native.json",
+          "type": "bug",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "BF-U01",
@@ -3179,7 +3224,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "bottle",
@@ -4468,7 +4513,7 @@
     },
     {
       "project_key": "attrs",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/python-attrs/attrs",
         "commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
@@ -4481,7 +4526,16 @@
         "research/github-projects/attrs.md",
         "research/github-projects/attrs-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "Attribute过滤器只选择精确字段对象",
+          "id": "AT-M01-DEV",
+          "legacy_changes": [],
+          "native": "verification/AT-M01-DEV.native.json",
+          "type": "bug",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "AT-U01",
@@ -4533,7 +4587,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "mdit-py-plugins",
@@ -4937,7 +4991,7 @@
     },
     {
       "project_key": "anytree",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/c0fec0de/anytree",
         "commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
@@ -4950,7 +5004,16 @@
         "research/github-projects/anytree.md",
         "research/github-projects/anytree-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "JSON深度覆盖不污染共享字典导出器",
+          "id": "AN-M01-DEV",
+          "legacy_changes": [],
+          "native": "verification/AN-M01-DEV.native.json",
+          "type": "bug",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "AN-U01",
@@ -4995,11 +5058,11 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "babel",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/python-babel/babel",
         "commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
@@ -5013,7 +5076,16 @@
         "research/github-projects/babel.md",
         "research/github-projects/babel-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "显式日期时间模式的可样式化字段分段",
+          "id": "BA-M01-DEV",
+          "legacy_changes": [],
+          "native": "verification/BA-M01-DEV.native.json",
+          "type": "feature",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "BA-U01",
@@ -5058,7 +5130,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "werkzeug",
@@ -5640,7 +5712,7 @@
     },
     {
       "project_key": "arrow",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/arrow-py/arrow",
         "commit": "2224255c4acc594d734cef0bbc83360452a67983",
@@ -5653,7 +5725,16 @@
         "research/github-projects/arrow.md",
         "research/github-projects/arrow-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "固定偏移完整匹配并统一拒绝非法分量",
+          "id": "AR-M01-DEV",
+          "legacy_changes": [],
+          "native": "verification/AR-M01-DEV.native.json",
+          "type": "bug",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "AR-U01",
@@ -5698,7 +5779,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "charset-normalizer",
@@ -6396,7 +6477,7 @@
     },
     {
       "project_key": "portion",
-      "status": "blocked",
+      "status": "ready",
       "source": {
         "repository": "https://github.com/AlexandreDecan/portion",
         "commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
@@ -6409,7 +6490,16 @@
         "research/github-projects/portion.md",
         "research/github-projects/portion-roadmap-20.md"
       ],
-      "tasks": [],
+      "tasks": [
+        {
+          "goal": "为区间采样增加可选进度检查与全局输出上限",
+          "id": "PT-CHECKED-DEV",
+          "legacy_changes": [],
+          "native": "verification/PT-CHECKED-DEV.native.json",
+          "type": "feature",
+          "validation": "passed_original_reference_and_frozen_regression"
+        }
+      ],
       "legacy_tasks": [
         {
           "task_id": "PT-U01",
@@ -6447,7 +6537,7 @@
           "complete_task": null
         }
       ],
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "origin": "research_coverage_expansion_20261024"
     },
     {
       "project_key": "humanize",
@@ -7529,5 +7619,5 @@
       ]
     }
   ],
-  "validated_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc"
+  "validated_catalog_digest": "693472a30e4bc5cb7c11a966877978ceb11357ca0e1a68fc560258c1058e9758"
 }

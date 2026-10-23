@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "task_id": "AT-M01-DEV",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "version": 2,
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Match Attribute arguments to include/exclude by object identity so content-equal fields belonging to unrelated classes do not leak across selections. Preserve exact class and field-name branches, multiple equivalent Attribute arguments, inherited exact-field behavior, asdict/astuple integration, Attribute equality/hash and the existing _split_what contract. Preserve all public-contract compatibility controls and pass the complete frozen upstream suite.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Deliver a real implementation change only within the two authorized paths. Do not modify original tests, dependencies, test configuration, locale data or protected verification. Cite actual implementation evidence.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized new test file that fail on the pinned original and pass after the implementation. Cover the public normal and boundary cases; protected controller verification does not replace delivered tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct implementations and evidence grounded in the public contract; do not match wording or a reference patch."
+}

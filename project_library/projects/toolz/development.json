@@ -1,0 +1,64 @@
+{
+  "schema": 3,
+  "project_key": "toolz",
+  "title": "修复分批占位字符串与真实业务文本冲突",
+  "category": "函数式管道与聚合",
+  "description": "固定真实源码上的完整工程交付：调查、方案确认、实施、公开回归与独立验收。",
+  "seed_digest": "c9f35ac651c8c23d4912bb082fba900ef1bef82401c80d843b62c11625acdffb",
+  "environment": "toolz-py312",
+  "source": {
+    "repository": "https://github.com/pytoolz/toolz",
+    "commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TZ-PAD-DEV-SCENE",
+      "title": "修复分批占位字符串与真实业务文本冲突",
+      "goal": "修复分批占位字符串与真实业务文本冲突",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TZ-PAD-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TZ-PAD-DEV",
+          "kind": "modify",
+          "goal": "修复分批占位字符串与真实业务文本冲突",
+          "prompt": "We need a complete development change in this pinned real project. Inspect the actual implementation and public reproduction first, explain the call path and edge cases, ask clarification questions, propose a compatibility-conscious plan and wait for my confirmation before editing. Then implement and validate within the same conversation and workspace. The eventual delivery contract is:\n\nRepair partition and partition_all so any ordinary string, specifically the pinned implementation's '__no__pad__' literal, remains real data and can also be an explicitly supplied padding value. Missing slots must be recognized by an unambiguous internal identity marker, never by comparing business values. Preserve tuple batches, default truncation for partition, partial final groups for partition_all, lazy finite prefixes of infinite input, existing at-most-one-batch lookahead, original invalid-__len__ diagnostics, top-level/curried APIs, and all existing frozen tests.\n\nDeliver implementation, meaningful original-failing public tests at library/toolz/tests/test_development_padding.py, and a concise compatibility document at library/docs/development-tz-pad-dev.md. Do not modify frozen original tests, dependency metadata, test controls, or any other paths.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-tests.py"
+          ],
+          "allowed_paths": [
+            "library/toolz/itertoolz.py",
+            "library/toolz/tests/test_development_padding.py",
+            "library/docs/development-tz-pad-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TZ-PAD-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TZ-PAD-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TZ-PAD-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

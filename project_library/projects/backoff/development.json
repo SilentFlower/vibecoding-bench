@@ -1,0 +1,65 @@
+{
+  "schema": 3,
+  "project_key": "backoff",
+  "title": "统一有限重试耗尽时的放弃政策",
+  "category": "重试与异步调用",
+  "description": "固定真实源码上的完整工程交付：调查、方案确认、实施、公开回归与独立验收。",
+  "seed_digest": "793e155f3a3ef75f177ca1a4e92b25544ff113e1c9f1e4381fd6441ee4cbcd8f",
+  "environment": "backoff-py312",
+  "source": {
+    "repository": "https://github.com/litl/backoff",
+    "commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BF-EXHAUST-DEV-SCENE",
+      "title": "统一有限重试耗尽时的放弃政策",
+      "goal": "统一有限重试耗尽时的放弃政策",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BF-EXHAUST-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BF-EXHAUST-DEV",
+          "kind": "modify",
+          "goal": "统一有限重试耗尽时的放弃政策",
+          "prompt": "We need a complete development change in this pinned real project. Inspect the actual implementation and public reproduction first, explain the call path and edge cases, ask clarification questions, propose a compatibility-conscious plan and wait for my confirmation before editing. Then implement and validate within the same conversation and workspace. The eventual delivery contract is:\n\nRepair on_exception so exhausting a finite wait generator follows raise_on_giveup in both synchronous and asynchronous execution: False returns None; True (including the default) propagates the same last exception object. Preserve the exact number of target attempts, zero/finite waits, exactly one giveup callback with exception and tries, awaited async callbacks, handler-error propagation, ordinary success and on_predicate behavior. Do not add sleeping/network calls to tests, change unrelated retry policies, or intercept exceptions outside the configured exception type.\n\nDeliver implementation, meaningful original-failing public tests at library/tests/test_development_exhaustion.py, and a concise compatibility document at library/docs/development-bf-exhaust-dev.md. Do not modify frozen original tests, dependency metadata, test controls, or any other paths.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-tests.py"
+          ],
+          "allowed_paths": [
+            "library/backoff/_sync.py",
+            "library/backoff/_async.py",
+            "library/tests/test_development_exhaustion.py",
+            "library/docs/development-bf-exhaust-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BF-EXHAUST-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BF-EXHAUST-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BF-EXHAUST-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

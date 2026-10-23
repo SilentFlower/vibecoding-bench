@@ -1,0 +1,483 @@
+{
+  "base_proof_sha256": "f8c2f10c1378b19c53e998c4a9eaf04418dc31e26e18cd0035b7297d300ada41",
+  "catalog_digest": "693472a30e4bc5cb7c11a966877978ceb11357ca0e1a68fc560258c1058e9758",
+  "fresh_proof_sha256": "029c51c37394664d50775798ee67aae2f74d85747a79f1460323277db56364f3",
+  "fresh_tasks": 10,
+  "projects": 40,
+  "real_model_calls": 0,
+  "results": [
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "3372655235bf9d9a886de638e6ad1418068c20f289c659f067cf396b73d3f22f",
+      "error": null,
+      "project_key": "alive-progress",
+      "reference_digest": "9113609e51eaeffdb6b578ed3ce665ac3f6e06930afdac634860c774dfdbdb6c",
+      "status": "passed",
+      "task_id": "AP-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "8b27857287b3a2ff35a5474654e914ce7c033627d0e521f076c92ef0f3ed9e9b",
+      "error": null,
+      "project_key": "boltons",
+      "reference_digest": "c8332f6a03e505402027e4f831dad11112f7b404b54366c39460d583f17cf0dd",
+      "status": "passed",
+      "task_id": "BO-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "caadeaebc6646c6f997983054c2f3e8d3dfedcbb44c28f451bc6b3f597bfc3b8",
+      "error": null,
+      "project_key": "cachetools",
+      "reference_digest": "efeb3f1a672d8cfc87cfad94d025bdef70aeaebe6cea771264fb396e8241b19a",
+      "status": "passed",
+      "task_id": "CT-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "3697c8f0bd02a60d640370a622de699b07de0652769e9febe6933ac195ca5fa2",
+      "error": null,
+      "project_key": "cli-helpers",
+      "reference_digest": "1e8c1f437371bd7b5bd13eb1bee01dace382956bd554947cbd21ffcd3e7bc7d0",
+      "status": "passed",
+      "task_id": "CH-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "24c87bbf14d4d0f69a21dafc9592c3f531c403f17a4a38aa5c4ae3573ecc833c",
+      "error": null,
+      "project_key": "click",
+      "reference_digest": "f68f29555ccc576d2d5d1531d3ee203b423f8af719cd4a33aaff17af8cd47b8e",
+      "status": "passed",
+      "task_id": "CK-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "c04ba316aeae924e01b78c32d9b26c573804551f9ea771a6096b309522fca69b",
+      "error": null,
+      "project_key": "confuse",
+      "reference_digest": "0a7cabd1edd08d7749ed113397b26579604b6751324a2750e807a110a72bd863",
+      "status": "passed",
+      "task_id": "CF-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "07c2527be8f5d9424d1f37732b90bb3f087c03525bad4871279ab131c68eaaea",
+      "error": null,
+      "project_key": "dpath",
+      "reference_digest": "6c8d6b9c9f03a14ae3a08e3b5a98f203c0ba2d7d7c7c58c9062046bd68664497",
+      "status": "passed",
+      "task_id": "DP-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "95adae5e21c66cd84c7ed9cc536bbbaed9a15957361830d6b249c57560a6dddd",
+      "error": null,
+      "project_key": "feedgen",
+      "reference_digest": "433b1dcf6fae0f1379534f23c41bb90861b453e35a23bc37df87a3929fa15912",
+      "status": "passed",
+      "task_id": "FG-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "e91aae621222bd5b9d71e6a89b818d563be08cc8991a7c69d0b129e7c8954bfb",
+      "error": null,
+      "project_key": "ftfy",
+      "reference_digest": "ad144b71f6597854964ff133213321b6e29c4e5f3bb392efa68c0d9f4d5a2a51",
+      "status": "passed",
+      "task_id": "FT-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "115ebda0c55acccbc49c9787a1263aef82c179b4aacc8126a972067ef244873d",
+      "error": null,
+      "project_key": "inflect",
+      "reference_digest": "c8dab1db678203df801a5b13dc0a9a3623d103ce8135d8b2b4181a390b955623",
+      "status": "passed",
+      "task_id": "IF-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "9320c12fdfe6e1c5b4cf38faf7c1895c7bfbe578ca4ad8e57eae22f1cc3eb354",
+      "error": null,
+      "project_key": "jinja",
+      "reference_digest": "65de11c00683c97ead86201e5dd8ed786e7b7ab8e9f1ff12e7193027509084f4",
+      "status": "passed",
+      "task_id": "JI-M02-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "0ae4b57756cc847d9d8471515c6304711de220bfce1b2afacfe5a867bc1ce570",
+      "error": null,
+      "project_key": "jmespath",
+      "reference_digest": "06af3a7c9d086a5f13f15702a242f106ece2e0014c28670412e8e0012370f7a4",
+      "status": "passed",
+      "task_id": "JM-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "c402cbe09e2ee1685bf11a424495e3d3c1acacc05fe98e43e6f482a6cb45c50a",
+      "error": null,
+      "project_key": "marshmallow",
+      "reference_digest": "eca90b51efad20f7e625b8516efebf0260f84a3e4c13a1c48dfede558e005fc0",
+      "status": "passed",
+      "task_id": "MM-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "69380eb6a395d926252293d0f9635ee0a671c1d7edccad33c6ecda43593b3aa5",
+      "error": null,
+      "project_key": "mistune",
+      "reference_digest": "4aa45b1c8309614cc2d0a889d3109bc210adc1b1e6e999c93263a296a30f2bd3",
+      "status": "passed",
+      "task_id": "MS-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "19de9272761218bbb76d83f0bcb136ce2a6a3a5e61173238c4f8c400c47b93cd",
+      "error": null,
+      "project_key": "path",
+      "reference_digest": "b55a21297e9cd24a57975de49204bd7d48cd913d1374f6c12b41de1c630224b3",
+      "status": "passed",
+      "task_id": "PA-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "f30d58a0c3d9bb34414581134720a29c375746e006f7e470c567bc15127c0f01",
+      "error": null,
+      "project_key": "pydantic-settings",
+      "reference_digest": "43ab93d0b849ff6d7e21fff7ce8e9aa103bdd46673831ba66f0c7ed483174824",
+      "status": "passed",
+      "task_id": "PS-UNION-FIX-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "7adb719502909d3fd4bdfbec74b9445fb6c735dfd4df52bd559e5f37407439f7",
+      "error": null,
+      "project_key": "python-dotenv",
+      "reference_digest": "316c2c86c149c536e376316b68bc65f5344cdd1a9d2ecdae5713016f5a2ada4f",
+      "status": "passed",
+      "task_id": "DE-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "7adb719502909d3fd4bdfbec74b9445fb6c735dfd4df52bd559e5f37407439f7",
+      "error": null,
+      "project_key": "python-dotenv",
+      "reference_digest": "84833b67b96016c74a0087aec55b68c63c93fb2bbef48997ef028daee65335c9",
+      "status": "passed",
+      "task_id": "DE-M02-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "a9181e19224379b7c3593996869c4c80f4b8afa19a4126d25bd0e2115f84eca2",
+      "error": null,
+      "project_key": "python-frontmatter",
+      "reference_digest": "1265ef6ed801db87aa74a92a9e4f1d60d0f19df603f980df94f31613727e3e87",
+      "status": "passed",
+      "task_id": "FM-FX-01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "8dd7615bcf48a05cc7f71d9b856eb76ce05e8531c4c41974863a2038ad6665c6",
+      "error": null,
+      "project_key": "schedule",
+      "reference_digest": "c7e820491a0def570c7985791e66f1595d396f7d3e1763bda0c4b876053a826f",
+      "status": "passed",
+      "task_id": "SC-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "8dd7615bcf48a05cc7f71d9b856eb76ce05e8531c4c41974863a2038ad6665c6",
+      "error": null,
+      "project_key": "schedule",
+      "reference_digest": "bb5b6c3ba58bbc9e30a49519cedc9a4acf8bcced07fd014611bf980128033ac2",
+      "status": "passed",
+      "task_id": "SC-M02-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "2112b7802ed21a5cf2f6aa67b1924fc63f3d741ee5c101d2fbf92ddee021f249",
+      "error": null,
+      "project_key": "simplejson",
+      "reference_digest": "43a2043bafbd53a47386662a8eb7470b27d4813a62038dabd31788788b64db13",
+      "status": "passed",
+      "task_id": "SJ-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "da2111c04ccd5d9e1d8aed50e2c109a74d5672b5f6c9d0b3ef7948e486150631",
+      "error": null,
+      "project_key": "sqlglot",
+      "reference_digest": "15c0ea1e0f834a95dc52842a3b6b5e0d49b40ed466421f368fe749a646eece83",
+      "status": "passed",
+      "task_id": "SG-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "ad04f5bd2eab0ed5a5df85293e9e4a4d93c3fd0dfbe1212f30f668a87a971eb9",
+      "error": null,
+      "project_key": "sqlite-utils",
+      "reference_digest": "b3586ce220bd81ac628b7cc6e15d4e53e2fa6bdaf607fc5373c67eece6f1c30b",
+      "status": "passed",
+      "task_id": "SQ-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "ad04f5bd2eab0ed5a5df85293e9e4a4d93c3fd0dfbe1212f30f668a87a971eb9",
+      "error": null,
+      "project_key": "sqlite-utils",
+      "reference_digest": "56788e999c11272fde7fe27f2b004780d46429b9c25946a53563b5225b06173a",
+      "status": "passed",
+      "task_id": "SQ-M02-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "439d40837853f736e747980b1e5bbd203f4ada2b1af7a8bb5ca80f3375b5ac79",
+      "error": null,
+      "project_key": "tablib",
+      "reference_digest": "204b6bb1435117830bf2b816955f6ce08598ef8d817c86dc095656b528e45c14",
+      "status": "passed",
+      "task_id": "TB-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "81d150c00cf69a817d431bd984f45afcca9357492ed4ea13bad1f12c7c6ec14f",
+      "error": null,
+      "project_key": "tabulate",
+      "reference_digest": "ddf7b19bb5bc1d0b07de5ae5dbdf854fe43096738bab5e7d12df853d11b705a2",
+      "status": "passed",
+      "task_id": "TB-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "da47c91c3b8656616942cbe854ce3a1c833d1df34dde5cb59af7eac3616f206d",
+      "error": null,
+      "project_key": "tenacity",
+      "reference_digest": "908292fb6a611bfdea4a98a057cec2625eaab5151764e985ff04aaf1f20a0dbd",
+      "status": "passed",
+      "task_id": "TN-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "da47c91c3b8656616942cbe854ce3a1c833d1df34dde5cb59af7eac3616f206d",
+      "error": null,
+      "project_key": "tenacity",
+      "reference_digest": "fd583b445e9185999cea5f718b0c66a0d61d8938fbcee507e1102361249f10a2",
+      "status": "passed",
+      "task_id": "TN-M02-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "d478acdf6f6cf1c05645ad6ec2ceadd0a83d76755a2df6c34689e4bcae52cac7",
+      "error": null,
+      "project_key": "tinydb",
+      "reference_digest": "abc03170d7bab9946d253626d842253e04b8e131563c290a05af72c5116cf677",
+      "status": "passed",
+      "task_id": "TD-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "d478acdf6f6cf1c05645ad6ec2ceadd0a83d76755a2df6c34689e4bcae52cac7",
+      "error": null,
+      "project_key": "tinydb",
+      "reference_digest": "aae2460c1b1d85633c4423d4ee07a871fdbabf80cf3bf4f5e260a2fa66e2dec8",
+      "status": "passed",
+      "task_id": "TD-M02-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "3bed3305cd2ed71e2dc402c2102f17b17f9f08b5557ad380a10876eaca2e0da3",
+      "error": null,
+      "project_key": "tomlkit",
+      "reference_digest": "2e9961b179fbfb51d8941efd494c28102711a8d7b00801877002221105197bb2",
+      "status": "passed",
+      "task_id": "TK-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "3bed3305cd2ed71e2dc402c2102f17b17f9f08b5557ad380a10876eaca2e0da3",
+      "error": null,
+      "project_key": "tomlkit",
+      "reference_digest": "47f1e3cee324b7056d016c7c2b18bd0b0877b61ae74295a6026edb4aadffc624",
+      "status": "passed",
+      "task_id": "TK-M02-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "456a25ad2f55ed11693ab417462400f39590bb28f8d65e6da497db4922e4b9fa",
+      "error": null,
+      "project_key": "typer",
+      "reference_digest": "96741b1db08eb1b5f3aaeb23013d0efd32bd2a2fc6e663e8f07fe7b56ef35159",
+      "status": "passed",
+      "task_id": "TY-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "c0c06f90a56b44cabee5c41f2ae37b3d52a34f7542d13936123dac2eddf5098b",
+      "error": null,
+      "project_key": "xlsxwriter",
+      "reference_digest": "30df027143926eb95c2a826b5c997c8bd9c927790bc0f11083737ea7b5a66143",
+      "status": "passed",
+      "task_id": "XW-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "base_catalog_digest": "341fb2cfba447206618bb987af096b365daaec61c1a954774297c7945fef93bc",
+      "baseline_digest": "ef3fbb39effc4a84d89f2a7410f56b66c9b03725279d8ecf442a4936b0a1f59b",
+      "error": null,
+      "project_key": "xmltodict",
+      "reference_digest": "c9a2f074d3ab6bdff4ab1d2cf07c5e1b8133cab50600eebdbbdc711d98b8ba8a",
+      "status": "passed",
+      "task_id": "XD-M01-DEV",
+      "validation_origin": "unchanged_frozen_project_and_environment"
+    },
+    {
+      "baseline_digest": "7a4bd0306e3cfb1e669fa928b7cd293938cba41b07db8637c2bc1a0a3d0d110b",
+      "environment_profile_digest": "7cec1af84a17dce01c0ad9cb287927af09b09a49597f3894be570173a05bee0d",
+      "evidence_sha256": "a0e2b75ab2a391057654bdcbfab37b9a3069b07024f479369a5247f9685efd55",
+      "frozen_project_digest": "bc79a24c8a23eb7406c60b3d556d0ff4ae4b88adbb088272fcba102760103668",
+      "project_key": "agate",
+      "reference_digest": "86f15dde755939a90a815c0b5b4cf95179a25b55f77333868b2cfae46a8d78df",
+      "status": "passed",
+      "task_id": "AG-M01-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "e543fef9531643095cbb40ec62663be9a5e0bb1b75256cde8293f8f0fcbf1425",
+      "environment_profile_digest": "01bac84d4b6a1a4b95c58a8d795de5ad4966954940cf4c587f411828dc82f00a",
+      "evidence_sha256": "06693ee4d12022461d8e49c18a7908fe0f557e7e5a34eb7ae4fd2d810f1e0803",
+      "frozen_project_digest": "37d48d72a2ceaa9df1cd3381a5306b1540c5d4d2b5c6b2becbeb4a659c5325b1",
+      "project_key": "anytree",
+      "reference_digest": "3f7a23550fdcb836f185caad4174172d030ba1f017d9596f41faa5d8d2e218e5",
+      "status": "passed",
+      "task_id": "AN-M01-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "619dfb275eb2c21802cc68803fe7daf7ed4fcdce583f938f29db7136b5bc47e3",
+      "environment_profile_digest": "a2463937d6c63ac069621c9fa49df7b6804bb106cd22a8c876fe2c30697eac51",
+      "evidence_sha256": "7b4456657155a52afbb342e25f42680e07aa8bdc21fae2de96035dd88931f614",
+      "frozen_project_digest": "a19f4b19d8ba071bdb8fef10886cf088b6e6f7f05501a5f3de701614433a651e",
+      "project_key": "arrow",
+      "reference_digest": "181e50991904606e9e7c7973f65e89a592559b1fd7cb00316b6aa899e6b09cf4",
+      "status": "passed",
+      "task_id": "AR-M01-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "7ca0146f6e7a6ca478a29d8963632afa6e12b9a3e4d43c69e70a387e4f28b60f",
+      "environment_profile_digest": "8d290363b2a9e567b2b7cb06365a5b40f243f326dee706358a709658c7f898d0",
+      "evidence_sha256": "38223f027ef8a92696bdc0188115daecbc996a075c91d48bdcda744d7dca2a75",
+      "frozen_project_digest": "056e61c2e2b7d124da755dc0db97af5fae0d3b6be5d7f72cce9a416087fe2103",
+      "project_key": "attrs",
+      "reference_digest": "c149b205e710646337529ea7d3af2618ce693ab928b7e0efda75c8dba1a6aa40",
+      "status": "passed",
+      "task_id": "AT-M01-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "3ce71deff56aa14e35ba197981380780abca30f57b4008106a4200ef0099a756",
+      "environment_profile_digest": "8c9d0409b9a353ab1920545afd9f883ab910395cde8c709d974a144deb6e69b6",
+      "evidence_sha256": "5c99fb3a8e80a224e478cc456e6e4677383bc631c6b4e60f97045130bd46c678",
+      "frozen_project_digest": "72cd4d0aebb89379d3d173966ceb513488d2a48b26c6cd7098b7a6a4c079a55c",
+      "project_key": "babel",
+      "reference_digest": "0083e7e7f1b8be3b692bc015200cde1cb8469500efcc3e794732f55fa7dd1a97",
+      "status": "passed",
+      "task_id": "BA-M01-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "793e155f3a3ef75f177ca1a4e92b25544ff113e1c9f1e4381fd6441ee4cbcd8f",
+      "environment_profile_digest": "7bd07c9e990d4f013651226e5b4f1ec0e968174c5617e1eb5ce619dca7001f52",
+      "evidence_sha256": "32ada15b37832d78259bcfc29a30ab4a9b7c6406a7ccb216d19053438efdba83",
+      "frozen_project_digest": "48eee14a0005ce8776b7de38a293b0cd819bbfb65d722bf42542b0c4e858a91a",
+      "project_key": "backoff",
+      "reference_digest": "4bb9f788dc8d01058f0bd6d8fda70c1f1798943863c2c4941d1e40174f6bdf52",
+      "status": "passed",
+      "task_id": "BF-EXHAUST-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "98648094fcc03c5479bd8d14538da9666a2f70da494fbd885facf0676acbd8f2",
+      "environment_profile_digest": "b53e3215ce7d74d93f03274b40cdc3920c919b14e9214b21d58c76d878255d4b",
+      "evidence_sha256": "ee5d64c2de61cc0073c121f14d24e5be124caa6fef6623d7a560e820db03be17",
+      "frozen_project_digest": "47f1867f9fdc5ba03f4bc385bf0aaf65836a2a1ef1fd6b426c1dff6b6c3b3d9b",
+      "project_key": "portion",
+      "reference_digest": "5948d8da1ce6da022841b33b84286bd1ee3834ea351787188ea6633df55e979f",
+      "status": "passed",
+      "task_id": "PT-CHECKED-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "5286c17ca75866756e7ba0fc5ca17b93cd80f2cb556fa5d6c60908714cb746f1",
+      "environment_profile_digest": "aeb81fa477d70c4828b5ded48ae227bf7ee37b83e55c1bf1bae407d4cf7ffe62",
+      "evidence_sha256": "96900637f7e2613d78d92c592297cf919329b25cb11e057cbc7428009c51ecf5",
+      "frozen_project_digest": "08159ab2df5a30964fc83905a8613963fabdc655bc905ffcd3830a7a186ebb53",
+      "project_key": "python-box",
+      "reference_digest": "041db6024c5c518b11a17e7551e3d5ea20cfe6102f99d61b695d5c515d1b648a",
+      "status": "passed",
+      "task_id": "BX-YAML-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "c19a29c30e6315ecbb6d5430415edfe0151cf8fc69be2eb2b2045f147195e8f6",
+      "environment_profile_digest": "be1a494d774208fca5a14dd3946a42e2e2c2ac149e4c3a4e18767221d76fdb74",
+      "evidence_sha256": "de018637e9688280bd357698ebf5594766d2bd101e4d0b3254b0fc222f1c2723",
+      "frozen_project_digest": "a3f381fd707026d95d309cae6f5d132745fb0281be2429e1a6fa1e07f03a2aa6",
+      "project_key": "python-decouple",
+      "reference_digest": "92f5cb0eaa6aa02c0effe1d3a7d6a8e743f3019b45644f25ccaf54d9354b982a",
+      "status": "passed",
+      "task_id": "DC-BOM-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    },
+    {
+      "baseline_digest": "c9f35ac651c8c23d4912bb082fba900ef1bef82401c80d843b62c11625acdffb",
+      "environment_profile_digest": "378dcc7a731fd238e949f9adc60114910f614807b470a265bc0027a9d744337f",
+      "evidence_sha256": "6149679accddcff2bc13815b5698c09147ce17d34da0fa5fe8b841d37f918f52",
+      "frozen_project_digest": "eb1b77ba8e5fc6c31013eddd4efda95e9ee3f2120925b282f197dd38f64f6a86",
+      "project_key": "toolz",
+      "reference_digest": "d435d548e97d3da9264fbcf1d58f1e972fd35292645c48410058b8ce619ad8d1",
+      "status": "passed",
+      "task_id": "TZ-PAD-DEV",
+      "validation_origin": "fresh_original_reference_and_frozen_regression"
+    }
+  ],
+  "status": "passed",
+  "tasks": 46,
+  "unchanged_previously_verified_tasks": 36
+}

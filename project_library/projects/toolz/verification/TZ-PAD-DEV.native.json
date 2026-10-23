@@ -1,0 +1,21 @@
+{
+  "script": "verification/development-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "marker_matrix": true,
+    "explicit_padding": true,
+    "identity_only": true,
+    "lazy_bounded_lookahead": true,
+    "ordinary_partition": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

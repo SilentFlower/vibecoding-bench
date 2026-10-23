@@ -1,0 +1,21 @@
+{
+  "script": "verification/development-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "env_aliases": true,
+    "ini_aliases": true,
+    "empty_and_comment": true,
+    "embedded_marker_preserved": true,
+    "explicit_encoding_and_errors": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

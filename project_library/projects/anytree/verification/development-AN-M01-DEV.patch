@@ -1,0 +1,94 @@
+--- a/library/src/anytree/exporter/jsonexporter.py
++++ b/library/src/anytree/exporter/jsonexporter.py
+@@ -1,4 +1,5 @@
+ import json
++from copy import copy
+ 
+ from .dictexporter import DictExporter
+ 
+@@ -59,6 +60,8 @@
+     def _export(self, node):
+         dictexporter = self.dictexporter or DictExporter()
+         if self.maxlevel is not None:
++            # 深度属于本次 JSON 导出；浅复制保留回调和子类，避免共享配置被污染。
++            dictexporter = copy(dictexporter)
+             dictexporter.maxlevel = self.maxlevel
+         return dictexporter.export(node)
+ 
+--- /dev/null
++++ b/library/tests/test_development_json_exporter.py
+@@ -0,0 +1,74 @@
++"""共享字典导出器深度隔离的公开回归。"""
++from collections import OrderedDict
++import io
++import json
++import unittest
++from anytree import Node
++from anytree.exporter import DictExporter, JsonExporter
++
++def tree():
++    """创建三层分类树。@return 根节点。"""
++    root = Node('root', secret='hidden')
++    Node('b', parent=root)
++    child = Node('a', parent=root)
++    Node('leaf', parent=child)
++    return root
++
++class MarkedExporter(DictExporter):
++    """保留普通子类行为。@param kwargs 导出配置。@return 实例。"""
++    def export(self, node):
++        """在导出结果标记子类状态。@param node 根。@return 字典。"""
++        data = super().export(node)
++        data['marker'] = self.marker
++        return data
++
++class TestDevelopmentJsonExporter(unittest.TestCase):
++    """验证调用级深度。@return 测试实例。"""
++    def test_shared_exporter_survives_preview(self):
++        """摘要后全量数据不丢失。@return None。"""
++        root = tree()
++        shared = DictExporter()
++        before = shared.export(root)
++        self.assertNotIn('children', json.loads(JsonExporter(shared,maxlevel=1).export(root)))
++        self.assertIsNone(shared.maxlevel)
++        self.assertEqual(shared.export(root), before)
++
++    def test_write_and_independent_depths(self):
++        """write与连续覆盖互不污染。@return None。"""
++        root = tree()
++        shared = DictExporter(maxlevel=2)
++        stream = io.StringIO()
++        JsonExporter(shared,maxlevel=1).write(root,stream)
++        self.assertNotIn('children',json.loads(stream.getvalue()))
++        self.assertEqual(shared.maxlevel,2)
++        full = json.loads(JsonExporter(shared,maxlevel=3).export(root))
++        self.assertEqual(full['children'][1]['children'][0]['name'],'leaf')
++        normal = json.loads(JsonExporter(shared).export(root))
++        self.assertNotIn('children',normal['children'][1])
++        self.assertEqual(shared.maxlevel,2)
++
++    def test_callbacks_dictcls_and_subclass(self):
++        """保留回调、容器与普通子类。@return None。"""
++        attrs = lambda values: [(key,value) for key,value in values if key=='name']
++        children = lambda values: sorted(values,key=lambda node:node.name)
++        shared = MarkedExporter(dictcls=OrderedDict,attriter=attrs,childiter=children)
++        shared.marker = 'custom'
++        result = json.loads(JsonExporter(shared,maxlevel=2).export(tree()))
++        self.assertEqual([child['name'] for child in result['children']],['a','b'])
++        self.assertEqual(result['marker'],'custom')
++        self.assertNotIn('secret',result)
++        self.assertIs(shared.dictcls,OrderedDict)
++        self.assertIs(shared.attriter,attrs)
++        self.assertIs(shared.childiter,children)
++        self.assertIsNone(shared.maxlevel)
++
++    def test_exception_does_not_change_configuration(self):
++        """回调失败时不留下临时配置。@return None。"""
++        def fail(values):
++            """复现调用方回调错误。@param values 属性。@return 不返回。"""
++            raise RuntimeError('callback failed')
++        shared = DictExporter(attriter=fail,maxlevel=7)
++        with self.assertRaisesRegex(RuntimeError,'callback failed'):
++            JsonExporter(shared,maxlevel=1).export(tree())
++        self.assertEqual(shared.maxlevel,7)
++        self.assertIs(shared.attriter,fail)

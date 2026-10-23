@@ -1,0 +1,63 @@
+{
+  "project_key": "attrs",
+  "category": "输入、快照与公开导出",
+  "seed_digest": "7ca0146f6e7a6ca478a29d8963632afa6e12b9a3e4d43c69e70a387e4f28b60f",
+  "environment": "attrs-py312",
+  "source": {
+    "repository": "https://github.com/python-attrs/attrs",
+    "commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "schema": 3,
+  "title": "attrs数据对象开发任务",
+  "description": "固定真实源码上的完整工程任务：调查、方案确认、实施、公开失败测试与完整上游回归。",
+  "scenarios": [
+    {
+      "id": "AT-S01-DEV",
+      "title": "Attribute过滤器只选择精确字段对象",
+      "goal": "Attribute过滤器只选择精确字段对象",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "AT-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AT-M01-DEV",
+          "kind": "modify",
+          "goal": "Attribute过滤器只选择精确字段对象",
+          "prompt": "We need a real development change in this pinned project. First inspect the supplied contract, reproduction and actual source; explain the relevant call path and edge cases, ask any necessary clarification questions, and propose a concrete compatibility and test plan. Wait for my confirmation before editing. Continue implementation and validation fixes in this same conversation and workspace. The following is the eventual delivery scope, not permission to skip investigation or plan agreement:\n\nMatch Attribute arguments to include/exclude by object identity so content-equal fields belonging to unrelated classes do not leak across selections. Preserve exact class and field-name branches, multiple equivalent Attribute arguments, inherited exact-field behavior, asdict/astuple integration, Attribute equality/hash and the existing _split_what contract.\n\nRead materials/development-contract.md for the exact public contract. Deliver meaningful original-failing public tests in the authorized new test file. Keep original tests, controls, dependencies and unrelated behavior unchanged.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-reproducer.py"
+          ],
+          "allowed_paths": [
+            "library/src/attr/filters.py",
+            "library/tests/test_development_filter_identity.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/AT-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/AT-M01-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/AT-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

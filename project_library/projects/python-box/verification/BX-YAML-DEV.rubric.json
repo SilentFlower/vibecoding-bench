@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BX-YAML-DEV",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Box.to_yaml for frozen configurations whose lists become tuples containing nested Box objects. Export those nested mappings and sequences as native YAML data through the existing backend, for both strings and files, without unfreezing or mutating the source. Preserve nested values, Unicode, empty sequences, None/bool/numbers, ordinary YAML and JSON behavior, caller serialization options, and meaningful backend errors. YAML sequences may use native lists; do not change to_dict/to_json or global YAML representers, monkeypatch the parser, or weaken frozen mutation guards.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests at library/test/test_development_frozen_yaml.py that fail on the pinned original and pass after the authorized implementation. Cite the delivered source and tests; preserve all original tests and frozen upstream controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Change only the authorized implementation, new public test and documentation paths. Preserve compatibility and pass the complete frozen native regression. Use actual source and execution facts, not claims or reference wording.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct implementations backed by actual behavior; do not match reference text or verbosity."
+}

@@ -236,7 +236,8 @@ class ProjectsService:
             account = self.account(account_id)
             if not agent or not account:
                 raise ValueError('请先为可用账号保存项目池')
-            running = account_id in self.controllers
+            controller = self.controllers.get(account_id)
+            running = bool(controller and not controller[1].is_set())
             now = time.time()
             self._write('UPDATE projects_agents SET schedule_enabled=?,schedule_interval_sec=?,schedule_next_at=?,'
                 'schedule_identity=?,schedule_state=?,schedule_message=?,updated_at=? WHERE account_id=?',
@@ -320,6 +321,10 @@ class ProjectsService:
                         message = str(error)[:300] if isinstance(error, ValueError) else '计划检查失败，保留现场等待人工核对'
                         self._write("UPDATE projects_agents SET schedule_next_at=NULL,schedule_state='blocked',schedule_message=? WHERE account_id=?",
                             (message, account_id))
+                    elif (current and account_id in self.controllers and checked is not None
+                            and current['generation'] == checked[0]):
+                        self._suspend_gate(account_id, current['generation'], {'allowed': False,
+                            'retryable': False, 'reason': 'admission', 'message': '执行门禁暂不可核对，保留现场等待检查'}, now)
 
     def _eligibility(self, agent: dict, work: dict | None) -> tuple[str | None, str | None]:
         if self.actions(agent['account_id']):
@@ -425,6 +430,53 @@ class ProjectsService:
             return None
         return {key: work[key] for key in ('id', 'project_key', 'objective_id', 'goal', 'status',
             'session_id', 'work_sec', 'created_at', 'started_at', 'ended_at', 'message')}
+
+    def view(self, account_id: int | None = None) -> dict:
+        """为控制台补充可读准入、真实任务进度与最近动作，不创建任务或调用模型。
+
+        :param account_id: 可选账号范围。
+        :return: 不含账号身份、内部来源或私有路径的页面摘要。
+        """
+        result = self.state(account_id)
+        for agent in result['agents']:
+            account = self.account(agent['account_id'])
+            work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+            try:
+                gate = self.admission(account, work) if account else {
+                    'allowed': False, 'reason': 'account', 'retryable': False, 'message': '账号不可用'}
+            except Exception:
+                gate = {'allowed': False, 'reason': 'unavailable', 'retryable': False, 'message': '执行条件暂不可读取'}
+            public = {key: gate.get(key) for key in ('allowed', 'reason', 'retryable', 'retry_at', 'message')}
+            quota = gate.get('quota')
+            public['quota'] = None if not isinstance(quota, dict) else {
+                'known': bool(quota.get('known')), 'source': quota.get('source'),
+                'observed_at': quota.get('observed_at'),
+                'limits': {key: (quota.get('limits') or {}).get(key) for key in ('five_hour', 'seven_day')},
+                'hit': [key for key in quota.get('hit', []) if key in ('five_hour', 'seven_day')],
+                'windows': {key: {field: window.get(field) for field in
+                    ('utilization', 'reset_at', 'resets_at', 'exhausted', 'rejected', 'observed_at')}
+                    for key, window in (quota.get('windows') or {}).items()
+                    if key in ('five_hour', 'seven_day') and isinstance(window, dict)}}
+            window = gate.get('window')
+            public['window'] = None if not isinstance(window, dict) else {key: window.get(key) for key in
+                ('enabled', 'allowed', 'timezone', 'next_open_at', 'next_close_at')}
+            agent['admission'] = public
+            completed = sum(item['project_key'] in agent['project_keys'] for item in agent['passed'])
+            elapsed = work['work_sec'] if work else 0
+            if work and work['segment_started_at']:
+                elapsed += max(0, time.time() - work['segment_started_at'])
+            agent['progress'] = {'completed': completed, 'remaining': len(agent['available_objectives']),
+                'total': completed + len(agent['available_objectives']), 'elapsed_work_sec': elapsed,
+                'remaining_work_sec': max(0, agent['budget_sec'] - elapsed) if work else agent['budget_sec']}
+            event = self._one("SELECT kind,payload_json,created_at FROM projects_events WHERE account_id=? "
+                "AND kind IN ('pi','input','started','verification','error','gate_wait') ORDER BY id DESC LIMIT 1", (agent['account_id'],))
+            agent['activity'] = None
+            if event:
+                payload = json.loads(event['payload_json'])
+                text = payload.get('text') or payload.get('message') or ''
+                agent['activity'] = {'kind': event['kind'], 'created_at': event['created_at'],
+                    'text': text[:300] if isinstance(text, str) else ''}
+        return result
 
     def events(self, account_id: int, after: int = 0) -> list[dict]:
         """读取账号独立事件流，使用整数游标分页。
@@ -649,6 +701,12 @@ class ProjectsService:
             self._write('UPDATE projects_agents SET generation=generation+1,status=?,message=?,updated_at=? WHERE account_id=?',
                 ('blocked' if agent['status'] == 'blocked' or uncertain else 'paused',
                     '服务已重启，原会话和进度已保留', time.time(), agent['account_id']))
+            if agent['schedule_enabled'] and agent['schedule_state'] == 'completed' and not uncertain:
+                current = self._one('SELECT * FROM projects_agents WHERE account_id=?', (agent['account_id'],))
+                hold, _ = self._eligibility(current, work)
+                if not hold:
+                    self._write("UPDATE projects_agents SET schedule_next_at=?,schedule_state='scheduled',schedule_message=? WHERE account_id=?",
+                        (time.time(), '项目内容已有新的未完成目标，等待检查执行条件', agent['account_id']))
             if agent['status'] in ('running', 'waiting', 'interrupted') and not uncertain:
                 restart.append(agent['account_id'])
         for account_id in restart:
@@ -804,7 +862,8 @@ class ProjectsService:
             if name == 'project_read':
                 if args['project_key'] not in json.loads(agent['project_keys_json']):
                     raise ValueError('项目不在本账号授权池中')
-                assets = self.catalog.for_work(work) if work and work['project_key'] == args['project_key'] else self.catalog
+                assets = self.catalog.for_work(work) if (work and work['status'] not in ('passed', 'stopped')
+                    and work['project_key'] == args['project_key']) else self.catalog
                 return assets.project(args['project_key'])
             if name == 'account_wait':
                 seconds = args['seconds']

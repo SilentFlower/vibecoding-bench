@@ -1,0 +1,95 @@
+--- a/library/decouple.py
++++ b/library/decouple.py
+@@ -1,5 +1,6 @@
+ # coding: utf-8
+ import os
++from codecs import lookup
+ import sys
+ import string
+ from shlex import shlex
+@@ -24,6 +25,18 @@
+ 
+ 
+ DEFAULT_ENCODING = 'UTF-8'
++
++
++def _repository_lines(stream, encoding):
++    """只在文件第一行消费UTF-8首标记，保持原open编码参数兼容。
++
++    :param stream: 已按用户编码打开的文本流。
++    :param encoding: 原文件编码参数。
++    :return: 保留后续全部字符的逐行迭代器。
++    """
++    utf8 = encoding is not None and lookup(encoding).name in ('utf-8', 'utf-8-sig')
++    for index, line in enumerate(stream):
++        yield line[1:] if utf8 and index == 0 and line.startswith('\ufeff') else line
+ 
+ 
+ # Python 3.10 don't have strtobool anymore. So we move it here.
+@@ -127,7 +140,7 @@
+     def __init__(self, source, encoding=DEFAULT_ENCODING):
+         self.parser = ConfigParser()
+         with open(source, encoding=encoding) as file_:
+-            read_config(self.parser, file_)
++            read_config(self.parser, _repository_lines(file_, encoding))
+ 
+     def __contains__(self, key):
+         return (key in os.environ or
+@@ -148,7 +161,7 @@
+         self.data = {}
+ 
+         with open(source, encoding=encoding) as file_:
+-            for line in file_:
++            for line in _repository_lines(file_, encoding):
+                 line = line.strip()
+                 if not line or line.startswith('#') or '=' not in line:
+                     continue
+--- /dev/null
++++ b/library/tests/test_development_bom.py
+@@ -0,0 +1,36 @@
++"""公开回归：只识别UTF-8文件最开头的BOM，不损坏真实配置内容。"""
++from pathlib import Path
++from tempfile import TemporaryDirectory
++from decouple import Config, RepositoryEnv, RepositoryIni
++
++
++def test_env_initial_bom_and_unicode():
++    """BOM不能成为首键的一部分。@return None。"""
++    with TemporaryDirectory() as root:
++        path = Path(root) / 'settings.env'
++        path.write_bytes(b'\xef\xbb\xbf' + 'BOM_APP_NAME=咖啡\n'.encode())
++        assert Config(RepositoryEnv(str(path)))('BOM_APP_NAME') == '咖啡'
++
++
++def test_ini_initial_bom():
++    """同样的兼容政策适用于INI首节。@return None。"""
++    with TemporaryDirectory() as root:
++        path = Path(root) / 'settings.ini'
++        path.write_bytes(b'\xef\xbb\xbf[settings]\nBOM_APP_PORT=8443\n')
++        assert Config(RepositoryIni(str(path)))('BOM_APP_PORT', cast=int) == 8443
++
++
++def test_value_bom_is_preserved():
++    """值内部BOM是业务数据，不能全局清除。@return None。"""
++    with TemporaryDirectory() as root:
++        path = Path(root) / 'settings.env'
++        path.write_text('BOM_APP_VALUE=left\ufeffright\n', encoding='utf-8')
++        assert Config(RepositoryEnv(str(path)))('BOM_APP_VALUE') == 'left\ufeffright'
++
++
++def test_explicit_latin1_remains_available():
++    """显式非UTF8编码及已有强制转换继续工作。@return None。"""
++    with TemporaryDirectory() as root:
++        path = Path(root) / 'settings.env'
++        path.write_bytes('BOM_APP_VALUE=café\n'.encode('latin-1'))
++        assert Config(RepositoryEnv(str(path), encoding='latin-1'))('BOM_APP_VALUE') == 'café'
+--- /dev/null
++++ b/library/docs/development-dc-bom-dev.md
+@@ -0,0 +1,7 @@
++# 兼容UTF-8配置文件首BOM且保留真实值
++
++固定源码：https://github.com/HBNetwork/python-decouple @ 0573e6f96637f08fb4cb85e0552f0622d36827d4。
++
++Make RepositoryEnv and RepositoryIni accept an optional UTF-8 BOM only at the start of a UTF-8 encoded file, including standard UTF-8 codec aliases and utf-8-sig. Handle empty/BOM-only files and a BOM before a comment. Preserve every later U+FEFF in keys or values, existing Config precedence/casts/defaults, explicitly requested non-UTF8 encodings, and decoding errors. Apply the policy at the actual repository file-reading boundaries, not by global string replacement or modifying os.environ.
++
++公开测试见同目录 development-tests.py。请在授权测试路径交付能在原版失败的回归，不修改现有测试控制或依赖；文档路径需说明行为、边界和兼容政策。私有验收独立执行，公开样例不代表全部边界。

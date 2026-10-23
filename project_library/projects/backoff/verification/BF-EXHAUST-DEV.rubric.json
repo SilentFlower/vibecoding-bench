@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BF-EXHAUST-DEV",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair on_exception so exhausting a finite wait generator follows raise_on_giveup in both synchronous and asynchronous execution: False returns None; True (including the default) propagates the same last exception object. Preserve the exact number of target attempts, zero/finite waits, exactly one giveup callback with exception and tries, awaited async callbacks, handler-error propagation, ordinary success and on_predicate behavior. Do not add sleeping/network calls to tests, change unrelated retry policies, or intercept exceptions outside the configured exception type.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests at library/tests/test_development_exhaustion.py that fail on the pinned original and pass after the authorized implementation. Cite the delivered source and tests; preserve all original tests and frozen upstream controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Change only the authorized implementation, new public test and documentation paths. Preserve compatibility and pass the complete frozen native regression. Use actual source and execution facts, not claims or reference wording.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "Accept equivalent correct implementations backed by actual behavior; do not match reference text or verbosity."
+}

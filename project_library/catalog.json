@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "version": "real-development-cycles-v1-en",
+  "version": "real-development-cycles-v2-coverage-20261024-en",
   "project_manifest": "development.json",
   "projects": [
     "python-frontmatter",
@@ -32,7 +32,17 @@
     "ftfy",
     "feedgen",
     "tablib",
-    "sqlglot"
+    "sqlglot",
+    "agate",
+    "anytree",
+    "arrow",
+    "attrs",
+    "babel",
+    "backoff",
+    "python-decouple",
+    "toolz",
+    "portion",
+    "python-box"
   ],
   "admission": [
     {
@@ -89,8 +99,7 @@
     },
     {
       "project_key": "python-decouple",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "click",
@@ -144,8 +153,7 @@
     },
     {
       "project_key": "toolz",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "jsonschema",
@@ -159,8 +167,7 @@
     },
     {
       "project_key": "agate",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "csvkit",
@@ -169,8 +176,7 @@
     },
     {
       "project_key": "python-box",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "rich",
@@ -189,8 +195,7 @@
     },
     {
       "project_key": "backoff",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "bottle",
@@ -276,8 +281,7 @@
     },
     {
       "project_key": "attrs",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "mdit-py-plugins",
@@ -311,13 +315,11 @@
     },
     {
       "project_key": "anytree",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "babel",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "werkzeug",
@@ -365,8 +367,7 @@
     },
     {
       "project_key": "arrow",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "charset-normalizer",
@@ -424,8 +425,7 @@
     },
     {
       "project_key": "portion",
-      "status": "blocked",
-      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+      "status": "ready"
     },
     {
       "project_key": "humanize",

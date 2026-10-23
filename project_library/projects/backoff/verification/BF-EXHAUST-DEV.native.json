@@ -1,0 +1,19 @@
+{
+  "script": "verification/development-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "sync_policy_matrix": true,
+    "async_policy_matrix": true,
+    "handler_error_propagates": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

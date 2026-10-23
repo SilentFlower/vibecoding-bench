@@ -1,0 +1,72 @@
+--- a/library/agate/table/join.py
++++ b/library/agate/table/join.py
+@@ -112,12 +112,13 @@
+     elif right_key_is_sequence:
+         right_columns = [right_table._columns[key] for key in right_key]
+         right_data = list(zip(*[column.values() for column in right_columns]))
+-        right_key_indices = [right_table._columns._keys.index(key) for key in right_key]
++        # 采用已解析列的物理索引，名称/位置混用与等值列都不能改变键身份。
++        right_key_indices = [column.index for column in right_columns]
+     # Right key is a column name/index
+     else:
+         right_column = right_table._columns[right_key]
+         right_data = right_column.values()
+-        right_key_indices = [right_table._columns.index(right_column)]
++        right_key_indices = [right_column.index]
+ 
+     # Build names and type lists
+     column_names = list(self._column_names)
+--- /dev/null
++++ b/library/tests/test_development_join_keys.py
+@@ -0,0 +1,51 @@
++"""连接键身份的公开业务回归，不修改原有测试控制。"""
++import unittest
++import agate
++
++def table(rows, names):
++    """创建显式文本类型表。@param rows 行。@param names 列名。@return Table。"""
++    return agate.Table(rows, names, [agate.Text()] * len(names))
++
++class TestDevelopmentJoinKeys(unittest.TestCase):
++    """保护实际右键列与投影合同。@param 无。@return 测试实例。"""
++    def test_composite_indices_and_mixed_keys(self):
++        """验证复合索引与混合标识符。@return None。"""
++        left = table([('A','north'),('B','south')], ['sku','region'])
++        right = table([('A','north','one'),('B','south','two')], ['code','zone','label'])
++        for keys in ([0,1], [0,'zone'], [-3,-2], ['code','zone']):
++            with self.subTest(keys=keys):
++                joined = left.join(right, ['sku','region'], keys)
++                self.assertEqual(joined.column_names, ('sku','region','label'))
++                self.assertEqual([tuple(r) for r in joined.rows], [('A','north','one'),('B','south','two')])
++
++    def test_equal_valued_copy_is_not_the_key(self):
++        """值相同的前列不能替代指定键。@return None。"""
++        left = table([('A',),('B',)], ['id'])
++        right = table([('A','A','first'),('B','B','second')], ['copy','key','label'])
++        for key in ('key', 1, -2):
++            with self.subTest(key=key):
++                result = left.join(right, 'id', key)
++                self.assertEqual(result.column_names, ('id','copy','label'))
++                self.assertEqual(tuple(result.rows[1]), ('B','B','second'))
++        self.assertEqual(right.column_names, ('copy','key','label'))
++
++    def test_explicit_projection_and_full_outer(self):
++        """显式键投影与全外连接保留既有语义。@return None。"""
++        left = table([('A','n'),('Z','z')], ['id','region'])
++        right = table([('A','n','x'),('B','s','y')], ['code','zone','label'])
++        projected = left.join(right, ['id','region'], [0,1], columns=['code','label'])
++        self.assertEqual(projected.column_names, ('id','region','code','label'))
++        self.assertEqual(tuple(projected.rows[1]), ('Z','z',None,None))
++        outer = left.join(right, ['id','region'], [0,1], full_outer=True)
++        self.assertEqual(outer.column_names, ('id','region','code','zone','label'))
++        self.assertEqual(tuple(outer.rows[-1]), (None,None,'B','s','y'))
++
++    def test_callable_inner_and_required_matching(self):
++        """保留函数键、内连接与必需匹配错误。@return None。"""
++        left = table([('A',),('X',)], ['id'])
++        right = table([('A','ok')], ['code','label'])
++        result = left.join(right, lambda row: row['id'], lambda row: row['code'], inner=True)
++        self.assertEqual(result.column_names, ('id','code','label'))
++        self.assertEqual(tuple(result.rows[0]), ('A','A','ok'))
++        with self.assertRaises(ValueError):
++            left.join(right, 'id', 'code', require_match=True)

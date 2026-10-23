@@ -1,0 +1,13 @@
+{
+  "script": "verification/development_public.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "public_file_exists": true,
+    "public_tests_pass": true
+  },
+  "resource_profile": "business",
+  "test_file": "library/tests/test_development_datetime_parts.py"
+}

@@ -87,6 +87,18 @@ class ProjectsAdmissionTests(unittest.TestCase):
         gate = main._projects_admission(self.account, self.work)
         self.assertEqual('quota', gate['reason'])
         self.assertIsNone(gate['retry_at'])
+
+    def test_rest_window_keeps_known_quota_visible_without_starting_requests(self):
+        """休息时段仍显示已有被动用量，不能把暂未执行误画成额度未知。:return: None。"""
+        self.observe(12)
+        with patch.object(main, '_account_run_window', return_value={'allowed': False,
+                'next_open_at': time.time() + 300, 'message': '休息中', 'timezone': 'UTC'}):
+            gate = main._projects_admission(self.account, self.work)
+        self.assertEqual('window', gate['reason'])
+        self.assertEqual(12, gate['quota']['windows']['five_hour']['utilization'])
+        self.assertEqual(30, gate['quota']['limits']['five_hour'])
+        self.runner.query_quota.assert_not_called()
+        main.cc2api_client.refresh_usage.assert_not_called()
         self.assertTrue(gate['retryable'])
 
     def test_window_and_login_wait_are_retryable_but_environment_is_manual(self):

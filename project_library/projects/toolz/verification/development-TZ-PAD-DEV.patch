@@ -1,0 +1,52 @@
+--- a/library/toolz/itertoolz.py
++++ b/library/toolz/itertoolz.py
+@@ -676,7 +676,8 @@
+                for i, it in enumerate(itertools.tee(seq, n))))
+ 
+ 
+-no_pad = '__no__pad__'
++# 内部缺失标记必须使用身份，业务字符串与显式padding不受特殊对待。
++no_pad = object()
+ 
+ 
+ def partition(n, seq, pad=no_pad):
+--- /dev/null
++++ b/library/toolz/tests/test_development_padding.py
+@@ -0,0 +1,27 @@
++"""公开回归：业务字符串不能被分批内部缺失标记吞掉。"""
++from itertools import count, islice
++from toolz import partition, partition_all
++
++
++def test_exact_old_marker_in_complete_and_partial_batches():
++    """旧标记字面量出现在真实数据任意位置都应保留。@return None。"""
++    marker = '__no__pad__'
++    assert list(partition_all(2, iter([1, marker]))) == [(1, marker)]
++    assert list(partition_all(2, iter([marker, 2, marker]))) == [(marker, 2), (marker,)]
++
++
++def test_explicit_marker_string_is_real_padding():
++    """显式传入同值字符串仍表示填充值。@return None。"""
++    assert list(partition(3, [1], pad='__no__pad__')) == [(1, '__no__pad__', '__no__pad__')]
++
++
++def test_default_padding_and_lazy_stream_remain_compatible():
++    """默认丢残批、无限流有限前缀和原批次类型保持。@return None。"""
++    assert list(partition(2, [1, 2, 3])) == [(1, 2)]
++    assert list(islice(partition_all(2, count()), 2)) == [(0, 1), (2, 3)]
++
++
++def test_none_and_empty_inputs():
++    """空值是普通元素，空输入不制造批次。@return None。"""
++    assert list(partition_all(3, [None, '__no__pad__', None])) == [(None, '__no__pad__', None)]
++    assert list(partition_all(2, [])) == []
+--- /dev/null
++++ b/library/docs/development-tz-pad-dev.md
+@@ -0,0 +1,7 @@
++# 修复分批占位字符串与真实业务文本冲突
++
++固定源码：https://github.com/pytoolz/toolz @ 451af60dec590a6010e2babdbf391ea8f815122f。
++
++Repair partition and partition_all so any ordinary string, specifically the pinned implementation's '__no__pad__' literal, remains real data and can also be an explicitly supplied padding value. Missing slots must be recognized by an unambiguous internal identity marker, never by comparing business values. Preserve tuple batches, default truncation for partition, partial final groups for partition_all, lazy finite prefixes of infinite input, existing at-most-one-batch lookahead, original invalid-__len__ diagnostics, top-level/curried APIs, and all existing frozen tests.
++
++公开测试见同目录 development-tests.py。请在授权测试路径交付能在原版失败的回归，不修改现有测试控制或依赖；文档路径需说明行为、边界和兼容政策。私有验收独立执行，公开样例不代表全部边界。

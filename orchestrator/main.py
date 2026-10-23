@@ -7930,9 +7930,6 @@ def _projects_admission(account: dict, work: dict | None) -> dict:
     :return: 是否放行、机器可读原因、是否可被动重试及可信恢复时间。
     """
     window = _account_run_window(account)
-    if not window['allowed']:
-        return {'allowed': False, 'reason': 'window', 'retryable': True,
-            'retry_at': window.get('next_open_at'), 'message': _window_message(window), 'window': window}
     public_quota = None
     if quota_guard:
         quota_guard.consume(account)
@@ -7942,6 +7939,11 @@ def _projects_admission(account: dict, work: dict | None) -> dict:
         public_quota = {'known': state.get('known', False), 'source': state.get('source'),
             'observed_at': state.get('observed_at'), 'windows': state.get('windows', {}),
             'limits': policy.get('limits', {}), 'hit': policy.get('hit', [])}
+    if not window['allowed']:
+        return {'allowed': False, 'reason': 'window', 'retryable': True,
+            'retry_at': window.get('next_open_at'), 'message': _window_message(window),
+            'window': window, 'quota': public_quota}
+    if quota_guard:
         if state.get('account_error'):
             return {'allowed': False, 'reason': 'account_error', 'retryable': False, 'retry_at': None,
                 'message': state.get('message') or '账号异常，需要重新授权或人工核实', 'quota': public_quota}
@@ -7954,7 +7956,7 @@ def _projects_admission(account: dict, work: dict | None) -> dict:
                 'quota': public_quota}
     if login_manager and login_manager.has_active_name(account['name']):
         return {'allowed': False, 'reason': 'login', 'retryable': True, 'retry_at': None,
-            'message': '账号正在登录或重新授权'}
+            'message': '账号正在登录或重新授权', 'quota': public_quota, 'window': window}
     connection = get_db()
     try:
         environment = connection.execute('SELECT state FROM account_environments WHERE account_id=?', (account['id'],)).fetchone()
@@ -7962,7 +7964,7 @@ def _projects_admission(account: dict, work: dict | None) -> dict:
         connection.close()
     if environment and environment['state'] in ('reconcile', 'cli_reconcile', 'rebuilding'):
         return {'allowed': False, 'reason': 'environment', 'retryable': False, 'retry_at': None,
-            'message': '账号环境需要先完成对账'}
+            'message': '账号环境需要先完成对账', 'quota': public_quota, 'window': window}
     return {'allowed': True, 'reason': 'allowed', 'retryable': False, 'retry_at': None,
         'message': None, 'quota': public_quota, 'window': window}
 

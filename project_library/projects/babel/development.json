@@ -1,0 +1,64 @@
+{
+  "project_key": "babel",
+  "category": "金额、预约与翻译发布",
+  "seed_digest": "3ce71deff56aa14e35ba197981380780abca30f57b4008106a4200ef0099a756",
+  "environment": "babel-py312",
+  "source": {
+    "repository": "https://github.com/python-babel/babel",
+    "commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/babel/locale-data/LICENSE.unicode"
+    ]
+  },
+  "schema": 3,
+  "title": "Babel区域化交付开发任务",
+  "description": "固定真实源码上的完整工程任务：调查、方案确认、实施、公开失败测试与完整上游回归。",
+  "scenarios": [
+    {
+      "id": "BA-S01-DEV",
+      "title": "显式日期时间模式的可样式化字段分段",
+      "goal": "显式日期时间模式的可样式化字段分段",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BA-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BA-M01-DEV",
+          "kind": "modify",
+          "goal": "显式日期时间模式的可样式化字段分段",
+          "prompt": "We need a real development change in this pinned project. First inspect the supplied contract, reproduction and actual source; explain the relevant call path and edge cases, ask any necessary clarification questions, and propose a concrete compatibility and test plan. Wait for my confirmation before editing. Continue implementation and validation fixes in this same conversation and workspace. The following is the eventual delivery scope, not permission to skip investigation or plan agreement:\n\nAdd format_datetime_to_parts(datetime=None, format=\"yyyy-MM-dd\", tzinfo=None, locale=None) for explicit LDML patterns, returning ordered {type, field, value} dictionaries. type is the original LDML symbol or literal; field is the repeated source token or None; value is localized output. Concatenation must exactly equal format_datetime for that explicit pattern.\n\nRead materials/development-contract.md for the exact public contract. Deliver meaningful original-failing public tests in the authorized new test file. Keep original tests, controls, dependencies and unrelated behavior unchanged.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-reproducer.py"
+          ],
+          "allowed_paths": [
+            "library/babel/dates.py",
+            "library/tests/test_development_datetime_parts.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BA-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BA-M01-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BA-M01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 window.ProjectsUI = (() => {
   let api, prefix, source, accountId = null, agents = [], catalog = [], accounts = [], cursor = 0;
   let revision = 0, selection = 0, timeline = [], scheduleClock = null;
+  const pendingActions = new Map();
   const $ = selector => document.querySelector(selector);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
@@ -49,12 +50,10 @@ window.ProjectsUI = (() => {
     $('#projects-account').onchange = event => selectAccount(Number(event.target.value));
     fillSchedule();
     scheduleClock = setInterval(paintSchedule, 1000);
+    $('#projects-tab-terminal').onclick = () => selectTab('terminal');
+    $('#projects-tab-events').onclick = () => selectTab('events');
     document.querySelectorAll('[data-pi-action]').forEach(button => {
-      button.onclick = () => perform(async () => {
-        if (!accountId) throw new Error('请先选择并保存账号项目池');
-        const result = await api(`/projects/agents/${accountId}/${button.dataset.piAction}`, {method: 'POST'});
-        updateAgents(result); paintState(); await loadReconciliation();
-      });
+      button.onclick = () => runAction(button.dataset.piAction);
     });
     try {
       const values = await Promise.all([api('/projects'), api('/projects/catalog'), api('/accounts')]);
@@ -81,6 +80,7 @@ window.ProjectsUI = (() => {
     selection += 1;
     source?.close(); source = null;
     clearInterval(scheduleClock); scheduleClock = null;
+    pendingActions.clear();
     cursor = 0; timeline = []; accountId = null;
   }
 
@@ -92,7 +92,61 @@ window.ProjectsUI = (() => {
   function updateAgents(value) {
     for (const agent of value.agents) {
       const index = agents.findIndex(item => item.account_id === agent.account_id);
-      if (index < 0) agents.push(agent); else agents[index] = agent;
+      // 操作回执只含核心状态；保留最近 GET/SSE 提供的额度、进度和活动，直到新的视图明确更新它们。
+      if (index < 0) agents.push(agent); else agents[index] = {...agents[index], ...agent};
+    }
+  }
+
+  /**
+   * 切换执行现场标签，终端和交互列表各自保留滚动位置。
+   * @param {string} name 终端或交互标签。
+   * @return {void}
+   */
+  function selectTab(name) {
+    for (const tab of ['terminal', 'events']) {
+      $(`#projects-tab-${tab}`).setAttribute('aria-selected', String(tab === name));
+      $(`#projects-${tab}-panel`).classList.toggle('hidden', tab !== name);
+    }
+  }
+
+  /**
+   * 刷新公开运行视图，保持所有尚未保存的配置输入。
+   * @return {Promise<void>} 摘要已更新。
+   */
+  async function refreshView() {
+    const current = revision, selected = accountId;
+    const value = await api('/projects');
+    if (current !== revision || selected !== accountId) return;
+    updateAgents(value); paintState();
+  }
+
+  /**
+   * 立即反馈正在进行的控制操作，同一账号请求完成前不能重复点击。
+   * @param {string} action 启动、暂停或停止。
+   * @return {Promise<void>} 控制回执及公开视图已读取。
+   */
+  async function runAction(action) {
+    if (!accountId) { feedback('请先选择并保存账号项目池'); return; }
+    const selected = accountId, current = revision, chosen = selection;
+    if (pendingActions.has(selected)) return;
+    const pending = {action};
+    pendingActions.set(selected, pending); paintState();
+    feedback(action === 'start' ? '正在启动 / 恢复 Pi，核对账号与执行条件…'
+      : action === 'pause' ? '正在暂停 Pi 并关闭自动计划，保留原会话…' : '正在停止当前目标并保留现场…');
+    try {
+      const result = await api(`/projects/agents/${selected}/${action}`, {method: 'POST'});
+      if (current !== revision || selected !== accountId || chosen !== selection) return;
+      updateAgents(result); paintState(); await loadReconciliation();
+      const agent = agents.find(item => item.account_id === selected);
+      feedback(action === 'start' ? agent?.controller_active ? 'Pi 已启动，正在读取项目和原会话。'
+        : agent?.message || '执行条件尚未满足，请查看运行总览。'
+        : action === 'pause' ? '已暂停，自动计划已关闭，原会话和工作区已保留。' : '当前目标已停止，现场和交付记录已保留。');
+      await refreshView();
+    } catch (error) {
+      if (current === revision && selected === accountId && chosen === selection) feedback(error.message);
+    } finally {
+      if (pendingActions.get(selected) === pending) pendingActions.delete(selected);
+      if (current === revision && selected === accountId && chosen === selection) paintState();
     }
   }
 
@@ -199,6 +253,7 @@ window.ProjectsUI = (() => {
     updateAgents(value); paintState(); feedback('项目池和指南已保存。');
     $('#projects-schedule-form').querySelectorAll('input, button').forEach(element => { element.disabled = false; });
     if (!source) await selectAccount(accountId);
+    await refreshView();
   }
 
   /**
@@ -229,6 +284,7 @@ window.ProjectsUI = (() => {
     if (current !== revision || selected !== accountId || chosen !== selection) return;
     updateAgents(value); fillSchedule(); paintState();
     feedback(enabled ? '自动计划已保存；满足账号运行条件后继续指挥。' : '自动计划已关闭；当前任务保持原状态。');
+    await refreshView();
   }
 
   /**
@@ -261,8 +317,73 @@ window.ProjectsUI = (() => {
         : schedule.state === 'completed' ? '暂无未完成目标，更新项目池后继续。'
         : agent.controller_active ? '当前一轮结束后安排下次检查。' : '等待执行条件变化后再检查。';
     } else {
-      next.textContent = '';
+      next.textContent = agent.controller_active && ['running', 'waiting'].includes(agent.status)
+        ? '当前轮次继续运行；结束后等待你手动启动下一轮。' : '自动计划已关闭，由你手动启动或恢复。';
     }
+  }
+
+  /**
+   * 用真实累计秒数显示工作时间，不推测任务完成百分比。
+   * @param {number|null|undefined} seconds 已采集秒数。
+   * @return {string} 中文时长或未采集说明。
+   */
+  function duration(seconds) {
+    if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return '未采集';
+    const value = Math.max(0, Math.floor(seconds));
+    return value >= 3600 ? `${Math.floor(value / 3600)} 小时 ${Math.floor(value % 3600 / 60)} 分`
+      : `${Math.floor(value / 60)} 分 ${value % 60} 秒`;
+  }
+
+  /**
+   * 显示公开被动额度和用户阈值，未知数值始终留空而非冒充零。
+   * @param {object|undefined} admission 最近一次公开门禁视图。
+   * @return {void}
+   */
+  function paintQuota(admission) {
+    const quota = admission?.quota;
+    for (const key of ['five_hour', 'seven_day']) {
+      const element = $(`#projects-quota-${key}`), value = quota?.windows?.[key]?.utilization;
+      const measured = quota?.known !== false && typeof value === 'number' && Number.isFinite(value) && value >= 0;
+      const limit = quota?.limits?.[key], limited = typeof limit === 'number' && Number.isFinite(limit) && limit > 0;
+      const fill = element.querySelector('[data-quota-fill]'), marker = element.querySelector('[data-quota-limit]');
+      element.querySelector('[data-quota-value]').textContent = measured ? `${Number(value.toFixed(1))}%` : '未采集';
+      element.dataset.known = String(measured);
+      element.dataset.hit = String((quota?.hit || []).includes(key));
+      fill.classList.toggle('hidden', !measured);
+      fill.style.width = measured ? `${Math.min(100, value)}%` : '';
+      if (measured) fill.setAttribute('aria-valuenow', String(value)); else fill.removeAttribute('aria-valuenow');
+      marker.classList.toggle('hidden', !limited);
+      marker.style.left = limited ? `${Math.min(100, limit)}%` : '';
+      marker.title = limited ? `自动运行阈值 ${limit}%` : '';
+      const observed = quota?.observed_at;
+      element.querySelector('[data-quota-description]').textContent = `${limited ? `运行阈值 ${limit}%` : '未设置运行阈值'} · ${measured && typeof observed === 'number' ? `最近采集 ${new Date(observed * 1000).toLocaleTimeString('zh-CN', {hour12: false})}` : '等待真实响应采集'}`;
+    }
+  }
+
+  /**
+   * 只展示已验收计数和真实工作时间，区分当前目标与上一份交付。
+   * @param {object|undefined} agent 当前账号视图。
+   * @return {void}
+   */
+  function paintProgress(agent) {
+    const progress = agent?.progress, bar = $('#projects-progress-bar');
+    const known = Number.isInteger(progress?.completed) && Number.isInteger(progress?.remaining)
+      && Number.isInteger(progress?.total) && progress.total >= 0;
+    $('#projects-progress-text').textContent = known ? `${progress.completed} / ${progress.total} 项已通过` : '尚未采集';
+    bar.classList.toggle('hidden', !known || progress.total === 0);
+    if (known && progress.total > 0) bar.value = Math.min(100, progress.completed / progress.total * 100);
+    else bar.removeAttribute('value');
+    $('#projects-progress-detail').textContent = known ? `授权池内剩余 ${progress.remaining} 项工程目标 · 通过独立验收才计入完成` : '以独立验收通过的目标计数。';
+    const work = agent?.work, unfinished = work && !['passed', 'stopped'].includes(work.status);
+    $('#projects-target-label').textContent = !work || unfinished ? '当前目标' : work.status === 'passed' ? '最近完成目标' : '最近停止目标';
+    $('#projects-current').innerHTML = work
+      ? `<p class="projects-target-state">${unfinished ? escape(names[work.status] || work.status) : work.status === 'passed' ? '上一目标已验收通过' : '上一目标已停止'}</p><strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p>`
+      : '<p class="hint">尚未开始工程目标，Pi 会从授权项目池选择。</p>';
+    $('#projects-budget').textContent = unfinished
+      ? `当前目标累计 ${duration(progress?.elapsed_work_sec)} · 剩余预算 ${duration(progress?.remaining_work_sec)}` : '';
+    const activity = agent?.activity;
+    $('#projects-activity').textContent = activity?.text
+      ? `${typeof activity.created_at === 'number' ? new Date(activity.created_at * 1000).toLocaleTimeString('zh-CN', {hour12: false}) + ' · ' : ''}${activity.text}` : '';
   }
 
   /**
@@ -271,17 +392,41 @@ window.ProjectsUI = (() => {
    */
   function paintState() {
     const agent = agents.find(item => item.account_id === accountId);
-    $('#projects-state').textContent = agent ? names[agent.status] || agent.status : '保存项目池后即可启动 Pi';
+    const pending = pendingActions.get(accountId), schedule = agent?.schedule, work = agent?.work;
+    const unfinished = work && !['passed', 'stopped'].includes(work.status), admission = agent?.admission;
+    const active = agent?.controller_active && ['running', 'waiting'].includes(agent.status);
+    let status = agent ? names[agent.status] || agent.status : '保存项目池后即可启动 Pi';
+    if (pending) status = pending.action === 'start' ? '正在启动 / 恢复 Pi…' : '正在收口当前执行…';
+    else if (active) status = work?.status === 'verifying' ? '独立验收中'
+      : unfinished ? 'Pi 指挥中' : 'Pi 指挥中 · 准备下一个目标';
+    else if (schedule?.state === 'blocked' || agent?.status === 'blocked') status = '需要处理';
+    else if (schedule?.state === 'completed') status = '项目池已完成';
+    else if (schedule?.enabled) status = schedule.state === 'waiting' ? '等待运行条件' : '待机 · 已安排自动启动';
+    $('#projects-state').textContent = status;
+    $('#projects-overview').dataset.state = pending ? 'pending' : active ? 'running' : schedule?.state || agent?.status || 'off';
     $('#projects-message').textContent = agent?.message || '';
-    const work = agent?.work;
-    $('#projects-current').innerHTML = work ? `<strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · ${escape(names[work.status] || work.status)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p><p class="hint">${escape(work.message || '')}</p>`
-      : '<p class="hint">Pi 将从授权项目池选择工程目标，并在实际终端中推进。</p>';
+    $('#projects-admission').textContent = !agent ? '选择账号并保存项目池后，查看运行条件。'
+      : admission?.allowed === false ? admission.message || '当前执行条件未满足。'
+      : admission?.allowed === true ? `运行条件允许${admission.window?.timezone ? ` · 账号时区 ${admission.window.timezone}` : ''}` : '执行条件尚未采集。';
+    let next = '选择账号并保存项目池。';
+    if (agent) {
+      if (pending) next = '控制操作已提交，请等待运行状态更新。';
+      else if (active) next = work?.status === 'verifying' ? '等待独立验收结果，Pi 会依据事实决定是否返工。' : 'Pi 持续观察终端并推进；可在交互标签查看最近操作。';
+      else if (schedule?.state === 'blocked' || agent.status === 'blocked') next = '处理等待原因后，重新保存计划或手动启动。';
+      else if (schedule?.state === 'completed' || agent.progress?.remaining === 0) next = '授权项目池已完成，扩充项目池后继续。';
+      else if (admission?.allowed === false) next = schedule?.enabled && admission.retryable ? '满足运行条件后自动恢复原目标。' : '运行条件解除后，手动启动或恢复。';
+      else if (schedule?.enabled) next = '到达下次时间后自动检查，接续未完成目标。';
+      else next = unfinished ? '点击“启动 / 恢复 Pi”继续原目标，累计预算保持不变。' : '点击“启动 / 恢复 Pi”，从授权池选择未完成目标。';
+    }
+    $('#projects-next-action').textContent = next;
+    paintProgress(agent); paintQuota(admission);
     const usage = agent?.pi_usage;
     const native = agent?.claude_usage;
     const count = value => value === null || value === undefined ? '未采集' : value.toLocaleString();
     $('#projects-usage').textContent = usage ? `Pi${usage.complete === false ? '（已知小计）' : ''}：输入 ${count(usage.input_tokens)} · 输出 ${count(usage.output_tokens)} · 缓存 ${count(usage.cache_read_tokens)}；Claude：输入 ${count(native?.input_tokens)} · 输出 ${count(native?.output_tokens)} · 缓存 ${count(native?.cache_read_input_tokens)}` : '尚无模型调用';
     document.querySelectorAll('[data-pi-action]').forEach(button => {
-      button.disabled = !agent || (button.dataset.piAction === 'start' && agent.controller_active === true);
+      button.disabled = !agent || !!pending || (button.dataset.piAction === 'start' && agent.controller_active === true);
+      button.setAttribute('aria-busy', String(!!pending));
     });
     paintSchedule();
   }

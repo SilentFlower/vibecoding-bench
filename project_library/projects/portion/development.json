@@ -1,0 +1,64 @@
+{
+  "schema": 3,
+  "project_key": "portion",
+  "title": "Portion安全区间采样开发任务",
+  "category": "端点、覆盖状态与空闲窗口",
+  "description": "在固定真实源码中交付可选步进检查和有限采样，保留默认兼容行为。",
+  "seed_digest": "98648094fcc03c5479bd8d14538da9666a2f70da494fbd885facf0676acbd8f2",
+  "environment": "portion-py312",
+  "source": {
+    "repository": "https://github.com/AlexandreDecan/portion",
+    "commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PT-CHECKED-SCENE",
+      "title": "为区间采样增加可选进度检查与全局输出上限",
+      "goal": "为区间采样增加可选进度检查与全局输出上限",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PT-CHECKED-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PT-CHECKED-DEV",
+          "kind": "modify",
+          "goal": "为区间采样增加可选进度检查与全局输出上限",
+          "prompt": "We need a complete development feature in this pinned real project. First inspect the actual iterate call path and public reproduction, clarify edge cases, propose a concrete compatibility plan and wait for my confirmation before editing. Continue implementation and validation fixes in this same conversation and workspace. The eventual delivery contract is:\n\nExtend the actual portion.iterate API with keyword-only checked=False and max_items=None. With checked=True, each evaluated numeric or callable step must strictly advance in the requested direction; reject a zero/stagnating/wrong-direction step with ValueError, including while skipping an open starting boundary. max_items is a nonnegative integer excluding bool, limits total yielded values across disjoint atomic parts, and 0 must return without invoking base or step. Stop at the limit without an extra step call. Keep default legacy behavior, lazy finite prefixes of unbounded intervals, custom date steps and bases, reverse ordering, existing callback exceptions, all original tests and specialized create_api exports. Do not use wall clocks, background threads or eager enumeration to simulate a limit.\n\nDeliver meaningful public regression tests at library/tests/test_development_checked_iterate.py and concise compatibility documentation at library/docs/development-checked-iterate.md. Only modify the authorized paths; do not change existing tests, dependencies or test controls.",
+          "requires": [],
+          "materials": [
+            "materials/development-contract.md",
+            "materials/development-tests.py"
+          ],
+          "allowed_paths": [
+            "library/portion/func.py",
+            "library/tests/test_development_checked_iterate.py",
+            "library/docs/development-checked-iterate.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PT-CHECKED-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/PT-CHECKED-DEV.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/PT-CHECKED-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

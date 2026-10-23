@@ -1,0 +1,98 @@
+--- a/library/src/attr/filters.py
++++ b/library/src/attr/filters.py
+@@ -33,13 +33,15 @@
+ 
+     .. versionchanged:: 23.1.0 Accept strings with field names.
+     """
+-    cls, names, attrs = _split_what(what)
++    cls, names, _ = _split_what(what)
++    # 不能先用集合去重：内容相等的两个已选字段仍是两个不同身份。
++    attrs = tuple(item for item in what if isinstance(item, Attribute))
+ 
+     def include_(attribute, value):
+         return (
+             value.__class__ in cls
+             or attribute.name in names
+-            or attribute in attrs
++            or any(attribute is item for item in attrs)
+         )
+ 
+     return include_
+@@ -60,13 +62,15 @@
+ 
+     .. versionchanged:: 23.3.0 Accept field name string as input argument
+     """
+-    cls, names, attrs = _split_what(what)
++    cls, names, _ = _split_what(what)
++    # 不能先用集合去重：内容相等的两个已选字段仍是两个不同身份。
++    attrs = tuple(item for item in what if isinstance(item, Attribute))
+ 
+     def exclude_(attribute, value):
+         return not (
+             value.__class__ in cls
+             or attribute.name in names
+-            or attribute in attrs
++            or any(attribute is item for item in attrs)
+         )
+ 
+     return exclude_
+--- /dev/null
++++ b/library/tests/test_development_filter_identity.py
+@@ -0,0 +1,57 @@
++"""精确Attribute身份过滤的公开回归。"""
++import unittest
++import attr
++import attrs
++from attr.filters import _split_what, exclude, include
++
++def model(name):
++    """生成同结构的独立模型。@param name 类名。@return attrs类。"""
++    return attr.make_class(name, {'x':attr.ib(default=1), 'text':attr.ib(default='ok')})
++
++class TestDevelopmentFilterIdentity(unittest.TestCase):
++    """保护字段对象选择边界。@return 测试实例。"""
++    def test_equal_foreign_fields_do_not_match(self):
++        """相等的异类字段不能被选中。@return None。"""
++        first,second = model('First'),model('Second')
++        own,foreign = attr.fields(first).x,attr.fields(second).x
++        self.assertEqual(own,foreign)
++        self.assertIsNot(own,foreign)
++        self.assertTrue(include(own)(own,1))
++        self.assertFalse(include(own)(foreign,1))
++        self.assertFalse(exclude(own)(own,1))
++        self.assertTrue(exclude(own)(foreign,1))
++        self.assertFalse(include(own)(own.evolve(),1))
++
++    def test_multiple_equal_selected_fields_are_not_deduplicated(self):
++        """多个相等参数全部按身份保留。@return None。"""
++        a,b,c = (attr.fields(model(name)).x for name in ('A','B','C'))
++        selected = include(a,b,a)
++        rejected = exclude(a,b,a)
++        self.assertEqual([selected(field,2) for field in (a,b,c)],[True,True,False])
++        self.assertEqual([rejected(field,2) for field in (a,b,c)],[False,False,True])
++        self.assertEqual(_split_what((a,b))[2],frozenset((a,b)))
++        self.assertEqual(a,b)
++        self.assertEqual(hash(a),hash(b))
++
++    def test_name_type_and_mixed_controls(self):
++        """名称和精确类型分支保持原有OR语义。@return None。"""
++        first,second = model('A'),model('B')
++        own,foreign = attr.fields(first).x,attr.fields(second).x
++        self.assertTrue(include('x')(foreign,1))
++        self.assertTrue(include(own,str)(foreign,'s'))
++        self.assertFalse(include(int)(foreign,True))
++        self.assertFalse(include()(own,1))
++        self.assertTrue(exclude()(own,1))
++        self.assertFalse(exclude(own,'x')(foreign,1))
++
++    def test_exports_and_inherited_actual_identity(self):
++        """导出与继承按实际字段身份一致处理。@return None。"""
++        first,second = model('A'),model('B')
++        own = attr.fields(first).x
++        for api in (attr,attrs):
++            self.assertEqual(api.asdict(second(),filter=include(own)),{})
++            self.assertEqual(api.astuple(second(),filter=exclude(own)),(1,'ok'))
++            self.assertEqual(api.asdict(first(),filter=include(own)),{'x':1})
++        child = attr.s(type('Child',(first,),{}))
++        inherited = attr.fields(child).x
++        self.assertEqual(include(own)(inherited,1),inherited is own)

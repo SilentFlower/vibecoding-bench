@@ -84,6 +84,39 @@ class ProjectsScheduleTests(unittest.TestCase):
         self.assertFalse(controller[1].is_set())
         self.assertEqual(generation, self.service.state(1)['agents'][0]['generation'])
 
+    def test_reenabling_while_old_controller_is_stopping_keeps_a_due_plan(self):
+        """已取消但尚在收尾的旧线程不能让重新开启的计划永久失去下次时间。:return: None。"""
+        self.service.configure(1, ['example'])
+        stopped = threading.Event()
+        stopped.set()
+        self.service.controllers[1] = (threading.Thread(), stopped)
+        agent = self.service.configure_schedule(1, True, 5)['agents'][0]
+        self.assertEqual('scheduled', agent['schedule']['state'])
+        self.assertIsNotNone(agent['schedule']['next_run_at'])
+        self.service.controllers.pop(1)
+        self.service.tick()
+        self.assertTrue(self.pi.entered.wait(1))
+
+    def test_view_exposes_actual_progress_and_only_public_quota_fields(self):
+        """页面得到真实进度与门禁原因，内部身份和原始来源始终不进入公开视图。:return: None。"""
+        self.activate(keys=['example', 'other'])
+        result = self.start_work()
+        self.service._write('UPDATE projects_work SET segment_started_at=? WHERE id=?',
+            (time.time() - 12, result['work_id']))
+        self.service.admission = lambda *_: {'allowed': False, 'reason': 'quota', 'retryable': True,
+            'retry_at': time.time() + 300, 'message': '达到阈值', 'identity': 'PRIVATE_IDENTITY',
+            'quota': {'known': True, 'identity': 'PRIVATE_IDENTITY', 'source': 'cli', 'limits': {'five_hour': 30},
+                'windows': {'five_hour': {'utilization': 31, 'identity': 'PRIVATE_IDENTITY', 'reset_at': time.time() + 300}}, 'hit': ['five_hour']},
+            'window': {'allowed': True, 'timezone': 'Asia/Shanghai', 'secret': 'PRIVATE_IDENTITY'}}
+        agent = self.service.view(1)['agents'][0]
+        self.assertNotIn('PRIVATE_IDENTITY', str(agent))
+        self.assertEqual({'completed': 0, 'remaining': 2, 'total': 2},
+            {key: agent['progress'][key] for key in ('completed', 'remaining', 'total')})
+        self.assertGreaterEqual(agent['progress']['elapsed_work_sec'], 12)
+        self.assertEqual(31, agent['admission']['quota']['windows']['five_hour']['utilization'])
+        self.assertEqual(30, agent['admission']['quota']['limits']['five_hour'])
+        self.assertEqual('quota', agent['admission']['reason'])
+
     def test_gate_watcher_stops_manual_run_even_when_schedule_disabled(self):
         """在途门禁监控独立于定时开关，守住未调用新工具期间的Claude执行。:return: None。"""
         self.service.configure(1, ['example'])
@@ -157,6 +190,30 @@ class ProjectsScheduleTests(unittest.TestCase):
         self.assertIsNone(agent['schedule']['next_run_at'])
         self.assertFalse(self.pi.entered.is_set())
         self.service.configure(1, ['example', 'other'])
+        self.service.tick()
+        self.assertTrue(self.pi.entered.wait(1))
+
+    def test_completed_enabled_plan_rechecks_new_content_after_service_recovery(self):
+        """内容扩充后，已开启且因目标完成休眠的计划能识别新目标。:return: None。"""
+        self.activate()
+        self.start_work()
+        self.verification = {'status': 'passed', 'feedback': []}
+        self.tool('project_submit', {'summary': '原版本全部完成'})
+        self.service._write("UPDATE projects_agents SET status='paused' WHERE account_id=1")
+        self.service.configure_schedule(1, True, 1)
+        self.service.tick()
+        self.assertEqual('completed', self.service.state(1)['agents'][0]['schedule']['state'])
+        old = self.catalog.project
+
+        def expanded(key, detail=True):
+            """模拟新增公开工程目标。:param key: 项目。:param detail: 是否详细。:return: 新目标目录。"""
+            value = old(key, detail)
+            value['objectives'].append({'id': 'later-feature', 'goal': '新版本目标'})
+            return value
+
+        self.catalog.project = expanded
+        self.service.recover()
+        self.assertEqual('scheduled', self.service.state(1)['agents'][0]['schedule']['state'])
         self.service.tick()
         self.assertTrue(self.pi.entered.wait(1))
 

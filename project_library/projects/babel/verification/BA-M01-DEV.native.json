@@ -1,0 +1,19 @@
+{
+  "script": "verification/development_native.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "field_literal_metadata": true,
+    "localized_exact_join": true,
+    "normalization_controls": true,
+    "invalid_patterns_and_freshness": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}
