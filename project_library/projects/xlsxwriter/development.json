@@ -1,0 +1,62 @@
+{
+  "schema": 3,
+  "project_key": "xlsxwriter",
+  "title": "XlsxWriter库存报表开发任务",
+  "category": "Excel包生成与交付",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "c0c06f90a56b44cabee5c41f2ae37b3d52a34f7542d13936123dac2eddf5098b",
+  "environment": "xlsxwriter-py312",
+  "source": {
+    "repository": "https://github.com/jmcnamara/XlsxWriter",
+    "commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "XW-S04-DEV",
+      "title": "让通用写入的公式禁用覆盖数组字符串",
+      "goal": "让通用写入的公式禁用覆盖数组字符串",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XW-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-M01-DEV",
+          "kind": "modify",
+          "goal": "让通用写入的公式禁用覆盖数组字符串",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement only the explicit generic-conversion opt-out contract and saved-package public regressions. Preserve defaults,explicit APIs and original tests.",
+          "requires": [],
+          "materials": [
+            "materials/optout-repair.md"
+          ],
+          "allowed_paths": [
+            "library/xlsxwriter/worksheet.py",
+            "app/test_formula_optout.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XW-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XW-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

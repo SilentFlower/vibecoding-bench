@@ -459,18 +459,26 @@ class ProjectIterationTests(ProjectIterationFixture):
         """正式库只接入就绪真实内容，临时调度夹具不计真实项目。@return None。"""
         root = ROOT/'project_library'
         catalog = json.loads((root/'catalog.json').read_text())
-        self.assertEqual(2,catalog['schema'])
+        self.assertEqual(3,catalog['schema'])
+        self.assertEqual('development.json',catalog['project_manifest'])
         self.assertTrue({'python-frontmatter','pydantic-settings','typer'}.issubset(catalog['projects']))
         self.assertEqual(len(catalog['projects']),len(set(catalog['projects'])))
         self.assertFalse(any((root/'projects'/f'project-{number:03d}').exists() for number in range(1,101)))
         self.assertFalse((root/'build_catalog.py').exists())
         self.assertFalse((root/'reference_runtime.py').exists())
-        # 准入内容可以追加；约束真实来源与旧内容保留，不能把首版三个项目写成永久容量。
+        # 准入内容可以追加；未具备工程合同的项目保留阻塞记录，不能用问答补可执行数量。
         ready = ProjectLibrary(root)
         self.assertEqual(set(catalog['projects']),set(ready.projects))
+        historical = ProjectLibrary(root,catalog_name='catalog-v37.json')
+        self.assertEqual(2,historical.schema)
+        self.assertEqual(set(historical.projects),{item['project_key'] for item in catalog['admission']})
+        self.assertFalse({item['project_key'] for item in catalog['admission'] if item['status']=='blocked'} & set(ready.projects))
         repositories = set()
         for project in ready.projects.values():
-            self.assertEqual(2,project.manifest['schema'])
+            self.assertEqual(3,project.manifest['schema'])
+            for scene in project.manifest['scenarios']:
+                self.assertEqual(1,len(scene['tasks']))
+                self.assertIn(scene['tasks'][0]['development_cycle'],('feature','bug'))
             source = project.manifest['source']
             self.assertRegex(source['repository'],r'^https://github\.com/[^/]+/[^/]+/?$')
             self.assertRegex(source['commit'],r'^[0-9a-f]{40}$')

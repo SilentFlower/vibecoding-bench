@@ -1,0 +1,65 @@
+{
+  "schema": 3,
+  "project_key": "jinja",
+  "title": "Jinja 报表模板开发任务",
+  "category": "模板与文档生成",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "9320c12fdfe6e1c5b4cf38faf7c1895c7bfbe578ca4ad8e57eae22f1cc3eb354",
+  "environment": "jinja-py312",
+  "source": {
+    "repository": "https://github.com/pallets/jinja",
+    "commit": "5ef70112a1ff19c05324ff889dd30405b1002044",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "JI-S03-DEV",
+      "title": "修复过滤器对 Mapping 输入和显式 None 默认值的兼容行为",
+      "goal": "修复过滤器对 Mapping 输入和显式 None 默认值的兼容行为",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JI-M02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JI-M02-DEV",
+          "kind": "modify",
+          "goal": "修复过滤器对 Mapping 输入和显式 None 默认值的兼容行为",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nFix the demonstrated urlencode dispatch bug so standard Mapping implementations are encoded as their items. Preserve dict behavior, duplicate keys in pair iterables and existing string-path quoting. Limit changes to the allowed paths and deliver meaningful public regression tests.\n\nFix map(attribute=\"field\", default=none) so missing fields produce the explicit None default. Omitting default must retain Undefined; existing None, False, 0 and empty-string values must remain unchanged. Cover synchronous and asynchronous templates, deliver public regression tests and preserve the previously accepted Mapping urlencode behavior.",
+          "requires": [],
+          "materials": [
+            "materials/S03/urlencode.md",
+            "materials/S03/repair-boundaries.md",
+            "materials/S03/map-default.md"
+          ],
+          "allowed_paths": [
+            "library/src/jinja2/filters.py",
+            "library/tests/test_filters.py",
+            "library/tests/test_async_filters.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JI-M02-DEV.rubric.json",
+            "native": "verification/JI-M02.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JI-M02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

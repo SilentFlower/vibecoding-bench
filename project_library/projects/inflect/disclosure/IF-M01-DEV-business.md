@@ -1,0 +1,12 @@
+# Business scope
+
+Implement only the explicitly authorized key-prevalidation repair, public regressions and change fragment. Preserve accepted modes/values and original tests.
+
+# Investigation topics
+
+
+
+# Supplied business material: materials/classical-repair.md
+
+Explicit authorization: change only library/inflect/__init__.py, add app/test_classical.py and library/newsfragments/+classical-validation.bugfix.rst. If classical is called with any unknown key, raise the existing UnknownClassicalModeError before changing classical_dict at all, including all=True/False and arbitrary keyword order. Preserve no-argument enable-all, all plus specific valid overrides, the existing accepted value semantics, count/custom rules and all original tests/doctests. Prevalidate keys rather than swallowing errors or only guarding all. Add meaningful public unittest regressions and the required upstream-style change fragment. No release or publication.
+

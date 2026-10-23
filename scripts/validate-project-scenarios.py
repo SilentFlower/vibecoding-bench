@@ -23,7 +23,7 @@ def validate(args: argparse.Namespace, data: Path) -> dict:
     :param data: 本次专用临时数据根，不写入任何批次数据库。
     :return: 实际程序结果及内容身份，不表示模型完成。
     """
-    library = ProjectLibrary(args.root).install(data)
+    library = ProjectLibrary(args.root, catalog_name=args.catalog).install(data)
     project = library.projects[args.project]
     scenarios = project.manifest['scenarios']
     task = next((task for scene in scenarios for task in scene['tasks'] if task['id']==args.task),None)
@@ -84,6 +84,7 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,default=ROOT/'project_library')
+    parser.add_argument('--catalog', default='catalog.json')
     parser.add_argument('--project',required=True)
     parser.add_argument('--task',required=True)
     parser.add_argument('--entry')

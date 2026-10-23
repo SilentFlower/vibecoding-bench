@@ -1,0 +1,58 @@
+{
+  "criteria": [
+    {
+      "id": "normal_export",
+      "requirement": "Run export with the input list and --output file in a real process. Preserve only sku/name/quantity in order, save actual Chinese characters in UTF-8, support an empty array, and independently read the output to verify it.",
+      "evidence": [
+        "verification/native_checks.py",
+        "materials/TY-M01/catalog.json"
+      ]
+    },
+    {
+      "id": "validation",
+      "requirement": "Enforce an array of objects, non-empty strings, non-negative integer quantities that exclude bool, and unique sku values. Invalid JSON or any invalid record must produce a nonzero exit and an explanation, leaving no partial output.",
+      "evidence": [
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "files",
+      "requirement": "Refuse to overwrite existing output; reject identical input and output paths; leave the input unchanged; clearly fail when the input is missing. Printing JSON alone must not stand in for writing the file.",
+      "evidence": [
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "regression",
+      "requirement": "Preserve the product subcommand’s behavior: quantity 3, a default of 1, and rejection of negative quantities. Root and export help must not create output files.",
+      "evidence": [
+        "materials/TY-M01/shop.py",
+        "verification/native_checks.py"
+      ]
+    },
+    {
+      "id": "delivery_scope",
+      "requirement": "Modify only app/shop.py, app/tests/, and app/README.md; preserve catalog.json, the Typer library, and the environment. Provide user tests with real business assertions and brief usage documentation. Self-reported success does not replace independent verification.",
+      "evidence": [
+        "project.json",
+        "verification/native_checks.py"
+      ],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "allowed_outcomes": [
+    "application_enhancement"
+  ],
+  "baseline_expectation": "APP-R0 has no export command, so this engineering target is expected to fail on the original version. A controller-side reference candidate may demonstrate that the target is achievable, but the reference implementation must not be supplied to the model.",
+  "schema": 1,
+  "task_id": "TY-M01-DEV",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "result_version": 2,
+  "version": 3
+}

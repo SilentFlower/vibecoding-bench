@@ -1,0 +1,59 @@
+--- a/library/schedule/__init__.py
++++ b/library/schedule/__init__.py
+@@ -302,7 +302,7 @@
+         if self.at_time is not None:
+             return "Every %s %s at %s do %s %s" % (
+                 self.interval,
+-                self.unit[:-1] if self.interval == 1 else self.unit,
++                self.unit[:-1] if self.unit is not None and self.interval == 1 else self.unit,
+                 self.at_time,
+                 call_repr,
+                 timestats,
+@@ -317,7 +317,7 @@
+             return fmt % dict(
+                 interval=self.interval,
+                 latest=self.latest,
+-                unit=(self.unit[:-1] if self.interval == 1 else self.unit),
++                unit=(self.unit[:-1] if self.unit is not None and self.interval == 1 else self.unit),
+                 call_repr=call_repr,
+                 timestats=timestats,
+             )
+--- a/library/test_schedule.py
++++ b/library/test_schedule.py
+@@ -1597,3 +1597,36 @@
+         scheduler.every()
+         scheduler.every(10).seconds
+         scheduler.run_pending()
++
++
++class UnconfiguredReprRegressionTests(TestCase):
++    """未配置对象的安全展示与配置后兼容回归。"""
++
++    def test_unconfigured_repr_is_safe_and_read_only(self):
++        """默认、双间隔和仅选单位均能展示且不隐式配置。@return None。"""
++        scheduler = schedule.Scheduler()
++        for job in (schedule.Job(1), scheduler.every(), scheduler.every(2), scheduler.every().minutes):
++            original = dict(job.__dict__)
++            self.assertTrue(repr(job))
++            self.assertTrue(str(job))
++            self.assertEqual(job.__dict__, original)
++        self.assertEqual(scheduler.jobs, [])
++        self.assertEqual(str(scheduler.every()), "Job(interval=1, unit=None, do=None, args=(), kwargs={})")
++        self.assertEqual(repr(scheduler.every(2)), "Every 2 None do [None] (last run: [never], next run: [never])")
++
++    def test_configured_repr_does_not_run_callback(self):
++        """保留已配置时间与调用参数，不得为了展示运行回调。@return None。"""
++        calls = []
++
++        def report(value, flag=True):
++            """记录真实调用。@param value 业务值。@param flag 标记。@return None。"""
++            calls.append((value, flag))
++
++        with mock_datetime(2026, 10, 21, 12, 0):
++            scheduler = schedule.Scheduler()
++            job = scheduler.every().minute.do(report, "x", flag=False)
++            before = dict(job.__dict__)
++            self.assertEqual(repr(job), "Every 1 minute do report('x', flag=False) (last run: [never], next run: 2026-10-21 12:01:00)")
++            self.assertEqual(job.__dict__, before)
++            self.assertEqual(scheduler.jobs, [job])
++        self.assertEqual(calls, [])

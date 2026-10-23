@@ -1,0 +1,65 @@
+{
+  "schema": 3,
+  "project_key": "path",
+  "title": "Path文件处理开发任务",
+  "category": "文件保真与工作流",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "19de9272761218bbb76d83f0bcb136ce2a6a3a5e61173238c4f8c400c47b93cd",
+  "environment": "path-py312",
+  "source": {
+    "repository": "https://github.com/jaraco/path",
+    "commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+    "license_files": [
+      "seed/app/licenses/LICENSE.path.build.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PA-S04-DEV",
+      "title": "修复用户块取消时的原文件恢复",
+      "goal": "修复用户块取消时的原文件恢复",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PA-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-M01-DEV",
+          "kind": "modify",
+          "goal": "修复用户块取消时的原文件恢复",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement the explicitly authorized user-block cancellation recovery described in the supplied repair requirements. Preserve all existing behavior and original tests, and add meaningful public regression tests in the authorized existing test file. Modify only the two listed files and use dedicated temporary files.",
+          "requires": [],
+          "materials": [
+            "materials/cancellation-symptom.md",
+            "materials/recovery-policy.md",
+            "materials/cancellation.py",
+            "materials/repair.md"
+          ],
+          "allowed_paths": [
+            "library/path/__init__.py",
+            "library/tests/test_path.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PA-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/PA-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

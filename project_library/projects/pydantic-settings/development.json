@@ -1,0 +1,66 @@
+{
+  "schema": 3,
+  "project_key": "pydantic-settings",
+  "title": "Pydantic Settings 商品工具配置场景",
+  "category": "configuration",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "f30d58a0c3d9bb34414581134720a29c375746e006f7e470c567bc15127c0f01",
+  "environment": "pydantic-settings-py312",
+  "source": {
+    "repository": "https://github.com/pydantic/pydantic-settings",
+    "commit": "8dc9e05ab07d91e21dd2a37d0b9c30f6d92b1930",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "PS-S04-DEV",
+      "title": "修复库内字典Union分段环境解码并补回归",
+      "goal": "修复库内字典Union分段环境解码并补回归",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PS-UNION-FIX-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PS-UNION-FIX-DEV",
+          "kind": "modify",
+          "goal": "修复库内字典Union分段环境解码并补回归",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nFix this segmented environment decoding issue for dictionary union values in the library and add regression tests. Valid JSON lists of strings must produce lists, while ordinary strings must remain unchanged. Do not expand the requirements beyond the default behavior.",
+          "materials": [
+            "materials/union-model.py",
+            "materials/union-input.json",
+            "materials/union-diagnosis-context.md"
+          ],
+          "requires": [],
+          "allowed_paths": [
+            "library/pydantic_settings/sources/providers/env.py",
+            "library/pydantic_settings/sources/utils.py",
+            "library/pydantic_settings/sources/base.py",
+            "library/tests"
+          ],
+          "outcomes": [
+            "code_verified"
+          ],
+          "evaluation": {
+            "version": 3,
+            "rubric": "verification/PS-UNION-FIX-DEV.rubric.json",
+            "native": "verification/native/union-fixed.json",
+            "semantic": true
+          },
+          "owner_materials": [
+            "disclosure/PS-UNION-FIX-DEV-business.md"
+          ],
+          "development_cycle": "bug",
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

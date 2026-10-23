@@ -1,0 +1,64 @@
+--- /dev/null
++++ b/app/test_classical.py
+@@ -0,0 +1,45 @@
++"""模式配置失败不修改此前引擎状态的公开回归。"""
++import unittest
++
++from inflect import UnknownClassicalModeError, engine
++
++
++class ClassicalFailure(unittest.TestCase):
++    """覆盖all、键顺序及正常模式更新。"""
++
++    def test_all_then_invalid_is_unchanged(self):
++        """全量模式与未知键混用不能部分更新。@return None。"""
++        value = engine()
++        before = value.classical_dict.copy()
++        with self.assertRaises(UnknownClassicalModeError):
++            value.classical(all=True, invalid_option=True)
++        self.assertEqual(value.classical_dict, before)
++
++    def test_specific_then_invalid_is_unchanged(self):
++        """具体模式同样先完整校验键。@return None。"""
++        value = engine()
++        value.classical(names=False, zero=True)
++        before = value.classical_dict.copy()
++        with self.assertRaises(UnknownClassicalModeError):
++            value.classical(zero=False, names=True, invalid_option=True)
++        self.assertEqual(value.classical_dict, before)
++
++    def test_invalid_before_all_is_unchanged(self):
++        """参数顺序不应改变失败保证。@return None。"""
++        value = engine()
++        value.classical()
++        before = value.classical_dict.copy()
++        with self.assertRaises(UnknownClassicalModeError):
++            value.classical(invalid_option=True, all=False)
++        self.assertEqual(value.classical_dict, before)
++
++    def test_valid_modes_and_count_are_compatible(self):
++        """合法模式和值语义保持，计数状态不受影响。@return None。"""
++        value = engine()
++        value.num(1)
++        value.classical()
++        self.assertTrue(all(value.classical_dict.values()))
++        value.classical(all=False, names=True)
++        self.assertTrue(value.classical_dict['names'])
++        self.assertFalse(value.classical_dict['zero'])
++        self.assertEqual(value.plural_noun('child'), 'child')
+--- a/library/inflect/__init__.py
++++ b/library/inflect/__init__.py
+@@ -2253,6 +2253,9 @@
+         exception: UnknownClasicalModeError
+ 
+         """
++        # 先验证全部键，避免抛错前改变后续文案使用的模式。
++        if any(key not in def_classical for key in kwargs):
++            raise UnknownClassicalModeError
+         if not kwargs:
+             self.classical_dict = all_classical.copy()
+             return
+--- /dev/null
++++ b/library/newsfragments/+classical-validation.bugfix.rst
+@@ -0,0 +1 @@
++Validate all classical mode keys before changing engine state.

@@ -1,0 +1,81 @@
+{
+  "schema": 3,
+  "project_key": "typer",
+  "title": "Typer 本地商品 CLI",
+  "category": "命令行工具",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "fd8db542b38dd5da63cdbd625dc964acd6648da242cec842bd161b84c8fa852b",
+  "environment": "typer-py312",
+  "source": {
+    "repository": "https://github.com/fastapi/typer",
+    "commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/typer/_click/LICENSE.txt",
+      "seed/PYDANTIC-v1.9.2-LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TY-S04-DEV",
+      "title": "为用户商品应用增加完整JSON清单导出并保留既有行为",
+      "goal": "为用户商品应用增加完整JSON清单导出并保留既有行为",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TY-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TY-M01-DEV",
+          "kind": "modify",
+          "goal": "为用户商品应用增加完整JSON清单导出并保留既有行为",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nNow modify this product application to add an `export` subcommand. Use `python shop.py export catalog.json --output result.json` to export the product list as JSON: preserve product order and the sku, name, and quantity fields, ignore other fields, and save Chinese characters as actual characters. The input must be an array of objects, each with non-empty string sku and name fields and a non-negative integer quantity (booleans do not count as integers). Reject duplicate sku values; an empty array is allowed. Invalid JSON or any invalid record must result in a nonzero exit with an explanation, and must not leave a partial export file. Refuse to overwrite an existing output file, and do not modify the input file. Also preserve the existing `product` command, add tests of business behavior, and provide brief usage documentation. Modify only this user application and its tests and documentation; do not change Typer or the dependency environment.",
+          "materials": [
+            "materials/TY-M01/shop.py",
+            "materials/TY-M01/catalog.json",
+            "materials/TY-M01/README.md"
+          ],
+          "requires": [],
+          "allowed_paths": [
+            "app/shop.py",
+            "app/tests",
+            "app/README.md"
+          ],
+          "outcomes": [
+            "application_enhancement"
+          ],
+          "evaluation": {
+            "version": 3,
+            "rubric": "verification/TY-M01-DEV.rubric.json",
+            "native": "verification/native/export.json",
+            "semantic": true
+          },
+          "setup": [
+            {
+              "source": "materials/TY-M01/shop.py",
+              "target": "app/shop.py"
+            },
+            {
+              "source": "materials/TY-M01/catalog.json",
+              "target": "app/catalog.json"
+            },
+            {
+              "source": "materials/TY-M01/README.md",
+              "target": "app/README.md"
+            }
+          ],
+          "owner_materials": [
+            "disclosure/TY-M01-DEV-business.md"
+          ],
+          "development_cycle": "feature",
+          "branches": []
+        }
+      ]
+    }
+  ]
+}

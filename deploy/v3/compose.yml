@@ -10,6 +10,8 @@ services:
       retries: 12
     environment:
       V3_ROLE: gateway
+      # 峰值预热按北京时间触发，不使用账号容器的独立时区。
+      TZ: Asia/Shanghai
       V3_RELEASE: ${V3_RELEASE:?需要联合构建批次}
       V3_DEPLOYMENT_ID: ${V3_DEPLOYMENT_ID}
       SERVER_PORT: 5674
@@ -57,6 +59,10 @@ services:
       WEBUI_DIR: /webui
       TOPICS_FILE: /repo/topics.md
       CLAUDE_CODE_VERSION: ${V3_CLI_VERSION:-2.1.293}
+      PROJECT_REQUESTER_BASE_URL: ${PROJECT_REQUESTER_BASE_URL:-}
+      PROJECT_REQUESTER_MODEL: ${PROJECT_REQUESTER_MODEL:-}
+      PROJECT_REQUESTER_FALLBACK_MODEL: ${PROJECT_REQUESTER_FALLBACK_MODEL:-}
+      PROJECT_REQUESTER_API_KEY: ${PROJECT_REQUESTER_API_KEY:-}
     volumes:
       - ${V3_DATA_ROOT}/bench:/data
       - /var/run/docker.sock:/var/run/docker.sock

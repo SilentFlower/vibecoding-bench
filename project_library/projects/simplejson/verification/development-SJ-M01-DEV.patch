@@ -1,0 +1,91 @@
+--- /dev/null
++++ b/app/test_tool_output.py
+@@ -0,0 +1,67 @@
++"""公开验证CLI输入错误保留输出与同路径格式化，两种原生引擎均实际运行。"""
++from pathlib import Path
++import subprocess
++import sys
++from tempfile import TemporaryDirectory
++import unittest
++
++
++class ToolOutputTests(unittest.TestCase):
++    """以独立进程执行真实tool.main，不检查实现文本。"""
++
++    def run_cli(self, mode: str, args: list[str], data: bytes | None = None):
++        """运行真实CLI与指定引擎。@param mode 引擎。@param args 输入输出参数。@param data 标准输入。@return 实际进程。"""
++        code = ('import simplejson\n' + ('simplejson._toggle_speedups(False)\n' if mode == 'python' else '')
++            + 'from simplejson.tool import main\nmain()\n')
++        return subprocess.run([sys.executable, '-I', '-B', '-c', code, *args],
++            input=data, capture_output=True, timeout=10)
++
++    def test_invalid_input_keeps_existing_output_bytes(self) -> None:
++        """输入解析失败不应触碰已有输出。@return None。"""
++        for mode in ('c', 'python'):
++            with TemporaryDirectory() as directory:
++                source, output = Path(directory) / 'input.json', Path(directory) / 'output.json'
++                source.write_bytes(b'{"broken":')
++                output.write_bytes(b'PREVIOUS_RESULT\n')
++                result = self.run_cli(mode, [str(source), str(output)])
++                self.assertNotEqual(result.returncode, 0)
++                self.assertEqual(output.read_bytes(), b'PREVIOUS_RESULT\n')
++                self.assertEqual(source.read_bytes(), b'{"broken":')
++
++    def test_same_path_formats_after_complete_input_parse(self) -> None:
++        """同路径合法输入不得被提前截断，金额表示保留。@return None。"""
++        for mode in ('c', 'python'):
++            with TemporaryDirectory() as directory:
++                source = Path(directory) / 'inplace.json'
++                source.write_bytes(b'{"z":2,"amount":1.2300}')
++                result = self.run_cli(mode, [str(source), str(source)])
++                self.assertEqual(result.returncode, 0, result.stderr)
++                self.assertEqual(source.read_bytes(), b'{\n    "amount": 1.2300,\n    "z": 2\n}\n')
++
++    def test_distinct_output_overwrites_only_after_valid_input(self) -> None:
++        """正常双文件行为保留排序、缩进和换行。@return None。"""
++        for mode in ('c', 'python'):
++            with TemporaryDirectory() as directory:
++                source, output = Path(directory) / 'input.json', Path(directory) / 'output.json'
++                original = b'{"b":2,"a":1}'
++                source.write_bytes(original)
++                output.write_text('old')
++                result = self.run_cli(mode, [str(source), str(output)])
++                self.assertEqual(result.returncode, 0, result.stderr)
++                self.assertEqual(result.stdout, b'')
++                self.assertEqual(source.read_bytes(), original)
++                self.assertEqual(output.read_bytes(), b'{\n    "a": 1,\n    "b": 2\n}\n')
++
++    def test_stdin_and_single_input_file_keep_stdout_contract(self) -> None:
++        """无输出文件参数时，原有标准流约定保持。@return None。"""
++        for mode in ('c', 'python'):
++            expected = b'{\n    "a": 1,\n    "b": 2\n}\n'
++            result = self.run_cli(mode, [], b'{"b":2,"a":1}')
++            self.assertEqual(result.returncode, 0, result.stderr)
++            self.assertEqual(result.stdout, expected)
++            with TemporaryDirectory() as directory:
++                source = Path(directory) / 'input.json'
++                source.write_text('{"b":2,"a":1}')
++                result = self.run_cli(mode, [str(source)])
++                self.assertEqual(result.returncode, 0, result.stderr)
++                self.assertEqual(result.stdout, expected)
+--- a/library/simplejson/tool.py
++++ b/library/simplejson/tool.py
+@@ -22,7 +22,7 @@
+         outfile = sys.stdout
+     elif len(sys.argv) == 3:
+         infile = open(sys.argv[1], 'r')
+-        outfile = open(sys.argv[2], 'w')
++        outfile = None
+     else:
+         raise SystemExit(sys.argv[0] + " [infile [outfile]]")
+     with infile:
+@@ -32,6 +32,9 @@
+                             use_decimal=True)
+         except ValueError:
+             raise SystemExit(sys.exc_info()[1])
++    if outfile is None:
++        # 输入已完整解析并关闭后再打开，避免错误输入和同路径提前截断。
++        outfile = open(sys.argv[2], 'w')
+     with outfile:
+         json.dump(obj, outfile, sort_keys=True, indent='    ', use_decimal=True)
+         outfile.write('\n')

@@ -1,0 +1,104 @@
+--- a/app/test_lineage_render.py
++++ b/app/test_lineage_render.py
+@@ -1 +1,79 @@
+-"""请在授权修复中补充血缘图渲染的公开回归测试。"""
++"""血缘图渲染的公开业务回归，保持原树和有效高亮。"""
++import json
++import unittest
++
++from sqlglot import exp, parse_one
++from sqlglot.lineage import Node, lineage
++
++
++def state(root: Node) -> str:
++    """记录原树及父子接线。@param root 原图。@return 稳定状态。"""
++    return json.dumps([{'source': node.source.dump(), 'expression': node.expression.dump(),
++        'parents': [(id(part), id(part.parent) if part.parent is not None else None,
++            part.arg_key, part.index) for part in node.source.walk()]}
++        for node in root.walk()], sort_keys=True)
++
++
++class LineageRenderTests(unittest.TestCase):
++    """覆盖普通血缘、共享树、根节点、表节点和输出选项。"""
++
++    def test_original_tree_and_parent_links_survive_repeated_rendering(self) -> None:
++        """反复展示不能污染后续SQL导出。@return None。"""
++        root = lineage('total', 'SELECT quantity + 1 AS total FROM orders',
++            schema={'orders': {'quantity': 'INT'}}, trim_selects=False)
++        before = state(root)
++        first, second = root.to_html(imports=False), root.to_html(imports=False)
++        self.assertEqual(state(root), before)
++        self.assertEqual(first.nodes, second.nodes)
++        self.assertEqual(first.edges, second.edges)
++
++    def test_highlight_keeps_the_corresponding_projection(self) -> None:
++        """复制后仍须突出对应表达式，不能静默删除高亮。@return None。"""
++        root = lineage('total', 'SELECT quantity + 1 AS total FROM orders',
++            schema={'orders': {'quantity': 'INT'}}, trim_selects=False)
++        expected = '<b>' + root.expression.sql(pretty=True) + '</b>'
++        title = root.to_html(imports=False).nodes[id(root)]['title']
++        self.assertIn(expected, title)
++        self.assertEqual(title.count('<b>'), 1)
++
++    def test_shared_source_is_unchanged_for_all_nodes(self) -> None:
++        """共享同一查询的节点之间不能积累高亮。@return None。"""
++        source = parse_one('SELECT x AS first, x + 1 AS second FROM input')
++        child = Node('second', source.expressions[1], source)
++        root = Node('first', source.expressions[0], source, downstream=[child])
++        before = state(root)
++        graph = root.to_html(imports=False)
++        self.assertEqual(state(root), before)
++        for node in root.walk():
++            self.assertEqual(graph.nodes[id(node)]['title'].count('<b>'), 1)
++
++    def test_expression_equal_to_source_keeps_a_detached_root(self) -> None:
++        """独立根表达式也必须保持原父指针为空。@return None。"""
++        expression = parse_one('x + 1')
++        root = Node('result', expression, expression)
++        before = state(root)
++        graph = root.to_html(imports=False)
++        self.assertEqual(state(root), before)
++        self.assertIsNone(expression.parent)
++        self.assertIn('<b>x + 1</b>', graph.nodes[id(root)]['title'])
++
++    def test_table_branch_keeps_its_original_group_and_label(self) -> None:
++        """表节点原展示分组和标签兼容。@return None。"""
++        table = exp.to_table('orders')
++        root = Node('orders.quantity', table, parse_one('SELECT quantity FROM orders'))
++        before = state(root)
++        row = root.to_html(imports=False).nodes[id(root)]
++        self.assertEqual(state(root), before)
++        self.assertEqual(row['group'], 1)
++        self.assertEqual(row['label'], 'FROM orders')
++
++    def test_render_options_and_dialect_are_forwarded(self) -> None:
++        """保留现有方言与展示选项传递。@return None。"""
++        root = lineage('total', 'SELECT quantity + 1 AS total FROM orders',
++            schema={'orders': {'quantity': 'INT'}}, trim_selects=False)
++        before = state(root)
++        graph = root.to_html(dialect='mysql', imports=False, options={'width': '900px'})
++        self.assertEqual(state(root), before)
++        self.assertFalse(graph.imports)
++        self.assertEqual(graph.options['width'], '900px')
++        self.assertIn('<b>', graph.nodes[id(root)]['title'])
+--- a/library/sqlglot/lineage.py
++++ b/library/sqlglot/lineage.py
+@@ -55,9 +55,16 @@
+                 group = 1
+             else:
+                 label = node.expression.sql(pretty=True, dialect=dialect)
+-                source = node.source.transform(
++                source = node.source.copy()
++                # 原高亮按对象身份匹配；逐一映射复制节点，既保护原树又保留对应高亮。
++                target = next(
++                    (cloned for original, cloned in zip(node.source.walk(), source.walk())
++                     if original is node.expression),
++                    None,
++                )
++                source = source.transform(
+                     lambda n: (
+-                        exp.Tag(this=n, prefix="<b>", postfix="</b>") if n is node.expression else n
++                        exp.Tag(this=n, prefix="<b>", postfix="</b>") if n is target else n
+                     ),
+                     copy=False,
+                 ).sql(pretty=True, dialect=dialect)

@@ -1,0 +1,90 @@
+--- a/library/src/jinja2/filters.py
++++ b/library/src/jinja2/filters.py
+@@ -165,7 +165,7 @@
+     if isinstance(value, str) or not isinstance(value, abc.Iterable):
+         return url_quote(value)
+ 
+-    if isinstance(value, dict):
++    if isinstance(value, abc.Mapping):
+         items: t.Iterable[tuple[str, t.Any]] = value.items()
+     else:
+         items = value  # type: ignore
+@@ -1720,6 +1720,7 @@
+ ) -> t.Callable[[t.Any], t.Any]:
+     if not args and "attribute" in kwargs:
+         attribute = kwargs.pop("attribute")
++        explicit_none = "default" in kwargs and kwargs["default"] is None
+         default = kwargs.pop("default", None)
+ 
+         if kwargs:
+@@ -1727,7 +1728,18 @@
+                 f"Unexpected keyword argument {next(iter(kwargs))!r}"
+             )
+ 
+-        func = make_attrgetter(context.environment, attribute, default=default)
++        if explicit_none:
++            # 局部哨兵仅区分map显式None，不改变共享getter其他调用方的缺省语义。
++            missing_default = object()
++            getter = make_attrgetter(
++                context.environment, attribute, default=missing_default
++            )
++
++            def func(item: t.Any) -> t.Any:
++                value = getter(item)
++                return None if value is missing_default else value
++        else:
++            func = make_attrgetter(context.environment, attribute, default=default)
+     else:
+         try:
+             name = args[0]
+--- a/library/tests/test_async_filters.py
++++ b/library/tests/test_async_filters.py
+@@ -308,3 +308,17 @@
+ 
+     out = run_async_fn(test)
+     assert out == "0,1,2 .. 3,4,5"
++
++
++def test_async_map_explicit_none_regression(run_async_fn):
++    """真实异步渲染保留显式None和已有值。@param run_async_fn 两种上游执行器。@return None。"""
++    async def check():
++        env = Environment(enable_async=True)
++        captured = []
++        env.filters["capture_values"] = lambda values: captured.extend(values) or ""
++        template = env.from_string('{{ rows|map(attribute="field", default=none)|list|capture_values }}')
++        await template.render_async(rows=[{}, {"field": None}, {"field": False}, {"field": 0}, {"field": ""}])
++        assert captured == [None, None, False, 0, ""]
++        assert [type(value) for value in captured] == [type(None), type(None), bool, int, str]
++
++    run_async_fn(check)
+--- a/library/tests/test_filters.py
++++ b/library/tests/test_filters.py
+@@ -881,3 +881,28 @@
+ 
+         with pytest.raises(TemplateRuntimeError, match="No filter named 'f'"):
+             t2.render(x=42)
++
++
++def test_urlencode_standard_mapping_regression():
++    """标准Mapping按items编码，同时保留重复pair和路径。@return None。"""
++    from collections import UserDict
++    from urllib.parse import parse_qsl
++    from jinja2.filters import do_urlencode
++
++    value = UserDict({"q": "A+1 & /", "中文": "值", "": ""})
++    assert parse_qsl(do_urlencode(value), keep_blank_values=True) == list(value.items())
++    assert do_urlencode([("q", "a"), ("q", "b")]) == "q=a&q=b"
++    assert do_urlencode("a/b c") == "a/b%20c"
++
++
++def test_map_explicit_none_regression():
++    """显式None与省略default区分且不替换已有假值。@return None。"""
++    from jinja2 import Undefined
++
++    env = Environment()
++    rows = [{}, {"field": None}, {"field": False}, {"field": 0}, {"field": ""}]
++    values = env.compile_expression("rows|map(attribute='field', default=none)|list")(rows=rows)
++    assert values == [None, None, False, 0, ""]
++    assert [type(value) for value in values] == [type(None), type(None), bool, int, str]
++    omitted = env.compile_expression("rows|map(attribute='field')|list", undefined_to_none=False)(rows=rows)
++    assert isinstance(omitted[0], Undefined)

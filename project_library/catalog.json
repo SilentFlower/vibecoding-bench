@@ -1,4 +1,7 @@
 {
+  "schema": 3,
+  "version": "real-development-cycles-v1-en",
+  "project_manifest": "development.json",
   "projects": [
     "python-frontmatter",
     "pydantic-settings",
@@ -13,94 +16,494 @@
     "cachetools",
     "xmltodict",
     "tabulate",
-    "python-decouple",
     "click",
     "cli-helpers",
     "mistune",
     "boltons",
-    "more-itertools",
-    "configobj",
-    "dataset",
-    "python-markdown",
-    "markdown-it-py",
     "path",
-    "petl",
-    "toolz",
-    "jsonschema",
-    "docutils",
-    "agate",
-    "csvkit",
-    "python-box",
-    "rich",
-    "pydash",
-    "configargparse",
-    "backoff",
-    "bottle",
-    "deepdiff",
-    "cerberus",
-    "icecream",
     "dpath",
     "alive-progress",
     "jmespath",
     "confuse",
     "simplejson",
     "marshmallow",
-    "pyyaml",
     "inflect",
-    "tqdm",
-    "pluggy",
     "xlsxwriter",
-    "mistletoe",
-    "python-docx",
-    "python-pptx",
-    "attrs",
-    "mdit-py-plugins",
-    "dynaconf",
-    "cssselect",
-    "structlog",
-    "flask",
-    "cattrs",
-    "anytree",
-    "babel",
-    "werkzeug",
-    "html2text",
-    "packaging",
-    "bibtexparser",
-    "treelib",
-    "sqlparse",
-    "python-dateutil",
     "ftfy",
-    "pypika",
-    "arrow",
-    "charset-normalizer",
-    "injector",
-    "pyparsing",
-    "markdownify",
-    "loguru",
-    "pyrsistent",
     "feedgen",
-    "sortedcontainers",
-    "wtforms",
-    "python-constraint",
-    "feedparser",
-    "portion",
-    "humanize",
-    "bidict",
     "tablib",
-    "natsort",
-    "html5lib",
-    "python-liquid",
-    "webcolors",
-    "funcy",
-    "transitions",
-    "python-statemachine",
-    "wrapt",
-    "pendulum",
-    "collective-icalendar",
-    "textdistance",
-    "chardet",
     "sqlglot"
   ],
-  "schema": 2,
-  "version": "real-project-scenarios-v37-en"
+  "admission": [
+    {
+      "project_key": "python-frontmatter",
+      "status": "ready"
+    },
+    {
+      "project_key": "pydantic-settings",
+      "status": "ready"
+    },
+    {
+      "project_key": "typer",
+      "status": "ready"
+    },
+    {
+      "project_key": "tinydb",
+      "status": "ready"
+    },
+    {
+      "project_key": "jinja",
+      "status": "ready"
+    },
+    {
+      "project_key": "schedule",
+      "status": "ready"
+    },
+    {
+      "project_key": "python-dotenv",
+      "status": "ready"
+    },
+    {
+      "project_key": "tomlkit",
+      "status": "ready"
+    },
+    {
+      "project_key": "sqlite-utils",
+      "status": "ready"
+    },
+    {
+      "project_key": "tenacity",
+      "status": "ready"
+    },
+    {
+      "project_key": "cachetools",
+      "status": "ready"
+    },
+    {
+      "project_key": "xmltodict",
+      "status": "ready"
+    },
+    {
+      "project_key": "tabulate",
+      "status": "ready"
+    },
+    {
+      "project_key": "python-decouple",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "click",
+      "status": "ready"
+    },
+    {
+      "project_key": "cli-helpers",
+      "status": "ready"
+    },
+    {
+      "project_key": "mistune",
+      "status": "ready"
+    },
+    {
+      "project_key": "boltons",
+      "status": "ready"
+    },
+    {
+      "project_key": "more-itertools",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "configobj",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "dataset",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "python-markdown",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "markdown-it-py",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "path",
+      "status": "ready"
+    },
+    {
+      "project_key": "petl",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "toolz",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "jsonschema",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "docutils",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "agate",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "csvkit",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "python-box",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "rich",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "pydash",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "configargparse",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "backoff",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "bottle",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "deepdiff",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "cerberus",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "icecream",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "dpath",
+      "status": "ready"
+    },
+    {
+      "project_key": "alive-progress",
+      "status": "ready"
+    },
+    {
+      "project_key": "jmespath",
+      "status": "ready"
+    },
+    {
+      "project_key": "confuse",
+      "status": "ready"
+    },
+    {
+      "project_key": "simplejson",
+      "status": "ready"
+    },
+    {
+      "project_key": "marshmallow",
+      "status": "ready"
+    },
+    {
+      "project_key": "pyyaml",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "inflect",
+      "status": "ready"
+    },
+    {
+      "project_key": "tqdm",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "pluggy",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "xlsxwriter",
+      "status": "ready"
+    },
+    {
+      "project_key": "mistletoe",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "python-docx",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "python-pptx",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "attrs",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "mdit-py-plugins",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "dynaconf",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "cssselect",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "structlog",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "flask",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "cattrs",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "anytree",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "babel",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "werkzeug",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "html2text",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "packaging",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "bibtexparser",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "treelib",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "sqlparse",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "python-dateutil",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "ftfy",
+      "status": "ready"
+    },
+    {
+      "project_key": "pypika",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "arrow",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "charset-normalizer",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "injector",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "pyparsing",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "markdownify",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "loguru",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "pyrsistent",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "feedgen",
+      "status": "ready"
+    },
+    {
+      "project_key": "sortedcontainers",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "wtforms",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "python-constraint",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "feedparser",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "portion",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "humanize",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "bidict",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "tablib",
+      "status": "ready"
+    },
+    {
+      "project_key": "natsort",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "html5lib",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "python-liquid",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "webcolors",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "funcy",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "transitions",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "python-statemachine",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "wrapt",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "pendulum",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "collective-icalendar",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "textdistance",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "chardet",
+      "status": "blocked",
+      "reason": "现有内容只有理解、咨询、方案或诊断；尚无可独立验收的真实工程交付合同、原版失败与修复通过证据。研究提案保留待核实，不计完整任务。"
+    },
+    {
+      "project_key": "sqlglot",
+      "status": "ready"
+    }
+  ]
 }

@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "task_id": "SQ-M01-DEV",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "comparison": "Judge supported business reasoning and actual behavior. Accept concise equivalent valid answers, not keywords, answer length or similarity to a reference patch.",
+  "criteria": [
+    {
+      "id": "behavior",
+      "requirement": "All independent finite-input and real SQLite search assertions must pass, including FTS4 initial/INSERT and FTS5 CRUD, list/tuple/iterator/generator, empty table, quoted names, tokenizer and identical-versus-changed replace semantics. Do not swallow SQL exceptions or disable triggers.",
+      "evidence": [
+        "materials/fts-repair.md",
+        "library/sqlite_utils/db.py:3754-3871"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "requirement": "Deliver meaningful public test assertions covering the original iterator failure, repeated consumption with triggers, and normal compatibility. Inspect actual candidate test files; native behavior alone does not satisfy test delivery.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Only authorized implementation/public tests may change; complete frozen upstream regression must pass. Do not apply the independent convert repair or repair the unrelated FTS4 UPDATE limitation.",
+      "evidence": [
+        "materials/fts-repair.md"
+      ]
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "version": 2
+}

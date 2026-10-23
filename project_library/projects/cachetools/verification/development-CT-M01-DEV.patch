@@ -1,0 +1,74 @@
+--- a/library/src/cachetools/_descriptor.py
++++ b/library/src/cachetools/_descriptor.py
+@@ -4,6 +4,7 @@
+ 
+ import functools
+ import warnings
++from inspect import Parameter, signature
+ 
+ 
+ def _warn_classmethod(stacklevel):
+@@ -115,7 +116,17 @@
+     # Receiver is taken from *args so autospec'd instances accept any call,
+     # as they did before class access returned a callable.
+     def __call__(self, /, *args, **kwargs):
++        """按原函数receiver定义绑定。@param args 位置参数。@param kwargs 关键字参数。@return 真实方法结果。"""
+         if not args:
++            try:
++                receiver = next(iter(signature(self.__wrapped__).parameters.values()), None)
++            except (TypeError, ValueError):
++                receiver = None
++            # 只补足原函数允许的关键字绑定，不放宽位置专用或缺失receiver。
++            if (receiver is not None and receiver.kind is Parameter.POSITIONAL_OR_KEYWORD
++                    and receiver.name in kwargs):
++                obj = kwargs.pop(receiver.name)
++                return self.__descriptor.__get__(obj)(**kwargs)
+             msg = "Cannot call @cachedmethod through the class without an instance"
+             raise TypeError(msg)
+         obj, *args = args
+--- a/library/tests/test_cachedmethod.py
++++ b/library/tests/test_cachedmethod.py
+@@ -823,3 +823,43 @@
+         mock.get.assert_called_with(1)
+         self.assertEqual(mock.get(value=1), 42)
+         mock.get.assert_called_with(value=1)
++
++
++class KeywordReceiverRegressionTests(unittest.TestCase):
++    """验证类入口关键字receiver与既有调用等价。"""
++
++    def test_keyword_receiver_and_cache_info(self):
++        """相同业务键保持一次求值及后续命中。@return None。"""
++        class Catalog:
++            """保存独立业务缓存。"""
++            def __init__(self):
++                """初始化缓存。@return None。"""
++                self.cache = Cache(8)
++
++            @cachedmethod(lambda obj: obj.cache, info=True)
++            def get(self, value):
++                """返回业务输入。@param value 输入。@return 输入。"""
++                return value
++
++        catalog = Catalog()
++        self.assertEqual(catalog.get(value=3), 3)
++        self.assertEqual(Catalog.get(catalog, value=3), 3)
++        self.assertEqual(Catalog.get(self=catalog, value=3), 3)
++        self.assertEqual(catalog.get.cache_info().misses, 1)
++        self.assertEqual(catalog.get.cache_info().hits, 2)
++
++    def test_nonstandard_receiver_name(self):
++        """关键字绑定读取真实receiver名，不硬编码self。@return None。"""
++        class Catalog:
++            """采用自定义receiver参数名。"""
++            def __init__(self):
++                """创建缓存。@return None。"""
++                self.cache = {}
++
++            @cachedmethod(lambda obj: obj.cache)
++            def get(owner, value):
++                """返回实际参数。@param owner 实例。@param value 输入。@return 输入。"""
++                return value
++
++        catalog = Catalog()
++        self.assertEqual(Catalog.get(owner=catalog, value=7), 7)

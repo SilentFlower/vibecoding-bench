@@ -1,0 +1,66 @@
+--- a/library/tenacity/wait.py
++++ b/library/tenacity/wait.py
+@@ -100,11 +100,31 @@
+ 
+     @override
+     def __call__(self, retry_state: "RetryCallState") -> float:
+-        # Positional, like `BaseRetrying._run_wait`: a `WaitBaseT` callable is
+-        # only guaranteed to take the state positionally, so passing it by
+-        # keyword crashed on any callable whose parameter is not named
+-        # `retry_state`.
+-        return float(sum(x(retry_state) for x in self.wait_funcs))
++        # 每帧保留进入节点时取得的迭代器及子结果，避免压平改变浮点分组。
++        stack = [(self, iter(self.wait_funcs), [])]
++        active = {id(self)}
++        while stack:
++            node, children, values = stack[-1]
++            try:
++                child = next(children)
++            except StopIteration:
++                result = float(sum(values))
++                active.remove(id(node))
++                stack.pop()
++                if not stack:
++                    return result
++                stack[-1][2].append(result)
++                continue
++            if type(child) is wait_combine:
++                # 只记录当前路径，合法共享子树在另一位置出现时仍按次求值。
++                if id(child) in active:
++                    raise ValueError("Cyclic built-in wait_combine graph")
++                active.add(id(child))
++                stack.append((child, iter(child.wait_funcs), []))
++            else:
++                # 自定义子类是不透明策略，保留其原调用及位置参数约定。
++                values.append(child(retry_state))
++        raise RuntimeError("Unreachable empty wait frame")
+ 
+ 
+ class wait_chain(wait_base):
+--- a/library/tests/test_tenacity.py
++++ b/library/tests/test_tenacity.py
+@@ -2425,3 +2425,24 @@
+ 
+ if __name__ == "__main__":
+     unittest.main()
++
++
++def test_deep_builtin_wait_combine_preserves_groups() -> None:
++    """无递归深树仍保持每层求和分组。@return None。"""
++    rs = tenacity.RetryCallState(tenacity.Retrying(), None, (), {})
++    tree = tenacity.wait_fixed(1)
++    for _ in range(2000):
++        tree = tenacity.wait_combine(tree, tenacity.wait_fixed(1))
++    assert tree(rs) == 2001.0
++    grouped = tenacity.wait_combine(tenacity.wait_combine(tenacity.wait_fixed(1e16), tenacity.wait_fixed(1)), tenacity.wait_fixed(-1e16))
++    assert grouped(rs) == 0.0
++
++
++def test_builtin_wait_combine_rejects_cycle_allows_shared() -> None:
++    """活动路径检测不能误拒绝共享无环子树。@return None。"""
++    rs = tenacity.RetryCallState(tenacity.Retrying(), None, (), {})
++    shared = tenacity.wait_combine(tenacity.wait_fixed(2))
++    assert tenacity.wait_combine(shared, shared)(rs) == 4.0
++    shared.wait_funcs = (shared,)
++    with pytest.raises(ValueError, match="Cyclic"):
++        shared(rs)

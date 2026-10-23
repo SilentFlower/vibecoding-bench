@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "task_id": "TD-M02-DEV",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "behavior",
+      "requirement": "The independent native list/tuple/iterator/generator, order, callback, repeated-ID, storage and enumeration-failure matrix and the fixed complete upstream regression must pass. Rule enumeration must finish before any rule is applied; this adds no general rollback guarantee for arbitrary callback exceptions.",
+      "evidence": []
+    },
+    {
+      "id": "delivery-tests",
+      "requirement": "Deliver meaningful public regressions that fail for the original one-shot bug, verify all documents and returned IDs, and cover enumeration failure without partial changes. Inspect actual candidate assertions and implementation; a prose claim or weakened tests is incomplete.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Only update_multiple and authorized public regressions may change; preserve existing order, repeated IDs and storage APIs without private-check, dependency or broad transaction changes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer.",
+  "version": 2
+}

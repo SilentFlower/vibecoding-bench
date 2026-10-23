@@ -1,0 +1,53 @@
+--- a/library/src/mistune/__main__.py
++++ b/library/src/mistune/__main__.py
+@@ -106,10 +106,10 @@
+     args = parser.parse_args()
+ 
+     message = args.message
+-    if not message and not args.file:
++    if message is None and not args.file:
+         message = read_stdin()
+ 
+-    if message:
++    if message is not None:
+         md = _md(args)
+         text = md(message)
+         assert isinstance(text, str)
+--- a/library/tests/test_cli.py
++++ b/library/tests/test_cli.py
+@@ -1,4 +1,5 @@
+ import io
++import subprocess
+ import sys
+ from contextlib import redirect_stdout
+ from unittest.mock import patch
+@@ -20,3 +21,29 @@
+ 
+ 
+ TestCliMessage.load_fixtures("cli.txt")
++
++
++def test_empty_message_and_piped_document_are_valid():
++    """已提供空文本与没有输入必须区分。@return None。"""
++    for arguments in ([], ["-m", ""]):
++        result = subprocess.run([sys.executable, "-m", "mistune", *arguments],
++            input="", text=True, capture_output=True, timeout=8)
++        assert result.returncode == 0
++        assert result.stdout.strip() == ""
++        assert result.stderr == ""
++
++
++def test_empty_message_writes_file_and_wins_over_file_input(tmp_path):
++    """空结果仍应写文件，并保留显式消息优先。@param tmp_path 临时目录。@return None。"""
++    destination = tmp_path / "result.html"
++    output = subprocess.run([sys.executable, "-m", "mistune", "-m", "", "-o", str(destination)],
++        input="", text=True, capture_output=True, timeout=8)
++    assert output.returncode == 0
++    assert destination.is_file() and destination.read_text() == ""
++    assert output.stdout == ""
++    document = tmp_path / "source.md"
++    document.write_text("# File fallback", encoding="utf-8")
++    priority = subprocess.run([sys.executable, "-m", "mistune", "-m", "", "-f", str(document)],
++        input="", text=True, capture_output=True, timeout=8)
++    assert priority.returncode == 0
++    assert priority.stdout.strip() == ""

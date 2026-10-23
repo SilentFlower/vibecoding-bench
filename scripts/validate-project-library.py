@@ -14,20 +14,23 @@ sys.path.insert(0, str(ROOT / 'orchestrator'))
 from project_library import ProjectLibrary
 
 
-def validate(root: Path, run_all: bool = False) -> dict:
+def validate(root: Path, run_all: bool = False, catalog_name: str = 'catalog.json') -> dict:
     """校验内容库并按需执行全部基线与参考行为。
 
     :param root: 待校验内容根。
     :param run_all: 是否运行真实初始程序与参考断言。
+    :param catalog_name: 当前或保留的历史目录文件。
     :return: 数量与通过证据摘要。
     """
-    library = ProjectLibrary(root)
-    if library.schema == 2:
+    library = ProjectLibrary(root, catalog_name=catalog_name)
+    if library.schema in (2, 3):
         if run_all:
             raise ValueError('场景内容不使用旧参考运行时；请使用 scripts/validate-project-scenarios.py')
-        return {'content_schema':2,'projects':len(library.projects),
+        return {'content_schema':library.schema,'projects':len(library.projects),
             'scenarios':sum(project.summary()['scenario_count'] for project in library.projects.values()),
             'tasks':sum(project.summary()['task_count'] for project in library.projects.values()),
+            'reviewed_projects':len(library.catalog_document.get('admission', [])),
+            'blocked_projects':sum(item['status'] == 'blocked' for item in library.catalog_document.get('admission', [])),
             'digest':library.digest,'evidence':'内容结构及离线制品摘要，不代表原生验收或模型完成'}
     evaluate = runpy.run_path(str(root/'reference_runtime.py'))['evaluate'] if run_all else None
     baseline_count = reference_count = incomplete_steps = 0
@@ -71,9 +74,10 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,default=ROOT/'project_library')
+    parser.add_argument('--catalog', default='catalog.json')
     parser.add_argument('--all',action='store_true')
     args = parser.parse_args()
-    print(json.dumps(validate(args.root,args.all),ensure_ascii=False))
+    print(json.dumps(validate(args.root,args.all,args.catalog),ensure_ascii=False))
 
 
 if __name__ == '__main__':

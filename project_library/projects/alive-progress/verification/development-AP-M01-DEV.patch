@@ -1,0 +1,98 @@
+--- /dev/null
++++ b/app/test_finalize.py
+@@ -0,0 +1,84 @@
++"""真实公开回归：合法假值回调、默认行为和未耗尽生命周期。"""
++from io import StringIO
++import unittest
++
++from alive_progress import alive_it
++
++
++class FalseCallable:
++    """用合法假值模拟已经配置的业务收尾对象。"""
++
++    def __init__(self) -> None:
++        """保存实际句柄观察。@return None。"""
++        self.calls = []
++
++    def __bool__(self) -> bool:
++        """模拟自定义状态而非缺少回调。@return False。"""
++        return False
++
++    def __call__(self, bar) -> None:
++        """记录实际进度。@param bar 库传入的句柄。@return None。"""
++        self.calls.append(bar.current)
++
++
++class EmptyCallable:
++    """以长度协议提供另一种假值可调用对象。"""
++
++    def __init__(self) -> None:
++        """保存实际调用。@return None。"""
++        self.calls = []
++
++    def __len__(self) -> int:
++        """长度为零不意味着没有配置回调。@return 0。"""
++        return 0
++
++    def __call__(self, bar) -> None:
++        """记录真正句柄。@param bar 进度句柄。@return None。"""
++        self.calls.append(bar.current)
++
++
++class FinalizeTests(unittest.TestCase):
++    """按公开调用检验回调行为，不检查候选实现的写法。"""
++
++    def options(self) -> dict:
++        """隔离测试输出，不依赖真实终端或计时。@return 独占选项。"""
++        return {'file': StringIO(), 'force_tty': False, 'enrich_print': False, 'receipt': False}
++
++    def test_false_bool_callable_receives_final_handle_for_nonempty_and_empty_input(self) -> None:
++        """两种输入都正常耗尽并只收尾一次。@return None。"""
++        for items in ([1, 2], []):
++            ending = FalseCallable()
++            self.assertEqual(list(alive_it(items, finalize=ending, **self.options())), items)
++            self.assertEqual(ending.calls, [len(items)])
++
++    def test_zero_length_callable_is_not_absent(self) -> None:
++        """长度协议也不能使合法回调被跳过。@return None。"""
++        ending = EmptyCallable()
++        self.assertEqual(list(alive_it(['A'], finalize=ending, **self.options())), ['A'])
++        self.assertEqual(ending.calls, [1])
++
++    def test_none_and_normal_function_keep_item_order_and_single_use(self) -> None:
++        """默认无回调与原有函数不受修复影响。@return None。"""
++        self.assertEqual(list(alive_it([2, 1], finalize=None, **self.options())), [2, 1])
++        calls = []
++        adapter = alive_it([2, 1], finalize=lambda bar: calls.append(bar.current), **self.options())
++        self.assertEqual(list(adapter), [2, 1])
++        self.assertEqual(list(adapter), [])
++        self.assertEqual(calls, [2])
++
++    def test_early_close_and_iterator_error_do_not_gain_finalization(self) -> None:
++        """修复选择条件不能扩展成异常或取消时也强制收尾。@return None。"""
++        ending = FalseCallable()
++        iterator = iter(alive_it([1, 2], finalize=ending, **self.options()))
++        next(iterator)
++        iterator.close()
++        self.assertEqual(ending.calls, [])
++
++        def broken():
++            """模拟原迭代器自身失败。@return 合成输入。"""
++            yield 1
++            raise RuntimeError('synthetic iterator failure')
++
++        with self.assertRaisesRegex(RuntimeError, 'synthetic iterator failure'):
++            list(alive_it(broken(), finalize=ending, **self.options()))
++        self.assertEqual(ending.calls, [])
+--- a/library/alive_progress/core/progress.py
++++ b/library/alive_progress/core/progress.py
+@@ -592,7 +592,7 @@
+             for item in self._it:
+                 yield item
+                 self._bar()
+-            if self._finalize:
++            if self._finalize is not None:
+                 self._finalize(self._bar)
+ 
+     def __call__(self, *args, **kwargs):

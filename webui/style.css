@@ -1596,7 +1596,8 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .project-create[open] > summary::after { content: '收起'; }
 .project-panel { scroll-margin-top: 100px; }
 #project-batch-form { margin-top: 16px; }
-#project-batch-form .row > label { min-width: 0; }
+#project-batch-form .row > label,
+#project-requester-form .row > label { min-width: 0; }
 .project-toolbar .filter-wrap { margin-left: auto; flex: 0 1 340px; min-width: 0; }
 .project-toolbar input[type=search] { min-width: 0; width: 100%; border: 0; background: transparent; box-shadow: none; }
 .project-choice-list .batch-topic { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
@@ -1643,7 +1644,8 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .project-scenario-task p, .project-scenario-task strong, .project-scenario-task .btn { overflow-wrap: anywhere; }
 .project-scenario-task .btn { max-width: 100%; }
 @media (max-width: 720px) {
-  #project-batch-form > .row { flex-direction: column; align-items: stretch; }
+  #project-batch-form > .row,
+  #project-requester-form > .row { flex-direction: column; align-items: stretch; }
   .project-toolbar .filter-wrap { flex-basis: 100%; margin-left: 0; }
   .project-choice-list, .project-catalog { grid-template-columns: minmax(0, 1fr); }
   .project-create, .project-panel { padding: 10px; }

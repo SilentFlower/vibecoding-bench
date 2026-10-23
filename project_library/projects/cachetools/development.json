@@ -1,0 +1,63 @@
+{
+  "schema": 3,
+  "project_key": "cachetools",
+  "title": "Cachetools缓存开发任务",
+  "category": "应用缓存与调用语义",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "caadeaebc6646c6f997983054c2f3e8d3dfedcbb44c28f451bc6b3f597bfc3b8",
+  "environment": "cachetools-py312",
+  "source": {
+    "repository": "https://github.com/tkem/cachetools",
+    "commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CT-S03-DEV",
+      "title": "修复类访问关键字receiver并保护原调用合同",
+      "goal": "修复类访问关键字receiver并保护原调用合同",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CT-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CT-M01-DEV",
+          "kind": "modify",
+          "goal": "修复类访问关键字receiver并保护原调用合同",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nRepair the supplied cachedmethod class-access inconsistency under the complete public receiver contract. Support the original receiver parameter name without hardcoding self. Preserve valid bound/positional calls, info and independent instances; keep positional-only, missing and duplicate receiver rejection. Modify only the authorized implementation and public test file, and deliver meaningful original-failing public regression tests.",
+          "requires": [],
+          "materials": [
+            "materials/receiver-reproducer.py",
+            "materials/receiver-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/cachetools/_descriptor.py",
+            "library/tests/test_cachedmethod.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CT-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CT-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CT-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

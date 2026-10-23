@@ -1,0 +1,65 @@
+--- a/library/tests/test_items.py
++++ b/library/tests/test_items.py
+@@ -1683,3 +1683,33 @@
+         _ = 123 in table
+     # membership must not resolve values or mutate the document
+     assert doc.as_string() == content
++
++
++def test_array_inplace_repeat_preserves_binding_and_rendering() -> None:
++    """核原位重复、索引计数及后续编辑。@return None。"""
++    from operator import imul
++
++    for count in (0, -1, 1, 2, 3, False, True):
++        source = "a = [1, 2] # tail\n"
++        doc = parse(source)
++        array = doc["a"]
++        result = imul(array, count)
++        expected = [1, 2] * count
++        assert result is array is doc["a"]
++        assert array.unwrap() == expected
++        assert parse(doc.as_string()).unwrap()["a"] == expected
++        if count == 1:
++            assert doc.as_string() == source
++        array.append(9)
++        expected.append(9)
++        assert parse(doc.as_string()).unwrap()["a"] == expected
++
++
++def test_array_inplace_repeat_preserves_nested_references() -> None:
++    """重复可变元素沿 Python list 共享引用。@return None。"""
++    doc = parse("a = [[1]]\n")
++    array = doc["a"]
++    array *= 2
++    assert array[0] is array[1]
++    array[0].append(2)
++    assert parse(doc.as_string()).unwrap()["a"] == [[1, 2], [1, 2]]
+--- a/library/tomlkit/items.py
++++ b/library/tomlkit/items.py
+@@ -17,6 +17,7 @@
+ from datetime import timedelta
+ from datetime import tzinfo
+ from enum import Enum
++from operator import index
+ from typing import TYPE_CHECKING
+ from typing import Any
+ from typing import TypeVar
+@@ -1774,6 +1775,18 @@
+ 
+         self._reindex()
+ 
++    def __imul__(self, count: Any) -> Array:
++        """同步原位重复。@param count 支持索引协议的计数。@return 原数组。"""
++        count = index(count)
++        if count <= 0:
++            self.clear()
++        elif count > 1:
++            # 快照避免迭代增长中的数组，并通过既有插入通道维护文本与索引。
++            original = tuple(self)
++            for _ in range(count - 1):
++                self.extend(original)
++        return self
++
+     def _getstate(self, protocol: int = 3) -> tuple[list[Item], Trivia, bool]:
+         return list(self._iter_items()), self._trivia, self._multiline
+ 

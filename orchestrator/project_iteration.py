@@ -16,6 +16,7 @@ from project_library import (ProjectLibrary, canonical_json, digest_json, materi
     read_document, safe_relative, snapshot_tree, write_document)
 from project_plans import PLAN_DEFAULTS, ProjectPlans, initialize_plan_schema, normalized_policy
 from project_scenarios import ProjectScenarios, SCENARIO_DEFAULTS, normalized_scenario_policy
+from project_dialogue import ProjectDialogueClient
 
 
 PROJECT_RUN_KIND = 'project_iteration'
@@ -79,13 +80,14 @@ class ProjectIterationManager:
     :param execution_control: 按运行代次控制独立进程树的回调。
     :param schedule_admission: 创建新计划前的只读账号门禁。
     :param concurrency_limit: 实际账号 CLI 容量。
+    :param dialogue: 可选外接需求方客户端，旧内容不依赖该配置。
     """
 
     def __init__(self, data: Path, library: ProjectLibrary | None, database: Callable, write_lock,
                  submit: Callable, settings: Callable, identity: Callable, stop_run: Callable,
                  verifier, is_executing: Callable, admission: Callable | None = None,
                  execution_control: Callable | None = None, schedule_admission: Callable | None = None,
-                 concurrency_limit: int = 2) -> None:
+                 concurrency_limit: int = 2, dialogue: ProjectDialogueClient | None = None) -> None:
         """注册内容版本并初始化推进依赖；参数契约见类说明。@return None。"""
         self.data, self.database, self.write_lock = data, database, write_lock
         self.submit, self.settings, self.identity, self.stop_run = submit, settings, identity, stop_run
@@ -93,6 +95,7 @@ class ProjectIterationManager:
         self.admission = admission
         self.review_admission = None
         self.review_refresh = None
+        self.dialogue = dialogue
         self.library = library.install(data) if library is not None else None
         self.objects = data/'project-artifacts/objects'
         self.manifests = data/'project-artifacts/manifests'
@@ -136,9 +139,10 @@ class ProjectIterationManager:
         """
         if self.library is None:
             raise ValueError('当前项目内容库不可用，历史批次仍可读取')
-        defaults = SCENARIO_DEFAULTS if self.library.schema == 2 else PLAN_DEFAULTS
+        defaults = SCENARIO_DEFAULTS if self.library.schema in (2, 3) else PLAN_DEFAULTS
         return {'content_schema':self.library.schema,'version':self.library.version,'digest':self.library.digest,
             'scheduling_defaults':{**defaults,'concurrency':self.plans.limit},
+            'admission':self.library.catalog_document.get('admission', []),
             'projects':[project.summary() for project in self.library.projects.values()]}
 
     def create_batch(self, account_id: int, name: str, project_keys: list[str] | None = None,
@@ -154,6 +158,8 @@ class ProjectIterationManager:
         """
         if self.library is None:
             raise ValueError('当前项目内容库不可用，不能新建批次')
+        if self.library.schema == 3 and self.dialogue is None:
+            raise ValueError('完整开发周期需要先配置外部需求方模型')
         keys = list(self.library.projects) if project_keys is None else list(project_keys)
         if (not keys or len(keys)>100 or len(set(keys))!=len(keys)
                 or any(key not in self.library.projects for key in keys)):
@@ -161,7 +167,7 @@ class ProjectIterationManager:
         if not isinstance(name,str) or not 1 <= len(name.strip()) <= 120:
             raise ValueError('项目批次名称须为 1～120 个字符')
         if scenario_entries:
-            if self.library.schema != 2 or any(key not in keys for key in scenario_entries):
+            if self.library.schema not in (2, 3) or any(key not in keys for key in scenario_entries):
                 raise ValueError('场景入口只能引用本次选中的新内容项目')
             for key,selections in scenario_entries.items():
                 scenarios = {item['id']:item for item in self.library.projects[key].manifest['scenarios']}
@@ -174,7 +180,7 @@ class ProjectIterationManager:
         if account is None:
             raise ValueError('账号不存在或已停用')
         selected_policy = DEFAULT_POLICY
-        if self.library.schema == 2:
+        if self.library.schema in (2, 3):
             selected_policy = normalized_scenario_policy(policy or {}, len(keys), self.plans.limit)
             random.shuffle(keys)
         elif policy is not None:
@@ -196,7 +202,7 @@ class ProjectIterationManager:
                         cursor = connection.execute('INSERT INTO project_instances(batch_id,project_key,manifest_json,seed_digest,roadmap_digest,checkpoint_digest,visit_order,initial_order,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
                             (batch_id,key,canonical_json(manifest).decode(),manifest['seed_digest'],digest_json(manifest.get('steps',manifest.get('scenarios'))),
                             manifest['seed_digest'],order,order,now,now))
-                        if self.library.schema == 2:
+                        if self.library.schema in (2, 3):
                             self.scenarios.create_tasks(connection,cursor.lastrowid,manifest,now,(scenario_entries or {}).get(key))
             finally:
                 connection.close()
@@ -213,6 +219,12 @@ class ProjectIterationManager:
             item['policy'] = json.loads(item.pop('policy_json'))
             item['counts'] = {row['status']:row['count'] for row in self._rows(
                 'SELECT status,COUNT(*) AS count FROM project_instances WHERE batch_id=? GROUP BY status',(item['id'],))}
+            content = self._one("SELECT json_extract(manifest_json,'$.schema') AS schema FROM project_instances WHERE batch_id=? LIMIT 1", (item['id'],))
+            item['content_schema'] = content['schema'] if content else None
+            if item['content_schema'] == 3:
+                item['task_counts'] = {row['status']: row['count'] for row in self._rows(
+                    'SELECT t.status,COUNT(*) AS count FROM project_scenario_tasks t JOIN project_scenario_instances s ON s.id=t.scenario_instance_id '
+                    'JOIN project_instances i ON i.id=s.instance_id WHERE i.batch_id=? AND t.selected=1 GROUP BY t.status', (item['id'],))}
             if item['policy'].get('schema')==2:
                 item['scheduling'] = self.plans.batch_summary(item)
             elif item['policy'].get('schema')==3:
@@ -242,7 +254,7 @@ class ProjectIterationManager:
         if item is None:
             raise ValueError('项目实例不存在')
         result = self._public_instance(item,True)
-        if json.loads(item['manifest_json'])['schema'] == 2:
+        if json.loads(item['manifest_json'])['schema'] in (2, 3):
             return self.scenarios.instance_detail(item,result)
         result['attempts'] = self._rows('SELECT a.id,a.step_id,a.attempt_no,a.run_id,a.plan_id,a.validation_status,a.execution_released_at,'
             'a.candidate_digest,a.accepted_checkpoint_digest,a.created_at,a.ended_at,r.status AS execution_status,'
@@ -254,10 +266,10 @@ class ProjectIterationManager:
     def _public_instance(self, item: dict, include_steps: bool) -> dict:
         manifest = json.loads(item['manifest_json'])
         result = {key:value for key,value in item.items() if key not in ('manifest_json','workspace_relative')}
-        if manifest['schema'] == 2:
+        if manifest['schema'] in (2, 3):
             counts = {row['status']:row['count'] for row in self._rows('SELECT t.status,COUNT(*) AS count FROM project_scenario_tasks t '
                 'JOIN project_scenario_instances s ON s.id=t.scenario_instance_id WHERE s.instance_id=? AND t.selected=1 GROUP BY t.status',(item['id'],))}
-            result.update(content_schema=2,title=manifest['title'],scenario_count=len(manifest['scenarios']),
+            result.update(content_schema=manifest['schema'],title=manifest['title'],scenario_count=len(manifest['scenarios']),
                 task_count=sum(len(scenario['tasks']) for scenario in manifest['scenarios']),workspace_path=None,
                 task_counts=counts,selected_task_count=sum(counts.values()))
             return result

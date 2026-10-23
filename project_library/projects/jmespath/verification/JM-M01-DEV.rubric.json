@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "task_id": "JM-M01-DEV",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Comparator ==/!= must recursively distinguish Boolean true/false from numeric1/0 in nested arrays and objects, in both operand orders and filters. Preserve ordinary numeric equality, scalar behavior, nulls, ordered array shape and unordered object key sets without input mutation. Change only visitor.py plus app/test_json_equality.py and deliver meaningful regressions; do not broaden to contains or ordering.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer.",
+  "version": 2
+}

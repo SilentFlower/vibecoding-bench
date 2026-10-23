@@ -1,0 +1,60 @@
+--- a/library/boltons/iterutils.py
++++ b/library/boltons/iterutils.py
+@@ -913,7 +913,8 @@
+     redundant_order = []
+     redundant_groups = {}
+     for i in src:
+-        k = key_func(i) if key else i
++        # 合法key的存在性不能由对象自身的布尔值决定。
++        k = key_func(i) if key is not None else i
+         if k not in seen:
+             seen[k] = i
+         else:
+--- a/library/tests/test_iterutils.py
++++ b/library/tests/test_iterutils.py
+@@ -3,6 +3,7 @@
+ import pytest
+ 
+ from boltons.dictutils import OMD
++from boltons.iterutils import redundant
+ from boltons.iterutils import (first,
+                                split,
+                                pairwise,
+@@ -697,3 +698,37 @@
+         frange(10, step=0)
+     with pytest.raises(ValueError):
+         list(xfrange(10, step=0))
++
++
++def test_redundant_uses_falsey_callable_business_key():
++    """可调用对象的自身真值不得取消归一化。@return None。"""
++    class FalseKey:
++        """模拟falsey业务键函数。"""
++
++        def __call__(self, value):
++            """归一化业务值。@param value 原值。@return 小写键。"""
++            return value.lower()
++
++        def __bool__(self):
++            """保持自身falsey。@return False。"""
++            return False
++
++    assert redundant(['A', 'a', 'B', 'b'], key=FalseKey()) == ['a', 'b']
++
++
++def test_redundant_grouped_records_use_zero_length_callable():
++    """分组与不可哈希记录同样须使用合法key。@return None。"""
++    class EmptyKey:
++        """模拟长度为零的记录键函数。"""
++
++        def __call__(self, value):
++            """归一化真实记录字段。@param value 记录。@return 小写键。"""
++            return value['code'].lower()
++
++        def __len__(self):
++            """保持零长度。@return 0。"""
++            return 0
++
++    rows = [{'code': 'A'}, {'code': 'a'}, {'code': 'B'}, {'code': 'b'}]
++    assert redundant(rows, key=EmptyKey(), groups=True) == [[rows[0], rows[1]], [rows[2], rows[3]]]
++    assert rows == [{'code': 'A'}, {'code': 'a'}, {'code': 'B'}, {'code': 'b'}]

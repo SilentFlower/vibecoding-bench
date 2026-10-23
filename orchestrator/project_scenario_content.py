@@ -8,6 +8,7 @@ from project_library import canonical_json, read_document, safe_relative, snapsh
 
 
 CONTENT_SCHEMA = 2
+DEVELOPMENT_SCHEMA = 3
 TASK_KINDS = frozenset({'understand', 'consult', 'diagnose', 'plan', 'modify'})
 CONTENT_ID = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,79}$')
 CHECKSUM = re.compile(r'^[a-f0-9]{64}$')
@@ -84,7 +85,7 @@ def validate_scenario_project(root: Path, manifest: object, key: str) -> None:
     :return: None；不完整或矛盾内容抛出 ValueError。
     """
     if (not isinstance(manifest, dict) or type(manifest.get('schema')) is not int
-            or manifest['schema'] != CONTENT_SCHEMA or manifest.get('project_key') != key):
+            or manifest['schema'] not in (CONTENT_SCHEMA, DEVELOPMENT_SCHEMA) or manifest.get('project_key') != key):
         raise ValueError('场景项目版本或目录归属不合法')
     for field in ('title', 'category', 'description', 'seed_digest', 'environment'):
         _text(manifest.get(field), field)
@@ -106,6 +107,9 @@ def validate_scenario_project(root: Path, manifest: object, key: str) -> None:
         for field in ('title', 'goal'):
             _text(scenario.get(field), field)
         scenario_tasks = _unique_items(scenario.get('tasks'), '任务')
+        development = manifest['schema'] == DEVELOPMENT_SCHEMA
+        if development and len(scenario_tasks) != 1:
+            raise ValueError('完整开发场景必须对应一项需求或一个BUG')
         entries = _unique_items(scenario.get('entries'), '场景入口')
         if scenario.get('default_entry') not in entries:
             raise ValueError('场景默认入口不存在')
@@ -121,7 +125,7 @@ def validate_scenario_project(root: Path, manifest: object, key: str) -> None:
             if task_id in tasks:
                 raise ValueError(f'任务标识在项目内重复：{task_id}')
             tasks[task_id], owners[task_id] = task, scenario_id
-            _validate_task(root, task)
+            _validate_task(root, task, development=development)
             edges[task_id] = [dependency['task_id'] for dependency in task['requires']]
         reachable = {task_id for entry in entries.values() for task_id in entry['task_ids']}
         for task in scenario_tasks.values():
@@ -174,14 +178,23 @@ def validate_scenario_project(root: Path, manifest: object, key: str) -> None:
                 raise ValueError('代码依赖只能引用工程修改任务')
 
 
-def _validate_task(root: Path, task: dict) -> None:
+def _validate_task(root: Path, task: dict, *, development: bool = False) -> None:
     if task.get('kind') not in TASK_KINDS:
         raise ValueError('场景任务类型不支持')
     for field in ('goal', 'prompt'):
         _text(task.get(field), field)
-    turns = task.get('max_turns', 4)
-    if type(turns) is not int or not 1 <= turns <= 8:
-        raise ValueError('任务正常回复轮次须为 1～8')
+    if development:
+        if task['kind'] != 'modify' or task.get('development_cycle') not in ('feature', 'bug'):
+            raise ValueError('完整开发任务必须声明真实需求或BUG及最终工程交付')
+        if 'max_turns' in task:
+            raise ValueError('完整开发周期按累计预算控制，不使用旧短题轮数限制')
+        _materials(root, task.get('owner_materials', []), 'disclosure')
+    else:
+        if 'development_cycle' in task or 'owner_materials' in task:
+            raise ValueError('完整开发元数据必须使用新内容版本')
+        turns = task.get('max_turns', 4)
+        if type(turns) is not int or not 1 <= turns <= 8:
+            raise ValueError('任务正常回复轮次须为 1～8')
     requires = task.get('requires')
     if not isinstance(requires, list):
         raise ValueError('任务必须显式声明真实依赖')
@@ -275,12 +288,16 @@ def scenario_summary(manifest: dict, *, include_tasks: bool = False) -> dict:
     result = {field: manifest[field] for field in
         ('project_key', 'title', 'category', 'description', 'seed_digest')}
     result['source'] = {field: manifest['source'][field] for field in ('repository', 'commit', 'license_files')}
-    result.update(content_schema=CONTENT_SCHEMA, scenario_count=len(manifest['scenarios']),
+    result.update(content_schema=manifest['schema'], scenario_count=len(manifest['scenarios']),
         task_count=sum(len(scenario['tasks']) for scenario in manifest['scenarios']))
     if include_tasks:
         result['scenarios'] = [{'id': scenario['id'], 'title': scenario['title'], 'goal': scenario['goal'],
             'tasks': [{field: task[field] for field in ('id', 'kind', 'goal', 'requires')}
                 for task in scenario['tasks']]} for scenario in manifest['scenarios']]
+        if manifest['schema'] == DEVELOPMENT_SCHEMA:
+            for scenario, public in zip(manifest['scenarios'], result['scenarios']):
+                for task, projected in zip(scenario['tasks'], public['tasks']):
+                    projected['development_cycle'] = task['development_cycle']
     return result
 
 

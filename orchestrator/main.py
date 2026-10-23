@@ -41,6 +41,8 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from fastapi.exceptions import RequestValidationError
+from fastapi.exception_handlers import request_validation_exception_handler
 from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr, ValidationError
 from requests.exceptions import RequestException
 from sse_starlette.sse import EventSourceResponse
@@ -54,6 +56,7 @@ from login_drafts import LoginDraftStore
 from physical_features import physical_features_summary
 from run_windows import normalize_run_window, run_window_snapshot
 from project_library import ProjectLibrary
+from project_requester_settings import ProjectRequesterSettings
 from project_scenarios import initialize_scenario_schema
 from project_iteration import PROJECT_RUN_KIND, PROJECT_RUN_KINDS, PROJECT_SCHEMA, ProjectIterationManager, initialize_plan_schema
 from project_verifier import ProjectVerifier
@@ -7883,11 +7886,12 @@ quota_guard: Optional[QuotaGuard] = None
 account_runtime: Optional[AccountRuntime] = None
 project_iterations: Optional[ProjectIterationManager] = None
 project_iteration_error: Optional[str] = None
+project_requester_settings: Optional[ProjectRequesterSettings] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, project_iterations, project_iteration_error
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, project_iterations, project_iteration_error, project_requester_settings
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -7906,6 +7910,7 @@ async def lifespan(app: FastAPI):
     quota_guard = QuotaGuard(runner)
     project_iterations = None
     project_iteration_error = None
+    project_requester_settings = ProjectRequesterSettings(BENCH_DATA / 'settings/project-requester.json')
     if account_runtime:
         library = None
         try:
@@ -7919,6 +7924,7 @@ async def lifespan(app: FastAPI):
                 ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image), scheduler.is_executing,
                 admission=_project_admission, execution_control=_project_execution_control,
                 schedule_admission=_project_schedule_admission, concurrency_limit=PER_ACCOUNT_CONCURRENCY)
+            project_iterations.dialogue = project_requester_settings.client()
             account_runtime.set_project_iterations(project_iterations)
             project_iterations.review_refresh = lambda account: account_runtime.reviews.retry_owner_refresh(account,_refresh_project_review_owner)
         except (ValueError, OSError) as error:
@@ -8078,6 +8084,20 @@ class RuntimeModelIn(BaseModel):
     default_model: Optional[str] = None
 
 
+class ProjectRequesterIn(BaseModel):
+    """保存一个外接需求方服务及多个可用模型。
+
+    :param base_url: OpenAI 兼容 HTTPS 根地址。
+    :param models: 按优先级排列的主用与备用模型。
+    :param api_key: 可选新密钥；留空沿用服务端当前密钥。
+    """
+
+    model_config = ConfigDict(extra='forbid')
+    base_url: StrictStr
+    models: list[StrictStr]
+    api_key: StrictStr | None = None
+
+
 class RuntimeEffortIn(BaseModel):
     """
     WebUI 保存普通 / 批量 run 思考预算的请求体。
@@ -8219,6 +8239,69 @@ def get_runtime_model():
     :return: 页面覆盖值、环境兜底值和当前生效值
     """
     return runtime_model_response()
+
+
+@app.exception_handler(RequestValidationError)
+async def safe_request_validation(request: Request, error: RequestValidationError):
+    """配置校验错误不回显用户输入的密钥，其它接口沿用默认处理。
+
+    :param request: 当前 HTTP 请求。
+    :param error: Pydantic 请求校验错误。
+    :return: 不包含秘密输入的错误响应。
+    """
+    if request.url.path == '/api/settings/project-requester':
+        return JSONResponse(status_code=422, content={'detail': '外接需求方配置字段类型不合法'})
+    return await request_validation_exception_handler(request, error)
+
+
+@app.get('/api/settings/project-requester')
+def get_project_requester():
+    """读取需求方服务配置，密钥只返回是否已配置。
+
+    :return: 配置来源、地址、模型优先级和就绪状态。
+    """
+    if project_requester_settings is None:
+        raise HTTPException(503, '需求方配置服务尚未就绪')
+    return project_requester_settings.public()
+
+
+@app.put('/api/settings/project-requester')
+def update_project_requester(body: ProjectRequesterIn):
+    """动态保存需求方配置，后续请求使用新客户端。
+
+    :param body: 一个服务地址、多个模型和可选新密钥。
+    :return: 保存后的脱敏配置。
+    """
+    if project_requester_settings is None:
+        raise HTTPException(503, '需求方配置服务尚未就绪')
+    try:
+        with project_requester_settings.lock:
+            client = project_requester_settings.save(body.base_url, body.models, body.api_key)
+            if project_iterations:
+                project_iterations.dialogue = client
+            return project_requester_settings.public()
+    except ValueError:
+        raise HTTPException(400, '需求方配置无效，请检查 HTTPS 地址、密钥及 1～8 个不重复的模型') from None
+    except OSError:
+        raise HTTPException(500, '需求方配置未能保存，现有配置继续生效') from None
+
+
+@app.delete('/api/settings/project-requester')
+def reset_project_requester():
+    """清除页面覆盖，恢复服务端环境配置。
+
+    :return: 恢复后的脱敏配置。
+    """
+    if project_requester_settings is None:
+        raise HTTPException(503, '需求方配置服务尚未就绪')
+    try:
+        with project_requester_settings.lock:
+            client = project_requester_settings.reset()
+            if project_iterations:
+                project_iterations.dialogue = client
+            return project_requester_settings.public()
+    except OSError:
+        raise HTTPException(500, '需求方配置未能恢复，现有配置继续生效') from None
 
 
 @app.put("/api/settings/runtime-model")
@@ -10337,7 +10420,7 @@ def get_project_instance_usage(iid: int) -> dict:
     :return: 每步骤的请求、输出和数据完整性。
     """
     instance = get_project_instance(iid)
-    if instance.get('content_schema') == 2:
+    if instance.get('content_schema') in (2, 3):
         return _project_manager().scenarios.usage(iid)
     steps = {}
     for attempt in instance["attempts"]:

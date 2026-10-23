@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "task_id": "FM-FX-01-DEV",
+  "criteria": [
+    {
+      "id": "independent-behavior",
+      "requirement": "All controlled native assertions must pass: preserve content and handler metadata separately from the body and actual handler, and ensure correct read/write round trips. Do not grade against a single required patch style.",
+      "evidence": []
+    },
+    {
+      "id": "compatibility",
+      "requirement": "Preserve existing Post construction, explicit handler identity, empty headers, null metadata, defaults overrides, and the flat semantics of to_dict.",
+      "evidence": [
+        "library/frontmatter/__init__.py:176",
+        "library/frontmatter/__init__.py:306"
+      ]
+    },
+    {
+      "id": "scope-and-regression",
+      "requirement": "Limit changes to the library's reading collision and necessary tests and documentation. Do not change business fields or add other proposed enhancements. Accept the checkpoint only after the applicable strict native regression checks pass.",
+      "evidence": []
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate facts, behavior, and constraints rather than keywords, answer length, or similarity to a reference answer.",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+  "version": 3
+}

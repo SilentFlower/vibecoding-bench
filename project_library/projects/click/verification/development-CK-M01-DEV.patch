@@ -1,0 +1,76 @@
+--- a/library/src/click/exceptions.py
++++ b/library/src/click/exceptions.py
+@@ -55,6 +55,7 @@
+         return self.message
+ 
+     def show(self, file: t.IO[t.Any] | None = None) -> None:
++        """显示受控错误与有序附注。@param file 输出流。@return None。"""
+         if file is None:
+             file = get_text_stderr()
+ 
+@@ -63,6 +64,9 @@
+             file=file,
+             color=self.show_color,
+         )
++        for note in getattr(self, "__notes__", ()):
++            if note:
++                echo(_("Note: {note}").format(note=note), file=file, color=self.show_color)
+ 
+ 
+ class UsageError(ClickException):
+@@ -85,6 +89,7 @@
+         self.cmd = self.ctx.command if self.ctx else None
+ 
+     def show(self, file: t.IO[t.Any] | None = None) -> None:
++        """显示受控错误与有序附注。@param file 输出流。@return None。"""
+         if file is None:
+             file = get_text_stderr()
+         color = None
+@@ -109,6 +114,9 @@
+             file=file,
+             color=color,
+         )
++        for note in getattr(self, "__notes__", ()):
++            if note:
++                echo(_("Note: {note}").format(note=note), file=file, color=color)
+ 
+ 
+ class BadParameter(UsageError):
+--- /dev/null
++++ b/library/tests/test_exceptions/test_click_exception.py
+@@ -0,0 +1,35 @@
++"""受控错误附注的公开原版失败回归。"""
++from io import StringIO
++
++import click
++from click.testing import CliRunner
++
++
++def test_order_error_notes_display_and_unnoted_control():
++    """基础错误须输出有序附注而不改变主消息或普通错误。@return None。"""
++    error = click.ClickException("Order unavailable")
++    error.add_note("Check local input")
++    error.add_note("")
++    error.add_note("咖啡\nsecond line")
++    output = StringIO()
++    error.show(file=output)
++    assert output.getvalue() == "Error: Order unavailable\nNote: Check local input\nNote: 咖啡\nsecond line\n"
++    assert error.format_message() == "Order unavailable"
++    plain = StringIO()
++    click.ClickException("plain").show(file=plain)
++    assert plain.getvalue() == "Error: plain\n"
++
++
++def test_order_usage_notes_keep_exit_and_usage():
++    """UsageError覆盖路径也必须展示附注，usage和退出码保持。@return None。"""
++    @click.command()
++    def ship():
++        """产生合成参数错误。@return None。"""
++        error = click.UsageError("Invalid order", ctx=click.get_current_context())
++        error.add_note("Check quantity")
++        raise error
++
++    result = CliRunner().invoke(ship)
++    assert result.exit_code == 2
++    assert result.stderr.count("Usage:") == 1
++    assert result.stderr.endswith("Error: Invalid order\nNote: Check quantity\n")

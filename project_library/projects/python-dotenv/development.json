@@ -1,0 +1,108 @@
+{
+  "schema": 3,
+  "project_key": "python-dotenv",
+  "title": "python-dotenv 配置接入与编辑开发任务",
+  "category": "配置与本地工具",
+  "description": "固定真实源码上的 2 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "7adb719502909d3fd4bdfbec74b9445fb6c735dfd4df52bd559e5f37407439f7",
+  "environment": "python-dotenv-py312",
+  "source": {
+    "repository": "https://github.com/theskumar/python-dotenv",
+    "commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DE-S04-DEV",
+      "title": "保留 set/unset 非目标记录的原始换行",
+      "goal": "保留 set/unset 非目标记录的原始换行",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DE-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DE-M01-DEV",
+          "kind": "modify",
+          "goal": "保留 set/unset 非目标记录的原始换行",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nPreserve the original text and newline bytes of every non-target parsed record when set_key or unset_key edits a UTF-8 file. Keep existing LF serialization of changed or newly appended target lines and existing return values, quoting, file modes, symlink behavior and failure cleanup. Add focused public tests. The attached reproduction and contract are complete; no earlier answer is required.",
+          "requires": [],
+          "materials": [
+            "materials/newline-reproduction.md",
+            "materials/newline-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/dotenv/main.py",
+            "library/tests/test_main.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DE-M01-DEV.rubric.json",
+            "native": "verification/newline.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DE-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "DE-S05-DEV",
+      "title": "跨行键在打开或创建文件前失败",
+      "goal": "跨行键在打开或创建文件前失败",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DE-M02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DE-M02-DEV",
+          "kind": "modify",
+          "goal": "跨行键在打开或创建文件前失败",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nMake set_key raise ValueError for a key containing CR or LF before opening rewrite or creating a destination file. Existing files must remain byte-identical and missing destination files must remain absent on rejection. Preserve normal keys, values, return values and other editing behavior. Add focused tests; do not broaden the accepted-key policy. This scene starts independently from the original baseline and the attachments are self-contained.",
+          "requires": [],
+          "materials": [
+            "materials/key-reproduction.md",
+            "materials/key-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/dotenv/main.py",
+            "library/tests/test_main.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DE-M02-DEV.rubric.json",
+            "native": "verification/keys.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DE-M02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

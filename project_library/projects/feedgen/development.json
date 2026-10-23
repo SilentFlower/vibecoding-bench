@@ -1,0 +1,64 @@
+{
+  "schema": 3,
+  "project_key": "feedgen",
+  "title": "Feedgen文档订阅开发任务",
+  "category": "RSS/Atom语义与序列化",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "95adae5e21c66cd84c7ed9cc536bbbaed9a15957361830d6b249c57560a6dddd",
+  "environment": "feedgen-py312",
+  "source": {
+    "repository": "https://github.com/lkiesow/python-feedgen",
+    "commit": "97260abb1793eb164c458c10b493690beb413f6d",
+    "license_files": [
+      "seed/library/license.bsd",
+      "seed/library/license.lgpl"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FG-S05-DEV",
+      "title": "修复Atom条目链接元数据丢失",
+      "goal": "修复Atom条目链接元数据丢失",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FG-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-M01-DEV",
+          "kind": "modify",
+          "goal": "修复Atom条目链接元数据丢失",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement the narrowly authorized link metadata repair and meaningful public regressions. Preserve all original controls and run the full applicable original regression.",
+          "requires": [],
+          "materials": [
+            "materials/link-repair.md",
+            "materials/public-test-example.py"
+          ],
+          "allowed_paths": [
+            "library/feedgen/entry.py",
+            "app/test_atom_link.py"
+          ],
+          "outcomes": [
+            "implemented_with_public_regression_tests"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FG-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FG-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

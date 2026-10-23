@@ -1,0 +1,62 @@
+{
+  "schema": 3,
+  "project_key": "tablib",
+  "title": "Tablib商品表开发任务",
+  "category": "表格导入、导出与字段对齐",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "439d40837853f736e747980b1e5bbd203f4ada2b1af7a8bb5ca80f3375b5ac79",
+  "environment": "tablib-py312",
+  "source": {
+    "repository": "https://github.com/jazzband/tablib",
+    "commit": "966876c76a6378557c1951badc1665b4d1375875",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TB-S04-DEV",
+      "title": "修复商品字典记录的字段错位",
+      "goal": "修复商品字典记录的字段错位",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-M01-DEV",
+          "kind": "modify",
+          "goal": "修复商品字典记录的字段错位",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement the supplied bounded mapping-import repair and public regressions. Only the two authorized files may change.",
+          "requires": [],
+          "materials": [
+            "materials/dict-alignment.md"
+          ],
+          "allowed_paths": [
+            "library/src/tablib/core.py",
+            "app/test_dict_import.py"
+          ],
+          "outcomes": [
+            "repaired_and_regression_verified"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

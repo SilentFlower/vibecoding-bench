@@ -1,0 +1,62 @@
+{
+  "schema": 3,
+  "project_key": "jmespath",
+  "title": "JMESPath业务查询开发任务",
+  "category": "JSON投影与查询语言",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "0ae4b57756cc847d9d8471515c6304711de220bfce1b2afacfe5a867bc1ce570",
+  "environment": "jmespath-py312",
+  "source": {
+    "repository": "https://github.com/jmespath/jmespath.py",
+    "commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "JM-S05-DEV",
+      "title": "修复嵌套JSON比较混淆布尔和数字",
+      "goal": "修复嵌套JSON比较混淆布尔和数字",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JM-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-M01-DEV",
+          "kind": "modify",
+          "goal": "修复嵌套JSON比较混淆布尔和数字",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement only the explicitly authorized recursive comparator repair and public regressions. Preserve every listed compatibility boundary and all frozen original tests.",
+          "requires": [],
+          "materials": [
+            "materials/equality-repair.md"
+          ],
+          "allowed_paths": [
+            "library/jmespath/visitor.py",
+            "app/test_json_equality.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JM-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JM-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "schema": 3,
+  "project_key": "python-frontmatter",
+  "title": "python-frontmatter 文档资料开发任务",
+  "category": "文档处理",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "a9181e19224379b7c3593996869c4c80f4b8afa19a4126d25bd0e2115f84eca2",
+  "environment": "python-frontmatter-py312",
+  "source": {
+    "repository": "https://github.com/eyeseast/python-frontmatter",
+    "commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FM-S02-DEV",
+      "title": "修复合法保留键元数据的读取冲突并保持兼容",
+      "goal": "修复合法保留键元数据的读取冲突并保持兼容",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FM-FX-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FM-FX-01-DEV",
+          "kind": "modify",
+          "goal": "修复合法保留键元数据的读取冲突并保持兼容",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nFix this reading issue. The document's content is a business summary field and must be preserved separately from the body; handler may also be a business field. Keep existing Post construction and ordinary document usage compatible, and add the necessary regression checks.\nFull reproduction: import frontmatter; text = \"---\\ncontent: 备用摘要\\n---\\n正文\"; frontmatter.loads(text) raises TypeError: Post.__init__() got multiple values for argument 'content'.\nYou may modify library/frontmatter, the related tests, and documentation. Preserve the existing flat output contract of Post.to_dict, and do not expand the scope to formatting preservation or deep merging.",
+          "requires": [],
+          "materials": [],
+          "allowed_paths": [
+            "library/frontmatter",
+            "library/tests",
+            "library/README.md",
+            "library/docs",
+            "app/tmp"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 3,
+            "rubric": "verification/FM-FX-01-DEV.rubric.json",
+            "native": "verification/repair.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FM-FX-01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

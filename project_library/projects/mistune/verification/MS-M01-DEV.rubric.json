@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "task_id": "MS-M01-DEV",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Distinguish None from provided empty text and pass valid empty documents through the normal renderer/output path. Satisfy pipe/message/file/priority/PTY controls without adding AST JSON features or changing plugins/controls; complete frozen original regression and public tests must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer.",
+  "version": 2
+}

@@ -1,0 +1,43 @@
+--- a/library/tenacity/wait.py
++++ b/library/tenacity/wait.py
+@@ -226,6 +226,9 @@
+     @override
+     def __call__(self, retry_state: "RetryCallState") -> float:
+         exponent = retry_state.attempt_number - 1
++        # 零贡献不应先求无关的大幂，再误走溢出封顶路径。
++        if self.multiplier == 0:
++            return max(max(0, self.min), min(0, self.max))
+         if (
+             self.multiplier > 0
+             and self.max > 0
+@@ -320,7 +323,8 @@
+     def __call__(self, retry_state: "RetryCallState") -> float:
+         jitter = random.uniform(0, self.jitter)
+         try:
+-            exp = self.exp_base ** (retry_state.attempt_number - 1)
++            # jitter 已按原顺序采样一次，零倍率只消去指数贡献。
++            exp = 0 if self.multiplier == 0 else self.exp_base ** (retry_state.attempt_number - 1)
+             result = self.multiplier * exp + jitter
+         except OverflowError:
+             result = self.max
+--- a/library/tests/test_tenacity.py
++++ b/library/tests/test_tenacity.py
+@@ -2425,3 +2425,18 @@
+ 
+ if __name__ == "__main__":
+     unittest.main()
++
++
++def test_zero_exponential_contribution_avoids_overflow() -> None:
++    """两个真实溢出通道必须保留下界与抖动。@return None。"""
++    from unittest.mock import patch
++
++    rs = tenacity.RetryCallState(tenacity.Retrying(), None, (), {})
++    rs.attempt_number = 2049
++    for multiplier in (0, 0.0):
++        for base in (2, 2.0):
++            assert tenacity.wait_exponential(multiplier=multiplier, exp_base=base, max=60)(rs) == 0
++            assert tenacity.wait_exponential(multiplier=multiplier, exp_base=base, min=3, max=60)(rs) == 3
++            with patch("tenacity.wait.random.uniform", return_value=0.25) as draw:
++                assert tenacity.wait_exponential_jitter(multiplier=multiplier, exp_base=base, max=60)(rs) == 0.25
++                draw.assert_called_once_with(0, 1)

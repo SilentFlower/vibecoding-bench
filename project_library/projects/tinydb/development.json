@@ -1,0 +1,115 @@
+{
+  "schema": 3,
+  "project_key": "tinydb",
+  "title": "TinyDB 本地订单开发任务",
+  "category": "数据存储",
+  "description": "固定真实源码上的 2 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "d478acdf6f6cf1c05645ad6ec2ceadd0a83d76755a2df6c34689e4bcae52cac7",
+  "environment": "tinydb-py312",
+  "source": {
+    "repository": "https://github.com/msiemens/tinydb",
+    "commit": "edff96aeb2616402e9489d46e90a592c05565621",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/docs/_themes/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TD-S02-DEV",
+      "title": "让 fragment 缓存身份包含完整字段路径",
+      "goal": "让 fragment 缓存身份包含完整字段路径",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TD-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-M01-DEV",
+          "kind": "modify",
+          "goal": "让 fragment 缓存身份包含完整字段路径",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nFix the nested fragment query-cache collision demonstrated here. Queries with the same fragment on different complete field paths must return their own matching documents regardless of evaluation order. Preserve root-level fragments, missing-field behavior, normal query caching, and the uncacheable map-path contract. Add focused public regression coverage without changing storage APIs or private verification files. The attached reproduction is sufficient; no earlier answer is required.",
+          "requires": [],
+          "materials": [
+            "materials/tags-report.md",
+            "materials/fragment-reproducer.py",
+            "materials/fragment-observed.txt",
+            "materials/fragment-repair.md"
+          ],
+          "allowed_paths": [
+            "library/tinydb/queries.py",
+            "library/tests/test_queries.py",
+            "library/tests/test_tables.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TD-M01-DEV.rubric.json",
+            "native": "verification/fragment.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TD-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TD-S03-DEV",
+      "title": "让有限一次性规则与列表规则更新结果一致",
+      "goal": "让有限一次性规则与列表规则更新结果一致",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TD-M02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-M02-DEV",
+          "kind": "modify",
+          "goal": "让有限一次性规则与列表规则更新结果一致",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nMake update_multiple apply a finite one-shot iterable of update rules to all matching documents just as it applies an equivalent list or tuple. Preserve rule order, in-place callback behavior, repeated returned IDs, and existing storage interfaces. If enumerating the rules fails, no part of those rules should have been applied. Add focused public regressions; do not introduce general transaction semantics or modify private verification files. The attached reproduction is self-contained; this scene starts from the original baseline.",
+          "requires": [],
+          "materials": [
+            "materials/rule-order.py",
+            "materials/rule-order-observed.txt",
+            "materials/generator-reproducer.py",
+            "materials/generator-observed.txt",
+            "materials/generator-repair.md"
+          ],
+          "allowed_paths": [
+            "library/tinydb/table.py",
+            "library/tests/test_tinydb.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TD-M02-DEV.rubric.json",
+            "native": "verification/batch.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TD-M02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

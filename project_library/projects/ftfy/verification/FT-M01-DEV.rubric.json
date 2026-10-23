@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "task_id": "FT-M01-DEV",
+  "source_commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "The nonexplaining encoding branch forwards the full actual TextFixerConfig. Independent mixed-language and compound-disabled controls retain their literal inputs; kwargs and convenience functions agree with those policies. Defaults still repairschÃ¶n toschön,fix_encodingFalse remains disabled,explainFalse returnsNone and enabled explanations remain replayable. Only the two authorized files may change.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer.",
+  "version": 2
+}

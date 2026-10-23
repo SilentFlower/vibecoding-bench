@@ -1,0 +1,63 @@
+{
+  "schema": 3,
+  "project_key": "mistune",
+  "title": "Mistune文档处理开发任务",
+  "category": "文档解析与本地转换",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "69380eb6a395d926252293d0f9635ee0a671c1d7edccad33c6ecda43593b3aa5",
+  "environment": "mistune-py312",
+  "source": {
+    "repository": "https://github.com/lepture/mistune",
+    "commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MS-S03-DEV",
+      "title": "修复空文档CLI并保留真实输出副作用",
+      "goal": "修复空文档CLI并保留真实输出副作用",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MS-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-M01-DEV",
+          "kind": "modify",
+          "goal": "修复空文档CLI并保留真实输出副作用",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement the complete public empty-document CLI contract, including actual -o file creation, explicit empty-message precedence and nonblocking interactive absence. Preserve nonempty/missing-file behavior and modify only the authorized implementation/test files with meaningful original-failing public tests.",
+          "requires": [],
+          "materials": [
+            "materials/empty-cases.md",
+            "materials/empty-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/mistune/__main__.py",
+            "library/tests/test_cli.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MS-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MS-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

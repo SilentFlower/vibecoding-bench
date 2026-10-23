@@ -1,0 +1,69 @@
+--- /dev/null
++++ b/app/test_formula_optout.py
+@@ -0,0 +1,55 @@
++"""通用公式转换选项的最终工作簿公开回归。"""
++from io import BytesIO
++import unittest
++import xml.etree.ElementTree as ET
++from zipfile import ZipFile
++
++from xlsxwriter import Workbook
++
++
++NS = {'s': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
++
++
++class FormulaOptOut(unittest.TestCase):
++    """分别核字面值、默认公式和显式公式。"""
++
++    def workbook(self, options, populate):
++        """读取实际保存后的单元格和文本。@param options 配置。@param populate 写入函数。@return XML和文本。"""
++        output = BytesIO()
++        book = Workbook(output, {'in_memory': True, **options})
++        populate(book.add_worksheet())
++        book.close()
++        with ZipFile(output) as archive:
++            sheet = ET.fromstring(archive.read('xl/worksheets/sheet1.xml'))
++            strings = []
++            if 'xl/sharedStrings.xml' in archive.namelist():
++                strings = [''.join(item.itertext()) for item in ET.fromstring(archive.read('xl/sharedStrings.xml'))]
++            return {cell.attrib['r']: cell for cell in sheet.findall('.//s:c', NS)}, strings
++
++    def test_disabled_keeps_both_expression_forms_literal(self):
++        """禁止转换时两种形式均不产生公式节点。@return None。"""
++        cells, strings = self.workbook({'strings_to_formulas': False},
++            lambda sheet: [sheet.write(0, 0, '=1+2'), sheet.write(1, 0, '{=SUM(1,2)}')])
++        for address, expected in [('A1', '=1+2'), ('A2', '{=SUM(1,2)}')]:
++            self.assertIsNone(cells[address].find('s:f', NS))
++            self.assertEqual(strings[int(cells[address].findtext('s:v', namespaces=NS))], expected)
++
++    def test_default_still_detects_both_forms(self):
++        """默认转换能力不能整体关闭。@return None。"""
++        cells, _ = self.workbook({}, lambda sheet: [sheet.write(0, 0, '=1+2'), sheet.write(1, 0, '{=SUM(1,2)}')])
++        self.assertIsNotNone(cells['A1'].find('s:f', NS))
++        self.assertEqual(cells['A2'].find('s:f', NS).attrib['t'], 'array')
++
++    def test_explicit_formula_is_independent_of_generic_flag(self):
++        """显式写公式仍按授权生成公式部件。@return None。"""
++        cells, _ = self.workbook({'strings_to_formulas': False},
++            lambda sheet: [sheet.write_formula(0, 0, '=1+2', None, 3), sheet.write_formula(1, 0, '{=SUM(1,2)}', None, 3)])
++        self.assertEqual(cells['A1'].findtext('s:v', namespaces=NS), '3')
++        self.assertEqual(cells['A2'].find('s:f', NS).attrib['t'], 'array')
++
++    def test_explicit_text_and_ordinary_number_are_preserved(self):
++        """独立文本API和数值分派保持。@return None。"""
++        cells, strings = self.workbook({}, lambda sheet: [sheet.write_string(0, 0, '{=SUM(1,2)}'), sheet.write(1, 0, 5)])
++        self.assertIsNone(cells['A1'].find('s:f', NS))
++        self.assertIn('{=SUM(1,2)}', strings)
++        self.assertEqual(cells['A2'].findtext('s:v', namespaces=NS), '5')
+--- a/library/xlsxwriter/worksheet.py
++++ b/library/xlsxwriter/worksheet.py
+@@ -528,7 +528,7 @@
+         if self.strings_to_formulas and token.startswith("="):
+             return self._write_formula(row, col, *args)
+ 
+-        if token.startswith("{=") and token.endswith("}"):
++        if self.strings_to_formulas and token.startswith("{=") and token.endswith("}"):
+             return self._write_formula(row, col, *args)
+ 
+         # pylint: disable=too-many-boolean-expressions

@@ -1,0 +1,40 @@
+--- a/library/frontmatter/__init__.py
++++ b/library/frontmatter/__init__.py
+@@ -191,7 +191,10 @@
+     text = u(text, encoding)
+     handler = handler or detect_format(text, handlers)
+     metadata, content = parse(text, encoding, handler, **defaults)
+-    return Post(content, handler, **metadata)
++    # 先传正文与实际处理器，再写元数据，避免合法业务键与构造形参冲突。
++    post = Post(content, handler)
++    post.metadata.update(metadata)
++    return post
+ 
+ 
+ def dump(
+--- /dev/null
++++ b/library/tests/test_development_cycle.py
+@@ -0,0 +1,23 @@
++"""保留键业务元数据的公开回归。"""
++import frontmatter
++import pytest
++
++
++@pytest.mark.parametrize("header", ["content: 备用摘要", "handler: 业务字段", "content: 摘要\nhandler: 业务字段"])
++def test_business_reserved_metadata_roundtrip(header):
++    """读取与往返时业务保留键不能覆盖正文或处理器。@param header 业务头部。@return None。"""
++    text = "---\n" + header + "\n---\n正文"
++    expected, body = frontmatter.parse(text)
++    post = frontmatter.loads(text)
++    assert post.metadata == expected
++    assert post.content == body == "正文"
++    assert post.handler is not None
++    restored = frontmatter.loads(frontmatter.dumps(post))
++    assert restored.metadata == expected
++    assert restored.content == body
++
++
++def test_original_constructor_and_flat_export():
++    """原构造及扁平导出保持既有合同。@return None。"""
++    post = frontmatter.Post("body", title="normal")
++    assert post.to_dict() == {"title": "normal", "content": "body"}

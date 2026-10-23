@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "task_id": "TD-M01-DEV",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "behavior",
+      "requirement": "The independent native fragment matrix and the fixed complete upstream regression must pass. Distinct complete paths must not share results in either evaluation order while preserving root/empty/missing/composed queries and uncacheable map paths. Do not disable all caching or special-case the example field names.",
+      "evidence": []
+    },
+    {
+      "id": "delivery-tests",
+      "requirement": "Deliver meaningful public regression tests within the allowed files that fail for the original path collision and exercise order/path or storage controls. Inspect candidate implementation and actual test assertions; a prose claim, no tests, or weakened assertions is incomplete.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Limit edits to the authorized query implementation and public tests. Preserve storage APIs and normal caching semantics; do not alter private verification or dependencies.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and constraints. Accept concise or equivalent valid answers; do not grade keyword matching, answer length, or similarity to a reference answer.",
+  "version": 2
+}

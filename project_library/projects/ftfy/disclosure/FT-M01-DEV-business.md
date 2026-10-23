@@ -1,0 +1,12 @@
+# Business scope
+
+Implement only the explicitly authorized complete-config forwarding repair and public regressions. Preserve defaults and all original tests.
+
+# Investigation topics
+
+
+
+# Supplied business material: materials/explain-repair.md
+
+Explicit authorization: change only library/ftfy/__init__.py and add app/test_explain_config.py. Disabling explain must only suppress the explanation,not reset caller-selected encoding options. In particular,decode_inconsistent_utf8=False must retain "中文 cafÃ©",and both decode_inconsistent_utf8=False plus restore_byte_a0=False must retain "voilÃ le travail",with explainTrue and False. Preserve the complete TextFixerConfig,kwargs overrides,fix_text/fix_text_segment behavior,default repairs,fix_encoding=False and replayable explanations. Add meaningful public unittest regressions; preserve all original tests,doctests and known-failure markers. Do not broaden the repair to max_decode_length,UTF-16 line splitting,encoding heuristics or new APIs.
+

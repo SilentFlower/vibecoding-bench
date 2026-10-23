@@ -1,0 +1,34 @@
+--- a/library/tests/test_items.py
++++ b/library/tests/test_items.py
+@@ -1683,3 +1683,19 @@
+         _ = 123 in table
+     # membership must not resolve values or mutate the document
+     assert doc.as_string() == content
++
++
++def test_inline_dotted_last_leaf_retains_empty_parents() -> None:
++    """叶子删除必须保留仍存在的逻辑父表。@return None。"""
++    for source, path, expected in [
++        ('t = {a="", b.c=1, d=1}\n', ('b', 'c'), {"a": "", "b": {}, "d": 1}),
++        ('t = {b.c=1}\n', ('b', 'c'), {"b": {}}),
++        ('t = {b.c.d=1}\n', ('b', 'c', 'd'), {"b": {"c": {}}}),
++    ]:
++        doc = parse(source)
++        parent = doc["t"]
++        for part in path[:-1]:
++            parent = parent[part]
++        del parent[path[-1]]
++        assert doc.unwrap() == {"t": expected}
++        assert parse(doc.as_string()).unwrap() == {"t": expected}
+--- a/library/tomlkit/items.py
++++ b/library/tomlkit/items.py
+@@ -2214,6 +2214,9 @@
+         """Render a table materialized from a dotted key as a list of
+         ``prefix.child = value`` strings, recursing into nested dotted
+         children."""
++        # 删除叶子只留下 Null 占位时，父键仍存在，不能展平为空串。
++        if not any(k is not None for k, _ in table.value.body):
++            return [f"{key.as_string()}{key.sep or ' = '}{{}}"]
+         prefix = f"{key.as_string()}.{key.sep}"
+         parts = []
+         for k, v in table.value.body:

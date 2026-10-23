@@ -1,0 +1,51 @@
+--- a/library/path/__init__.py
++++ b/library/path/__init__.py
+@@ -1777,8 +1777,8 @@
+ 
+         try:
+             yield readable, writable
+-        except Exception:
+-            # move backup back
++        except BaseException:
++            # 用户块的取消和退出也要先恢复备份，再传播原始异常。
+             readable.close()
+             writable.close()
+             self.remove_p()
+--- a/library/tests/test_path.py
++++ b/library/tests/test_path.py
+@@ -1401,3 +1401,35 @@
+     def test_invalid_handler(self):
+         with pytest.raises(ValueError):
+             path.Handlers._resolve('raise')
++
++
++def test_in_place_recovers_original_after_keyboard_interrupt(tmp_path):
++    """文本重写取消必须恢复原字节并传播同一中断。@param tmp_path 临时目录。@return None。"""
++    document = Path(str(tmp_path)) / 'document.txt'
++    original = '茶\r\noriginal\n'.encode('utf-8')
++    document.write_bytes(original)
++    interruption = KeyboardInterrupt('synthetic cancellation')
++    with pytest.raises(KeyboardInterrupt) as caught:
++        with document.in_place(encoding='utf-8') as (reader, writer):
++            writer.write('partial')
++            raise interruption
++    assert caught.value is interruption
++    assert document.bytes() == original
++    assert reader.closed and writer.closed
++    assert not Path(str(document) + '.bak').exists()
++
++
++def test_in_place_recovers_original_after_system_exit(tmp_path):
++    """二进制退出与自定义备份同样恢复原内容。@param tmp_path 临时目录。@return None。"""
++    document = Path(str(tmp_path)) / 'document.bin'
++    original = b'\x00\xff\r\noriginal'
++    document.write_bytes(original)
++    interruption = SystemExit(19)
++    with pytest.raises(SystemExit) as caught:
++        with document.in_place(mode='rb', backup_extension='.saved') as (reader, writer):
++            writer.write(b'partial')
++            raise interruption
++    assert caught.value is interruption
++    assert document.bytes() == original
++    assert reader.closed and writer.closed
++    assert not Path(str(document) + '.saved').exists()

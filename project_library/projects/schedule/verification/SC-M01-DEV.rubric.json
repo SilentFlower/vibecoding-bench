@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "task_id": "SC-M01-DEV",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "comparison": "Evaluate behavior, evidence, assumptions and scope. Accept concise equivalent valid answers; do not grade keywords, length, reference wording or a particular patch style.",
+  "criteria": [
+    {
+      "id": "controlled-behavior",
+      "requirement": "All independent native assertions must pass: positive-delay zero/one/three jobs, exact interleaving, snapshot additions and cancellation, callback arguments/decorator use, zero-delay behavior, and exception propagation without extra sleep.",
+      "evidence": [
+        "library/schedule/__init__.py:103-121",
+        "materials/run-all-contract.md"
+      ]
+    },
+    {
+      "id": "focused-public-tests",
+      "requirement": "Deliver meaningful focused public tests in library/test_schedule.py covering the original tail-delay failure and empty/single-job counterexamples, plus important snapshot/cancellation/exception compatibility. Inspect the supplied candidate test assertions; independent native success alone does not fulfill the public-test requirement.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope-regression",
+      "requirement": "Only the authorized implementation and public test file may change. Preserve existing scheduling behavior and pass the complete frozen applicable upstream regression collection. Do not pre-apply the unrelated repr repair from another scenario.",
+      "evidence": [
+        "library/schedule/__init__.py:103-121",
+        "materials/run-all-contract.md"
+      ]
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "version": 2
+}

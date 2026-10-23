@@ -1,0 +1,31 @@
+--- a/library/sqlite_utils/db.py
++++ b/library/sqlite_utils/db.py
+@@ -3770,6 +3770,8 @@
+         :param tokenize: Custom SQLite tokenizer to use, for example ``"porter"`` to enable Porter stemming.
+         :param replace: Should any existing FTS index for this table be replaced by the new one?
+         """
++        # 列名会被建表、填充和触发器重复使用，先冻结有限输入。
++        columns = tuple(columns)
+         create_fts_sql = (
+             textwrap.dedent("""
+             CREATE VIRTUAL TABLE {table_fts} USING {fts_version} (
+--- a/library/tests/test_fts.py
++++ b/library/tests/test_fts.py
+@@ -777,3 +777,17 @@
+     result = CliRunner().invoke(cli_module.cli, ["enable-fts", db_path, "v", "text"])
+     assert result.exit_code == 1
+     assert result.output.strip() == "Error: Table v is actually a view"
++
++
++@pytest.mark.parametrize("fts_version", ["FTS4", "FTS5"])
++@pytest.mark.parametrize("create_triggers", [False, True])
++def test_finite_one_shot_columns_preserve_fts(fts_version, create_triggers):
++    """一次性列名在后续SQL仍可复用。@param fts_version 版本。@param create_triggers 触发器。@return None。"""
++    db = Database(memory=True)
++    table = db["oneshot"].insert({"id": 1, "body": "azure"}, pk="id")
++    assert table.enable_fts(iter(["body"]), fts_version=fts_version,
++                            create_triggers=create_triggers) is table
++    assert [row["id"] for row in table.search("azure")] == [1]
++    table.insert({"id": 2, "body": "violet"})
++    assert [row["id"] for row in table.search("violet")] == ([2] if create_triggers else [])
++    db.close()

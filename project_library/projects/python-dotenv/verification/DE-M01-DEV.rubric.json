@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "task_id": "DE-M01-DEV",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "correctness",
+      "requirement": "The independent newline matrix and full frozen upstream regression must pass. Preserve non-target records byte-for-byte across CRLF/LF/CR/mixed cases while retaining target LF, existing append separator, quoting, modes, symlink and cleanup behavior. Do not change global read-only semantics.",
+      "evidence": [
+        "library/src/dotenv/main.py:162-223",
+        "library/src/dotenv/main.py:259-329",
+        "materials/newline-contract.md",
+        "materials/newline-reproduction.md",
+        "materials/newline-contract.md"
+      ]
+    },
+    {
+      "id": "delivery-tests",
+      "requirement": "Deliver meaningful focused public tests within the allowed test file. They must exercise the reported defect with assertions that fail against the original implementation and preserve normal controls. Inspect actual candidate files rather than accepting a prose claim.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Only edit the authorized implementation and public test file. Do not modify private verification, dependencies or unrelated behavior. Preserve the stated compatibility boundary.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate factual grounding, actual business behavior and explicit constraints. Accept concise or equivalent valid answers; do not grade keyword matching, length or similarity to a reference.",
+  "version": 2
+}

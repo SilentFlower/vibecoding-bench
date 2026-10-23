@@ -71,6 +71,7 @@ function projectStatus(status, domain = 'legacy') {
     evaluating: '独立验收中', waiting_material: '待材料', waiting_release: '候选已封存，等待释放',
     review_ready: '等待同模型评审', review_queued: '评审已排队', waiting_review_release: '评审完成，等待释放',
     uncertain: '评审受阻', exhausted: '预算或次数耗尽', mechanical_running: '原生验收中',
+    dialogue_wait: '需求方服务暂不可用，等待恢复', dialogue_done: '交流已保存，待继续',
     error: '验收异常', cancelled: '已停止，未验收', success: '执行结束', timeout: '超时', auth_failed: '认证失效'})[status] || status || '未知';
 }
 
@@ -101,7 +102,7 @@ function updateProjectSelection() {
   const capacity = Math.max(1, Math.min(limit, selected, Number(form.elements.active_projects.value) || 1));
   form.elements.concurrency.max = capacity;
   if (Number(form.elements.concurrency.value) > capacity) form.elements.concurrency.value = capacity;
-  const maximumSteps = state.projectCatalog.content_schema === 2 ? 100 : Math.max(...state.projectCatalog.projects.filter(p =>
+  const maximumSteps = [2, 3].includes(state.projectCatalog.content_schema) ? 100 : Math.max(...state.projectCatalog.projects.filter(p =>
     $$('input[name="project_keys"]:checked', form).some(input => input.value === p.project_key)).map(p => p.step_count), 1);
   form.elements.rotation_steps.max = maximumSteps;
   form.elements.steps_per_plan.max = maximumSteps;
@@ -116,7 +117,7 @@ function updateProjectSelection() {
 async function renderProjects() {
   try {
     const loaded = await Promise.allSettled([
-      API('/accounts'), API('/project-catalog'), API('/project-iteration-batches'),
+      API('/accounts'), API('/project-catalog'), API('/project-iteration-batches'), API('/settings/project-requester'),
     ]);
     if (loaded[0].status === 'rejected') throw loaded[0].reason;
     if (loaded[2].status === 'rejected') throw loaded[2].reason;
@@ -126,7 +127,10 @@ async function renderProjects() {
     state.accounts = accounts;
     state.projectCatalog = catalog;
     state.projectBatches = batches;
-    $('#project-library-count').textContent = catalog.content_schema === 2
+    bindProjectRequesterForm(loaded[3].status === 'fulfilled' ? loaded[3].value : null);
+    $('#project-library-count').textContent = catalog.content_schema === 3
+      ? `${catalog.admission?.length || catalog.projects.length} 个项目已重审 · ${catalog.projects.length} 个可用 · ${catalog.projects.reduce((n, p) => n + p.task_count, 0)} 项完整需求／BUG`
+      : [2, 3].includes(catalog.content_schema)
       ? `${catalog.projects.length} 个项目 · ${catalog.projects.reduce((n, p) => n + p.scenario_count, 0)} 个场景 · ${catalog.projects.reduce((n, p) => n + p.task_count, 0)} 个任务`
       : `${catalog.projects.length} 个项目 · ${catalog.projects.reduce((n, p) => n + p.step_count, 0)} 个步骤`;
     const form = $('#project-batch-form');
@@ -134,15 +138,18 @@ async function renderProjects() {
       if (form.elements[key] && !form.elements[key].dataset.userEdited) form.elements[key].value = value;
     });
     form.oninput = event => { if (event.target.name) event.target.dataset.userEdited = 'true'; };
-    $$('[data-scenario-budgets]', form).forEach(node => node.classList.toggle('hidden', catalog.content_schema !== 2));
-    form.elements.steps_per_plan.closest('label').querySelector('.lbl').textContent = catalog.content_schema === 2 ? '每个逻辑计划任务数' : '$ steps_per_plan · 每次 CLI 计划步数';
-    form.elements.timeout_sec.closest('label').querySelector('.lbl').textContent = catalog.content_schema === 2 ? '候选单次工作上限（秒）' : '$ timeout_sec · 单次计划超时（秒）';
+    $$('[data-scenario-budgets]', form).forEach(node => node.classList.toggle('hidden', ![2, 3].includes(catalog.content_schema)));
+    form.elements.steps_per_plan.closest('label').querySelector('.lbl').textContent = [2, 3].includes(catalog.content_schema) ? '每个逻辑计划任务数' : '$ steps_per_plan · 每次 CLI 计划步数';
+    form.elements.timeout_sec.closest('label').querySelector('.lbl').textContent = [2, 3].includes(catalog.content_schema) ? '候选单次工作上限（秒）' : '$ timeout_sec · 单次计划超时（秒）';
+    $('[data-scenario-budget-hint]', form).textContent = catalog.content_schema === 3
+      ? '同一需求或 BUG 在原会话完成调查、方案确认和实施，交付后才验收。超时续做保留累计预算；需求方外接模型用量单列。'
+      : '同模型独立会话评审，复用当前账号及额度，用量单列。超时接续保留累计预算；首次执行后最多两次继续／修正。';
     form.elements.account_id.innerHTML = accounts.map(a => `<option value="${a.id}">${escapeHTML(a.name)}</option>`).join('') || '<option value="">请先添加可用账号</option>';
     const choices = $('#project-choice-list');
     choices.innerHTML = catalog.projects.map(p => `<label class="batch-topic">
       <input type="checkbox" name="project_keys" value="${escapeHTML(p.project_key)}" checked />
       <span class="batch-topic-title">${escapeHTML(p.title)}<span class="topic-cat">${escapeHTML(p.category)} · ${escapeHTML(p.project_key)}</span></span>
-      <span class="hint">${p.content_schema === 2 ? `${p.scenario_count} 场景 / ${p.task_count} 任务` : `${p.step_count} 步`}</span>
+      <span class="hint">${[2, 3].includes(p.content_schema) ? `${p.scenario_count} 场景 / ${p.task_count} 任务` : `${p.step_count} 步`}</span>
     </label>`).join('') + '<p id="project-filter-empty" class="hint empty-panel hidden">没有匹配的项目</p>';
     choices.onchange = updateProjectSelection;
     form.elements.account_id.onchange = updateProjectSelection;
@@ -174,14 +181,16 @@ async function renderProjects() {
       $('#project-filter-empty').classList.toggle('hidden', items.some(item => !item.classList.contains('hidden')));
     };
     updateProjectSelection();
-    $('#project-catalog-list').innerHTML = catalog.projects.map(p => `<button type="button" class="project-catalog-item" data-project-preview="${escapeHTML(p.project_key)}"><strong>${escapeHTML(p.title)}</strong><span class="muted">${escapeHTML(p.category)} · ${p.content_schema === 2 ? `${p.task_count} 个任务` : `${p.step_count} 步`}</span></button>`).join('');
+    const blocked = (catalog.admission || []).filter(item => item.status === 'blocked');
+    $('#project-catalog-list').innerHTML = catalog.projects.map(p => `<button type="button" class="project-catalog-item" data-project-preview="${escapeHTML(p.project_key)}"><strong>${escapeHTML(p.title)}</strong><span class="muted">${escapeHTML(p.category)} · ${[2, 3].includes(p.content_schema) ? `${p.task_count} 个任务` : `${p.step_count} 步`}</span></button>`).join('')
+      + (blocked.length ? `<details><summary>${blocked.length} 个项目待补齐交付与验收</summary><ul>${blocked.map(item => `<li><strong>${escapeHTML(item.project_key)}</strong>：${escapeHTML(item.reason)}</li>`).join('')}</ul></details>` : '');
     $('#project-catalog-list').onclick = async event => {
       const button = event.target.closest('[data-project-preview]');
       if (!button) return;
       try {
         const project = await API(`/project-catalog/${encodeURIComponent(button.dataset.projectPreview)}`);
         endRunDetail();
-        const goals = project.content_schema === 2 ? project.scenarios.flatMap(scene => scene.tasks) : project.steps;
+        const goals = [2, 3].includes(project.content_schema) ? project.scenarios.flatMap(scene => scene.tasks) : project.steps;
         $('#modal-content').innerHTML = `<h3>${escapeHTML(project.title)}</h3><p>${escapeHTML(project.description)}</p><ol>${goals.map(step => `<li>${escapeHTML(step.goal.split(/Interface contract:|接口契约：/)[0].trim())}</li>`).join('')}</ol>`;
         openModal('#modal');
       } catch (error) { alert('读取项目路线失败：' + error.message); }
@@ -205,6 +214,60 @@ async function renderProjects() {
 }
 
 /**
+ * 编辑一个需求方服务的模型优先级，密钥只写入服务端且不缓存到页面状态。
+ * @param {object|null} configuration 服务端脱敏配置，读取失败时为 null
+ * @return {void}
+ */
+function bindProjectRequesterForm(configuration) {
+  const form = $('#project-requester-form');
+  if (!form) return;
+  const status = $('#project-requester-status');
+  const reset = $('[data-requester-reset]', form);
+  const submit = $('[type="submit"]', form);
+  const paint = value => {
+    form.elements.base_url.value = value?.base_url || '';
+    form.elements.models.value = (value?.models || []).join('\n');
+    form.elements.api_key.value = '';
+    form.elements.api_key.required = !value?.api_key_configured;
+    form.elements.api_key.placeholder = value?.api_key_configured ? '已配置；留空沿用，填写则替换' : '请输入 API Key';
+    status.textContent = !value ? '配置读取失败，请刷新后重试。' : value.error
+      || `${value.ready ? '配置已就绪' : '尚未配置'} · ${value.source === 'page' ? '页面配置' : '环境配置'} · 密钥${value.api_key_configured ? '已配置' : '未配置'}${value.models?.length ? ` · 调用顺序：${value.models.join(' → ')}` : ''}`;
+  };
+  paint(configuration);
+  submit.disabled = !configuration;
+  reset.disabled = !configuration;
+  const save = async restore => {
+    if (form.dataset.submitting === 'true') return;
+    const models = form.elements.models.value.split(/\r?\n/).map(value => value.trim()).filter(Boolean);
+    if (!restore && (models.length < 1 || models.length > 8 || new Set(models).size !== models.length)) {
+      alert('请填写 1～8 个不重复的模型，每行一个。');
+      return;
+    }
+    form.dataset.submitting = 'true';
+    submit.disabled = true;
+    reset.disabled = true;
+    try {
+      const options = restore ? {method: 'DELETE'} : {method: 'PUT', body: JSON.stringify({
+        base_url: form.elements.base_url.value.trim(), models, api_key: form.elements.api_key.value.trim() || null,
+      })};
+      const saved = await API('/settings/project-requester', options);
+      // 只有服务端确认写入后才清空输入，失败时保留用户正在编辑的地址和模型列表。
+      paint(saved);
+      status.textContent = `已保存，后续请求生效。${status.textContent}`;
+    } catch (error) {
+      form.elements.api_key.value = '';
+      alert('保存需求方模型配置失败：' + error.message);
+    } finally {
+      delete form.dataset.submitting;
+      submit.disabled = false;
+      reset.disabled = false;
+    }
+  };
+  form.onsubmit = event => { event.preventDefault(); save(false); };
+  reset.onclick = () => save(true);
+}
+
+/**
  * 创建只包含元数据的暂停批次。
  * @param {SubmitEvent} event 表单事件
  * @return {Promise<void>} 创建完成
@@ -223,7 +286,7 @@ async function createProjectBatch(event) {
       account_id: Number(form.elements.account_id.value), name: form.elements.name.value,
       project_keys: projectKeys,
       ...Object.fromEntries(['concurrency', 'active_projects', 'rotation_steps', 'steps_per_plan',
-        'timeout_sec', 'interval_min_sec', 'interval_max_sec', ...(state.projectCatalog.content_schema === 2
+        'timeout_sec', 'interval_min_sec', 'interval_max_sec', ...([2, 3].includes(state.projectCatalog.content_schema)
           ? ['task_budget_sec', 'review_timeout_sec', 'review_budget_sec'] : [])].map(key => [key, Number(form.elements[key].value)])),
     })});
     state.projectBatches = await API('/project-iteration-batches');
@@ -251,7 +314,7 @@ function paintProjectBatches() {
     <td>${batch.id}</td><td class="project-name">${escapeHTML(batch.name)}</td>
     <td>${escapeHTML(names[batch.account_id] || `账号 #${batch.account_id}`)}</td>
     <td>${projectStatusPill(batch.status, batch.policy.schema === 3 ? 'batch' : 'legacy')}</td>
-    <td>${batch.counts.completed || 0} / ${Object.values(batch.counts).reduce((sum, count) => sum + count, 0)} 已完成</td>
+    <td>${batch.content_schema === 3 ? `${batch.task_counts.passed || 0} / ${Object.values(batch.task_counts).reduce((sum, count) => sum + count, 0)} 完整任务交付通过` : `${batch.counts.completed || 0} / ${Object.values(batch.counts).reduce((sum, count) => sum + count, 0)} 已完成`}</td>
     <td><button type="button" class="btn btn-sm" data-project-batch="${batch.id}" ${batch.id === state.projectBatchId ? 'disabled' : ''}>${batch.id === state.projectBatchId ? '已选中' : '查看详情'}</button></td>
   </tr>`).join('') || '<tr><td colspan="6" class="muted empty-cell">暂无迭代批次，选择项目后创建第一个批次。</td></tr>';
   host.onclick = event => {
@@ -314,10 +377,10 @@ function paintProjectBatch() {
     ${batch.status === 'active' ? '<button class="btn btn-sm" type="button" data-project-action="pause">暂停</button>' : ''}
     ${!['stopped', 'completed', 'stopping'].includes(batch.status) ? '<button class="btn btn-sm btn-danger" type="button" data-project-action="stop">停止批次</button>' : ''}</div></header>
     ${batch.error ? `<p class="warmup-error">${escapeHTML(batch.error)}</p>` : ''}
-    <p class="hint project-description">${scenarioMode ? `并发 ${batch.policy.concurrency}；活动池 ${batch.policy.active_projects}；每个逻辑计划 ${batch.policy.steps_per_plan} 个任务，通过 ${batch.policy.rotation_steps} 个任务后轮换。候选单次 ${batch.policy.timeout_sec} 秒／任务累计 ${batch.policy.task_budget_sec} 秒；评审单次 ${batch.policy.review_timeout_sec} 秒／任务累计 ${batch.policy.review_budget_sec} 秒。` : batch.policy.schema === 2 ? `并发 ${batch.policy.concurrency} / 账号上限 ${batch.scheduling?.account_concurrency_limit ?? '—'}，在途 ${batch.scheduling?.active_runs?.length ?? 0}；活动池 ${batch.instances.filter(item => item.in_pool).length}/${batch.policy.active_projects}，连续通过 ${batch.policy.rotation_steps} 步后轮换；每次 CLI 计划 ${batch.policy.steps_per_plan} 步，超时 ${batch.policy.timeout_sec} 秒，计划间隔 ${batch.policy.interval_min_sec}～${batch.policy.interval_max_sec} 秒。` : `最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换。`}业务失败最多修复 ${batch.policy.repair_limit} 次。</p>
+    <p class="hint project-description">${batch.content_schema === 3 ? `并发 ${batch.policy.concurrency}；活动池 ${batch.policy.active_projects}。完整需求／BUG 保持原会话，交付后独立验收；单次工作片段 ${batch.policy.timeout_sec} 秒，任务累计 ${batch.policy.task_budget_sec} 秒。执行超时后优先续做原任务。` : scenarioMode ? `并发 ${batch.policy.concurrency}；活动池 ${batch.policy.active_projects}；每个逻辑计划 ${batch.policy.steps_per_plan} 个任务，通过 ${batch.policy.rotation_steps} 个任务后轮换。候选单次 ${batch.policy.timeout_sec} 秒／任务累计 ${batch.policy.task_budget_sec} 秒；评审单次 ${batch.policy.review_timeout_sec} 秒／任务累计 ${batch.policy.review_budget_sec} 秒。` : batch.policy.schema === 2 ? `并发 ${batch.policy.concurrency} / 账号上限 ${batch.scheduling?.account_concurrency_limit ?? '—'}，在途 ${batch.scheduling?.active_runs?.length ?? 0}；活动池 ${batch.instances.filter(item => item.in_pool).length}/${batch.policy.active_projects}，连续通过 ${batch.policy.rotation_steps} 步后轮换；每次 CLI 计划 ${batch.policy.steps_per_plan} 步，超时 ${batch.policy.timeout_sec} 秒，计划间隔 ${batch.policy.interval_min_sec}～${batch.policy.interval_max_sec} 秒。` : `最多 ${batch.policy.active_projects} 个活动项目，按阶段轮换。`}业务失败最多修复 ${batch.policy.repair_limit} 次。</p>
     ${batch.scheduling ? `<p class="hint project-scheduling-hint">${escapeHTML(schedulingHint)}${nextLaunch} · 额度阈值继承账号设置</p>` : ''}
     <div class="table-frame project-table-scroll"><table class="data project-instances-table"><thead><tr><th>project</th><th>steps</th><th>status</th><th>workspace</th></tr></thead><tbody>
-    ${batch.instances.map(item => `<tr class="${item.id === state.projectInstanceId ? 'project-selected-row' : ''}"><td><div class="op-actions"><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button>${item.in_pool ? '<span class="pill pill-queued">活动池</span>' : ''}</div></td><td>${item.content_schema === 2 ? `${item.task_counts.passed || 0}/${item.selected_task_count} 任务通过` : `${item.next_step_index}/${item.step_count}`}</td><td>${projectStatusPill(item.status, item.content_schema === 2 ? 'batch' : 'legacy')}${item.switch_reason ? `<div class="hint">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${item.content_schema === 2 ? '按场景独立保留' : item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">首次运行后创建</span>'}</td></tr>`).join('')}
+    ${batch.instances.map(item => `<tr class="${item.id === state.projectInstanceId ? 'project-selected-row' : ''}"><td><div class="op-actions"><button type="button" class="btn btn-sm" data-project-instance="${item.id}">${escapeHTML(item.title)}</button>${item.in_pool ? '<span class="pill pill-queued">活动池</span>' : ''}</div></td><td>${[2, 3].includes(item.content_schema) ? `${item.task_counts.passed || 0}/${item.selected_task_count} 任务通过` : `${item.next_step_index}/${item.step_count}`}</td><td>${projectStatusPill(item.status, [2, 3].includes(item.content_schema) ? 'batch' : 'legacy')}${item.switch_reason ? `<div class="hint">${escapeHTML(item.switch_reason)}</div>` : ''}</td><td>${[2, 3].includes(item.content_schema) ? '按场景独立保留' : item.workspace_path ? `<code class="project-path">${escapeHTML(item.workspace_path)}</code>` : '<span class="muted">首次运行后创建</span>'}</td></tr>`).join('')}
     </tbody></table></div>`;
   // 状态推送不能把正在浏览的百项目列表反复拉回顶部。
   const nextScroll = host.querySelector('.project-table-scroll');
@@ -355,7 +418,7 @@ function paintProjectInstance() {
   const instance = state.projectInstanceDetail;
   const host = $('#project-instance-detail');
   if (!instance || !host) return;
-  if (instance.content_schema === 2) { paintScenarioInstance(instance, host); return; }
+  if ([2, 3].includes(instance.content_schema)) { paintScenarioInstance(instance, host); return; }
   host.classList.remove('hidden');
   const roadmapOpen = host.querySelector('[data-project-roadmap]')?.open || false;
   const previousScroll = host.querySelector('.project-table-scroll');
@@ -421,6 +484,10 @@ function scenarioTaskStatus(task) {
   if (task.phase === 'timeout_resume' && task.status === 'ready') return '超时待续';
   if (task.phase === 'material_ready' && task.status === 'ready') return '补充材料待投放';
   if (task.phase === 'waiting_release') return '候选已封存，等待释放';
+  if (task.development_cycle && task.status === 'evaluating'
+      && ['pending', 'requesting', 'ready', 'retry_wait'].includes(task.requester?.status)) {
+    return task.requester.status === 'retry_wait' ? '需求方服务暂不可用，等待恢复' : '需求方正在承接本轮交流';
+  }
   if (task.status === 'evaluating') return projectStatus(task.evaluation?.status || 'evaluating');
   if (task.status === 'pending') return '等待前置任务';
   return projectStatus(task.status, 'task');
@@ -436,22 +503,27 @@ function paintScenarioInstance(instance, host) {
   const opened = new Set($$('details[data-scenario-id][open]', host).map(node => node.dataset.scenarioId));
   const scroll = host.scrollTop;
   const kinds = {understand: '理解', consult: '咨询', diagnose: '诊断', plan: '方案', modify: '修改'};
+  const phases = {investigating: '调查与方案讨论', implementing: '方案已确认，实施中', repairing: '根据验收反馈修复', verifying: '交付验收中', accepted: '交付已接受'};
+  const development = instance.content_schema === 3;
   const tasks = instance.scenarios.flatMap(scene => scene.tasks).filter(task => task.selected);
   host.classList.remove('hidden');
   host.innerHTML = `<header class="row-between"><h3>${escapeHTML(instance.title)}</h3><button class="btn btn-sm" type="button" data-scenario-usage>任务与评审用量</button></header>
     <p class="hint">${instance.scenario_count} 个场景 · 当前入口 ${tasks.length} 个任务 · ${tasks.filter(task => task.status === 'passed').length} 个通过 · ${tasks.filter(task => task.accepted_checkpoint_digest).length} 个代码检查点已接受。</p>
-    <p class="hint">同模型独立会话评审；回答通过、代码接受与运行结束分别记录。</p>
+    <p class="hint">${development ? '每项需求／BUG 保留连续会话与工作区；普通追问直接继续，交付后独立验收。需求方外接模型用量单列。' : '同模型独立会话评审；回答通过、代码接受与运行结束分别记录。'}</p>
     ${instance.scenarios.map(scene => `<details class="project-scenario" data-scenario-id="${scene.id}" ${opened.has(String(scene.id)) ? 'open' : ''}>
       <summary><strong>${escapeHTML(scene.title)}</strong> · ${escapeHTML(projectStatus(scene.status, 'scenario'))}</summary>
       <p class="hint">${escapeHTML(scene.goal)}</p>
-      ${scene.tasks.map(task => `<article class="project-scenario-task"><header class="row-between"><strong>${escapeHTML(task.task_key)} · ${escapeHTML(kinds[task.kind] || task.kind)}</strong><span class="pill pill-${task.status === 'passed' ? 'success' : task.status === 'running' ? 'running' : 'queued'}">${escapeHTML(scenarioTaskStatus(task))}</span></header>
+      ${scene.tasks.map(task => `<article class="project-scenario-task"><header class="row-between"><strong>${escapeHTML(task.task_key)} · ${escapeHTML(task.development_cycle ? task.development_cycle === 'bug' ? 'BUG 修复' : '功能需求' : kinds[task.kind] || task.kind)}</strong><span class="pill pill-${task.status === 'passed' ? 'success' : task.status === 'running' ? 'running' : 'queued'}">${escapeHTML(scenarioTaskStatus(task))}</span></header>
         <p>${escapeHTML(task.goal)}</p>
-        ${task.selected ? `<p class="hint">业务尝试 ${task.attempt_count}/3 · 第 ${task.turn_no} 轮 · 工作剩余 ${Math.max(0, Math.floor(task.candidate_budget.remaining_sec))} 秒 · 评审剩余 ${Math.max(0, Math.floor(task.review_budget.remaining_sec))} 秒${task.candidate_budget.reserved_sec ? ` · 未决工作预留 ${Math.ceil(task.candidate_budget.reserved_sec)} 秒` : ''}</p>` : ''}
+        ${task.selected ? `<p class="hint">${task.development_cycle ? escapeHTML(phases[task.development_phase] || task.development_phase) : `业务尝试 ${task.attempt_count}/3`} · 第 ${task.turn_no} 轮交流 · 工作剩余 ${Math.max(0, Math.floor(task.candidate_budget.remaining_sec))} 秒 · 评审剩余 ${Math.max(0, Math.floor(task.review_budget.remaining_sec))} 秒${task.candidate_budget.reserved_sec ? ` · 未决工作预留 ${Math.ceil(task.candidate_budget.reserved_sec)} 秒` : ''}</p>` : ''}
+        ${task.requester?.requests ? `<p class="hint">需求方：${escapeHTML(task.requester.model || '未知模型')} · ${task.requester.requests} 次外接请求${task.requester.fallback_reason ? ` · 降级原因：${escapeHTML(task.requester.fallback_reason)}` : ''}</p>` : ''}
+        ${task.requester?.revisions ? `<p class="hint">业务修复 ${task.requester.revisions.business_repairs}/2 · 同版本异议复核 ${task.requester.revisions.review_appeals}/1 · 需求方服务恢复 ${task.requester.infrastructure_recoveries} 次</p>` : ''}
         ${task.requires.length ? `<p class="hint">依赖：${task.requires.map(dependency => `${escapeHTML(dependency.task_id)}（${dependency.artifact === 'code' ? '已接受代码' : '回答'}）`).join('、')}</p>` : ''}
         ${task.error ? `<p class="warmup-error">${escapeHTML(task.error)}</p>` : ''}
         ${task.result?.outcome ? `<p class="hint">业务结果：${escapeHTML(task.result.outcome)}</p>` : ''}
         <p class="hint">${task.accepted_checkpoint_digest ? `代码已接受：${escapeHTML(task.accepted_checkpoint_digest.slice(0, 16))}` : '代码未产生新的已接受检查点'}</p>
         <div class="op-actions">${task.evaluation ? `<button class="btn btn-sm" type="button" data-scenario-artifact="${task.id}">回答与验收证据</button>` : ''}
+          ${task.development_cycle ? `<button class="btn btn-sm" type="button" data-scenario-conversation="${task.id}">连续对话</button>` : ''}
           ${task.executions.map(execution => `<button class="btn btn-sm" type="button" data-project-run="${escapeHTML(execution.run_id)}">${execution.role === 'review' ? '评审' : '任务'} ${escapeHTML(execution.run_id)}</button>${projectStatusPill(execution.execution_status)}`).join('')}</div>
       </article>`).join('')}
     </details>`).join('')}`;
@@ -460,17 +532,33 @@ function paintScenarioInstance(instance, host) {
     try {
       const run = event.target.closest('[data-project-run]');
       const artifact = event.target.closest('[data-scenario-artifact]');
+      const conversation = event.target.closest('[data-scenario-conversation]');
       if (run) await openRunDetail(run.dataset.projectRun);
       if (artifact) await showScenarioArtifact(instance.id, Number(artifact.dataset.scenarioArtifact));
+      if (conversation) await showScenarioConversation(instance.id, Number(conversation.dataset.scenarioConversation));
       if (event.target.closest('[data-scenario-usage]')) {
         const usage = await API(`/project-instances/${instance.id}/usage`);
         endRunDetail();
-        const rows = usage.tasks.flatMap(task => Object.entries(task.roles).map(([role, value]) => `<tr><td>${escapeHTML(task.task_key)} · ${role === 'review' ? '评审' : '任务'}</td><td>${value.input_tokens ?? '未知'}</td><td>${value.output_tokens ?? '未知'}</td><td>${value.cache_read_input_tokens ?? '未知'} / ${value.cache_creation_input_tokens ?? '未知'}</td><td>${value.requests ?? '未知'}</td><td>${value.complete ? '完整' : '不完整'}</td></tr>`));
-        $('#modal-content').innerHTML = `<h3>任务与评审用量</h3><p class="hint">累计所有尝试与恢复的主会话记录；缓存读／写单列，未知不补零。</p><div class="table-frame project-table-scroll"><table class="data"><thead><tr><th>任务 / 角色</th><th>输入</th><th>输出</th><th>缓存读 / 写</th><th>请求</th><th>覆盖</th></tr></thead><tbody>${rows.join('') || '<tr><td colspan="6">尚无执行记录</td></tr>'}</tbody></table></div>`;
+        const rows = usage.tasks.flatMap(task => Object.entries(task.roles).map(([role, value]) => `<tr><td>${escapeHTML(task.task_key)} · ${{review: '最终评审', requester: '需求方（外接）', candidate: '开发者'}[role] || '任务'}</td><td>${value.input_tokens ?? '未知'}</td><td>${value.output_tokens ?? '未知'}</td><td>${value.cache_read_input_tokens ?? '未知'} / ${value.cache_creation_input_tokens ?? '未知'}</td><td>${value.requests ?? '未知'}</td><td>${value.complete ? '完整' : '不完整'}</td></tr>`));
+        $('#modal-content').innerHTML = `<h3>开发者、需求方与评审用量</h3><p class="hint">累计所有尝试与恢复的实际记录；外接需求方独立统计。缓存读／写依据服务记录，未知不补零。</p><div class="table-frame project-table-scroll"><table class="data"><thead><tr><th>任务 / 角色</th><th>输入</th><th>输出</th><th>缓存读 / 写</th><th>请求</th><th>覆盖</th></tr></thead><tbody>${rows.join('') || '<tr><td colspan="6">尚无执行记录</td></tr>'}</tbody></table></div>`;
         openModal('#modal');
       }
     } catch (error) { alert('读取场景证据失败：' + error.message); }
   };
+}
+
+/**
+ * 按需展示完整任务的已消费消息和冻结回答，避免状态流重复传输长对话。
+ * @param {number} instanceId 实例 ID
+ * @param {number} taskId 完整任务 ID
+ * @return {Promise<void>} 展示完成
+ */
+async function showScenarioConversation(instanceId, taskId) {
+  const result = await API(`/project-instances/${instanceId}/scenario-tasks/${taskId}/attempts`);
+  endRunDetail();
+  $('#modal-content').onclick = null;
+  $('#modal-content').innerHTML = `<h3>完整任务连续对话</h3><p class="hint">仅展示已经确认消费的消息与冻结回答；待发送消息保留在任务进度中。</p>${(result.conversation || []).map(message => `<article><h4>${message.role === 'assistant' ? '开发者' : '需求方'}</h4><pre class="project-report">${escapeHTML(message.content)}</pre></article>`).join('') || '<p class="hint">尚无已确认的交流记录</p>'}`;
+  openModal('#modal');
 }
 
 /**

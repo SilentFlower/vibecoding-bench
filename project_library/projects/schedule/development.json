@@ -1,0 +1,108 @@
+{
+  "schema": 3,
+  "project_key": "schedule",
+  "title": "schedule 日常调度开发任务",
+  "category": "调度与可靠运行",
+  "description": "固定真实源码上的 2 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "8dd7615bcf48a05cc7f71d9b856eb76ce05e8531c4c41974863a2038ad6665c6",
+  "environment": "schedule-py312",
+  "source": {
+    "repository": "https://github.com/dbader/schedule",
+    "commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "SC-S04-DEV",
+      "title": "修复批量执行的尾等待并保持快照与取消语义",
+      "goal": "修复批量执行的尾等待并保持快照与取消语义",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SC-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-M01-DEV",
+          "kind": "modify",
+          "goal": "修复批量执行的尾等待并保持快照与取消语义",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nFix Scheduler.run_all so delay_seconds is applied only between jobs in the current snapshot, with no trailing delay. Preserve execution order, snapshot semantics, callback arguments, cancellation and exception propagation. Add focused public regression tests. Do not change unrelated scheduling behavior. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change.",
+          "requires": [],
+          "materials": [
+            "materials/run-all-trace.json",
+            "materials/run-all-contract.md"
+          ],
+          "allowed_paths": [
+            "library/schedule/__init__.py",
+            "library/test_schedule.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SC-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SC-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "SC-S05-DEV",
+      "title": "安全展示未配置任务并保留已配置格式与状态",
+      "goal": "安全展示未配置任务并保留已配置格式与状态",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SC-M02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SC-M02-DEV",
+          "kind": "modify",
+          "goal": "安全展示未配置任务并保留已配置格式与状态",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nMake repr safe for an unconfigured Job, including default interval one. Preserve its unconfigured state and exact representation of configured jobs. Do not assign a default unit, register it, or run a callback merely to format it. Add focused public tests. This independent scenario starts from the original checkout and does not inherit the run_all repair. Use the pinned checkout as evidence and cite the relevant source symbols. State assumptions and missing information. Preserve existing public behavior unless this task explicitly requests a change.",
+          "requires": [],
+          "materials": [
+            "materials/interactive.txt",
+            "materials/repr-contract.md"
+          ],
+          "allowed_paths": [
+            "library/schedule/__init__.py",
+            "library/test_schedule.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SC-M02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SC-M02.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SC-M02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

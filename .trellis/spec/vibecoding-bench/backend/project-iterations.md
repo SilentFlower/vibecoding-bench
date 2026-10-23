@@ -1,5 +1,7 @@
 # 项目迭代模式契约
 
+内容 schema 3 的完整需求／BUG 周期复用 policy 3，见末节；历史内容 schema 1／2 继续遵守各自冻结版本。
+
 ## Scenario: legacy 内容 schema 1 的线性步骤与计划执行
 
 本节的单步与同 CLI 多步分别指无 schema 的旧执行策略与 policy 2；其中历史“schema 2”均指执行策略版本，不是内容 schema 2。共享停止、鉴权及文件交接继续适用；新场景使用后节 policy 3 契约。
@@ -438,3 +440,90 @@ Dynaconf的76份和Flask的一份固定公开.env原件沿既有精确路径／S
 - 独立验收：正例、反例、基线和此前已接受能力均实际运行；核对候选加载路径、真实业务副作用、超时、依赖不可用及输出边界，禁止候选修改冻结验收。完整原生集合和单步集合的资源预算分别实测。
 - 进度对账：来源不同的仓库去重；候选、研究完成、验收就绪、模型完成及生产发布各自统计。未解决的适用基线失败或未完整定义的步骤不得进入研究完成计数。
 - 退役回归：正式库无旧 100 项和正式生成入口；合成夹具只在测试临时目录出现；旧库不能被默默重建。调度／验证测试改用显式夹具，保留目录接续、检查点、停止和并发回归；确认源码清理未修改历史发布与实例数据。
+
+## Scenario: 内容 schema 3 的完整开发周期与动态需求方配置
+
+### 1. Scope / Trigger
+
+- 修改 `project_dialogue.py`、`project_development.py`、`project_requester_settings.py`、完整任务恢复／验收、`#projects` 配置表单或 schema 3 内容时适用。
+- 一个需求或 BUG 对应一个完整任务；源码调查、追问、方案确认、实施、交付和修复属于同一任务、同一开发者会话与工作区。普通交流不启动独立评分。
+- 原账号身份、运行时段、额度、执行许可、严格释放和私有最终评审继续遵守既有账号契约。
+
+### 2. Signatures
+
+```python
+ProjectLibrary(root, minimum_projects=100, minimum_steps=20, catalog_name='catalog.json')
+ProjectDialogueClient(base_url, api_key, model, fallback_model='', *, timeout=30,
+                      opener=None, additional_models=None, revision='environment')
+ProjectDialogueClient.generate(context, preferred_model=None, timeout_sec=None)
+ProjectRequesterSettings(path, environment=None)
+ProjectRequesterSettings.public()
+ProjectRequesterSettings.save(base_url, models, api_key=None)
+ProjectRequesterSettings.reset()
+```
+
+- `GET /api/settings/project-requester`：读取脱敏配置。
+- `PUT /api/settings/project-requester`：`{base_url: string, models: string[], api_key?: string|null}`；未知字段拒绝。
+- `DELETE /api/settings/project-requester`：清除页面覆盖并恢复环境初始值。
+- 响应字段固定为 `base_url`、`models`、`api_key_configured`、`source`（`page/environment/invalid`）、`revision`、`ready`、`error`；不返回 `api_key`。
+- `project_dialogue_jobs` 以 `evaluation_job_id UNIQUE` 绑定冻结回答，保存 `task_id/generation/status/phase/request_json/result_json/attempts_json/model/work_sec/reserved_sec/recoveries/retry_at/error` 及时间；不新增需求方 CLI 作业角色。
+
+### 3. Contracts
+
+**配置与请求**：
+
+- 页面仅管理一个 HTTPS Base URL 和按优先级排列的 1～8 个不重复模型。首个主用，后续按序降级。模型使用 `MODEL_NAME` 校验；地址不含认证、query 或 fragment；地址和模型名不得混入密钥。
+- 环境初始值使用 `PROJECT_REQUESTER_BASE_URL`、`PROJECT_REQUESTER_API_KEY`、`PROJECT_REQUESTER_MODEL`、`PROJECT_REQUESTER_FALLBACK_MODEL`。页面覆盖原子保存到 `BENCH_DATA/settings/project-requester.json`，文件 0600、创建的父目录 0700；保存密钥留空时沿用服务端当前值。保存不发出连通请求，`ready` 只表示配置语法完整。
+- 保存成功后替换管理器的后续请求客户端；在途客户端保留开始时的地址、模型与配置版本，已生成有效消息继续复用。配置版本变化后重新按新列表选模；同一版本内当前任务沿用已选模型，避免每轮重试已耗尽的主模型。
+- `POST <base_url>/chat/completions` 使用 Bearer、非流式 `messages` 和 `max_tokens=1024`；禁止自动重定向。一次生成对每个模型最多尝试一次；单模型默认网络超时 30 秒，控制端共用最多 60 秒预留及任务剩余预算。
+- 402／明确额度错误、429、500／502／503／504 和传输故障可有限降级；认证、参数和无效回复错误不通过换模型掩盖。主备均失败有限等待恢复；未知在途结果保留预留并阻塞盲重发。
+- 严格 JSON 只有 `action` 和 `message`；动作只允许 `reply/implement/verify`，前两种消息非空。重复字段、截断、工具调用、拒绝、额外评分字段和密钥反射均拒绝。
+- 请求只含任务、可披露业务材料、真实对话和已确认方案，业务上下文不超过 512 KiB、响应不超过 64 KiB；私有 rubric、验收源码、参考补丁和凭据不进入请求。调用及配置版本、服务地址、请求／返回模型、实际 usage 分别留证，缺失统计保持未知。
+
+**原会话与验收**：
+
+- 先凭原生父链确认输入／回答并严格释放执行，再由外部需求方推进。有效结果先保存后应用；同一冻结回答重放不重调模型、不重复投递。
+- 仅方案确认后的实施／返工阶段允许 `verify`。最终交付依次核授权范围、独立程序事实、冻结回归和必要交付审查；程序未通过不能接受代码，模型不能自行声明任务完成。
+- 失败反馈提供可公开的位置与实际差异；大型回归保留失败事实而非完整收集清单，并按 UTF-8 字节有界。真实代码修复最多两次，同版本语义异议只复核一次；确定程序失败必须修复，存疑结论保留交付待处理。
+- 超时仅结束执行片段；Run 保留 timeout，原会话、方案及半成品待续做。任务工作预算累计开发者、最终评审和需求方时间及未决预留；普通交流和基础设施切片不计业务修复。
+- 同账号可执行的续做优先于新需求；服务等待不占 Claude 执行名额。停止、身份变化、会话／工作区缺失、消费不明、预算耗尽和严格释放失败均不能被自动恢复绕过。
+- 已生成未投递复用原消息；已投递未确认先核原生消费；已消费未回复续原会话；交付待验收继续原冻结版本；程序验证已完成但结果未收口复用原验证事实。
+
+**内容与页面**：
+
+- schema 3 每场景恰好一项 `kind=modify`、`development_cycle=feature|bug` 的任务，具有独立原生验收，不携带旧短题 `max_turns`。`owner_materials` 只引用 `disclosure/` 中的业务材料。
+- 目录可用 `project_manifest=development.json` 选择新定义，保留原 `project.json` 与 `catalog-v37.json`；冻结历史不迁移。`admission` 的 ready 集合必须精确等于可执行项目集合，blocked 必须有原因。
+- 当前重审口径为 100 项目、30 就绪项目／36 完整任务、70 待准入；旧 426 场景／726 短任务和研究提案单列。生成目录不能替代准入证明，激活须由 `build-project-development-content.py --activate --validation-report <回执>` 核全部任务覆盖与内容摘要。
+- 页面按完整交付计完成数，轮次、业务修复、异议复核及服务恢复分别展示；连续对话按需读取。开发者、需求方、最终评审用量单列，缓存命中以真实服务证据为准。
+- 局部 `<pasted_content>` 包装只在同 ID 单层标签与已知边界换行移除后，能精确还原原输入时接受；额外正文、不同 ID 和嵌套／多重包装拒绝。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 处理 |
+| --- | --- |
+| HTTP 地址、重复或超过 8 个模型、密钥混入地址／模型 | 配置 PUT 400，保持原配置和客户端 |
+| 配置字段类型错误／未知字段 | 422，固定错误不回显密钥输入 |
+| 未登录／无内部服务凭据 | 沿用管理鉴权拒绝读取与写入 |
+| 配置保存失败 | 500，旧客户端及私有配置继续生效 |
+| 页面文件损坏 | `ready=false/source=invalid`，拒绝盲用环境供应商；可完整重填或恢复环境 |
+| 新完整任务尚未配置客户端 | 拒绝新批次，历史 reader 保持可用 |
+| 配置在请求中修改 | 保存原结果及来源，下一请求采用新版本 |
+| 未确认方案即 verify | 阻塞提前验收，保留会话 |
+| 明确程序失败或复核次数耗尽 | 不接受交付，具体反馈或保留阻塞原因 |
+| 验证已完成／收口重复到达 | 复用原事实，只接受一次任务完成 |
+
+### 5. Scenarios and Examples
+
+- 正常：页面填写 `https://ai.flower-cli.com/v1`，模型按 `gemini-3-flash-agent`、`deepseek-flash` 排列。主模型额度不足后转备用，方案确认和实施都在开发者原会话进行。
+- 边界：管理员改变地址和模型顺序，密钥留空；已生成追问仍发送原内容，之后的需求方请求使用新版本，已运行客户端保留原来源。
+- 错误：普通问答每轮都要求 pass；或将 slice timeout 当作任务结束并重建 seed。正确：普通回复直接推进，超时严格释放后恢复原会话与工作区，共用累计预算。
+- 错误：只凭语义 pass 覆盖程序失败、将问题改名补齐百项目数、或因结果未知盲重发 API。正确：保留独立事实、逐仓准入和未决预留，分别处理真实失败与基础设施恢复。
+
+### 6. Tests Required
+
+- `test_project_dialogue`：请求格式、严格动作、额度／限流／5xx／传输降级、认证不降级、总时限、重复字段与密钥反射；另核 `_NoRedirect` 是生产 opener 的实际处理器。
+- `test_project_requester_settings`：私有权限、重载、空密钥沿用、恢复环境、多个模型顺序、在途客户端保持、保存失败原子性、API 鉴权与 DTO 错误脱敏。
+- `test_project_development`：十轮普通交流零评审、确认方案、具体失败修复、有限异议、超时／暂停／重启／停止竞争、配置变化与缓存消息、续做优先、预算和接受幂等。
+- `validate-development-content.py`：逐任务核原版失败、参考通过、授权范围、冻结回归；双试点另拒绝错误候选。来源、许可证、离线制品与交付副本摘要一致。
+- `verify-project-development-pilots.py --browser`：合成开发者／语义评审、本机 HTTPS 需求方、真实 SQLite／原生交接／Docker 原生验收；Chrome 双主题与 390／1280 宽度核配置保存、三模型降级、新 Bearer、连续对话及 API 对账。
+- 真实供应商最小连通、真实模型完整业务、模拟机制及生产部署分别留证；未实测的模型质量、费用与缓存收益不报通过。

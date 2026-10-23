@@ -1,0 +1,12 @@
+# Business scope
+
+Implement the supplied bounded mapping-import repair and public regressions. Only the two authorized files may change.
+
+# Investigation topics
+
+
+
+# Supplied business material: materials/dict-alignment.md
+
+A product import assigns Dataset.dict=[{"sku":"A","qty":2},{"qty":5,"sku":"B"}]. The pinned original takes headers from first-row keys but each row values by insertion order,so B is misfiled. Repair only library/src/tablib/core.py and app/test_dict_import.py:align each mapping row by the first-row header names,preserve first-row header order and input mappings. Reject non-dict records,missing keys or extra keys within a mapping batch with existing UnsupportedFormat before replacing existing Dataset state. Retain existing empty-list no-op and positional list-of-lists behavior. JSON and YAML use the same setter and must benefit without format-module edits. Preserve all upstream tests. Deliver meaningful public regression tests that fail on original and pass on the repair;do not change private controls or dependencies.
+

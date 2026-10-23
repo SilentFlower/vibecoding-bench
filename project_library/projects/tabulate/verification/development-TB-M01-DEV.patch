@@ -1,0 +1,38 @@
+--- a/library/tabulate/__init__.py
++++ b/library/tabulate/__init__.py
+@@ -2487,6 +2487,9 @@
+     If `original` is not a list to begin with (i.e. scalar value) a list of
+     length `num_desired` completely populated with `default will be returned
+     """
++    # tuple与list采用同一补齐运算，同时避免修改调用方序列。
++    if isinstance(original, tuple):
++        original = list(original)
+     if isinstance(original, Iterable) and not isinstance(original, str):
+         return original + [default] * (num_desired - len(original))
+     else:
+--- a/library/test/test_api.py
++++ b/library/test/test_api.py
+@@ -65,3 +65,23 @@
+     assert type(simple_separated_format) is type(lambda: None)
+     expected_sig = [("separator", _empty)]
+     _check_signature(simple_separated_format, expected_sig)
++
++
++def test_inventory_rowalign_tuple_equivalence():
++    """短tuple与list必须等价且不得修改调用方。@return None。"""
++    rows = [["coffee\nbeans", "ready"], ["tea", "packed"]]
++    options = {"headers": ["Product name", "Shipping note"], "tablefmt": "grid"}
++    value = ["bottom"]
++    assert tabulate(rows, rowalign=("bottom",), **options) == tabulate(rows, rowalign=value, **options)
++    assert tabulate(rows, rowalign=(), **options) == tabulate(rows, rowalign=[], **options)
++    assert value == ["bottom"]
++
++
++def test_inventory_headerwidth_tuple_equivalence():
++    """表头宽度也必须走同一合法序列合同。@return None。"""
++    rows = [["coffee", "ready"], ["tea", "packed"]]
++    options = {"headers": ["Product name", "Shipping note"], "tablefmt": "grid"}
++    value = [6]
++    assert tabulate(rows, maxheadercolwidths=(6,), **options) == tabulate(rows, maxheadercolwidths=value, **options)
++    assert tabulate(rows, maxheadercolwidths=(), **options) == tabulate(rows, maxheadercolwidths=[], **options)
++    assert value == [6]

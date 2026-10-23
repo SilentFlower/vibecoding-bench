@@ -71,7 +71,7 @@
       <header class="view-head">
         <div>
           <h2 class="view-title"><span class="bracket">▌</span>projects <span class="muted">// continuous iteration</span></h2>
-          <p class="hint">围绕真实项目理解、咨询、诊断、讨论方案与修改；任务结果、代码接受和执行记录分别保存。</p>
+          <p class="hint">在同一会话完成真实需求或 BUG 的调查、方案确认、实施与验收。</p>
         </div>
         <div class="view-actions">
           <span id="project-library-count" class="hint">加载项目库</span>
@@ -79,6 +79,22 @@
         </div>
       </header>
       <p id="project-feedback" class="hint hidden" role="status"></p>
+      <details class="batch-panel">
+        <summary class="capture-title"><strong>外接需求方模型配置</strong><span class="muted">// 保存后动态生效</span></summary>
+        <form id="project-requester-form" class="form">
+          <div class="row">
+            <label><span class="lbl">Base URL</span><input name="base_url" type="url" placeholder="https://ai.flower-cli.com/v1" maxlength="2048" required></label>
+            <label><span class="lbl">API Key</span><input name="api_key" type="password" autocomplete="new-password" maxlength="4096" placeholder="留空沿用已配置密钥"></label>
+          </div>
+          <label><span class="lbl">可用模型 · 一行一个，首个主用，其后依次降级（最多 8 个）</span><textarea name="models" rows="3" placeholder="gemini-3-flash-agent&#10;deepseek-flash" required></textarea></label>
+          <p class="hint">保存后无需重启，后续需求方请求采用新配置；已经生成的消息和正在执行的请求保留原记录。</p>
+          <p class="hint" id="project-requester-status" role="status">读取配置中</p>
+          <div class="row-end">
+            <button class="btn btn-sm" type="button" data-requester-reset>恢复环境配置</button>
+            <button class="btn btn-primary" type="submit">保存模型配置</button>
+          </div>
+        </form>
+      </details>
       <details class="batch-panel project-create" open>
         <summary class="capture-title"><strong>创建迭代批次</strong><span class="muted">// 选择账号与项目</span></summary>
         <form id="project-batch-form" class="form">
@@ -100,7 +116,7 @@
             <label><span class="lbl">单次评审预算（秒）</span><input name="review_timeout_sec" type="number" min="60" max="600" value="180"></label>
             <label><span class="lbl">任务累计评审预算（秒）</span><input name="review_budget_sec" type="number" min="60" max="86400" value="720"></label>
           </div>
-          <p class="hint hidden" data-scenario-budgets>同模型独立会话评审，复用当前账号及额度，用量单列。超时接续保留累计预算；首次执行后最多两次继续／修正。</p>
+          <p class="hint hidden" data-scenario-budgets data-scenario-budget-hint>同一需求或 BUG 在原会话完成调查、方案确认和实施，交付后才验收。超时续做保留累计预算；需求方外接模型用量单列。</p>
           <div class="row">
             <label><span class="lbl">$ interval_min_sec · 计划补位间隔下限（秒）</span><input name="interval_min_sec" type="number" min="0" max="86400" value="0" required></label>
             <label><span class="lbl">$ interval_max_sec · 计划补位间隔上限（秒）</span><input name="interval_max_sec" type="number" min="0" max="86400" value="0" required></label>

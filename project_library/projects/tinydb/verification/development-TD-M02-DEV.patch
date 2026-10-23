@@ -1,0 +1,62 @@
+--- a/library/tests/test_tinydb.py
++++ b/library/tests/test_tinydb.py
+@@ -837,3 +837,47 @@
+     query.is_cacheable = lambda: False
+     assert db.search(query) == [{'foo': 'bar'}]
+     assert not db._query_cache
++
++
++def test_update_multiple_finite_rule_iterables(tmp_path):
++    """有限一次性规则与可重用规则保持顺序、返回 ID 和落盘一致。@param tmp_path 临时目录。@return None。"""
++    from tinydb.operations import increment
++    from tinydb.storages import MemoryStorage
++
++    for storage in ('memory', 'json'):
++        for mode in ('list', 'tuple', 'iterator', 'generator'):
++            options = {'storage': MemoryStorage} if storage == 'memory' else {}
++            args = [] if storage == 'memory' else [tmp_path / f'{storage}-{mode}.json']
++            with TinyDB(*args, **options) as database:
++                database.insert_multiple([{'qty': 0}, {'qty': 0}])
++                rules = [(increment('qty'), Query().qty == 0), ({'stage': 'ready'}, Query().qty == 1)]
++                updates = {'list': lambda: rules, 'tuple': lambda: tuple(rules),
++                           'iterator': lambda: iter(rules), 'generator': lambda: (rule for rule in rules)}[mode]()
++                assert database.update_multiple(updates) == [1, 1, 2, 2]
++                assert database.all() == [{'qty': 1, 'stage': 'ready'}, {'qty': 1, 'stage': 'ready'}]
++
++
++def test_update_multiple_rule_enumeration_failure_is_not_applied(tmp_path):
++    """先完成规则枚举，避免内存引用与文件出现部分修改。@param tmp_path 临时目录。@return None。"""
++    from copy import deepcopy
++    from tinydb.storages import MemoryStorage
++
++    for storage in ('memory', 'json'):
++        path = tmp_path / f'{storage}-error.json'
++        options = {'storage': MemoryStorage} if storage == 'memory' else {}
++        args = [] if storage == 'memory' else [path]
++        with TinyDB(*args, **options) as database:
++            database.insert_multiple([{'qty': 1}, {'qty': 2}])
++            before = deepcopy(database.all())
++            raw = path.read_bytes() if storage == 'json' else None
++
++            def broken_rules():
++                """模拟解析一半失败的有限配置。@return 规则迭代器。"""
++                yield ({'changed': True}, Query().qty > 0)
++                raise ValueError('config unavailable')
++
++            with pytest.raises(ValueError, match='config unavailable'):
++                database.update_multiple(broken_rules())
++            assert database.all() == before
++            if storage == 'json':
++                assert path.read_bytes() == raw
+--- a/library/tinydb/table.py
++++ b/library/tinydb/table.py
+@@ -540,6 +540,9 @@
+         :returns: a list containing the updated document's ID
+         """
+ 
++        # 先完整枚举有限规则，避免一次性迭代器耗尽或枚举失败时已修改文档。
++        updates = list(updates)
++
+         # Define the function that will perform the update
+         def perform_update(fields, table, doc_id):
+             if callable(fields):

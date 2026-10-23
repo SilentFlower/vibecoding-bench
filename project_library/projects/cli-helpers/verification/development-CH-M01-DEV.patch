@@ -1,0 +1,49 @@
+--- a/library/cli_helpers/tabular_output/output_formatter.py
++++ b/library/cli_helpers/tabular_output/output_formatter.py
+@@ -161,6 +161,8 @@
+             raise ValueError('unrecognized format "{}"'.format(format_name))
+ 
+         (_, _preprocessors, formatter, fkwargs) = self._output_formats[format_name]
++        # 注册默认属于所有实例，本次覆盖必须使用独立顶层映射。
++        fkwargs = dict(fkwargs)
+         fkwargs.update(kwargs)
+         if column_types is None:
+             data = list(data)
+--- a/library/tests/tabular_output/test_output_formatter.py
++++ b/library/tests/tabular_output/test_output_formatter.py
+@@ -348,3 +348,35 @@
+             iter(data), headers, format_name=format_name, **extra_kwargs
+         ):
+             assert isinstance(row, text_type), "not unicode for {}".format(format_name)
++
++
++def test_export_call_options_do_not_leak_between_instances(monkeypatch):
++    """本次覆盖不得成为下一实例的默认。@param monkeypatch 测试隔离。@return None。"""
++    registry = {key: row._replace(formatter_args=dict(row.formatter_args))
++        for key, row in TabularOutputFormatter._output_formats.items()}
++    monkeypatch.setattr(TabularOutputFormatter, "_output_formats", registry)
++    default = registry["simple"].formatter_args["missing_value"]
++    first = "\n".join(TabularOutputFormatter("simple").format_output(
++        [[None]], ["value"], missing_value="CALL_ONLY"))
++    second = "\n".join(TabularOutputFormatter("simple").format_output([[None]], ["value"]))
++    assert "CALL_ONLY" in first
++    assert default in second and "CALL_ONLY" not in second
++    assert registry["simple"].formatter_args["missing_value"] == default
++
++
++def test_registered_export_defaults_and_caller_mapping_stay_unchanged(monkeypatch):
++    """自定义格式和注册者默认同样保持。@param monkeypatch 测试隔离。@return None。"""
++    monkeypatch.setattr(TabularOutputFormatter, "_output_formats", {})
++
++    def render(data, headers, missing_value="BASE", **kwargs):
++        """返回本次缺值策略。@param data 行。@param headers 表头。@param missing_value 缺值。@param kwargs 其他选项。@return 行迭代器。"""
++        return iter([missing_value])
++
++    defaults = {"missing_value": "BASE"}
++    TabularOutputFormatter.register_new_formatter("custom_export", render, kwargs=defaults)
++    first = list(TabularOutputFormatter("custom_export").format_output(
++        [[None]], ["value"], missing_value="CUSTOM"))
++    second = list(TabularOutputFormatter("custom_export").format_output([[None]], ["value"]))
++    assert first == ["CUSTOM"]
++    assert second == ["BASE"]
++    assert defaults == {"missing_value": "BASE"}

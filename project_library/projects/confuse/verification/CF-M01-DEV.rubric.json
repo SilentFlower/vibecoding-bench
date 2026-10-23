@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "task_id": "CF-M01-DEV",
+  "source_commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Successful YamlSource.load replaces its mapping so removed keys fall through and empty/absent optional sources clear. Preserve source object/metadata and its prior valid mapping on parse or non-mapping failure. Change only sources.py and app/test_reload.py, retain original tests, and do not broaden to environment refresh or all-source atomicity.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use the actual supplied evidence and pinned source, respect authorization, and distinguish observed behavior, existing guarantees and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized file that fail on the pinned original and pass after the repair; cite the actual implementation and tests. Preserve all original tests and controls.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations; do not match wording or a reference answer.",
+  "version": 2
+}

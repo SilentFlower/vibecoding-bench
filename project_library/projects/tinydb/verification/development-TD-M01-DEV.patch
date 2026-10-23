@@ -1,0 +1,58 @@
+--- a/library/tests/test_queries.py
++++ b/library/tests/test_queries.py
+@@ -527,3 +527,44 @@
+ 
+     assert query({'test': 1})
+     assert not query({'test': 0})
++
++
++def test_fragment_distinct_complete_paths_and_cache_order(tmp_path):
++    """核对两存储、双查询顺序及真实缓存保留。@param tmp_path 测试临时目录。@return None。"""
++    from tinydb import TinyDB
++    from tinydb.storages import MemoryStorage
++
++    for storage in ('memory', 'json'):
++        for reverse in (False, True):
++            options = {'storage': MemoryStorage} if storage == 'memory' else {}
++            args = [] if storage == 'memory' else [tmp_path / f'{storage}-{reverse}.json']
++            with TinyDB(*args, **options) as database:
++                database.insert_multiple([
++                    {'a': {'n': {'x': 3}}, 'b': {'n': {'x': 4}}},
++                    {'a': {'n': {'x': 4}}, 'b': {'n': {'x': 3}}},
++                ])
++                conditions = [(Query().a.n.fragment({'x': 3}), [1]),
++                              (Query().b.n.fragment({'x': 3}), [2])]
++                if reverse:
++                    conditions.reverse()
++                for condition, expected in conditions:
++                    assert condition.is_cacheable()
++                    assert [doc.doc_id for doc in database.search(condition)] == expected
++                    assert [doc.doc_id for doc in database.search(condition)] == expected
++                assert len(database._query_cache) == 2
++
++
++def test_fragment_map_remains_dynamic():
++    """可变 callable 的路径不得成为缓存键。@return None。"""
++    from tinydb import TinyDB
++    from tinydb.storages import MemoryStorage
++
++    state = {'field': 'a'}
++    condition = Query().map(lambda document: document[state['field']]).fragment({'x': 1})
++    with TinyDB(storage=MemoryStorage) as database:
++        database.insert_multiple([{'a': {'x': 1}, 'b': {'x': 2}}, {'a': {'x': 2}, 'b': {'x': 1}}])
++        assert not condition.is_cacheable()
++        assert [doc.doc_id for doc in database.search(condition)] == [1]
++        state['field'] = 'b'
++        assert [doc.doc_id for doc in database.search(condition)] == [2]
++        assert len(database._query_cache) == 0
+--- a/library/tinydb/queries.py
++++ b/library/tinydb/queries.py
+@@ -496,7 +496,7 @@
+ 
+         return self._generate_test(
+             lambda value: test(value),
+-            ('fragment', freeze(document)),
++            ('fragment', self._path, freeze(document)),
+             allow_empty_path=True
+         )
+ 

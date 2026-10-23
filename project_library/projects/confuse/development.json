@@ -1,0 +1,62 @@
+{
+  "schema": 3,
+  "project_key": "confuse",
+  "title": "Confuse分层配置开发任务",
+  "category": "YAML配置与源归属",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "c04ba316aeae924e01b78c32d9b26c573804551f9ea771a6096b309522fca69b",
+  "environment": "confuse-py312",
+  "source": {
+    "repository": "https://github.com/beetbox/confuse",
+    "commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CF-S05-DEV",
+      "title": "修复文件重载后已删除配置仍残留",
+      "goal": "修复文件重载后已删除配置仍残留",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CF-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-M01-DEV",
+          "kind": "modify",
+          "goal": "修复文件重载后已删除配置仍残留",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement only the explicitly authorized single-source replacement repair and public regressions. Preserve all stated parsing, identity and compatibility boundaries.",
+          "requires": [],
+          "materials": [
+            "materials/reload-repair.md"
+          ],
+          "allowed_paths": [
+            "library/confuse/sources.py",
+            "app/test_reload.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CF-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CF-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

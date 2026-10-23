@@ -1,0 +1,33 @@
+--- a/library/pydantic_settings/sources/providers/env.py
++++ b/library/pydantic_settings/sources/providers/env.py
+@@ -326,8 +326,10 @@
+                         enum_val = _annotation_enum_name_to_val(target_field.annotation, env_val)
+                         env_val = env_val if enum_val is None else enum_val
+                 elif target_field:
+-                    # target_field is a raw type (e.g. from dict value type annotation)
++                    # 字典值只有原始注解，也需像普通字段一样识别含复杂成员的联合类型。
+                     is_complex = _annotation_is_complex(target_field, [], self._init_state)
++                    if not is_complex and is_union_origin(get_origin(target_field)):
++                        is_complex = _union_is_complex(target_field, [], self._init_state)
+                     allow_json_failure = True
+                 else:
+                     # nested field type is dict
+--- /dev/null
++++ b/library/tests/test_development_cycle.py
+@@ -0,0 +1,16 @@
++"""分段环境变量字典联合值的公开回归。"""
++import pytest
++from pydantic_settings import BaseSettings, SettingsConfigDict
++
++
++class UnionValue(BaseSettings):
++    """读取隔离业务环境中的字典联合值。@param config 字符串或列表配置。"""
++    model_config = SettingsConfigDict(env_prefix="CYCLE_", env_nested_delimiter="__", env_file=None, cli_parse_args=False)
++    config: dict[str, list[str] | str] = {}
++
++
++@pytest.mark.parametrize("raw, expected", [("[]", []), ('["茶", "咖啡"]', ["茶", "咖啡"]), ("plain", "plain")])
++def test_nested_union_value_uses_actual_type(monkeypatch, raw, expected):
++    """列表解码但普通文本保持原值。@param monkeypatch 环境隔离。@param raw 环境值。@param expected 预期值。@return None。"""
++    monkeypatch.setenv("CYCLE_CONFIG__ITEM", raw)
++    assert UnionValue().config == {"item": expected}

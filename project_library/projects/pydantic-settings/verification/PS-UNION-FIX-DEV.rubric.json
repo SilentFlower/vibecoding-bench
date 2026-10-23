@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "task_id": "PS-UNION-FIX-DEV",
+  "version": 3,
+  "criteria": [
+    {
+      "id": "scope",
+      "requirement": "Modify segmented environment decoding within the library and add regression tests. Do not substitute consumer-side changes, hardcoded inputs, or test-only changes for the fix.",
+      "required": true
+    },
+    {
+      "id": "behavior",
+      "requirement": "Use independent cases to verify empty lists, lists containing Chinese text, ordinary text, invalid JSON strings, multiple keys, invalid list elements, and case-sensitivity boundaries.",
+      "required": true
+    },
+    {
+      "id": "regression",
+      "requirement": "Preserve existing top-level behavior for ordinary Union and NoDecode/ForceDecode/enable_decoding, and run the applicable native regression checks. Accept the engineering checkpoint only after controller-side verification succeeds.",
+      "required": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "source_evidence": {
+    "main": [
+      "library/pydantic_settings/main.py:255",
+      "library/pydantic_settings/main.py:295",
+      "library/pydantic_settings/main.py:323",
+      "library/pydantic_settings/main.py:336"
+    ],
+    "env": [
+      "library/pydantic_settings/sources/providers/env.py:200",
+      "library/pydantic_settings/sources/providers/env.py:217",
+      "library/pydantic_settings/sources/providers/env.py:275"
+    ],
+    "decode": [
+      "library/pydantic_settings/sources/base.py:194",
+      "library/pydantic_settings/sources/utils.py:150",
+      "library/pydantic_settings/sources/utils.py:213"
+    ]
+  },
+  "accept_equivalent_answers": true,
+  "grade_length": false,
+  "uncertain_rule": "Return uncertain when evidence is insufficient; do not automatically treat the candidate as failed. Do not require disclosure of hidden reasoning.",
+  "feedback_policy": "Return only declared public business rules and feedback codes. Do not disclose hidden examples or the complete rubric."
+}

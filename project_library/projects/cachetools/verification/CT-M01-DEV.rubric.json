@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "task_id": "CT-M01-DEV",
+  "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Satisfy the full public receiver contract using the actual wrapped method signature while preserving unrelated behavior. The independent call matrix and complete frozen upstream regression must pass. Deliver meaningful public original-failing tests and cite the actual authorized implementation and test files; no new pytest controls or dependencies.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "scope",
+      "requirement": "Use only actually supplied evidence and the pinned public source. Respect the task authorization and distinguish observed facts, normal limitations and proposals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "public-tests",
+      "requirement": "Deliver meaningful public regression tests in the authorized test file that fail on the original receiver behavior and pass after the repair; cite the implementation and test files. Mere claims or unrelated tests are insufficient.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Accept equivalent correct reasoning and implementations grounded in actual evidence; do not match wording, verbosity or a reference answer.",
+  "version": 2
+}

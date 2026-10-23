@@ -1,0 +1,63 @@
+{
+  "schema": 3,
+  "project_key": "click",
+  "title": "Click工具命令开发任务",
+  "category": "命令参数与应用交互",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "24c87bbf14d4d0f69a21dafc9592c3f531c403f17a4a38aa5c4ae3573ecc833c",
+  "environment": "click-py312",
+  "source": {
+    "repository": "https://github.com/pallets/click",
+    "commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+    "license_files": [
+      "seed/library/LICENSE.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CK-S04-DEV",
+      "title": "展示有序错误附注并保护既有CLI输出",
+      "goal": "展示有序错误附注并保护既有CLI输出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CK-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CK-M01-DEV",
+          "kind": "modify",
+          "goal": "展示有序错误附注并保护既有CLI输出",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement the complete public note-display enhancement for both base and usage errors. Preserve streams, color, unnoted output, usage, exit codes and format_message. Modify only the authorized implementation and new public test file, with meaningful original-failing tests.",
+          "requires": [],
+          "materials": [
+            "materials/error-notes.py",
+            "materials/notes-contract.md"
+          ],
+          "allowed_paths": [
+            "library/src/click/exceptions.py",
+            "library/tests/test_exceptions/test_click_exception.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CK-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CK-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CK-M01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

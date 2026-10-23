@@ -1,0 +1,55 @@
+--- a/library/tests/test_xmltodict.py
++++ b/library/tests/test_xmltodict.py
+@@ -720,3 +720,33 @@
+     xml = "<a><b>1</b><b>2</b><c>x</c></a>"
+     expected = {"a": [{"b": ["1", "2"], "c": ["x"]}]}
+     assert parse(xml, force_list=True) == expected
++
++
++def test_order_chunk_iterator_and_map_regression():
++    """普通同步迭代器和map必须保持原解析结果。@return None。"""
++    chunks = ["<orders>", "<order id='A'><qty>2</qty></order>", "</orders>"]
++    expected = {"orders": {"order": {"@id": "A", "qty": "2"}}}
++    assert parse(iter(chunks)) == expected
++    assert parse(map(str, chunks)) == expected
++
++
++def test_order_utf8_chunk_iterator_regression():
++    """字节边界不得截断多字节业务文本。@return None。"""
++    raw = "<order>咖啡</order>".encode("utf-8")
++    position = raw.index("咖".encode("utf-8")) + 1
++    assert parse(iter([raw[:position], raw[position:]])) == {"order": "咖啡"}
++
++
++def test_order_iterator_callback_stops_consumption_regression():
++    """回调拒绝时不得先消费完整输入。@return None。"""
++    consumed = []
++
++    def record(chunk):
++        """记录实际被请求的分块。@param chunk 分块。@return 原分块。"""
++        consumed.append(chunk)
++        return chunk
++
++    chunks = ["<orders>", "<order id='A'/>", "<order id='B'/>", "</orders>"]
++    with pytest.raises(ParsingInterrupted):
++        parse(map(record, chunks), item_depth=2, item_callback=lambda path, item: False)
++    assert consumed == chunks[:2]
+--- a/library/xmltodict.py
++++ b/library/xmltodict.py
+@@ -6,6 +6,7 @@
+ from xml.sax.xmlreader import AttributesImpl
+ from io import StringIO
+ from inspect import isgenerator
++from collections.abc import Iterator
+ import codecs
+ 
+ class ParsingInterrupted(Exception):
+@@ -369,7 +370,7 @@
+         parser.EntityDeclHandler = _forbid_entities
+     if hasattr(xml_input, 'read'):
+         parser.ParseFile(xml_input)
+-    elif isgenerator(xml_input):
++    elif isgenerator(xml_input) or isinstance(xml_input, Iterator):
+         for chunk in xml_input:
+             parser.Parse(chunk, False)
+         parser.Parse(b'', True)

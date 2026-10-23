@@ -1,0 +1,62 @@
+{
+  "schema": 3,
+  "project_key": "marshmallow",
+  "title": "Marshmallow订单验收开发任务",
+  "category": "模式校验与数据投影",
+  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "c402cbe09e2ee1685bf11a424495e3d3c1acacc05fe98e43e6f482a6cb45c50a",
+  "environment": "marshmallow-py312",
+  "source": {
+    "repository": "https://github.com/marshmallow-code/marshmallow",
+    "commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MM-S05-DEV",
+      "title": "拒绝日期字段隐式接受时间对象",
+      "goal": "拒绝日期字段隐式接受时间对象",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MM-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MM-M01-DEV",
+          "kind": "modify",
+          "goal": "拒绝日期字段隐式接受时间对象",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nImplement only the explicit Date rejection contract and public regressions, preserving every stated compatibility boundary.",
+          "requires": [],
+          "materials": [
+            "materials/date-repair.md"
+          ],
+          "allowed_paths": [
+            "library/src/marshmallow/fields.py",
+            "app/test_date.py"
+          ],
+          "outcomes": [
+            "implemented_and_verified"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MM-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MM-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MM-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

@@ -16,6 +16,8 @@ python3 deploy/v3/manage.py backup --env /absolute/path/v3.env --backup-dir /abs
 
 建议端口 18080 只是默认值，实际启动前必须空闲。默认绑定 127.0.0.1；远程访问按现有安全反代配置接入这个新端口。内部账号和调度器服务只在独立 Docker 网络通信。
 
+gateway 显式使用 `TZ=Asia/Shanghai`，峰值预热的小时配置按北京时间解释，例如 `4,6` 在每天 04:10、06:10 触发。账号容器继续使用各自保存的时区。
+
 每个构建批次使用唯一 `v3-<release>` 标签。清单记录父仓和子仓提交、冻结源码内容哈希、工作区是否有未提交修改、平台、默认 CLI、布局与传输版本及两个镜像的本地 ID（`digest`）与原始配置哈希（`config_digest`）；启动逐项核对标签、角色、批次和镜像身份。不得用旧 latest、混用批次或覆盖清单。本地构建不会推送镜像。`scripts/v3-stack` 提供同一组命令的短入口。
 
 ## GHCR 发布与远程交付
@@ -143,3 +145,11 @@ python3 deploy/v3/verify_forwarding.py --manifest /absolute/path/v3-verification
 测试替身成功只证明隔离业务链路。生产发送器经账号代理完成非模型 HTTPS 往返、真实 Anthropic 模型推理是另外两项验收；受限账号不能用来证明成功推理。
 
 默认 CLI 版本为 `2.1.293`；显式 `V3_CLI_VERSION`、页面版本覆盖及已有 Run 的冻结版本继续按原优先级生效。
+
+## 完整开发周期的外接需求方
+
+内容 schema 3 的新批次需要给 orchestrator 配置 `PROJECT_REQUESTER_BASE_URL=https://ai.flower-cli.com/v1`、`PROJECT_REQUESTER_MODEL=gemini-3-flash-agent`、`PROJECT_REQUESTER_FALLBACK_MODEL=deepseek-flash` 和受保护的 `PROJECT_REQUESTER_API_KEY`。沿用部署 env 的权限保护方式；环境值用于初始配置；项目页也可动态编辑一个 Base URL、私有密钥和 1～8 个有序模型，保存后无需重启。页面覆盖以 0600 原子存入 `bench/settings/project-requester.json`，API 只返回密钥是否已配置，留空保存沿用当前密钥，并可恢复环境配置。密钥不传给账号 CLI、sender 或浏览器响应。未配置或配置不合法时拒绝新完整任务，历史批次仍可读。
+
+普通对话不启动独立评审；外部需求方按实际回答生成追问、确认实施或提交验收。402／明确额度不足、429 与暂时服务失败按已配置模型顺序有界降级；同一配置版本内当前任务之后沿用已选备用，新配置对后续请求生效。认证／参数错误、主备均不可用或结果未知会保留原任务及可见原因，不重建开发者会话。原会话、代码、生成消息和累计预算在暂停及执行切片超时后保留。
+
+当前百项目重审口径、未准入清单、完整内容与本地验证命令见 [内容库说明](../../project_library/README.md)。这次源码配置变更不表示生产已更新，也未自动启动真实 Claude 任务。

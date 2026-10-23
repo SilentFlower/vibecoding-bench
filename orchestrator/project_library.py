@@ -197,7 +197,7 @@ class ProjectDefinition:
         :param include_steps: 是否附带步骤目标。
         :return: 可序列化的项目摘要。
         """
-        if self.manifest['schema'] == 2:
+        if self.manifest['schema'] in (2, 3):
             from project_scenario_content import scenario_summary
             return scenario_summary(self.manifest, include_tasks=include_steps)
         result = {key: self.manifest[key] for key in
@@ -217,22 +217,40 @@ class ProjectLibrary:
     :param root: 源码或已注册的内容目录。
     :param minimum_projects: 生产内容数量下限，隔离测试可显式缩小。
     :param minimum_steps: 每项目步骤下限。
+    :param catalog_name: 同一源码根中的历史目录文件名，默认读取当前目录。
     """
 
-    def __init__(self, root: Path, *, minimum_projects: int = 100, minimum_steps: int = 20) -> None:
+    def __init__(self, root: Path, *, minimum_projects: int = 100, minimum_steps: int = 20,
+                 catalog_name: str = 'catalog.json') -> None:
         """加载并校验内容；参数契约见类说明。@return None。"""
         self.root = root
-        catalog = read_document(root / "catalog.json")
+        if safe_relative(catalog_name) != Path(catalog_name).name:
+            raise ValueError('内容目录必须是根目录内的文件')
+        catalog = read_document(root / catalog_name)
         if (not isinstance(catalog, dict) or type(catalog.get("schema")) is not int
-                or catalog['schema'] not in (1, 2)):
+                or catalog['schema'] not in (1, 2, 3)):
             raise ValueError("项目目录 schema 不合法")
         self.schema = catalog['schema']
         self.catalog_document = catalog
+        manifest_name = catalog.get('project_manifest', 'project.json')
+        if manifest_name not in ('project.json', 'development.json') or self.schema != 3 and manifest_name != 'project.json':
+            raise ValueError('内容目录的项目定义入口不合法')
         keys = catalog.get("projects")
         if (not isinstance(keys, list) or len(keys) < (minimum_projects if self.schema == 1 else 1)
                 or any(not isinstance(key, str) or not PROJECT_KEY.fullmatch(key) for key in keys)
                 or len(set(keys)) != len(keys)):
             raise ValueError("项目目录数量、标识或唯一性不合法")
+        if 'admission' in catalog:
+            admission = catalog['admission']
+            if (self.schema != 3 or not isinstance(admission, list)
+                    or any(not isinstance(item, dict) or set(item) - {'project_key', 'status', 'reason'}
+                        or not isinstance(item.get('project_key'), str) or not PROJECT_KEY.fullmatch(item['project_key'])
+                        or item.get('status') not in ('ready', 'blocked')
+                        or item['status'] == 'blocked' and (not isinstance(item.get('reason'), str) or not item['reason'].strip())
+                        for item in admission)
+                    or len({item['project_key'] for item in admission}) != len(admission)
+                    or {item['project_key'] for item in admission if item['status'] == 'ready'} != set(keys)):
+                raise ValueError('逐仓准入记录与可执行项目不一致')
         self.version = catalog.get("version")
         if not isinstance(self.version, str) or not self.version.strip():
             raise ValueError("项目目录缺少内容版本")
@@ -242,9 +260,11 @@ class ProjectLibrary:
             project_root = root / "projects" / key
             if project_root.is_symlink():
                 raise ValueError("项目内容目录不能是链接")
-            manifest = read_document(project_root / "project.json")
-            if self.schema == 2:
+            manifest = read_document(project_root / manifest_name)
+            if self.schema in (2, 3):
                 from project_scenario_content import validate_scenario_project
+                if not isinstance(manifest, dict) or manifest.get('schema') != self.schema:
+                    raise ValueError('项目内容版本与目录不一致')
                 validate_scenario_project(project_root, manifest, key)
             else:
                 self._validate(manifest, key, minimum_steps)
@@ -252,9 +272,9 @@ class ProjectLibrary:
             if actual["digest"] != manifest["seed_digest"]:
                 raise ValueError(f"项目 {key} 初始版本摘要不一致")
             self.projects[key] = ProjectDefinition(project_root, manifest)
-            if self.schema == 2:
+            if self.schema in (2, 3):
                 project_digests[key] = snapshot_tree(project_root)['digest']
-        if self.schema == 2:
+        if self.schema in (2, 3):
             from project_scenario_content import validate_environment
             for project in self.projects.values():
                 environment = project.manifest['environment']

@@ -1,0 +1,88 @@
+--- a/library/schedule/__init__.py
++++ b/library/schedule/__init__.py
+@@ -115,9 +115,11 @@
+             len(self.jobs),
+             delay_seconds,
+         )
+-        for job in self.jobs[:]:
++        jobs = self.jobs[:]
++        for index, job in enumerate(jobs):
+             self._run_job(job)
+-            time.sleep(delay_seconds)
++            if index < len(jobs) - 1:
++                time.sleep(delay_seconds)
+ 
+     def get_jobs(self, tag: Optional[Hashable] = None) -> List["Job"]:
+         """
+--- a/library/test_schedule.py
++++ b/library/test_schedule.py
+@@ -1597,3 +1597,69 @@
+         scheduler.every()
+         scheduler.every(10).seconds
+         scheduler.run_pending()
++
++
++class RunAllTailDelayRegressionTests(TestCase):
++    """仅在任务之间等待的公开行为回归。"""
++
++    def test_delay_for_zero_one_and_three_jobs(self):
++        """空集合与单任务不等待，三任务按真实执行顺序只等待两次。@return None。"""
++        for count in (0, 1, 3):
++            scheduler, events = schedule.Scheduler(), []
++            for index in range(count):
++                scheduler.every().minute.do(lambda value: events.append(("job", value)), index)
++            with mock.patch.object(schedule.time, "sleep", side_effect=lambda delay: events.append(("sleep", delay))):
++                scheduler.run_all(2)
++            expected = []
++            for index in range(count):
++                if index:
++                    expected.append(("sleep", 2))
++                expected.append(("job", index))
++            self.assertEqual(events, expected)
++
++    def test_cancel_does_not_skip_snapshot(self):
++        """首任务取消自身后仍执行快照的第二项。@return None。"""
++        scheduler, events = schedule.Scheduler(), []
++
++        def first():
++            """记录并返回取消信号。@return CancelJob。"""
++            events.append("first")
++            return schedule.CancelJob
++
++        first_job = scheduler.every().minute.do(first)
++        second_job = scheduler.every().minute.do(lambda: events.append("second"))
++        with mock.patch.object(schedule.time, "sleep") as sleeping:
++            scheduler.run_all(2)
++        self.assertEqual(events, ["first", "second"])
++        sleeping.assert_called_once_with(2)
++        self.assertEqual(scheduler.jobs, [second_job])
++        self.assertNotIn(first_job, scheduler.jobs)
++
++    def test_added_job_waits_for_next_batch(self):
++        """回调中新建任务不能进入同一快照批次。@return None。"""
++        scheduler, events = schedule.Scheduler(), []
++
++        def first():
++            """创建下一批任务。@return None。"""
++            events.append("first")
++            scheduler.every().minute.do(lambda: events.append("new"))
++
++        scheduler.every().minute.do(first)
++        scheduler.every().minute.do(lambda: events.append("second"))
++        with mock.patch.object(schedule.time, "sleep") as sleeping:
++            scheduler.run_all(2)
++        self.assertEqual(events, ["first", "second"])
++        self.assertEqual(len(scheduler.jobs), 3)
++        sleeping.assert_called_once_with(2)
++
++    def test_exception_stops_without_sleep(self):
++        """异常原样传播，不能执行后项或在失败后等待。@return None。"""
++        scheduler = schedule.Scheduler()
++        healthy = mock.Mock()
++        scheduler.every().minute.do(mock.Mock(side_effect=ValueError("synthetic")))
++        scheduler.every().minute.do(healthy)
++        with mock.patch.object(schedule.time, "sleep") as sleeping:
++            with self.assertRaises(ValueError):
++                scheduler.run_all(2)
++        sleeping.assert_not_called()
++        healthy.assert_not_called()

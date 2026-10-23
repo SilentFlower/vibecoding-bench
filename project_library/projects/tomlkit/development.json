@@ -1,0 +1,109 @@
+{
+  "schema": 3,
+  "project_key": "tomlkit",
+  "title": "TOMLKit 配置保真开发任务",
+  "category": "配置与文档编辑",
+  "description": "固定真实源码上的 2 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "3bed3305cd2ed71e2dc402c2102f17b17f9f08b5557ad380a10876eaca2e0da3",
+  "environment": "tomlkit-py312",
+  "source": {
+    "repository": "https://github.com/python-poetry/tomlkit",
+    "commit": "eddd27e43a62fe58707c311bfad2f52e72493f53",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/tests/toml-test/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TK-S03-DEV",
+      "title": "修复 Array 的 *=，保留文档绑定、合法格式和现有数组操作。",
+      "goal": "修复 Array 的 *=，保留文档绑定、合法格式和现有数组操作。",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TK-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TK-M01-DEV",
+          "kind": "modify",
+          "goal": "修复 Array 的 *=，保留文档绑定、合法格式和现有数组操作。",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nFix in-place repetition for Array in the supplied reproducer. The same Array object must remain bound to the document, and its values, index operations, unwrap, and serialized TOML must agree after valid repetition counts. Follow Python list index-count semantics, preserve exact text for *= 1, and retain existing comments and the behavior of unrelated array operations. Changes to formatting may be local to material newly added or cleared by repetition. Include regression tests within the allowed paths.",
+          "requires": [],
+          "materials": [
+            "materials/array-reproducer.py",
+            "materials/array-repair.md"
+          ],
+          "allowed_paths": [
+            "library/tomlkit/items.py",
+            "library/tests/test_items.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TK-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TK-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TK-S04-DEV",
+      "title": "删除叶子时保留仍存在的空父表，不影响普通 inline 删除的既有排版。",
+      "goal": "删除叶子时保留仍存在的空父表，不影响普通 inline 删除的既有排版。",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TK-M02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TK-M02-DEV",
+          "kind": "modify",
+          "goal": "删除叶子时保留仍存在的空父表，不影响普通 inline 删除的既有排版。",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nFix inline-table rendering after deleting the last leaf of a dotted child. Deleting the leaf must retain every still-present parent as an explicit empty inline table at the correct path, and the result must parse to the independently expected logical tree. Preserve ordinary flat-key deletion output, untouched documents, sibling values, ordering, and existing dotted-child insertion. Keep the change limited to the allowed paths and add regression coverage.",
+          "requires": [],
+          "materials": [
+            "materials/inline-delete-reproducer.py",
+            "materials/inline-repair.md"
+          ],
+          "allowed_paths": [
+            "library/tomlkit/items.py",
+            "library/tests/test_items.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TK-M02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TK-M02.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TK-M02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

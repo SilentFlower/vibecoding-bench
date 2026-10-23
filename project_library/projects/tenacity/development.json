@@ -1,0 +1,108 @@
+{
+  "schema": 3,
+  "project_key": "tenacity",
+  "title": "Tenacity 有界重试开发任务",
+  "category": "可靠运行与重试策略",
+  "description": "固定真实源码上的 2 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "seed_digest": "da47c91c3b8656616942cbe854ce3a1c833d1df34dde5cb59af7eac3616f206d",
+  "environment": "tenacity-py312",
+  "source": {
+    "repository": "https://github.com/jd/tenacity",
+    "commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "TN-S04-DEV",
+      "title": "零指数贡献保持下界和抖动，不误跳上限",
+      "goal": "零指数贡献保持下界和抖动，不误跳上限",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TN-M01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TN-M01-DEV",
+          "kind": "modify",
+          "goal": "零指数贡献保持下界和抖动，不误跳上限",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nAvoid computing an irrelevant exponential contribution when the multiplier is zero in wait_exponential and wait_exponential_jitter. Preserve min/max ordering, random-exponential bounds, one jitter draw and all non-zero behavior. Cover integer and float zero/base cases without changing public signatures or sleeping.",
+          "requires": [],
+          "materials": [
+            "materials/zero-reproducer.py",
+            "materials/zero-contract.md"
+          ],
+          "allowed_paths": [
+            "library/tenacity/wait.py",
+            "library/tests/test_tenacity.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TN-M01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-M01.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TN-M01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TN-S05-DEV",
+      "title": "迭代求值内置组合树，同时保留分组与自定义策略",
+      "goal": "迭代求值内置组合树，同时保留分组与自定义策略",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TN-M02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TN-M02-DEV",
+          "kind": "modify",
+          "goal": "迭代求值内置组合树，同时保留分组与自定义策略",
+          "prompt": "We need to complete a real development change in this pinned project. First inspect the actual source and supplied business reproduction, explain the relevant call path and edge cases, and raise any clarification questions. Propose a concrete plan with compatibility and test coverage, and wait for my confirmation before editing. Continue the implementation and any validation fixes in this same conversation and workspace. The following describes the eventual delivery scope, not an instruction to skip investigation or plan agreement:\n\nEvaluate deeply nested built-in wait_combine trees without relying on Python recursion. Preserve each node's original float(sum(...)) grouping, left-to-right leaf calls, callable argument convention, custom subclasses and changes visible when a node is entered. Do not flatten opaque strategies or raise the global recursion limit. Reject cyclic built-in combination graphs with a clear ValueError while allowing shared acyclic subtrees. Add focused tests.",
+          "requires": [],
+          "materials": [
+            "materials/combine-reproducer.py",
+            "materials/combine-contract.md"
+          ],
+          "allowed_paths": [
+            "library/tenacity/wait.py",
+            "library/tests/test_tenacity.py"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TN-M02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TN-M02.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TN-M02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

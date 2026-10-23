@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "task_id": "JI-M02-DEV",
+  "criteria": [
+    {
+      "id": "c1-behavior",
+      "requirement": "Standard Mapping inputs must encode items with correct key/value Unicode and form quoting; dict, duplicate pair keys and string-path quoting remain compatible. Independent business and full frozen upstream regression must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "c1-public-tests",
+      "requirement": "Deliver meaningful regression tests in the authorized public test files that fail on the original Mapping bug and cover compatibility. Cite the actual candidate tests and implementation; a claim of adding tests is insufficient.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "c1-scope",
+      "requirement": "Change only the explicitly allowed source and public test paths, without new dependencies or test-control changes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "c2-explicit-default",
+      "requirement": "Explicit None replaces missing fields; omitting default retains Undefined. Existing None, False, 0 and empty-string values retain value and type. Cover sync, async, nested and StrictUndefined paths. Independent business and full upstream regression must pass.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "c2-preserved-capabilities",
+      "requirement": "Preserve the accepted JI-M01 Mapping behavior and shared attrgetter callers such as groupby/sum/unique. Do not globally turn all Undefined into None.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "c2-public-tests",
+      "requirement": "Deliver actual public regression tests for explicit None versus omitted default and sync/async behavior, preserving the earlier Mapping tests. Cite delivered candidate files; do not count fixed oracle results as delivered public tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "cycle-public-tests",
+      "allow_candidate_evidence": true,
+      "requirement": "Deliver meaningful public regression tests within the authorized test paths that fail on the pinned original and pass with the change. Preserve the frozen original tests, test controls, and compatibility behavior; cite actual delivered test files. Controller-owned verification is independent evidence and does not replace delivered public tests.",
+      "evidence": []
+    }
+  ],
+  "comparison": "Evaluate supported behavior, constraints and delivered evidence, not keywords, verbosity or reference-answer similarity.",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044",
+  "version": 2
+}

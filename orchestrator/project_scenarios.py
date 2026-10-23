@@ -15,6 +15,7 @@ from project_library import (canonical_json, digest_json, materialize_snapshot, 
     safe_relative, snapshot_tree, write_document)
 from project_evaluation import check_change_scope, load_rubric, parse_review, review_package, review_prompt, source_evidence
 from project_scenario_usage import aggregate_usage, observed_model, source_usage
+from project_development import DEVELOPMENT_SQL, ProjectDevelopment
 
 if TYPE_CHECKING:
     from project_iteration import ProjectIterationManager
@@ -114,7 +115,7 @@ def initialize_scenario_schema(connection) -> None:
     :param connection: 已初始化通用与项目基础表的连接。
     :return: None。
     """
-    connection.executescript(SCENARIO_SCHEMA)
+    connection.executescript(SCENARIO_SCHEMA + DEVELOPMENT_SQL)
 
 
 def normalized_scenario_policy(values: dict, project_count: int, account_limit: int) -> dict:
@@ -161,6 +162,7 @@ class ProjectScenarios:
         self.owner = owner
         self._evaluating = set()
         self._evaluation_lock = threading.Lock()
+        self.development = ProjectDevelopment(self)
 
     def context(self, run_id: str) -> dict | None:
         """提供原运行器所需的项目归属及独立场景会话。
@@ -519,6 +521,12 @@ class ProjectScenarios:
                 item.update(goal=definition['goal'], requires=definition['requires'],
                     result=json.loads(task['result_json']) if task['result_json'] else None,
                     candidate_budget=self.budget(task['id']),review_budget=self.budget(task['id'],'review'))
+                if self.development.handles(task):
+                    requester = self.development.summary(task['id'])
+                    item.update(development_cycle=definition['development_cycle'],
+                        development_phase='accepted' if task['status'] == 'passed' else 'verifying'
+                            if task['status'] == 'evaluating' and requester['status'] == 'applied' and requester['action'] == 'verify'
+                            else self.development.phase(task['id']), requester=requester)
                 item['executions'] = self.owner._rows('SELECT e.id,e.run_id,e.role,e.turn_no,r.status AS execution_status '
                     'FROM project_task_executions e JOIN runs r ON r.id=e.run_id WHERE e.task_id=? ORDER BY e.id', (task['id'],))
                 item['evaluation'] = self.owner._one('SELECT id,status,error,created_at,ended_at FROM project_evaluation_jobs '
@@ -548,11 +556,14 @@ class ProjectScenarios:
         :param task_id: 业务任务。
         :return: 不含会话身份及隐藏输入的记录。
         """
-        self.require_task(instance_id,task_id)
-        return {'task_id':task_id,'attempts':self.owner._rows('SELECT id,attempt_no,reason,consumed_at,ended_at,result '
+        task = self.require_task(instance_id,task_id)
+        result = {'task_id':task_id,'attempts':self.owner._rows('SELECT id,attempt_no,reason,consumed_at,ended_at,result '
             'FROM project_task_attempts WHERE task_id=? ORDER BY attempt_no',(task_id,)),
             'executions':self.owner._rows('SELECT e.id,e.attempt_id,e.run_id,e.role,e.turn_no,e.created_at,e.ended_at,r.status AS execution_status '
                 'FROM project_task_executions e JOIN runs r ON r.id=e.run_id WHERE e.task_id=? ORDER BY e.id',(task_id,))}
+        if self.development.handles(task):
+            result.update(conversation=self._conversation(task_id), requester=self.development.summary(task_id))
+        return result
 
     def artifacts(self, instance_id: int, task_id: int, evaluation_id: int | None = None) -> dict:
         """按冻结回答版本读取答案、独立验收及源码清单。
@@ -641,6 +652,8 @@ class ProjectScenarios:
                 summary['work'] = self.budget(task['id'],role)
                 item['roles'][role] = summary
                 grouped.setdefault((task['kind'],role),[]).extend(observations)
+            if self.development.handles(self.task(task['id'])):
+                item['roles']['requester'] = self.development.summary(task['id'])
             result.append(item)
         return {'instance_id':instance_id,'tasks':result,'by_kind':[{'kind':kind,'role':role,**aggregate_usage(values)}
             for (kind,role),values in sorted(grouped.items())]}
@@ -706,8 +719,10 @@ class ProjectScenarios:
                     attempt = connection.execute('SELECT * FROM project_task_attempts WHERE task_id=? ORDER BY attempt_no DESC LIMIT 1',
                         (execution['task_id'],)).fetchone()
                     reason = task['next_reason']
-                    if not attempt or reason in ('initial', 'correction', 'timeout'):
-                        if task['attempt_count'] >= 3:
+                    definition = json.loads(task['definition_json'])
+                    development = definition.get('development_cycle') in ('feature', 'bug')
+                    if not attempt or reason in ('initial', 'correction', 'timeout') and not (development and reason == 'timeout'):
+                        if not development and task['attempt_count'] >= 3:
                             raise ValueError('任务首次执行及两次继续／修正已经用尽')
                         cursor = connection.execute('INSERT INTO project_task_attempts(task_id,attempt_no,reason,consumed_at) VALUES(?,?,?,?)',
                             (task['id'], task['attempt_count'] + 1, reason, time.time()))
@@ -1057,6 +1072,11 @@ class ProjectScenarios:
             if not instance['in_pool'] and instance['status'] != 'completed':
                 self.owner.plans._write('UPDATE project_instances SET in_pool=1 WHERE id=?', (instance['id'],))
                 pool.append(instance)
+        resumable = {item['instance_id'] for item in self.owner._rows('SELECT DISTINCT s.instance_id FROM project_scenario_tasks t '
+            'JOIN project_scenario_instances s ON s.id=t.scenario_instance_id JOIN project_instances i ON i.id=s.instance_id '
+            "WHERE i.batch_id=? AND t.status='ready' AND (t.turn_no>1 OR t.attempt_count>0) "
+            "AND json_extract(t.definition_json,'$.development_cycle') IN ('feature','bug')", (batch['id'],))}
+        pool.sort(key=lambda item: item['id'] not in resumable)
         for instance in pool:
             if capacity <= 0:
                 break
@@ -1080,11 +1100,23 @@ class ProjectScenarios:
 
     def _reserve_candidate(self, batch: dict, account: dict, task_id: int) -> bool:
         task = self.task(task_id)
+        if self.development.handles(task) and task['turn_no'] == 1 and not task['attempt_count']:
+            continuing = self.owner._rows('SELECT t.id FROM project_scenario_tasks t '
+                'JOIN project_scenario_instances s ON s.id=t.scenario_instance_id JOIN project_instances i ON i.id=s.instance_id '
+                'JOIN project_iteration_batches b ON b.id=i.batch_id '
+                "WHERE b.account_id=? AND b.status='active' AND t.selected=1 AND t.id<>? AND (t.turn_no>1 OR t.attempt_count>0) "
+                "AND json_extract(t.definition_json,'$.development_cycle') IN ('feature','bug') AND t.status='ready'", (account['id'], task_id))
+            # 仅可执行的续做优先；外部服务等待或预算异常不能把整个账号的新任务永久卡住。
+            for previous in continuing:
+                remaining = self.budget(previous['id'])
+                if not remaining['uncertain'] and remaining['slice_sec'] >= 1:
+                    return False
         budget = self.budget(task_id)
         if budget['uncertain'] or budget['slice_sec'] < 1:
             self._task_status(task_id, 'blocked' if budget['uncertain'] else 'exhausted', '工作预算待核实' if budget['uncertain'] else '累计工作预算已用尽')
             return False
-        if task['next_reason'] in ('initial', 'timeout', 'correction') and task['attempt_count'] >= 3:
+        if (not self.development.handles(task) and task['next_reason'] in ('initial', 'timeout', 'correction')
+                and task['attempt_count'] >= 3):
             self._task_status(task_id, 'exhausted', '首次执行及两次继续／修正已用尽')
             return False
         definition = json.loads(task['definition_json'])
@@ -1220,13 +1252,16 @@ class ProjectScenarios:
         elif source and self.owner._one('SELECT id FROM project_evaluation_jobs WHERE source_id=?', (source['id'],)):
             self.owner.plans._write("UPDATE project_evaluation_jobs SET status='queued' WHERE source_id=? AND status='waiting_release'", (source['id'],))
         elif execution['run_status'] == 'timeout' and execution['attempt_id']:
-            self.owner.plans._write("UPDATE project_task_attempts SET ended_at=?,result='timeout' WHERE id=? AND ended_at IS NULL",
-                (time.time(),execution['attempt_id']))
-            if self.budget(task['id'])['slice_sec'] < 1 or task['attempt_count'] >= 3:
+            development = self.development.handles(task)
+            if not development:
+                self.owner.plans._write("UPDATE project_task_attempts SET ended_at=?,result='timeout' WHERE id=? AND ended_at IS NULL",
+                    (time.time(),execution['attempt_id']))
+            if self.budget(task['id'])['slice_sec'] < 1 or not development and task['attempt_count'] >= 3:
                 self._task_status(task['id'], 'exhausted', '超时后任务累计预算或继续次数已用尽')
             else:
-                self.owner.plans._write("UPDATE project_scenario_tasks SET status='ready',phase='timeout_resume',next_reason='timeout',next_prompt=?,updated_at=? WHERE id=?",
-                    ('Continue the current unfinished task in the original session. Preserve completed work and existing files, and provide your answer when finished.', time.time(), task['id']))
+                self.owner.plans._write("UPDATE project_scenario_tasks SET status='ready',phase='timeout_resume',next_reason=?,next_prompt=?,updated_at=? WHERE id=?",
+                    ('continuation' if development else 'timeout',
+                        'Continue the current unfinished task in the original session. Preserve completed work, the agreed plan, and existing files. Resume the current unfinished phase without starting over.', time.time(), task['id']))
         else:
             if task['infra_recoveries'] >= 2:
                 self._task_status(task['id'], 'blocked', '执行基础设施恢复次数已用尽')
@@ -1275,7 +1310,7 @@ class ProjectScenarios:
     def _advance_jobs(self, batch: dict) -> None:
         jobs = self.owner._rows('SELECT j.* FROM project_evaluation_jobs j JOIN project_scenario_tasks t ON t.id=j.task_id '
             'JOIN project_scenario_instances s ON s.id=t.scenario_instance_id JOIN project_instances i ON i.id=s.instance_id '
-            "WHERE i.batch_id=? AND j.status IN ('queued','mechanical_running') ORDER BY j.id", (batch['id'],))
+            "WHERE i.batch_id=? AND j.status IN ('queued','mechanical_running','dialogue_wait') ORDER BY j.id", (batch['id'],))
         if batch['status'] not in ('active', 'pausing'):
             return
         for job in jobs:
@@ -1290,6 +1325,8 @@ class ProjectScenarios:
     def _mechanical_job(self, job_id: int) -> None:
         try:
             job = self.owner._one('SELECT * FROM project_evaluation_jobs WHERE id=?', (job_id,))
+            if not job or job['status'] not in ('queued', 'mechanical_running', 'dialogue_wait'):
+                return
             task = self.task(job['task_id'])
             definition = json.loads(task['definition_json'])
             library = self.owner._release(task['catalog_release_id'])
@@ -1300,15 +1337,18 @@ class ProjectScenarios:
             execution = self.owner._one('SELECT * FROM project_task_executions WHERE id=?', (source['execution_id'],))
             if execution['ended_at'] is None or task['generation'] != job['generation']:
                 return
-            self.owner.plans._write("UPDATE project_evaluation_jobs SET status='mechanical_running' WHERE id=? AND status IN ('queued','mechanical_running')", (job_id,))
+            if self.development.handles(task) and self.development.advance(job, task):
+                return
+            self.owner.plans._write("UPDATE project_evaluation_jobs SET status='mechanical_running' WHERE id=? AND status IN ('queued','mechanical_running','dialogue_wait')", (job_id,))
             candidate = self.owner.data / safe_relative(job['candidate_relative'])
             snapshot = read_document(self.owner.manifests / (job['candidate_digest'] + '.json'))
             before_digest = json.loads(job['evidence_json'])['input_checkpoint_digest']
             before = read_document(self.owner.manifests / (before_digest + '.json'))
-            report = check_change_scope(before, snapshot, definition['allowed_paths'])
+            verified = self.development.handles(task) and job['native_result_json'] is not None
+            report = json.loads(job['native_result_json']) if verified else check_change_scope(before, snapshot, definition['allowed_paths'])
             if snapshot_tree(candidate)['digest'] != job['candidate_digest']:
                 raise ValueError('冻结候选对象被替换或篡改')
-            if report['status'] == 'passed' and definition['evaluation'].get('native'):
+            if not verified and report['status'] == 'passed' and definition['evaluation'].get('native'):
                 spec = read_document(project.root / safe_relative(definition['evaluation']['native']))
                 profile = library.environments[project.manifest['environment']]
                 answer = read_document(self.owner.data / safe_relative(job['answer_relative']))['text']
@@ -1551,13 +1591,17 @@ class ProjectScenarios:
                                     (task['scenario_instance_id'], key))
                             status, phase = 'ready', 'material_ready'
                     elif decision == 'fail':
-                        if current['attempt_count'] >= 3:
+                        development = self.development.handles(task)
+                        if not development and current['attempt_count'] >= 3:
                             status, phase, error = 'failed', 'attempt_limit', '独立验收未通过且修正次数已用尽'
-                        elif current['turn_no'] >= definition.get('max_turns', 4):
+                        elif not development and current['turn_no'] >= definition.get('max_turns', 4):
                             status, phase, error = 'exhausted', 'turn_limit', '正常答复轮次已经用尽'
                         else:
                             status, phase = 'ready', 'correction_ready'
                             prompt = 'Continue the original task and revise the current answer or authorized code according to this independent validation feedback: ' + ', '.join(result.get('feedback_codes', []))
+                            if development:
+                                prompt = self.development.failure_feedback(job, result)
+                                phase = 'repairing'
                     else:
                         raise ValueError('不能接受未支持的评审动作')
                     public_result = {key: result.get(key) for key in ('decision', 'outcome', 'feedback_codes')}
@@ -1593,18 +1637,32 @@ class ProjectScenarios:
         owned = connection is None
         connection = self.owner.database() if owned else connection
         try:
-            task = connection.execute('SELECT b.policy_json FROM project_scenario_tasks t '
+            task = connection.execute('SELECT b.policy_json,t.definition_json FROM project_scenario_tasks t '
                 'JOIN project_scenario_instances s ON s.id=t.scenario_instance_id JOIN project_instances i ON i.id=s.instance_id '
                 'JOIN project_iteration_batches b ON b.id=i.batch_id WHERE t.id=?', (task_id,)).fetchone()
             if task is None:
                 raise ValueError('场景任务不存在')
             policy = json.loads(task['policy_json'])
-            rows = [dict(row) for row in connection.execute('SELECT w.*,e.evaluation_job_id,e.review_attempt '
+            development = self.development.handles(task)
+            all_rows = [dict(row) for row in connection.execute('SELECT w.*,e.evaluation_job_id,e.review_attempt '
                 'FROM project_work_segments w JOIN project_execution_sources x ON x.id=w.source_id '
-                'JOIN project_task_executions e ON e.id=x.execution_id WHERE e.task_id=? AND w.role=?', (task_id, role))]
+                'JOIN project_task_executions e ON e.id=x.execution_id WHERE e.task_id=?', (task_id,))]
+            rows = [row for row in all_rows if row['role'] == role]
             confirmed = sum(row['confirmed_sec'] for row in rows)
             reserved = sum(max(0, row['reserved_sec'] - row['confirmed_sec']) for row in rows if row['status'] != 'settled')
             remaining = max(0, policy['task_budget_sec' if role == 'candidate' else 'review_budget_sec'] - confirmed - reserved)
+            external_uncertain = False
+            if development:
+                external = connection.execute('SELECT COALESCE(SUM(work_sec),0) AS confirmed,COALESCE(SUM(reserved_sec),0) AS reserved,'
+                    "COALESCE(MAX(status='uncertain'),0) AS uncertain FROM project_dialogue_jobs WHERE task_id=?", (task_id,)).fetchone()
+                total_confirmed = sum(row['confirmed_sec'] for row in all_rows) + external['confirmed']
+                total_reserved = sum(max(0,row['reserved_sec']-row['confirmed_sec']) for row in all_rows if row['status'] != 'settled') + external['reserved']
+                total_remaining = max(0, policy['task_budget_sec'] - total_confirmed - total_reserved)
+                if role == 'candidate':
+                    confirmed, reserved, remaining = total_confirmed, total_reserved, total_remaining
+                else:
+                    remaining = min(remaining, total_remaining)
+                external_uncertain = bool(external['uncertain'])
             available = min(remaining, policy['timeout_sec' if role == 'candidate' else 'review_timeout_sec'])
             if role == 'review' and job_id is not None:
                 job = connection.execute('SELECT response_budget_sec FROM project_evaluation_jobs WHERE id=? AND task_id=?',
@@ -1622,7 +1680,7 @@ class ProjectScenarios:
                     policy['review_timeout_sec'] - charged(attempt_rows)))
             return {'confirmed_sec': confirmed, 'reserved_sec': reserved, 'remaining_sec': remaining,
                 'slice_sec': None if role == 'review' and job_id is None else available,
-                'uncertain': any(row['status'] == 'uncertain' for row in rows)}
+                'uncertain': external_uncertain or any(row['status'] == 'uncertain' for row in (all_rows if development else rows))}
         finally:
             if owned:
                 connection.close()

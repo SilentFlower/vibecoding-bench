@@ -1,0 +1,14 @@
+{
+  "script": "verification/development-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_cycle.py"
+}
