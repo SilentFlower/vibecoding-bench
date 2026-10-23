@@ -1,7 +1,7 @@
 /** 新 Projects：围绕账号 Pi、真实终端与工作记录组织界面。 */
 window.ProjectsUI = (() => {
   let api, prefix, source, accountId = null, agents = [], catalog = [], accounts = [], cursor = 0;
-  let revision = 0, selection = 0, timeline = [];
+  let revision = 0, selection = 0, timeline = [], scheduleClock = null;
   const $ = selector => document.querySelector(selector);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
@@ -37,6 +37,7 @@ window.ProjectsUI = (() => {
     const current = revision;
     api = options.api; prefix = options.prefix;
     $('#projects-agent-form').onsubmit = event => { event.preventDefault(); perform(saveAgent); };
+    $('#projects-schedule-form').onsubmit = event => { event.preventDefault(); perform(saveSchedule); };
     $('#projects-model-form').onsubmit = event => { event.preventDefault(); perform(saveModel); };
     $('#projects-model-reset').onclick = () => perform(async () => {
       await api('/settings/project-requester', {method: 'DELETE'}); await loadModel();
@@ -46,6 +47,8 @@ window.ProjectsUI = (() => {
     $('#projects-clear-all').onclick = () => paintCatalog([]);
     $('#projects-projects').onchange = paintSelectionCount;
     $('#projects-account').onchange = event => selectAccount(Number(event.target.value));
+    fillSchedule();
+    scheduleClock = setInterval(paintSchedule, 1000);
     document.querySelectorAll('[data-pi-action]').forEach(button => {
       button.onclick = () => perform(async () => {
         if (!accountId) throw new Error('请先选择并保存账号项目池');
@@ -77,6 +80,7 @@ window.ProjectsUI = (() => {
     revision += 1;
     selection += 1;
     source?.close(); source = null;
+    clearInterval(scheduleClock); scheduleClock = null;
     cursor = 0; timeline = []; accountId = null;
   }
 
@@ -105,6 +109,7 @@ window.ProjectsUI = (() => {
     const form = $('#projects-agent-form');
     form.elements.instructions.value = agent?.instructions || '';
     form.elements.budget_minutes.value = (agent?.budget_sec || 3600) / 60;
+    fillSchedule();
     paintCatalog(agent?.project_keys || []); paintState(); paintEvents();
     $('#projects-screen').textContent = '等待 Pi 观察 Claude Code 终端。';
     if (!accountId) return;
@@ -192,7 +197,72 @@ window.ProjectsUI = (() => {
       budget_sec: Number(form.elements.budget_minutes.value) * 60,
     })});
     updateAgents(value); paintState(); feedback('项目池和指南已保存。');
+    $('#projects-schedule-form').querySelectorAll('input, button').forEach(element => { element.disabled = false; });
     if (!source) await selectAccount(accountId);
+  }
+
+  /**
+   * 仅在切换账号或明确保存计划后回填，实时状态不覆盖尚未保存的输入。
+   * @return {void}
+   */
+  function fillSchedule() {
+    const agent = agents.find(item => item.account_id === accountId);
+    const form = $('#projects-schedule-form');
+    form.elements.schedule_enabled.checked = agent?.schedule?.enabled === true;
+    form.elements.interval_minutes.value = agent?.schedule?.interval_minutes ?? 60;
+    form.querySelectorAll('input, button').forEach(element => { element.disabled = !agent; });
+    paintSchedule();
+  }
+
+  /**
+   * 独立保存定时设置，不暂停或重新创建当前控制者。
+   * @return {Promise<void>} 计划已保存并回显。
+   */
+  async function saveSchedule() {
+    if (!accountId) throw new Error('请先选择账号并保存项目池');
+    const selected = accountId, current = revision, chosen = selection;
+    const form = $('#projects-schedule-form');
+    const enabled = form.elements.schedule_enabled.checked;
+    const value = await api(`/projects/agents/${selected}/schedule`, {method: 'PUT', body: JSON.stringify({
+      enabled, interval_minutes: Number(form.elements.interval_minutes.value),
+    })});
+    if (current !== revision || selected !== accountId || chosen !== selection) return;
+    updateAgents(value); fillSchedule(); paintState();
+    feedback(enabled ? '自动计划已保存；满足账号运行条件后继续指挥。' : '自动计划已关闭；当前任务保持原状态。');
+  }
+
+  /**
+   * 显示已保存的自动计划和倒计时，不修改表单编辑值。
+   * @return {void}
+   */
+  function paintSchedule() {
+    const status = $('#projects-schedule-status'), next = $('#projects-schedule-next');
+    if (!status || !next) return;
+    const agent = agents.find(item => item.account_id === accountId);
+    if (!agent) {
+      status.textContent = '先保存账号项目池，再启用自动指挥。';
+      next.textContent = '';
+      return;
+    }
+    const schedule = agent.schedule;
+    const states = {off: '未启用', scheduled: '已安排', running: '本轮指挥中', waiting: '等待执行条件',
+      blocked: '需要处理', completed: '项目池已完成'};
+    status.textContent = schedule?.enabled
+      ? `定时已开启 · ${states[schedule.state] || schedule.state} · 每轮结束后间隔 ${schedule.interval_minutes} 分钟`
+      : `定时已关闭${agent.controller_active ? ' · 当前 Pi 继续运行' : ''}`;
+    if (schedule?.message) status.textContent += `；${schedule.message}`;
+    const timestamp = schedule?.next_run_at;
+    if (schedule?.enabled && typeof timestamp === 'number' && Number.isFinite(timestamp)) {
+      const seconds = Math.max(0, Math.ceil(timestamp - Date.now() / 1000));
+      const waiting = seconds ? `约 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒后检查` : '已到时间，等待核对执行条件';
+      next.textContent = `下次检查：${new Date(timestamp * 1000).toLocaleString('zh-CN', {hour12: false})}（浏览器当地时间）· ${waiting}`;
+    } else if (schedule?.enabled) {
+      next.textContent = schedule.state === 'blocked' ? '请处理原因后重新保存计划或手动启动。'
+        : schedule.state === 'completed' ? '暂无未完成目标，更新项目池后继续。'
+        : agent.controller_active ? '当前一轮结束后安排下次检查。' : '等待执行条件变化后再检查。';
+    } else {
+      next.textContent = '';
+    }
   }
 
   /**
@@ -211,8 +281,9 @@ window.ProjectsUI = (() => {
     const count = value => value === null || value === undefined ? '未采集' : value.toLocaleString();
     $('#projects-usage').textContent = usage ? `Pi${usage.complete === false ? '（已知小计）' : ''}：输入 ${count(usage.input_tokens)} · 输出 ${count(usage.output_tokens)} · 缓存 ${count(usage.cache_read_tokens)}；Claude：输入 ${count(native?.input_tokens)} · 输出 ${count(native?.output_tokens)} · 缓存 ${count(native?.cache_read_input_tokens)}` : '尚无模型调用';
     document.querySelectorAll('[data-pi-action]').forEach(button => {
-      button.disabled = !agent || (button.dataset.piAction === 'start' && ['running', 'waiting'].includes(agent.status));
+      button.disabled = !agent || (button.dataset.piAction === 'start' && agent.controller_active === true);
     });
+    paintSchedule();
   }
 
   /**

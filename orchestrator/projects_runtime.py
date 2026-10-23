@@ -5,9 +5,13 @@ import hashlib
 import json
 import os
 import shutil
+import time
+from datetime import datetime
+from math import isfinite
 from pathlib import Path
 from socket import SHUT_WR
 from tempfile import TemporaryDirectory
+from threading import RLock
 
 from account_isolation import role_container
 from account_runtime import AccountRuntime, atomic_json
@@ -30,7 +34,7 @@ class ProjectsTerminal:
     """
 
     def __init__(self, runtime: AccountRuntime, catalog, settings, quota_context, quota_release=None, credentials=None,
-                 driver: Path | None = None) -> None:
+                 driver: Path | None = None, *, quota_observation=None) -> None:
         """登记运行依赖，不启动账号或模型。
 
         :param runtime: 账号运行环境。
@@ -40,11 +44,14 @@ class ProjectsTerminal:
         :param quota_release: 执行收口后归还额度恢复认领的回调。
         :param credentials: 启动前向权威凭据所有者同步的回调。
         :param driver: 本批控制镜像提供的只读终端监督脚本。
+        :param quota_observation: 接收精确账号、来源及原生结构化限额或认证补证的回调。
         :return: None。
         """
         self.runtime, self.catalog = runtime, catalog
         self.settings, self.quota_context = settings, quota_context
         self.quota_release, self.credentials = quota_release, credentials
+        self.quota_observation = quota_observation
+        self._passive_lock = RLock()
         local = Path(__file__).resolve().parents[1] / 'images/account/projects_cli.py'
         self.driver = driver or (local if local.is_file() else Path('/opt/v3/projects-cli.py'))
 
@@ -128,6 +135,12 @@ class ProjectsTerminal:
                 native = root / 'home/.claude/projects' / cwd.replace('/', '-') / (work['session_id'] + '.jsonl')
                 if work.get('resume_required') and not native.is_file():
                     raise ValueError('原 Claude 会话缺失，不能用新会话替代已有输入')
+                cursor = root / 'runtime/projects-quota' / (handle + '.json')
+                # 恢复沿用原 JSONL，但旧错误不属于新执行；从启动前的精确字节边界开始。
+                observed = native.stat() if native.is_file() else None
+                atomic_json(cursor, {'source': source, 'session_id': work['session_id'],
+                    'file_identity': f'{observed.st_dev}:{observed.st_ino}' if observed else None,
+                    'offset': observed.st_size if observed else 0, 'discarding': False, 'seen': []})
                 configuration = {'session': session, 'socket': socket, 'session_id': work['session_id'],
                     'resume': native.is_file(), 'settings': f'/run/v3/jobs/{handle}/settings.json',
                     'model': settings.get('execution_model'), 'timeout_sec': work['remaining_sec'],
@@ -221,6 +234,126 @@ class ProjectsTerminal:
                 installed.rename(target)
             atomic_json(marker, {'profile_digest': checksum})
         return {'bin': container_root + '/site-packages/bin', 'site': container_root + '/site-packages'}
+
+    def passive_status(self, work: dict) -> dict:
+        """消费本代原生会话中的结构化错误，不解释普通正文或发起额度请求。
+
+        :param work: 含当前账号、控制代次、原生会话及已登记执行定位的工作。
+        :return: 新补证的认证错误、限额窗口、可信重置时间与去重键；没有新事实时返回空摘要。
+        """
+        empty = {'account_error': None, 'quota_limited': False, 'window': None, 'retry_at': None,
+            'observed_at': None, 'evidence_key': None, 'native_error': None}
+        if not work.get('runtime_json'):
+            return empty
+        info = json.loads(work['runtime_json'])
+        with self._passive_lock:
+            job = self.runtime.job_for_container(info['token'])
+            expected_source = f"projects:{work['id']}:{work['generation']}"
+            if (job['account']['id'] != work['account_id'] or job['row']['account_id'] != work['account_id']
+                    or job['source'] != expected_source or info.get('source') != expected_source
+                    or job.get('heartbeat_failed')):
+                raise ValueError('原生额度补证与账号或执行代次不符')
+            root = self.runtime._root(job['row'])
+            directory = self.runtime.data / safe_relative(info['native'])
+            expected = root / 'home/.claude/projects' / job['cwd'].replace('/', '-')
+            path = directory / (work['session_id'] + '.jsonl')
+            if directory != expected or directory.is_symlink() or path.is_symlink():
+                raise ValueError('原生额度补证的会话目录归属不符')
+            if not path.exists():
+                return empty
+            if not path.is_file() or not path.resolve().is_relative_to(root.resolve()):
+                raise ValueError('原生额度补证必须属于当前固定账号')
+            marker = root / 'runtime/projects-quota' / (hashlib.sha256(expected_source.encode()).hexdigest()[:20] + '.json')
+            state = read_document(marker) if marker.is_file() else {'source': expected_source,
+                'session_id': work['session_id'], 'offset': 0, 'file_identity': None, 'discarding': False, 'seen': []}
+            if state.get('source') != expected_source or state.get('session_id') != work['session_id']:
+                raise ValueError('原生额度补证游标与当前执行不符')
+            observed = path.stat()
+            identity = f'{observed.st_dev}:{observed.st_ino}'
+            if state['file_identity'] not in (None, identity) or state['offset'] > observed.st_size:
+                state.update(offset=0, discarding=False)
+            state['file_identity'] = identity
+            initial = state['offset']
+            with path.open('rb') as source:
+                source.seek(initial)
+                while source.tell() - initial < 256 * 1024:
+                    offset = source.tell()
+                    line = source.readline(2 * 1024 * 1024)
+                    if not line:
+                        break
+                    complete = line.endswith(b'\n')
+                    if state['discarding']:
+                        state.update(offset=source.tell(), discarding=not complete)
+                        continue
+                    if not complete:
+                        if len(line) == 2 * 1024 * 1024:
+                            # 超长普通消息分片跳过，不能把后半段误当独立错误事件。
+                            state.update(offset=source.tell(), discarding=True)
+                        else:
+                            source.seek(offset)
+                        break
+                    try:
+                        value = json.loads(line)
+                    except (ValueError, UnicodeError):
+                        state['offset'] = source.tell()
+                        continue
+                    facts = self._passive_error(value, work, expected_source, time.time())
+                    if facts and facts['evidence_key'] not in state['seen']:
+                        if self.quota_observation:
+                            # 补证提交失败不能推进游标；同一事实可由回调按时间和键幂等重试。
+                            self.quota_observation(job['account'], expected_source, facts)
+                        state['seen'] = [*state['seen'], facts['evidence_key']][-128:]
+                        state['offset'] = source.tell()
+                        atomic_json(marker, state)
+                        return facts
+                    state['offset'] = source.tell()
+            atomic_json(marker, state)
+            return empty
+
+    @staticmethod
+    def _passive_error(value: object, work: dict, source: str, now: float) -> dict | None:
+        """只信任官方错误标志及结构化字段，模型普通回答不能形成门禁事实。"""
+        if (not isinstance(value, dict) or value.get('type') != 'assistant'
+                or value.get('isApiErrorMessage') is not True or value.get('isSidechain') is True
+                or value.get('sessionId') != work['session_id']):
+            return None
+        message = value.get('message')
+        if not isinstance(message, dict) or message.get('role') != 'assistant':
+            return None
+        error, identifier = value.get('error'), value.get('uuid')
+        if (error not in ('rate_limit', 'account_on_hold', 'invalid_grant', 'authentication_failed')
+                or not isinstance(identifier, str) or not 1 <= len(identifier) <= 200):
+            return None
+        try:
+            timestamp = datetime.fromisoformat(str(value.get('timestamp') or '').replace('Z', '+00:00'))
+            observed = timestamp.timestamp()
+        except (ValueError, OverflowError, OSError):
+            return None
+        started = work.get('segment_started_at') or work.get('started_at') or work.get('created_at')
+        if timestamp.tzinfo is None or not started or not float(started) <= observed <= now + 5:
+            return None
+        if error == 'rate_limit' and value.get('apiErrorIsTransient') is True:
+            return None
+        facts = {'account_error': ('invalid_grant' if error == 'authentication_failed' else error)
+            if error != 'rate_limit' else None, 'quota_limited': error == 'rate_limit',
+            'window': 'unknown' if error == 'rate_limit' else None, 'retry_at': None,
+            'observed_at': observed, 'native_error': error,
+            'evidence_key': hashlib.sha256(f'{source}:{identifier}:{error}'.encode()).hexdigest()}
+        if error != 'rate_limit':
+            return facts
+        parameters = value.get('apiErrorParams')
+        details = value.get('quotaLimits')
+        if not isinstance(details, dict) and isinstance(parameters, dict):
+            details = parameters.get('rate_limit_info')
+        if isinstance(details, dict) and details.get('status') == 'rejected':
+            kind = details.get('rateLimitType')
+            if kind in ('five_hour', 'seven_day'):
+                facts['window'] = kind
+            reset = details.get('resetsAt')
+            horizon = 6 * 3600 if kind == 'five_hour' else 8 * 86400
+            if type(reset) in (int, float) and isfinite(reset) and observed < reset <= observed + horizon:
+                facts['retry_at'] = float(reset)
+        return facts
 
     def observe(self, work: dict, cursor: int = 0) -> dict:
         """取得有界终端画面及原生会话增量，不推断应当发送的回复。

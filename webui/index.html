@@ -91,12 +91,22 @@
           <form id="projects-agent-form" class="form">
             <label><span class="lbl">运行账号</span><select id="projects-account" required></select></label>
             <label><span class="lbl">本轮最长工作时间 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="60" required></label>
+            <p class="hint">恢复会接续未完成的目标和原会话；累计预算耗尽后需人工调整，定时运行不会清零。</p>
             <label><span class="lbl">给 Pi 的业务指南</span><textarea name="instructions" rows="4" maxlength="12000" placeholder="例如：先调查并讨论方案，确认后实施；优先完成一个目标，再换项目。"></textarea></label>
             <label><span class="lbl">授权项目池</span><input id="projects-filter" type="search" placeholder="搜索项目研究"></label>
             <p class="hint" id="projects-research-count"></p>
             <div class="view-actions"><button class="btn btn-sm" type="button" id="projects-select-all" title="选择全部项目，包含当前搜索隐藏的项目">全选</button><button class="btn btn-sm" type="button" id="projects-clear-all" title="清空全部项目的选择">清空</button><span class="hint" id="projects-selected-count" role="status"></span></div>
             <div id="projects-projects" class="projects-choices"></div>
             <button class="btn btn-primary" type="submit">保存项目池与指南</button>
+          </form>
+          <form id="projects-schedule-form" class="form">
+            <h3>自动指挥计划</h3>
+            <label class="toggle-line"><input type="checkbox" name="schedule_enabled" disabled><span>启用定时指挥</span></label>
+            <label><span class="lbl">每轮结束后的间隔 · 分钟</span><input type="number" name="interval_minutes" min="1" max="1440" value="60" required disabled></label>
+            <p class="hint">先保存项目池。开启后立即检查，后续按间隔继续，并遵守账号的当地运行时段与额度门禁。运行中可以保存计划；关闭计划会保留当前任务。</p>
+            <p class="hint" id="projects-schedule-status" role="status">尚未启用定时指挥</p>
+            <p class="hint" id="projects-schedule-next"></p>
+            <button class="btn btn-primary" type="submit" disabled>保存自动计划</button>
           </form>
         </aside>
         <div class="projects-main">
@@ -106,6 +116,7 @@
               <button class="btn" type="button" data-pi-action="pause" disabled>暂停</button>
               <button class="btn" type="button" data-pi-action="stop" disabled>停止当前目标</button>
             </div></div>
+            <p class="hint">“暂停”和“停止当前目标”会同时关闭自动计划；恢复会继续原目标。</p>
             <p class="hint" id="projects-message"></p><div id="projects-current"></div><p class="hint" id="projects-usage"></p>
           </section>
           <section id="projects-reconciliation" class="batch-panel hidden"><h3>输入结果待核对</h3><div id="projects-actions"></div></section>
@@ -778,7 +789,7 @@
     </div>
   </div>
 
-  <script src="projects.js?v=20261024-project-selection"></script>
+  <script src="projects.js?v=20261024-project-schedule"></script>
   <script src="app.js?v=20261023-pi-projects"></script>
 </body>
 </html>

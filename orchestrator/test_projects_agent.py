@@ -268,7 +268,7 @@ class ProjectsAgentTests(unittest.TestCase):
         state = self.service.state(1)['agents'][0]
         self.assertEqual('blocked', state['work']['status'])
         self.assertGreaterEqual(state['work']['work_sec'], 25)
-        self.assertEqual('paused', state['status'])
+        self.assertEqual('blocked', state['status'])
         with self.assertRaises(ValueError): self.service.start(1)
 
     def test_same_account_start_is_idempotent_until_process_has_stopped(self):

@@ -7927,28 +7927,103 @@ def _projects_admission(account: dict, work: dict | None) -> dict:
 
     :param account: 当前账号。
     :param work: 当前新架构工作，可为空。
-    :return: 是否放行及实际等待原因。
+    :return: 是否放行、机器可读原因、是否可被动重试及可信恢复时间。
     """
     window = _account_run_window(account)
     if not window['allowed']:
-        return {'allowed': False, 'message': _window_message(window)}
+        return {'allowed': False, 'reason': 'window', 'retryable': True,
+            'retry_at': window.get('next_open_at'), 'message': _window_message(window), 'window': window}
+    public_quota = None
     if quota_guard:
         quota_guard.consume(account)
         state = quota_guard.snapshot(account)
         source = json.loads(work['runtime_json']).get('source') if work and work.get('runtime_json') else None
         policy = quota_guard.policy_snapshot(account, 'warmup', source, quota_state=state)
-        if state.get('account_error') or state.get('blocked') or policy.get('blocked'):
-            return {'allowed': False, 'message': state.get('message') or policy.get('message') or '等待账号额度或认证门禁解除'}
+        public_quota = {'known': state.get('known', False), 'source': state.get('source'),
+            'observed_at': state.get('observed_at'), 'windows': state.get('windows', {}),
+            'limits': policy.get('limits', {}), 'hit': policy.get('hit', [])}
+        if state.get('account_error'):
+            return {'allowed': False, 'reason': 'account_error', 'retryable': False, 'retry_at': None,
+                'message': state.get('message') or '账号异常，需要重新授权或人工核实', 'quota': public_quota}
+        blockers = [value for value in (state, policy) if value.get('blocked')]
+        if blockers:
+            resets = [quota_timestamp(value.get('resume_at')) for value in blockers]
+            return {'allowed': False, 'reason': 'quota', 'retryable': True,
+                'retry_at': max(resets) if all(value is not None for value in resets) else None,
+                'message': state.get('message') or policy.get('message') or '等待被动额度更新或窗口重置',
+                'quota': public_quota}
     if login_manager and login_manager.has_active_name(account['name']):
-        return {'allowed': False, 'message': '账号正在登录或重新授权'}
+        return {'allowed': False, 'reason': 'login', 'retryable': True, 'retry_at': None,
+            'message': '账号正在登录或重新授权'}
     connection = get_db()
     try:
         environment = connection.execute('SELECT state FROM account_environments WHERE account_id=?', (account['id'],)).fetchone()
     finally:
         connection.close()
     if environment and environment['state'] in ('reconcile', 'cli_reconcile', 'rebuilding'):
-        return {'allowed': False, 'message': '账号环境需要先完成对账'}
-    return {'allowed': True, 'message': None}
+        return {'allowed': False, 'reason': 'environment', 'retryable': False, 'retry_at': None,
+            'message': '账号环境需要先完成对账'}
+    return {'allowed': True, 'reason': 'allowed', 'retryable': False, 'retry_at': None,
+        'message': None, 'quota': public_quota, 'window': window}
+
+
+def _projects_native_quota(account: dict, source: str, facts: dict) -> None:
+    """把精确原生执行的结构化拒绝补证合并到共享被动门禁，不发起任何网络探测。
+
+    :param account: 原终端登记的账号快照。
+    :param source: 经过终端适配器核对的 projects 工作和执行代次。
+    :param facts: 原生错误类别、真实观察时间、可选可信重置与去重键。
+    :return: None；旧账号身份、旧代次或早于新允许事实的认证错误均不生效。
+    """
+    if not quota_guard or not isinstance(facts, dict):
+        return
+    match = re.fullmatch(r'projects:([a-f0-9]{32}):([1-9][0-9]*)', source)
+    observed = quota_timestamp(facts.get('observed_at'))
+    if not match or observed is None or observed > time.time() + 5:
+        return
+    with _oauth_owner_lock(str(account['name'])):
+        current = _projects_account(account['id'])
+        if not current:
+            return
+        connection = get_db()
+        try:
+            work = connection.execute('SELECT account_id,generation,account_identity,runtime_json,'
+                'segment_started_at,status FROM projects_work WHERE id=?', (match[1],)).fetchone()
+        finally:
+            connection.close()
+        identity = _quota_identity(current)
+        if (not work or work['account_id'] != account['id'] or work['generation'] != int(match[2])
+                or work['status'] not in ('running', 'verifying') or work['account_identity'] != identity
+                or _quota_identity(account) != identity or not work['segment_started_at']
+                or observed < work['segment_started_at']):
+            return
+        runtime = json.loads(work['runtime_json']) if work['runtime_json'] else {}
+        if runtime.get('source') != source:
+            return
+        with quota_guard._lock:
+            quota_guard.consume(current)
+            state = quota_guard.snapshot(current)
+            error = facts.get('account_error')
+            if error in ('account_on_hold', 'invalid_grant'):
+                # 原生旧认证错误不能覆盖后来正常响应确认的可用身份。
+                if observed >= float(state.get('observed_at') or 0):
+                    quota_guard.record_auth_failure(current, error)
+                return
+            if facts.get('quota_limited') is not True:
+                return
+            window = facts.get('window')
+            window = window if window in ('five_hour', 'seven_day') else 'unknown'
+            if window == 'unknown' and observed < float(state.get('observed_at') or 0):
+                return
+            rejected = {'observed_at': observed, 'rejected': True, 'exhausted': True}
+            reset = quota_timestamp(facts.get('retry_at'))
+            horizon = 6 * 3600 if window == 'five_hour' else 8 * 86400
+            if reset is not None and observed < reset <= observed + horizon:
+                rejected.update(reset_at=reset, resets_at=datetime.fromtimestamp(reset, timezone.utc).isoformat())
+            # 保留原生时间；用当前时间重发旧拒绝会错误覆盖后续允许证据。
+            quota_guard._observe(current, identity, {'windows': {window: rejected},
+                'observed_at': observed, 'allowed': False, 'origin': 'cli'})
+            quota_guard._publish(current)
 
 
 def _projects_quota_context(account: dict, source: str, flows: Path, controls: Path) -> dict:
@@ -8043,7 +8118,7 @@ async def lifespan(app: FastAPI):
         catalog = ProjectsCatalog(research, library)
         pi = ProjectsPi()
         terminal = ProjectsTerminal(account_runtime, catalog, _project_execution_settings, _projects_quota_context,
-            _projects_quota_release, _projects_credentials)
+            _projects_quota_release, _projects_credentials, quota_observation=_projects_native_quota)
         verification = ProjectsVerification(catalog, terminal,
             ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image),
             pi, project_requester_settings.agent_configuration)
@@ -8058,6 +8133,8 @@ async def lifespan(app: FastAPI):
     oauth_refresh_scheduler.start()
     warmup_scheduler.start()
     quota_guard.start()
+    if projects_service:
+        projects_service.start_scheduler()
     if V3_ENABLED:
         scheduler.recover_window_waits()
         scheduler.recover_active_batches()

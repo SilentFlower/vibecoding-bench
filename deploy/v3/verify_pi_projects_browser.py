@@ -26,7 +26,7 @@ sys.path.insert(0, str(ROOT / 'orchestrator'))
 from project_requester_settings import ProjectRequesterSettings
 from project_library import materialize_snapshot, read_document
 from projects_api import projects_router
-from test_projects_agent import CatalogFixture, ProjectsAgentTests
+from test_projects_agent import CatalogFixture, PiFixture, ProjectsAgentTests
 
 
 class BrowserCatalog(CatalogFixture):
@@ -40,8 +40,26 @@ class BrowserCatalog(CatalogFixture):
         return value
 
 
+class BrowserPi(PiFixture):
+    """为浏览器表单操作保留充足时间，不调用模型或真实账号。"""
+
+    def run(self, configuration, tools, event, stop, timeout_sec):
+        """持有合成控制者直到页面暂停，避免表单验证被短夹具超时打断。
+
+        :param configuration: 控制端生成的启动配置。
+        :param tools: 当前账号的工具回调。
+        :param event: 公开事件回调。
+        :param stop: 当前控制者停止信号。
+        :param timeout_sec: 本轮工作预算。
+        :return: 已停止状态。
+        """
+        self.entered.set()
+        stop.wait(min(60, timeout_sec))
+        return 'stopped'
+
+
 async def verify(evidence: Path) -> dict:
-    """核对项目池全选清空、配置保存、Pi 生命周期、SSE 和手机布局。
+    """核对项目池选择、独立自动计划、Pi 生命周期、SSE 和手机布局。
 
     :param evidence: 截图与检查报告目录。
     :return: 实际检查结果。
@@ -49,6 +67,8 @@ async def verify(evidence: Path) -> dict:
     evidence.mkdir(parents=True, exist_ok=True)
     fixture = ProjectsAgentTests('test_pause_rejects_old_generation_before_any_terminal_write')
     fixture.setUp()
+    fixture.pi = BrowserPi()
+    fixture.service.pi = fixture.pi
     fixture.service.catalog = BrowserCatalog(fixture.root)
     fixture.activate(); initial = fixture.start_work()
     work = fixture.service._one('SELECT * FROM projects_work WHERE id=?', (initial['work_id'],))
@@ -58,6 +78,7 @@ async def verify(evidence: Path) -> dict:
     directory = fixture.root / 'projects/submissions' / submitted['submission_id']
     materialize_snapshot(read_document(directory / 'snapshot.json'), fixture.root / 'projects/objects', directory / 'candidate')
     fixture.service._write("UPDATE projects_agents SET status='off' WHERE account_id=1")
+    fixture.service.configure(2, ['other'])
     configuration = ProjectRequesterSettings(fixture.root / 'provider.json', {})
     configuration.save('https://example.invalid/v1', ['test-model'], 'browser-private-key')
     application = FastAPI()
@@ -78,7 +99,8 @@ async def verify(evidence: Path) -> dict:
     @application.get('/api/accounts')
     def accounts():
         """返回合成账号。:return: 无凭据账号列表。"""
-        return [{'id': 1, 'name': '浏览器合成账号', 'enabled': True}]
+        return [{'id': 1, 'name': '浏览器合成账号', 'enabled': True},
+            {'id': 2, 'name': '浏览器第二账号', 'enabled': True}]
 
     @application.get('/api/auth/me')
     def auth():
@@ -162,6 +184,15 @@ async def verify(evidence: Path) -> dict:
                         await asyncio.sleep(0.1)
                     raise AssertionError('浏览器等待失败：' + expression)
 
+                async def reload():
+                    """等待新文档真正替换旧页面，避免重载回显断言读到原 DOM。
+
+                    :return: None。
+                    """
+                    await evaluate('window.browserReloadMarker=true')
+                    await rpc('Page.reload', session=session)
+                    await until('window.browserReloadMarker !== true && document.readyState === "complete"')
+
                 await rpc('Page.addScriptToEvaluateOnNewDocument', {'source': '''window.projectStreams=[];
                     const Original=window.EventSource;window.EventSource=class extends Original{
                     constructor(...args){super(...args);window.projectStreams.push(this)}
@@ -177,7 +208,7 @@ async def verify(evidence: Path) -> dict:
                 await evaluate('document.querySelector("#projects-agent-form").requestSubmit()')
                 await until('document.querySelector("#projects-feedback").textContent.includes("已保存")')
                 assert json.loads(fixture.service._one('SELECT project_keys_json FROM projects_agents WHERE account_id=1')['project_keys_json']) == ['example', 'other']
-                await rpc('Page.reload', session=session)
+                await reload()
                 await until('document.querySelectorAll("[name=project_key]:checked").length === 2 && document.querySelector("#projects-selected-count").textContent.includes("已选 2 个")')
                 await evaluate('document.querySelector("#projects-filter").value="example";document.querySelector("#projects-filter").dispatchEvent(new Event("input"));document.querySelector("#projects-clear-all").click();')
                 await until('document.querySelectorAll("[name=project_key]:checked").length === 0 && document.querySelector("#projects-selected-count").textContent.includes("已选 0 个")')
@@ -193,9 +224,16 @@ async def verify(evidence: Path) -> dict:
                 record = fixture.service._one('SELECT * FROM projects_agents WHERE account_id=1')
                 assert json.loads(record['project_keys_json']) == ['example']
                 assert record['instructions'] == '按实际交互完整指挥'
-                await rpc('Page.reload', session=session)
+                await reload()
                 await until('document.querySelectorAll("[name=project_key]:checked").length === 1 && document.querySelector("[name=project_key][value=example]").checked && document.querySelector("#projects-selected-count").textContent.includes("已选 1 个")')
                 assert await evaluate('document.querySelector("[name=instructions]").value === "按实际交互完整指挥" && !document.querySelector("[name=project_key][value=other]").checked')
+                await until('document.querySelector("#projects-schedule-form")?.elements.interval_minutes.disabled === false')
+                assert await evaluate('(()=>{const form=document.querySelector("#projects-schedule-form");return !form.elements.schedule_enabled.checked && form.elements.interval_minutes.value === "60"})()')
+                assert await evaluate('(()=>{const input=document.querySelector("#projects-schedule-form").elements.interval_minutes;input.value="0";const low=!input.checkValidity();input.value="1441";const high=!input.checkValidity();input.value="60";return low && high && input.checkValidity()})()')
+                original_schedule = fixture.service.state(1)['agents'][0]['schedule']
+                rejected_schedule = await evaluate('Promise.all([{enabled:false,interval_minutes:0},{enabled:false,interval_minutes:1441},{enabled:false,interval_minutes:1.5},{enabled:"true",interval_minutes:60}].map(body=>fetch("/api/projects/agents/1/schedule",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}).then(response=>response.status)))')
+                assert rejected_schedule == [422, 422, 422, 422]
+                assert fixture.service.state(1)['agents'][0]['schedule'] == original_schedule
                 await until('document.querySelector("[data-work]") !== null')
                 await evaluate('document.querySelector("[data-work]").click()')
                 await until('document.querySelector("[data-submission]") !== null')
@@ -203,13 +241,57 @@ async def verify(evidence: Path) -> dict:
                 await until('document.querySelector("[data-candidate-path]") !== null')
                 await evaluate('document.querySelector("[data-candidate-path]").click()')
                 await until('document.querySelector("#projects-delivery-preview").textContent === "VALUE = 2\\n"')
+                # example 的交付已通过；加入未完成的 other，避免计划验证被“项目池已完成”门禁提前结束。
+                await evaluate('document.querySelector("[name=project_key][value=other]").click();document.querySelector("#projects-agent-form").requestSubmit();')
+                await until('document.querySelector("#projects-feedback").textContent.includes("已保存")')
                 await evaluate('document.querySelector("[data-pi-action=start]").click()')
                 await until('document.querySelector("#projects-state").textContent.includes("指挥中")')
                 fixture.service._event(1, 'pi', {'text': '<img src=x onerror="window.eventInjected=true">实际交互'})
                 await until('document.querySelector("#projects-events").textContent.includes("实际交互")')
                 assert not await evaluate('!!window.eventInjected || !!document.querySelector("#projects-events img")')
+                running_generation = fixture.service.state(1)['agents'][0]['generation']
+                assert fixture.service.state(1)['agents'][0]['controller_active']
+                await evaluate('(()=>{const form=document.querySelector("#projects-schedule-form");form.elements.schedule_enabled.click();form.elements.interval_minutes.value="15";form.requestSubmit()})()')
+                await until('document.querySelector("#projects-feedback").textContent.includes("自动计划已保存")')
+                running = fixture.service.state(1)['agents'][0]
+                assert running['controller_active'] and running['generation'] == running_generation
+                assert running['schedule']['enabled'] and running['schedule']['interval_minutes'] == 15
+                await until('document.querySelector("#projects-schedule-status").textContent.includes("间隔 15 分钟") && document.querySelector("#projects-schedule-next").textContent.length > 0')
+                await evaluate('(()=>{const form=document.querySelector("#projects-schedule-form");form.elements.schedule_enabled.click();form.elements.interval_minutes.value="37"})()')
+                fixture.service._event(1, 'pi', {'text': '定时表单保留检查'})
+                await until('document.querySelector("#projects-events").textContent.includes("定时表单保留检查")')
+                assert await evaluate('(()=>{const form=document.querySelector("#projects-schedule-form");return !form.elements.schedule_enabled.checked && form.elements.interval_minutes.value === "37"})()')
+                assert fixture.service.state(1)['agents'][0]['schedule']['interval_minutes'] == 15
+                await evaluate('document.querySelector("#projects-schedule-form").requestSubmit()')
+                await until('document.querySelector("#projects-feedback").textContent.includes("自动计划已关闭")')
+                running = fixture.service.state(1)['agents'][0]
+                assert running['controller_active'] and running['generation'] == running_generation
+                assert not running['schedule']['enabled'] and running['schedule']['interval_minutes'] == 37
+                await evaluate('document.querySelector("#projects-account").value="2";document.querySelector("#projects-account").dispatchEvent(new Event("change"));')
+                await until('document.querySelector("#projects-schedule-form").elements.interval_minutes.value === "60"')
+                assert not await evaluate('document.querySelector("#projects-schedule-form").elements.schedule_enabled.checked')
+                await evaluate('document.querySelector("#projects-schedule-form").elements.interval_minutes.value="22";document.querySelector("#projects-schedule-form").requestSubmit();')
+                await until('document.querySelector("#projects-feedback").textContent.includes("自动计划已关闭")')
+                assert fixture.service.state(2)['agents'][0]['schedule']['interval_minutes'] == 22
+                await evaluate('document.querySelector("#projects-account").value="1";document.querySelector("#projects-account").dispatchEvent(new Event("change"));')
+                await until('document.querySelector("#projects-schedule-form").elements.interval_minutes.value === "37"')
+                await evaluate('document.querySelector("#projects-schedule-form").elements.interval_minutes.value="41";document.querySelector("#projects-account").value="2";document.querySelector("#projects-account").dispatchEvent(new Event("change"));')
+                await until('document.querySelector("#projects-schedule-form").elements.interval_minutes.value === "22"')
+                await evaluate('document.querySelector("#projects-account").value="1";document.querySelector("#projects-account").dispatchEvent(new Event("change"));')
+                await until('document.querySelector("#projects-schedule-form").elements.interval_minutes.value === "37"')
+                await reload()
+                await until('document.querySelector("#projects-schedule-form")?.elements.interval_minutes.value === "37" && document.querySelector("#projects-account").value === "1"')
+                assert not await evaluate('document.querySelector("#projects-schedule-form").elements.schedule_enabled.checked')
+                assert fixture.service.state(1)['agents'][0]['controller_active']
+                assert fixture.service.state(1)['agents'][0]['generation'] == running_generation
+                await evaluate('(()=>{const form=document.querySelector("#projects-schedule-form");form.elements.schedule_enabled.click();form.elements.interval_minutes.value="19";form.requestSubmit()})()')
+                await until('document.querySelector("#projects-feedback").textContent.includes("自动计划已保存")')
                 await evaluate('document.querySelector("[data-pi-action=pause]").click()')
                 await until('document.querySelector("#projects-state").textContent.includes("已暂停")')
+                assert not fixture.service.state(1)['agents'][0]['schedule']['enabled']
+                await until('document.querySelector("#projects-schedule-status").textContent.includes("定时已关闭")')
+                await evaluate('document.querySelector("#projects-account").value="2";document.querySelector("#projects-account").dispatchEvent(new Event("change"));document.querySelector("#projects-account").value="1";document.querySelector("#projects-account").dispatchEvent(new Event("change"));')
+                await until('!document.querySelector("#projects-schedule-form").elements.schedule_enabled.checked && document.querySelector("#projects-schedule-form").elements.interval_minutes.value === "19"')
                 await evaluate('document.querySelector("[data-research=example]").click()')
                 await until('document.querySelector("#projects-research").open')
                 assert not await evaluate('!!window.researchInjected || !!document.querySelector("#projects-research-body img")')
@@ -234,6 +316,8 @@ async def verify(evidence: Path) -> dict:
                 assert not any(path.startswith(legacy_paths) for path in requested_paths), '新页面仍请求旧项目接口'
         result = {'status': 'passed', 'checks': ['真实表单与SQLite保存', 'Pi启动暂停', 'SSE事件及切页关闭',
             '筛选时全选覆盖全部项目', '筛选时清空全部项目', '单选实时更新已选数量', '项目池保存重载回显',
+            '自动计划默认关闭与间隔范围', '运行中启停自动计划不重建Pi', 'SSE保留未保存的计划输入',
+            '计划切账号及重载回填', '人工暂停关闭自动计划',
             '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '无旧历史入口及请求', '1280暗色与390亮色布局']}
         (evidence / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
         return result

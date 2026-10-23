@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS projects_agents (
   status TEXT NOT NULL DEFAULT 'off', project_keys_json TEXT NOT NULL DEFAULT '[]',
   instructions TEXT NOT NULL DEFAULT '', session_file TEXT, current_work_id TEXT,
   budget_sec INTEGER NOT NULL DEFAULT 3600, message TEXT, updated_at REAL NOT NULL,
+  schedule_enabled INTEGER NOT NULL DEFAULT 0, schedule_interval_sec INTEGER NOT NULL DEFAULT 3600,
+  schedule_next_at REAL, schedule_last_started_at REAL, schedule_state TEXT NOT NULL DEFAULT 'off',
+  schedule_message TEXT, schedule_identity TEXT,
   FOREIGN KEY(account_id) REFERENCES accounts(id)
 );
 CREATE TABLE IF NOT EXISTS projects_work (
@@ -142,7 +145,10 @@ class ProjectsService:
             {'id': value['id'], 'binding': value.get('cc2api_account_id')}).decode())
         self.lock = threading.RLock()
         self.controllers = {}
+        self.controller_identities = {}
         self.closed = False
+        self.scheduler_stop = threading.Event()
+        self.scheduler_thread = None
         connection = database()
         try:
             with write_lock, connection:
@@ -151,6 +157,15 @@ class ProjectsService:
                 for name, definition in (('account_identity', 'TEXT'), ('claude_usage_json', "TEXT NOT NULL DEFAULT '{}'")):
                     if name not in columns:
                         connection.execute(f'ALTER TABLE projects_work ADD COLUMN {name} {definition}')
+                columns = {row['name'] for row in connection.execute('PRAGMA table_info(projects_agents)')}
+                for name, definition in (
+                        ('schedule_enabled', 'INTEGER NOT NULL DEFAULT 0'),
+                        ('schedule_interval_sec', 'INTEGER NOT NULL DEFAULT 3600'),
+                        ('schedule_next_at', 'REAL'), ('schedule_last_started_at', 'REAL'),
+                        ('schedule_state', "TEXT NOT NULL DEFAULT 'off'"),
+                        ('schedule_message', 'TEXT'), ('schedule_identity', 'TEXT')):
+                    if name not in columns:
+                        connection.execute(f'ALTER TABLE projects_agents ADD COLUMN {name} {definition}')
         finally:
             connection.close()
 
@@ -201,7 +216,158 @@ class ProjectsService:
                 'VALUES(?,?,?,?,?) ON CONFLICT(account_id) DO UPDATE SET project_keys_json=excluded.project_keys_json,'
                 'instructions=excluded.instructions,budget_sec=excluded.budget_sec,updated_at=excluded.updated_at',
                 (account_id, json.dumps(project_keys), instructions, budget_sec, time.time()))
+            self._write("UPDATE projects_agents SET schedule_next_at=?,schedule_state='scheduled',schedule_message=? "
+                'WHERE account_id=? AND schedule_enabled=1',
+                (time.time(), '配置已更新，等待重新检查执行条件', account_id))
         return self.state(account_id)
+
+    def configure_schedule(self, account_id: int, enabled: bool, interval_minutes: int = 60) -> dict:
+        """保存账号自动唤醒计划，不打断正在运行的控制者。
+
+        :param account_id: 已保存项目池的账号。
+        :param enabled: 是否允许到点自动启动。
+        :param interval_minutes: 每轮结束后的最短休息分钟数。
+        :return: 最新账号及计划状态。
+        """
+        if type(enabled) is not bool or type(interval_minutes) is not int or not 1 <= interval_minutes <= 1440:
+            raise ValueError('定时开关或运行间隔不合法')
+        with self.lock:
+            agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+            account = self.account(account_id)
+            if not agent or not account:
+                raise ValueError('请先为可用账号保存项目池')
+            running = account_id in self.controllers
+            now = time.time()
+            self._write('UPDATE projects_agents SET schedule_enabled=?,schedule_interval_sec=?,schedule_next_at=?,'
+                'schedule_identity=?,schedule_state=?,schedule_message=?,updated_at=? WHERE account_id=?',
+                (int(enabled), interval_minutes * 60, now if enabled and not running else None,
+                    self.identity(account) if enabled else None,
+                    'running' if enabled and running else 'scheduled' if enabled else 'off',
+                    '本轮结束后按间隔继续' if enabled and running else '已开启，等待检查执行条件' if enabled else '定时运行已关闭',
+                    now, account_id))
+            self._event(account_id, 'schedule', {'enabled': enabled, 'interval_minutes': interval_minutes})
+        return self.state(account_id)
+
+    def start_scheduler(self) -> None:
+        """启动本地计划扫描和持续门禁监控，扫描本身不调用模型。
+
+        :return: None。
+        """
+        with self.lock:
+            if self.closed or self.scheduler_thread:
+                return
+            self.scheduler_stop.clear()
+            self.scheduler_thread = threading.Thread(target=self._schedule_loop, name='projects-scheduler', daemon=True)
+            self.scheduler_thread.start()
+
+    def _schedule_loop(self) -> None:
+        while not self.scheduler_stop.is_set():
+            try:
+                self.tick()
+            except Exception:
+                # 单次数据库或环境读取失败不能杀死后续扫描，也不能推断账号已可运行。
+                pass
+            self.scheduler_stop.wait(2)
+
+    def tick(self, now: float | None = None) -> None:
+        """检查所有在途控制者的门禁，并认领已到点的账号计划。
+
+        :param now: 可选 UTC 秒，测试可固定到期时间。
+        :return: None。
+        """
+        if self.closed:
+            return
+        now = time.time() if now is None else now
+        for saved in self._rows('SELECT * FROM projects_agents ORDER BY account_id'):
+            account_id = saved['account_id']
+            checked = None
+            try:
+                with self.lock:
+                    agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+                    controller = self.controllers.get(account_id)
+                    if not agent:
+                        continue
+                    checked = (agent['generation'], agent['updated_at'], agent['schedule_next_at'])
+                    work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+                if controller and not controller[1].is_set():
+                    # 运行中的 Pi 同样持续监控；无需启用计划才能受到额度与时段保护。
+                    observation_failed = False
+                    if work and work.get('runtime_json') and hasattr(self.terminal, 'passive_status'):
+                        try:
+                            self.terminal.passive_status(work)
+                        except Exception:
+                            observation_failed = True
+                    account = self.account(account_id)
+                    gate = self.admission(account, work) if account else {
+                        'allowed': False, 'retryable': False, 'reason': 'account', 'message': '账号已停用或删除'}
+                    if gate['allowed'] and observation_failed:
+                        fresh = self._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+                        if fresh and fresh['runtime_json'] == work['runtime_json'] and fresh['status'] in ('running', 'verifying'):
+                            gate = {'allowed': False, 'retryable': False, 'reason': 'observation',
+                                'message': '原生额度补证暂不可核对，保留现场等待人工检查'}
+                    if account and self.controller_identities.get(account_id, self.identity(account)) != self.identity(account):
+                        gate = {'allowed': False, 'retryable': False, 'reason': 'identity', 'message': '账号身份或绑定已改变，请人工核对'}
+                    if not gate['allowed']:
+                        self._suspend_gate(account_id, agent['generation'], gate, now)
+                elif (not controller and agent['schedule_enabled'] and agent['schedule_next_at'] is not None
+                        and agent['schedule_next_at'] <= now):
+                    self.start(account_id, scheduled=True, now=now)
+            except Exception as error:
+                with self.lock:
+                    current = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+                    if (current and account_id not in self.controllers and current['schedule_enabled']
+                            and checked == (current['generation'], current['updated_at'], current['schedule_next_at'])):
+                        message = str(error)[:300] if isinstance(error, ValueError) else '计划检查失败，保留现场等待人工核对'
+                        self._write("UPDATE projects_agents SET schedule_next_at=NULL,schedule_state='blocked',schedule_message=? WHERE account_id=?",
+                            (message, account_id))
+
+    def _eligibility(self, agent: dict, work: dict | None) -> tuple[str | None, str | None]:
+        if self.actions(agent['account_id']):
+            return 'blocked', '有未对账的终端输入，自动计划不能重发或解除'
+        if work and work['status'] not in ('passed', 'stopped'):
+            if work['status'] == 'blocked':
+                return 'blocked', '原工作需要人工核对，不能自动恢复'
+            if work['account_identity'] and work['account_identity'] != self.identity(self.account(agent['account_id'])):
+                return 'blocked', '原工作账号身份已变化，请先核对'
+            if work['work_sec'] >= agent['budget_sec']:
+                return 'blocked', '原任务累计预算已用尽，请调整预算或停止目标；定时运行不会重置预算'
+            return None, None
+        available = self.state(agent['account_id'])['agents'][0]['available_objectives']
+        if not available:
+            return 'completed', '授权项目池暂无未完成工程目标，等待更新项目池或目标'
+        return None, None
+
+    def _wait_gate(self, agent: dict, gate: dict, now: float) -> None:
+        retryable = gate.get('retryable', True)
+        retry_at = gate.get('retry_at')
+        next_at = max(now + 2, retry_at) if isinstance(retry_at, (int, float)) else now + 60
+        enabled = bool(agent['schedule_enabled'])
+        message = gate.get('message') or '等待执行条件'
+        self._write('UPDATE projects_agents SET status=?,message=?,schedule_state=?,schedule_message=?,schedule_next_at=?,'
+            'updated_at=? WHERE account_id=? AND generation=?',
+            ('waiting' if enabled and retryable else 'paused' if retryable else 'blocked', message,
+                'waiting' if enabled and retryable else 'blocked' if enabled else 'off', message,
+                next_at if enabled and retryable else None, now, agent['account_id'], agent['generation']))
+
+    def _suspend_gate(self, account_id: int, generation: int, gate: dict, now: float) -> None:
+        with self.lock:
+            agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+            controller = self.controllers.get(account_id)
+            if not agent or agent['generation'] != generation or not controller or controller[1].is_set():
+                return
+            controller[1].set()
+            # 先撤销代次，再收口精确 CLI；迟到的验收或输入不能将已暂停执行复活。
+            self._write('UPDATE projects_agents SET generation=generation+1 WHERE account_id=?', (account_id,))
+            agent['generation'] += 1
+            work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+            if work and work['status'] not in ('passed', 'stopped'):
+                try:
+                    self._release(work, 'waiting' if gate.get('retryable', True) else 'blocked')
+                except Exception:
+                    gate = {'retryable': False, 'message': '执行收口未确认，保留现场和租约，需环境对账'}
+            self._wait_gate(agent, gate, now)
+            self._event(account_id, 'gate_wait', {'reason': gate.get('reason'), 'message': gate.get('message'),
+                'retry_at': gate.get('retry_at')}, work['id'] if work else None)
 
     def state(self, account_id: int | None = None) -> dict:
         """取得控制者、工作和实际 Pi 用量，不返回私有路径或工具凭据。
@@ -214,6 +380,12 @@ class ProjectsService:
         result = []
         for agent in agents:
             agent.pop('session_file', None)
+            agent.pop('schedule_identity', None)
+            agent['controller_active'] = agent['account_id'] in self.controllers
+            agent['schedule'] = {'enabled': bool(agent.pop('schedule_enabled')),
+                'interval_minutes': agent.pop('schedule_interval_sec') // 60,
+                'next_run_at': agent.pop('schedule_next_at'), 'last_started_at': agent.pop('schedule_last_started_at'),
+                'state': agent.pop('schedule_state'), 'message': agent.pop('schedule_message')}
             agent['project_keys'] = json.loads(agent.pop('project_keys_json'))
             work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
             agent['work'] = self._public_work(work)
@@ -372,10 +544,12 @@ class ProjectsService:
         self._write('INSERT OR IGNORE INTO projects_events(account_id,work_id,kind,payload_json,event_key,created_at) '
             'VALUES(?,?,?,?,?,?)', (account_id, work_id, kind, canonical_json(payload).decode(), key, time.time()))
 
-    def start(self, account_id: int) -> dict:
+    def start(self, account_id: int, *, scheduled: bool = False, now: float | None = None) -> dict:
         """启动一个账号控制者，重复请求不产生第二个 Pi。
 
         :param account_id: 已配置的账号。
+        :param scheduled: 是否认领到点计划，必须重新核对人工开关。
+        :param now: 可选计划检查时间。
         :return: 公开状态。
         """
         with self.lock:
@@ -386,30 +560,55 @@ class ProjectsService:
             agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
             if not agent or not self.account(account_id):
                 raise ValueError('请先为可用账号配置项目池')
+            now = time.time() if now is None else now
+            if scheduled and (not agent['schedule_enabled'] or agent['schedule_next_at'] is None
+                    or agent['schedule_next_at'] > now):
+                return self.state(account_id)
+            account = self.account(account_id)
+            if agent['schedule_enabled'] and agent['schedule_identity'] != self.identity(account):
+                raise ValueError('计划绑定的账号身份已变化，请核对后重新保存计划')
             if self._one("SELECT a.id FROM projects_actions a JOIN projects_work w ON w.id=a.work_id "
                     "WHERE w.account_id=? AND a.status IN ('intent','unknown') LIMIT 1", (account_id,)):
                 raise ValueError('有未对账的终端输入，请先核对操作结果')
+            current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+            unavailable, message = self._eligibility(agent, current_work)
+            if unavailable:
+                if scheduled:
+                    self._write('UPDATE projects_agents SET schedule_state=?,schedule_message=?,schedule_next_at=NULL WHERE account_id=?',
+                        (unavailable, message, account_id))
+                    return self.state(account_id)
+                raise ValueError(message)
+            gate = self.admission(account, current_work)
+            if not gate['allowed']:
+                self._wait_gate(agent, gate, now)
+                return self.state(account_id)
             configuration = self.provider()
             if not configuration or not self.pi.available():
                 raise ValueError('Pi 运行时或外接模型配置尚未就绪')
-            current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
-            if (not current_work or current_work['status'] in ('passed', 'stopped')) and not any(
-                    self.catalog.project(key, detail=False)['ready'] for key in json.loads(agent['project_keys_json'])):
-                raise ValueError('所选项目目前仅有研究，请至少选择一个具备独立验收合同的项目')
             generation = agent['generation'] + 1
-            self._write("UPDATE projects_agents SET generation=?,status='running',message=NULL,updated_at=? WHERE account_id=?",
-                (generation, time.time(), account_id))
+            self._write("UPDATE projects_agents SET generation=?,status='running',message=NULL,updated_at=?,schedule_next_at=NULL,"
+                "schedule_last_started_at=?,schedule_state=CASE WHEN schedule_enabled=1 THEN 'running' ELSE 'off' END WHERE account_id=?",
+                (generation, now, now, account_id))
             stop = threading.Event()
             thread = threading.Thread(target=self._run, args=(account_id, generation, configuration, stop), daemon=True)
             self.controllers[account_id] = (thread, stop)
-            thread.start()
+            self.controller_identities[account_id] = self.identity(account)
+            try:
+                thread.start()
+            except Exception:
+                self.controllers.pop(account_id, None)
+                self.controller_identities.pop(account_id, None)
+                self._write("UPDATE projects_agents SET status='blocked',message=?,schedule_state='blocked',schedule_next_at=NULL WHERE account_id=?",
+                    ('Pi 控制线程未能启动，请人工核对后重试', account_id))
+                raise
         return self.state(account_id)
 
-    def pause(self, account_id: int, *, stop_work: bool = False) -> dict:
+    def pause(self, account_id: int, *, stop_work: bool = False, disable_schedule: bool = True) -> dict:
         """使旧代次立即失效，并中止 Pi 和它持有的 CLI。
 
         :param account_id: 目标账号。
         :param stop_work: 是否结束当前目标；默认保留可恢复进度。
+        :param disable_schedule: 人工操作关闭自动唤醒；服务退出保留已保存计划。
         :return: 最新公开状态。
         """
         with self.lock:
@@ -418,6 +617,9 @@ class ProjectsService:
                 controller[1].set()
             self._write("UPDATE projects_agents SET generation=generation+1,status='paused',message=?,updated_at=? WHERE account_id=?",
                 ('已停止当前工作' if stop_work else '人工暂停，保留工作区与原会话', time.time(), account_id))
+            if disable_schedule:
+                self._write("UPDATE projects_agents SET schedule_enabled=0,schedule_next_at=NULL,schedule_state='off',"
+                    'schedule_message=? WHERE account_id=?', ('人工暂停或停止，定时运行已关闭', account_id))
             agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
             work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],)) if agent else None
             if work and work['status'] not in ('passed', 'stopped'):
@@ -442,10 +644,11 @@ class ProjectsService:
                 uncertain = self._one("SELECT id FROM projects_actions WHERE work_id=? AND status IN ('intent','unknown') LIMIT 1", (work['id'],))
                 reserved = max(0, time.time() - work['segment_started_at']) if work['segment_started_at'] else 0
                 self._write('UPDATE projects_work SET status=?,runtime_json=NULL,segment_started_at=NULL,work_sec=work_sec+?,message=? WHERE id=?',
-                    ('blocked' if uncertain else 'paused', min(reserved, agent['budget_sec']),
+                    ('blocked' if uncertain or work['status'] == 'blocked' else 'paused', min(reserved, agent['budget_sec']),
                         '服务已重启，原工作及会话保留，请核对后恢复', work['id']))
-            self._write("UPDATE projects_agents SET generation=generation+1,status='paused',message=?,updated_at=? WHERE account_id=?",
-                ('服务已重启，原会话和进度已保留', time.time(), agent['account_id']))
+            self._write('UPDATE projects_agents SET generation=generation+1,status=?,message=?,updated_at=? WHERE account_id=?',
+                ('blocked' if agent['status'] == 'blocked' or uncertain else 'paused',
+                    '服务已重启，原会话和进度已保留', time.time(), agent['account_id']))
             if agent['status'] in ('running', 'waiting', 'interrupted') and not uncertain:
                 restart.append(agent['account_id'])
         for account_id in restart:
@@ -461,13 +664,16 @@ class ProjectsService:
         :return: None。
         """
         self.closed = True
+        self.scheduler_stop.set()
+        if self.scheduler_thread and self.scheduler_thread is not threading.current_thread():
+            self.scheduler_thread.join(timeout=8)
         restart = []
         for account_id in list(self.controllers):
             try:
                 agent = self._one('SELECT status FROM projects_agents WHERE account_id=?', (account_id,))
                 if agent and agent['status'] in ('running', 'waiting'):
                     restart.append(account_id)
-                self.pause(account_id)
+                self.pause(account_id, disable_schedule=False)
             except ValueError:
                 self._event(account_id, 'error', {'message': '服务退出时执行收口未确认，保留环境记录'})
         for thread, stop in list(self.controllers.values()):
@@ -483,6 +689,8 @@ class ProjectsService:
         account = self.account(account_id)
         if not account:
             raise ValueError('账号已停用或删除')
+        if self.controller_identities.get(account_id, self.identity(account)) != self.identity(account):
+            raise ValueError('账号身份或绑定已改变，禁止继续旧控制者')
         work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
         if (work and work['status'] not in ('passed', 'stopped') and work['account_identity']
                 and work['account_identity'] != self.identity(account)):
@@ -506,7 +714,8 @@ class ProjectsService:
                     session_file = None
             config = {**provider, 'session_dir': str(directory), 'session_file': session_file, 'tools': TOOLS,
                 'instructions': AGENT_GUIDE + '\n用户业务指南：\n' + agent['instructions'],
-                'prompt': '继续指挥这个账号的项目工作。先读取 account_state，并核对原会话、未完成工作和待处理事件。'}
+                'prompt': '继续指挥这个账号的项目工作。先读取 account_state，按最新 available_objectives 选择未完成目标，'
+                    '不要沿用旧总结中“没有任务”的推测。核对并优先恢复原会话、未完成工作和待处理事件。'}
             outcome = self.pi.run(config,
                 lambda name, args, call_id: self.tool(account_id, generation, name, args, call_id, stop),
                 lambda value: self._pi_event(account_id, generation, value), stop, agent['budget_sec'])
@@ -515,20 +724,43 @@ class ProjectsService:
             self._event(account_id, 'error', {'message': 'Pi 指挥中断：' + detail})
         finally:
             with self.lock:
-                agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
-                if agent and agent['generation'] == generation:
-                    work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
-                    if work and work['status'] not in ('passed', 'stopped'):
-                        try:
-                            self._release(work, 'paused' if outcome in ('settled', 'stopped', 'timeout') else 'blocked')
-                        except Exception:
-                            outcome = 'error'
-                            self._event(account_id, 'error', {'message': 'CLI 执行收口未确认，保留环境及租约待对账'}, work['id'])
-                    self._write('UPDATE projects_agents SET status=?,message=?,updated_at=? WHERE account_id=? AND generation=?',
-                        ('paused' if outcome != 'error' else 'blocked',
-                            {'settled': 'Pi 已结束本轮指挥', 'stopped': '已停止', 'timeout': '本次指挥预算已用尽'}.get(outcome,
-                                'Pi 运行失败，请查看事件并检查模型工具调用兼容性'), time.time(), account_id, generation))
-                self.controllers.pop(account_id, None)
+                try:
+                    agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+                    if agent and agent['generation'] == generation:
+                        work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+                        if work and work['status'] not in ('passed', 'stopped'):
+                            try:
+                                self._release(work, 'paused' if outcome in ('settled', 'stopped', 'timeout') else 'blocked')
+                            except Exception:
+                                outcome = 'error'
+                                self._event(account_id, 'error', {'message': 'CLI 执行收口未确认，保留环境及租约待对账'}, work['id'])
+                        self._write('UPDATE projects_agents SET status=?,message=?,updated_at=? WHERE account_id=? AND generation=?',
+                            ('paused' if outcome != 'error' else 'blocked',
+                                {'settled': 'Pi 已结束本轮指挥', 'stopped': '已停止', 'timeout': '本次指挥预算已用尽'}.get(outcome,
+                                    'Pi 运行失败，请查看事件并检查模型工具调用兼容性'), time.time(), account_id, generation))
+                        if agent['schedule_enabled']:
+                            current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+                            hold, message = self._eligibility(agent, current_work)
+                            if outcome == 'error':
+                                hold, message = 'blocked', 'Pi 运行异常，等待人工核对后重新启用或启动'
+                            gate = self.admission(self.account(account_id), current_work) if not hold else {'allowed': True}
+                            if not gate['allowed']:
+                                self._wait_gate(agent, gate, time.time())
+                            else:
+                                self._write('UPDATE projects_agents SET schedule_state=?,schedule_message=?,schedule_next_at=? WHERE account_id=? AND generation=?',
+                                    (hold or 'scheduled', message or '本轮已结束，按间隔自动继续',
+                                        None if hold else time.time() + agent['schedule_interval_sec'], account_id, generation))
+                except Exception:
+                    try:
+                        self._write("UPDATE projects_agents SET status='blocked',message=?,schedule_state='blocked',"
+                            'schedule_message=?,schedule_next_at=NULL WHERE account_id=? AND generation=?',
+                            ('Pi 收尾检查失败，原现场已保留', '计划收尾检查失败，请人工核对', account_id, generation))
+                    except Exception:
+                        pass
+                finally:
+                    # 控制线程已经结束；回调异常也必须释放内存登记，不能让启动永远幂等到死线程。
+                    self.controllers.pop(account_id, None)
+                    self.controller_identities.pop(account_id, None)
 
     def _pi_event(self, account_id: int, generation: int, value: dict) -> None:
         agent, work = self._current(account_id, generation)
@@ -590,6 +822,7 @@ class ProjectsService:
             gate = self.admission(self.account(account_id), work)
             if not gate['allowed']:
                 self._release(work, 'waiting')
+                self._suspend_gate(account_id, generation, gate, time.time())
                 return {'status': 'waiting', 'message': gate.get('message', '账号门禁未放行')}
             if name == 'claude_observe':
                 return self._observe(work, generation, args.get('wait_sec', 0), stop)
@@ -646,6 +879,7 @@ class ProjectsService:
         account = self.account(account_id)
         gate = self.admission(account, work)
         if not gate['allowed']:
+            self._suspend_gate(account_id, generation, gate, time.time())
             return {'status': 'waiting', 'message': gate.get('message', '账号当前不可运行')}
         remaining = int(agent['budget_sec'] - work['work_sec'])
         if remaining <= 0:
@@ -720,6 +954,7 @@ class ProjectsService:
             gate = self.admission(self.account(work['account_id']), work)
             if not gate['allowed']:
                 self._release(work, 'waiting')
+                self._suspend_gate(work['account_id'], generation, gate, time.time())
                 return {'status': 'waiting', 'message': gate.get('message') or '发送前账号门禁发生改变'}
             if self._one("SELECT id FROM projects_actions WHERE work_id=? AND status IN ('intent','unknown') LIMIT 1", (work['id'],)):
                 raise ValueError('已有未确认的输入，需要先核对，不能继续发送')
@@ -761,6 +996,10 @@ class ProjectsService:
                 if result['status'] == 'passed':
                     self._release(work, 'passed')
                 else:
+                    gate = self.admission(self.account(work['account_id']), work)
+                    if not gate['allowed']:
+                        self._release(work, 'waiting')
+                        return {'submission_id': submission, **result, 'waiting': gate}
                     self.terminal.control(work, 'resume')
                     self._write('UPDATE projects_work SET status=?,message=? WHERE id=? AND generation=?',
                         ('running' if result['status'] == 'failed' else 'blocked',
@@ -771,7 +1010,11 @@ class ProjectsService:
             current = self._one('SELECT generation FROM projects_agents WHERE account_id=?', (work['account_id'],))
             valid = current and current['generation'] == generation and not (stop and stop.is_set())
             if valid:
-                self.terminal.control(work, 'resume')
+                gate = self.admission(self.account(work['account_id']), work)
+                if gate['allowed']:
+                    self.terminal.control(work, 'resume')
+                else:
+                    self._release(work, 'waiting')
                 self._write("UPDATE projects_work SET status='blocked',message=? WHERE id=? AND generation=?",
                     ('独立验收未能完成，已保留冻结候选', work['id'], generation))
             report = {'status': 'error' if valid else 'cancelled',

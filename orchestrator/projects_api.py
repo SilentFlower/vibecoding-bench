@@ -6,7 +6,7 @@ import json
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, StrictBool, StrictInt, StrictStr
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr
 from sse_starlette.sse import EventSourceResponse
 
 
@@ -31,6 +31,17 @@ class ProjectsReconcileIn(BaseModel):
     """
     operation_id: StrictStr
     sent: StrictBool
+    model_config = ConfigDict(extra='forbid')
+
+
+class ProjectsScheduleIn(BaseModel):
+    """独立配置账号的自动指挥计划，不修改正在运行的 Pi。
+
+    :param enabled: 是否在满足执行门禁时自动启动下一轮。
+    :param interval_minutes: 每轮结束后等待的分钟数，范围为 1～1440。
+    """
+    enabled: StrictBool
+    interval_minutes: StrictInt = Field(ge=1, le=1440)
     model_config = ConfigDict(extra='forbid')
 
 
@@ -75,6 +86,14 @@ def projects_router(service) -> APIRouter:
         """保存 Pi 配置。:param account_id: 账号。:param body: 项目池与指南。:return: 账号控制状态。"""
         try:
             return owner().configure(account_id, body.project_keys, body.instructions, body.budget_sec)
+        except ValueError as error:
+            raise HTTPException(409, str(error)) from None
+
+    @router.put('/agents/{account_id}/schedule')
+    def configure_schedule(account_id: int, body: ProjectsScheduleIn) -> dict:
+        """保存自动计划。:param account_id: 账号。:param body: 启用状态和间隔。:return: 账号控制状态。"""
+        try:
+            return owner().configure_schedule(account_id, body.enabled, body.interval_minutes)
         except ValueError as error:
             raise HTTPException(409, str(error)) from None
 
