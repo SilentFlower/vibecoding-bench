@@ -27,13 +27,22 @@ FROM python:3.12-slim-bookworm AS control
 RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
+COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+COPY images/pi-agent/package.json images/pi-agent/package-lock.json /opt/pi-agent/
+RUN cd /opt/pi-agent && npm ci --ignore-scripts --no-audit --no-fund
+COPY images/pi-agent/host.mjs /opt/pi-agent/host.mjs
 COPY orchestrator/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"
 COPY orchestrator/*.py ./
 COPY topics.md /repo/topics.md
 COPY project_library /repo/project_library
+COPY research/github-projects /repo/research/github-projects
+ENV PROJECTS_PI_HOST=/opt/pi-agent/host.mjs PROJECTS_RESEARCH_DIR=/repo/research/github-projects
 COPY images/worker/entrypoint.sh /opt/v3/worker.sh
+COPY images/account/projects_cli.py /opt/v3/projects-cli.py
 COPY images/worker/task_followups.py /app/task_followups.py
 COPY webui /webui
 COPY --from=frontend /terminal/xterm/lib/xterm.js /webui/vendor/xterm.js
@@ -84,6 +93,7 @@ COPY images/account/network-guard.py /usr/local/bin/v3-network-guard
 COPY images/account/cli-control.py /usr/local/bin/v3-cli-control
 COPY images/worker/task_followups.py /usr/local/bin/task_followups.py
 COPY images/account/project_plan.py /usr/local/bin/v3-project-plan
+COPY images/account/projects_cli.py /usr/local/bin/v3-projects-cli
 RUN ln -s task_followups.py /usr/local/bin/v3-task-followups
 COPY images/account/system-profile.c /opt/v3/system-profile.c
 RUN cc -shared -fPIC -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now \

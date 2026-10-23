@@ -405,7 +405,8 @@ def build(release: str, manifest_path: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="vibebench-v3-source-") as temporary:
         snapshot = Path(temporary)
         folders = ("cc2api/src", "cc2api/vendor", "cc2api/craftls", "cc2api/web", "images/account",
-            "images/sidecar", "images/worker", "images/v3", "orchestrator", "webui", "project_library")
+            "images/sidecar", "images/worker", "images/v3", "images/pi-agent", "orchestrator", "webui", "project_library",
+            "research/github-projects")
         for relative in folders:
             shutil.copytree(REPO / relative, snapshot / relative, ignore=source_snapshot_ignore)
         for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md"):

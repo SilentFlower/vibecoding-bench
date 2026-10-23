@@ -698,7 +698,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             "NETWORK_INSPECTION_MODE": "passthrough",
             "QUOTA_SOURCE": "oauth-refresh:synthetic",
         })
-        runner._exec_oauth_refresh_probe.assert_called_once_with("fixed-token", use_mitm=False)
+        runner._exec_oauth_refresh_probe.assert_called_once_with("fixed-token", use_mitm=False, force_refresh=False)
         runtime.cleanup.assert_called_once_with("fixed-token")
         runner.client.containers.run.assert_not_called()
 

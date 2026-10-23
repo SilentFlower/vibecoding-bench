@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261020-project-scheduling" />
+  <link rel="stylesheet" href="style.css?v=20261023-pi-projects" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -69,85 +69,57 @@
   <template id="tpl-projects">
     <section class="view project-view">
       <header class="view-head">
-        <div>
-          <h2 class="view-title"><span class="bracket">▌</span>projects <span class="muted">// continuous iteration</span></h2>
-          <p class="hint">在同一会话完成真实需求或 BUG 的调查、方案确认、实施与验收。</p>
-        </div>
-        <div class="view-actions">
-          <span id="project-library-count" class="hint">加载项目库</span>
-          <button class="btn btn-primary" type="button" id="project-new-batch">+ 创建批次</button>
-        </div>
+        <div><h2 class="view-title"><span class="bracket">▌</span>projects <span class="muted">// Pi 指挥</span></h2>
+          <p class="hint">每个账号一个 Pi，持续观察并操作 Claude Code，推进真实项目开发。</p></div>
+        <span class="hint" id="projects-runtime">正在读取运行时</span>
       </header>
-      <p id="project-feedback" class="hint hidden" role="status"></p>
+      <p id="projects-feedback" class="hint hidden" role="status"></p>
       <details class="batch-panel">
-        <summary class="capture-title"><strong>外接需求方模型配置</strong><span class="muted">// 保存后动态生效</span></summary>
-        <form id="project-requester-form" class="form">
+        <summary class="capture-title"><strong>Pi 模型配置</strong><span class="muted">// 外接服务</span></summary>
+        <form id="projects-model-form" class="form">
           <div class="row">
-            <label><span class="lbl">Base URL</span><input name="base_url" type="url" placeholder="https://ai.flower-cli.com/v1" maxlength="2048" required></label>
+            <label><span class="lbl">服务地址</span><input name="base_url" type="url" maxlength="2048" placeholder="https://ai.flower-cli.com/v1" required></label>
             <label><span class="lbl">API Key</span><input name="api_key" type="password" autocomplete="new-password" maxlength="4096" placeholder="留空沿用已配置密钥"></label>
           </div>
-          <label><span class="lbl">可用模型 · 一行一个，首个主用，其后依次降级（最多 8 个）</span><textarea name="models" rows="3" placeholder="gemini-3-flash-agent&#10;deepseek-flash" required></textarea></label>
-          <p class="hint">保存后无需重启，后续需求方请求采用新配置；已经生成的消息和正在执行的请求保留原记录。</p>
-          <p class="hint" id="project-requester-status" role="status">读取配置中</p>
-          <div class="row-end">
-            <button class="btn btn-sm" type="button" data-requester-reset>恢复环境配置</button>
-            <button class="btn btn-primary" type="submit">保存模型配置</button>
-          </div>
+          <label><span class="lbl">模型 · 按优先级一行一个</span><textarea name="models" rows="2" required></textarea></label>
+          <p class="hint" id="projects-model-status"></p>
+          <div class="row-end"><button type="button" class="btn btn-sm" id="projects-model-reset">恢复环境配置</button><button class="btn btn-primary" type="submit">保存模型配置</button></div>
         </form>
       </details>
-      <details class="batch-panel project-create" open>
-        <summary class="capture-title"><strong>创建迭代批次</strong><span class="muted">// 选择账号与项目</span></summary>
-        <form id="project-batch-form" class="form">
-          <div class="row">
-            <label><span class="lbl">$ account · 运行账号</span><select name="account_id" required></select></label>
-            <label><span class="lbl">$ name · 批次名称</span><input name="name" value="项目迭代批次" maxlength="120" required></label>
-          </div>
-          <div class="row">
-            <label><span class="lbl">$ concurrency · 同账号并发</span><input name="concurrency" type="number" min="1" max="2" value="2" required></label>
-            <label><span class="lbl">$ active_projects · 活动项目池</span><input name="active_projects" type="number" min="1" max="100" value="3" required></label>
-            <label><span class="lbl">$ rotation_steps · 连续通过后轮换</span><input name="rotation_steps" type="number" min="1" value="5" required></label>
-          </div>
-          <div class="row">
-            <label><span class="lbl">$ steps_per_plan · 每次 CLI 计划步数</span><input name="steps_per_plan" type="number" min="1" value="2" required></label>
-            <label><span class="lbl">$ timeout_sec · 单次计划超时（秒）</span><input name="timeout_sec" type="number" min="60" max="86400" value="1800" required></label>
-          </div>
-          <div class="row hidden" data-scenario-budgets>
-            <label><span class="lbl">任务累计工作预算（秒）</span><input name="task_budget_sec" type="number" min="60" max="86400" value="1800"></label>
-            <label><span class="lbl">单次评审预算（秒）</span><input name="review_timeout_sec" type="number" min="60" max="600" value="180"></label>
-            <label><span class="lbl">任务累计评审预算（秒）</span><input name="review_budget_sec" type="number" min="60" max="86400" value="720"></label>
-          </div>
-          <p class="hint hidden" data-scenario-budgets data-scenario-budget-hint>同一需求或 BUG 在原会话完成调查、方案确认和实施，交付后才验收。超时续做保留累计预算；需求方外接模型用量单列。</p>
-          <div class="row">
-            <label><span class="lbl">$ interval_min_sec · 计划补位间隔下限（秒）</span><input name="interval_min_sec" type="number" min="0" max="86400" value="0" required></label>
-            <label><span class="lbl">$ interval_max_sec · 计划补位间隔上限（秒）</span><input name="interval_max_sec" type="number" min="0" max="86400" value="0" required></label>
-          </div>
-          <p class="hint" id="project-capacity" role="status"></p>
-          <p class="hint">5h／7d 消耗阈值继承账号设置；命中后等待后续计划，已投放计划完成当前范围。间隔只用于两次计划之间，0 表示不额外休息。</p>
-          <div class="batch-toolbar project-toolbar">
-            <button class="btn btn-sm" type="button" id="project-select-all">全选项目</button>
-            <button class="btn btn-sm" type="button" id="project-clear-all">清空</button>
-            <span class="hint" id="project-selected-count" role="status"></span>
-            <div class="filter-wrap">
-              <span class="filter-prefix">filter&gt;</span>
-              <input type="search" id="project-filter" placeholder="搜索项目 / 分类 / 编号" aria-label="搜索迭代项目" />
-            </div>
-          </div>
-          <div id="project-choice-list" class="batch-topic-list project-choice-list" role="group" aria-label="选择迭代项目"></div>
-          <div class="batch-toolbar">
-            <p class="hint">创建后为暂停状态，可在下方启动。项目首次运行时才建立工作目录，此后持续保留成果。</p>
-            <button class="btn btn-primary" type="submit">创建批次</button>
-          </div>
-        </form>
-      </details>
-      <div class="table-frame">
-        <table class="data project-batches-table">
-          <thead><tr><th>id</th><th>batch</th><th>account</th><th>status</th><th>projects</th><th>op</th></tr></thead>
-          <tbody id="project-batches"></tbody>
-        </table>
+      <div class="projects-layout">
+        <aside class="batch-panel">
+          <form id="projects-agent-form" class="form">
+            <label><span class="lbl">运行账号</span><select id="projects-account" required></select></label>
+            <label><span class="lbl">本轮最长工作时间 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="60" required></label>
+            <label><span class="lbl">给 Pi 的业务指南</span><textarea name="instructions" rows="4" maxlength="12000" placeholder="例如：先调查并讨论方案，确认后实施；优先完成一个目标，再换项目。"></textarea></label>
+            <label><span class="lbl">授权项目池</span><input id="projects-filter" type="search" placeholder="搜索项目研究"></label>
+            <p class="hint" id="projects-research-count"></p>
+            <div id="projects-projects" class="projects-choices"></div>
+            <button class="btn btn-primary" type="submit">保存项目池与指南</button>
+          </form>
+        </aside>
+        <div class="projects-main">
+          <section class="batch-panel">
+            <div class="view-head"><strong id="projects-state">请选择账号</strong><div class="view-actions">
+              <button class="btn btn-primary" type="button" data-pi-action="start" disabled>启动 / 恢复 Pi</button>
+              <button class="btn" type="button" data-pi-action="pause" disabled>暂停</button>
+              <button class="btn" type="button" data-pi-action="stop" disabled>停止当前目标</button>
+            </div></div>
+            <p class="hint" id="projects-message"></p><div id="projects-current"></div><p class="hint" id="projects-usage"></p>
+          </section>
+          <section id="projects-reconciliation" class="batch-panel hidden"><h3>输入结果待核对</h3><div id="projects-actions"></div></section>
+          <section class="batch-panel"><h3>Claude Code 终端</h3><pre id="projects-screen" class="projects-screen">等待 Pi 观察 Claude Code 终端。</pre></section>
+          <section class="batch-panel"><h3>Pi 与 Claude 的实际交互</h3><ol id="projects-events" class="projects-events"></ol></section>
+          <details class="batch-panel" open><summary>工作记录</summary><div id="projects-history"></div></details>
+          <details class="batch-panel" id="projects-delivery"><summary id="projects-delivery-title">冻结交付与源码</summary><div id="projects-submissions"></div><div id="projects-delivery-files"></div><pre class="projects-document" id="projects-delivery-preview"></pre></details>
+        </div>
       </div>
-      <section class="batch-panel project-panel hidden" id="project-batch-panel"><div id="project-batch-detail"></div></section>
-      <section class="batch-panel project-panel hidden" id="project-instance-detail"></section>
-      <details class="project-panel"><summary>浏览项目库与路线</summary><div id="project-catalog-list" class="project-catalog"></div></details>
+      <details id="projects-research" class="batch-panel"><summary id="projects-research-title">项目研究</summary><pre id="projects-research-body" class="projects-document"></pre></details>
+      <details class="batch-panel"><summary>旧 Projects 只读历史</summary>
+        <p class="hint">旧批次、执行和成果原样保留。这里的状态是历史记录，新工作由 Pi 接管。</p>
+        <button type="button" class="btn btn-sm" id="projects-legacy-load">读取旧批次</button>
+        <div id="projects-legacy-list"></div><pre id="projects-legacy-detail" class="projects-document"></pre>
+      </details>
     </section>
   </template>
 
@@ -810,6 +782,7 @@
     </div>
   </div>
 
-  <script src="app.js?v=20261020-project-scheduling"></script>
+  <script src="projects.js?v=20261023-pi-projects"></script>
+  <script src="app.js?v=20261023-pi-projects"></script>
 </body>
 </html>

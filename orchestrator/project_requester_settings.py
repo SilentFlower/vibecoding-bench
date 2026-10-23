@@ -72,6 +72,19 @@ class ProjectRequesterSettings:
             except ValueError:
                 return None
 
+    def agent_configuration(self) -> dict | None:
+        """为 Pi 子进程提供内存启动配置，不能用于公开 API 或日志。
+
+        :return: 已校验的服务地址、模型及密钥；未就绪时为 None。
+        """
+        with self.lock:
+            try:
+                value, _ = self._read()
+                self._client(value)
+                return {key: value[key] for key in ('base_url', 'api_key', 'models', 'revision')}
+            except ValueError:
+                return None
+
     def public(self) -> dict:
         """返回页面可编辑字段和密钥是否已配置，不回传密钥内容。
 

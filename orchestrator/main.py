@@ -60,6 +60,12 @@ from project_requester_settings import ProjectRequesterSettings
 from project_scenarios import initialize_scenario_schema
 from project_iteration import PROJECT_RUN_KIND, PROJECT_RUN_KINDS, PROJECT_SCHEMA, ProjectIterationManager, initialize_plan_schema
 from project_verifier import ProjectVerifier
+from projects import PROJECTS_SCHEMA, ProjectsService
+from projects_api import projects_router
+from projects_catalog import ProjectsCatalog
+from projects_pi import ProjectsPi
+from projects_runtime import ProjectsTerminal
+from projects_verification import ProjectsVerification
 from topic_library import (decode_followup_timing, decode_followups, encode_followups, parse_topics,
     sample_followup_timing, sample_followups)
 
@@ -83,6 +89,7 @@ HOST_BENCH_DATA = Path(os.environ.get("HOST_BENCH_DATA", str(BENCH_DATA)))
 WORKER_IMAGE = os.environ.get("WORKER_IMAGE", "vibebench-worker:latest")
 SIDECAR_IMAGE = os.environ.get("SIDECAR_IMAGE", "vibebench-sidecar:latest")
 V3_ENABLED = bool(os.environ.get("V3_DEPLOYMENT_ID"))
+PROJECTS_AGENT_ENABLED = V3_ENABLED and os.environ.get('PROJECTS_AGENT_ENABLED', '1') != '0'
 PER_ACCOUNT_CONCURRENCY = int(os.environ.get("PER_ACCOUNT_CONCURRENCY", "2"))
 SIDECAR_READY_TIMEOUT = float(os.environ.get("SIDECAR_READY_TIMEOUT", "120"))
 DNS_READY_HOST = os.environ.get("DNS_READY_HOST", "example.com")
@@ -1498,6 +1505,7 @@ def init_db() -> None:
         with conn:
             conn.executescript(_SCHEMA)
             conn.executescript(PROJECT_SCHEMA)
+            conn.executescript(PROJECTS_SCHEMA)
             initialize_plan_schema(conn)
             initialize_scenario_schema(conn)
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
@@ -1663,6 +1671,9 @@ def _account_reference_counts(conn: sqlite3.Connection, account_id: int) -> dict
     projects = conn.execute("SELECT COUNT(*) AS n FROM project_iteration_batches WHERE account_id=?", (account_id,)).fetchone()["n"]
     if projects:
         counts["project_iteration_batches"] = projects
+    agents = conn.execute('SELECT COUNT(*) AS n FROM projects_agents WHERE account_id=?', (account_id,)).fetchone()['n']
+    if agents:
+        counts['projects_agents'] = agents
     return counts
 
 
@@ -3547,6 +3558,9 @@ class QuotaGuard:
             if state.get("account_error"):
                 self.record_auth_failure(account, state["account_error"])
         for run in runs:
+            if PROJECTS_AGENT_ENABLED and run['run_kind'] in PROJECT_RUN_KINDS:
+                # 旧 Projects 已进入只读历史；重启恢复不能重新认领或改写旧执行。
+                continue
             account = by_id.get(run["account_id"])
             if (run["status"] == "queued" and run.get("window_wait_until") is not None
                     and run.get("started_at") is None and not run.get("worker_container") and not run.get("stop_requested_at")):
@@ -3667,6 +3681,8 @@ class QuotaGuard:
         finally:
             conn.close()
         for run in rows:
+            if PROJECTS_AGENT_ENABLED and run['run_kind'] in PROJECT_RUN_KINDS:
+                continue
             if run["run_kind"] in PROJECT_RUN_KINDS and (not project_iterations or not project_iterations.execution_allowed(run["id"])):
                 continue
             if self._cancel_changed_identity(run, account):
@@ -6382,6 +6398,8 @@ class Scheduler:
         finally:
             connection.close()
         for run in rows:
+            if PROJECTS_AGENT_ENABLED and run['run_kind'] in PROJECT_RUN_KINDS:
+                continue
             if run.get("stop_requested_at") is not None or run["status"] == "stopping":
                 self._update_attempt(run["id"], int(run["quota_attempt"]), status="stopped", ended_at=time.time())
                 self._update_batch_item_for_run(run["id"], "stopped")
@@ -7887,11 +7905,97 @@ account_runtime: Optional[AccountRuntime] = None
 project_iterations: Optional[ProjectIterationManager] = None
 project_iteration_error: Optional[str] = None
 project_requester_settings: Optional[ProjectRequesterSettings] = None
+projects_service: Optional[ProjectsService] = None
+
+
+def _projects_account(account_id: int) -> dict | None:
+    """读取仍可使用的账号，不发出模型或认证请求。
+
+    :param account_id: 账号 ID。
+    :return: 最新账号行或 None。
+    """
+    connection = get_db()
+    try:
+        row = _get_available_account(connection, account_id)
+        return dict(row) if row else None
+    finally:
+        connection.close()
+
+
+def _projects_admission(account: dict, work: dict | None) -> dict:
+    """核对 Pi 工作的时段、被动额度和身份门禁，已有作业不被自己的槽位阻挡。
+
+    :param account: 当前账号。
+    :param work: 当前新架构工作，可为空。
+    :return: 是否放行及实际等待原因。
+    """
+    window = _account_run_window(account)
+    if not window['allowed']:
+        return {'allowed': False, 'message': _window_message(window)}
+    if quota_guard:
+        quota_guard.consume(account)
+        state = quota_guard.snapshot(account)
+        source = json.loads(work['runtime_json']).get('source') if work and work.get('runtime_json') else None
+        policy = quota_guard.policy_snapshot(account, 'warmup', source, quota_state=state)
+        if state.get('account_error') or state.get('blocked') or policy.get('blocked'):
+            return {'allowed': False, 'message': state.get('message') or policy.get('message') or '等待账号额度或认证门禁解除'}
+    if login_manager and login_manager.has_active_name(account['name']):
+        return {'allowed': False, 'message': '账号正在登录或重新授权'}
+    connection = get_db()
+    try:
+        environment = connection.execute('SELECT state FROM account_environments WHERE account_id=?', (account['id'],)).fetchone()
+    finally:
+        connection.close()
+    if environment and environment['state'] in ('reconcile', 'cli_reconcile', 'rebuilding'):
+        return {'allowed': False, 'message': '账号环境需要先完成对账'}
+    return {'allowed': True, 'message': None}
+
+
+def _projects_quota_context(account: dict, source: str, flows: Path, controls: Path) -> dict:
+    """为新控制者登记正式 CLI 的本地被动额度证据。
+
+    :param account: 当前账号。
+    :param source: 精确工作代次。
+    :param flows: 当前运行证据目录。
+    :param controls: 网络进程可发布暂停信号的位置。
+    :return: 额度采集环境，不主动探测模型。
+    """
+    if quota_guard and not quota_guard.admit(account, source, warmup=True, workload='warmup'):
+        raise RuntimeBusy('正式执行的额度恢复机会尚不可领取')
+    try:
+        return quota_guard.prepare(account, source, flows, controls, warmup=True) if quota_guard else {}
+    except Exception:
+        if quota_guard:
+            quota_guard.release(account, source, unstarted=True)
+        raise
+
+
+def _projects_quota_release(account: dict, source: str, unstarted: bool) -> None:
+    """仅在精确 CLI 收口后归还其额度认领。
+
+    :param account: 执行账号。
+    :param source: 精确工作代次。
+    :param unstarted: 是否已确认没有启动正式执行。
+    :return: None。
+    """
+    if quota_guard:
+        quota_guard.release(account, source, unstarted=unstarted)
+
+
+def _projects_credentials(account: dict) -> None:
+    """启动前从唯一权威所有者同步绑定凭据，保持现有锁序。
+
+    :param account: 当前账号。
+    :return: None。
+    """
+    if account.get('cc2api_account_id') is not None:
+        with _oauth_owner_lock(account['name']):
+            _sync_bound_account_credentials_locked(account, OAUTH_REFRESH_BUFFER_SEC)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, project_iterations, project_iteration_error, project_requester_settings
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, project_iterations, project_iteration_error, project_requester_settings, projects_service
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -7910,6 +8014,7 @@ async def lifespan(app: FastAPI):
     quota_guard = QuotaGuard(runner)
     project_iterations = None
     project_iteration_error = None
+    projects_service = None
     project_requester_settings = ProjectRequesterSettings(BENCH_DATA / 'settings/project-requester.json')
     if account_runtime:
         library = None
@@ -7931,8 +8036,21 @@ async def lifespan(app: FastAPI):
             # 新内容损坏只隔离新入口，原题库执行仍可使用。
             project_iteration_error = "项目内容库不可用：" + str(error)[:300]
     quota_guard.recover()
-    if project_iterations:
+    if project_iterations and not PROJECTS_AGENT_ENABLED:
         project_iterations.recover(runner.cleanup_quota_run)
+    if account_runtime and PROJECTS_AGENT_ENABLED:
+        research = Path(os.environ.get('PROJECTS_RESEARCH_DIR', str(Path(__file__).resolve().parents[1] / 'research/github-projects')))
+        catalog = ProjectsCatalog(research, library)
+        pi = ProjectsPi()
+        terminal = ProjectsTerminal(account_runtime, catalog, _project_execution_settings, _projects_quota_context,
+            _projects_quota_release, _projects_credentials)
+        verification = ProjectsVerification(catalog, terminal,
+            ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image),
+            pi, project_requester_settings.agent_configuration)
+        projects_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, terminal, _projects_account,
+            _projects_admission, project_requester_settings.agent_configuration, verification, pi, _quota_identity)
+        verification.event = projects_service._event
+        projects_service.recover()
     # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
     login_manager.cleanup_stale()
     continue_manager.cleanup_stale()
@@ -7943,11 +8061,13 @@ async def lifespan(app: FastAPI):
     if V3_ENABLED:
         scheduler.recover_window_waits()
         scheduler.recover_active_batches()
-    if project_iterations:
+    if project_iterations and not PROJECTS_AGENT_ENABLED:
         project_iterations.start()
     try:
         yield
     finally:
+        if projects_service:
+            projects_service.close()
         if project_iterations:
             project_iterations.stop()
         scheduler.stop_window_waits()
@@ -7959,6 +8079,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="vibecoding-bench", lifespan=lifespan)
+app.include_router(projects_router(lambda: projects_service))
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -10323,14 +10444,17 @@ class ProjectIterationBatchIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def _project_manager(*, require_catalog: bool = False) -> ProjectIterationManager:
+def _project_manager(*, require_catalog: bool = False, writable: bool = False) -> ProjectIterationManager:
     """取得可用的 v3 项目迭代能力。
 
     :param require_catalog: 新目录准入是否必须就绪；历史读取不依赖它。
+    :param writable: 是否修改旧批次；新 Projects 启用时仅允许读取历史。
     :return: 项目管理器；不可用时返回明确的 HTTP 错误。
     """
     if not project_iterations:
         raise HTTPException(503, project_iteration_error or "项目迭代需要 v3 固定账号运行环境")
+    if writable and PROJECTS_AGENT_ENABLED:
+        raise HTTPException(409, '旧项目批次已归入只读历史，请在 Pi Projects 中开始新工作')
     if require_catalog and project_iterations.library is None:
         raise HTTPException(503, project_iteration_error or "当前项目内容库不可用，历史批次仍可读取")
     return project_iterations
@@ -10358,7 +10482,7 @@ def create_project_iteration_batch(body: ProjectIterationBatchIn) -> dict:
         policy = body.model_dump(exclude={"account_id", "name", "project_keys", "scenario_entries"}, exclude_unset=True)
         if policy.get('concurrency', 1) is None:
             policy.pop('concurrency')
-        return _project_manager(require_catalog=True).create_batch(body.account_id, body.name, body.project_keys, policy, body.scenario_entries)
+        return _project_manager(require_catalog=True, writable=True).create_batch(body.account_id, body.name, body.project_keys, policy, body.scenario_entries)
     except ValueError as error:
         raise HTTPException(400, str(error))
 
@@ -10380,7 +10504,7 @@ def get_project_iteration_batch(bid: int) -> dict:
 
 def _transition_project_batch(bid: int, action: str) -> dict:
     try:
-        return _project_manager().transition(bid, action)
+        return _project_manager(writable=True).transition(bid, action)
     except ValueError as error:
         raise HTTPException(409, str(error))
 
@@ -11109,6 +11233,11 @@ def run_task(tid: int):
 
 @app.get("/api/runs")
 def list_runs(limit: int = 200):
+    """读取运行列表，并明确标记旧 Projects 的只读记录。
+
+    :param limit: 最多返回的运行数量。
+    :return: 运行与账号门禁的公开摘要。
+    """
     conn = get_db()
     try:
         rows = conn.execute(
@@ -11118,6 +11247,8 @@ def list_runs(limit: int = 200):
         ).fetchall()
         items = [dict(r) for r in rows]
         for item in items:
+            if PROJECTS_AGENT_ENABLED and item['run_kind'] in PROJECT_RUN_KINDS:
+                item['read_only'] = True
             account = conn.execute("SELECT * FROM accounts WHERE id=?", (item["account_id"],)).fetchone()
             item["passive_quota"] = _public_quota(dict(account)) if account else {}
             item["run_window"] = _account_run_window(dict(account)) if account else {}
@@ -11213,6 +11344,11 @@ def _public_followup_progress(run: dict) -> dict:
 
 @app.get("/api/runs/{rid}")
 def get_run(rid: str):
+    """读取一条运行的原始记录与公开进度。
+
+    :param rid: 运行 ID。
+    :return: 详情及旧项目记录的只读标记。
+    """
     conn = get_db()
     try:
         row = conn.execute(
@@ -11222,6 +11358,8 @@ def get_run(rid: str):
         if not row:
             raise HTTPException(404)
         result = dict(row)
+        if PROJECTS_AGENT_ENABLED and result['run_kind'] in PROJECT_RUN_KINDS:
+            result['read_only'] = True
         task = conn.execute("SELECT prompt FROM tasks WHERE id=?", (result["task_id"],)).fetchone()
         result["prompt"] = task["prompt"] if task else None
         result["followups"] = _public_followup_progress(result)
@@ -11480,6 +11618,8 @@ def _request_run_stop(rid: str, *, allow_terminal: bool) -> dict:
         conn.close()
     if allow_terminal and run["status"] in _TERMINAL_RUN_STATUSES | {"stopping"}:
         return {"ok": True}
+    if PROJECTS_AGENT_ENABLED and run['run_kind'] in PROJECT_RUN_KINDS:
+        raise HTTPException(409, '旧 Projects 执行记录为只读历史')
     if run["status"] not in ("queued", "running", "quota_wait"):
         raise HTTPException(400, f"运行 {rid} 当前不是 queued/running 状态")
     runner.persist_worker_profile(run.get("worker_container"))
@@ -11543,11 +11683,13 @@ def delete_run(rid: str):
         try:
             with conn:
                 row = conn.execute(
-                    "SELECT status FROM runs WHERE id=? AND deleted_at IS NULL",
+                    "SELECT status,run_kind FROM runs WHERE id=? AND deleted_at IS NULL",
                     (rid,),
                 ).fetchone()
                 if not row:
                     raise HTTPException(404, "运行记录不存在")
+                if PROJECTS_AGENT_ENABLED and row['run_kind'] in PROJECT_RUN_KINDS:
+                    raise HTTPException(409, '旧 Projects 执行记录为只读历史')
                 if row["status"] in ("queued", "running", "stopping", "quota_wait"):
                     raise HTTPException(409, f"运行 {rid} 仍处于 {row['status']} 状态，请先停止并收口")
                 cur = conn.execute(

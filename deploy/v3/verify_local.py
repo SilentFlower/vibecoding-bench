@@ -373,6 +373,10 @@ def verify() -> None:
         runtime.cleanup(runtime.execution_token(container.id, "login:abcdef654321"))
         assert (runtime._root(row) / "home" / ".claude" / ".credentials.json").read_bytes() == original
         verify_physical_observation(runtime, row)
+        if os.environ.get('VERIFY_PI_PROJECTS_ONLY') == '1':
+            from verify_pi_projects_execution import verify_pi_projects_execution
+            verify_pi_projects_execution(runtime, client, account, row)
+            return
         if os.environ.get("VERIFY_PROJECT_SCHEDULING_ONLY") == "1" or os.environ.get("VERIFY_PROJECT_CATALOG_ONLY") == "1":
             from verify_project_scheduling import verify_project_scheduling
             verify_project_scheduling(runtime, client, account, row,

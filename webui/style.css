@@ -1654,3 +1654,25 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 @media (max-width: 920px) {
   .project-panel { scroll-margin-top: 190px; }
 }
+/* Pi 控制台保留表单编辑位置，终端及交互记录各自滚动。 */
+.projects-layout { display: grid; grid-template-columns: minmax(240px, 330px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.projects-main { min-width: 0; display: grid; gap: 14px; }
+.projects-choices { max-height: 450px; overflow: auto; }
+.projects-choice { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.projects-choice label { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.projects-choice input { width: auto; }
+.projects-choice small { display: block; margin-top: 4px; }
+.projects-screen, .projects-document { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; padding: 14px; max-height: 520px; }
+.projects-screen { min-height: 220px; background: var(--bg); font: 12px/1.6 'JetBrains Mono', monospace; }
+.projects-events { list-style: none; padding: 0; max-height: 460px; overflow: auto; }
+.projects-events li { padding: 10px 0; border-bottom: 1px solid var(--border); }
+.projects-events pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.projects-history-row { display: flex; flex-wrap: wrap; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+#projects-delivery-files .btn, #projects-submissions .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; margin-block: 4px; }
+@media (max-width: 760px) {
+  .projects-layout { grid-template-columns: 1fr; }
+  .projects-choices { max-height: 260px; }
+  #projects-model-form > .row { flex-direction: column; align-items: stretch; }
+  #projects-model-form label, #projects-agent-form label { min-width: 0; }
+  #projects-model-form input, #projects-agent-form input, #projects-agent-form select { min-width: 0; max-width: 100%; }
+}

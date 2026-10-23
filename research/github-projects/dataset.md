@@ -1,0 +1,72 @@
+# 真实项目审查：dataset
+
+研究日期：2026-10-21。来源、适用原生基线和 20 步研究路线已完成；尚未实现路线、冻结新增验收或接入正式项目库。
+
+## 来源与固定版本
+
+- 官方仓库：[pudo/dataset](https://github.com/pudo/dataset)。以字典操作 SQL 表，自动建立表／列，支持批量加载、事务和简易查询。
+- 固定提交：[db592cc041014762bba55fd544e982170831f227](https://github.com/pudo/dataset/tree/db592cc041014762bba55fd544e982170831f227)；版本与运行要求：2.0.0，Python >=3.10。
+- 许可证：MIT。保留 Open Knowledge Foundation、Friedrich Lindenberg、Gregor Aisch 版权和 MIT 许可。
+- 来源确认采用官方 GitHub 仓库、REST 元数据、实际 LICENSE 与源码；issue 仅是线索，未复现项不称为缺陷。
+
+## 实测规模与运行成本
+
+| 项目 | 结果 |
+| --- | --- |
+| 跟踪文件 | 37 个，272,471 字节 |
+| Python 产品源码 | 6 个文件、1,727 行 |
+| Python 测试文件 | 5 个、717 行 |
+| 隔离依赖安装 | 22.68 秒，venv 81,257,770 字节 |
+| 适用原生基线 | 61 通过、0 失败、0 错误、0 跳过 |
+| 基线进程 | 1.712 秒，峰值子进程 RSS 65728 KiB |
+| 容器运行 | 整体 2.075 秒，内存 256 MiB、PID 64，无 OOM |
+
+核心要求 SQLAlchemy >=1.4,<3 与 Alembic >=0.6.2，实际安装及传递依赖见冻结清单。研究仅用内置 SQLite，无独立数据库服务器、云凭据或网络数据。没有安装 PostgreSQL/MySQL 驱动，也未启动对应服务。
+
+安装是单独依赖准备阶段；执行环境使用正式 V3 账号镜像 `ghcr.io/silentflower/vibebench-v3-account:v3-ci-39482854683-1`（镜像 ID `sha256:72d65643b550824e2422090c7d152d954e35ddf6247e80b8ae5d30855a2750dc`），Python 3.12、UID/GID 1000、无网络、只读根、移除 capabilities、禁止提权。只挂本仓源码、依赖、取证脚本和专用结果目录；源码复制到临时文件系统，HOME 为新建临时目录，未挂账号／父目录／宿主凭据或 Docker socket。基线与 smoke 容器均已删除并核对不存在。依赖锁定见 requirements-frozen.txt；预备环境不会混入源码快照。
+
+## 原生结构与实际场景
+
+Database 通过 SQLAlchemy Engine 管理每线程 Connection、显式事务栈与表缓存，Alembic 操作管理 schema；Table 通过 _sync_columns 做自动列演进、find 返回 ResultIter，insert_many 按块写，upsert_many 当前逐条执行；ResultIter 负责结果转为 row_type 并在耗尽时关闭。读取了完整相关方法及 SQL 值／行类型定义，确认当前 datetime between 已直接调用 SQLAlchemy between，未把旧 issue #366 再算新缺陷。
+
+使用显式 SQLite 文件 URL 创建订单、insert_many、upsert 和 with database 事务更新，关闭重开后以 SQL SUM 核对总量为 7。复现 update_many(...ensure=True) 对新增列仍抛 CompileError，回滚后列未出现。另实际观察 ChunkedInsert 在应用异常退出后仍写入未满队列，路线按保持旧默认的增强处理。
+
+## 基线范围与限制
+
+运行完整 test/ 集合，61 通过、0 失败／错误／跳过。默认 db 夹具使用隔离 SQLite；部分上游测试在 SQLite 下直接 return，pytest 不标 skipped，因此 61 通过不代表 PostgreSQL/MySQL 或无主键所有分支都执行。
+
+未验证 PostgreSQL/MySQL 方言、独立服务、多线程生产负载、SQLAlchemy1.4兼容矩阵、ruff/mypy 或文档构建。增强首版涉及方言时均明确以 SQLite 为准，其余方言须后续单独建立基线；不因底层 SQLAlchemy 支持就声称本封装能力已经存在或已验收。尚未实现平台原生入口适配。
+
+## 迭代路线
+
+[20 步路线](./dataset-roadmap-20.md)逐项包含原版缺口、交付、兼容边界、正常／异常验收、真实模块与回归入口；需求来自下述固定源码与实际使用场景，不声称上游已经采纳。缺陷复现／对照及公开 API 观察保存在 smoke-output/log.txt。
+
+1 项已复现 ensure/types 契约修复、19 项增强；每项针对现有 SQL 字典封装的具体工作流。已有类型参数、唯一索引创建、事务、日期 between 与高级过滤不是新功能，相关增强只补当前公开入口缺口并保留底层 SQLAlchemy 可替代方式。
+
+## 重跑与证据
+
+证据根：`.deploy/github-100-research/data-tools/dataset/`（本地忽略目录，未纳入 Git；跨机器需重新检出、安装）。
+
+```bash
+git clone https://github.com/pudo/dataset.git <checkout>
+git -C <checkout> checkout --detach db592cc041014762bba55fd544e982170831f227
+python3 -m venv <venv>
+<venv>/bin/python -m pip install -r <evidence>/test-requirements.txt -e <checkout>
+```
+
+在无账号且无祖先配置的隔离环境执行原生命令：
+
+```text
+/usr/local/bin/python3 -m pytest -q -ra -p no:cacheprovider --junitxml=/output/baseline-tests.xml
+/usr/local/bin/python3 /smoke.py
+```
+
+本轮容器可复跑入口：`.deploy/github-100-research/data-tools/research_runner.py`，例如以装有 Docker SDK 的 Python 执行 `research_runner.py --name baseline run dataset -- <上述原生命令>`；runner 只读挂载 `.deploy/github-100-research/data-tools/dataset/source`、本仓 site-packages 与 smoke.py，`/output` 是本仓专用结果目录。
+
+- `repository.json`、`issues-open.json`、`revision.txt`、`size.json`：官方元数据、提交与逐文件规模。
+- `installation.json`、`installation-result.json`、`install.log`、`requirements-frozen.txt`、`test-requirements.txt`：实际安装和固定依赖。
+- `baseline-result.json`、`baseline-output/baseline-tests.xml`、`baseline-output/log.txt`：实际基线和计数。
+- `smoke.py`、`smoke-result.json`、`smoke-output/log.txt`：原生业务副作用、原版能力观察。
+- `research.json`、`roadmap-20.json`、`evidence-sha256.json`、`review-result.json`：逐仓研究、结构化路线和校验摘要。
+
+本轮只形成研究文档。未修改上游源码、业务实现、正式库或线上数据；未提交、推送、部署或向上游发消息。模型执行、平台独立验收与生产接入均未开始。

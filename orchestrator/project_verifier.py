@@ -210,7 +210,8 @@ class ProjectVerifier:
                 shutil.rmtree(input_directory, ignore_errors=True)
 
     def verify_native(self, candidate: Path, project_root: Path, specification: dict,
-                      environment_root: Path, profile: dict, *, answer: str = '', regression: bool = False) -> dict:
+                      environment_root: Path, profile: dict, *, answer: str = '', regression: bool = False,
+                      cancel: threading.Event | None = None) -> dict:
         """在隔离容器中离线运行控制端原生业务观察并比较冻结结果。
 
         :param candidate: 冻结候选源码，不能修改持续工作区。
@@ -220,6 +221,7 @@ class ProjectVerifier:
         :param profile: 固定 Python 环境及业务／回归资源。
         :param answer: 已冻结的原生回答，仅给独立验收脚本。
         :param regression: 是否使用独立资源执行冻结原生完整回归。
+        :param cancel: 新 Projects 的精确取消信号；旧调用省略时保持原行为。
         :return: passed、failed 或 error，环境失败不会触发业务修正。
         """
         contract = None
@@ -257,6 +259,8 @@ class ProjectVerifier:
             payload = {'script': script, 'args': args, 'python_paths': paths, 'requirements': requirements}
             write_document(directory / 'native.json', payload, mode=0o644)
             with self._slots, self._native_cleanup(lambda:container):
+                if cancel and cancel.is_set():
+                    return {'status': 'cancelled', 'message': '当前交付验收已取消'}
                 self._reconcile_native_cleanup(input_root/'cleanup-blocked.json')
                 container = self.client.containers.create(self.image,
                     name='bench-project-native-' + uuid.uuid4().hex[:12],
@@ -277,11 +281,24 @@ class ProjectVerifier:
                 container.start()
                 deadline=time.monotonic()+60
                 while b'VIBEBENCH_NATIVE_READY_V1\n' not in container.logs(stdout=True,stderr=False):
+                    if cancel and cancel.is_set():
+                        return {'status': 'cancelled', 'message': '当前交付验收已取消'}
                     container.reload()
                     if container.status!='running' or time.monotonic()>=deadline:
                         return {'status':'error','message':'原生离线环境准备异常或超时'}
                     time.sleep(0.1)
                 try:
+                    if cancel:
+                        deadline = time.monotonic() + resources['timeout_sec']
+                        while True:
+                            if cancel.is_set():
+                                return {'status': 'cancelled', 'message': '当前交付验收已取消'}
+                            container.reload()
+                            if container.status != 'running':
+                                break
+                            if time.monotonic() >= deadline:
+                                raise ReadTimeout('独立验收超过预算')
+                            cancel.wait(0.2)
                     completed = container.wait(timeout=resources['timeout_sec'])
                 except ReadTimeout:
                     return {'status': 'failed', 'message': '原生程序超过冻结业务验收时限'}

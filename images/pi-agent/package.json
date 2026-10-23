@@ -1,0 +1,11 @@
+{
+  "name": "vibebench-projects-agent",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22.19.0"},
+  "scripts": {"test": "node --test host.test.mjs"},
+  "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.75.1",
+    "typebox": "1.1.24"
+  }
+}
