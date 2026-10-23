@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS projects_submissions (
 AGENT_GUIDE = '''你是这个账号唯一的项目负责人和 Claude Code 操作者。
 你完整决定业务交流和终端下一步，不依赖固定对话轮次或程序匹配某句回复。
 先使用 account_state 了解现有工作及项目池，再通过 project_read 阅读公开研究和工程目标。
+account_state 中 available_objectives 是当前授权池全部未完成工程目标的权威清单。
+清单非空时从中自主选择目标，不能根据少数研究项目的抽查结果宣称整个项目池没有任务。
+先完成或恢复已有未完成工作；仅在没有未完成工作且 available_objectives 为空时报告目标已全部完成。
 从已选项目中选择尚未通过的工程目标，以 claude_start 创建或恢复同一项目工作区和 Claude 原会话。
 用 claude_observe 取得终端画面和原生会话事件；没有变化时使用它的 wait_sec 等待，避免无意义的模型循环。
 你可以发送文本，使用 Enter、方向键、Tab、Escape、Ctrl-C 等处理真正看到的交互。
@@ -222,6 +225,12 @@ class ProjectsService:
                 agent['claude_usage'][field] = sum(values) if values else None
             agent['claude_usage']['complete'] = bool(native) and all(item.get('complete') for item in native)
             agent['passed'] = self._rows("SELECT project_key,objective_id,goal FROM projects_work WHERE account_id=? AND status='passed'", (agent['account_id'],))
+            completed = {(item['project_key'], item['objective_id']) for item in agent['passed']}
+            agent['available_objectives'] = [
+                {'project_key': key, 'objective_id': objective['id'], 'goal': objective['goal']}
+                for key in agent['project_keys']
+                for objective in self.catalog.project(key, detail=False)['objectives']
+                if (key, objective['id']) not in completed]
             usage = self._rows("SELECT payload_json FROM projects_events WHERE account_id=? AND kind='usage'", (agent['account_id'],))
             agent['pi_usage'] = {'input_tokens': 0, 'output_tokens': 0, 'cache_read_tokens': 0, 'cache_write_tokens': 0}
             for row in usage:

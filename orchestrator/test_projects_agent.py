@@ -173,6 +173,20 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual(2, len(self.terminal.sent))
         self.assertEqual(text, self.terminal.sent[-1][2])
 
+    def test_account_state_lists_all_remaining_objectives_after_one_project_passes(self):
+        """完整目标索引排除已完成项，Pi 不需要抽查研究来猜测整个授权池。
+
+        :return: None。
+        """
+        self.activate(keys=['example', 'other'])
+        self.start_work()
+        self.verification = {'status': 'passed', 'feedback': []}
+        self.tool('project_submit', {'summary': '已通过第一个工程目标'})
+        agent = self.tool('account_state')['agents'][0]
+        self.assertEqual([{'project_key': 'other', 'objective_id': 'feature', 'goal': '修复实际行为'}],
+            agent['available_objectives'])
+        self.assertEqual('example', agent['passed'][0]['project_key'])
+
     def test_two_accounts_are_isolated_and_pool_cannot_be_extended_by_model(self):
         """同目标的两账号使用不同工作目录、会话与工具归属。:return: None。"""
         self.activate(1); self.activate(2)
