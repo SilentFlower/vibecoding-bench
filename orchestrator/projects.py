@@ -11,6 +11,7 @@ from pathlib import Path
 from project_library import canonical_json, digest_json, read_document, safe_relative, snapshot_tree, write_document
 from account_runtime import RuntimeBusy
 from projects_pi import ProjectsPi
+from pi_owners import AccountPiOwners
 from projects_runtime import KEYS
 
 
@@ -123,7 +124,7 @@ class ProjectsService:
     """
 
     def __init__(self, data: Path, database, write_lock, catalog, terminal, account,
-                 admission, provider, verifier, pi=None, identity=None) -> None:
+                 admission, provider, verifier, pi=None, identity=None, owners=None) -> None:
         """初始化新数据表和进程登记，不启动任何真实账号。
 
         :param data: 数据根。
@@ -137,12 +138,15 @@ class ProjectsService:
         :param verifier: 独立验证回调。
         :param pi: Pi 运行时。
         :param identity: 稳定账号身份回调，不使用会轮换的访问令牌。
+        :param owners: 与养号共用的账号 Pi 控制者登记，省略时创建本服务登记。
         :return: None。
         """
         self.data, self.database, self.write_lock = data, database, write_lock
         self.catalog, self.terminal, self.account = catalog, terminal, account
         self.admission, self.provider, self.verifier = admission, provider, verifier
         self.pi = pi or ProjectsPi()
+        self.owners = owners if owners is not None else AccountPiOwners()
+        self.controller_owner_tokens = {}
         self.identity = identity or (lambda value: canonical_json(
             {'id': value['id'], 'binding': value.get('cc2api_account_id')}).decode())
         self.lock = threading.RLock()
@@ -935,49 +939,66 @@ class ProjectsService:
             if not configuration or not self.pi.available():
                 raise ValueError('Pi 运行时或外接模型配置尚未就绪')
             generation = agent['generation'] + 1
-            with self.write_lock:
-                connection = self.database()
-                try:
-                    with connection:
-                        connection.execute('BEGIN IMMEDIATE')
-                        if retry_event:
-                            # 故障放行、人工审计和新代次必须一起提交，不能留下可被定时扫描接续的半状态。
-                            saved = connection.execute('SELECT * FROM projects_work WHERE id=?', (current_work['id'],)).fetchone()
-                            latest = connection.execute("SELECT id FROM projects_events WHERE account_id=? "
-                                "AND kind IN ('error','started','manual_retry','gate_wait') ORDER BY id DESC LIMIT 1", (account_id,)).fetchone()
-                            if not saved or dict(saved) != current_work or not latest or latest['id'] != retry_event['id']:
-                                raise ValueError('原工作或故障事实已变化，请重新核对后启动')
-                            connection.execute("UPDATE projects_work SET status='paused',message=? WHERE id=?",
-                                ('人工已确认重试原模型，保留原工作和会话', current_work['id']))
-                            connection.execute('INSERT INTO projects_events(account_id,work_id,kind,payload_json,created_at) VALUES(?,?,?,?,?)',
-                                (account_id, current_work['id'], 'manual_retry', canonical_json({'reason': json.loads(retry_event['payload_json'])['reason'],
-                                    'error_event_id': retry_event['id'], 'generation': generation, 'source': 'manual_start'}).decode(), now))
-                        if not scheduled and not recovering and recovery and recovery['phase'] in ('scheduled', 'exhausted', 'paused'):
-                            connection.execute('INSERT INTO projects_events(account_id,work_id,kind,payload_json,event_key,created_at) VALUES(?,?,?,?,?,?)',
-                                (account_id, current_work['id'] if current_work else None, 'recovery', canonical_json({'phase': 'reset', 'attempt': 0,
-                                    'reason': 'model_unavailable', 'delay_ms': 0, 'generation': generation, 'source': 'schedule'}).decode(),
-                                    f'model-recovery:{account_id}:{generation}:reset', now))
-                        updated = connection.execute("UPDATE projects_agents SET generation=?,status='running',message=NULL,updated_at=?,schedule_next_at=NULL,"
-                            "schedule_last_started_at=?,schedule_state=CASE WHEN schedule_enabled=1 THEN 'running' ELSE 'off' END WHERE account_id=? AND generation=?",
-                            (generation, now, now, account_id, agent['generation']))
-                        if updated.rowcount != 1:
-                            raise ValueError('Pi 控制代次已变化，请重新核对后启动')
-                finally:
-                    connection.close()
-            stop = threading.Event()
-            thread = threading.Thread(target=self._run, args=(account_id, generation, configuration, stop), daemon=True)
-            self.controllers[account_id] = (thread, stop)
-            self.controller_identities[account_id] = self.identity(account)
+            owner_token = self.owners.claim(account_id, 'projects', generation)
+            if owner_token is None:
+                self._wait_gate(agent, {'allowed': False, 'reason': 'controller_busy', 'retryable': True,
+                    'retry_at': now + 60, 'message': '账号养号或其他 Pi 正在运行，项目指挥顺延'}, now)
+                return self.state(account_id)
+            thread = None
             try:
-                thread.start()
-            except Exception:
-                self.controllers.pop(account_id, None)
-                self.controller_identities.pop(account_id, None)
-                self._write("UPDATE projects_agents SET status='blocked',message=?,schedule_state='blocked',schedule_next_at=NULL WHERE account_id=?",
-                    ('Pi 控制线程未能启动，请人工核对后重试', account_id))
-                if retry_event:
-                    self._write("UPDATE projects_work SET status='blocked' WHERE id=?", (current_work['id'],))
-                    self._event(account_id, 'error', {'message': 'Pi 控制线程未能启动，原模型尚未重试'}, current_work['id'])
+                with self.write_lock:
+                    connection = self.database()
+                    try:
+                        with connection:
+                            connection.execute('BEGIN IMMEDIATE')
+                            if retry_event:
+                                # 故障放行、人工审计和新代次必须一起提交，不能留下可被定时扫描接续的半状态。
+                                saved = connection.execute('SELECT * FROM projects_work WHERE id=?', (current_work['id'],)).fetchone()
+                                latest = connection.execute("SELECT id FROM projects_events WHERE account_id=? "
+                                    "AND kind IN ('error','started','manual_retry','gate_wait') ORDER BY id DESC LIMIT 1", (account_id,)).fetchone()
+                                if not saved or dict(saved) != current_work or not latest or latest['id'] != retry_event['id']:
+                                    raise ValueError('原工作或故障事实已变化，请重新核对后启动')
+                                connection.execute("UPDATE projects_work SET status='paused',message=? WHERE id=?",
+                                    ('人工已确认重试原模型，保留原工作和会话', current_work['id']))
+                                connection.execute('INSERT INTO projects_events(account_id,work_id,kind,payload_json,created_at) VALUES(?,?,?,?,?)',
+                                    (account_id, current_work['id'], 'manual_retry', canonical_json({'reason': json.loads(retry_event['payload_json'])['reason'],
+                                        'error_event_id': retry_event['id'], 'generation': generation, 'source': 'manual_start'}).decode(), now))
+                            if not scheduled and not recovering and recovery and recovery['phase'] in ('scheduled', 'exhausted', 'paused'):
+                                connection.execute('INSERT INTO projects_events(account_id,work_id,kind,payload_json,event_key,created_at) VALUES(?,?,?,?,?,?)',
+                                    (account_id, current_work['id'] if current_work else None, 'recovery', canonical_json({'phase': 'reset', 'attempt': 0,
+                                        'reason': 'model_unavailable', 'delay_ms': 0, 'generation': generation, 'source': 'schedule'}).decode(),
+                                        f'model-recovery:{account_id}:{generation}:reset', now))
+                            updated = connection.execute("UPDATE projects_agents SET generation=?,status='running',message=NULL,updated_at=?,schedule_next_at=NULL,"
+                                "schedule_last_started_at=?,schedule_state=CASE WHEN schedule_enabled=1 THEN 'running' ELSE 'off' END WHERE account_id=? AND generation=?",
+                                (generation, now, now, account_id, agent['generation']))
+                            if updated.rowcount != 1:
+                                raise ValueError('Pi 控制代次已变化，请重新核对后启动')
+                    finally:
+                        connection.close()
+                stop = threading.Event()
+                thread = threading.Thread(target=self._run, args=(account_id, generation, configuration, stop), daemon=True)
+                self.controllers[account_id] = (thread, stop)
+                self.controller_identities[account_id] = self.identity(account)
+                self.controller_owner_tokens[account_id] = (generation, owner_token)
+                try:
+                    thread.start()
+                except Exception:
+                    self.controllers.pop(account_id, None)
+                    self.controller_identities.pop(account_id, None)
+                    self._write("UPDATE projects_agents SET status='blocked',message=?,schedule_state='blocked',schedule_next_at=NULL WHERE account_id=?",
+                        ('Pi 控制线程未能启动，请人工核对后重试', account_id))
+                    if retry_event:
+                        self._write("UPDATE projects_work SET status='blocked' WHERE id=?", (current_work['id'],))
+                        self._event(account_id, 'error', {'message': 'Pi 控制线程未能启动，原模型尚未重试'}, current_work['id'])
+                    raise
+            except BaseException:
+                # 数据提交或线程创建失败也必须退还本次令牌，不能把账号永久认领。
+                self.owners.release(account_id, owner_token)
+                if thread is not None and not thread.is_alive() and self.controllers.get(account_id, (None,))[0] is thread:
+                    self.controllers.pop(account_id, None)
+                    self.controller_identities.pop(account_id, None)
+                if self.controller_owner_tokens.get(account_id) == (generation, owner_token):
+                    self.controller_owner_tokens.pop(account_id, None)
                 raise
         return self.state(account_id)
 
@@ -1181,6 +1202,10 @@ class ProjectsService:
                     # 控制线程已经结束；回调异常也必须释放内存登记，不能让启动永远幂等到死线程。
                     self.controllers.pop(account_id, None)
                     self.controller_identities.pop(account_id, None)
+                    owned = self.controller_owner_tokens.get(account_id)
+                    if owned and owned[0] == generation:
+                        self.controller_owner_tokens.pop(account_id, None)
+                        self.owners.release(account_id, owned[1])
 
     def _pi_event(self, account_id: int, generation: int, value: dict) -> None:
         agent, work = self._current(account_id, generation)

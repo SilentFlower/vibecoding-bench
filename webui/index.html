@@ -38,6 +38,7 @@
       <a href="#projects" data-tab="projects"><span class="tab-en">projects</span><span class="tab-cn">项目迭代</span></a>
       <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行</span></a>
       <a href="#environments" data-tab="environments"><span class="tab-en">environments</span><span class="tab-cn">环境</span></a>
+      <a href="#warmup" data-tab="warmup"><span class="tab-en">warmup</span><span class="tab-cn">Pi 养号</span></a>
     </nav>
     <div class="statline">
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="toggle theme" title="switch theme">☀</button>
@@ -60,7 +61,7 @@
     <span class="hintbar-sep">│</span>
     <span><kbd>/</kbd> focus filter</span>
     <span class="hintbar-sep">│</span>
-    <span><kbd>1-6</kbd> switch tab</span>
+    <span><kbd>1-7</kbd> switch tab</span>
     <span class="hintbar-spacer"></span>
     <span class="hintbar-build">build · <span id="build-tag">p1</span></span>
   </footer>
@@ -149,6 +150,43 @@
         <details class="batch-panel" id="projects-delivery"><summary id="projects-delivery-title">冻结交付与源码</summary><p id="projects-delivery-duration" class="hint" title="按实际累计执行时间统计，暂停和计划等待不计入。"></p><div id="projects-submissions"></div><div id="projects-delivery-files"></div><pre class="projects-document" id="projects-delivery-preview"></pre></details>
       </section>
       <details id="projects-research" class="batch-panel"><summary id="projects-research-title">项目研究</summary><pre id="projects-research-body" class="projects-document"></pre></details>
+    </section>
+  </template>
+
+  <template id="tpl-warmup">
+    <section class="view project-view">
+      <header class="view-head projects-header">
+        <div><h2 class="view-title"><span class="bracket">▌</span>warmup <span class="muted">// Pi 养号</span></h2><p id="warmup-runtime" class="hint">正在读取 Pi 运行时</p></div>
+        <label class="projects-account-picker"><span class="lbl">运行账号</span><select id="warmup-account"></select></label>
+      </header>
+      <section id="warmup-overview" class="batch-panel projects-overview">
+        <div class="projects-overview-head"><div><span class="lbl">养号状态</span><h3 id="warmup-state">请选择账号</h3><p id="warmup-message" class="hint"></p></div>
+          <div class="view-actions projects-controls"><button type="button" class="btn btn-primary" data-warmup-action="start" disabled>启动 / 恢复 Pi</button><button type="button" class="btn" data-warmup-action="pause" disabled>暂停养号</button><button type="button" class="btn" data-warmup-action="stop" disabled>停止本轮</button></div>
+        </div>
+        <p id="warmup-feedback" class="hint projects-feedback hidden" role="status" aria-live="polite"></p>
+        <p id="warmup-admission" class="projects-admission"></p>
+        <div class="projects-overview-grid">
+          <article class="projects-summary-card"><span class="lbl">本轮题目</span><strong id="warmup-current">尚未开始</strong><p id="warmup-progress" class="hint"></p><p id="warmup-duration" class="hint" title="按实际累计执行时间统计，暂停和计划等待不计入。"></p><p id="warmup-activity" class="hint"></p></article>
+          <article class="projects-summary-card"><span class="lbl">下次运行</span><strong id="warmup-next">尚未开启</strong><p id="warmup-schedule" class="hint"></p><button id="warmup-config" type="button" class="btn btn-sm" disabled>间隔 / 额度设置</button></article>
+          <article class="projects-summary-card"><span class="lbl">运行方式</span><p>Pi 使用原题库推进完整交流，决定澄清、方案确认、补充需求与收尾。</p><p class="hint">同账号与项目迭代串行执行。暂停关闭后续自动养号，恢复会接续本轮原会话。</p></article>
+        </div>
+        <div class="projects-quota-grid">
+          <article id="warmup-quota-five_hour" class="projects-quota"><div class="projects-quota-head"><span>5h 已用额度</span><strong data-quota-value>未采集</strong></div><div class="projects-quota-meter"><span class="projects-quota-fill hidden" data-quota-fill role="progressbar" aria-label="养号5h已用额度" aria-valuemin="0" aria-valuemax="100"></span><i class="projects-quota-limit hidden" data-quota-limit></i></div><p class="hint" data-quota-description></p></article>
+          <article id="warmup-quota-seven_day" class="projects-quota"><div class="projects-quota-head"><span>7d 已用额度</span><strong data-quota-value>未采集</strong></div><div class="projects-quota-meter"><span class="projects-quota-fill hidden" data-quota-fill role="progressbar" aria-label="养号7d已用额度" aria-valuemin="0" aria-valuemax="100"></span><i class="projects-quota-limit hidden" data-quota-limit></i></div><p class="hint" data-quota-description></p></article>
+        </div>
+        <details class="projects-usage-detail"><summary>查看 Pi 与 Claude 用量</summary><p id="warmup-usage" class="hint">尚未采集模型用量。</p></details>
+      </section>
+      <section id="warmup-reconciliation" class="batch-panel hidden"><h3>输入结果待核对</h3><p class="hint">先暂停并核对原会话；记录事实后再显式恢复 Pi。</p><div id="warmup-actions"></div></section>
+      <section class="batch-panel projects-workspace">
+        <div class="projects-tabs" role="tablist" aria-label="养号执行现场"><button id="warmup-tab-terminal" type="button" role="tab" aria-selected="true" aria-controls="warmup-terminal-panel">Claude Code 终端</button><button id="warmup-tab-events" type="button" role="tab" aria-selected="false" aria-controls="warmup-events-panel">Pi 与 Claude 交互</button></div>
+        <div id="warmup-terminal-panel" role="tabpanel" aria-labelledby="warmup-tab-terminal"><p id="warmup-screen-status" class="hint"></p><pre id="warmup-screen" class="projects-screen">等待当前轮次的终端观察。</pre></div>
+        <div id="warmup-events-panel" class="hidden" role="tabpanel" aria-labelledby="warmup-tab-events"><div class="projects-pagination" aria-label="养号交互分页"><span id="warmup-events-page" class="hint" role="status"></span><button id="warmup-events-latest" type="button" class="btn btn-sm" disabled>最新一页</button><button id="warmup-events-previous" type="button" class="btn btn-sm" disabled>上一页</button><button id="warmup-events-next" type="button" class="btn btn-sm" disabled>下一页</button></div><button id="warmup-events-new" type="button" class="btn btn-sm hidden"></button><ol id="warmup-events" class="projects-events"></ol></div>
+      </section>
+      <div class="projects-settings">
+        <details class="batch-panel"><summary class="projects-settings-title"><strong>给 Pi 的养号业务指南</strong></summary><form id="warmup-guide-form" class="form"><label><span class="lbl">本轮累计预算 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="30" required></label><label><span class="lbl">追加提示词</span><textarea name="instructions" rows="4" maxlength="12000" placeholder="例如：先理解需求并确认方案，再实施；与 Claude 使用英文交流。"></textarea></label><p class="hint">保存后的原文会完整交给 Pi。修改前请先暂停，保存后在下次启动 / 恢复中生效。</p><button type="submit" class="btn btn-primary">保存业务指南</button></form></details>
+        <details class="batch-panel"><summary class="projects-settings-title"><strong>Pi 模型配置</strong><span class="hint">与项目迭代共用模型优先级</span></summary><form id="warmup-model-form" class="form"><div class="row"><label><span class="lbl">服务地址</span><input name="base_url" type="url" required></label><label><span class="lbl">API Key</span><input name="api_key" type="password" autocomplete="new-password" placeholder="留空沿用已配置密钥"></label></div><label><span class="lbl">模型 · 按优先级一行一个</span><textarea name="models" rows="3" required></textarea></label><p id="warmup-model-status" class="hint"></p><button type="submit" class="btn btn-primary">保存模型配置</button></form></details>
+      </div>
+      <section class="projects-records"><details class="batch-panel" open><summary>养号轮次与耗时</summary><div class="projects-pagination" aria-label="养号轮次分页"><span id="warmup-rounds-page" class="hint" role="status"></span><button id="warmup-rounds-latest" type="button" class="btn btn-sm" disabled>最新一页</button><button id="warmup-rounds-previous" type="button" class="btn btn-sm" disabled>上一页</button><button id="warmup-rounds-next" type="button" class="btn btn-sm" disabled>下一页</button></div><button id="warmup-rounds-new" type="button" class="btn btn-sm hidden"></button><div id="warmup-rounds"></div></details><details id="warmup-round-detail" class="batch-panel"><summary id="warmup-round-title">本轮需求与补充</summary><pre id="warmup-round-body" class="projects-document"></pre></details></section>
     </section>
   </template>
 
@@ -812,6 +850,6 @@
   </div>
 
   <script src="projects.js?v=20261025-projects-work-duration"></script>
-  <script src="app.js?v=20261024-project-overview"></script>
+  <script src="app.js?v=20261025-warmup-pi"></script>
 </body>
 </html>

@@ -46,6 +46,7 @@ const state = {
   runDetail: null,
   viewGeneration: 0,
   runWindowConfig: null,
+  warmupAccountId: null,
 };
 
 // ===================== Pi 项目指挥 =====================
@@ -53,6 +54,382 @@ const state = {
 function renderProjects() {
   return window.ProjectsUI.mount({api: API, prefix: RUNTIME_BASE});
 }
+
+/** 展示账号 Pi 养号现场，沿用原账号的间隔与额度设置。@return {Promise<void>} 页面加载完成。 */
+function renderWarmup() {
+  return WarmupUI.mount();
+}
+
+/** 账号 Pi 养号现场：配置由原账号入口维护，现场只展示当前轮的真实增量。 */
+const WarmupUI = (() => {
+  const base = '/accounts/warmup/pi';
+  const names = {off: '尚未开启', ready: '准备中', running: 'Pi 指挥中', waiting: '等待执行条件',
+    paused: '已暂停', blocked: '需要处理', completed: '本轮完成', stopped: '本轮已停止'};
+  let revision = 0, selection = 0, accountId = null, agents = [], source = null, cursor = 0;
+  let screenRound = null, screenId = 0, clock = null, busy = false, pages = {};
+  const element = name => $(`#warmup-${name}`);
+  const agent = () => agents.find(item => item.account_id === accountId);
+  const active = (version, selected, chosen) => version === revision && selected === accountId && chosen === selection;
+
+  /**
+   * 显示当前页面的可读操作反馈。
+   * @param {string} message 状态或错误。
+   * @param {boolean} error 是否为错误。
+   * @return {void}
+   */
+  function feedback(message, error = false) {
+    const node = element('feedback');
+    if (!node) return;
+    node.textContent = message; node.classList.toggle('hidden', !message);
+    node.dataset.kind = error ? 'error' : 'status'; node.setAttribute('role', error ? 'alert' : 'status');
+  }
+
+  /** 执行明确的用户操作并显示失败。@param {Function} action 异步操作。@return {Promise<void>} 操作结束。 */
+  async function perform(action) {
+    try { feedback(''); await action(); } catch (error) { feedback(error.message, true); }
+  }
+
+  /** 清除旧连接和回调，离页后不再刷新旧DOM。@return {void} */
+  function unmount() {
+    revision += 1; selection += 1; source?.close(); source = null;
+    clearInterval(clock); clock = null; accountId = null; cursor = 0; busy = false;
+    screenRound = null; screenId = 0; pages = {};
+  }
+
+  /** 进入独立养号现场，不启动模型或改变原开关。@return {Promise<void>} 页面加载完成。 */
+  async function mount() {
+    unmount();
+    const version = revision;
+    $('#warmup-form').onsubmit = saveWarmupConfig;
+    element('account').onchange = event => perform(() => selectAccount(Number(event.target.value)));
+    element('guide-form').onsubmit = event => { event.preventDefault(); perform(saveGuide); };
+    element('model-form').onsubmit = event => { event.preventDefault(); perform(saveModel); };
+    element('config').onclick = () => perform(async () => {
+      const selected = state.accounts.find(item => item.id === accountId);
+      if (selected) await openWarmupModal(selected);
+    });
+    $$('[data-warmup-action]').forEach(button => { button.onclick = () => perform(() => control(button.dataset.warmupAction)); });
+    for (const tab of ['terminal', 'events']) element('tab-' + tab).onclick = () => {
+      for (const name of ['terminal', 'events']) {
+        element('tab-' + name).setAttribute('aria-selected', String(name === tab));
+        element(name + '-panel').classList.toggle('hidden', name !== tab);
+      }
+    };
+    for (const kind of ['events', 'rounds']) {
+      for (const direction of ['previous', 'next', 'latest'])
+        element(kind + '-' + direction).onclick = () => perform(() => loadPage(kind, direction));
+      element(kind + '-new').onclick = () => perform(() => loadPage(kind, 'latest'));
+    }
+    try {
+      const [view, accounts] = await Promise.all([API(base), API('/accounts'), loadModel()]);
+      if (version !== revision) return;
+      agents = view.agents; state.accounts = accounts;
+      element('runtime').textContent = view.pi_available ? 'Pi 运行时已就绪 · 使用原养号题库' : 'Pi 运行时尚未就绪';
+      const available = accounts.filter(item => item.enabled && !item.deleted_at);
+      element('account').innerHTML = '<option value="">选择运行账号</option>' + available.map(item =>
+        `<option value="${item.id}">${escapeHTML(item.name)}</option>`).join('');
+      const initial = available.find(item => item.id === state.warmupAccountId) || available[0];
+      if (initial) element('account').value = initial.id;
+      await selectAccount(initial?.id);
+      if (version !== revision) return;
+      clock = setInterval(paintSchedule, 1000);
+    } catch (error) { if (version === revision) feedback(error.message, true); }
+  }
+
+  /** 刷新显式保存的账号配置，保留未保存的Pi指南和当前翻页位置。@return {Promise<void>} 配置已更新。 */
+  async function refreshConfiguration() {
+    const version = revision;
+    const [view, accounts] = await Promise.all([API(base), API('/accounts')]);
+    if (version !== revision) return;
+    state.accounts = accounts; merge(view); paint();
+  }
+
+  /** 合并账号公开摘要，不覆盖正在编辑的表单。@param {object} view 公开视图。@return {void} */
+  function merge(view) {
+    for (const value of view.agents) {
+      const index = agents.findIndex(item => item.account_id === value.account_id);
+      if (index < 0) agents.push(value); else agents[index] = {...agents[index], ...value};
+    }
+  }
+
+  /** 切账号时读取最新现场与高水位，禁止回放历史终端。@param {number} id 账号。@return {Promise<void>} 现场就绪。 */
+  async function selectAccount(id) {
+    source?.close(); source = null; accountId = id || null; state.warmupAccountId = accountId;
+    const chosen = ++selection, version = revision, selected = accountId;
+    cursor = 0; screenRound = null; screenId = 0; busy = false;
+    pages = Object.fromEntries([['events', 20], ['rounds', 10]].map(([kind, size]) =>
+      [kind, {size, rows: [], index: 0, loading: false, incoming: [], pending: new Set()}]));
+    const form = element('guide-form');
+    form.elements.instructions.value = agent()?.instructions || '';
+    form.elements.budget_minutes.value = (agent()?.budget_sec || 1800) / 60;
+    element('round-detail').open = false; element('round-body').textContent = '';
+    element('actions').innerHTML = ''; element('reconciliation').classList.add('hidden');
+    paint(); paintPage('events'); paintPage('rounds');
+    if (!selected) return;
+    try {
+      const [snapshot, history] = await Promise.all([API(`${base}/agents/${selected}/snapshot`),
+        API(`${base}/agents/${selected}/rounds/page?limit=10`), loadActions()]);
+      if (!active(version, selected, chosen)) return;
+      merge(snapshot.state); cursor = snapshot.cursor;
+      pages.events.rows = [snapshot.events]; pages.rounds.rows = [history];
+      paint(); paintScreen(snapshot.observation); paintPage('events'); paintPage('rounds');
+      source = new EventSource(`${RUNTIME_BASE}/api${base}/stream?account_id=${selected}&after=${cursor}`);
+      source.addEventListener('update', event => {
+        if (!active(version, selected, chosen)) return;
+        try {
+          const value = JSON.parse(event.data); merge(value.state); paint();
+          if (element('feedback').textContent === '连接中断，正在重连；原会话保留。') feedback('');
+          const latest = [], observations = [];
+          for (const item of value.events) {
+            if (item.id <= cursor) continue;
+            cursor = item.id;
+            if (item.kind === 'observation') observations.push(item);
+            else if (item.kind !== 'usage') latest.push(item);
+          }
+          paintScreen(observations.reverse().find(item => item.round_id === screenRound));
+          receive('events', latest);
+          if (agent()?.round) receive('rounds', [agent().round]);
+          if (value.events.some(item => ['input_unknown', 'reconciled'].includes(item.kind)))
+            loadActions().catch(error => { if (active(version, selected, chosen)) feedback(error.message, true); });
+        } catch { feedback('养号连接暂不可用，请核对最新状态。', true); }
+      });
+      source.onerror = () => { if (active(version, selected, chosen)) feedback('连接中断，正在重连；原会话保留。'); };
+    } catch (error) { if (active(version, selected, chosen)) throw error; }
+  }
+
+  /** 控制当前账号，防止重复点击或旧账号回执覆盖新页面。@param {string} action 启动或暂停。@return {Promise<void>} 控制回执已处理。 */
+  async function control(action) {
+    if (!accountId || busy) return;
+    if (action === 'start' && !agent()?.schedule.enabled) {
+      feedback('请先在“间隔 / 额度设置”中开启养号计划，再启动 Pi。');
+      return;
+    }
+    const version = revision, selected = accountId, chosen = selection;
+    busy = true; paint(); feedback(action === 'start' ? '正在启动 / 恢复 Pi…' : '正在收口当前养号轮次…');
+    try {
+      const view = await API(`${base}/agents/${selected}/${action}`, {method: 'POST'});
+      if (!active(version, selected, chosen)) return;
+      merge(view); paint(); await loadActions();
+      feedback(action === 'start' ? agent()?.controller_active ? 'Pi 已启动，正在接续本轮需求与原会话。'
+        : agent()?.message || '尚未满足执行条件，请查看等待原因。'
+        : action === 'pause' ? '已暂停自动养号，原轮次与会话已保留。' : '当前轮次已停止，自动养号已关闭。');
+    } catch (error) {
+      if (active(version, selected, chosen)) throw error;
+    } finally { if (active(version, selected, chosen)) { busy = false; paint(); } }
+  }
+
+  /** 保存追加指南原文及预算，不启用账号或重建原会话。@return {Promise<void>} 保存完成。 */
+  async function saveGuide() {
+    if (!accountId) throw new Error('请先选择账号');
+    const version = revision, selected = accountId, chosen = selection, form = element('guide-form');
+    try {
+      const view = await API(`${base}/agents/${selected}`, {method: 'PUT', body: JSON.stringify({
+        instructions: form.elements.instructions.value, budget_sec: Number(form.elements.budget_minutes.value) * 60})});
+      if (!active(version, selected, chosen)) return;
+      merge(view); paint(); feedback('养号业务指南已保存，原文将在下次启动 / 恢复时交给 Pi。');
+    } catch (error) { if (active(version, selected, chosen)) throw error; }
+  }
+
+  /** 加载共享模型配置，密钥不回显。@return {Promise<void>} 表单已载入。 */
+  async function loadModel() {
+    const version = revision, value = await API('/settings/project-requester');
+    if (version !== revision) return;
+    const form = element('model-form');
+    form.elements.base_url.value = value.base_url; form.elements.models.value = value.models.join('\n');
+    form.elements.api_key.value = '';
+    element('model-status').textContent = value.ready ? '模型配置已就绪；与项目迭代共用，密钥不回显。' : value.error || '请配置支持流式响应和工具调用的模型。';
+  }
+
+  /** 保存共享模型配置，不改变在途Pi的冻结设置。@return {Promise<void>} 配置已保存。 */
+  async function saveModel() {
+    const version = revision, form = element('model-form');
+    await API('/settings/project-requester', {method: 'PUT', body: JSON.stringify({base_url: form.elements.base_url.value,
+      api_key: form.elements.api_key.value || null, models: form.elements.models.value.split('\n').map(value => value.trim()).filter(Boolean)})});
+    if (version !== revision) return;
+    await loadModel(); feedback('共享 Pi 模型配置已保存；后续启动 / 恢复采用新配置。');
+  }
+
+  /** 显示累计执行用时，不将暂停或计划等待计入。@param {number} seconds 实测秒数。@return {string} 可读耗时。 */
+  function duration(seconds) {
+    if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return '未采集';
+    const value = Math.max(0, Math.floor(seconds));
+    return `${value >= 3600 ? Math.floor(value / 3600) + ' 小时 ' : ''}${Math.floor(value % 3600 / 60)} 分 ${value % 60} 秒`;
+  }
+
+  /** 更新状态而不回填未保存表单。@return {void} */
+  function paint() {
+    const value = agent(), round = value?.round, schedule = value?.schedule;
+    const running = value?.controller_active;
+    element('state').textContent = busy ? '正在处理操作…' : running ? 'Pi 指挥中'
+      : !schedule?.enabled ? '自动养号已关闭' : value?.status === 'waiting' ? '等待执行条件'
+      : value?.status === 'blocked' ? '需要处理' : '待机 · 等待下次运行';
+    element('overview').dataset.state = busy ? 'pending' : running ? 'running' : value?.status || 'off';
+    element('message').textContent = value?.message || '';
+    element('admission').textContent = value?.admission?.message || (value?.admission?.allowed ? '运行条件允许' : '选择账号后查看执行条件。');
+    element('current').textContent = round?.title || '尚未开始本轮题目';
+    element('progress').textContent = round ? `${names[round.status] || round.status} · 已确认需求 ${round.completed_stages} / ${round.required_stages} 项` : '从启用题库选择完整需求，Pi 自主推进交流。';
+    element('duration').textContent = round ? `${round.status === 'completed' ? '完成耗时' : '累计执行'} ${duration(round.work_sec)}${['completed', 'stopped'].includes(round.status) ? '' : ' · 剩余预算 ' + duration(value.progress?.remaining_work_sec)}` : '';
+    element('activity').textContent = value?.activity ? eventText(value.activity) : '';
+    element('config').disabled = !accountId;
+    $$('[data-warmup-action]').forEach(button => { button.disabled = !accountId || busy || button.dataset.warmupAction === 'start' && !!running; });
+    paintSchedule(); paintScreen(); paintQuota(value?.admission?.quota);
+    const count = number => typeof number === 'number' && Number.isFinite(number) ? number.toLocaleString() : '未采集';
+    const pi = value?.pi_usage, claude = value?.claude_usage;
+    element('usage').textContent = `Pi 账号累计${pi?.complete === false ? '（已知小计）' : ''}：未缓存输入 ${count(pi?.input_tokens)} · 缓存读取 ${count(pi?.cache_read_tokens)} · 缓存写入 ${count(pi?.cache_write_tokens)} · 输出 ${count(pi?.output_tokens)}；Claude 本轮${claude?.complete === false ? '（已知小计）' : ''}：未缓存输入 ${count(claude?.input_tokens)} · 缓存读取 ${count(claude?.cache_read_input_tokens)} · 输出 ${count(claude?.output_tokens)}`;
+  }
+
+  /** 显示被动额度及原账号阈值，未知值不冒充零。@param {object} quota 真实额度摘要。@return {void} */
+  function paintQuota(quota) {
+    for (const key of ['five_hour', 'seven_day']) {
+      const node = element('quota-' + key), value = quota?.windows?.[key]?.utilization;
+      const known = quota?.known !== false && typeof value === 'number' && Number.isFinite(value) && value >= 0;
+      const limit = quota?.limits?.[key], limited = typeof limit === 'number' && Number.isFinite(limit) && limit > 0;
+      node.querySelector('[data-quota-value]').textContent = known ? `${Number(value.toFixed(1))}%` : '未采集';
+      node.dataset.known = String(known); node.dataset.hit = String((quota?.hit || []).includes(key));
+      const fill = node.querySelector('[data-quota-fill]'), marker = node.querySelector('[data-quota-limit]');
+      fill.classList.toggle('hidden', !known); fill.style.width = known ? `${Math.min(100, value)}%` : '';
+      if (known) fill.setAttribute('aria-valuenow', value); else fill.removeAttribute('aria-valuenow');
+      marker.classList.toggle('hidden', !limited); marker.style.left = limited ? `${Math.min(100, limit)}%` : '';
+      node.querySelector('[data-quota-description]').textContent = limited ? `下一轮阈值 ${limit}% · 已认领的当前整轮继续，真实用尽仍停止` : '未设置百分比阈值 · 沿用真实额度用尽保护';
+    }
+  }
+
+  /** 根据服务器的下一次时间显示倒计时，不自行重算随机间隔。@return {void} */
+  function paintSchedule() {
+    if (!element('next')) return;
+    const value = agent()?.schedule;
+    const next = value?.next_run_at;
+    element('next').textContent = value?.enabled ? typeof next === 'number'
+      ? `${new Date(next * 1000).toLocaleString('zh-CN', {hour12: false})}` : agent()?.controller_active ? '本轮结束后安排' : '等待处理当前原因' : '自动养号已关闭';
+    const wait = typeof next === 'number' ? ` · ${Math.max(0, Math.ceil((next * 1000 - Date.now()) / 1000))} 秒后检查` : '';
+    element('schedule').textContent = value ? `原间隔 ${value.interval_min_hours}～${value.interval_max_hours} 小时${wait}` : '';
+  }
+
+  /** 终端仅显示当前轮最新画面，切轮立即清空旧屏幕。@param {object} observation 可选观察。@return {void} */
+  function paintScreen(observation) {
+    const round = agent()?.round, id = round?.id || null;
+    if (screenRound !== id || !screenId) {
+      screenRound = id; screenId = 0;
+      element('screen').textContent = id ? '等待当前轮次的终端观察。' : '尚未开始养号轮次。';
+      element('screen-status').textContent = id ? `题目 ${round.topic_no} · 等待最新画面` : '这里只显示当前轮的最新终端画面。';
+    }
+    if (!observation || observation.round_id !== id || observation.id <= screenId) return;
+    screenId = observation.id; element('screen').textContent = observation.payload.screen || '终端已释放，原会话保留。';
+    element('screen-status').textContent = `题目 ${round.topic_no} · 最近观察 ${new Date(observation.created_at * 1000).toLocaleString('zh-CN', {hour12: false})}`;
+  }
+
+  /** 将公开事件翻译为业务状态，所有返回文本仍由渲染器转义。@param {object} item 事件。@return {string} 可读消息。 */
+  function eventText(item) {
+    const payload = item.payload || {};
+    if (item.kind === 'guide_loaded') return '本轮已将保存的追加指南与默认指南一起交给 Pi。';
+    if (payload.text || payload.message) return payload.text || payload.message;
+    if (item.kind === 'started') return '已启动本轮 Claude 原会话。';
+    if (item.kind === 'completed') return '本轮需求与补充已完成。';
+    if (item.kind === 'reconciled') return '已记录人工核对结果，请显式恢复 Pi。';
+    if (item.kind === 'recovery') return payload.phase === 'recovered' ? '模型已恢复，继续原会话。'
+      : `模型暂不可用，约 ${Math.ceil((payload.delay_ms || 0) / 1000)} 秒后${payload.phase === 'fallback' ? '切换备用模型' : '重试'}。`;
+    return JSON.stringify(payload, null, 2);
+  }
+
+  /** 接收增量，浏览旧页时仅提示新记录，保留阅读位置。@param {string} kind 交互或轮次。@param {Array<object>} items 真实增量。@return {void} */
+  function receive(kind, items) {
+    if (!items.length) return;
+    const value = pages[kind];
+    if (value.loading) { value.incoming.push(...items); return; }
+    if (value.index) {
+      for (const item of items) {
+        let known = false;
+        for (const page of value.rows) {
+          const index = page.items.findIndex(previous => previous.id === item.id);
+          if (index >= 0) { page.items[index] = item; known = true; }
+        }
+        if (!known) value.pending.add(item.id);
+      }
+    } else {
+      const previous = value.rows[0] || {items: [], next_before: null};
+      const merged = Array.from(new Map([...previous.items, ...items].map(item => [item.id, item])).values());
+      merged.sort(kind === 'events' ? (left, right) => right.id - left.id
+        : (left, right) => right.created_at - left.created_at || right.id.localeCompare(left.id));
+      const visible = merged.slice(0, value.size), more = previous.next_before != null || merged.length > value.size;
+      value.rows = [{items: visible, next_before: more && visible.length ? visible.at(-1).id : null}]; value.pending.clear();
+    }
+    paintPage(kind);
+  }
+
+  /** 读取稳定游标分页，账号切换后丢弃旧响应。@param {string} kind 交互或轮次。@param {string} direction 翻页方向。@return {Promise<void>} 当前页已载入。 */
+  async function loadPage(kind, direction) {
+    const value = pages[kind];
+    if (!accountId || value.loading) return;
+    const target = direction === 'next' ? value.index + 1 : direction === 'previous' ? value.index - 1 : 0;
+    if (target < 0) return;
+    if (!target && value.pending.size) direction = 'latest';
+    if (direction !== 'latest' && value.rows[target]) { value.index = target; paintPage(kind, true); return; }
+    const before = direction === 'next' ? value.rows[value.index]?.next_before : null;
+    if (direction === 'next' && before == null) return;
+    const version = revision, selected = accountId, chosen = selection;
+    value.loading = true; value.incoming = []; paintPagination(kind);
+    try {
+      const page = await API(`${base}/agents/${selected}/${kind}/page?limit=${value.size}${before == null ? '' : '&before=' + encodeURIComponent(before)}`);
+      if (!active(version, selected, chosen)) return;
+      if (direction === 'latest') { value.rows = [page]; value.index = 0; value.pending.clear(); }
+      else { value.rows[target] = page; value.index = target; }
+      paintPage(kind, true);
+    } catch (error) { if (active(version, selected, chosen)) throw error; }
+    finally {
+      if (active(version, selected, chosen)) { value.loading = false; const pending = value.incoming; value.incoming = []; receive(kind, pending); paintPagination(kind); }
+    }
+  }
+
+  /** 更新最新在前的页码和新记录提示。@param {string} kind 记录类型。@return {void} */
+  function paintPagination(kind) {
+    const value = pages[kind];
+    element(kind + '-page').textContent = `${value.loading ? '加载中 · ' : ''}第 ${value.index + 1} 页 · 每页 ${value.size} 条 · 最新在前`;
+    element(kind + '-previous').disabled = value.loading || !value.index;
+    element(kind + '-next').disabled = value.loading || value.rows[value.index]?.next_before == null;
+    element(kind + '-latest').disabled = value.loading || !value.index && !value.pending.size;
+    const notice = element(kind + '-new'); notice.classList.toggle('hidden', !value.pending.size); notice.disabled = value.loading;
+    notice.textContent = `有 ${value.pending.size} 条新记录，查看最新`;
+  }
+
+  /** 渲染当前页，外部正文始终转义，主动翻页回到页首。@param {string} kind 交互或轮次。@param {boolean} reset 是否重置滚动。@return {void} */
+  function paintPage(kind, reset = false) {
+    const node = element(kind), value = pages[kind], top = node.scrollTop, height = node.scrollHeight;
+    const rows = value.rows[value.index]?.items || [];
+    if (kind === 'events') {
+      const labels = {pi: 'Pi', input: '发送到 Claude', started: '原生会话', error: '异常',
+        recovery: '模型恢复', guide_loaded: '业务指南', completed: '本轮完成', input_unknown: '输入待核对', reconciled: '人工核对'};
+      node.innerHTML = rows.map(item => `<li data-warmup-event="${item.id}"><small class="muted">${escapeHTML(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))} · ${escapeHTML(labels[item.kind] || item.kind)}</small><pre>${escapeHTML(eventText(item))}</pre></li>`).join('') || '<li class="hint">启动后查看 Pi 的判断、实际输入与完成记录。</li>';
+    } else {
+      node.innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escapeHTML(item.topic_no)}</strong><span>${escapeHTML(item.title)}<small class="hint">${escapeHTML(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small></span><span>${escapeHTML(names[item.status] || item.status)}</span><span>${item.status === 'completed' ? '完成耗时' : '累计执行'} ${escapeHTML(duration(item.work_sec))}</span><button type="button" class="btn btn-sm" data-warmup-round="${escapeHTML(item.id)}">查看本轮需求</button></div>`).join('') || '<p class="hint">尚无 Pi 养号轮次，原 worker 记录仍可在“运行”中查看。</p>';
+      $$('[data-warmup-round]').forEach(button => { button.onclick = () => perform(async () => {
+        const version = revision, selected = accountId, chosen = selection;
+        const detail = await API(`${base}/rounds/${encodeURIComponent(button.dataset.warmupRound)}`);
+        if (!active(version, selected, chosen)) return;
+        element('round-detail').open = true; element('round-title').textContent = detail.round.title;
+        element('round-body').textContent = [detail.topic.prompt, ...detail.topic.followups.map((text, index) => `补充需求 ${index + 1}\n${text}`)].join('\n\n');
+      }); });
+    }
+    paintPagination(kind); node.scrollTop = reset ? 0 : top > 40 ? top + Math.max(0, node.scrollHeight - height) : top;
+  }
+
+  /** 读取原操作意图，只有用户明确确认才记录对账结论。@return {Promise<void>} 对账区域已更新。 */
+  async function loadActions() {
+    const version = revision, selected = accountId, chosen = selection;
+    if (!selected) return;
+    const rows = await API(`${base}/agents/${selected}/actions`);
+    if (!active(version, selected, chosen)) return;
+    element('reconciliation').classList.toggle('hidden', !rows.length);
+    element('actions').innerHTML = rows.map(item => `<div class="batch-panel"><pre>${escapeHTML(item.request.text || JSON.stringify(item.request.keys))}</pre><button type="button" class="btn btn-sm" data-warmup-reconcile="${escapeHTML(item.id)}" data-sent="true">确认已发送</button> <button type="button" class="btn btn-sm" data-warmup-reconcile="${escapeHTML(item.id)}" data-sent="false">确认未发送</button></div>`).join('');
+    $$('[data-warmup-reconcile]').forEach(button => { button.onclick = () => perform(async () => {
+      const view = await API(`${base}/agents/${selected}/reconcile`, {method: 'POST', body: JSON.stringify({
+        operation_id: button.dataset.warmupReconcile, sent: button.dataset.sent === 'true'})});
+      if (!active(version, selected, chosen)) return;
+      merge(view); paint(); await loadActions(); feedback('核对结论已保存，请确认后显式恢复 Pi。');
+    }); });
+  }
+
+  return {mount, unmount, refreshConfiguration};
+})();
 
 // ===================== 路由 =====================
 const ROUTES = {
@@ -62,6 +439,7 @@ const ROUTES = {
   topics: renderTopics,
   tasks: renderTasks,
   runs: renderRuns,
+  warmup: renderWarmup,
 };
 
 function currentTab() {
@@ -87,6 +465,7 @@ function navigate() {
   }
   if (tab !== 'runs') endRunDetail();
   if (tab !== 'projects') window.ProjectsUI.unmount();
+  if (tab !== 'warmup') WarmupUI.unmount();
   ROUTES[tab]();
 }
 
@@ -247,7 +626,7 @@ function renderWarmupStatus(account) {
     return `<div class="warmup-error"><strong>${label}</strong>：${escapeHTML(message)}${resume}</div>`;
   }).join('');
   if (account.cc2api_account_id == null && !Number(account.warmup_enabled || 0)) {
-    return `<span class="pill pill-queued">未绑定</span>
+    return `<span class="pill pill-queued">${account.warmup_engine === 'pi' ? 'Pi 养号未开启' : '未绑定'}</span>
       ${thresholds ? `<div class="muted">普通任务阈值：${escapeHTML(thresholds)}</div>` : ''}
       ${quotaStatuses}`;
   }
@@ -267,6 +646,9 @@ function renderWarmupStatus(account) {
     auth_failed: 'pill-failed',
     sync_failed: 'pill-timeout',
     paused: 'pill-failed',
+    waiting: 'pill-quota_wait',
+    blocked: 'pill-failed',
+    completed: 'pill-success',
   }[status] || (enabled ? 'pill-success' : 'pill-queued');
   const error = account.warmup_last_error
     ? `<div class="warmup-error" title="${escapeHTML(account.warmup_last_error)}">${escapeHTML(account.warmup_last_error)}</div>`
@@ -319,6 +701,7 @@ async function renderAccounts() {
           (RUNTIME_BASE ? `<button type="button" class="btn btn-sm" data-cc2-process="${a.id}">更新进程指标</button>` : '')}
         ${RUNTIME_BASE ? `<button type="button" class="btn btn-sm" data-run-window-config="${a.id}">运行时段</button>` : ''}
         <button class="btn btn-sm" data-warmup-config="${a.id}">养号 / 额度</button>
+        ${a.warmup_engine === 'pi' ? `<button class="btn btn-sm" data-warmup-console="${a.id}">Pi 养号现场</button>` : ''}
         ${Number(a.warmup_enabled || 0) === 1 ? `<button class="btn btn-sm btn-primary" data-warmup-now="${a.id}">立即运行</button>` : ''}
         ${Number(a.warmup_enabled || 0) !== 1 && (a.cc2api_account_id != null || a.warmup_last_status === 'paused') ? `<button class="btn btn-sm" data-warmup-resume="${a.id}">恢复</button>` : ''}
         ${a.cc2api_account_id == null || RUNTIME_BASE ? `<button class="btn btn-sm" data-relogin="${a.id}">重新授权</button>` : ''}
@@ -377,6 +760,7 @@ async function renderAccounts() {
       return;
     }
     const warmupConfigId = e.target.dataset.warmupConfig;
+    const warmupConsoleId = e.target.dataset.warmupConsole;
     const warmupNowId = e.target.dataset.warmupNow;
     const warmupResumeId = e.target.dataset.warmupResume;
     const unbindId = e.target.dataset.cc2Unbind;
@@ -421,6 +805,11 @@ async function renderAccounts() {
       }
       return;
     }
+    if (warmupConsoleId) {
+      state.warmupAccountId = Number(warmupConsoleId);
+      location.hash = '#warmup';
+      return;
+    }
     if (warmupConfigId) {
       const account = state.accounts.find(a => String(a.id) === String(warmupConfigId));
       if (account) await openWarmupModal(account);
@@ -433,7 +822,10 @@ async function renderAccounts() {
         if (!result.started) {
           alert(result.warmup_last_error || `未启动：${result.warmup_last_status || '账号当前不可认领'}`);
         }
-        await renderAccounts();
+        if (state.accounts.find(account => String(account.id) === String(warmupNowId))?.warmup_engine === 'pi') {
+          state.warmupAccountId = Number(warmupNowId);
+          location.hash = '#warmup';
+        } else await renderAccounts();
       } catch (err) {
         alert('立即运行失败: ' + err.message);
       } finally {
@@ -445,7 +837,10 @@ async function renderAccounts() {
       e.target.disabled = true;
       try {
         await API(`/accounts/${warmupResumeId}/warmup/resume`, { method: 'POST' });
-        await renderAccounts();
+        if (state.accounts.find(account => String(account.id) === String(warmupResumeId))?.warmup_engine === 'pi') {
+          state.warmupAccountId = Number(warmupResumeId);
+          location.hash = '#warmup';
+        } else await renderAccounts();
       } catch (err) {
         alert('恢复养号失败: ' + err.message);
       } finally {
@@ -636,7 +1031,8 @@ async function saveWarmupConfig(e) {
       body: JSON.stringify(payload),
     });
     closeModal('#warmup-modal');
-    await renderAccounts();
+    if (currentTab() === 'warmup') await WarmupUI.refreshConfiguration();
+    else await renderAccounts();
   } catch (err) {
     alert('保存养号与额度配置失败: ' + err.message);
   } finally {
@@ -2578,7 +2974,7 @@ function startClock() {
 }
 
 function bindShortcuts() {
-  const TAB_KEYS = { '1': 'accounts', '2': 'topics', '3': 'tasks', '4': 'projects', '5': 'runs', '6': 'environments' };
+  const TAB_KEYS = { '1': 'accounts', '2': 'topics', '3': 'tasks', '4': 'projects', '5': 'runs', '6': 'environments', '7': 'warmup' };
   document.addEventListener('keydown', (e) => {
     const inField = /^(INPUT|TEXTAREA|SELECT)$/i.test(e.target.tagName);
 
