@@ -67,9 +67,8 @@ from projects_pi import ProjectsPi
 from projects_runtime import ProjectsTerminal
 from projects_verification import ProjectsVerification
 from pi_owners import AccountPiOwners
-from warmup_runtime import WarmupTerminal
-from warmup_pi import WarmupPiService
 from warmup_pi_api import warmup_pi_router
+from projects_warmup import migrate_warmup_configuration, warmup_migration_blocker
 from topic_library import (decode_followup_timing, decode_followups, encode_followups, parse_topics,
     sample_followup_timing, sample_followups)
 
@@ -7228,7 +7227,7 @@ class Scheduler:
 
 
 class WarmupScheduler:
-    """按账号随机小时区间创建真实养号 run。"""
+    """兼容账号养号入口，v3 委托独立工程引擎，旧环境保留 worker 调度。"""
 
     def __init__(self, scheduler: Scheduler) -> None:
         """
@@ -7243,10 +7242,12 @@ class WarmupScheduler:
 
     def start(self) -> None:
         """
-        恢复重启前的养号状态并启动后台扫描线程。
+        仅在旧环境恢复养号并启动扫描，v3 使用工程引擎自己的计划。
 
         :return: None
         """
+        if V3_ENABLED or isinstance(warmup_pi_service, ProjectsService):
+            return
         if self._thread and self._thread.is_alive():
             return
         self._recover_stale_runs()
@@ -7266,17 +7267,20 @@ class WarmupScheduler:
 
     def trigger_account(self, account_id: int, require_due: bool = False) -> dict:
         """
-        原子认领账号并创建一次真实养号 task/run。
+        v3 委托独立工程空间，旧环境才创建题库 task/run。
 
         :param account_id: bench accounts.id
         :param require_due: 是否要求 `warmup_next_run_at` 已到期
-        :return: 是否启动及新 run id
+        :return: 是否启动、真实工程 work_id，或旧环境 run_id。
         """
-        if warmup_pi_service:
+        if isinstance(warmup_pi_service, ProjectsService):
             view = warmup_pi_service.start(account_id, scheduled=require_due)
             agent = next((item for item in view['agents'] if item['account_id'] == account_id), None)
-            return {'started': bool(agent and agent['controller_active']),
-                'round_id': (agent.get('round') or {}).get('id') if agent else None, 'engine': 'pi'}
+            return {'started': bool(agent and agent['controller_active']), 'engine': 'projects',
+                'work_id': (agent.get('work') or {}).get('id') if agent else None,
+                'status': agent.get('status') if agent else None, 'message': agent.get('message') if agent else None}
+        if V3_ENABLED:
+            raise ValueError('工程养号服务尚未就绪，不会回退到题库执行')
         connection = get_db()
         try:
             row = _get_available_account(connection, account_id)
@@ -7400,7 +7404,7 @@ class WarmupScheduler:
                         or run_row["status"] != "running"
                     ):
                         return
-                    if warmup_pi_service and warmup_pi_service.has_taken_over(run_row['account_id'], connection=conn):
+                    if _warmup_engine_taken_over(run_row['account_id'], connection=conn):
                         return
                     conn.execute(
                         "UPDATE accounts SET warmup_last_status='running' "
@@ -7472,7 +7476,7 @@ class WarmupScheduler:
             conn = get_db()
             try:
                 with conn:
-                    if warmup_pi_service and warmup_pi_service.has_taken_over(run['account_id'], connection=conn):
+                    if _warmup_engine_taken_over(run['account_id'], connection=conn):
                         return
                     account_row = conn.execute(
                         "SELECT * FROM accounts WHERE id=?",
@@ -7557,6 +7561,8 @@ class WarmupScheduler:
             self._stop.wait(max(1.0, WARMUP_SCHEDULER_TICK_SEC))
 
     def _tick(self) -> None:
+        if V3_ENABLED or isinstance(warmup_pi_service, ProjectsService):
+            return
         now = time.time()
         conn = get_db()
         try:
@@ -7584,7 +7590,7 @@ class WarmupScheduler:
             conn = get_db()
             try:
                 with conn:
-                    if warmup_pi_service and warmup_pi_service.has_taken_over(account_id, connection=conn):
+                    if _warmup_engine_taken_over(account_id, connection=conn):
                         return None
                     row = conn.execute(
                         "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL "
@@ -7673,7 +7679,7 @@ class WarmupScheduler:
             conn = get_db()
             try:
                 with conn:
-                    if warmup_pi_service and warmup_pi_service.has_taken_over(account['id'], connection=conn):
+                    if _warmup_engine_taken_over(account['id'], connection=conn):
                         return None
                     current = conn.execute(
                         "SELECT * FROM accounts WHERE id=? AND enabled=1 AND deleted_at IS NULL "
@@ -7736,7 +7742,7 @@ class WarmupScheduler:
             conn = get_db()
             try:
                 with conn:
-                    if warmup_pi_service and warmup_pi_service.has_taken_over(account['id'], connection=conn):
+                    if _warmup_engine_taken_over(account['id'], connection=conn):
                         return
                     conn.execute(
                         "UPDATE accounts SET warmup_enabled=?, warmup_next_run_at=?, "
@@ -7759,7 +7765,7 @@ class WarmupScheduler:
             conn = get_db()
             try:
                 with conn:
-                    if warmup_pi_service and warmup_pi_service.has_taken_over(account['id'], connection=conn):
+                    if _warmup_engine_taken_over(account['id'], connection=conn):
                         return
                     conn.execute(
                         "UPDATE accounts SET warmup_enabled=0, warmup_next_run_at=NULL, "
@@ -7933,8 +7939,26 @@ project_iterations: Optional[ProjectIterationManager] = None
 project_iteration_error: Optional[str] = None
 project_requester_settings: Optional[ProjectRequesterSettings] = None
 projects_service: Optional[ProjectsService] = None
-warmup_pi_service = None
+warmup_pi_service: Optional[ProjectsService] = None
 pi_owners: Optional[AccountPiOwners] = None
+
+
+def _warmup_engine_taken_over(account_id: int, *, connection=None) -> bool:
+    """在旧回调已有事务内检查独立工程养号配置，避免旧题库回调改写新计划。
+
+    :param account_id: 原账号。
+    :param connection: 已有 SQLite 连接，传入时不另取数据库锁。
+    :return: 是否已由新工程空间接管。
+    """
+    if not warmup_pi_service:
+        return False
+    owned = connection is None
+    connection = get_db() if owned else connection
+    try:
+        return connection.execute('SELECT 1 FROM warmup_projects_agents WHERE account_id=?', (account_id,)).fetchone() is not None
+    finally:
+        if owned:
+            connection.close()
 
 
 def _projects_account(account_id: int) -> dict | None:
@@ -8005,21 +8029,26 @@ def _pi_admission(account: dict, work: dict | None, *, admitted_round: bool = Fa
 
 def _projects_admission(account: dict, work: dict | None) -> dict:
     """保持工程 Pi 原有的每次输入额度策略。:param account: 账号。:param work: 当前工程工作。:return: 准入判定。"""
-    return _pi_admission(account, work)
+    return _engineering_pi_admission(account, work, 'projects')
 
 
-def _warmup_pi_admission(account: dict, work: dict | None) -> dict:
-    """养号 Pi 沿用旧 worker 门禁，先完成旧执行，绝不抢占已有账号工作。
+def _warmup_projects_admission(account: dict, work: dict | None) -> dict:
+    """为独立工程养号核对旧任务交接及账号共同门禁。:param account: 账号。:param work: 原工程。:return: 准入判定。"""
+    blocker = warmup_migration_blocker(get_db, account['id'])
+    if blocker:
+        return {'allowed': False, 'reason': 'legacy_warmup', 'retryable': False, 'retry_at': None, 'message': blocker}
+    return _engineering_pi_admission(account, work, 'warmup')
 
-    :param account: 当前有效账号。
-    :param work: 当前冻结养号轮，尚未选题时为空。
-    :return: 共用时段、额度、身份和独占执行判定。
+
+def _engineering_pi_admission(account: dict, work: dict | None, namespace: str) -> dict:
+    """从模型思考阶段就保护账号互斥，两个工程空间不能抢占旧执行或彼此。
+
+    :param account: 当前账号。
+    :param work: 当前空间的工作。
+    :param namespace: 受控的 projects 或 warmup。
+    :return: 共同门禁和独占运行判定。
     """
-    active = bool(work and work.get('started_at') and work.get('status') not in ('completed', 'stopped'))
-    if work and work.get('status') not in ('completed', 'stopped') and work['account_identity'] != _quota_identity(account):
-        return {'allowed': False, 'reason': 'identity', 'retryable': False, 'retry_at': None,
-            'message': '原养号轮账号身份已变化，请先核对原会话'}
-    gate = _pi_admission(account, work, admitted_round=active)
+    gate = _pi_admission(account, work)
     if not gate['allowed']:
         return gate
     source = json.loads(work['runtime_json']).get('source') if work and work.get('runtime_json') else None
@@ -8035,45 +8064,14 @@ def _warmup_pi_admission(account: dict, work: dict | None) -> dict:
             busy = busy or any(job['row']['account_id'] == account['id'] and job['source'] != source
                 for job in account_runtime.jobs.values())
     owner = pi_owners.owner(account['id']) if pi_owners else None
-    if busy or owner and owner['kind'] != 'warmup':
+    if busy or owner and owner['kind'] != namespace:
         return {**gate, 'allowed': False, 'reason': 'busy', 'retryable': True, 'retry_at': time.time() + 60,
-            'message': '账号已有执行，等待原工作结束后继续养号'}
+            'message': '账号已有执行，等待原工作结束后继续工程迭代'}
     return gate
 
 
-def _warmup_pi_topic(account: dict) -> dict:
-    """从原启用题库冻结选题、补充内容和时序，新旧最近二十轮共同避重。
 
-    :param account: 养号账号。
-    :return: 可复现的原题库业务快照，不创建工程验收或旧 run。
-    """
-    connection = get_db()
-    try:
-        topics = [dict(row) for row in connection.execute(
-            'SELECT * FROM topics WHERE enabled=1 AND deleted_at IS NULL ORDER BY id')]
-        recent = connection.execute('SELECT topic_id FROM ('
-            "SELECT topic_id,(created_at-2440587.5)*86400 AS created_at,id FROM runs WHERE account_id=? AND run_kind='warmup' AND topic_id IS NOT NULL "
-            'UNION ALL SELECT topic_id,created_at,id FROM warmup_pi_rounds WHERE account_id=?'
-            ') ORDER BY created_at DESC,id DESC LIMIT 20', (account['id'], account['id'])).fetchall()
-        fingerprints = _load_recent_topic_prompt_fingerprints(connection)
-        for row in reversed(connection.execute('SELECT r.topic_json,t.title,t.description,t.category FROM warmup_pi_rounds r '
-                'JOIN topics t ON t.id=r.topic_id ORDER BY r.created_at DESC,r.id DESC LIMIT ?',
-                (_NATURAL_TOPIC_PROMPT_HISTORY_LIMIT,)).fetchall()):
-            fingerprints.append(_topic_prompt_fingerprint(json.loads(row['topic_json'])['prompt'], dict(row)))
-    finally:
-        connection.close()
-    if not topics:
-        raise ValueError('题库没有可用题目，请先启用养号题目')
-    recent_ids = [int(row['topic_id']) for row in recent]
-    candidates = [topic for topic in topics if topic['id'] not in set(recent_ids)]
-    if not candidates and recent_ids:
-        candidates = [topic for topic in topics if topic['id'] != recent_ids[0]]
-    topic = random.choice(candidates or topics)
-    followups = sample_followups(decode_followups(_topic_followup_candidates(topic, None, 'natural')))
-    timing = decode_followup_timing(sample_followup_timing(followups, 1800, TIMEOUT_WRAPUP_SEC), len(followups))
-    return {'topic_id': topic['id'], 'topic_no': topic['no'], 'title': topic['title'],
-        'prompt': build_topic_prompt(topic, 'natural', fingerprints), 'followups': followups,
-        'timing': timing, 'settings': _project_execution_settings()}
+
 
 
 def _merge_native_quota(current: dict, identity: str, facts: dict, observed: float) -> None:
@@ -8119,9 +8117,27 @@ def _projects_native_quota(account: dict, source: str, facts: dict) -> None:
     :param facts: 原生错误类别、真实观察时间、可选可信重置与去重键。
     :return: None；旧账号身份、旧代次或早于新允许事实的认证错误均不生效。
     """
+    _engineering_native_quota(account, source, facts, 'projects')
+
+
+def _warmup_projects_native_quota(account: dict, source: str, facts: dict) -> None:
+    """仅合并独立工程养号空间的精确执行证据。:param account: 账号。:param source: 原执行。:param facts: 结构化事实。:return: None。"""
+    _engineering_native_quota(account, source, facts, 'warmup')
+
+
+def _engineering_native_quota(account: dict, source: str, facts: dict, namespace: str) -> None:
+    """按可信空间绑定工程原生证明，禁止跨空间借用工作或执行代次。
+
+    :param account: 原账号。
+    :param source: 原生执行来源。
+    :param facts: 结构化额度或认证补证。
+    :param namespace: 固定工程空间。
+    :return: None。
+    """
+    table = {'projects': 'projects_work', 'warmup': 'warmup_projects_work'}[namespace]
     if not quota_guard or not isinstance(facts, dict):
         return
-    match = re.fullmatch(r'projects:([a-f0-9]{32}):([1-9][0-9]*)', source)
+    match = re.fullmatch(namespace + r':([a-f0-9]{32}):([1-9][0-9]*)', source)
     observed = quota_timestamp(facts.get('observed_at'))
     if not match or observed is None or observed > time.time() + 5:
         return
@@ -8132,7 +8148,7 @@ def _projects_native_quota(account: dict, source: str, facts: dict) -> None:
         connection = get_db()
         try:
             work = connection.execute('SELECT account_id,generation,account_identity,runtime_json,'
-                'segment_started_at,status FROM projects_work WHERE id=?', (match[1],)).fetchone()
+                'segment_started_at,status FROM ' + table + ' WHERE id=?', (match[1],)).fetchone()
         finally:
             connection.close()
         identity = _quota_identity(current)
@@ -8147,67 +8163,8 @@ def _projects_native_quota(account: dict, source: str, facts: dict) -> None:
         _merge_native_quota(current, identity, facts, observed)
 
 
-def _warmup_pi_native_quota(account: dict, source: str, facts: dict) -> None:
-    """核对真实养号原生会话后合并拒绝证据，工程工作证明范围保持独立。
-
-    :param account: 原执行账号快照。
-    :param source: 固定 warmup 轮次及代次。
-    :param facts: 已经原生解析器确认的结构化错误。
-    :return: None。
-    """
-    if not quota_guard or not isinstance(facts, dict):
-        return
-    match = re.fullmatch(r'warmup:([a-f0-9]{32}):([1-9][0-9]*)', source)
-    observed = quota_timestamp(facts.get('observed_at'))
-    if not match or observed is None or observed > time.time() + 5:
-        return
-    with _oauth_owner_lock(str(account['name'])):
-        current = _projects_account(account['id'])
-        if not current:
-            return
-        connection = get_db()
-        try:
-            row = connection.execute('SELECT account_id,generation,account_identity,runtime_json,segment_started_at,status '
-                'FROM warmup_pi_rounds WHERE id=?', (match[1],)).fetchone()
-        finally:
-            connection.close()
-        identity = _quota_identity(current)
-        if (not row or row['account_id'] != account['id'] or row['generation'] != int(match[2])
-                or row['status'] != 'running' or row['account_identity'] != identity or _quota_identity(account) != identity
-                or not row['segment_started_at'] or observed < row['segment_started_at']):
-            return
-        runtime = json.loads(row['runtime_json']) if row['runtime_json'] else {}
-        if runtime.get('source') == source:
-            _merge_native_quota(current, identity, facts, observed)
 
 
-def _warmup_pi_quota_context(account: dict, source: str, flows: Path, controls: Path) -> dict:
-    """启动养号时检查软阈值，恢复原已开始轮仅检查共同耗尽与单次更新许可。
-
-    :param account: 当前账号。
-    :param source: 精确轮次和代次。
-    :param flows: 本轮证据路径。
-    :param controls: 本轮暂停信号路径。
-    :return: 现有被动额度环境。
-    """
-    match = re.fullmatch(r'warmup:([a-f0-9]{32}):([1-9][0-9]*)', source)
-    connection = get_db()
-    try:
-        row = connection.execute('SELECT * FROM warmup_pi_rounds WHERE id=?', (match[1],)).fetchone() if match else None
-    finally:
-        connection.close()
-    if (not row or row['account_id'] != account['id'] or row['generation'] != int(match[2])
-            or row['account_identity'] != _quota_identity(account) or row['status'] in ('completed', 'stopped')):
-        raise ValueError('养号执行来源与原轮次不一致')
-    resume = bool(row['started_at'])
-    if quota_guard and not quota_guard.admit(account, source, warmup=not resume, workload=None if resume else 'warmup'):
-        raise RuntimeBusy('养号额度或本窗口的恢复机会尚不可领取')
-    try:
-        return quota_guard.prepare(account, source, flows, controls, warmup=True) if quota_guard else {}
-    except Exception:
-        if quota_guard:
-            quota_guard.release(account, source, unstarted=True)
-        raise
 
 
 def _projects_quota_context(account: dict, source: str, flows: Path, controls: Path) -> dict:
@@ -8299,37 +8256,47 @@ async def lifespan(app: FastAPI):
     quota_guard.recover()
     if project_iterations and not PROJECTS_AGENT_ENABLED:
         project_iterations.recover(runner.cleanup_quota_run)
-    if account_runtime and PROJECTS_AGENT_ENABLED:
+    if account_runtime and (PROJECTS_AGENT_ENABLED or WARMUP_PI_ENABLED):
         research = Path(os.environ.get('PROJECTS_RESEARCH_DIR', str(Path(__file__).resolve().parents[1] / 'research/github-projects')))
         catalog = ProjectsCatalog(research, library)
         pi = ProjectsPi()
-        terminal = ProjectsTerminal(account_runtime, catalog, _project_execution_settings, _projects_quota_context,
-            _projects_quota_release, _projects_credentials, quota_observation=_projects_native_quota)
-        verification = ProjectsVerification(catalog, terminal,
-            ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image),
-            pi, project_requester_settings.agent_configuration)
-        projects_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, terminal, _projects_account,
-            _projects_admission, project_requester_settings.agent_configuration, verification, pi, _quota_identity,
-            owners=pi_owners)
-        verification.event = projects_service._event
-        verification.accepted = projects_service.accepted_work
-        projects_service.recover()
-    if account_runtime and WARMUP_PI_ENABLED:
-        warmup_terminal = WarmupTerminal(account_runtime, _project_execution_settings, _warmup_pi_quota_context,
-            _projects_quota_release, _projects_credentials, quota_observation=_warmup_pi_native_quota)
-        warmup_pi_service = WarmupPiService(BENCH_DATA, get_db, _db_lock, warmup_terminal, _projects_account,
-            _warmup_pi_admission, project_requester_settings.agent_configuration, _warmup_pi_topic,
-            warmup_scheduler._next_run_at, identity=_quota_identity, owners=pi_owners)
-        warmup_pi_service.recover()
+        if PROJECTS_AGENT_ENABLED:
+            terminal = ProjectsTerminal(account_runtime, catalog, _project_execution_settings, _projects_quota_context,
+                _projects_quota_release, _projects_credentials, quota_observation=_projects_native_quota)
+            verification = ProjectsVerification(catalog, terminal,
+                ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image),
+                pi, project_requester_settings.agent_configuration)
+            projects_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, terminal, _projects_account,
+                _projects_admission, project_requester_settings.agent_configuration, verification, pi, _quota_identity,
+                owners=pi_owners)
+            verification.event = projects_service._event
+            verification.accepted = projects_service.accepted_work
+            projects_service.recover()
+        if WARMUP_PI_ENABLED:
+            warmup_terminal = ProjectsTerminal(account_runtime, catalog, _project_execution_settings, _projects_quota_context,
+                _projects_quota_release, _projects_credentials, quota_observation=_warmup_projects_native_quota, namespace='warmup')
+            warmup_verification = ProjectsVerification(catalog, warmup_terminal,
+                ProjectVerifier(runner.client, BENCH_DATA, HOST_BENCH_DATA, account_runtime.image),
+                pi, project_requester_settings.agent_configuration)
+            warmup_pi_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, warmup_terminal, _projects_account,
+                _warmup_projects_admission, project_requester_settings.agent_configuration, warmup_verification, pi, _quota_identity,
+                owners=pi_owners, namespace='warmup', auto_cycle=True)
+            warmup_verification.event = warmup_pi_service._event
+            warmup_verification.accepted = warmup_pi_service.accepted_work
+            migrate_warmup_configuration(get_db, _db_lock)
+            warmup_pi_service.recover()
     # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
     login_manager.cleanup_stale()
     continue_manager.cleanup_stale()
     oauth_refresh_scheduler.cleanup_stale()
     oauth_refresh_scheduler.start()
-    warmup_scheduler.start()
+    if not V3_ENABLED:
+        warmup_scheduler.start()
     quota_guard.start()
     if projects_service:
         projects_service.start_scheduler()
+    if warmup_pi_service:
+        warmup_pi_service.start_scheduler()
     if V3_ENABLED:
         scheduler.recover_window_waits()
         scheduler.recover_active_batches()
@@ -8860,6 +8827,15 @@ class WarmupConfigIn(BaseModel):
     warmup_quota_7d_limit_percent: Optional[StrictInt] = None
 
 
+class WarmupProjectsResumeIn(BaseModel):
+    """恢复原工程时仅按明确请求调整独立养号计划。
+
+    :param enable_schedule: 省略保留原计划，显式布尔值才改变开关。
+    """
+    enable_schedule: StrictBool | None = None
+    model_config = ConfigDict(extra='forbid')
+
+
 def _oauth_owner_transition_blocker(account: dict, login_sid: Optional[str] = None) -> Optional[str]:
     """
     查找会让 AT/RT 所有权切换不安全的活跃工作。
@@ -9033,7 +9009,13 @@ def list_accounts():
             if _login_save_pending(conn, row["name"]):
                 continue
             account = dict(row)
-            account['warmup_engine'] = 'pi' if warmup_pi_service else 'worker'
+            account['warmup_engine'] = 'projects' if isinstance(warmup_pi_service, ProjectsService) else 'worker'
+            account['project_pi'] = None
+            if isinstance(warmup_pi_service, ProjectsService):
+                agents = warmup_pi_service.state(account['id'])['agents']
+                if agents:
+                    account['project_pi'] = {key: agents[0].get(key) for key in
+                        ('status', 'message', 'controller_active', 'schedule', 'work')}
             account["cli_concurrency_limit"] = min(2, PER_ACCOUNT_CONCURRENCY)
             account["upstream_proxy_scheme"] = _normalize_upstream_proxy_scheme(
                 account.get("upstream_proxy_scheme")
@@ -9311,7 +9293,7 @@ def _associate_account_to_cc2api(aid: int, action: str, target_id: Optional[int]
 @app.put("/api/accounts/{aid}/warmup")
 def update_account_warmup(aid: int, body: WarmupConfigIn):
     """
-    保存可选 cc2api 绑定、养号随机间隔与普通任务额度阈值。
+    工程模式只保存账号额度；旧环境保留绑定和小时计划兼容。
 
     :param aid: bench accounts.id
     :param body: 可选 cc2api 账号 ID、开关、小时区间和阈值
@@ -9336,6 +9318,26 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
         account = dict(row)
     finally:
         conn.close()
+    if isinstance(warmup_pi_service, ProjectsService):
+        if any(field in body.model_fields_set for field in ('enabled', 'interval_min_hours', 'interval_max_hours')):
+            raise HTTPException(409, '工程养号使用独立的养号迭代计划，请在养号迭代页面设置定时；此接口只保存额度阈值')
+        if body.cc2api_account_id is not None and body.cc2api_account_id != account.get('cc2api_account_id'):
+            raise HTTPException(409, '请使用账号关联入口修改绑定，额度保存不会改写凭据')
+        with _db_lock:
+            conn = get_db()
+            try:
+                with conn:
+                    current = _get_available_account(conn, aid)
+                    if not current:
+                        raise HTTPException(404, '账号不存在或已停用')
+                    for field in threshold_fields:
+                        if field in body.model_fields_set:
+                            conn.execute(f'UPDATE accounts SET {field}=? WHERE id=?', (getattr(body, field), aid))
+            finally:
+                conn.close()
+        if quota_guard:
+            quota_guard._publish(_projects_account(aid))
+        return {'ok': True, 'engine': 'projects'}
     with _oauth_owner_lock(str(account["name"])):
         with _cc2api_binding_lock:
             conn = get_db()
@@ -9406,14 +9408,9 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                                 "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1",
                                 (aid,),
                             ).fetchone()
-                            pi_round = conn.execute('SELECT r.id FROM warmup_pi_agents p JOIN warmup_pi_rounds r '
-                                "ON r.id=p.current_round_id WHERE p.account_id=? AND r.status NOT IN ('completed','stopped')",
-                                (aid,)).fetchone() if warmup_pi_service else None
-                            # 计划开关只影响未来轮次；当前轮、人工门禁和恢复排期由 Pi 自己收口。
-                            saved_next = (current['warmup_next_run_at'] if pi_round else
-                                None if active else next_run_at) if enabled else None
-                            saved_status = current['warmup_last_status'] if pi_round else (
-                                active['status'] if active and enabled else 'scheduled' if enabled else 'off')
+                            # 此分支仅保留非 v3 的旧 worker 兼容，工程养号在上方已明确分流。
+                            saved_next = (None if active else next_run_at) if enabled else None
+                            saved_status = active['status'] if active and enabled else 'scheduled' if enabled else 'off'
                             conn.execute(
                                 "UPDATE accounts SET warmup_enabled=?, "
                                 "warmup_interval_min_hours=?, warmup_interval_max_hours=?, "
@@ -9425,7 +9422,7 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                                     high,
                                     saved_next,
                                     saved_status,
-                                    current['warmup_last_error'] if pi_round else None,
+                                    None,
                                     aid,
                                 ),
                             )
@@ -9455,10 +9452,10 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
 @app.post("/api/accounts/{aid}/warmup/run")
 def run_account_warmup_now(aid: int):
     """
-    立即为已启用账号触发一次养号 run。
+    显式启动独立养号工程，不隐式开启任何定时计划。
 
     :param aid: bench accounts.id
-    :return: 是否成功创建 run 及最近养号状态
+    :return: 是否启动、真实工作 ID 和当前工程状态。
     """
     if not warmup_scheduler:
         raise HTTPException(500, "养号调度器尚未就绪")
@@ -9475,7 +9472,7 @@ def run_account_warmup_now(aid: int):
         result = warmup_scheduler.trigger_account(aid)
     except ValueError as exc:
         raise HTTPException(409, str(exc)) from None
-    if result.get("started"):
+    if result.get("started") or result.get('engine') == 'projects':
         return result
     conn = get_db()
     try:
@@ -9492,39 +9489,36 @@ def run_account_warmup_now(aid: int):
 
 
 @app.post("/api/accounts/{aid}/warmup/resume")
-def resume_account_warmup(aid: int):
+def resume_account_warmup(aid: int, body: WarmupProjectsResumeIn | None = None):
     """
-    清除暂停原因并重新安排账号下一次养号。
+    恢复原未完成工程，保留工作与会话，不自行解除硬门禁。
 
     :param aid: bench accounts.id
-    :return: 新的下次触发时间
+    :param body: 可选计划开关，省略时不改变原计划。
+    :return: 原工作和当前计划；旧环境返回兼容计划状态。
     """
-    if warmup_pi_service:
-        account = _projects_account(aid)
-        if not account:
+    if isinstance(warmup_pi_service, ProjectsService):
+        if not _projects_account(aid):
             raise HTTPException(404, '账号不存在或已停用')
-        if account.get('cc2api_account_id') is None:
-            if not account_runtime:
-                raise HTTPException(409, '启用定时养号前请先同步并绑定 cc2api OAuth 账号')
-            try:
-                _read_bench_profile_identity(account['name'])
-            except ValueError:
-                raise HTTPException(409, '本地 OAuth 凭据不完整，请先完成该账号 CLI 登录') from None
-        with _db_lock:
-            connection = get_db()
-            try:
-                with connection:
-                    connection.execute('UPDATE accounts SET warmup_enabled=1,'
-                        'warmup_next_run_at=COALESCE(warmup_next_run_at,?),warmup_auth_failures=0 '
-                        'WHERE id=? AND enabled=1 AND deleted_at IS NULL', (time.time(), aid))
-            finally:
-                connection.close()
         try:
-            view = warmup_pi_service.start(aid)
+            with warmup_pi_service.lock:
+                agents = warmup_pi_service.state(aid)['agents']
+                agent = agents[0] if agents else None
+                work = agent.get('work') if agent else None
+                if not agent or not agent['controller_active'] and (not work or work['status'] in ('passed', 'stopped')):
+                    raise ValueError('没有可恢复的未完成工程，请在养号迭代中启动新目标')
+                enabled = body.enable_schedule if body else None
+                if enabled is not None and enabled != agent['schedule']['enabled']:
+                    warmup_pi_service.configure_schedule(aid, enabled, agent['schedule']['interval_minutes'],
+                        agent['schedule']['interval_max_minutes'])
+                view = warmup_pi_service.start(aid)
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from None
-        current = _projects_account(aid)
-        return {'ok': True, 'engine': 'pi', 'next_run_at': current['warmup_next_run_at'], 'state': view}
+        current = view['agents'][0]
+        return {'ok': True, 'engine': 'projects', 'work_id': (current.get('work') or {}).get('id'),
+            'next_run_at': current['schedule']['next_run_at'], 'state': view}
+    if V3_ENABLED:
+        raise HTTPException(503, '工程养号服务尚未就绪，不会回退到题库执行')
     with _db_lock:
         conn = get_db()
         try:

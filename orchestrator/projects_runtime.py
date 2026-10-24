@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 from contextlib import ExitStack
 from pathlib import Path
@@ -26,7 +27,7 @@ class ProjectsTerminal(PiTerminal):
     """
 
     def __init__(self, runtime: AccountRuntime, catalog, settings, quota_context, quota_release=None, credentials=None,
-                 driver: Path | None = None, *, quota_observation=None) -> None:
+                 driver: Path | None = None, *, quota_observation=None, namespace: str = 'projects') -> None:
         """登记工程资产与原有终端依赖，不启动模型。
 
         :param runtime: 固定账号运行环境。
@@ -37,11 +38,26 @@ class ProjectsTerminal(PiTerminal):
         :param credentials: 唯一凭据所有者同步回调。
         :param driver: 只读终端监督脚本。
         :param quota_observation: 原生结构化门禁补证回调。
+        :param namespace: 服务端固定的工程迭代或养号工程空间。
         :return: None。
         """
         super().__init__(runtime, settings, quota_context, quota_release, credentials, driver,
-            quota_observation=quota_observation, namespace='projects', scenario_resources=True)
+            quota_observation=quota_observation, namespace=namespace, scenario_resources=True)
         self.catalog = catalog
+
+    def _workspace_identity(self, account: dict, row: dict, project_key: str, seed_digest: str, cycle_no: int):
+        """从固定身份计算工作区，保留原工程首轮的全部历史路径。:param account: 账号。:param row: 环境。:param project_key: 项目。:param seed_digest: 冻结seed。:param cycle_no: 正整数轮次。:return: 别名及注册凭据。"""
+        if type(cycle_no) is not int or cycle_no < 1:
+            raise ValueError('工程轮次必须为正整数')
+        identity = {'account_id': account['id'], 'environment_id': row['environment_id'],
+            'project_key': project_key, 'seed_digest': seed_digest}
+        if self.namespace == 'projects' and cycle_no == 1:
+            alias = 'workspace-' + hashlib.sha256(f"{account['id']}:{project_key}:{seed_digest}".encode()).hexdigest()[:16]
+        else:
+            alias = self.namespace + '-workspace-' + hashlib.sha256(
+                f"{self.namespace}:{account['id']}:{project_key}:{seed_digest}:{cycle_no}".encode()).hexdigest()[:16]
+            identity.update(namespace=self.namespace, cycle_no=cycle_no, workspace='projects/' + alias)
+        return alias, identity
 
     def _prepare_execution(self, root: Path, row: dict, account: dict, work: dict) -> tuple[Path, dict]:
         """准备同一项目累计源码与其冻结离线 Python 依赖。:param root: 账号目录。:param row: 环境。:param account: 账号。:param work: 原工程。:return: 工作区和原有工程环境。"""
@@ -66,12 +82,12 @@ class ProjectsTerminal(PiTerminal):
         :param definition: 当前完整工程目标。
         :return: 保留此前修改的累计项目目录。
         """
-        alias = 'workspace-' + hashlib.sha256(
-            f"{account['id']}:{work['project_key']}:{project.manifest['seed_digest']}".encode()).hexdigest()[:16]
+        alias, identity = self._workspace_identity(account, row, work['project_key'],
+            project.manifest['seed_digest'], work.get('cycle_no', 1))
         workspace = root / 'projects' / alias
-        marker = root / 'runtime/projects-workspaces' / (alias + '.json')
-        identity = {'account_id': account['id'], 'environment_id': row['environment_id'],
-            'project_key': work['project_key'], 'seed_digest': project.manifest['seed_digest']}
+        marker = root / 'runtime' / (self.namespace + '-workspaces') / (alias + '.json')
+        if any(path.is_symlink() for path in (root, root / 'projects', root / 'runtime', marker.parent, marker)):
+            raise ValueError('工程工作区或注册目录不能为链接')
         if marker.exists():
             if read_document(marker) != identity or workspace.is_symlink() or not workspace.is_dir():
                 raise ValueError('项目工作区的账号或初始版本证明不符')
@@ -97,7 +113,9 @@ class ProjectsTerminal(PiTerminal):
             inputs[target] = content
         receipt = {**identity, 'objective_id': work['objective_id'], 'library_digest': work['library_digest'],
             'inputs': {name: hashlib.sha256(content).hexdigest() for name, content in sorted(inputs.items())}}
-        input_marker = root / 'runtime/projects-inputs' / (digest_json(receipt) + '.json')
+        input_marker = root / 'runtime' / (self.namespace + '-inputs') / (digest_json(receipt) + '.json')
+        if input_marker.parent.is_symlink() or input_marker.is_symlink():
+            raise ValueError('工程输入注册目录不能为链接')
         if input_marker.exists():
             saved = read_document(input_marker)
             if {key: value for key, value in saved.items() if key != 'legacy_existing_work'} != receipt:
@@ -143,6 +161,116 @@ class ProjectsTerminal(PiTerminal):
                     os.fsync(output.fileno())
         atomic_json(input_marker, receipt)
         return workspace
+
+    def _registered_identity(self, saved: dict, account: dict, row: dict):
+        """核对不可伪装成其它账号或轮次的注册身份。:param saved: 已读取凭据。:param account: 当前账号。:param row: 固定环境。:return: 轮次、别名和规范身份。"""
+        if (not isinstance(saved, dict) or saved.get('account_id') != account['id']
+                or saved.get('environment_id') != row['environment_id']
+                or saved.get('namespace', 'projects') != self.namespace
+                or not isinstance(saved.get('project_key'), str) or not saved['project_key']
+                or not isinstance(saved.get('seed_digest'), str) or not re.fullmatch('[a-f0-9]{64}', saved['seed_digest'])):
+            raise ValueError('工程清理注册的账号、空间或初始版本不符')
+        cycle = saved.get('cycle_no', 1)
+        alias, identity = self._workspace_identity(account, row, saved['project_key'], saved['seed_digest'], cycle)
+        if any(saved.get(key) != value for key, value in identity.items()):
+            raise ValueError('工程清理注册的真实路径或轮次不符')
+        return cycle, alias, identity
+
+    def cleanup_cycle(self, account: dict, cycle_no: int) -> None:
+        """只清理指定账号、当前空间及已登记轮次的累计源码和输入凭据。
+
+        :param account: 仍属于固定环境的正式账号，包含 id/name。
+        :param cycle_no: 已由业务服务确认全量通过的正整数轮次。
+        :return: None；缺失的已登记文件可重入，未知目录或链接拒绝删除。
+        """
+        if type(cycle_no) is not int or cycle_no < 1 or type(account.get('id')) is not int or account['id'] < 1:
+            raise ValueError('工程清理账号或轮次不合法')
+        runtime = self.runtime
+        connection = runtime.database()
+        try:
+            saved = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (account['id'],)).fetchone()
+        finally:
+            connection.close()
+        if not saved:
+            return
+        with runtime.environment_lock(saved['environment_id']):
+            connection = runtime.database()
+            try:
+                current = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (account['id'],)).fetchone()
+            finally:
+                connection.close()
+            if (not current or current['environment_id'] != saved['environment_id'] or current['name'] != account['name']):
+                raise ValueError('工程清理期间账号环境已变化')
+            row = dict(current)
+            root = runtime._root(row)
+            markers = root / 'runtime' / (self.namespace + '-workspaces')
+            inputs = root / 'runtime' / (self.namespace + '-inputs')
+            projects = root / 'projects'
+            for path in (root, root / 'runtime', projects, markers, inputs):
+                if path.is_symlink() or path.exists() and not path.is_dir():
+                    raise ValueError('工程清理路径不能是链接或未知文件')
+            executions = root / 'runtime/executions'
+            legacy = root / 'runtime/execution.json'
+            if (row['state'] not in ('ready', 'stopped') or runtime.environment_jobs(row['environment_id'])
+                    or legacy.exists() or legacy.is_symlink() or executions.is_symlink()
+                    or executions.exists() and (not executions.is_dir() or any(executions.iterdir()))):
+                raise ValueError('账号仍有原生作业或未确认登记，不能清理工程轮次')
+            registered, selected = {}, []
+            prefix = 'workspace-' if self.namespace == 'projects' else self.namespace + '-workspace-'
+            for path in sorted(markers.iterdir()) if markers.exists() else []:
+                if path.is_symlink() or not path.is_file() or path.stat().st_nlink != 1:
+                    raise ValueError('工程工作区注册目录包含链接或未知文件')
+                # 兼容早期题库养号的独立 round marker；其文件名不属于工程别名空间。
+                if self.namespace == 'warmup' and not path.name.startswith(prefix):
+                    if re.fullmatch('[a-f0-9]{32}\\.json', path.name):
+                        continue
+                    raise ValueError('工程工作区注册目录包含未知文件')
+                saved_marker = read_document(path)
+                cycle, alias, identity = self._registered_identity(saved_marker, account, row)
+                if path.name != alias + '.json' or saved_marker != identity:
+                    raise ValueError('工程工作区凭据路径或内容不符')
+                registered[alias] = identity
+                if cycle == cycle_no:
+                    selected.append((projects / alias, path))
+            # 同空间出现无注册目录时不能猜其所属轮次，也不能靠目录名前缀直接清空。
+            for path in projects.iterdir() if projects.exists() else []:
+                owned = path.name.startswith(prefix) or self.namespace == 'projects' and path.name.startswith('projects-workspace-')
+                if owned and path.name not in registered:
+                    raise ValueError('存在未登记的同空间工程目录，请先核对')
+            selected_inputs = []
+            for path in sorted(inputs.iterdir()) if inputs.exists() else []:
+                if path.is_symlink() or not path.is_file() or path.stat().st_nlink != 1:
+                    raise ValueError('工程输入注册目录包含链接或未知文件')
+                receipt = read_document(path)
+                cycle, alias, identity = self._registered_identity(receipt, account, row)
+                canonical = {key: value for key, value in receipt.items() if key != 'legacy_existing_work'}
+                if (path.name != digest_json(canonical) + '.json' or registered.get(alias) != identity
+                        or not isinstance(receipt.get('inputs'), dict) or not isinstance(receipt.get('objective_id'), str)
+                        or not isinstance(receipt.get('library_digest'), str)):
+                    raise ValueError('工程输入凭据与已登记工作区不符')
+                for name, digest in receipt['inputs'].items():
+                    safe_relative(name)
+                    if not isinstance(digest, str) or not re.fullmatch('[a-f0-9]{64}', digest):
+                        raise ValueError('工程输入凭据摘要不符')
+                if cycle == cycle_no:
+                    selected_inputs.append(path)
+            for workspace, _ in selected:
+                if workspace.is_symlink() or workspace.exists() and not workspace.is_dir():
+                    raise ValueError('工程清理工作区被替换为链接或未知文件')
+                if workspace.exists():
+                    for directory, folders, files in os.walk(workspace, followlinks=False):
+                        for name in [*folders, *files]:
+                            path = Path(directory) / name
+                            if path.is_symlink() or not (path.is_file() or path.is_dir()):
+                                raise ValueError('工程清理内容包含链接或特殊文件')
+            # 先验证全部身份和路径，再删除源码、输入凭据，最后删注册凭据；中断后仍有原证明可重入。
+            for workspace, _ in selected:
+                if workspace.exists():
+                    shutil.rmtree(workspace)
+            for path in selected_inputs:
+                path.unlink(missing_ok=True)
+            for _, path in selected:
+                path.unlink(missing_ok=True)
 
     def _prepare_python(self, row: dict, project, library) -> dict:
         runtime = self.runtime

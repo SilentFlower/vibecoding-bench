@@ -39,19 +39,22 @@ class ProjectsScheduleIn(BaseModel):
 
     :param enabled: 是否在满足执行门禁时自动启动下一轮。
     :param interval_minutes: 每轮结束后等待的分钟数，范围为 1～1440。
+    :param interval_max_minutes: 可选随机间隔上限，省略时沿用固定间隔。
     """
     enabled: StrictBool
     interval_minutes: StrictInt = Field(ge=1, le=1440)
+    interval_max_minutes: StrictInt | None = Field(None, ge=1, le=1440)
     model_config = ConfigDict(extra='forbid')
 
 
-def projects_router(service) -> APIRouter:
+def projects_router(service, *, prefix: str = '/api/projects') -> APIRouter:
     """创建路由，运行时读取服务引用，不绕过既有管理鉴权。
 
     :param service: 返回当前 ProjectsService 的回调。
+    :param prefix: 服务端固定的入口前缀，两个任务空间共用同一工程接口。
     :return: 可挂载的 FastAPI 路由。
     """
-    router = APIRouter(prefix='/api/projects')
+    router = APIRouter(prefix=prefix)
 
     def owner():
         """取得当前已就绪的账号控制服务。
@@ -93,7 +96,7 @@ def projects_router(service) -> APIRouter:
     def configure_schedule(account_id: int, body: ProjectsScheduleIn) -> dict:
         """保存自动计划。:param account_id: 账号。:param body: 启用状态和间隔。:return: 账号控制状态。"""
         try:
-            return owner().configure_schedule(account_id, body.enabled, body.interval_minutes)
+            return owner().configure_schedule(account_id, body.enabled, body.interval_minutes, body.interval_max_minutes)
         except ValueError as error:
             raise HTTPException(409, str(error)) from None
 

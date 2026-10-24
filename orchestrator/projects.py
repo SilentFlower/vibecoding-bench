@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 import threading
 import time
 import uuid
@@ -11,6 +12,7 @@ from pathlib import Path
 from project_library import canonical_json, digest_json, read_document, safe_relative, snapshot_tree, write_document
 from account_runtime import RuntimeBusy
 from projects_pi import ProjectsPi
+from projects_store import ProjectsDatabase
 from pi_owners import AccountPiOwners
 from projects_runtime import KEYS
 
@@ -24,6 +26,7 @@ CREATE TABLE IF NOT EXISTS projects_agents (
   schedule_enabled INTEGER NOT NULL DEFAULT 0, schedule_interval_sec INTEGER NOT NULL DEFAULT 3600,
   schedule_next_at REAL, schedule_last_started_at REAL, schedule_state TEXT NOT NULL DEFAULT 'off',
   schedule_message TEXT, schedule_identity TEXT,
+  schedule_interval_max_sec INTEGER, cycle_no INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY(account_id) REFERENCES accounts(id)
 );
 CREATE TABLE IF NOT EXISTS projects_work (
@@ -35,6 +38,7 @@ CREATE TABLE IF NOT EXISTS projects_work (
   account_identity TEXT, claude_usage_json TEXT NOT NULL DEFAULT '{}',
   started_at REAL, segment_started_at REAL, work_sec REAL NOT NULL DEFAULT 0,
   created_at REAL NOT NULL, ended_at REAL, message TEXT,
+  cycle_no INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY(account_id) REFERENCES projects_agents(account_id)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS projects_one_work_per_account ON projects_work(account_id)
@@ -124,7 +128,8 @@ class ProjectsService:
     """
 
     def __init__(self, data: Path, database, write_lock, catalog, terminal, account,
-                 admission, provider, verifier, pi=None, identity=None, owners=None) -> None:
+                 admission, provider, verifier, pi=None, identity=None, owners=None,
+                 *, namespace: str = 'projects', auto_cycle: bool = False) -> None:
         """初始化新数据表和进程登记，不启动任何真实账号。
 
         :param data: 数据根。
@@ -139,9 +144,14 @@ class ProjectsService:
         :param pi: Pi 运行时。
         :param identity: 稳定账号身份回调，不使用会轮换的访问令牌。
         :param owners: 与养号共用的账号 Pi 控制者登记，省略时创建本服务登记。
+        :param namespace: 服务端固定的项目迭代或养号迭代空间。
+        :param auto_cycle: 全部工程验收通过后是否清理本轮工作区并重新开始。
         :return: None。
         """
-        self.data, self.database, self.write_lock = data, database, write_lock
+        if namespace not in ('projects', 'warmup') or type(auto_cycle) is not bool:
+            raise ValueError('工程迭代空间或循环配置不合法')
+        self.namespace, self.auto_cycle = namespace, auto_cycle
+        self.data, self.database, self.write_lock = data, ProjectsDatabase(database, namespace), write_lock
         self.catalog, self.terminal, self.account = catalog, terminal, account
         self.admission, self.provider, self.verifier = admission, provider, verifier
         self.pi = pi or ProjectsPi()
@@ -155,7 +165,7 @@ class ProjectsService:
         self.closed = False
         self.scheduler_stop = threading.Event()
         self.scheduler_thread = None
-        connection = database()
+        connection = self.database()
         try:
             with write_lock, connection:
                 connection.executescript(PROJECTS_SCHEMA)
@@ -163,6 +173,8 @@ class ProjectsService:
                 for name, definition in (('account_identity', 'TEXT'), ('claude_usage_json', "TEXT NOT NULL DEFAULT '{}'")):
                     if name not in columns:
                         connection.execute(f'ALTER TABLE projects_work ADD COLUMN {name} {definition}')
+                if 'cycle_no' not in columns:
+                    connection.execute('ALTER TABLE projects_work ADD COLUMN cycle_no INTEGER NOT NULL DEFAULT 1')
                 columns = {row['name'] for row in connection.execute('PRAGMA table_info(projects_agents)')}
                 for name, definition in (
                         ('schedule_enabled', 'INTEGER NOT NULL DEFAULT 0'),
@@ -170,6 +182,9 @@ class ProjectsService:
                         ('schedule_next_at', 'REAL'), ('schedule_last_started_at', 'REAL'),
                         ('schedule_state', "TEXT NOT NULL DEFAULT 'off'"),
                         ('schedule_message', 'TEXT'), ('schedule_identity', 'TEXT')):
+                    if name not in columns:
+                        connection.execute(f'ALTER TABLE projects_agents ADD COLUMN {name} {definition}')
+                for name, definition in (('schedule_interval_max_sec', 'INTEGER'), ('cycle_no', 'INTEGER NOT NULL DEFAULT 1')):
                     if name not in columns:
                         connection.execute(f'ALTER TABLE projects_agents ADD COLUMN {name} {definition}')
         finally:
@@ -227,16 +242,21 @@ class ProjectsService:
                 (time.time(), '配置已更新，等待重新检查执行条件', account_id))
         return self.state(account_id)
 
-    def configure_schedule(self, account_id: int, enabled: bool, interval_minutes: int = 60) -> dict:
+    def configure_schedule(self, account_id: int, enabled: bool, interval_minutes: int = 60,
+                           interval_max_minutes: int | None = None) -> dict:
         """保存账号自动唤醒计划，不打断正在运行的控制者。
 
         :param account_id: 已保存项目池的账号。
         :param enabled: 是否允许到点自动启动。
         :param interval_minutes: 每轮结束后的最短休息分钟数。
+        :param interval_max_minutes: 可选随机间隔上界，省略时采用固定间隔。
         :return: 最新账号及计划状态。
         """
         if type(enabled) is not bool or type(interval_minutes) is not int or not 1 <= interval_minutes <= 1440:
             raise ValueError('定时开关或运行间隔不合法')
+        maximum = interval_minutes if interval_max_minutes is None else interval_max_minutes
+        if type(maximum) is not int or not interval_minutes <= maximum <= 1440:
+            raise ValueError('定时随机间隔上界不合法')
         with self.lock:
             agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
             account = self.account(account_id)
@@ -245,15 +265,22 @@ class ProjectsService:
             controller = self.controllers.get(account_id)
             running = bool(controller and not controller[1].is_set())
             now = time.time()
-            self._write('UPDATE projects_agents SET schedule_enabled=?,schedule_interval_sec=?,schedule_next_at=?,'
+            self._write('UPDATE projects_agents SET schedule_enabled=?,schedule_interval_sec=?,schedule_interval_max_sec=?,schedule_next_at=?,'
                 'schedule_identity=?,schedule_state=?,schedule_message=?,updated_at=? WHERE account_id=?',
-                (int(enabled), interval_minutes * 60, now if enabled and not running else None,
+                (int(enabled), interval_minutes * 60, maximum * 60, now if enabled and not running else None,
                     self.identity(account) if enabled else None,
                     'running' if enabled and running else 'scheduled' if enabled else 'off',
                     '本轮结束后按间隔继续' if enabled and running else '已开启，等待检查执行条件' if enabled else '定时运行已关闭',
                     now, account_id))
             self._event(account_id, 'schedule', {'enabled': enabled, 'interval_minutes': interval_minutes})
         return self.state(account_id)
+
+    @staticmethod
+    def _next_interval(agent: dict) -> float:
+        """按当前空间自己的计划计算等待时长，固定计划不引入随机偏移。:param agent: 持久计划。:return: 秒数。"""
+        minimum = agent['schedule_interval_sec']
+        maximum = agent.get('schedule_interval_max_sec') or minimum
+        return random.uniform(minimum, maximum) if maximum > minimum else minimum
 
     def start_scheduler(self) -> None:
         """启动本地计划扫描和持续门禁监控，扫描本身不调用模型。
@@ -349,22 +376,101 @@ class ProjectsService:
             return None, None
         state = self.state(agent['account_id'])['agents'][0]
         if not state['remaining_objectives']:
+            if self.auto_cycle:
+                authorized = {(key, item['id']) for key in json.loads(agent['project_keys_json'])
+                    for item in self.catalog.project(key, detail=False)['objectives']}
+                if not self._cycle_targets() <= authorized:
+                    return 'completed', '当前授权目标已完成；完整工程池全部验收通过后才会清理并重开整轮'
+                return (None, None) if self._cycle_complete(agent) else (
+                    'blocked', '本轮目标缺少有效的独立通过证明，不能清理或重新开始')
             return 'completed', '授权项目池暂无未完成工程目标，等待更新项目池或目标'
         if not state['available_objectives']:
             return 'blocked', '尚有未完成目标等待工程前置，需先核对前置交付、账号身份或未确认输入'
         return None, None
 
-    def _dependency_proofs(self, account_id: int) -> list[dict]:
+    def _dependency_proofs(self, account_id: int, cycle_no: int | None = None) -> list[dict]:
         """读取有独立通过交付且没有未知输入的本账号前置事实。
 
         :param account_id: 可信账号 ID。
+        :param cycle_no: 指定工程轮次，省略时使用该空间当前轮次。
         :return: 仅作为内部依赖门禁使用的已通过工作。
         """
-        return self._rows("SELECT w.* FROM projects_work w WHERE w.account_id=? AND w.status='passed' "
+        if cycle_no is None:
+            agent = self._one('SELECT cycle_no FROM projects_agents WHERE account_id=?', (account_id,))
+            cycle_no = agent['cycle_no'] if agent else 1
+        return self._rows("SELECT w.* FROM projects_work w WHERE w.account_id=? AND w.cycle_no=? AND w.status='passed' "
             "AND EXISTS(SELECT 1 FROM projects_submissions s WHERE s.work_id=w.id AND s.status='passed' "
             "AND s.generation=w.generation AND s.report_json IS NOT NULL) "
             "AND NOT EXISTS(SELECT 1 FROM projects_actions a WHERE a.work_id=w.id AND a.status IN ('intent','unknown'))",
-            (account_id,))
+            (account_id, cycle_no))
+
+    def _cycle_targets(self) -> set[tuple[str, str]]:
+        """取得完整工程池的目标集合，缩小授权范围不能缩短整轮重置门槛。:return: 当前内容库全部工程目标。"""
+        return {(project['project_key'], item['id']) for project in self.catalog.listing()['projects']
+            for item in project['objectives']}
+
+    def _cycle_complete(self, agent: dict) -> bool:
+        """核对本轮全部授权目标的独立通过事实，不能借旧轮记录跳过新实现。:param agent: 原账号控制记录。:return: 是否完整通过。"""
+        authorized = {(key, objective['id']) for key in json.loads(agent['project_keys_json'])
+            for objective in self.catalog.project(key, detail=False)['objectives']}
+        expected = self._cycle_targets()
+        if not expected or not expected <= authorized:
+            return False
+        account = self.account(agent['account_id'])
+        identity = self.identity(account) if account else None
+        reports = self._rows('SELECT s.work_id,s.report_json FROM projects_submissions s JOIN projects_work w ON w.id=s.work_id '
+            "WHERE w.account_id=? AND w.cycle_no=? AND w.status='passed' AND s.status='passed' AND s.generation=w.generation",
+            (agent['account_id'], agent['cycle_no']))
+        verified = set()
+        for report in reports:
+            try:
+                value = json.loads(report['report_json'])
+                if isinstance(value, dict) and value.get('status') == 'passed':
+                    verified.add(report['work_id'])
+            except (ValueError, TypeError):
+                continue
+        completed = set()
+        for proof in self._dependency_proofs(agent['account_id'], agent['cycle_no']):
+            pair = proof['project_key'], proof['objective_id']
+            if pair not in expected or proof['account_identity'] != identity or proof['id'] not in verified:
+                continue
+            try:
+                project, definition = self.catalog.objective(*pair)
+                old, contract = self.catalog.for_work(proof).objective(*pair)
+                if (old.manifest['seed_digest'] == project.manifest['seed_digest']
+                        and contract == definition == json.loads(proof['definition_json'])):
+                    completed.add(pair)
+            except (ValueError, OSError, KeyError, TypeError):
+                continue
+        return expected <= completed
+
+    def _advance_cycle(self, agent: dict) -> dict:
+        """全部通过且已认领账号后，幂等清理旧工作区，再原子发布新一轮零进度。:param agent: 当前轮控制记录。:return: 新轮控制记录。"""
+        account_id = agent['account_id']
+        if (not self.auto_cycle or not self._cycle_complete(agent)
+                or self._one("SELECT id FROM projects_work WHERE account_id=? AND (status NOT IN ('passed','stopped') "
+                    'OR runtime_json IS NOT NULL OR segment_started_at IS NOT NULL) LIMIT 1', (account_id,))
+                or self._one('SELECT a.id FROM projects_actions a JOIN projects_work w ON w.id=a.work_id '
+                    "WHERE w.account_id=? AND a.status IN ('intent','unknown') LIMIT 1", (account_id,))):
+            raise ValueError('本轮尚未完整验收或执行未收口，不能重置进度')
+        # 清理失败时不提交新轮；原完整通过事实保留，重试只继续清理同一批登记目录。
+        self.terminal.cleanup_cycle(self.account(account_id), agent['cycle_no'])
+        with self.write_lock:
+            connection = self.database()
+            try:
+                with connection:
+                    changed = connection.execute('UPDATE projects_agents SET cycle_no=cycle_no+1,current_work_id=NULL,'
+                        'session_file=NULL,message=?,updated_at=? WHERE account_id=? AND cycle_no=?',
+                        ('本轮已全部验收，已清理项目并从原始内容重新开始', time.time(), account_id, agent['cycle_no']))
+                    if changed.rowcount != 1:
+                        raise ValueError('工程轮次已改变，不能重复清理')
+                    connection.execute('INSERT INTO projects_events(account_id,kind,payload_json,event_key,created_at) VALUES(?,?,?,?,?)',
+                        (account_id, 'cycle_started', canonical_json({'number': agent['cycle_no'] + 1,
+                            'previous': agent['cycle_no'], 'message': '旧项目工作目录已清理，新一轮从零开始'}).decode(),
+                            f"cycle-started:{account_id}:{agent['cycle_no'] + 1}", time.time()))
+            finally:
+                connection.close()
+        return self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
 
     def _missing_prerequisites(self, account_id: int, assets, key: str, definition: dict,
                                proofs: list[dict] | None = None, identity: str | None = None) -> list[str]:
@@ -424,7 +530,7 @@ class ProjectsService:
             identity = self.identity(account) if account else None
             if not identity or current['account_identity'] != identity:
                 raise ValueError('当前交付账号身份不符，不能省略原成果验收')
-            proofs = self._dependency_proofs(current['account_id'])
+            proofs = self._dependency_proofs(current['account_id'], current.get('cycle_no', 1))
         assets = self.catalog.for_work(current)
         project, _ = assets.objective(current['project_key'], current['objective_id'])
         accepted = []
@@ -491,6 +597,7 @@ class ProjectsService:
             agent['controller_active'] = agent['account_id'] in self.controllers
             agent['schedule'] = {'enabled': bool(agent.pop('schedule_enabled')),
                 'interval_minutes': agent.pop('schedule_interval_sec') // 60,
+                'interval_max_minutes': (agent.pop('schedule_interval_max_sec') or 0) // 60 or None,
                 'next_run_at': agent.pop('schedule_next_at'), 'last_started_at': agent.pop('schedule_last_started_at'),
                 'state': agent.pop('schedule_state'), 'message': agent.pop('schedule_message')}
             agent['project_keys'] = json.loads(agent.pop('project_keys_json'))
@@ -503,11 +610,15 @@ class ProjectsService:
                 values = [item[field] for item in native if type(item.get(field)) is int]
                 agent['claude_usage'][field] = sum(values) if values else None
             agent['claude_usage']['complete'] = bool(native) and all(item.get('complete') for item in native)
-            agent['passed'] = self._rows("SELECT project_key,objective_id,goal FROM projects_work WHERE account_id=? AND status='passed'", (agent['account_id'],))
+            agent['passed'] = self._rows("SELECT project_key,objective_id,goal FROM projects_work WHERE account_id=? AND cycle_no=? AND status='passed'",
+                (agent['account_id'], agent['cycle_no']))
             completed = {(item['project_key'], item['objective_id']) for item in agent['passed']}
             objectives = [(key, objective) for key in agent['project_keys']
                 for objective in self.catalog.project(key, detail=False)['objectives']]
             requirements = {(key, objective['id']): objective.get('requires', []) for key, objective in objectives}
+            cycle_targets = self._cycle_targets() if self.auto_cycle else set(requirements)
+            agent['cycle'] = {'number': agent['cycle_no'], 'completed': len(completed & cycle_targets),
+                'total': len(cycle_targets), 'automatic': self.auto_cycle}
             agent['remaining_objectives'] = [
                 {'project_key': key, 'objective_id': objective['id'], 'goal': objective['goal']}
                 for key, objective in objectives
@@ -544,14 +655,14 @@ class ProjectsService:
                 for field in ('input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens'):
                     agent['pi_usage'][field] = None
             result.append(agent)
-        return {'agents': result, 'pi_available': self.pi.available(), 'architecture': 'account-pi'}
+        return {'agents': result, 'pi_available': self.pi.available(), 'architecture': 'account-pi', 'namespace': self.namespace}
 
     @staticmethod
     def _public_work(work: dict | None) -> dict | None:
         if work is None:
             return None
-        return {key: work[key] for key in ('id', 'project_key', 'objective_id', 'goal', 'status',
-            'session_id', 'work_sec', 'created_at', 'started_at', 'ended_at', 'message')}
+        return {**{key: work[key] for key in ('id', 'project_key', 'objective_id', 'goal', 'status',
+            'session_id', 'work_sec', 'created_at', 'started_at', 'ended_at', 'message')}, 'cycle_no': work.get('cycle_no', 1)}
 
     def view(self, account_id: int | None = None) -> dict:
         """为控制台补充可读准入、真实任务进度与最近动作，不创建任务或调用模型。
@@ -592,7 +703,7 @@ class ProjectsService:
                 'total': completed + len(agent['remaining_objectives']), 'elapsed_work_sec': elapsed,
                 'remaining_work_sec': max(0, agent['budget_sec'] - elapsed) if work else agent['budget_sec']}
             event = self._one("SELECT kind,payload_json,created_at FROM projects_events WHERE account_id=? "
-                "AND kind IN ('pi','input','started','verification','error','gate_wait') ORDER BY id DESC LIMIT 1", (agent['account_id'],))
+                "AND kind IN ('pi','input','started','verification','error','gate_wait','cycle_started') ORDER BY id DESC LIMIT 1", (agent['account_id'],))
             agent['activity'] = None
             if event:
                 payload = json.loads(event['payload_json'])
@@ -915,6 +1026,11 @@ class ProjectsService:
                     "WHERE w.account_id=? AND a.status IN ('intent','unknown') LIMIT 1", (account_id,)):
                 raise ValueError('有未对账的终端输入，请先核对操作结果')
             current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+            if recovering and self.auto_cycle and not agent['schedule_enabled'] and self._cycle_complete(agent):
+                # 单次手动执行已经完成整轮时，进程恢复不能把“接续原工作”扩成新一轮付费执行。
+                self._write("UPDATE projects_agents SET status='paused',message=?,schedule_next_at=NULL WHERE account_id=?",
+                    ('本轮全部工程已验收，自动计划已关闭，等待显式启动下一轮', account_id))
+                return self.state(account_id)
             retry_event = self._manual_retry_event(agent, current_work) if not scheduled else None
             # 人工重试只在内存中放行这一项故障，其他门禁失败时不能提前解除原工作阻塞。
             eligible_work = {**current_work, 'status': 'paused'} if retry_event else current_work
@@ -939,13 +1055,16 @@ class ProjectsService:
             if not configuration or not self.pi.available():
                 raise ValueError('Pi 运行时或外接模型配置尚未就绪')
             generation = agent['generation'] + 1
-            owner_token = self.owners.claim(account_id, 'projects', generation)
+            owner_token = self.owners.claim(account_id, self.namespace, generation)
             if owner_token is None:
                 self._wait_gate(agent, {'allowed': False, 'reason': 'controller_busy', 'retryable': True,
                     'retry_at': now + 60, 'message': '账号养号或其他 Pi 正在运行，项目指挥顺延'}, now)
                 return self.state(account_id)
             thread = None
             try:
+                if self.auto_cycle and not self.state(account_id)['agents'][0]['remaining_objectives']:
+                    agent = self._advance_cycle(agent)
+                    current_work = None
                 with self.write_lock:
                     connection = self.database()
                     try:
@@ -1123,7 +1242,7 @@ class ProjectsService:
 
         try:
             agent, work = self._current(account_id, generation)
-            directory = self.data / 'projects/agents' / str(account_id)
+            directory = self.data / ('projects/agents' if self.namespace == 'projects' else 'warmup-projects/agents') / str(account_id)
             directory.mkdir(parents=True, exist_ok=True, mode=0o700)
             session_file = agent['session_file']
             if session_file:
@@ -1135,7 +1254,10 @@ class ProjectsService:
                         raise ValueError('Pi 原会话缺失，已保留现有业务进度，需恢复原会话文件')
                     session_file = None
             config = {**provider, 'session_dir': str(directory), 'session_file': session_file, 'tools': TOOLS, 'timeout_sec': agent['budget_sec'],
-                'instructions': AGENT_GUIDE + '\n用户业务指南：\n' + agent['instructions'],
+                'instructions': AGENT_GUIDE + ('\n这是独立的养号工程空间。完成本轮全部授权工程目标后结束本次指挥。'
+                    '服务会在下一次计划认领时核对全部独立验收、清理旧项目工作区并从原始内容开始新一轮。'
+                    '不要自行删除项目、清零记录、跳过未完成工作或借用另一轮的通过事实。\n' if self.auto_cycle else '')
+                    + '\n用户业务指南：\n' + agent['instructions'],
                 'prompt': '继续指挥这个账号的项目工作。先读取 account_state，按最新 available_objectives 选择未完成目标，'
                     '不要沿用旧总结中“没有任务”的推测。核对并优先恢复原会话、未完成工作和待处理事件。'}
             # 只保存实际启动配置的指纹，证明追加指南进入本轮，避免事件流复制业务原文或模型凭据。
@@ -1190,7 +1312,7 @@ class ProjectsService:
                                 else:
                                     self._write('UPDATE projects_agents SET schedule_state=?,schedule_message=?,schedule_next_at=? WHERE account_id=? AND generation=?',
                                         (hold or 'scheduled', message or '本轮已结束，按间隔自动继续',
-                                            None if hold else time.time() + agent['schedule_interval_sec'], account_id, generation))
+                                            None if hold else time.time() + self._next_interval(agent), account_id, generation))
                 except Exception:
                     try:
                         self._write("UPDATE projects_agents SET status='blocked',message=?,schedule_state='blocked',"
@@ -1210,7 +1332,7 @@ class ProjectsService:
     def _pi_event(self, account_id: int, generation: int, value: dict) -> None:
         agent, work = self._current(account_id, generation)
         if value['type'] == 'ready':
-            directory = self.data / 'projects/agents' / str(account_id)
+            directory = self.data / ('projects/agents' if self.namespace == 'projects' else 'warmup-projects/agents') / str(account_id)
             path = Path(value['session_file'])
             if not path.resolve().is_relative_to(directory.resolve()) or path.is_symlink():
                 raise ValueError('Pi 会话路径越界')
@@ -1327,8 +1449,8 @@ class ProjectsService:
             if work['status'] == 'blocked':
                 raise ValueError('原工作需要人工核对，不能由模型自行解除')
         else:
-            if self._one("SELECT id FROM projects_work WHERE account_id=? AND project_key=? AND objective_id=? AND status='passed'",
-                    (account_id, key, objective_id)):
+            if self._one("SELECT id FROM projects_work WHERE account_id=? AND project_key=? AND objective_id=? AND cycle_no=? AND status='passed'",
+                    (account_id, key, objective_id, agent['cycle_no'])):
                 raise ValueError('该账号已经完成这个工程目标')
             work_id = uuid.uuid4().hex
             settings = self.terminal.settings()
@@ -1345,10 +1467,10 @@ class ProjectsService:
                         # 目标与控制者指针必须同事务发布，中断不能留下占用唯一索引的孤儿工作。
                         with connection:
                             connection.execute('INSERT INTO projects_work(id,account_id,project_key,objective_id,goal,definition_json,library_root,'
-                                'library_digest,settings_json,generation,status,session_id,created_at,account_identity) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                                'library_digest,settings_json,generation,status,session_id,created_at,account_identity,cycle_no) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                                 (work_id, account_id, key, objective_id, definition['goal'], canonical_json(definition).decode(),
                                     str(self.catalog.library.root), self.catalog.library.digest, json.dumps(settings), generation,
-                                    'ready', str(uuid.uuid4()), time.time(), identity))
+                                    'ready', str(uuid.uuid4()), time.time(), identity, agent['cycle_no']))
                             connection.execute('UPDATE projects_agents SET current_work_id=? WHERE account_id=? AND generation=?',
                                 (work_id, account_id, generation))
                     finally:

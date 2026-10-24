@@ -171,6 +171,8 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
 }
 .tabs a::before { content: '['; color: var(--text-faint); margin-right: 2px; }
 .tabs a::after  { content: ']'; color: var(--text-faint); margin-left: 2px; }
+/* 组间细线沿用导航高度，手机换行时仍保留功能边界。 */
+.tabs a.nav-group-start { border-left: 1px solid var(--border-bright); margin-left: 6px; }
 .tabs a .tab-en { font-weight: 500; }
 .tabs a .tab-cn { color: var(--text-faint); font-size: 11px; }
 .tabs a:hover { color: var(--text); background: rgba(255, 182, 73, 0.05); }

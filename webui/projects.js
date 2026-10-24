@@ -2,6 +2,7 @@
 window.ProjectsUI = (() => {
   let api, prefix, source, accountId = null, agents = [], catalog = [], accounts = [], cursor = 0;
   let revision = 0, selection = 0, scheduleClock = null, recordPages = {};
+  let namespace = 'projects', servicePath = '/projects';
   let screenWorkId = null, screenEventId = 0;
   const pendingActions = new Map();
   const $ = selector => document.querySelector(selector);
@@ -31,23 +32,33 @@ window.ProjectsUI = (() => {
    * @return {Promise<void>} 操作完成。
    */
   async function perform(action) {
-    try { feedback(''); await action(); } catch (error) { feedback(error.message); }
+    const current = revision;
+    try { feedback(''); await action(); } catch (error) { if (current === revision) feedback(error.message); }
   }
 
   /**
    * 进入账号控制页，旧连接和旧回调均在退出后失效。
-   * @param {object} options 既有鉴权 API 与路径前缀。
+   * @param {object} options 既有鉴权 API、路径前缀、独立空间 namespace 和可选的只读预选 accountId。
    * @return {Promise<void>} 初始页面加载完成。
    */
   async function mount(options) {
     unmount();
     const current = revision;
-    api = options.api; prefix = options.prefix;
+    namespace = options.namespace === 'warmup' ? 'warmup' : 'projects';
+    servicePath = namespace === 'warmup' ? '/accounts/warmup/pi' : '/projects';
+    const endpoint = servicePath;
+    // 同一工程组件只改变服务路径；每次挂载重新读取该空间，避免表单或记录串到另一空间。
+    api = (path, settings) => options.api(path === '/projects' || path.startsWith('/projects/')
+      ? endpoint + path.slice('/projects'.length) : path, settings);
+    prefix = options.prefix;
+    $('#projects-title').textContent = namespace === 'warmup' ? '养号迭代' : '项目迭代';
+    $('#projects-overview').dataset.namespace = namespace;
     $('#projects-agent-form').onsubmit = event => { event.preventDefault(); perform(saveAgent); };
     $('#projects-schedule-form').onsubmit = event => { event.preventDefault(); perform(saveSchedule); };
     $('#projects-model-form').onsubmit = event => { event.preventDefault(); perform(saveModel); };
     $('#projects-model-reset').onclick = () => perform(async () => {
-      await api('/settings/project-requester', {method: 'DELETE'}); await loadModel();
+      await api('/settings/project-requester', {method: 'DELETE'});
+      if (current === revision) await loadModel();
     });
     $('#projects-filter').oninput = paintCatalog;
     $('#projects-select-all').onclick = () => paintCatalog(catalog.map(item => item.project_key));
@@ -78,8 +89,14 @@ window.ProjectsUI = (() => {
         `<option value="${item.id}">${escape(item.name)}</option>`).join('');
       paintCatalog();
       await loadModel();
-      const first = agents.find(item => usable.some(account => account.id === item.account_id));
-      if (first) { $('#projects-account').value = first.account_id; await selectAccount(first.account_id); }
+      if (current !== revision) return;
+      const requested = options.accountId;
+      const first = requested != null ? usable.find(item => item.id === requested)
+        : agents.find(item => usable.some(account => account.id === item.account_id));
+      const selected = requested != null ? first?.id : first?.account_id;
+      // 账号页的入口仅恢复选择与现场，不借导航隐式创建配置或启动控制者。
+      if (selected) { $('#projects-account').value = selected; await selectAccount(selected); }
+      else if (requested != null) feedback('该账号当前不可用，请选择其他运行账号', 'error');
     } catch (error) { if (current === revision) feedback(error.message); }
   }
 
@@ -200,7 +217,7 @@ window.ProjectsUI = (() => {
       recordPages.events.pages = [snapshot.events]; recordPages.history.pages = [history];
       paintState(); paintRecords('events'); paintRecords('history');
       paintScreen(snapshot.observation);
-      source = new EventSource(`${prefix}/api/projects/stream?account_id=${selected}&after=${cursor}`);
+      source = new EventSource(`${prefix}/api${servicePath}/stream?account_id=${selected}&after=${cursor}`);
       source.addEventListener('update', event => {
         if (current !== revision || selected !== accountId || request !== selection) return;
         try {
@@ -277,15 +294,20 @@ window.ProjectsUI = (() => {
    */
   async function saveAgent() {
     if (!accountId) throw new Error('请先选择运行账号');
+    const selected = accountId, current = revision, chosen = selection;
     const form = $('#projects-agent-form');
     const keys = Array.from(document.querySelectorAll('[name=project_key]:checked')).map(item => item.value);
-    const value = await api(`/projects/agents/${accountId}`, {method: 'PUT', body: JSON.stringify({
+    const value = await api(`/projects/agents/${selected}`, {method: 'PUT', body: JSON.stringify({
       project_keys: keys, instructions: form.elements.instructions.value,
       budget_sec: Number(form.elements.budget_minutes.value) * 60,
     })});
+    // 两个空间共用组件，旧页保存的回执不能合并到新空间的账号状态。
+    if (current !== revision || selected !== accountId || chosen !== selection) return;
     updateAgents(value); paintState(); feedback('项目池和指南已保存。');
     $('#projects-schedule-form').querySelectorAll('input, button').forEach(element => { element.disabled = false; });
-    if (!source) await selectAccount(accountId);
+    $('#projects-schedule-form').elements.interval_max_minutes.disabled = namespace !== 'warmup';
+    if (!source) await selectAccount(selected);
+    if (current !== revision || selected !== accountId) return;
     await refreshView();
   }
 
@@ -297,8 +319,13 @@ window.ProjectsUI = (() => {
     const agent = agents.find(item => item.account_id === accountId);
     const form = $('#projects-schedule-form');
     form.elements.schedule_enabled.checked = agent?.schedule?.enabled === true;
-    form.elements.interval_minutes.value = agent?.schedule?.interval_minutes ?? 60;
+    const interval = agent?.schedule?.interval_minutes ?? (namespace === 'warmup' ? 180 : 60);
+    form.elements.interval_minutes.value = interval;
+    form.elements.interval_max_minutes.value = agent?.schedule ? agent.schedule.interval_max_minutes ?? interval : 300;
     form.querySelectorAll('input, button').forEach(element => { element.disabled = !agent; });
+    form.elements.interval_max_minutes.disabled = !agent || namespace !== 'warmup';
+    $('#projects-interval-max').classList.toggle('hidden', namespace !== 'warmup');
+    $('#projects-interval-label').textContent = namespace === 'warmup' ? '间隔下限 · 分钟' : '每轮结束后的间隔 · 分钟';
     paintSchedule();
   }
 
@@ -311,9 +338,14 @@ window.ProjectsUI = (() => {
     const selected = accountId, current = revision, chosen = selection;
     const form = $('#projects-schedule-form');
     const enabled = form.elements.schedule_enabled.checked;
-    const value = await api(`/projects/agents/${selected}/schedule`, {method: 'PUT', body: JSON.stringify({
-      enabled, interval_minutes: Number(form.elements.interval_minutes.value),
-    })});
+    const payload = {enabled, interval_minutes: Number(form.elements.interval_minutes.value)};
+    if (namespace === 'warmup') {
+      payload.interval_max_minutes = form.elements.interval_max_minutes.value === '' ? null
+        : Number(form.elements.interval_max_minutes.value);
+      if (payload.interval_max_minutes != null && payload.interval_max_minutes < payload.interval_minutes)
+        throw new Error('养号间隔上限不能小于下限');
+    }
+    const value = await api(`/projects/agents/${selected}/schedule`, {method: 'PUT', body: JSON.stringify(payload)});
     if (current !== revision || selected !== accountId || chosen !== selection) return;
     updateAgents(value); fillSchedule(); paintState();
     feedback(enabled ? '自动计划已保存；满足账号运行条件后继续指挥。' : '自动计划已关闭；当前任务保持原状态。');
@@ -336,8 +368,10 @@ window.ProjectsUI = (() => {
     const schedule = agent.schedule;
     const states = {off: '未启用', scheduled: '已安排', running: '本轮指挥中', waiting: '等待执行条件',
       blocked: '需要处理', completed: '项目池已完成'};
+    const interval = schedule?.interval_max_minutes > schedule?.interval_minutes
+      ? `${schedule.interval_minutes}～${schedule.interval_max_minutes} 分钟随机` : `${schedule?.interval_minutes} 分钟`;
     status.textContent = schedule?.enabled
-      ? `定时已开启 · ${states[schedule.state] || schedule.state} · 每轮结束后间隔 ${schedule.interval_minutes} 分钟`
+      ? `定时已开启 · ${states[schedule.state] || schedule.state} · 每轮结束后间隔 ${interval}`
       : `定时已关闭${agent.controller_active ? ' · 当前 Pi 继续运行' : ''}`;
     if (schedule?.message) status.textContent += `；${schedule.message}`;
     const timestamp = schedule?.next_run_at;
@@ -347,7 +381,8 @@ window.ProjectsUI = (() => {
       next.textContent = `下次检查：${new Date(timestamp * 1000).toLocaleString('zh-CN', {hour12: false})}（浏览器当地时间）· ${waiting}`;
     } else if (schedule?.enabled) {
       next.textContent = schedule.state === 'blocked' ? '请处理原因后重新保存计划或手动启动。'
-        : schedule.state === 'completed' ? '暂无未完成目标，更新项目池后继续。'
+        : schedule.state === 'completed' ? namespace === 'warmup' && agent.cycle?.total > 0
+          ? '本轮工程全部验收通过后，按原计划从固定种子开始下一轮。' : '暂无未完成目标，更新项目池后继续。'
         : agent.controller_active ? '当前一轮结束后安排下次检查。' : '等待执行条件变化后再检查。';
     } else {
       next.textContent = agent.controller_active && ['running', 'waiting'].includes(agent.status)
@@ -416,6 +451,12 @@ window.ProjectsUI = (() => {
     const known = Number.isInteger(progress?.completed) && Number.isInteger(progress?.remaining)
       && Number.isInteger(progress?.total) && progress.total >= 0;
     $('#projects-progress-text').textContent = known ? `${progress.completed} / ${progress.total} 项已通过` : '尚未采集';
+    const cycle = agent?.cycle;
+    const cycleKnown = Number.isInteger(cycle?.number) && cycle.number > 0 && Number.isInteger(cycle.completed)
+      && cycle.completed >= 0 && Number.isInteger(cycle.total) && cycle.total >= cycle.completed;
+    $('#projects-cycle').textContent = cycleKnown
+      ? `第 ${cycle.number} 轮 · 完成 ${cycle.completed} / ${cycle.total}` : '周期进度尚未采集';
+    $('#projects-cycle').classList.toggle('hidden', namespace !== 'warmup');
     bar.classList.toggle('hidden', !known || progress.total === 0);
     if (known && progress.total > 0) bar.value = Math.min(100, progress.completed / progress.total * 100);
     else bar.removeAttribute('value');
@@ -462,6 +503,9 @@ window.ProjectsUI = (() => {
       if (pending) next = '控制操作已提交，请等待运行状态更新。';
       else if (active) next = work?.status === 'verifying' ? '等待独立验收结果，Pi 会依据事实决定是否返工。' : 'Pi 持续观察终端并推进；可在交互标签查看最近操作。';
       else if (schedule?.state === 'blocked' || agent.status === 'blocked') next = '处理等待原因后，重新保存计划或手动启动。';
+      else if (namespace === 'warmup' && agent.cycle?.total > 0 && agent.cycle.completed === agent.cycle.total)
+        next = schedule?.enabled ? '本轮工程已全部验收通过，将按原计划从固定种子开始下一轮。'
+          : '本轮工程已全部验收通过，下一次启动将从固定种子开始新一轮。';
       else if (schedule?.state === 'completed' || agent.progress?.remaining === 0) next = '授权项目池已完成，扩充项目池后继续。';
       else if (admission?.allowed === false) next = schedule?.enabled && admission.retryable ? '满足运行条件后自动恢复原目标。' : '运行条件解除后，手动启动或恢复。';
       else if (schedule?.enabled) next = '到达下次时间后自动检查，接续未完成目标。';
@@ -634,7 +678,7 @@ window.ProjectsUI = (() => {
    * @return {void}
    */
   function paintHistory(rows) {
-    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small></span><span>${escape(names[item.status] || item.status)}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
+    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${namespace === 'warmup' ? `第 ${escape(Number.isInteger(item.cycle_no) && item.cycle_no > 0 ? item.cycle_no : 1)} 轮 · ` : ''}${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small></span><span>${escape(names[item.status] || item.status)}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
     document.querySelectorAll('[data-work]').forEach(button => {
       button.onclick = () => perform(async () => {
         const current = revision, selected = accountId;
@@ -676,10 +720,12 @@ window.ProjectsUI = (() => {
     $('#projects-actions').innerHTML = rows.map(item => `<div class="batch-panel"><pre>${escape(item.request.text || JSON.stringify(item.request.keys))}</pre><p class="hint">核对原终端和会话后记录事实。核对不会自动恢复 Pi。</p><button type="button" class="btn btn-sm" data-reconcile="${escape(item.id)}" data-sent="true">确认已发送</button> <button type="button" class="btn btn-sm" data-reconcile="${escape(item.id)}" data-sent="false">确认未发送</button></div>`).join('');
     document.querySelectorAll('[data-reconcile]').forEach(button => {
       button.onclick = () => perform(async () => {
-        updateAgents(await api(`/projects/agents/${selected}/reconcile`, {method: 'POST', body: JSON.stringify({
+        const value = await api(`/projects/agents/${selected}/reconcile`, {method: 'POST', body: JSON.stringify({
           operation_id: button.dataset.reconcile, sent: button.dataset.sent === 'true',
-        })}));
-        await loadReconciliation(); paintState();
+        })});
+        if (current !== revision || selected !== accountId) return;
+        updateAgents(value); await loadReconciliation();
+        if (current === revision && selected === accountId) paintState();
       });
     });
   }
@@ -704,12 +750,15 @@ window.ProjectsUI = (() => {
    * @return {Promise<void>} 模型配置保存完成。
    */
   async function saveModel() {
+    const current = revision;
     const form = $('#projects-model-form');
     await api('/settings/project-requester', {method: 'PUT', body: JSON.stringify({
       base_url: form.elements.base_url.value, api_key: form.elements.api_key.value || null,
       models: form.elements.models.value.split('\n').map(value => value.trim()).filter(Boolean),
     })});
-    await loadModel(); feedback('Pi 模型配置已保存；在途控制者保留原配置，暂停后恢复即可采用新配置。');
+    if (current !== revision) return;
+    await loadModel();
+    if (current === revision) feedback('Pi 模型配置已保存；在途控制者保留原配置，暂停后恢复即可采用新配置。');
   }
 
   return {mount, unmount};

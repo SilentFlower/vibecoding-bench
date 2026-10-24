@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261024-projects-feed" />
+  <link rel="stylesheet" href="style.css?v=20261025-separate-projects-warmup" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -32,13 +32,13 @@
       <span class="brand-sub">300·topics · claude-code · mitm</span>
     </div>
     <nav class="tabs" role="tablist">
-      <a href="#accounts" data-tab="accounts"><span class="tab-en">accounts</span><span class="tab-cn">账号</span></a>
-      <a href="#topics"   data-tab="topics"><span class="tab-en">topics</span><span class="tab-cn">题库</span></a>
-      <a href="#tasks"    data-tab="tasks"><span class="tab-en">tasks</span><span class="tab-cn">任务</span></a>
-      <a href="#projects" data-tab="projects"><span class="tab-en">projects</span><span class="tab-cn">项目迭代</span></a>
-      <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行</span></a>
+      <a href="#accounts" data-tab="accounts" data-nav-group="基础配置" title="基础配置"><span class="tab-en">accounts</span><span class="tab-cn">账号</span></a>
       <a href="#environments" data-tab="environments"><span class="tab-en">environments</span><span class="tab-cn">环境</span></a>
-      <a href="#warmup" data-tab="warmup"><span class="tab-en">warmup</span><span class="tab-cn">Pi 养号</span></a>
+      <a href="#topics"   data-tab="topics" class="nav-group-start" data-nav-group="普通任务" title="普通任务"><span class="tab-en">topics</span><span class="tab-cn">题库</span></a>
+      <a href="#tasks"    data-tab="tasks"><span class="tab-en">tasks</span><span class="tab-cn">普通任务</span></a>
+      <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行记录</span></a>
+      <a href="#projects" data-tab="projects" class="nav-group-start" data-nav-group="工程迭代" title="工程迭代"><span class="tab-en">projects</span><span class="tab-cn">项目迭代</span></a>
+      <a href="#warmup" data-tab="warmup"><span class="tab-en">warmup</span><span class="tab-cn">养号迭代</span></a>
     </nav>
     <div class="statline">
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="toggle theme" title="switch theme">☀</button>
@@ -70,7 +70,7 @@
   <template id="tpl-projects">
     <section class="view project-view">
       <header class="view-head projects-header">
-        <div><h2 class="view-title"><span class="bracket">▌</span>projects <span class="muted">// Pi 指挥</span></h2>
+        <div><h2 class="view-title"><span class="bracket">▌</span><span id="projects-title">项目迭代</span> <span class="muted">// Pi 指挥</span></h2>
           <p class="hint" id="projects-runtime">正在读取运行时</p></div>
         <label class="projects-account-picker"><span class="lbl">运行账号</span><select id="projects-account" form="projects-agent-form" required></select></label>
       </header>
@@ -87,7 +87,7 @@
         <p id="projects-admission" class="projects-admission" role="status">选择账号后显示执行条件。</p>
         <div class="projects-overview-grid">
           <article class="projects-summary-card projects-target"><span class="lbl" id="projects-target-label">当前目标</span><div id="projects-current"></div><p class="hint" id="projects-budget" title="按实际累计执行时间统计，暂停和计划等待不计入。"></p><p class="hint" id="projects-activity"></p></article>
-          <article class="projects-summary-card"><span class="lbl">授权项目池进度</span><strong class="projects-metric" id="projects-progress-text">尚未采集</strong><progress class="projects-progress hidden" id="projects-progress-bar" max="100" aria-label="已通过工程目标占比"></progress><p class="hint" id="projects-progress-detail">以独立验收通过的目标计数。</p></article>
+          <article class="projects-summary-card"><span class="lbl">授权项目池进度</span><strong class="projects-metric" id="projects-progress-text">尚未采集</strong><p class="hint" id="projects-cycle">周期进度尚未采集</p><progress class="projects-progress hidden" id="projects-progress-bar" max="100" aria-label="已通过工程目标占比"></progress><p class="hint" id="projects-progress-detail">以独立验收通过的目标计数。</p></article>
           <article class="projects-summary-card"><span class="lbl">下一步</span><p id="projects-next-action">选择账号并保存项目池。</p><p class="hint" id="projects-schedule-status" role="status">尚未启用定时指挥</p><p class="hint" id="projects-schedule-next"></p></article>
         </div>
         <div class="projects-quota-grid">
@@ -127,7 +127,8 @@
           <summary class="projects-settings-title"><strong>自动指挥计划</strong><span class="hint">按账号当地运行时段执行</span></summary>
           <form id="projects-schedule-form" class="form">
             <label class="toggle-line"><input type="checkbox" name="schedule_enabled" disabled><span>启用定时指挥</span></label>
-            <label><span class="lbl">每轮结束后的间隔 · 分钟</span><input type="number" name="interval_minutes" min="1" max="1440" value="60" required disabled></label>
+            <label><span class="lbl" id="projects-interval-label">每轮结束后的间隔 · 分钟</span><input type="number" name="interval_minutes" min="1" max="1440" value="60" required disabled></label>
+            <label class="hidden" id="projects-interval-max"><span class="lbl">间隔上限 · 分钟，留空使用固定间隔</span><input type="number" name="interval_max_minutes" min="1" max="1440" disabled></label>
             <p class="hint">先保存项目池。开启后立即检查，后续按间隔继续；关闭计划保留当前任务。“暂停”和“停止当前目标”会同时关闭自动计划。</p>
             <button class="btn btn-primary" type="submit" disabled>保存自动计划</button>
           </form>
@@ -150,43 +151,6 @@
         <details class="batch-panel" id="projects-delivery"><summary id="projects-delivery-title">冻结交付与源码</summary><p id="projects-delivery-duration" class="hint" title="按实际累计执行时间统计，暂停和计划等待不计入。"></p><div id="projects-submissions"></div><div id="projects-delivery-files"></div><pre class="projects-document" id="projects-delivery-preview"></pre></details>
       </section>
       <details id="projects-research" class="batch-panel"><summary id="projects-research-title">项目研究</summary><pre id="projects-research-body" class="projects-document"></pre></details>
-    </section>
-  </template>
-
-  <template id="tpl-warmup">
-    <section class="view project-view">
-      <header class="view-head projects-header">
-        <div><h2 class="view-title"><span class="bracket">▌</span>warmup <span class="muted">// Pi 养号</span></h2><p id="warmup-runtime" class="hint">正在读取 Pi 运行时</p></div>
-        <label class="projects-account-picker"><span class="lbl">运行账号</span><select id="warmup-account"></select></label>
-      </header>
-      <section id="warmup-overview" class="batch-panel projects-overview">
-        <div class="projects-overview-head"><div><span class="lbl">养号状态</span><h3 id="warmup-state">请选择账号</h3><p id="warmup-message" class="hint"></p></div>
-          <div class="view-actions projects-controls"><button type="button" class="btn btn-primary" data-warmup-action="start" disabled>启动 / 恢复 Pi</button><button type="button" class="btn" data-warmup-action="pause" disabled>暂停养号</button><button type="button" class="btn" data-warmup-action="stop" disabled>停止本轮</button></div>
-        </div>
-        <p id="warmup-feedback" class="hint projects-feedback hidden" role="status" aria-live="polite"></p>
-        <p id="warmup-admission" class="projects-admission"></p>
-        <div class="projects-overview-grid">
-          <article class="projects-summary-card"><span class="lbl">本轮题目</span><strong id="warmup-current">尚未开始</strong><p id="warmup-progress" class="hint"></p><p id="warmup-duration" class="hint" title="按实际累计执行时间统计，暂停和计划等待不计入。"></p><p id="warmup-activity" class="hint"></p></article>
-          <article class="projects-summary-card"><span class="lbl">下次运行</span><strong id="warmup-next">尚未开启</strong><p id="warmup-schedule" class="hint"></p><button id="warmup-config" type="button" class="btn btn-sm" disabled>间隔 / 额度设置</button></article>
-          <article class="projects-summary-card"><span class="lbl">运行方式</span><p>Pi 使用原题库推进完整交流，决定澄清、方案确认、补充需求与收尾。</p><p class="hint">同账号与项目迭代串行执行。暂停关闭后续自动养号，恢复会接续本轮原会话。</p></article>
-        </div>
-        <div class="projects-quota-grid">
-          <article id="warmup-quota-five_hour" class="projects-quota"><div class="projects-quota-head"><span>5h 已用额度</span><strong data-quota-value>未采集</strong></div><div class="projects-quota-meter"><span class="projects-quota-fill hidden" data-quota-fill role="progressbar" aria-label="养号5h已用额度" aria-valuemin="0" aria-valuemax="100"></span><i class="projects-quota-limit hidden" data-quota-limit></i></div><p class="hint" data-quota-description></p></article>
-          <article id="warmup-quota-seven_day" class="projects-quota"><div class="projects-quota-head"><span>7d 已用额度</span><strong data-quota-value>未采集</strong></div><div class="projects-quota-meter"><span class="projects-quota-fill hidden" data-quota-fill role="progressbar" aria-label="养号7d已用额度" aria-valuemin="0" aria-valuemax="100"></span><i class="projects-quota-limit hidden" data-quota-limit></i></div><p class="hint" data-quota-description></p></article>
-        </div>
-        <details class="projects-usage-detail"><summary>查看 Pi 与 Claude 用量</summary><p id="warmup-usage" class="hint">尚未采集模型用量。</p></details>
-      </section>
-      <section id="warmup-reconciliation" class="batch-panel hidden"><h3>输入结果待核对</h3><p class="hint">先暂停并核对原会话；记录事实后再显式恢复 Pi。</p><div id="warmup-actions"></div></section>
-      <section class="batch-panel projects-workspace">
-        <div class="projects-tabs" role="tablist" aria-label="养号执行现场"><button id="warmup-tab-terminal" type="button" role="tab" aria-selected="true" aria-controls="warmup-terminal-panel">Claude Code 终端</button><button id="warmup-tab-events" type="button" role="tab" aria-selected="false" aria-controls="warmup-events-panel">Pi 与 Claude 交互</button></div>
-        <div id="warmup-terminal-panel" role="tabpanel" aria-labelledby="warmup-tab-terminal"><p id="warmup-screen-status" class="hint"></p><pre id="warmup-screen" class="projects-screen">等待当前轮次的终端观察。</pre></div>
-        <div id="warmup-events-panel" class="hidden" role="tabpanel" aria-labelledby="warmup-tab-events"><div class="projects-pagination" aria-label="养号交互分页"><span id="warmup-events-page" class="hint" role="status"></span><button id="warmup-events-latest" type="button" class="btn btn-sm" disabled>最新一页</button><button id="warmup-events-previous" type="button" class="btn btn-sm" disabled>上一页</button><button id="warmup-events-next" type="button" class="btn btn-sm" disabled>下一页</button></div><button id="warmup-events-new" type="button" class="btn btn-sm hidden"></button><ol id="warmup-events" class="projects-events"></ol></div>
-      </section>
-      <div class="projects-settings">
-        <details class="batch-panel"><summary class="projects-settings-title"><strong>给 Pi 的养号业务指南</strong></summary><form id="warmup-guide-form" class="form"><label><span class="lbl">本轮累计预算 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="30" required></label><label><span class="lbl">追加提示词</span><textarea name="instructions" rows="4" maxlength="12000" placeholder="例如：先理解需求并确认方案，再实施；与 Claude 使用英文交流。"></textarea></label><p class="hint">保存后的原文会完整交给 Pi。修改前请先暂停，保存后在下次启动 / 恢复中生效。</p><button type="submit" class="btn btn-primary">保存业务指南</button></form></details>
-        <details class="batch-panel"><summary class="projects-settings-title"><strong>Pi 模型配置</strong><span class="hint">与项目迭代共用模型优先级</span></summary><form id="warmup-model-form" class="form"><div class="row"><label><span class="lbl">服务地址</span><input name="base_url" type="url" required></label><label><span class="lbl">API Key</span><input name="api_key" type="password" autocomplete="new-password" placeholder="留空沿用已配置密钥"></label></div><label><span class="lbl">模型 · 按优先级一行一个</span><textarea name="models" rows="3" required></textarea></label><p id="warmup-model-status" class="hint"></p><button type="submit" class="btn btn-primary">保存模型配置</button></form></details>
-      </div>
-      <section class="projects-records"><details class="batch-panel" open><summary>养号轮次与耗时</summary><div class="projects-pagination" aria-label="养号轮次分页"><span id="warmup-rounds-page" class="hint" role="status"></span><button id="warmup-rounds-latest" type="button" class="btn btn-sm" disabled>最新一页</button><button id="warmup-rounds-previous" type="button" class="btn btn-sm" disabled>上一页</button><button id="warmup-rounds-next" type="button" class="btn btn-sm" disabled>下一页</button></div><button id="warmup-rounds-new" type="button" class="btn btn-sm hidden"></button><div id="warmup-rounds"></div></details><details id="warmup-round-detail" class="batch-panel"><summary id="warmup-round-title">本轮需求与补充</summary><pre id="warmup-round-body" class="projects-document"></pre></details></section>
     </section>
   </template>
 
@@ -542,7 +506,7 @@
       <form id="warmup-form" class="form">
         <input type="hidden" name="account_id" />
         <p class="hint" id="warmup-binding-hint"></p>
-        <div class="row warmup-interval-row">
+        <div class="row warmup-interval-row" id="warmup-legacy-interval">
           <label><span class="lbl">$ min_hours</span>
             <input name="interval_min_hours" type="number" min="1" max="720" required />
           </label>
@@ -550,10 +514,11 @@
             <input name="interval_max_hours" type="number" min="1" max="720" required />
           </label>
         </div>
-        <label class="toggle-line">
+        <label class="toggle-line" id="warmup-legacy-enabled">
           <input name="enabled" type="checkbox" />
           <span>启用定时养号</span>
         </label>
+        <button type="button" class="btn btn-sm hidden" id="warmup-projects-link">前往养号工程计划</button>
         <p class="hint"><strong>普通任务与养号额度控制</strong>：阈值按已用百分比判断。</p>
         <div class="row warmup-interval-row">
           <div class="warmup-quota-panel">
@@ -577,7 +542,7 @@
             <p class="hint" id="warmup-quota-7d-hint"></p>
           </div>
         </div>
-        <p class="hint">额度从正常响应中被动更新。观测到任一阈值命中时，当前普通任务或养号仍按原计划完成本轮（包括补充与收尾），下一轮等待窗口重置或真实额度更新，并遵守原投放间隔。单次响应仍可能跨过阈值。cc2api API 转发不受此阈值控制。</p>
+        <p class="hint" id="warmup-quota-policy-hint">额度从正常响应中被动更新。观测到任一阈值命中时，当前普通任务或养号仍按原计划完成本轮（包括补充与收尾），下一轮等待窗口重置或真实额度更新，并遵守原投放间隔。单次响应仍可能跨过阈值。cc2api API 转发不受此阈值控制。</p>
         <div class="row-end">
           <button type="button" class="btn" data-close="#warmup-modal">cancel</button>
           <button type="submit" class="btn btn-primary">save</button>
@@ -849,7 +814,7 @@
     </div>
   </div>
 
-  <script src="projects.js?v=20261025-projects-work-duration"></script>
-  <script src="app.js?v=20261025-warmup-pi"></script>
+  <script src="projects.js?v=20261025-separate-projects-warmup"></script>
+  <script src="app.js?v=20261025-separate-projects-warmup"></script>
 </body>
 </html>
