@@ -1,0 +1,97 @@
+--- a/library/development_tests/test_development_tk_atomic_file_dev.py
++++ b/library/development_tests/test_development_tk_atomic_file_dev.py
+@@ -0,0 +1,31 @@
++"""公开带版本检查原子文件保存回归。"""
++import pytest
++import tomlkit
++from tomlkit.files import load_with_digest,atomic_save,StaleDocumentError
++
++def test_edit_preserves_comments_and_returns_current_digest(tmp_path):
++    path=tmp_path/'app.toml';path.write_text('# keep\na=1\n')
++    document,digest=load_with_digest(path);document['a']=2
++    new=atomic_save(document,path,expected_digest=digest)
++    assert '# keep' in path.read_text() and load_with_digest(path)[1]==new and new!=digest
++
++def test_stale_disk_change_is_not_overwritten(tmp_path):
++    path=tmp_path/'app.toml';path.write_text('a=1\n')
++    document,digest=load_with_digest(path);path.write_text('a=3\n')
++    with pytest.raises(StaleDocumentError):
++        atomic_save(document,path,expected_digest=digest)
++    assert path.read_text()=='a=3\n' and list(tmp_path.iterdir())==[path]
++
++def test_replace_failure_preserves_bytes_and_cleans_temporary(tmp_path,monkeypatch):
++    path=tmp_path/'app.toml';path.write_text('a=1\n');path.chmod(0o640)
++    def broken(*args):
++        raise OSError('synthetic')
++    monkeypatch.setattr('os.replace',broken)
++    with pytest.raises(OSError):
++        atomic_save(tomlkit.parse('a=2\n'),path)
++    assert path.read_text()=='a=1\n' and path.stat().st_mode&0o777==0o640 and list(tmp_path.iterdir())==[path]
++
++def test_new_file_is_private_and_unicode_roundtrips(tmp_path):
++    path=tmp_path/'app.toml'
++    atomic_save(tomlkit.parse('name="雪"\n'),path)
++    assert path.stat().st_mode&0o777==0o600 and load_with_digest(path)[0]['name']=='雪'
+--- a/library/docs/development-tk-atomic-file-dev.md
++++ b/library/docs/development-tk-atomic-file-dev.md
+@@ -0,0 +1,5 @@
++# 带陈旧版本检查原子保存格式化TOML文件
++
++编辑器读取时保存原字节版本，提交前校验陈旧内容并原子替换，避免序列化和替换失败损坏旧文件。保留模式和格式，临时文件始终清理；该机制不是跨进程加锁事务。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tomlkit/files.py
++++ b/library/tomlkit/files.py
+@@ -0,0 +1,52 @@
++"""带陈旧编辑检查的原子TOML文件保存。"""
++import hashlib
++import os
++import stat
++import tempfile
++from pathlib import Path
++from tomlkit.api import parse
++
++
++class StaleDocumentError(ValueError):
++    """保存时磁盘内容已不再是读取版本。"""
++
++
++def load_with_digest(path):
++    """读取UTF8文档及字节版本。@param path 普通文件路径。@return (document,sha256)。
++    """
++    path=Path(path)
++    if path.is_symlink():
++        raise ValueError('不支持符号链接配置')
++    content=path.read_bytes()
++    return parse(content.decode('utf-8')),hashlib.sha256(content).hexdigest()
++
++
++def atomic_save(document,path,*,expected_digest=None):
++    """原子保存配置。@param document 文档。@param path 目标。
++    @param expected_digest 原字节SHA256；None表示显式无条件保存。@return 新字节SHA256。
++    """
++    path=Path(path)
++    content=document.as_string().encode('utf-8')
++    parse(content)
++    def check():
++        if path.is_symlink():
++            raise ValueError('不支持符号链接配置')
++        if expected_digest is not None:
++            actual=hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
++            if actual!=expected_digest:
++                raise StaleDocumentError('配置文件已改变')
++    check()
++    mode=stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
++    temporary=None
++    try:
++        with tempfile.NamedTemporaryFile(mode='wb',dir=path.parent,prefix='.'+path.name+'.',delete=False) as stream:
++            temporary=Path(stream.name)
++            stream.write(content);stream.flush()
++            os.fchmod(stream.fileno(),mode);os.fsync(stream.fileno())
++        check()
++        os.replace(temporary,path)
++        temporary=None
++    finally:
++        if temporary is not None:
++            temporary.unlink(missing_ok=True)
++    return hashlib.sha256(content).hexdigest()

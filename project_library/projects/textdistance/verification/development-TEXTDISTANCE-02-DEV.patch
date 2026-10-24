@@ -1,0 +1,148 @@
+--- a/library/docs/development-textdistance-02-dev.md
++++ b/library/docs/development-textdistance-02-dev.md
+@@ -0,0 +1,5 @@
++# 词与qgram最长公共序列在所有路径保持真实比较单元
++
++路线02：统一LCSSeq/LCSStr准备、递归与结果重建，词返回词列表，qgram保留tuple单元，普通字符/列表/tuple保持首输入表示。只准备一次，支持不可hash token，长度与归一化按单元计算；跨200分支和多序列均覆盖，继承已交付的自定义谓词。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_textdistance_02_dev.py
++++ b/library/tests/test_development_textdistance_02_dev.py
+@@ -0,0 +1,21 @@
++"""词和qgram结果保持比较单元，不偷偷拼接成字符。"""
++import textdistance
++
++
++def test_word_and_qgram_result_and_normalized_units():
++    """两种算法统一返回准备后的单元列表。@return None。"""
++    for cls in (textdistance.LCSSeq,textdistance.LCSStr):
++        assert cls(qval=None,external=False)('alpha beta gamma','other beta gamma')==['beta','gamma']
++        assert cls(qval=2,external=False)('abcd','xbcdy')==[('b','c'),('c','d')]
++        assert cls(qval=2,external=False)('a','abc')==[]
++        assert cls(qval=None,external=False).normalized_similarity('one two','one three')==0.5
++
++
++def test_long_path_and_unhashable_tokens():
++    """跨长短分支及不可hash token均按切片比较。@return None。"""
++    for cls in (textdistance.LCSSeq,textdistance.LCSStr):
++        assert cls(qval=2,external=False)('x'*205+'ab','zab')==[('a','b')]
++        assert cls(external=False)([[1],[2],[3]],[[0],[2],[3]])==[[2],[3]]
++        assert cls(external=False)((1,2,3),(0,2,3))==(2,3)
++    same=lambda *values:len({value.casefold() for value in values})==1
++    assert textdistance.LCSSeq(qval=None,test_func=same,external=False)('Alpha beta','alpha BETA')==['Alpha','beta']
+--- a/library/textdistance/algorithms/sequence_based.py
++++ b/library/textdistance/algorithms/sequence_based.py
+@@ -62,7 +62,7 @@
+                     lengths[i + 1][j + 1] = max(lengths[i + 1][j], lengths[i][j + 1])
+ 
+         # read the substring out from the matrix
+-        result = ''
++        result = seq1[:0]
+         i, j = len(seq1), len(seq2)
+         while i != 0 and j != 0:
+             if lengths[i][j] == lengths[i - 1][j]:
+@@ -71,10 +71,20 @@
+                 j -= 1
+             else:
+                 assert self.test_func(seq1[i - 1], seq2[j - 1])
+-                result = seq1[i - 1] + result
++                result = seq1[i - 1:i] + result
+                 i -= 1
+                 j -= 1
+         return result
++
++    @staticmethod
++    def _unit(sequence, value):
++        """保留当前准备序列的类型。@param sequence 序列。@param value 单元。@return 单元素序列。"""
++        if isinstance(sequence,str):return value
++        return type(sequence)([value])
++
++    def maximum(self, *sequences):
++        """按实际比较单元统计归一化上界。@param sequences 原输入。@return 最大单元数。"""
++        return max(map(len,self._get_sequences(*sequences)),default=0)
+ 
+     def _recursive(self, *sequences: str) -> str:
+         if not all(sequences):
+@@ -82,11 +92,11 @@
+         if self.test_func(*[s[-1] for s in sequences]):
+             c = sequences[0][-1]
+             sequences = tuple(s[:-1] for s in sequences)
+-            return self(*sequences) + c
++            return self._recursive(*sequences) + self._unit(sequences[0], c)
+         m = type(sequences[0])()  # empty sequence
+         for i, s in enumerate(sequences):
+             ss = sequences[:i] + (s[:-1], ) + sequences[i + 1:]
+-            m = max([self(*ss), m], key=len)
++            m = max([self._recursive(*ss), m], key=len)
+         return m
+ 
+     def __call__(self, *sequences: str) -> str:
+@@ -103,42 +113,35 @@
+ 
+ 
+ class LCSStr(_BaseSimilarity):
+-    """longest common substring similarity
+-    """
++    """最长公共连续单元，字符、词、gram和一般序列保持明确类型。"""
+ 
+-    def _standart(self, s1: str, s2: str) -> str:
+-        matcher = _SequenceMatcher(a=s1, b=s2)
+-        match = matcher.find_longest_match(0, len(s1), 0, len(s2))
+-        return s1[match.a: match.a + match.size]
++    def maximum(self, *sequences):
++        """按准备单元统计上界。@param sequences 原输入。@return 最大单元数。"""
++        return max(map(len,self._get_sequences(*sequences)),default=0)
+ 
+-    def _custom(self, *sequences: str) -> str:
+-        short = min(sequences, key=len)
+-        length = len(short)
+-        for n in range(length, 0, -1):
+-            for subseq in find_ngrams(short, n):
+-                joined = ''.join(subseq)
+-                for seq in sequences:
+-                    if joined not in seq:
+-                        break
+-                else:
+-                    return joined
+-        return type(short)()  # empty sequence
++    def __call__(self, *sequences):
++        """返回最长公共连续片段。@param sequences 原序列。@return 首输入表示的片段。"""
++        if not sequences:return ''
++        prepared=self._get_sequences(*sequences)
++        first=prepared[0]
++        if not all(prepared):return first[:0]
++        if len(prepared)==1:return first[:]
++        if len(prepared)==2 and all(isinstance(item,str) for item in prepared) and max(map(len,prepared))<200:
++            matcher=_SequenceMatcher(a=prepared[0],b=prepared[1])
++            match=matcher.find_longest_match(0,len(prepared[0]),0,len(prepared[1]))
++            return first[match.a:match.a+match.size]
++        short=min(prepared,key=len)
++        for length in range(len(short),0,-1):
++            for start in range(len(short)-length+1):
++                selected=short[start:start+length]
++                # 按单元切片比较，既不拼接token，也不要求token可hash。
++                if all(any(list(seq[offset:offset+length])==list(selected) for offset in range(len(seq)-length+1)) for seq in prepared):
++                    if isinstance(first,str):return ''.join(selected)
++                    return type(first)(selected)
++        return first[:0]
+ 
+-    def __call__(self, *sequences: str) -> str:
+-        if not all(sequences):
+-            return ''
+-        length = len(sequences)
+-        if length == 0:
+-            return ''
+-        if length == 1:
+-            return sequences[0]
+-
+-        sequences = self._get_sequences(*sequences)
+-        if length == 2 and max(map(len, sequences)) < 200:
+-            return self._standart(*sequences)
+-        return self._custom(*sequences)
+-
+-    def similarity(self, *sequences: str) -> int:
++    def similarity(self, *sequences):
++        """返回匹配单元数。@param sequences 原输入。@return 数量。"""
+         return len(self(*sequences))
+ 
+ 

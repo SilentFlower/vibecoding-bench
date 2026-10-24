@@ -1,0 +1,91 @@
+--- a/library/development_tests/test_development_xd_attr_sort_dev.py
++++ b/library/development_tests/test_development_xd_attr_sort_dev.py
+@@ -0,0 +1,25 @@
++"""公开稳定XML属性输出回归。"""
++from io import StringIO
++import pytest
++import xmltodict
++
++def test_attributes_sort_at_all_depths_and_default_order_is_retained():
++    value={'r':{'@z':'2','@a':'1','c':{'@y':'4','@b':'3'}}}
++    assert xmltodict.unparse(value,sort_attributes=True,full_document=False)=='<r a="1" z="2"><c b="3" y="4"></c></r>'
++    assert xmltodict.unparse(value,full_document=False).startswith('<r z="2" a="1">')
++
++def test_child_order_and_input_order_are_not_mutated():
++    value={'r':{'@z':'x','@a':'y','second':'2','first':'1'}};before=list(value['r'])
++    result=xmltodict.unparse(value,sort_attributes=True)
++    assert result.index('<second>')<result.index('<first>') and list(value['r'])==before
++
++def test_output_stream_escaping_and_short_empty_elements():
++    stream=StringIO();value={'r':{'@z':'<&','@a':'"','empty':None}}
++    xmltodict.unparse(value,stream,sort_attributes=True,short_empty_elements=True)
++    assert xmltodict.parse(stream.getvalue())==value
++
++def test_invalid_option_does_not_write_partial_document():
++    stream=StringIO()
++    with pytest.raises(TypeError):
++        xmltodict.unparse({'r':None},stream,sort_attributes='yes')
++    assert stream.getvalue()==''
+--- a/library/docs/development-xd-attr-sort-dev.md
++++ b/library/docs/development-xd-attr-sort-dev.md
+@@ -0,0 +1,5 @@
++# 显式稳定排序XML属性并保持元素及文本顺序
++
++对账导出可选择稳定的属性顺序，按最终输出属性名逐元素排序，保留子元素、文本与输入映射顺序。默认字节行为不变，同时支持流式输出、格式化和短空元素；该选项不等于XML规范化。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/xmltodict.py
++++ b/library/xmltodict.py
+@@ -461,7 +461,7 @@
+           expand_iter=None,
+           encoding='utf-8',
+           bytes_errors='replace',
+-          comment_key='#comment'):
++          comment_key='#comment', sort_attributes=False):
+     if isinstance(key, str) and key == comment_key:
+         comments_list = value if isinstance(value, list) else [value]
+         if isinstance(indent, int):
+@@ -539,6 +539,8 @@
+             indent = ' ' * indent
+         if pretty:
+             content_handler.ignorableWhitespace(depth * indent)
++        if sort_attributes:
++            attrs=dict(sorted(attrs.items()))
+         content_handler.startElement(key, AttributesImpl(attrs))
+         if pretty and children:
+             content_handler.ignorableWhitespace(newl)
+@@ -548,7 +550,7 @@
+                   pretty, newl, indent, namespaces=namespaces,
+                   namespace_separator=namespace_separator,
+                   expand_iter=expand_iter, encoding=encoding,
+-                  bytes_errors=bytes_errors, comment_key=comment_key)
++                  bytes_errors=bytes_errors, comment_key=comment_key, sort_attributes=sort_attributes)
+         if cdata is not None:
+             content_handler.characters(cdata)
+         if pretty and children:
+@@ -565,7 +567,7 @@
+ 
+ 
+ def unparse(input_dict, output=None, encoding='utf-8', full_document=True,
+-            short_empty_elements=False, comment_key='#comment',
++            short_empty_elements=False, comment_key='#comment', sort_attributes=False,
+             **kwargs):
+     """Emit an XML document for the given `input_dict` (reverse of `parse`).
+ 
+@@ -587,6 +589,8 @@
+     defaults to `'replace'`.
+ 
+     """
++    if type(sort_attributes) is not bool:
++        raise TypeError('sort_attributes必须为布尔值')
+     bytes_errors = kwargs.pop('bytes_errors', 'replace')
+     try:
+         codecs.lookup_error(bytes_errors)
+@@ -615,6 +619,7 @@
+             encoding=encoding,
+             bytes_errors=bytes_errors,
+             comment_key=comment_key,
++            sort_attributes=sort_attributes,
+             **kwargs,
+         )
+         if key != comment_key:

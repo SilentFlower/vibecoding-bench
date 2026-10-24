@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWNIFY-O03-DEV",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add base_url and url_transform options integrated into real a/img/video/source-fallback/poster conversion. Use urllib.parse.urljoin for nonempty relative destinations with a string base while preserving fragment-only references, empty destinations and absolute URI semantics. Call optional transform(resolved_url, kind) exactly once per actual nonempty destination, with kind link/image/video/poster, after resolution; a None result suppresses that destination and invalid return types raise TypeError. Preserve titles, inline-image rules, autolinks, source ordering and default output. Perform no network requests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

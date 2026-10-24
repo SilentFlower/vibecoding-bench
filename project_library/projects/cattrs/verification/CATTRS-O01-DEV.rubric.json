@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CATTRS-O01-DEV",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair union disambiguation so dataclass default_factory fields are treated as optional using the actual adapted field defaults, without invoking factories during discrimination. Truly ambiguous unions must raise TypeError independently of member order instead of selecting the class with the factory field. Preserve real required unique fields, ordinary defaults, attrs factories, Literal/renaming overrides and every frozen regression.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

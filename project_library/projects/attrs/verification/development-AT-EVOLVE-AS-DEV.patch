@@ -1,0 +1,111 @@
+--- a/library/development_tests/test_development_at_evolve_as_dev.py
++++ b/library/development_tests/test_development_at_evolve_as_dev.py
+@@ -0,0 +1,67 @@
++"""公开跨模型演化回归。"""
++import attrs
++import pytest
++from attrs.evolution import evolve_as
++
++def test_base_order_evolves_into_shipping_order():
++    @attrs.define
++    class Base:
++        number: int
++    @attrs.define
++    class Shipping(Base):
++        tracking: str = 'pending'
++    source = Base(7)
++    target = evolve_as(source, Shipping, tracking='sent')
++    assert isinstance(target, Shipping) and target.number == 7 and target.tracking == 'sent'
++
++def test_source_names_map_to_target_initialization_aliases():
++    @attrs.define
++    class Source:
++        _quantity: int = attrs.field(alias='source_qty')
++    @attrs.define
++    class Target:
++        _quantity: int = attrs.field(alias='target_qty')
++    assert evolve_as(Source(source_qty=3), Target, target_qty=5)._quantity == 5
++
++def test_target_converters_and_validators_run():
++    @attrs.define
++    class Source:
++        quantity: str
++    @attrs.define
++    class Target:
++        quantity: int = attrs.field(converter=int, validator=attrs.validators.ge(0))
++    assert evolve_as(Source('4'), Target).quantity == 4
++    with pytest.raises(ValueError):
++        evolve_as(Source('-1'), Target)
++
++def test_init_false_state_is_not_copied():
++    @attrs.define
++    class Source:
++        value: int
++        internal: str = attrs.field(init=False, default='source')
++    @attrs.define
++    class Target:
++        value: int
++        internal: str = attrs.field(init=False, default='target')
++    assert evolve_as(Source(1), Target).internal == 'target'
++
++def test_required_target_fields_and_unknown_aliases_are_explicit():
++    @attrs.define
++    class Source:
++        value: int
++    @attrs.define
++    class Target:
++        value: int
++        required: str
++    with pytest.raises(TypeError):
++        evolve_as(Source(1), Target)
++    with pytest.raises(TypeError):
++        evolve_as(Source(1), Source, unknown=3)
++
++def test_source_and_regular_evolve_are_preserved():
++    @attrs.define
++    class Source:
++        value: int
++    original = Source(1)
++    assert evolve_as(original, Source, value=2).value == 2 and original.value == 1
++    assert attrs.evolve(original, value=3).value == 3
+--- a/library/docs/development-at-evolve-as-dev.md
++++ b/library/docs/development-at-evolve-as-dev.md
+@@ -0,0 +1,5 @@
++# 保留字段和目标别名将订单演化为下一阶段模型
++
++订单从基础模型升级为带配送字段的目标模型时，需保留公共字段并按目标alias初始化。新增evolve_as，显式变更优先，目标转换／默认工厂／验证照常执行，不搬运init=False隐藏状态，不修改原实例，原evolve保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/attr/evolution.py
++++ b/library/src/attr/evolution.py
+@@ -0,0 +1,23 @@
++"""按字段身份及目标初始化别名演化模型，不修改源实例。"""
++from ._make import fields
++
++
++def evolve_as(instance, target_class, **changes):
++    """演化为显式目标类。@param instance 原实例。@param target_class attrs目标类。
++    @param changes 目标初始化别名到新值。@return 经过目标标准构造和验证的新实例。
++    """
++    source_fields = {field.name: field for field in fields(type(instance)) if field.init}
++    target_fields = [field for field in fields(target_class) if field.init]
++    aliases = [field.alias for field in target_fields]
++    if len(set(aliases)) != len(aliases):
++        raise TypeError('目标初始化别名冲突')
++    if set(changes) - set(aliases):
++        raise TypeError('包含目标未声明的初始化参数')
++    common = set(source_fields) & {field.name for field in target_fields}
++    if not common and not (issubclass(target_class, type(instance)) or issubclass(type(instance), target_class)):
++        raise TypeError('不相关目标没有可演化的公共字段')
++    values = dict(changes)
++    for field in target_fields:
++        if field.alias not in values and field.name in common:
++            values[field.alias] = getattr(instance, field.name)
++    return target_class(**values)
+--- a/library/src/attrs/evolution.py
++++ b/library/src/attrs/evolution.py
+@@ -0,0 +1,4 @@
++"""公开的跨模型演化接口。"""
++from attr.evolution import evolve_as
++
++__all__ = ['evolve_as']

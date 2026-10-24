@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CT-EXPIRE-LIMIT-DEV",
+  "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend TTLCache.expire(time=None,*,limit=None) with a validated nonnegative nonboolean integer limit. Return/remove at most that many expired pairs in original expiry order; zero removes nothing and None preserves exact legacy full cleanup. Repeated bounded calls must eventually remove all expired items without corrupting linked-list/LRU/weighted-size accounting or touching live entries. Invalid limits fail before timer sampling or mutation. Ordinary len/set/popitem still invoke default full expiry.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

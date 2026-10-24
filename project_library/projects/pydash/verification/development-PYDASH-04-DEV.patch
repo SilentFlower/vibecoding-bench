@@ -1,0 +1,97 @@
+--- a/library/docs/development-pydash-04-dev.md
++++ b/library/docs/development-pydash-04-dev.md
+@@ -0,0 +1,5 @@
++# JSON编辑使用显式Pointer并正确处理转义和数组边界
++
++路线04：显式JSON Pointer支持空根、转义、dict/list精确读写和末段追加；拒绝Python属性、非法数组索引与不存在父路径，不改变旧路径解释。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pydash/__init__.py
++++ b/library/src/pydash/__init__.py
+@@ -167,6 +167,7 @@
+     variance,
+     zscore,
+ )
++from .json_pointer import get_pointer, set_pointer, pointer_tokens
+ from .objects import (
+     apply,
+     apply_catch,
+--- a/library/src/pydash/json_pointer.py
++++ b/library/src/pydash/json_pointer.py
+@@ -0,0 +1,53 @@
++"""显式RFC6901路径，只访问JSON dict/list，不访问Python属性。"""
++import re
++
++
++
++def pointer_tokens(pointer):
++    """解码JSON Pointer。@param pointer 空根或斜杠路径。@return 不可变段序列。"""
++    if not isinstance(pointer,str):raise TypeError('pointer必须为字符串')
++    if pointer=='':return ()
++    if not pointer.startswith('/'):raise ValueError('pointer必须以/开始')
++    result=[]
++    for token in pointer[1:].split('/'):
++        if re.search(r'~(?![01])',token):raise ValueError('无效~转义')
++        result.append(token.replace('~1','/').replace('~0','~'))
++    return tuple(result)
++
++
++def _index(token,size,append=False):
++    """校验JSON数组索引，不能把负数或前导零解释为Python索引。"""
++    if append and token=='-':return size
++    if not re.fullmatch(r'0|[1-9][0-9]*',token):raise ValueError('无效数组索引')
++    index=int(token)
++    if index>=size:raise IndexError(index)
++    return index
++
++
++def get_pointer(document,pointer):
++    """按精确JSON路径读取。@param document JSON树。@param pointer 路径。@return 原值。"""
++    current=document
++    for token in pointer_tokens(pointer):
++        if isinstance(current,dict):current=current[token]
++        elif isinstance(current,list):current=current[_index(token,len(current))]
++        else:raise TypeError('路径经过非JSON容器')
++    return current
++
++
++def set_pointer(document,pointer,value):
++    """只写既有父容器。@param document JSON树。@param pointer 精确路径，末段-可追加。@param value 新值。@return 根对象，空路径返回替换值。"""
++    tokens=pointer_tokens(pointer)
++    if not tokens:return value
++    current=document
++    for token in tokens[:-1]:
++        if isinstance(current,dict):current=current[token]
++        elif isinstance(current,list):current=current[_index(token,len(current))]
++        else:raise TypeError('路径经过非JSON容器')
++    token=tokens[-1]
++    if isinstance(current,dict):current[token]=value
++    elif isinstance(current,list):
++        index=_index(token,len(current),append=True)
++        if index==len(current):current.append(value)
++        else:current[index]=value
++    else:raise TypeError('路径经过非JSON容器')
++    return document
+--- a/library/tests/test_development_pydash_04_dev.py
++++ b/library/tests/test_development_pydash_04_dev.py
+@@ -0,0 +1,20 @@
++"""JSON路径必须显式，普通属性解析和点路径保持原样。"""
++import unittest
++import pydash
++
++def test_escaped_keys_arrays_and_root_replacement():
++    """斜杠、波浪号和空键按RFC顺序解码。@return None。"""
++    source={'a/b':{'~key':[1,2]},'':3}
++    assert pydash.get_pointer(source,'/a~1b/~0key/1')==2
++    assert pydash.get_pointer(source,'/')==3 and pydash.get_pointer(source,'') is source
++    assert pydash.set_pointer(source,'/a~1b/~0key/-',4) is source
++    assert source['a/b']['~key']==[1,2,4]
++    assert pydash.set_pointer(source,'',9)==9
++
++def test_invalid_escapes_indices_and_noncontainers_do_not_mutate():
++    """不借用负索引、前导零或任意getattr。@return None。"""
++    source={'items':[1]}
++    for pointer in ('items','/~2','/items/01','/items/-1','/items/4','/items/0/name'):
++        with unittest.TestCase().assertRaises((ValueError,KeyError,IndexError,TypeError)):
++            pydash.set_pointer(source,pointer,7)
++        assert source=={'items':[1]}

@@ -1,0 +1,301 @@
+{
+  "project_key": "python-liquid",
+  "title": "Liquid商户模板工作场景",
+  "category": "语言语义、数据与渲染边界",
+  "seed_digest": "c49ffb26fbf60a5849638362cb01940b23fc9a7038ed5ded51b4f9a8e7612330",
+  "environment": "python-liquid-py312",
+  "source": {
+    "repository": "https://github.com/jg-rp/liquid",
+    "commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/tests/golden-liquid/LICENSE"
+    ]
+  },
+  "schema": 3,
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
+  "scenarios": [
+    {
+      "id": "PYTHON-LIQUID-01-DEV-SCENE",
+      "title": "工作区命名空间下同步异步模板加载共享正确缓存身份",
+      "goal": "工作区命名空间下同步异步模板加载共享正确缓存身份",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-LIQUID-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-LIQUID-01-DEV",
+          "kind": "modify",
+          "goal": "工作区命名空间下同步异步模板加载共享正确缓存身份",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair CachingLoaderMixin.load_async argument ordering: cache_key belongs to _check_cache_async and original name belongs to underlying source load_async. Preserve namespace resolution kwargs over context, separate namespaces, shared sync/async same-key cache identity, auto_reload and no-namespace behavior. Missing source must remain TemplateNotFoundError. Do not make synthetic namespace/name templates or disable caching to mask the defect.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_liquid_01_dev.py, and Chinese compatibility documentation at library/docs/development-python-liquid-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYTHON-LIQUID-01-DEV-contract.md",
+            "materials/PYTHON-LIQUID-01-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-LIQUID-01-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/liquid/builtin/loaders/mixins.py",
+            "library/tests/test_development_python_liquid_01_dev.py",
+            "library/docs/development-python-liquid-01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-LIQUID-01-DEV.rubric.json",
+            "native": "verification/PYTHON-LIQUID-01-DEV.native.json",
+            "public_native": "verification/PYTHON-LIQUID-01-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-LIQUID-02-DEV-SCENE",
+      "title": "编辑字典模板发布完整新版本并保留旧预览快照",
+      "goal": "编辑字典模板发布完整新版本并保留旧预览快照",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-LIQUID-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-LIQUID-02-DEV",
+          "kind": "modify",
+          "goal": "编辑字典模板发布完整新版本并保留旧预览快照",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd liquid.versioned_loader.VersionedDictLoader implementing real BaseLoader source/load/load_async contracts with explicit update/delete/snapshot, owned initial source mapping, monotonic per-name revisions, same-content no-op, bounded LRU compiled cache and in-memory RLock atomic loads. Old BoundTemplate and snapshot stay old; only changed name invalidates, missing loads/delete raise TemplateNotFoundError. Separate environments by actual environment object, and explicit globals loads do not mutate cached shared template globals. Async memory loads use same atomic operation without await split. Leave existing mutable DictLoader/CachingDictLoader behavior unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_liquid_02_dev.py, and Chinese compatibility documentation at library/docs/development-python-liquid-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYTHON-LIQUID-02-DEV-contract.md",
+            "materials/PYTHON-LIQUID-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-LIQUID-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/liquid/versioned_loader.py",
+            "library/tests/test_development_python_liquid_02_dev.py",
+            "library/docs/development-python-liquid-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-LIQUID-02-DEV.rubric.json",
+            "native": "verification/PYTHON-LIQUID-02-DEV.native.json",
+            "public_native": "verification/PYTHON-LIQUID-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-LIQUID-03-DEV-SCENE",
+      "title": "本地报告数据合同预检聚合缺字段与类型问题",
+      "goal": "本地报告数据合同预检聚合缺字段与类型问题",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-LIQUID-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-LIQUID-03-DEV",
+          "kind": "modify",
+          "goal": "本地报告数据合同预检聚合缺字段与类型问题",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd liquid.context_schema.ContextField(path tuple[str|int],expected_type,required=True,nullable=False), ContextSchema and validate_context(data,schema). Read declared Mapping/list/tuple paths only; report all missing and wrong-type fields in declaration order without values. Support explicit list indices, optional missing and nullable None separately; bool cannot satisfy int. Do not render templates, invoke filters or arbitrary object getters, infer filter types or declare dynamic paths complete. Schema copies field declarations, rejects duplicate/invalid paths, and extra undeclared data remains allowed. Default rendering behavior stays unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_liquid_03_dev.py, and Chinese compatibility documentation at library/docs/development-python-liquid-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYTHON-LIQUID-03-DEV-contract.md",
+            "materials/PYTHON-LIQUID-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-LIQUID-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/liquid/context_schema.py",
+            "library/tests/test_development_python_liquid_03_dev.py",
+            "library/docs/development-python-liquid-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-LIQUID-03-DEV.rubric.json",
+            "native": "verification/PYTHON-LIQUID-03-DEV.native.json",
+            "public_native": "verification/PYTHON-LIQUID-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-LIQUID-04-DEV-SCENE",
+      "title": "按业务记录身份独立渲染报告并隔离失败与上下文",
+      "goal": "按业务记录身份独立渲染报告并隔离失败与上下文",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-LIQUID-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-LIQUID-04-DEV",
+          "kind": "modify",
+          "goal": "按业务记录身份独立渲染报告并隔离失败与上下文",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd liquid.record_rendering.render_records and async-generator render_records_async over lazy (id,Mapping) records, returning immutable RenderedRecord(id,status,output,error-type). Use real BoundTemplate.render/render_async each time so assigns/cycle state does not leak across records. Preserve input order and identity; reject duplicate ids; continue mode records LiquidError without data/error-message leakage, fail-fast rethrows. Ordinary user exceptions and cancellation propagate. Keep work strictly pull-driven with no prefetch/unbounded tasks; closing after one item never executes later records. Both APIs are serial by explicit contract, no concurrency claim.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_liquid_04_dev.py, and Chinese compatibility documentation at library/docs/development-python-liquid-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYTHON-LIQUID-04-DEV-contract.md",
+            "materials/PYTHON-LIQUID-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-LIQUID-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/liquid/record_rendering.py",
+            "library/tests/test_development_python_liquid_04_dev.py",
+            "library/docs/development-python-liquid-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-LIQUID-04-DEV.rubric.json",
+            "native": "verification/PYTHON-LIQUID-04-DEV.native.json",
+            "public_native": "verification/PYTHON-LIQUID-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-LIQUID-05-DEV-SCENE",
+      "title": "报告模板源码包可离线移交并校验入口依赖与内容完整性",
+      "goal": "报告模板源码包可离线移交并校验入口依赖与内容完整性",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-LIQUID-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-LIQUID-05-DEV",
+          "kind": "modify",
+          "goal": "报告模板源码包可离线移交并校验入口依赖与内容完整性",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd liquid.template_bundle.make_bundle/templates explicit source Mapping plus root entries, load_bundle and immutable TemplateBundle with fresh environment(). Canonical schema1 JSON stores only raw source strings, explicit roots and SHA256 of canonical payload; reject tampering, duplicate JSON keys, unknown schema/fields, bad source types, missing/duplicate roots. Preserve all supplied dependency sources and prove real render/include in a fresh DictLoader environment. No pickle/code objects, no automatic dynamic-dependency completeness claim, no plugin/environment identity guessing; caller supplies compatible explicit options and cannot replace bundle loader. Copy sources and expose readonly snapshot.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_liquid_05_dev.py, and Chinese compatibility documentation at library/docs/development-python-liquid-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYTHON-LIQUID-05-DEV-contract.md",
+            "materials/PYTHON-LIQUID-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-LIQUID-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/liquid/template_bundle.py",
+            "library/tests/test_development_python_liquid_05_dev.py",
+            "library/docs/development-python-liquid-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-LIQUID-05-DEV.rubric.json",
+            "native": "verification/PYTHON-LIQUID-05-DEV.native.json",
+            "public_native": "verification/PYTHON-LIQUID-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-LIQUID-06-DEV-SCENE",
+      "title": "本地模板项目命令从真实JSON生成原子报告并保留失败前结果",
+      "goal": "本地模板项目命令从真实JSON生成原子报告并保留失败前结果",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-LIQUID-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-LIQUID-06-DEV",
+          "kind": "modify",
+          "goal": "本地模板项目命令从真实JSON生成原子报告并保留失败前结果",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd python -m liquid.project_cli and callable main(argv) using real Environment/FileSystemLoader/StrictUndefined, explicit --root --template --data --output. Require object JSON, local root-contained nonabsolute/non-parent-traversing template and root-contained resolved source; output cannot replace input JSON or any template-root file. Render completely before creating same-output-directory temp file, flush/fsync and os.replace atomically; cleanup on failure preserves existing output and prints only safe error type with exit2. Unicode, include/render, empty output and actual saved file must work. No network or credential lookup, no environment-data guessing, no source/config/test changes.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_liquid_06_dev.py, and Chinese compatibility documentation at library/docs/development-python-liquid-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYTHON-LIQUID-06-DEV-contract.md",
+            "materials/PYTHON-LIQUID-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-LIQUID-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/liquid/project_cli.py",
+            "library/tests/test_development_python_liquid_06_dev.py",
+            "library/docs/development-python-liquid-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-LIQUID-06-DEV.rubric.json",
+            "native": "verification/PYTHON-LIQUID-06-DEV.native.json",
+            "public_native": "verification/PYTHON-LIQUID-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+--- a/library/docs/development-python-frontmatter-04-dev.md
++++ b/library/docs/development-python-frontmatter-04-dev.md
+@@ -0,0 +1,5 @@
++# 批量导入可区分损坏头部并选择严格解析结果
++
++路线04：批量文档导入返回明确的缺失、成功、损坏及非映射状态，可选择抛携带结果的严格异常；默认元数据不被修改，空YAML合法。复用先前JSON对象能力，旧parse/loads仍按原宽容合同工作。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/frontmatter/parsing.py
++++ b/library/frontmatter/parsing.py
+@@ -0,0 +1,47 @@
++"""为批量文档导入提供明确的解析结果，保留原宽容API。"""
++from dataclasses import dataclass
++from frontmatter import detect_format, handlers
++from frontmatter.util import u
++
++
++@dataclass
++class ParseResult:
++    """独立解析结果。@param status 状态。@param metadata 字典。@param content 正文。@param handler 真实处理器。@param error 安全原因。"""
++    status: str
++    metadata: dict
++    content: str
++    handler: object = None
++    error: str = None
++
++
++class ParseError(ValueError):
++    """严格导入失败，携带完整结果。@param result 失败结果。"""
++    def __init__(self, result):
++        """保存结果供调用者分流。@param result 失败结果。@return None。"""
++        self.result = result
++        super().__init__(result.error)
++
++
++def parse_result(text, encoding='utf-8', handler=None, defaults=None, strict=False):
++    """显式区分缺失、合法、损坏及非映射头部。@param text 文本或字节。@param encoding 解码。@param handler 显式处理器。@param defaults 默认元数据。@param strict 是否抛ParseError。@return ParseResult。"""
++    normalized = u(text, encoding).strip()
++    metadata = dict(defaults or {})
++    actual = handler or detect_format(normalized, handlers)
++    if actual is None:
++        return ParseResult('absent', metadata, normalized)
++    try:
++        header, body = actual.split(normalized)
++        value = actual.load(header)
++    except Exception as error:
++        result = ParseResult('malformed', metadata, normalized, actual, str(error))
++    else:
++        if value is None:
++            value = {}
++        if not isinstance(value, dict):
++            result = ParseResult('non_mapping', metadata, body.strip(), actual, '元数据根必须是映射')
++        else:
++            metadata.update(value)
++            result = ParseResult('present', metadata, body.strip(), actual)
++    if strict and result.status in ('malformed', 'non_mapping'):
++        raise ParseError(result)
++    return result
+--- a/library/tests/test_development_python_frontmatter_04_dev.py
++++ b/library/tests/test_development_python_frontmatter_04_dev.py
+@@ -0,0 +1,26 @@
++"""显式结果让导入方区分无头部与损坏，原API不强制变严格。"""
++import unittest
++import frontmatter
++from frontmatter.parsing import ParseError, parse_result
++
++
++def test_status_and_defaults_are_independent():
++    """缺失、空头部、合法及非映射状态独立，默认值不变。@return None。"""
++    defaults={'x':1}
++    absent=parse_result(' body ',defaults=defaults)
++    assert absent.status=='absent' and absent.content=='body'
++    empty=parse_result('---\n---\nbody',defaults=defaults)
++    assert empty.status=='present' and empty.metadata==defaults
++    compact=parse_result('{"content":"meta","x":2}\nB',defaults=defaults)
++    assert compact.status=='present' and compact.metadata=={'content':'meta','x':2}
++    assert defaults=={'x':1}
++    assert parse_result('---\n- item\n---\nbody').status=='non_mapping'
++
++
++def test_strict_diagnostics_and_legacy_tolerance():
++    """错误结果可追踪，未启用严格模式的parse合同保留。@return None。"""
++    for raw in ('---\nunfinished','{bad}\nbody','---\n- item\n---\nB'):
++        with unittest.TestCase().assertRaises(ParseError) as raised:parse_result(raw,strict=True)
++        assert raised.exception.result.status in ('malformed','non_mapping')
++        assert raised.exception.result.error
++    assert frontmatter.parse('---\n- item\n---\nB')==({},'B')

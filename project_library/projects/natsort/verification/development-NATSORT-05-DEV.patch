@@ -1,0 +1,96 @@
+--- a/library/docs/development-natsort-05-dev.md
++++ b/library/docs/development-natsort-05-dev.md
+@@ -0,0 +1,5 @@
++# 为已有自然有序数据建立等价键范围与排名索引
++
++路线17：对既有自然有序记录建立快照，二分复用自然键查左右界、等价数量和范围；降序、重复键及字段提取正确，乱序输入拒绝而不暗中重排。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/natsort/search.py
++++ b/library/natsort/search.py
+@@ -0,0 +1,55 @@
++"""只读自然排序索引，查询复用预计算键而非字典序。"""
++from bisect import bisect_left, bisect_right
++import locale
++from natsort import natsort_keygen, ns
++
++
++class NaturalSortedIndex:
++    """保存已排序记录与原生自然键快照。@param iterable 已排序记录。@param key 提取字段。@param alg 原生策略。@param reverse 原输入降序。"""
++    def __init__(self, iterable, *, key=None, alg=ns.DEFAULT, reverse=False):
++        """建立快照并拒绝乱序，不静默重排。@param iterable 记录。@param key 提取器。@param alg 算法。@param reverse 降序。@return None。"""
++        self._natural=natsort_keygen(alg=alg);self._reverse=bool(reverse)
++        self._items=tuple(iterable)
++        self._keys=tuple(self._natural(key(item) if key else item) for item in self._items)
++        if any((a<b if reverse else a>b) for a,b in zip(self._keys,self._keys[1:])):
++            raise ValueError('输入尚未按自然序排列')
++        self._ascending=self._keys[::-1] if reverse else self._keys
++        self._locale=(locale.setlocale(locale.LC_COLLATE),locale.setlocale(locale.LC_NUMERIC)) if alg & ns.LOCALE else None
++
++    def __len__(self):
++        """返回记录数。@return 数量。"""
++        return len(self._items)
++
++    def __iter__(self):
++        """按输入顺序迭代原记录。@return 迭代器。"""
++        return iter(self._items)
++
++    def _query(self, value):
++        """在原排序上下文中生成查询键。@param value 已提取的查询值。@return 键。"""
++        if self._locale is not None and self._locale!=(locale.setlocale(locale.LC_COLLATE),locale.setlocale(locale.LC_NUMERIC)):
++            raise ValueError('locale已变化，请重建索引')
++        return self._natural(value)
++
++    def rank(self, value, side='left'):
++        """二分查询值在原输入顺序的左右界。@param value 已提取值。@param side left或right。@return 原始位置。"""
++        if side not in ('left','right'):raise ValueError('未知边界')
++        query=self._query(value)
++        if self._reverse:
++            return len(self)- (bisect_right(self._ascending,query) if side=='left' else bisect_left(self._ascending,query))
++        return bisect_left(self._ascending,query) if side=='left' else bisect_right(self._ascending,query)
++
++    def count(self, value):
++        """返回自然键相等的记录数量。@param value 查询值。@return 数量。"""
++        return self.rank(value,'right')-self.rank(value,'left')
++
++    def between(self, start=None, stop=None, *, include_start=True, include_stop=True):
++        """在自然升序上下界中查找，结果仍保持原输入方向。@param start 下界。@param stop 上界。@param include_start 含下界。@param include_stop 含上界。@return 原记录列表。"""
++        if start is not None and stop is not None and self._query(start)>self._query(stop):
++            raise ValueError('范围下界大于上界')
++        if self._reverse:
++            low=0 if stop is None else self.rank(stop,'left' if include_stop else 'right')
++            high=len(self) if start is None else self.rank(start,'right' if include_start else 'left')
++        else:
++            low=0 if start is None else self.rank(start,'left' if include_start else 'right')
++            high=len(self) if stop is None else self.rank(stop,'right' if include_stop else 'left')
++        return list(self._items[low:high])
+--- a/library/tests/test_development_natsort_05_dev.py
++++ b/library/tests/test_development_natsort_05_dev.py
+@@ -0,0 +1,27 @@
++"""已排序记录可按相同自然策略查询等价区间。"""
++import unittest
++from natsort.search import NaturalSortedIndex
++
++
++def test_equal_keys_and_ranges():
++    """02和2的左右界正确，返回原项。@return None。"""
++    index=NaturalSortedIndex(['x1','x2','x02','x3','x10'])
++    assert index.rank('x2')==1 and index.rank('x2','right')==3 and index.count('x2')==2
++    assert index.between('x2','x3')==['x2','x02','x3']
++    assert index.between('x2','x3',include_start=False)==['x3']
++
++
++def test_reverse_records_and_snapshot():
++    """降序索引保留记录且不依赖调用者列表后续重排。@return None。"""
++    records=[{'v':'x10'},{'v':'x3'},{'v':'x2'}]
++    index=NaturalSortedIndex(records,key=lambda row:row['v'],reverse=True)
++    records.reverse()
++    assert index.rank('x3')==1 and index.between('x2','x3')==[{'v':'x3'},{'v':'x2'}]
++    assert len(index)==3
++
++
++def test_empty_and_disorder_rejection():
++    """不把字典序数组误当自然序，也不静默排序。@return None。"""
++    assert NaturalSortedIndex([]).between()==[]
++    with unittest.TestCase().assertRaises(ValueError):NaturalSortedIndex(['x10','x2'])
++    with unittest.TestCase().assertRaises(ValueError):NaturalSortedIndex(['x1']).rank('x2','middle')

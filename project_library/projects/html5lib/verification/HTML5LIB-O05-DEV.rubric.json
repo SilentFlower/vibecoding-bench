@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML5LIB-O05-DEV",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add text.extract_text(tree,*,treewalker=\"etree\",include_hidden=False,include_images=False) using actual backend walker events. Preserve reading/tail order, paragraph and br boundaries, ordered/unordered list markers, decoded entities and exact pre-internal spaces/newlines while collapsing ordinary HTML whitespace. Omit head/script/style body-irrelevant text; hidden/template are optional and explicit image alt may be included. DOM/etree produce equivalent text and input trees/serializer output remain unchanged. Do not simply concatenate Characters, drop tail or claim HTML sanitization/network fetching.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

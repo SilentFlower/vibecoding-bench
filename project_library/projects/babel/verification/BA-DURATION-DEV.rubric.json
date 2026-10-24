@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BA-DURATION-DEV",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add babel.dates.format_duration(delta, *, units=(\"day\",\"hour\",\"minute\",\"second\"), max_parts=None, length=\"long\", locale=None). Accept nonnegative finite seconds or timedelta, decompose by explicit strictly descending unique week/day/hour/minute/second units, preserve fractional remainder in the smallest unit, omit zero components and render zero in the smallest unit. Use existing format_unit pluralization and CLDR unit list styles, falling back to standard list style for incomplete unit list patterns. max_parts truncates nonzero components without rounding. Reject calendar months/years, invalid order, negative/nonfinite values and invalid part counts; preserve format_timedelta.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

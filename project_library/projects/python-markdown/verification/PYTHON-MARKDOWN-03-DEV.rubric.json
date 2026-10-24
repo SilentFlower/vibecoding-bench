@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-MARKDOWN-03-DEV",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add opt-in markdown.extensions.uri_autolink with UriAutolinkExtension(schemes=(http,https,ssh,urn)). Match complete angle-bracket URI syntax before raw-HTML handling but after code/escapes, use per-instance case-insensitive validated scheme allowlists, and build ElementTree anchor attributes/AtomicString text through the real serializer. Forbid javascript/vbscript/data even if requested; unsupported schemes do not become links, ordinary HTML/email/standard autolinks keep existing semantics, and code spans/blocks never expand. No global lexer mutation or network access. Clearly state this policy controls new autolinks only and does not sanitize Markdown raw HTML as a whole.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

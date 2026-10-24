@@ -1,0 +1,125 @@
+--- a/library/docs/development-markdown-it-o06-dev.md
++++ b/library/docs/development-markdown-it-o06-dev.md
+@@ -0,0 +1,5 @@
++# 为真实语法树提供同步父链及Token来源的受控编辑
++
++对应路线19：受控插入/移动/删除/替换同步父链、兄弟及行内Token.children；先完整拒绝循环/根/叶容器/越界，真实to_tokens渲染反映修改，直接改公开list不在保证内。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/markdown_it/tree.py
++++ b/library/markdown_it/tree.py
+@@ -109,6 +109,77 @@
+         tokens: list[Token] = []
+         recursive_collect_tokens(self, tokens)
+         return tokens
++
++    def _check_editable_child(self, node):
++        """在任何修改前拒绝叶节点容器、根移动及祖先循环。@return None。"""
++        if not (self.is_root or self.is_nested or self.token is not None and self.token.children is not None):
++            raise ValueError('叶节点不能拥有子节点')
++        if not isinstance(node, SyntaxTreeNode) or node.is_root:
++            raise ValueError('只能插入非根语法节点')
++        ancestor = self
++        while ancestor is not None:
++            if ancestor is node:
++                raise ValueError('语法树不能形成循环')
++            ancestor = ancestor.parent
++
++    def _sync_token_children(self):
++        """行内/图片Token持有原children，编辑树后必须同步实际渲染来源。@return None。"""
++        if self.token is not None:
++            self.token.children = [token for child in self.children for token in child.to_tokens()]
++
++    def insert_child(self, index, node):
++        """在原序列插入点移动或新增节点，同时维护双向归属。
++
++        :param index: 修改前0..len(children)的插入位置。
++        :param node: 非根节点，已有父节点时先安全移出。
++        :return: 插入节点本身。
++        """
++        self._check_editable_child(node)
++        if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index <= len(self.children):
++            raise IndexError('子节点插入位置越界')
++        old_parent = node.parent
++        if old_parent is self:
++            old_index = self.children.index(node)
++            if old_index < index:
++                index -= 1
++        if old_parent is not None:
++            old_parent.remove_child(node)
++        self.children.insert(index, node)
++        node.parent = self
++        self._sync_token_children()
++        return node
++
++    def append_child(self, node):
++        """追加或移动节点到末尾。@param node 非根节点。@return 插入节点。"""
++        return self.insert_child(len(self.children), node)
++
++    def remove_child(self, node):
++        """移除直接子节点并解除父链。@param node 直接子节点。@return 被移除节点。"""
++        if node.parent is not self or node not in self.children:
++            raise ValueError('不是当前容器的直接子节点')
++        self.children.remove(node)
++        node.parent = None
++        self._sync_token_children()
++        return node
++
++    def replace_child(self, old, new):
++        """用新节点替换直接子节点，移动前完整检查循环。
++
++        :param old: 当前直接子节点。
++        :param new: 允许来自另一父节点的非根替代节点。
++        :return: 被移除的旧节点。
++        """
++        if old.parent is not self or old not in self.children:
++            raise ValueError('旧节点不是当前直接子节点')
++        self._check_editable_child(new)
++        if old is new:
++            return old
++        if new.parent is not None:
++            new.parent.remove_child(new)
++        index = self.children.index(old)
++        self.remove_child(old)
++        self.insert_child(index, new)
++        return old
+ 
+     @property
+     def children(self) -> list[Self]:
+--- a/library/tests/test_development_markdown_it_o06_dev.py
++++ b/library/tests/test_development_markdown_it_o06_dev.py
+@@ -0,0 +1,34 @@
++"""真实树编辑维护父链、兄弟及实际Token渲染结果。"""
++from markdown_it import MarkdownIt
++from markdown_it.tree import SyntaxTreeNode
++from markdown_it.token import Token
++import pytest
++
++def test_move_paragraph_between_containers_updates_render_and_siblings():
++    """一个节点只能有一个父节点，移动后原容器不再渲染该段。@return None。"""
++    md=MarkdownIt();tree=SyntaxTreeNode(md.parse('first\n\n> nested\n\nlast'))
++    first,quote,last=tree.children;quote.append_child(last)
++    assert last.parent is quote and tree.children==[first,quote] and quote.children[-1] is last
++    assert last.previous_sibling is quote.children[0] and last.next_sibling is None
++    html=md.renderer.render(tree.to_tokens(),md.options,{})
++    assert html=='<p>first</p>\n<blockquote>\n<p>nested</p>\n<p>last</p>\n</blockquote>\n'
++
++def test_inline_edits_replace_remove_and_same_parent_move_sync_tokens():
++    """行内children也必须同步原Token.children，而非仅改walk视图。@return None。"""
++    md=MarkdownIt();tree=SyntaxTreeNode(md.parse('old'))
++    inline=tree.children[0].children[0];old=inline.children[0]
++    new=SyntaxTreeNode([Token('text','',0,content='new')],create_root=False)
++    assert inline.replace_child(old,new) is old and old.parent is None
++    tail=SyntaxTreeNode([Token('text','',0,content='!')],create_root=False);inline.append_child(tail)
++    assert md.renderer.render(tree.to_tokens(),md.options,{})=='<p>new!</p>\n'
++    inline.insert_child(0,tail);assert inline.children==[tail,new]
++    inline.remove_child(tail);assert tail.parent is None and md.renderer.render(tree.to_tokens(),md.options,{})=='<p>new</p>\n'
++
++def test_rejected_cycles_roots_and_invalid_indices_leave_tree_intact():
++    """先验证再移动，拒绝操作不能先把候选从原父节点拆走。@return None。"""
++    md=MarkdownIt();tree=SyntaxTreeNode(md.parse('a\n\n> b'));paragraph,quote=tree.children;before=tree.to_tokens()
++    with pytest.raises(ValueError):quote.append_child(tree)
++    with pytest.raises(ValueError):quote.children[0].append_child(quote)
++    with pytest.raises(IndexError):quote.insert_child(99,paragraph)
++    with pytest.raises(ValueError):paragraph.children[0].children[0].append_child(quote)
++    assert tree.children==[paragraph,quote] and paragraph.parent is tree and tree.to_tokens()==before

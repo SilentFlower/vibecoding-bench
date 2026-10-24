@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-DATEUTIL-05-DEV",
+  "source_commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Allow case-insensitive X- extension properties at VTIMEZONE and STANDARD/DAYLIGHT component levels in tzical, ignoring their content as nonexecuting metadata. Preserve existing transition/offset/recurrence behavior, required TZID/DTSTART/offset checks, malformed BEGIN/END and unknown NON-X standard property errors. Parameters and repeated X properties are harmless; do not fetch TZURL/X URLs, import code or relax validation for ordinary properties.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

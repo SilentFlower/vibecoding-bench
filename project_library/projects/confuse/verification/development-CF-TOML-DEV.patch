@@ -1,0 +1,93 @@
+--- a/library/confuse/core.py
++++ b/library/confuse/core.py
+@@ -44,6 +44,7 @@
+ from . import templates, util, yaml_util
+ from .exceptions import ConfigError, ConfigTypeError, NotFoundError
+ from .sources import ConfigSource, EnvSource, YamlSource
++from .toml_source import TomlSource
+ 
+ if TYPE_CHECKING:
+     import builtins
+@@ -711,7 +712,7 @@
+         inserted with `add` or `set`, will remain unchanged.
+         """
+         for source in self.sources:
+-            if isinstance(source, YamlSource):
++            if isinstance(source, (YamlSource, TomlSource)):
+                 source.load()
+ 
+ 
+--- a/library/confuse/toml_source.py
++++ b/library/confuse/toml_source.py
+@@ -0,0 +1,31 @@
++"""可事务重载的标准TOML配置来源。"""
++import os
++import tomllib
++from .exceptions import ConfigReadError
++from .sources import ConfigSource
++
++
++class TomlSource(ConfigSource):
++    """提供与现有分层来源一致的文件身份信息。"""
++    def __init__(self,filename,default=False,base_for_paths=False,optional=False):
++        """读取来源。@param filename 文件路径。@param default 是否默认配置。
++        @param base_for_paths 相对路径基准。@param optional 缺失是否允许。@return None。
++        """
++        super().__init__({},os.path.abspath(os.fspath(filename)),default,base_for_paths)
++        self.optional=optional
++        self.load()
++
++    def load(self):
++        """完整解析后原位替换，解析失败不改变旧值。@return None。
++        """
++        try:
++            with open(self.filename,'rb') as stream:
++                value=tomllib.load(stream)
++        except FileNotFoundError as error:
++            if not self.optional:
++                raise ConfigReadError(self.filename,error) from error
++            value={}
++        except (OSError,tomllib.TOMLDecodeError) as error:
++            raise ConfigReadError(self.filename,error) from error
++        self.clear()
++        self.update(value)
+--- a/library/development_tests/test_development_cf_toml_dev.py
++++ b/library/development_tests/test_development_cf_toml_dev.py
+@@ -0,0 +1,29 @@
++"""公开TOML来源实际文件回归。"""
++from datetime import date
++import pytest
++from confuse import Configuration,ConfigReadError
++from confuse.toml_source import TomlSource
++
++def test_tables_dates_and_source_metadata(tmp_path):
++    file=tmp_path/'config.toml';file.write_text('[service]\nports=[80,443]\nday=2026-01-02\n')
++    source=TomlSource(file,default=True,base_for_paths=True)
++    assert source['service']=={'ports':[80,443],'day':date(2026,1,2)}
++    assert source.filename==str(file) and source.default and source.base_for_paths
++
++def test_successful_reload_removes_keys_and_preserves_identity(tmp_path):
++    file=tmp_path/'c.toml';file.write_text('old=1\nkeep=2\n');source=TomlSource(file)
++    config=Configuration('app',read=False);config.add({'old':9});config.set(source)
++    file.write_text('keep=3\n');config.reload()
++    assert config.sources[0] is source and config['old'].get()==9 and config['keep'].get()==3
++
++def test_bad_toml_preserves_last_valid_data(tmp_path):
++    file=tmp_path/'c.toml';file.write_text('value=4\n');source=TomlSource(file)
++    file.write_text('value=[\n')
++    with pytest.raises(ConfigReadError): source.load()
++    assert dict(source)=={'value':4}
++
++def test_optional_missing_becomes_empty_but_parse_error_is_not_optional(tmp_path):
++    file=tmp_path/'c.toml';source=TomlSource(file,optional=True);assert source=={}
++    file.write_text('v=1');source.load();file.unlink();source.load();assert source=={}
++    file.write_text('v=[')
++    with pytest.raises(ConfigReadError): source.load()
+--- a/library/docs/development-cf-toml-dev.md
++++ b/library/docs/development-cf-toml-dev.md
+@@ -0,0 +1,5 @@
++# 接入标准TOML文件来源并保持重载事务与来源身份
++
++实现真实TOML来源并接入Configuration.reload；加载成功才替换内容，删除的键不残留，失败保留最后有效配置。保留来源对象、路径归属和默认标记，缺失可选文件清空但语法错误不能吞掉。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

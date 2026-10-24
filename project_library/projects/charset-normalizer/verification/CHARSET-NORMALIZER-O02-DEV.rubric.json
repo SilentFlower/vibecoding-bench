@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARSET-NORMALIZER-O02-DEV",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement charset_normalizer.streams.from_stream(stream, *, max_bytes, read_size=65536, preserve_position=True, **options). Never read(-1), retain at most the explicit nonnegative budget, handle short reads and report actual read_bytes/eof/budget_exhausted with real from_bytes matches. Restore seekable caller positions even on errors and never close caller streams; nonseekable preservation/text reads/invalid bounds fail clearly. Zero budget must not read, and a limited prefix must not be represented as whole-source validation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

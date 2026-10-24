@@ -1,0 +1,81 @@
+--- a/library/docs/development-configobj-o03-dev.md
++++ b/library/docs/development-configobj-o03-dev.md
+@@ -0,0 +1,5 @@
++# 把真实编码配置完整写入后原子发布
++
++对应路线06：复用真实ConfigObj序列化但不污染原对象，完整写入同目录唯一临时文件后替换，保留模式并明确拒绝符号链接，失败清理可核。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/configobj/__init__.py
++++ b/library/src/configobj/__init__.py
+@@ -2135,6 +2135,40 @@
+             with open(self.filename, 'wb') as h:
+                 h.write(output_bytes)
+ 
++    def write_atomic(self, filename=None):
++        """完整序列化后在同目录原子替换，不改变现有流write协议。
++
++        :param filename: 可选目标路径；默认使用self.filename。
++        :return: 发布后的绝对目标路径；不声称断电持久或跨文件事务。
++        """
++        from copy import deepcopy
++        from io import BytesIO
++        from pathlib import Path
++        import stat
++        import tempfile
++        destination = self.filename if filename is None else filename
++        if destination is None:
++            raise ValueError('原子发布需要明确文件名')
++        path = Path(destination).absolute()
++        if path.is_symlink():
++            raise ValueError('原子发布不跟随符号链接')
++        # 在打开临时文件之前序列化，编码或引号错误不能触碰目标。
++        buffer = BytesIO()
++        deepcopy(self).write(outfile=buffer)
++        payload = buffer.getvalue()
++        previous_mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else 0o600
++        descriptor, temporary = tempfile.mkstemp(prefix='.' + path.name + '.', suffix='.tmp', dir=path.parent)
++        try:
++            with os.fdopen(descriptor, 'wb') as output:
++                output.write(payload)
++                output.flush()
++                os.fchmod(output.fileno(), previous_mode)
++            os.replace(temporary, path)
++        finally:
++            if os.path.exists(temporary):
++                os.unlink(temporary)
++        return path
++
+     def validate(self, validator, preserve_errors=False, copy=False,
+                  section=None):
+         """
+--- a/library/tests/test_development_configobj_o03_dev.py
++++ b/library/tests/test_development_configobj_o03_dev.py
+@@ -0,0 +1,27 @@
++"""原子发布使用真实ConfigObj编码及同目录替换。"""
++from configobj import ConfigObj
++import pytest
++import os
++
++def test_publish_roundtrip_mode_and_original_state(tmp_path):
++    """已有模式和注释保持，原配置对象不被序列化污染。@return None。"""
++    path=tmp_path/'app.ini';path.write_text('old=yes\n');path.chmod(0o640)
++    config=ConfigObj(['# title','x=杭州'],encoding='utf8');old_indent=config.indent_type
++    assert config.write_atomic(path)==path.absolute()
++    assert ConfigObj(str(path),encoding='utf8')['x']=='杭州' and path.stat().st_mode&0o777==0o640
++    assert config.indent_type==old_indent and config.filename is None
++
++def test_replace_failure_keeps_old_and_cleans(tmp_path,monkeypatch):
++    """替换失败不破坏旧字节且只清理本轮临时文件。@return None。"""
++    path=tmp_path/'app.ini';path.write_bytes(b'old=1\n')
++    def fail(*args):raise OSError('replace failed')
++    monkeypatch.setattr(os,'replace',fail)
++    with pytest.raises(OSError):ConfigObj({'x':'2'}).write_atomic(path)
++    assert path.read_bytes()==b'old=1\n' and list(tmp_path.iterdir())==[path]
++
++def test_new_file_mode_and_symlink_rejection(tmp_path):
++    """新文件私有模式，符号链接明确拒绝。@return None。"""
++    config=ConfigObj({'x':'1'});path=tmp_path/'new';config.write_atomic(path)
++    assert path.stat().st_mode&0o777==0o600
++    link=tmp_path/'link';link.symlink_to(path)
++    with pytest.raises(ValueError):config.write_atomic(link)

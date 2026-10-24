@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TK-STRING-STYLE-DEV",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add String.replace_value(value,*,fallback=False), returning a detached String that retains original single/multiline and basic/literal quote kind and an independent copy of trivia. Encode semantic value through existing from_raw so escaped characters and leading multiline newlines roundtrip. If literal style cannot represent the value, propagate InvalidStringError unless fallback=True, then switch only to the matching-width basic style. Preserve original node and str.replace semantics; validate arguments.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

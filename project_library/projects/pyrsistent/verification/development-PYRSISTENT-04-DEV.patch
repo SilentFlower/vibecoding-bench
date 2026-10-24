@@ -1,0 +1,79 @@
+--- a/library/docs/development-pyrsistent-04-dev.md
++++ b/library/docs/development-pyrsistent-04-dev.md
+@@ -0,0 +1,5 @@
++# 嵌套受校验容器序列化完整传递调用格式
++
++路线05：默认CheckedPMap键值和checked序列serializer递归传递真实format，多层容器与直接记录输出政策一致。自定义__serializer__仍接管，默认None不变，不假称任意序列化键可哈希。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyrsistent/_checked_types.py
++++ b/library/pyrsistent/_checked_types.py
+@@ -172,9 +172,9 @@
+         _store_types(dct, bases, '_checked_types', '__type__')
+         store_invariants(dct, bases, '_checked_invariants', '__invariant__')
+ 
+-        def default_serializer(self, _, value):
++        def default_serializer(self, format, value):
+             if isinstance(value, CheckedType):
+-                return value.serialize()
++                return value.serialize(format)
+             return value
+ 
+         dct.setdefault('__serializer__', default_serializer)
+@@ -439,14 +439,14 @@
+         _store_types(dct, bases, '_checked_value_types', '__value_type__')
+         store_invariants(dct, bases, '_checked_invariants', '__invariant__')
+ 
+-        def default_serializer(self, _, key, value):
++        def default_serializer(self, format, key, value):
+             sk = key
+             if isinstance(key, CheckedType):
+-                sk = key.serialize()
++                sk = key.serialize(format)
+ 
+             sv = value
+             if isinstance(value, CheckedType):
+-                sv = value.serialize()
++                sv = value.serialize(format)
+ 
+             return sk, sv
+ 
+--- a/library/tests/test_development_pyrsistent_04_dev.py
++++ b/library/tests/test_development_pyrsistent_04_dev.py
+@@ -0,0 +1,36 @@
++"""format必须穿过Checked容器到达记录字段serializer。"""
++from pyrsistent import PRecord,CheckedPMap,CheckedPVector,CheckedPSet,field
++
++
++class Item(PRecord):
++    """按format决定输出文本的业务值。"""
++    quantity=field(type=int,serializer=lambda format,value:str(format)+':'+str(value))
++
++
++class Items(CheckedPMap):
++    """真实受校验映射。"""
++    __key_type__=str
++    __value_type__=Item
++
++
++def test_nested_map_and_vector_receive_the_same_format():
++    """同对象直接和嵌套序列化政策一致。@return None。"""
++    class Sequence(CheckedPVector):
++        """受校验序列。"""
++        __type__=Item
++    item=Item(quantity=2)
++    assert item.serialize('json')=={'quantity':'json:2'}
++    assert Items({'a':item}).serialize('json')=={'a':{'quantity':'json:2'}}
++    assert Sequence([item]).serialize('json')==[{'quantity':'json:2'}]
++
++
++def test_custom_container_serializer_retains_authority_and_default():
++    """显式自定义serializer不被覆盖，None默认按原值传递。@return None。"""
++    class Custom(Items):
++        """容器自己的序列化策略。"""
++        def __serializer__(self,format,key,value):
++            """明确接管键值输出。@param format 格式。@param key 键。@param value 值。@return 一对。"""
++            return key,str(format)+':custom'
++    item=Item(quantity=3)
++    assert Custom({'a':item}).serialize('wire')=={'a':'wire:custom'}
++    assert Items({'a':item}).serialize()=={'a':{'quantity':'None:3'}}

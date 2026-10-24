@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BOTTLE-O06-DEV",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Build on delivered prefix cloning and add Bottle.inspect_routes() returning stable registration-order JSON metadata for actual rule/method/name/current-or-external owner, safe callback name, dynamic filter names and route-specific plugin names. Correctly explain legacy external owners and prefixed target-owned clones. Introspection must never execute callbacks, apply plugins, expose configuration/closure values or use address-bearing repr. Handle callable instances and unnamed/empty routes while preserving registration and dispatch.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

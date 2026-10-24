@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MS-PLAIN-TEXT-DEV",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement mistune.renderers.text.PlainTextRenderer(include_urls=False) as BaseRenderer with NAME=\"text\". Retain inline text/entity semantics and literal code, paragraph/heading/quote boundaries, ordered/unordered list item separation, task state, table cell boundaries and footnote references from actual tokens. Strip raw HTML tags while keeping text; optionally append link/image URLs without duplicating identical visible URLs. Handle AST plugin containers through children, empty input and repeated use without state leakage. Output must not include formatting HTML or silently use the HTML renderer and remove all structure.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

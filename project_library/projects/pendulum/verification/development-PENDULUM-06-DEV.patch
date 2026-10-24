@@ -1,0 +1,82 @@
+--- a/library/docs/development-pendulum-06-dev.md
++++ b/library/docs/development-pendulum-06-dev.md
+@@ -0,0 +1,5 @@
++# 交期计算使用不可变离线假日与自定义周末工作日历
++
++路线08：不可变离线BusinessCalendar支持自定义周末、假日、正负工作日推进与半开计数；零保持身份、DateTime保钟点/时区，不下载地区假日。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pendulum/business.py
++++ b/library/src/pendulum/business.py
+@@ -0,0 +1,46 @@
++"""调用方提供离线假日的不可变工作日历。"""
++from dataclasses import dataclass
++from datetime import date,datetime,timedelta
++import operator
++
++
++@dataclass(frozen=True)
++class BusinessCalendar:
++    """离线日历。@param holidays date集合。@param weekend 0周一至6周日的休息日。@return 不可变策略。"""
++    holidays: frozenset = frozenset()
++    weekend: frozenset = frozenset((5,6))
++
++    def __post_init__(self):
++        """固定输入并拒绝无法推进的整周休息政策。@return None。"""
++        holidays=frozenset(self.holidays);weekend=frozenset(self.weekend)
++        if any(not isinstance(day,date) or isinstance(day,datetime) for day in holidays):raise TypeError("holidays需要date")
++        if any(type(day) is not int or not 0<=day<=6 for day in weekend) or len(weekend)==7:raise ValueError("无效weekend")
++        object.__setattr__(self,"holidays",holidays);object.__setattr__(self,"weekend",weekend)
++
++    def is_business_day(self,value):
++        """判断指定日期。@param value date或datetime。@return 是否工作日。"""
++        day=date(value.year,value.month,value.day)
++        return day.weekday() not in self.weekend and day not in self.holidays
++
++    def add_business_days(self,value,amount):
++        """跳过假日推进日历日。@param value 原日期时间。@param amount 有符号整数，零不滚动。@return 原类型业务日期。"""
++        amount=operator.index(amount)
++        if amount==0:return value
++        direction=1 if amount>0 else -1;remaining=abs(amount);current=value
++        while remaining:
++            current=current.add(days=direction) if hasattr(current,"add") else current+timedelta(days=direction)
++            if self.is_business_day(current):remaining-=1
++        return current
++
++    def count(self,start,end):
++        """计数半开[start,end)工作日。@param start 首日。@param end 末日。@return 有符号计数。"""
++        if start>end:return -self.count(end,start)
++        current=date(start.year,start.month,start.day);stop=date(end.year,end.month,end.day);total=0
++        while current<stop:
++            total+=self.is_business_day(current);current+=timedelta(days=1)
++        return total
++
++    def next_business_day(self,value,include_current=False):
++        """查找下一工作日。@param value 起点。@param include_current 可保留当前工作日。@return 日期时间。"""
++        if include_current and self.is_business_day(value):return value
++        return self.add_business_days(value,1)
+--- a/library/tests/test_development_pendulum_06_dev.py
++++ b/library/tests/test_development_pendulum_06_dev.py
+@@ -0,0 +1,22 @@
++"""工作日历只用调用方假日，原始add日历语义不变。"""
++from datetime import date
++import unittest
++import pendulum
++from pendulum.business import BusinessCalendar
++
++def test_holidays_weekends_both_directions_and_halfopen_count():
++    """星期五加一工作日跳周末与周一假日。@return None。"""
++    calendar=BusinessCalendar({date(2024,1,8)})
++    friday=pendulum.date(2024,1,5)
++    assert calendar.add_business_days(friday,1)==pendulum.date(2024,1,9)
++    assert calendar.add_business_days(pendulum.date(2024,1,9),-1)==friday
++    assert calendar.count(friday,pendulum.date(2024,1,10))==2
++    assert calendar.count(pendulum.date(2024,1,10),friday)==-2
++
++def test_policy_is_frozen_start_nonbusiness_and_zero_is_identity():
++    """复制可变输入，保时区与钟点且不联网取假日。@return None。"""
++    source={date(2024,1,8)};calendar=BusinessCalendar(source);source.clear()
++    value=pendulum.datetime(2024,1,6,12,tz='Europe/Paris')
++    assert calendar.add_business_days(value,1)==pendulum.datetime(2024,1,9,12,tz='Europe/Paris')
++    assert calendar.add_business_days(value,0) is value
++    with unittest.TestCase().assertRaises(ValueError):BusinessCalendar(weekend=set(range(7)))

@@ -1,0 +1,57 @@
+--- a/library/docs/development-sqlite-utils-04-dev.md
++++ b/library/docs/development-sqlite-utils-04-dev.md
+@@ -0,0 +1,5 @@
++# TSV及自动探测导入统一遵守额外字段收集忽略与拒绝政策
++
++路线05：TSV/自动路径递归最内层传ignore_extras/extras_key，三种政策一致；短行None/互斥参数/原CloseableIterator保持，不跳过坏行、不改CLI默认截断。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/sqlite_utils/utils.py
++++ b/library/sqlite_utils/utils.py
+@@ -359,7 +359,8 @@
+         return _CloseableIterator(iter(rows), decoded_fp), Format.CSV
+     elif format == Format.TSV:
+         rows, _ = rows_from_file(
+-            fp, format=Format.CSV, dialect=csv.excel_tab, encoding=encoding
++            fp, format=Format.CSV, dialect=csv.excel_tab, encoding=encoding,
++            ignore_extras=ignore_extras, extras_key=extras_key,
+         )
+         return (
+             _extra_key_strategy(
+@@ -393,7 +394,8 @@
+                 first_bytes.decode(encoding or "utf-8-sig", "ignore")
+             )
+             rows, _ = rows_from_file(
+-                buffered, format=Format.CSV, dialect=dialect, encoding=encoding
++                buffered, format=Format.CSV, dialect=dialect, encoding=encoding,
++                ignore_extras=ignore_extras, extras_key=extras_key,
+             )
+             # Make sure we return the format we detected
+             detected_format = Format.TSV if dialect.delimiter == "\t" else Format.CSV
+--- a/library/tests/test_development_sqlite_utils_04_dev.py
++++ b/library/tests/test_development_sqlite_utils_04_dev.py
+@@ -0,0 +1,24 @@
++"""TSV/自动路径真正把多余字段策略传到最内层CSV reader。"""
++import io
++import unittest
++from sqlite_utils.utils import rows_from_file,Format,RowError
++
++def test_tsv_collect_ignore_and_default_error_match_csv():
++    """额外字段先被内层报错后外层无法补救，必须正确传递。@return None。"""
++    for delimiter,format in ((',',Format.CSV),('\t',Format.TSV)):
++        raw=f'a{delimiter}b\n1{delimiter}2{delimiter}3\n'.encode()
++        rows,_=rows_from_file(io.BytesIO(raw),format=format,extras_key='rest')
++        assert list(rows)==[{'a':'1','b':'2','rest':['3']}]
++        rows,_=rows_from_file(io.BytesIO(raw),format=format,ignore_extras=True)
++        assert list(rows)==[{'a':'1','b':'2'}]
++        rows,_=rows_from_file(io.BytesIO(raw),format=format)
++        with unittest.TestCase().assertRaises(RowError):list(rows)
++
++def test_detected_delimiter_policy_short_rows_and_conflicting_options():
++    """自动探测样本有足够正常行，避免把嗅探问题冒充策略失败。@return None。"""
++    raw=('a\tb\n'+''.join('1\t2\n' for _ in range(30))+'3\t4\textra\n').encode()
++    rows,format=rows_from_file(io.BytesIO(raw),extras_key='remaining')
++    values=list(rows);assert values[-1]=={'a':'3','b':'4','remaining':['extra']} and format is Format.TSV
++    rows,_=rows_from_file(io.BytesIO(b'a\tb\n1\n'),format=Format.TSV,ignore_extras=True)
++    assert list(rows)==[{'a':'1','b':None}]
++    with unittest.TestCase().assertRaises(ValueError):rows_from_file(io.BytesIO(raw),ignore_extras=True,extras_key='x')

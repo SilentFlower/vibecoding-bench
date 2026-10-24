@@ -1,0 +1,13 @@
+{
+  "script": "verification/development-SC-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/test_schedule.py"
+}

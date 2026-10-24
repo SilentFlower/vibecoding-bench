@@ -1,0 +1,70 @@
+--- a/library/docs/development-dynaconf-o01-dev.md
++++ b/library/docs/development-dynaconf-o01-dev.md
+@@ -0,0 +1,5 @@
++# 在真实文件加载前整体验证文本路径协议并拒绝非法参数
++
++对应路线01：load_file先整体验证str/文本PathLike/list/tuple并fspath规范化，非法参数任何silent都TypeError；None/空/模块名/glob旧可选路径保持，不任意str对象。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dynaconf/base.py
++++ b/library/dynaconf/base.py
+@@ -1320,7 +1320,25 @@
+         :param validate: Should trigger validation?
+         :param run_hooks: Should run collected hooks?
+         """
+-        files = ensure_a_list(path)
++        # 先整体规范化再产生任何加载副作用，silent不能吞程序参数类型错误。
++        if path is None:
++            files = []
++        elif isinstance(path, (str, os.PathLike)):
++            normalized = os.fspath(path)
++            if not isinstance(normalized, str):
++                raise TypeError('配置路径必须为文本路径')
++            files = ensure_a_list(normalized)
++        elif isinstance(path, (list, tuple)):
++            files = []
++            for item in path:
++                if not isinstance(item, (str, os.PathLike)):
++                    raise TypeError('路径序列只能包含str或PathLike')
++                normalized = os.fspath(item)
++                if not isinstance(normalized, str):
++                    raise TypeError('配置路径必须为文本路径')
++                files.append(normalized)
++        else:
++            raise TypeError('路径必须为str、PathLike或其有限list/tuple')
+         if not files:  # a glob pattern may return empty
+             return
+ 
+--- a/library/tests/test_development_dynaconf_o01_dev.py
++++ b/library/tests/test_development_dynaconf_o01_dev.py
+@@ -0,0 +1,30 @@
++"""真实load_file先验证整个路径参数，非法输入不能被silent吞掉。"""
++from dynaconf import Dynaconf
++from types import ModuleType
++import pytest
++
++def test_str_pathlike_and_glob_load_actual_files(tmp_path):
++    """文件路径协议与字符串真实读取相同值，glob保留顺序。@return None。"""
++    one=tmp_path/'one.json';one.write_text('{"VALUE":1}');two=tmp_path/'two.json';two.write_text('{"VALUE":2}')
++    for path in [str(one),one]:
++        settings=Dynaconf(environments=False);settings.load_file(path,silent=False);assert settings.VALUE==1
++    settings=Dynaconf(environments=False);settings.load_file(str(tmp_path/'*.json'));assert settings.VALUE==2
++
++def test_invalid_arguments_and_mixed_sequence_reject_before_loading(tmp_path):
++    """即使silent=True，模块/字典/数字及混合坏项在首文件加载前拒绝。@return None。"""
++    path=tmp_path/'one.json';path.write_text('{"VALUE":1}')
++    for silent in [True,False]:
++        for invalid in [ModuleType('fake'),{},42,b'bytes',[path,42]]:
++            settings=Dynaconf(environments=False)
++            with pytest.raises(TypeError):settings.load_file(invalid,silent=silent)
++            assert settings.get('VALUE') is None
++
++def test_bad_path_protocol_empty_lists_and_no_match_keep_explicit_boundaries():
++    """__fspath__结果不合法拒绝，None/空列表/无匹配按旧可选行为。@return None。"""
++    class Bad:
++        """错误路径协议实现。"""
++        def __fspath__(self):return 42
++    settings=Dynaconf(environments=False)
++    with pytest.raises(TypeError):settings.load_file(Bad())
++    assert settings.load_file([]) is None and settings.load_file(None) is None
++    assert settings.load_file('unmatched-ordinary-*.json') is None

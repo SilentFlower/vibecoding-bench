@@ -1,0 +1,89 @@
+--- a/library/docs/development-packaging-01-dev.md
++++ b/library/docs/development-packaging-01-dev.md
+@@ -0,0 +1,5 @@
++# 发行报表保留原版本拼写并独立使用PEP440比较
++
++路线01：独立不可变DisplayVersion保留精确原文，display展示原文、str与比较/hash继续标准规范化；已有Version派生时原文明确None，pickle和只读边界完整验证。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/packaging/display.py
++++ b/library/src/packaging/display.py
+@@ -0,0 +1,53 @@
++"""展示拼写与PEP440比较键分离，不修改Version原有存储/pickle。"""
++from dataclasses import dataclass
++from functools import total_ordering
++from packaging.version import Version
++
++
++@total_ordering
++@dataclass(frozen=True,eq=False,init=False)
++class DisplayVersion:
++    """不可变展示版本。@param value 原始版本文本。@return 原文与标准Version组成的对象。"""
++    raw_version: str | None
++    version: Version
++
++    def __init__(self,value):
++        """校验并保留精确原文。@param value 原字符串。@return None。"""
++        if not isinstance(value,str):raise TypeError('value必须为str')
++        parsed=Version(value)
++        object.__setattr__(self,'raw_version',value)
++        object.__setattr__(self,'version',parsed)
++
++    @classmethod
++    def from_version(cls,value):
++        """已有标准版本没有原文。@param value Version。@return raw_version为None的包装。"""
++        if not isinstance(value,Version):raise TypeError('value必须为Version')
++        result=object.__new__(cls)
++        object.__setattr__(result,'raw_version',None)
++        object.__setattr__(result,'version',value)
++        return result
++
++    @property
++    def display(self):
++        """返回原文或规范回退。@return 用户展示文本。"""
++        return self.raw_version if self.raw_version is not None else str(self.version)
++
++    def __str__(self):
++        """保持标准规范化字符串。@return PEP440规范文本。"""
++        return str(self.version)
++
++    def __hash__(self):
++        """哈希只由标准版本决定。@return 标准版本hash。"""
++        return hash(self.version)
++
++    def __eq__(self,other):
++        """比较时忽略展示拼写。@param other 标准或展示版本。@return 相等或NotImplemented。"""
++        if isinstance(other,DisplayVersion):other=other.version
++        if not isinstance(other,Version):return NotImplemented
++        return self.version==other
++
++    def __lt__(self,other):
++        """排序只使用标准版本。@param other 标准或展示版本。@return 顺序或NotImplemented。"""
++        if isinstance(other,DisplayVersion):other=other.version
++        if not isinstance(other,Version):return NotImplemented
++        return self.version<other
+--- a/library/tests/test_development_packaging_01_dev.py
++++ b/library/tests/test_development_packaging_01_dev.py
+@@ -0,0 +1,22 @@
++"""展示原文不进入版本比较键，旧Version协议不改变。"""
++import pickle
++import unittest
++from dataclasses import FrozenInstanceError
++from packaging.display import DisplayVersion
++from packaging.version import Version
++
++def test_raw_spelling_comparison_hash_and_normalized_text():
++    """CalVer、空白和local大小写均可展示原文。@return None。"""
++    value=DisplayVersion(' v2026.01.01+ABC ')
++    assert value.raw_version==' v2026.01.01+ABC ' and value.display==value.raw_version
++    assert str(value)=='2026.1.1+abc' and value==Version('2026.1.1+abc')
++    assert hash(value)==hash(Version('2026.1.1+abc')) and value<Version('2027')
++    assert len({value,Version('2026.1.1+abc')})==1
++
++def test_derived_version_pickle_and_readonly_policy():
++    """已有parts结果明确无原文，pickle保持只读内容。@return None。"""
++    value=DisplayVersion.from_version(Version.from_parts(release=(2,0)))
++    assert value.raw_version is None and value.display=='2.0'
++    restored=pickle.loads(pickle.dumps(DisplayVersion('02.00')))
++    assert restored.raw_version=='02.00' and restored==value
++    with unittest.TestCase().assertRaises(FrozenInstanceError):restored.raw_version='changed'

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "XD-BUDGET-DEV",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add optional parse kwargs max_depth/max_elements/max_text_chars (None or nonnegative nonboolean integer), validated before consuming input. Count depth including root=1, all element starts and cumulative decoded character-data lengths including whitespace (not attributes/comments). Raise XMLLimitError(ValueError) before constructing the offending element or appending excess text. Bound whole input even in item_depth streaming, namespace and chunked modes. Preserve unlimited defaults, entity blocking and callback stop semantics; do not claim rollback of callbacks emitted before a later limit failure.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

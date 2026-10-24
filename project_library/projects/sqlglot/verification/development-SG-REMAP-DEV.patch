@@ -1,0 +1,79 @@
+--- a/library/development_tests/test_development_sg_remap_dev.py
++++ b/library/development_tests/test_development_sg_remap_dev.py
+@@ -0,0 +1,24 @@
++"""公开表映射真实SQL回归。"""
++import sqlite3
++import pytest
++from sqlglot import parse_one
++from sqlglot.report_remap import remap_tables
++from sqlglot.report_inspection import inspect_tables
++
++def test_generated_query_executes_with_preserved_original_qualifier():
++    connection=sqlite3.connect(':memory:');connection.execute('create table new_table(id integer)');connection.execute('insert into new_table values(7)')
++    result=remap_tables('SELECT old_table.id FROM old_table',{('','','old_table'):('','','new_table')})
++    assert connection.execute(result.sql(dialect='sqlite')).fetchall()==[(7,)]
++
++def test_cte_shadowing_and_existing_alias_are_kept():
++    query='WITH local AS (SELECT id FROM base) SELECT x.id FROM local x JOIN target t ON x.id=t.id'
++    result=remap_tables(query,{('','','base'):('','archive','base_new'),('','','target'):('','','target_new')})
++    assert {row.name for row in inspect_tables(result)}=={'base_new','target_new'} and 'local AS' in result.sql() and 'AS t' in result.sql()
++
++def test_replacement_names_are_quoted_as_data_and_ast_is_unchanged():
++    source=parse_one('SELECT old.id FROM old');before=source.dump();result=remap_tables(source,{('','','old'):('','','strange;name')})
++    assert inspect_tables(result)[0].name=='strange;name' and source.dump()==before
++
++def test_unused_keys_and_malformed_names_fail_clearly():
++    with pytest.raises(ValueError): remap_tables('SELECT * FROM a',{('','','b'):('','','c')},require_all=True)
++    with pytest.raises(ValueError): remap_tables('SELECT * FROM a',{('','','a'):('catalog','','name')})
+--- a/library/docs/development-sg-remap-dev.md
++++ b/library/docs/development-sg-remap-dev.md
+@@ -0,0 +1,5 @@
++# 精确重映射物理表并保持别名和限定列可执行
++
++表映射只作用于真实物理表，精确匹配限定名并把新名称作为标识符数据引用。保留原别名，无别名时补原名以保持列引用可执行，修复对应库前缀，不误改CTE、文本或注释。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/sqlglot/report_remap.py
++++ b/library/sqlglot/report_remap.py
+@@ -0,0 +1,41 @@
++"""只重映射物理命名表，保留别名与限定列的语义。"""
++from collections.abc import Mapping
++from . import exp
++from .report_inspection import query_copy,physical_nodes
++from .optimizer.scope import traverse_scope
++
++
++def _name(value,*,key=False):
++    if not isinstance(value,tuple) or len(value)!=3 or any(not isinstance(part,str) for part in value) or not value[2]:
++        raise ValueError('限定名必须为catalog/database/name三元组')
++    if value[0] and not value[1]:
++        raise ValueError('catalog需要database')
++    return value
++
++
++def remap_tables(query,mapping,*,dialect=None,require_all=False):
++    """复制并精确重映射物理表。@param query 单查询。@param mapping 精确限定名三元组映射。
++    @param dialect 输入方言。@param require_all 是否拒绝未命中的映射键。@return 独立Query。
++    """
++    if not isinstance(mapping,Mapping) or type(require_all) is not bool:
++        raise TypeError('需要映射及布尔匹配策略')
++    replacements={_name(key,key=True):_name(value) for key,value in mapping.items()}
++    tree=query_copy(query,dialect);used=set()
++    scopes=traverse_scope(tree)
++    for scope_index,alias,table in physical_nodes(tree):
++        identity=(table.catalog,table.db,table.name)
++        if identity not in replacements:
++            continue
++        used.add(identity);original=table.this.copy();old_db=table.db;old_catalog=table.catalog
++        if not table.args.get('alias'):
++            table.set('alias',exp.TableAlias(this=original.copy()))
++            # 完整限定列在重命名后必须经保留的旧别名寻址，不能留下失效的旧库前缀。
++            for column in scopes[scope_index].columns:
++                if column.table==identity[2] and (not column.db or column.db==old_db) and (not column.catalog or column.catalog==old_catalog):
++                    column.set('table',original.copy());column.set('db',None);column.set('catalog',None)
++        catalog,database,name=replacements[identity]
++        for key,value in [('catalog',catalog),('db',database),('this',name)]:
++            table.set(key,exp.Identifier(this=value,quoted=True) if value else None)
++    if require_all and set(replacements)-used:
++        raise ValueError('存在未命中的表映射键')
++    return tree

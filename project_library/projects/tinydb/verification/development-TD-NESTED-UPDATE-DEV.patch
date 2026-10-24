@@ -1,0 +1,112 @@
+--- a/library/development_tests/test_development_td_nested_update_dev.py
++++ b/library/development_tests/test_development_td_nested_update_dev.py
+@@ -0,0 +1,36 @@
++"""公开嵌套字段编辑回归。"""
++import pytest
++from tinydb import TinyDB, Query
++from tinydb.storages import MemoryStorage
++from tinydb.operations import set_path, delete_path
++
++def test_nested_set_preserves_siblings_and_isolates_values():
++    data={'items':[]}
++    operation=set_path(('a.b','child'),data,create=True)
++    data['items'].append('outside')
++    first,second={'keep':1},{}
++    operation(first);operation(second)
++    first['a.b']['child']['items'].append('first')
++    assert second['a.b']['child']=={'items':[]} and first['keep']==1
++
++def test_delete_and_missing_policy_are_explicit():
++    doc={'a':{'b':1,'c':2}}
++    delete_path(('a','b'))(doc)
++    assert doc=={'a':{'c':2}}
++    delete_path(('missing','x'),missing_ok=True)(doc)
++
++def test_failed_parent_resolution_leaves_document_unchanged():
++    doc={'a':3}
++    with pytest.raises(TypeError):
++        set_path(('a','b'),1,create=True)(doc)
++    assert doc=={'a':3}
++    with pytest.raises(KeyError):
++        set_path(('missing','b'),1)(doc)
++    assert doc=={'a':3}
++
++def test_table_update_invalidates_query_cache():
++    with TinyDB(storage=MemoryStorage) as db:
++        db.insert({'order':{'state':'new'}})
++        assert len(db.search(Query().order.state=='new'))==1
++        db.update(set_path(('order','state'),'done'))
++        assert db.search(Query().order.state=='new')==[] and len(db.search(Query().order.state=='done'))==1
+--- a/library/docs/development-td-nested-update-dev.md
++++ b/library/docs/development-td-nested-update-dev.md
+@@ -0,0 +1,5 @@
++# 安全更新和删除嵌套字段而不共享可变值
++
++订单嵌套字段编辑不能把同一可变对象共享给多条记录。实现显式路径的更新和删除、可选创建父映射，单条记录失败前保持原样，保留相邻字段及普通update缓存失效语义，不承诺整批事务。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tinydb/operations.py
++++ b/library/tinydb/operations.py
+@@ -11,6 +11,62 @@
+ 
+ from collections.abc import Callable, MutableMapping
+ from typing import Any, Union
++
++
++def set_path(path, value, *, create=False):
++    """建立嵌套字段更新操作。@param path 字符串键序列。@param value 每文档独立深拷贝的新值。
++    @param create 是否创建缺失中间映射。@return 可交给Table.update的原地回调。
++    """
++    from copy import deepcopy
++    if isinstance(path, (str, bytes)):
++        raise TypeError('嵌套路径必须是键序列')
++    parts = tuple(path)
++    if not parts or any(not isinstance(part, str) for part in parts):
++        raise ValueError('嵌套路径必须包含字符串键')
++    frozen = deepcopy(value)
++    def transform(doc):
++        working = deepcopy(doc)
++        target = working
++        for part in parts[:-1]:
++            if part not in target:
++                if not create:
++                    raise KeyError(part)
++                target[part] = {}
++            target = target[part]
++            if not isinstance(target, MutableMapping):
++                raise TypeError('路径中间值必须是可变映射')
++        target[parts[-1]] = deepcopy(frozen)
++        doc.clear()
++        doc.update(working)
++    return transform
++
++
++def delete_path(path, *, missing_ok=False):
++    """建立嵌套删除操作。@param path 字符串键序列。@param missing_ok 是否忽略缺失。
++    @return Table.update回调；失败不修改本次文档。
++    """
++    from copy import deepcopy
++    if isinstance(path, (str, bytes)):
++        raise TypeError('嵌套路径必须是键序列')
++    parts = tuple(path)
++    if not parts or any(not isinstance(part, str) for part in parts):
++        raise ValueError('嵌套路径必须包含字符串键')
++    def transform(doc):
++        working, target = deepcopy(doc), None
++        target = working
++        try:
++            for part in parts[:-1]:
++                target = target[part]
++                if not isinstance(target, MutableMapping):
++                    raise TypeError('路径中间值必须是可变映射')
++            del target[parts[-1]]
++        except KeyError:
++            if missing_ok:
++                return
++            raise
++        doc.clear()
++        doc.update(working)
++    return transform
+ 
+ 
+ def delete(field: str) -> Callable[[MutableMapping], None]:

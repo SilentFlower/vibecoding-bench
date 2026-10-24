@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BIBTEXPARSER-O05-DEV",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement bibtexparser.identifiers.NormalizeIdentifiers(fields=(\"doi\", \"isbn\"), strict=False) as an opt-in non-mutating BlockMiddleware. Canonicalize DOI URL/doi prefixes and case without stripping potentially valid punctuation, normalize ISBN10/13 whitespace/hyphens and verify check digits including X. Preserve original values/status in metadata; invalid values remain unchanged unless strict requests failure. Only selected fields change, no external lookup or guessed repairs, and normal parsing/writing remains compatible.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

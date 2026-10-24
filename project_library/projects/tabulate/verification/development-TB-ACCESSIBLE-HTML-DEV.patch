@@ -1,0 +1,63 @@
+--- a/library/development_tests/test_development_tb_accessible_html_dev.py
++++ b/library/development_tests/test_development_tb_accessible_html_dev.py
+@@ -0,0 +1,22 @@
++"""公开可访问安全HTML报表回归。"""
++import pytest
++from html.parser import HTMLParser
++from tabulate.accessibility import accessible_html
++
++def test_caption_and_column_header_scopes_are_real_elements():
++    result=accessible_html([['a',1]],headers=['name','value'],caption='Orders')
++    assert '<caption>Orders</caption>' in result and result.count('scope="col"')==2
++
++def test_body_row_header_conversion_preserves_other_cells():
++    result=accessible_html([['a',1],['b',2]],headers=['name','value'],row_headers=True)
++    assert result.count('scope="row"')==2 and result.count('<td')==2
++
++def test_caption_id_and_data_are_safely_escaped():
++    result=accessible_html([['<script>bad</script>']],headers=['x'],caption='<b>caption</b>',table_id='x"onclick="bad')
++    assert '<script>' not in result and '<b>caption' not in result and '&quot;' in result and '&lt;script&gt;' in result
++
++def test_unsafe_output_override_and_bad_metadata_fail():
++    with pytest.raises(ValueError):
++        accessible_html([[1]],tablefmt='unsafehtml')
++    with pytest.raises(ValueError):
++        accessible_html([[1]],table_id='bad id')
+--- a/library/docs/development-tb-accessible-html-dev.md
++++ b/library/docs/development-tb-accessible-html-dev.md
+@@ -0,0 +1,5 @@
++# 提供带标题、列与行语义的安全HTML报表输出
++
++网页报表需要真实列、行标题语义及安全标题。新增固定安全HTML入口，输出scope、caption与可选id，保留对齐与数据转义，不能把业务字符串误当HTML标签，也不影响原html输出。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tabulate/accessibility.py
++++ b/library/tabulate/accessibility.py
+@@ -0,0 +1,27 @@
++"""添加明确语义的安全HTML报表输出。"""
++import re
++from html import escape
++from tabulate import tabulate
++
++
++def accessible_html(data,headers=(),*,caption=None,table_id=None,row_headers=False,**options):
++    """输出可访问HTML。@param data 表数据。@param headers 原表头。
++    @param caption 转义后的标题。@param table_id 非空无空白标识或None。
++    @param row_headers 是否把各数据行首格作为行标题。@param options 原渲染选项。
++    @return 带列／行scope、caption和可选id的安全HTML字符串。
++    """
++    if 'tablefmt' in options or type(row_headers) is not bool:
++        raise ValueError('可访问输出固定使用安全html格式')
++    if caption is not None and not isinstance(caption,str):
++        raise TypeError('标题必须是字符串')
++    if table_id is not None and (not isinstance(table_id,str) or not table_id or any(c.isspace() for c in table_id)):
++        raise ValueError('表标识必须非空且不含空白')
++    result=str(tabulate(data,headers=headers,tablefmt='html',**options))
++    opening='<table'+(' id="'+escape(table_id,quote=True)+'"' if table_id is not None else '')+'>'
++    if caption is not None:
++        opening+='\n<caption>'+escape(caption)+'</caption>'
++    result=result.replace('<table>',opening,1)
++    result=re.sub(r'<th(?=[\s>])','<th scope="col"',result)
++    if row_headers:
++        result=re.sub(r'(<tr>\s*)<td(\b[^>]*)>(.*?)</td>',lambda match:match.group(1)+'<th scope="row"'+match.group(2)+'>'+match.group(3)+'</th>',result,flags=re.S)
++    return result

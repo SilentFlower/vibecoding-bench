@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-CONSTRAINT-04-DEV",
+  "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add constraint.tables.AllowedTuples/ForbiddenTuples as real Constraint subclasses, with copied immutable row values, explicit variable-column order, shape/duplicate-variable checks and bounded max_rows preflight. Allowed tables filter support against assigned values AND remaining domains and prune only unsupported values in forward-check mode; forbidden tables reject exact complete rows and safely prune a single remaining variable. Support nonnumeric and unhashable comparable domain values without requiring hash-based membership. Empty allowed table is unsatisfiable, empty forbidden table imposes no restriction. Preserve original solvers and the earlier per-query independent Domain contract, including unary preprocessing without permanent model-domain mutation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

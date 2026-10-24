@@ -1,0 +1,14 @@
+{
+  "script": "verification/PYPIKA-01-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 2,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_pypika_01_dev.py"
+}

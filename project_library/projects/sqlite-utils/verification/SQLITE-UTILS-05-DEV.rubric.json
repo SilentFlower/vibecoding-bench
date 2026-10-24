@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SQLITE-UTILS-05-DEV",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair parsedate and parsedatetime to apply existing IGNORE/SET_NULL policy to genuine dateutil OverflowError as well as ParserError. Keep original value for IGNORE, None for SET_NULL, and re-raise original exception under default/unknown policy; preserve legal date/dayfirst/yearfirst, empty/falsy and normal parser error behavior. Do not catch arbitrary TypeError/RuntimeError or convert out-of-range dates into guessed valid values. Prove real huge-year data and both recipe entry points.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

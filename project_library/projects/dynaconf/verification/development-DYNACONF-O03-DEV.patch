@@ -1,0 +1,46 @@
+--- a/library/docs/development-dynaconf-o03-dev.md
++++ b/library/docs/development-dynaconf-o03-dev.md
+@@ -0,0 +1,5 @@
++# 让真实批量更新先取得顶层输入快照且不污染调用者映射
++
++对应路线03：update先创建顶层字典快照再并kwargs，优先级及解析/校验保持；普通/只读/空映射与键值迭代可用，失败也不写原顶层，不冒充深拷贝或事务。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dynaconf/base.py
++++ b/library/dynaconf/base.py
+@@ -1152,7 +1152,8 @@
+         if validate is empty:
+             validate = self.get("VALIDATE_ON_UPDATE_FOR_DYNACONF")
+ 
+-        data = data or {}
++        # update拥有本次顶层快照，不能把kwargs写进调用方字典/只读Mapping。
++        data = dict(data) if data is not None else {}
+         data.update(kwargs)
+ 
+         for key, value in data.items():
+--- a/library/tests/test_development_dynaconf_o03_dev.py
++++ b/library/tests/test_development_dynaconf_o03_dev.py
+@@ -0,0 +1,23 @@
++"""真实Settings.update不接管调用者顶层映射的写入所有权。"""
++from dynaconf import Dynaconf,Validator
++from dynaconf.validator import ValidationError
++from types import MappingProxyType
++import pytest
++
++def test_kwargs_override_settings_but_input_dictionary_is_untouched():
++    """kwargs优先级保持，原字典键和值都没有被额外写入。@return None。"""
++    settings=Dynaconf(environments=False);source={'VALUE':1};settings.update(source,VALUE=2,OTHER=3)
++    assert settings.VALUE==2 and settings.OTHER==3 and source=={'VALUE':1}
++
++def test_readonly_mapping_empty_mapping_and_generator_pairs_are_supported():
++    """顶层快照接受标准dict构造输入，不要求调用方有update方法。@return None。"""
++    settings=Dynaconf(environments=False);settings.update(MappingProxyType({'A':1}),B=2)
++    assert settings.A==1 and settings.B==2
++    settings.update(iter([('C',3)]),D=4);assert settings.C==3 and settings.D==4
++    empty={};settings.update(empty,E=5);assert empty=={}
++
++def test_validation_failure_does_not_write_extra_keys_into_original_mapping():
++    """本目标不声称settings事务，但失败也不能污染调用者顶层。@return None。"""
++    settings=Dynaconf(environments=False,validators=[Validator('PORT',gt=0)],PORT=1);source={'PORT':-1}
++    with pytest.raises(ValidationError):settings.update(source,EXTRA='new',validate=True)
++    assert source=={'PORT':-1}

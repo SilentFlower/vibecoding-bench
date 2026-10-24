@@ -1,0 +1,14 @@
+{
+  "script": "verification/XW-UTC-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_xw_utc_dev.py"
+}

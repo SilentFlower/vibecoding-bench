@@ -1,0 +1,57 @@
+--- a/library/docs/development-flask-o06-dev.md
++++ b/library/docs/development-flask-o06-dev.md
+@@ -0,0 +1,5 @@
++# 让endpoint冲突的失败注册不泄漏真实新路由到旧视图
++
++对应路线20：冲突视图在url_map可见修改前拒绝，失败URL仍404、旧规则/视图/方法/default保持；同视图别名和None后绑定等原语义保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/flask/sansio/app.py
++++ b/library/src/flask/sansio/app.py
+@@ -651,7 +651,6 @@
+         rule_obj = self.url_rule_class(rule, methods=methods, **options)
+         rule_obj.provide_automatic_options = provide_automatic_options  # type: ignore[attr-defined]
+ 
+-        self.url_map.add(rule_obj)
+         if view_func is not None:
+             old_func = self.view_functions.get(endpoint)
+             if old_func is not None and old_func != view_func:
+@@ -659,6 +658,9 @@
+                     "View function mapping is overwriting an existing"
+                     f" endpoint function: {endpoint}"
+                 )
++        # endpoint冲突必须在url_map可见修改之前拒绝，否则失败地址会泄漏到旧视图。
++        self.url_map.add(rule_obj)
++        if view_func is not None:
+             self.view_functions[endpoint] = view_func
+ 
+     @t.overload
+--- a/library/tests/test_development_flask_o06_dev.py
++++ b/library/tests/test_development_flask_o06_dev.py
+@@ -0,0 +1,26 @@
++"""重复endpoint失败后真实路由表与分发行为完全保持。"""
++from flask import Flask,Blueprint
++import pytest
++
++def test_failed_new_address_does_not_dispatch_old_view_or_enter_map():
++    """原版抛异常后/new仍可命中旧视图，本目标真正移除该半注册副作用。@return None。"""
++    app=Flask(__name__,static_folder=None);old=lambda:'old';new=lambda:'new';app.add_url_rule('/old','saved',old)
++    before=list(app.url_map.iter_rules());views=dict(app.view_functions)
++    with pytest.raises(AssertionError):app.add_url_rule('/new','saved',new)
++    assert list(app.url_map.iter_rules())==before and app.view_functions==views
++    client=app.test_client();assert client.get('/old').data==b'old' and client.get('/new').status_code==404
++
++def test_same_view_multiple_rules_and_none_view_registration_remain_valid():
++    """合法同视图别名与后绑定视图模式仍可注册。@return None。"""
++    app=Flask(__name__,static_folder=None);view=lambda:'same';app.add_url_rule('/a','shared',view);app.add_url_rule('/b','shared',view)
++    app.add_url_rule('/later','later');app.view_functions['later']=lambda:'bound'
++    assert app.test_client().get('/a').data==app.test_client().get('/b').data==b'same'
++    assert app.test_client().get('/later').data==b'bound'
++
++def test_methods_defaults_and_blueprint_conflict_keep_exact_previous_state():
++    """冲突带额外method/default也不能改变现有匹配器。@return None。"""
++    app=Flask(__name__,static_folder=None);app.add_url_rule('/old','group.saved',lambda **kwargs:'old',methods=['GET'])
++    before=[(rule.rule,rule.endpoint,rule.methods,rule.defaults) for rule in app.url_map.iter_rules()]
++    with pytest.raises(AssertionError):app.add_url_rule('/failed','group.saved',lambda **kwargs:'new',methods=['POST'],defaults={'x':1})
++    after=[(rule.rule,rule.endpoint,rule.methods,rule.defaults) for rule in app.url_map.iter_rules()]
++    assert after==before and app.test_client().post('/failed').status_code==404

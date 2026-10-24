@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "ICECREAM-O02-DEV",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend actual Timer context use with immutable context-local entry stacks and thread/task ownership, preserving sequential reuse and _enter_time compatibility after final exit. Same timer nested contexts must independently report full durations; child tasks inheriting a ContextVar must not close a parent-owned entry. Pop state before time/output callbacks, reject missing/repeated/cross-owner exit, preserve original business exception if ordinary output cleanup fails while propagating standalone output failure. Disabled output still cleans timing state. Do not change normal anonymous duration text or claim shared mutable private compatibility fields are the operational timing state.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

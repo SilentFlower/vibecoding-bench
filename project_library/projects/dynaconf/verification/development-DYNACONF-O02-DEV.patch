@@ -1,0 +1,93 @@
+--- a/library/docs/development-dynaconf-o02-dev.md
++++ b/library/docs/development-dynaconf-o02-dev.md
+@@ -0,0 +1,5 @@
++# 修复复用条件Validator跨环境与并发实例的继承状态泄漏
++
++对应路线02：when环境只经本次ContextVar继承不写共享描述器，显式env/嵌套组合/only_current_env保持；dev跳过后prod仍拒绝负PORT，并发与失败退出不泄漏。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dynaconf/validator.py
++++ b/library/dynaconf/validator.py
+@@ -3,6 +3,7 @@
+ from collections import defaultdict
+ from collections.abc import Sequence
+ from contextlib import suppress
++from contextvars import ContextVar
+ from copy import deepcopy
+ from itertools import chain
+ from types import MappingProxyType
+@@ -20,6 +21,8 @@
+     from dynaconf.base import LazySettings  # noqa: F401
+     from dynaconf.base import Settings
+ 
++
++_inherited_validation_envs = ContextVar('dynaconf_validation_envs', default=None)
+ 
+ DEFAULT_CAST = lambda value: value  # noqa
+ 
+@@ -271,16 +274,18 @@
+             raise ValueError("'exclude' must be a string or list of strings.")
+ 
+         current_env = getattr(settings, "current_env", "main")
+-        envs = self.envs or [current_env]
++        envs = self.envs or _inherited_validation_envs.get() or [current_env]
+ 
+         # NOTE: Smells bad, must not mutate a validator
+         if self.when is not None:
+             try:
+-                # inherit env if not defined
+-                if self.when.envs is None:
+-                    self.when.envs = envs
+-
+-                self.when.validate(settings, only=only, exclude=exclude)
++                # 继承环境只属于本次条件求值，绝不能写进共享Validator描述器。
++                token = _inherited_validation_envs.set(tuple(envs))
++                try:
++                    self.when.validate(settings, only=only, exclude=exclude,
++                                       only_current_env=only_current_env, variable_path=variable_path)
++                finally:
++                    _inherited_validation_envs.reset(token)
+             except ValidationError:
+                 # if when is invalid, return canceling validation flow
+                 return
+--- a/library/tests/test_development_dynaconf_o02_dev.py
++++ b/library/tests/test_development_dynaconf_o02_dev.py
+@@ -0,0 +1,38 @@
++"""共享条件Validator不能把第一个实例环境记到后续实例。"""
++from dynaconf import Dynaconf,Validator
++from dynaconf.validator import ValidationError
++from concurrent.futures import ThreadPoolExecutor
++import pytest
++
++def settings(env,enabled,port):
++    """创建真实启用环境的实例。@return Dynaconf。"""
++    return Dynaconf(environments=True,env=env,ENABLED=enabled,PORT=port)
++
++def test_reused_when_matches_fresh_validator_across_dev_prod():
++    """dev条件跳过后prod负值仍必须拒绝，when.envs保持未声明。@return None。"""
++    condition=Validator('ENABLED',eq=True);validator=Validator('PORT',gt=0,when=condition)
++    validator.validate(settings('dev',False,-1));assert condition.envs is None
++    with pytest.raises(ValidationError):validator.validate(settings('prod',True,-1))
++    assert condition.envs is None and validator.envs is None
++
++def test_nested_combined_conditions_and_explicit_env_remain_local():
++    """嵌套when及and/or组合不永久改子条件，显式env仍尊重。@return None。"""
++    nested=Validator('ENABLED',eq=True,when=Validator('MODE',eq='active'))
++    validator=Validator('PORT',gt=0,when=nested)
++    dev=settings('dev',False,-1);dev.set('MODE','active');validator.validate(dev)
++    prod=settings('prod',True,-1);prod.set('MODE','active')
++    with pytest.raises(ValidationError):validator.validate(prod)
++    assert nested.envs is None and nested.when.envs is None
++    combined=Validator('PORT',gt=0,when=Validator('ENABLED',eq=True) & Validator('MODE',eq='active'))
++    with pytest.raises(ValidationError):combined.validate(prod,only_current_env=True)
++
++def test_concurrent_instances_and_exception_exit_do_not_leak_environment():
++    """线程共享同一描述器只继承各自调用上下文。@return None。"""
++    condition=Validator('ENABLED',eq=True);validator=Validator('PORT',gt=0,when=condition)
++    def run(index):
++        current=settings('env'+str(index),index%2==1,-1)
++        try:validator.validate(current)
++        except ValidationError:return True
++        return False
++    with ThreadPoolExecutor(max_workers=4) as pool:assert list(pool.map(run,range(6)))==[False,True,False,True,False,True]
++    assert condition.envs is None

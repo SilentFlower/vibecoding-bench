@@ -1,0 +1,124 @@
+--- a/library/docs/development-collective-icalendar-o05-dev.md
++++ b/library/docs/development-collective-icalendar-o05-dev.md
+@@ -0,0 +1,5 @@
++# 按墙钟或绝对策略一致平移完整日程系列
++
++整组主项、例外、RDATE/EXDATE和UNTIL按同一明确策略平移，保留UID、文本、时长、时区定义及元数据。墙钟和UTC跨度区别明确，DST不存在/歧义和DATE精度有预检；相对提醒保持，绝对提醒仅显式移动，原日历不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/icalendar/schedule_shift.py
++++ b/library/src/icalendar/schedule_shift.py
+@@ -0,0 +1,73 @@
++"""按明确墙钟或绝对策略平移完整事件系列，不平移时区定义。"""
++from copy import deepcopy
++from datetime import date, datetime, timedelta, timezone
++from icalendar.prop.dt.types import vDDDTypes
++
++
++def shift_schedule(calendar, delta, *, mode='wall', ambiguous='error', shift_absolute_alarms=False):
++    """同时更新主项、例外、RDATE/EXDATE及UNTIL。
++
++    :param calendar: 真实Calendar或包含相关组件的根组件。
++    :param delta: timedelta偏移。
++    :param mode: wall保持墙钟跨度，absolute保持UTC跨度并拒绝浮动datetime。
++    :param ambiguous: 墙钟DST歧义采用error、first或second。
++    :param shift_absolute_alarms: 是否明确平移绝对TRIGGER，相对timedelta保持。
++    :return: 独立同类日历；非法日期或DST不存在时间不修改原对象。
++    """
++    if not isinstance(delta, timedelta) or mode not in ('wall', 'absolute') or ambiguous not in ('error', 'first', 'second'):
++        raise ValueError('无效日程平移政策')
++    def shift(value):
++        """移动一个真实日期值。@param value 日期、时间或PERIOD。@return 同类值。"""
++        if isinstance(value, tuple):
++            start, end = value
++            return shift(start), end if isinstance(end, timedelta) else shift(end)
++        if isinstance(value, datetime):
++            aware = value.tzinfo is not None and value.utcoffset() is not None
++            if mode == 'absolute':
++                if not aware:
++                    raise ValueError('绝对平移需要带时区时间')
++                return (value.astimezone(timezone.utc) + delta).astimezone(value.tzinfo)
++            result = value + delta
++            if aware:
++                restored = result.astimezone(timezone.utc).astimezone(result.tzinfo)
++                if restored.replace(tzinfo=None) != result.replace(tzinfo=None):
++                    raise ValueError('平移结果为DST不存在时间')
++                if result.replace(fold=0).utcoffset() != result.replace(fold=1).utcoffset():
++                    if ambiguous == 'error':
++                        raise ValueError('平移结果为DST歧义时间')
++                    result = result.replace(fold=0 if ambiguous == 'first' else 1)
++            return result
++        if isinstance(value, date):
++            if delta.seconds or delta.microseconds:
++                raise ValueError('DATE平移只接受整天')
++            return value + delta
++        raise TypeError('不支持的日期值')
++    result = deepcopy(calendar)
++    for component in result.walk():
++        if component.name == 'VALARM':
++            if shift_absolute_alarms and 'TRIGGER' in component:
++                original = component['TRIGGER']
++                value = component.decoded('TRIGGER')
++                if isinstance(value, datetime):
++                    component['TRIGGER'] = vDDDTypes(shift(value), params=deepcopy(original.params))
++            continue
++        if component.name not in ('VEVENT', 'VTODO'):
++            continue
++        for name in ('DTSTART', 'DTEND', 'DUE', 'RECURRENCE-ID'):
++            if name in component:
++                original = component[name]
++                if isinstance(original, list):
++                    raise ValueError('单值日期字段出现多个值')
++                component[name] = vDDDTypes(shift(component.decoded(name)), params=deepcopy(original.params))
++        for name in ('RDATE', 'EXDATE'):
++            if name in component:
++                groups = component[name] if isinstance(component[name], list) else [component[name]]
++                for group in groups:
++                    for value in group.dts:
++                        value.dt = shift(value.dt)
++        rules = component.get('RRULE', [])
++        for rule in rules if isinstance(rules, list) else [rules]:
++            if 'UNTIL' in rule:
++                original = rule['UNTIL']
++                rule['UNTIL'] = [shift(value) for value in original] if isinstance(original, list) else shift(original)
++    return result
+--- a/library/tests/test_development_collective_icalendar_o05_dev.py
++++ b/library/tests/test_development_collective_icalendar_o05_dev.py
+@@ -0,0 +1,37 @@
++"""平移整组日程必须保留主项与例外的对应关系。"""
++from datetime import date, datetime, timedelta, timezone
++from zoneinfo import ZoneInfo
++from icalendar import Calendar, Event, Alarm
++
++def test_master_exception_and_recurrence_dates():
++    """主项、覆盖、RDATE/EXDATE和UNTIL一起移动。@return None。"""
++    from icalendar.schedule_shift import shift_schedule
++    calendar = Calendar()
++    event = Event(); event.add('UID', 'series'); event.add('DTSTART', date(2026, 1, 1)); event.add('DTEND', date(2026, 1, 2))
++    event.add('RRULE', {'FREQ': 'DAILY', 'UNTIL': date(2026, 1, 10)})
++    event.add('EXDATE', date(2026, 1, 3)); event.add('RDATE', date(2026, 1, 12))
++    override = Event(); override.add('UID', 'series'); override.add('RECURRENCE-ID', date(2026, 1, 4)); override.add('DTSTART', date(2026, 1, 5))
++    calendar.add_component(event); calendar.add_component(override)
++    result = shift_schedule(calendar, timedelta(days=7))
++    shifted, exception = result.walk('VEVENT')
++    assert shifted.decoded('DTSTART') == date(2026, 1, 8) and exception.decoded('RECURRENCE-ID') == date(2026, 1, 11)
++    assert shifted['EXDATE'].dts[0].dt == date(2026, 1, 10) and shifted['RRULE']['UNTIL'] == date(2026, 1, 17)
++    assert event.decoded('DTSTART') == date(2026, 1, 1)
++
++def test_dst_wall_vs_absolute():
++    """DST跨越时墙钟日与24小时绝对偏移明确不同。@return None。"""
++    from icalendar.schedule_shift import shift_schedule
++    event = Event(); event.add('DTSTART', datetime(2026, 3, 7, 12, tzinfo=ZoneInfo('America/New_York')))
++    assert shift_schedule(event, timedelta(days=1), mode='wall').decoded('DTSTART').hour == 12
++    assert shift_schedule(event, timedelta(days=1), mode='absolute').decoded('DTSTART').hour == 13
++
++def test_alarm_policy_and_date_rejection():
++    """绝对提醒必须显式移动，相对提醒及DATE精度保持。@return None。"""
++    import pytest
++    from icalendar.schedule_shift import shift_schedule
++    event = Event(); event.add('DTSTART', datetime(2026, 1, 1, tzinfo=timezone.utc))
++    alarm = Alarm(); alarm.add('TRIGGER', datetime(2026, 1, 1, tzinfo=timezone.utc)); event.add_component(alarm)
++    assert shift_schedule(event, timedelta(days=1)).walk('VALARM')[0].decoded('TRIGGER') == alarm.decoded('TRIGGER')
++    assert shift_schedule(event, timedelta(days=1), shift_absolute_alarms=True).walk('VALARM')[0].decoded('TRIGGER') == datetime(2026, 1, 2, tzinfo=timezone.utc)
++    all_day = Event(); all_day.add('DTSTART', date(2026, 1, 1))
++    with pytest.raises(ValueError): shift_schedule(all_day, timedelta(hours=1))

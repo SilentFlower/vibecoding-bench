@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CERBERUS-O02-DEV",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add the actual Validator finite boolean rule with schema-validated arguments and native error-tree integration. When enabled reject NaN/positive or negative Infinity and nonnumeric/bool values, support finite int/float and registered Decimal types without converting large Decimals through float, and work in nested records. finite=False and absent finite preserve existing number/min/max policies; do not alter global types or claim existing bool exclusion as a separate feature.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

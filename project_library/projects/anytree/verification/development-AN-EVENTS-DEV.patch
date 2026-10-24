@@ -1,0 +1,112 @@
+--- a/library/development_tests/test_development_an_events_dev.py
++++ b/library/development_tests/test_development_an_events_dev.py
+@@ -0,0 +1,35 @@
++"""公开树事件流回归。"""
++from anytree import Node, EventIter, PreOrderIter
++
++def tree():
++    root = Node('r')
++    a = Node('a', parent=root)
++    Node('x', parent=a)
++    Node('b', parent=root)
++    return root
++
++def test_single_pass_pairs_events_in_child_order():
++    observed = [(event, node.name, depth) for event, node, depth in EventIter(tree())]
++    assert observed == [('enter','r',0), ('enter','a',1), ('enter','x',2), ('leave','x',2),
++        ('leave','a',1), ('enter','b',1), ('leave','b',1), ('leave','r',0)]
++
++def test_filter_hides_parent_events_without_pruning_children():
++    values = [(event, node.name) for event, node, depth in EventIter(tree(), filter_=lambda node: node.name != 'a')]
++    assert ('enter','a') not in values and ('enter','x') in values
++
++def test_stop_prunes_the_whole_subtree():
++    values = [node.name for event, node, depth in EventIter(tree(), stop=lambda node: node.name == 'a')]
++    assert values == ['r', 'b', 'b', 'r']
++
++def test_level_limits_follow_existing_iterator_conventions():
++    root = tree()
++    assert [(e, n.name, d) for e,n,d in EventIter(root, maxlevel=1)] == [('enter','r',0), ('leave','r',0)]
++    assert list(EventIter(root, maxlevel=0)) == []
++
++def test_filter_is_called_once_per_visible_or_hidden_node():
++    calls = []
++    result = list(EventIter(tree(), filter_=lambda node: calls.append(node.name) or True))
++    assert len(calls) == 4 and len(result) == 8
++
++def test_existing_preorder_is_unchanged():
++    assert [node.name for node in PreOrderIter(tree())] == ['r', 'a', 'x', 'b']
+--- a/library/docs/development-an-events-dev.md
++++ b/library/docs/development-an-events-dev.md
+@@ -0,0 +1,5 @@
++# 单遍交付分类树进入退出事件流
++
++分类层级文档需要单遍输出开闭合事件，不应分别遍历两次。新增EventIter，以实际节点身份、零起始深度和进入／退出事件返回；过滤不剪枝、stop剪枝、深度上限和状态过滤配对明确，深链不依赖Python递归。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/anytree/__init__.py
++++ b/library/src/anytree/__init__.py
+@@ -7,7 +7,7 @@
+ __url__ = "https://github.com/c0fec0de/anytree"
+ 
+ from . import cachedsearch, util
+-from .iterators import LevelOrderGroupIter, LevelOrderIter, PostOrderIter, PreOrderIter, ZigZagGroupIter
++from .iterators import EventIter, LevelOrderGroupIter, LevelOrderIter, PostOrderIter, PreOrderIter, ZigZagGroupIter
+ from .node import AnyNode, LightNodeMixin, LoopError, Node, NodeMixin, SymlinkNode, SymlinkNodeMixin, TreeError
+ from .render import AbstractStyle, AsciiStyle, ContRoundStyle, ContStyle, DoubleStyle, RenderTree
+ from .resolver import ChildResolverError, Resolver, ResolverError, RootResolverError
+@@ -27,6 +27,7 @@
+     "ContStyle",
+     "CountError",
+     "DoubleStyle",
++    "EventIter",
+     "LevelGroupOrderIter",
+     "LevelOrderGroupIter",
+     "LevelOrderIter",
+--- a/library/src/anytree/iterators/__init__.py
++++ b/library/src/anytree/iterators/__init__.py
+@@ -9,6 +9,7 @@
+ """
+ 
+ from .abstractiter import AbstractIter
++from .eventiter import EventIter
+ from .levelordergroupiter import LevelOrderGroupIter
+ from .levelorderiter import LevelOrderIter
+ from .postorderiter import PostOrderIter
+@@ -17,6 +18,7 @@
+ 
+ __all__ = [
+     "AbstractIter",
++    "EventIter",
+     "LevelOrderGroupIter",
+     "LevelOrderIter",
+     "PostOrderIter",
+--- a/library/src/anytree/iterators/eventiter.py
++++ b/library/src/anytree/iterators/eventiter.py
+@@ -0,0 +1,26 @@
++"""无递归、进入退出成对的单遍树事件迭代。"""
++from .abstractiter import AbstractIter
++
++
++class EventIter(AbstractIter):
++    """树事件迭代器。@param node 根。@param filter_ 节点显示过滤。
++    @param stop 子树剪枝。@param maxlevel 含根层数上限。
++    """
++
++    @staticmethod
++    def _iter(children, filter_, stop, maxlevel):
++        stack = [(child, 0, False, False) for child in reversed(children)]
++        while stack:
++            node, depth, leaving, visible = stack.pop()
++            if leaving:
++                if visible:
++                    yield ('leave', node, depth)
++                continue
++            visible = bool(filter_(node))
++            if visible:
++                yield ('enter', node, depth)
++            # 缓存同一次过滤结果，状态型过滤器也不能让已消费完整序列失去配对。
++            stack.append((node, depth, True, visible))
++            if maxlevel is None or depth + 1 < maxlevel:
++                for child in reversed(AbstractIter._get_children(node.children, stop)):
++                    stack.append((child, depth + 1, False, False))

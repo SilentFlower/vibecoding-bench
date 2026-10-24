@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MS-UNIQUE-FOOTNOTES-DEV",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend footnotes(md,*,unique_refs=False) with an explicit compatibility-preserving mode. Each occurrence of one defined footnote gets a unique fnref-N, fnref-N-2,... HTML id and the footnote item links back to all occurrences. Keep one note definition/order/index and expose occurrence metadata in opted-in AST tokens; unknown references remain literal. Reset counts per parsed document, preserve escaping and legacy default HTML/AST exactly, and verify document reuse plus interaction with directory extraction.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DEEPDIFF-O02-DEV",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix actual datetime_normalize temporal capability dispatch: plain date/subclasses retain date identity/value and timedelta remains a duration, neither receiving invalid hour/minute/second replace fields for any truncate setting. datetime/time continue existing truncation/timezone normalization. Do not promote date to datetime or suppress real type changes. Prove every accepted precision, nested DeepDiff, mixed date/datetime types, duration differences and DeepHash consistency, preserving all old datetime behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

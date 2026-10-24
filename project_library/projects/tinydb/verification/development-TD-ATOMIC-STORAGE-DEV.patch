@@ -1,0 +1,129 @@
+--- a/library/development_tests/test_development_td_atomic_storage_dev.py
++++ b/library/development_tests/test_development_td_atomic_storage_dev.py
+@@ -0,0 +1,45 @@
++"""公开原子JSON存储回归。"""
++import pytest
++from tinydb import TinyDB
++from tinydb.atomic import AtomicJSONStorage
++
++def test_tinydb_roundtrip_reopen_and_smaller_database(tmp_path):
++    path=tmp_path/'db.json'
++    with TinyDB(path,storage=AtomicJSONStorage) as db:
++        db.insert_multiple([{'value':'long'*100},{'value':'short'}])
++    with TinyDB(path,storage=AtomicJSONStorage) as db:
++        assert len(db)==2
++        db.remove(doc_ids=[1])
++    with TinyDB(path,storage=AtomicJSONStorage) as db:
++        assert db.all()==[{'value':'short'}]
++
++def test_serialization_failure_preserves_old_bytes(tmp_path):
++    path=tmp_path/'db.json'
++    storage=AtomicJSONStorage(path)
++    storage.write({'table':{}})
++    before=path.read_bytes()
++    with pytest.raises(TypeError):
++        storage.write({'bad':object()})
++    assert path.read_bytes()==before and list(tmp_path.iterdir())==[path]
++
++def test_replace_failure_cleans_temporary_and_preserves_mode(tmp_path,monkeypatch):
++    path=tmp_path/'db.json'
++    path.write_text('{}');path.chmod(0o640)
++    storage=AtomicJSONStorage(path)
++    def broken(*args):
++        raise OSError('synthetic')
++    monkeypatch.setattr('os.replace',broken)
++    with pytest.raises(OSError):
++        storage.write({'new':{}})
++    assert path.read_text()=='{}' and path.stat().st_mode&0o777==0o640 and list(tmp_path.iterdir())==[path]
++
++def test_missing_empty_closed_and_symlink_are_explicit(tmp_path):
++    path=tmp_path/'missing.json'
++    storage=AtomicJSONStorage(path)
++    assert storage.read() is None and not path.exists()
++    storage.close();storage.close()
++    with pytest.raises(ValueError):
++        storage.read()
++    link=tmp_path/'link.json';link.symlink_to(path)
++    with pytest.raises(ValueError):
++        AtomicJSONStorage(link)
+--- a/library/docs/development-td-atomic-storage-dev.md
++++ b/library/docs/development-td-atomic-storage-dev.md
+@@ -0,0 +1,5 @@
++# 提供序列化失败不损坏旧文件的原子JSON存储
++
++本地订单持久化需要整份数据序列化成功后才提交。新增可选原子JSONStorage，使用同目录临时文件、同步和替换，保留模式及失败清理；继续支持关闭重开、短数据覆盖，原JSONStorage保持兼容。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tinydb/atomic.py
++++ b/library/tinydb/atomic.py
+@@ -0,0 +1,70 @@
++"""面向单写者的原子JSON文件存储。"""
++import json
++import os
++import stat
++import tempfile
++from pathlib import Path
++from .storages import Storage
++
++
++class AtomicJSONStorage(Storage):
++    """序列化后通过同目录替换提交，不持有失效的旧文件句柄。"""
++    def __init__(self, path, *, create_dirs=False, encoding='utf-8', **options):
++        """配置存储。@param path 文件。@param create_dirs 是否创建父目录。
++        @param encoding 编码。@param options JSON序列化参数。@return None。
++        """
++        self.path, self.encoding, self.options = Path(path), encoding, options
++        self.closed = False
++        if create_dirs:
++            self.path.parent.mkdir(parents=True, exist_ok=True)
++        self._check()
++
++    def _check(self):
++        if self.closed:
++            raise ValueError('存储已经关闭')
++        if self.path.is_symlink():
++            raise ValueError('原子存储不接受符号链接目标')
++
++    def read(self):
++        """读取当前文件。@return 数据映射；不存在或空文件时为None。
++        """
++        self._check()
++        try:
++            text = self.path.read_text(encoding=self.encoding)
++        except FileNotFoundError:
++            return None
++        if not text:
++            return None
++        result = json.loads(text)
++        if not isinstance(result, dict):
++            raise ValueError('数据库根必须是映射')
++        return result
++
++    def write(self, data):
++        """序列化、同步并原子替换。@param data 数据库映射。@return None。
++        """
++        self._check()
++        if not isinstance(data, dict):
++            raise TypeError('数据库根必须是映射')
++        serialized = json.dumps(data, **self.options)
++        mode = stat.S_IMODE(self.path.stat().st_mode) if self.path.exists() else 0o600
++        temporary = None
++        try:
++            with tempfile.NamedTemporaryFile(mode='w', encoding=self.encoding, dir=self.path.parent,
++                                            prefix='.' + self.path.name + '.', delete=False) as stream:
++                temporary = Path(stream.name)
++                stream.write(serialized)
++                stream.flush()
++                os.fchmod(stream.fileno(), mode)
++                os.fsync(stream.fileno())
++            self._check()
++            os.replace(temporary, self.path)
++            temporary = None
++        finally:
++            if temporary is not None:
++                temporary.unlink(missing_ok=True)
++
++    def close(self):
++        """关闭逻辑存储，重复调用允许。@return None。
++        """
++        self.closed = True

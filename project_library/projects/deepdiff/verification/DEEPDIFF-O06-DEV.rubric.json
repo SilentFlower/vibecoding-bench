@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DEEPDIFF-O06-DEV",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add deepdiff.reporting.redacted_report(diff,*,redact_paths=(),mask=\"[已遮蔽]\",left_label=\"left\",right_label=\"right\",default_mapping=None) for explicit JSON-tree diff categories. Use actual verbose text representation from text/tree input, preserve category/path/type facts and independent display labels while masking matching values before serialization. Support exact/ancestor paths and native component * / ** wildcards without confusing a literal star key; also traverse coarse parent replacement payloads so child redactions cannot leak. Drop value-bearing multiline diff text when redaction is enabled. Reject unsupported pathless/set categories and invalid labels/paths, apply custom type serializers only after masking, return JSON-safe schema1 report and never mutate original Diff/Delta or source trees.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

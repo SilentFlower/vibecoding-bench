@@ -1,0 +1,309 @@
+{
+  "project_key": "sortedcontainers",
+  "title": "Sorted Containers本地索引工作场景",
+  "category": "有序状态与业务查询",
+  "seed_digest": "71c8cd0768d90d3e4b9c0c168a04e6b318b062a7d3a594b4ece88ca9c3bcb4ca",
+  "environment": "sortedcontainers-py312",
+  "source": {
+    "repository": "https://github.com/grantjenks/python-sortedcontainers",
+    "commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/app/THIRD_PARTY_LICENSES.txt"
+    ]
+  },
+  "schema": 3,
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
+  "scenarios": [
+    {
+      "id": "SORTEDCONTAINERS-01-DEV-SCENE",
+      "title": "同优先级任务可明确左插或右插且跨块索引一致",
+      "goal": "同优先级任务可明确左插或右插且跨块索引一致",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SORTEDCONTAINERS-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SORTEDCONTAINERS-01-DEV",
+          "kind": "modify",
+          "goal": "同优先级任务可明确左插或右插且跨块索引一致",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd SortedList.add_left/add_right inherited correctly by SortedKeyList. add_left inserts before every equal comparison key (including across block boundaries); add_right preserves current add arrival order. Reuse cached-key/block/index bookkeeping, retain payload identity and key extraction semantics. Cover empty/natural/keyed/reverse-key containers, equal keys with unequal payloads, split/index invariants and subsequent bisect/deletion. Existing add remains unchanged; do not enable arbitrary unsorted insert.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sortedcontainers_01_dev.py, and Chinese compatibility documentation at library/docs/development-sortedcontainers-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SORTEDCONTAINERS-01-DEV-contract.md",
+            "materials/SORTEDCONTAINERS-01-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SORTEDCONTAINERS-01-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/sortedcontainers/sortedlist.py",
+            "library/tests/test_development_sortedcontainers_01_dev.py",
+            "library/docs/development-sortedcontainers-01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SORTEDCONTAINERS-01-DEV.rubric.json",
+            "native": "verification/SORTEDCONTAINERS-01-DEV.native.json",
+            "public_native": "verification/SORTEDCONTAINERS-01-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SORTEDCONTAINERS-02-DEV-SCENE",
+      "title": "可变优先级业务对象按既有位置显式刷新排序索引",
+      "goal": "可变优先级业务对象按既有位置显式刷新排序索引",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SORTEDCONTAINERS-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SORTEDCONTAINERS-02-DEV",
+          "kind": "modify",
+          "goal": "可变优先级业务对象按既有位置显式刷新排序索引",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd SortedKeyList.refresh_at(index) with Python index protocol/negative indexes. A caller explicitly changed one payload key: remove by STORED index (never search with new key), rebuild a candidate index and reinsert at current key, then atomically commit only if all comparisons/key evaluations succeed. Return original payload identity. Other payload keys are required stable; a failed refresh preserves original stored ordering/key caches, without claiming rollback of caller object changes or key callback side effects. Maintain original key-stability default contract.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sortedcontainers_02_dev.py, and Chinese compatibility documentation at library/docs/development-sortedcontainers-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SORTEDCONTAINERS-02-DEV-contract.md",
+            "materials/SORTEDCONTAINERS-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SORTEDCONTAINERS-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/sortedcontainers/sortedlist.py",
+            "library/tests/test_development_sortedcontainers_02_dev.py",
+            "library/docs/development-sortedcontainers-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SORTEDCONTAINERS-02-DEV.rubric.json",
+            "native": "verification/SORTEDCONTAINERS-02-DEV.native.json",
+            "public_native": "verification/SORTEDCONTAINERS-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SORTEDCONTAINERS-03-DEV-SCENE",
+      "title": "列表集合与映射显式切换排序策略并保持原容器可用",
+      "goal": "列表集合与映射显式切换排序策略并保持原容器可用",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SORTEDCONTAINERS-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SORTEDCONTAINERS-03-DEV",
+          "kind": "modify",
+          "goal": "列表集合与映射显式切换排序策略并保持原容器可用",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sorted_copy(key=None) to SortedList/SortedKeyList, SortedSet and SortedDict. Build a fully independent container of the same logical family using the selected key, preserving members/value identities and natural ordering for None. Original content/order/strategy never change, including when new key raises. Rebind all cached bisect/irange proxies to the new index; retain empty/copy/pickle behavior. SortedList factory may return keyed/unkeyed concrete list type; no subclass constructor guarantee or implicit in-place rekey.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sortedcontainers_03_dev.py, and Chinese compatibility documentation at library/docs/development-sortedcontainers-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SORTEDCONTAINERS-03-DEV-contract.md",
+            "materials/SORTEDCONTAINERS-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SORTEDCONTAINERS-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/sortedcontainers/sortedlist.py",
+            "library/src/sortedcontainers/sortedset.py",
+            "library/src/sortedcontainers/sorteddict.py",
+            "library/tests/test_development_sortedcontainers_03_dev.py",
+            "library/docs/development-sortedcontainers-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SORTEDCONTAINERS-03-DEV.rubric.json",
+            "native": "verification/SORTEDCONTAINERS-03-DEV.native.json",
+            "public_native": "verification/SORTEDCONTAINERS-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SORTEDCONTAINERS-04-DEV-SCENE",
+      "title": "有序计划支持四种邻居查询并区分缺项与真实空值",
+      "goal": "有序计划支持四种邻居查询并区分缺项与真实空值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SORTEDCONTAINERS-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SORTEDCONTAINERS-04-DEV",
+          "kind": "modify",
+          "goal": "有序计划支持四种邻居查询并区分缺项与真实空值",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd floor/ceil/lower/higher(value,default=MISSING) to list/keyed list/set/dict. Use container bisect ordering: floor last <=, ceil first >=, lower strict predecessor, higher strict successor; keyed comparisons follow sorting key, including reverse keys and duplicate-key ties. Return existing value (dict returns key/value pair) preserving identity. Missing raises KeyError unless any explicit default, including None/False, is supplied. Existing indexing/bisect behavior unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sortedcontainers_04_dev.py, and Chinese compatibility documentation at library/docs/development-sortedcontainers-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SORTEDCONTAINERS-04-DEV-contract.md",
+            "materials/SORTEDCONTAINERS-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SORTEDCONTAINERS-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/sortedcontainers/sortedlist.py",
+            "library/src/sortedcontainers/sortedset.py",
+            "library/src/sortedcontainers/sorteddict.py",
+            "library/src/sortedcontainers/_neighbors.py",
+            "library/tests/test_development_sortedcontainers_04_dev.py",
+            "library/docs/development-sortedcontainers-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SORTEDCONTAINERS-04-DEV.rubric.json",
+            "native": "verification/SORTEDCONTAINERS-04-DEV.native.json",
+            "public_native": "verification/SORTEDCONTAINERS-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SORTEDCONTAINERS-05-DEV-SCENE",
+      "title": "按排序边界批量取出计划时间窗并同步删除索引",
+      "goal": "按排序边界批量取出计划时间窗并同步删除索引",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SORTEDCONTAINERS-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SORTEDCONTAINERS-05-DEV",
+          "kind": "modify",
+          "goal": "按排序边界批量取出计划时间窗并同步删除索引",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pop_range(minimum=None,maximum=None,inclusive=(True,True),reverse=False) to all three sorted container families. Boundaries follow existing value/key bisect semantics, None is unbounded, inclusive flags explicit bool pair, reversed/empty interval no-op. Collect removed values (dict items) then use existing block/view slice deletion; preserve duplicates, object identity and all remaining indexes. reverse affects returned list only. Cover large cross-block windows, reverse keys and empty/full deletion; do not treat old view slicing as newly implemented capability.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sortedcontainers_05_dev.py, and Chinese compatibility documentation at library/docs/development-sortedcontainers-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SORTEDCONTAINERS-05-DEV-contract.md",
+            "materials/SORTEDCONTAINERS-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SORTEDCONTAINERS-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/sortedcontainers/_poprange.py",
+            "library/src/sortedcontainers/sortedlist.py",
+            "library/src/sortedcontainers/sortedset.py",
+            "library/src/sortedcontainers/sorteddict.py",
+            "library/tests/test_development_sortedcontainers_05_dev.py",
+            "library/docs/development-sortedcontainers-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SORTEDCONTAINERS-05-DEV.rubric.json",
+            "native": "verification/SORTEDCONTAINERS-05-DEV.native.json",
+            "public_native": "verification/SORTEDCONTAINERS-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SORTEDCONTAINERS-06-DEV-SCENE",
+      "title": "有序映射惰性读取键区间的业务项和值",
+      "goal": "有序映射惰性读取键区间的业务项和值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SORTEDCONTAINERS-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SORTEDCONTAINERS-06-DEV",
+          "kind": "modify",
+          "goal": "有序映射惰性读取键区间的业务项和值",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd SortedDict.irange_items/irange_values with same minimum/maximum/inclusive/reverse signature and semantics as existing irange. Return lazy iterators, yielding current values when consumed and preserving identity; ranges/order remain based on dictionary keys or configured key function, never value sort. Cover None values, empty/unbounded/exclusive/reverse/reverse-key cases. Existing irange remains key-only and structural mutation follows its existing documented iterator contract; do not promise snapshots.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sortedcontainers_06_dev.py, and Chinese compatibility documentation at library/docs/development-sortedcontainers-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SORTEDCONTAINERS-06-DEV-contract.md",
+            "materials/SORTEDCONTAINERS-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SORTEDCONTAINERS-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/sortedcontainers/sorteddict.py",
+            "library/tests/test_development_sortedcontainers_06_dev.py",
+            "library/docs/development-sortedcontainers-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SORTEDCONTAINERS-06-DEV.rubric.json",
+            "native": "verification/SORTEDCONTAINERS-06-DEV.native.json",
+            "public_native": "verification/SORTEDCONTAINERS-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

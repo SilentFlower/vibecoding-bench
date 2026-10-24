@@ -1,0 +1,52 @@
+--- a/library/docs/development-feedparser-o01-dev.md
++++ b/library/docs/development-feedparser-o01-dev.md
+@@ -0,0 +1,5 @@
++# 修复JSON修改日期字段判断并保留正式时间与UTC解析事实
++
++对应路线01：正式date_modified检测/读取一致且优先，旧date_updated仅显式回退；原字符串与UTC保留，缺修改日期不写假updated、非法日期parsed为None。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/feedparser/parsers/json.py
++++ b/library/feedparser/parsers/json.py
+@@ -99,9 +99,11 @@
+         if "date_published" in e:
+             entry["published"] = e["date_published"]
+             entry["published_parsed"] = _parse_date(e["date_published"])
+-        if "date_updated" in e:
+-            entry["updated"] = e["date_modified"]
+-            entry["updated_parsed"] = _parse_date(e["date_modified"])
++        if "date_modified" in e or "date_updated" in e:
++            # 正式字段优先，旧错误拼写仅作为明确兼容回退，不能检查一字段却读取另一字段。
++            modified = e["date_modified"] if "date_modified" in e else e["date_updated"]
++            entry["updated"] = modified
++            entry["updated_parsed"] = _parse_date(modified)
+ 
+         if "tags" in e:
+             entry["category"] = e["tags"]
+--- a/library/tests/test_development_feedparser_o01_dev.py
++++ b/library/tests/test_development_feedparser_o01_dev.py
+@@ -0,0 +1,24 @@
++"""JSON Feed修改时间走真实parse入口，不借published兼容别名冒充。"""
++import feedparser,json,io
++
++def parse_entry(values):
++    """只解析内存JSON Feed，不触发路径/网络猜测。@return 实际条目。"""
++    result=feedparser.parse(io.StringIO(json.dumps({'version':'https://jsonfeed.org/version/1.1','title':'T','items':[dict(id='one',content_text='body',**values)]})))
++    assert not result.bozo;return result.entries[0]
++
++def test_only_date_modified_creates_real_updated_and_utc_tuple():
++    """检查真实字典键及UTC偏移，不使用published fallback。@return None。"""
++    entry=parse_entry({'date_modified':'2026-10-24T09:10:11+08:00'})
++    assert dict.__contains__(entry,'updated') and dict.__getitem__(entry,'updated')=='2026-10-24T09:10:11+08:00'
++    assert entry.updated_parsed[:6]==(2026,10,24,1,10,11)
++
++def test_correct_field_precedes_legacy_spelling_and_legacy_alone_no_keyerror():
++    """新旧同在正式字段优先，旧拼写兼容不再读缺失的date_modified。@return None。"""
++    entry=parse_entry({'date_modified':'2026-01-01T00:00:00Z','date_updated':'2025-01-01T00:00:00Z'})
++    assert entry.updated.startswith('2026')
++    assert parse_entry({'date_updated':'2025-01-01T00:00:00Z'}).updated.startswith('2025')
++
++def test_missing_invalid_and_published_fields_have_distinct_actual_keys():
++    """非法值保留原字符串及None解析，无修改日期时不写假updated。@return None。"""
++    assert not dict.__contains__(parse_entry({'date_published':'2026-01-01T00:00:00Z'}),'updated')
++    bad=parse_entry({'date_modified':'not-a-date'});assert bad.updated=='not-a-date' and bad.updated_parsed is None

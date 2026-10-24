@@ -1,0 +1,77 @@
+--- a/library/csvkit/utilities/csvgrep.py
++++ b/library/csvkit/utilities/csvgrep.py
+@@ -31,6 +31,7 @@
+             '-f', '--file', dest='matchfile', type=FileType('r'), action='store',
+             help='A path to a file. For each row, if any line in the file (stripped of line separators) is an exact '
+                  'match of the cell value, the row matches.')
++        self.argparser.add_argument('--ignore-case', action='store_true', help='使用Unicode casefold匹配文本，正则使用IGNORECASE。')
+         self.argparser.add_argument(
+             '-i', '--invert-match', dest='inverse', action='store_true',
+             help='Select non-matching rows, instead of matching rows.')
+@@ -60,16 +61,23 @@
+ 
+         rows, column_names, column_ids = self.get_rows_and_column_names_and_column_ids(**reader_kwargs)
+ 
+-        if self.args.regex:
+-            pattern = re.compile(self.args.regex)
++        if self.args.regex is not None:
++            pattern = re.compile(self.args.regex, re.IGNORECASE if self.args.ignore_case else 0)
+         elif self.args.matchfile:
+             lines = {line.rstrip() for line in self.args.matchfile}
++            if self.args.ignore_case:
++                lines = {line.casefold() for line in lines}
+             self.args.matchfile.close()
+ 
+             def pattern(x):
+-                return x in lines
++                return (x.casefold() if self.args.ignore_case else x) in lines
+         else:
+-            pattern = self.args.pattern
++            if self.args.ignore_case:
++                folded = self.args.pattern.casefold()
++                def pattern(value):
++                    return folded in value.casefold()
++            else:
++                pattern = self.args.pattern
+ 
+         patterns = {column_id: pattern for column_id in column_ids}
+         filter_reader = FilteringCSVReader(rows, header=False, patterns=patterns,
+--- a/library/docs/development-csvkit-o02-dev.md
++++ b/library/docs/development-csvkit-o02-dev.md
+@@ -0,0 +1,5 @@
++# 让真实CSVGrep统一支持Unicode忽略大小写策略
++
++对应路线03：明确-m仍为原子串匹配，-f为精确集合，文本casefold与正则IGNORECASE分别执行；原-i反选、多列逻辑、短行和输出内容保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_csvkit_o02_dev.py
++++ b/library/tests/test_development_csvkit_o02_dev.py
+@@ -0,0 +1,28 @@
++"""大小写选项进入真实CSVGrep，原invert短选项不变。"""
++import csv
++from io import StringIO
++from csvkit.utilities.csvgrep import CSVGrep
++
++def run(tmp_path,contents,args):
++    """通过真实utility读取合成文件。@return CSV行。"""
++    path=tmp_path/'input.csv';path.write_text(contents)
++    output=StringIO();CSVGrep([*args,str(path)],output_file=output).run()
++    return list(csv.reader(StringIO(output.getvalue())))
++
++def test_unicode_substring_and_default_sensitive(tmp_path):
++    """保留-m子串语义，显式casefold覆盖德语特殊大小写。@return None。"""
++    data='name\nStraße\nOTHER\n'
++    assert run(tmp_path,data,['-c','name','-m','STRASSE','--ignore-case'])==[['name'],['Straße']]
++    assert run(tmp_path,data,['-c','name','-m','STRASSE'])==[['name']]
++
++def test_matchfile_exact_inverse_and_short_rows(tmp_path):
++    """-f精确匹配，-i仍代表反选。@return None。"""
++    terms=tmp_path/'terms';terms.write_text('STRASSE\n')
++    assert run(tmp_path,'a,b\n1,Straße\n2,else\n3\n',['-c','b','-f',str(terms),'--ignore-case','-i'])==[['a','b'],['2','else'],['3']]
++
++def test_regex_flags_any_all_and_empty_pattern(tmp_path):
++    """正则flags和多列逻辑保持，空正则合法匹配。@return None。"""
++    data='a,b\nYES,no\nno,YES\n'
++    assert len(run(tmp_path,data,['-c','a,b','-r','^yes$','--ignore-case','-a']))==3
++    assert run(tmp_path,data,['-c','a,b','-r','^yes$','--ignore-case'])==[['a','b']]
++    assert len(run(tmp_path,data,['-c','a','-r','','--ignore-case']))==3

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYYAML-05-DEV",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add yaml.limits.LimitedSafeLoader/load_limited for decoded str single-document input only. Optional strict nonnegative integer max_chars, max_nodes (nonalias nodes), max_depth (root=1, keys count), max_aliases (reference occurrences). Check text length before parse and node/depth/alias budgets before compose; marked ComposerError for node constraints, YAMLError for text budget. Preserve normal safe graph identity and finally dispose, empty document zero budgets legal. No byte/stream budget claim, no large exhaustion payloads, no changes to default loader limits.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

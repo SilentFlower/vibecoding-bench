@@ -1,0 +1,64 @@
+--- a/library/docs/development-packaging-06-dev.md
++++ b/library/docs/development-packaging-06-dev.md
+@@ -0,0 +1,5 @@
++# 旧sdist连字符版本通过显式候选审查消除静默误判
++
++路线14：历史连字符sdist枚举全部合法名称/版本切分，无期望名称绝不猜测；已知名称只取唯一匹配，现代parse_sdist_filename原行为不动。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/packaging/utils.py
++++ b/library/src/packaging/utils.py
+@@ -20,6 +20,7 @@
+     "canonicalize_version",
+     "is_normalized_name",
+     "parse_sdist_filename",
++    "parse_legacy_sdist_filename",
+     "parse_wheel_filename",
+ ]
+ 
+@@ -368,3 +369,25 @@
+         ) from e
+ 
+     return (name, version)
++
++
++def parse_legacy_sdist_filename(filename,expected_name=None):
++    """审查旧连字符版本，绝不静默选一解。@param filename 历史归档名。@param expected_name 可选已知项目名。@return 无期望时候选tuple，有期望时唯一(name,Version)。"""
++    if filename.endswith(".tar.gz"):stem=filename[:-7]
++    elif filename.endswith(".zip"):stem=filename[:-4]
++    else:raise InvalidSdistFilename("不支持的extension")
++    expected=canonicalize_name(expected_name,validate=True) if expected_name is not None else None
++    candidates=[]
++    for index,char in enumerate(stem):
++        if char!="-":continue
++        try:
++            name=canonicalize_name(stem[:index],validate=True)
++            version=Version(stem[index+1:])
++        except (InvalidName,InvalidVersion):continue
++        item=(name,version)
++        if expected is not None and name!=expected:continue
++        if item not in candidates:candidates.append(item)
++    if not candidates:raise InvalidSdistFilename("没有合法切分")
++    if expected is None:return tuple(candidates)
++    if len(candidates)!=1:raise InvalidSdistFilename("已知名称仍有歧义")
++    return candidates[0]
+--- a/library/tests/test_development_packaging_06_dev.py
++++ b/library/tests/test_development_packaging_06_dev.py
+@@ -0,0 +1,17 @@
++"""旧sdist歧义是显式审查，不更改现代解析默认值。"""
++import unittest
++from packaging.utils import parse_legacy_sdist_filename,parse_sdist_filename,InvalidSdistFilename
++from packaging.version import Version
++
++def test_legacy_post_version_expected_name_or_all_candidates():
++    """cffi旧post写法需已知名称才能选定。@return None。"""
++    assert parse_legacy_sdist_filename('cffi-1.0.2-2.tar.gz','cffi')==('cffi',Version('1.0.2.post2'))
++    candidates=parse_legacy_sdist_filename('cffi-1.0.2-2.tar.gz')
++    assert ('cffi',Version('1.0.2.post2')) in candidates and ('cffi-1-0-2',Version('2')) in candidates
++    assert parse_sdist_filename('cffi-1.0.2-2.tar.gz')==('cffi-1-0-2',Version('2'))
++
++def test_normal_names_expected_mismatch_and_invalid_archives():
++    """现代名称仍可列候选，期望不匹配须拒绝。@return None。"""
++    assert parse_legacy_sdist_filename('my-pkg-1.2.zip','My_Pkg')==('my-pkg',Version('1.2'))
++    for filename,expected in (('pkg-1.zip','other'),('pkg-bad.tar.gz',None),('pkg-1.whl',None)):
++        with unittest.TestCase().assertRaises(InvalidSdistFilename):parse_legacy_sdist_filename(filename,expected)

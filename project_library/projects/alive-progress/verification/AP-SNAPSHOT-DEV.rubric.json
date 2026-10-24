@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AP-SNAPSHOT-DEV",
+  "source_commit": "69d9bf0aba6276e2434a3a595cceca55040d64d7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add public bar_handle.snapshot() returning frozen ProgressSnapshot(count,processed,total,percent,elapsed,rate,manual,active). Read actual current counters and last sampled raw elapsed/rate values without formatting strings, flushing, updating smoothing/timers or rendering. Unknown totals use None and percent None unless manual mode; preserve skipped count vs processed distinction. Snapshots are independent immutable values, work during pause and after finish, and active reflects actual live handle state. Preserve all old handle controls, manual/unknown modes and receipts.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,13 @@
+{
+  "script": "verification/AT-DEFAULT-METHOD-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 6,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_at_default_method_dev.py"
+}

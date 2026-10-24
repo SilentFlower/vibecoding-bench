@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "XW-SHEET-NAMES-DEV",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement xlsxwriter.sheet_names.add_named_worksheet(workbook,desired). Sanitize Excel forbidden characters/control chars, trim whitespace and leading/trailing apostrophes, provide fallback Sheet, avoid reserved History and limit to 31 Unicode codepoints. Compare against actual workbook.worksheets names case-insensitively with casefold, allocate stable \" (2)\" suffixes while re-truncating base. Return the actual new worksheet and never rename/overwrite existing sheets. Handle long names, all-invalid names, repeated collisions and inputs differing only by case.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

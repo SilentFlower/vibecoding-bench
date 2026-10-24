@@ -1,0 +1,300 @@
+{
+  "schema": 3,
+  "project_key": "bidict",
+  "title": "Bidict标识映射工作场景",
+  "category": "双射、冲突与发布边界",
+  "description": "固定真实源码上的完整工程交付：按共同中间域组合真实双向业务关系；按键值与谓词输出保持类型的独立双向子映射；对关系两侧转换并拒绝最终唯一性冲突；生成并应用有前置关系和顺序的可逆补丁；用显式类型codec交换可移植双向关系记录；共享保持实时关联的成对只读双向视图。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "b58a3350687c270e4e71765a609655ffa78fa5908a8699bdf637e34272715abd",
+  "environment": "bidict-py312",
+  "source": {
+    "repository": "https://github.com/jab/bidict",
+    "commit": "299fedc89f1d70d5d41cf7922564b376d3e2d435",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BIDICT-O01-DEV-SCENE",
+      "title": "按共同中间域组合真实双向业务关系",
+      "goal": "按共同中间域组合真实双向业务关系",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIDICT-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIDICT-O01-DEV",
+          "kind": "modify",
+          "goal": "按共同中间域组合真实双向业务关系",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bidict.compose.compose(mapping, other, *, missing=\"error\") for two BidirectionalMapping inputs. Compose A->B and B->C into a validated same-concrete-type A->C mapping, preserving left order and both sources. Missing intermediate keys either raise or explicitly select intersection with missing=\"ignore\". Support inverse symmetry, None, empty/frozen/ordered inputs and reject invalid policies/non-bidirectional sources; do not change union or putall semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-bidict-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIDICT-O01-DEV-contract.md",
+            "materials/BIDICT-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bidict/compose.py",
+            "library/tests/test_development_bidict_o01_dev.py",
+            "library/docs/development-bidict-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIDICT-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIDICT-O01-DEV.native.json",
+            "public_native": "verification/BIDICT-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIDICT-O01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIDICT-O02-DEV-SCENE",
+      "title": "按键值与谓词输出保持类型的独立双向子映射",
+      "goal": "按键值与谓词输出保持类型的独立双向子映射",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIDICT-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIDICT-O02-DEV",
+          "kind": "modify",
+          "goal": "按键值与谓词输出保持类型的独立双向子映射",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bidict.select.select(mapping, *, keys=None, values=None, predicate=None, strict=False). Combine requested key/value/predicate filters, distinguish absent filters from empty selections, retain original relative order and concrete bidict/frozen/ordered/custom type and inverse behavior. One-shot filters are consumed once. Strict missing requests raise before callbacks, callbacks propagate normally and result backing must be independent of source mutation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-bidict-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIDICT-O02-DEV-contract.md",
+            "materials/BIDICT-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bidict/select.py",
+            "library/tests/test_development_bidict_o02_dev.py",
+            "library/docs/development-bidict-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIDICT-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIDICT-O02-DEV.native.json",
+            "public_native": "verification/BIDICT-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIDICT-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIDICT-O03-DEV-SCENE",
+      "title": "对关系两侧转换并拒绝最终唯一性冲突",
+      "goal": "对关系两侧转换并拒绝最终唯一性冲突",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIDICT-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIDICT-O03-DEV",
+          "kind": "modify",
+          "goal": "对关系两侧转换并拒绝最终唯一性冲突",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bidict.transform.transform_items(mapping, *, key_fn=None, value_fn=None). Transform each original key/value exactly once into a new same-type ordered relation, validate both transformed key and value uniqueness before constructing/publishing, and report one-based conflicting source positions rather than silently dropping rows. Preserve inputs, inverse behavior, frozen/custom subclasses, callback exception identity and natural unhashable errors.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-bidict-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIDICT-O03-DEV-contract.md",
+            "materials/BIDICT-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bidict/transform.py",
+            "library/tests/test_development_bidict_o03_dev.py",
+            "library/docs/development-bidict-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIDICT-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIDICT-O03-DEV.native.json",
+            "public_native": "verification/BIDICT-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIDICT-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIDICT-O04-DEV-SCENE",
+      "title": "生成并应用有前置关系和顺序的可逆补丁",
+      "goal": "生成并应用有前置关系和顺序的可逆补丁",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIDICT-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIDICT-O04-DEV",
+          "kind": "modify",
+          "goal": "生成并应用有前置关系和顺序的可逆补丁",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bidict.relation_patch.relation_diff(before, after) and apply_relation_patch(mapping, patch, *, reverse=False). Produce versioned explicit add/remove/reassign facts with ordered full pre/post relations; apply only when the complete expected current relation/order matches. Validate final key/value uniqueness and return a new same-type relation, allowing cyclic value swaps, additions/removals and exact reverse restoration. Preserve original inputs on stale conditions, malformed schema or invalid final relations; never execute operation strings.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-bidict-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIDICT-O04-DEV-contract.md",
+            "materials/BIDICT-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bidict/relation_patch.py",
+            "library/tests/test_development_bidict_o04_dev.py",
+            "library/docs/development-bidict-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIDICT-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIDICT-O04-DEV.native.json",
+            "public_native": "verification/BIDICT-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIDICT-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIDICT-O05-DEV-SCENE",
+      "title": "用显式类型codec交换可移植双向关系记录",
+      "goal": "用显式类型codec交换可移植双向关系记录",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIDICT-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIDICT-O05-DEV",
+          "kind": "modify",
+          "goal": "用显式类型codec交换可移植双向关系记录",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bidict.records.to_records/from_records with explicit key/value codec callables, a schema1 ordered pairs format and checked codec identifier. Preserve tuple/int/str/None keys and values through caller-defined JSON-compatible encodings, reject malformed or duplicate-after-decoding keys/values instead of silently dropping rows, and allow the caller to explicitly choose ordered/frozen/custom result classes. Never import classes or execute expressions from data; preserve source relationships and callback errors.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-bidict-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIDICT-O05-DEV-contract.md",
+            "materials/BIDICT-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bidict/records.py",
+            "library/tests/test_development_bidict_o05_dev.py",
+            "library/docs/development-bidict-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIDICT-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIDICT-O05-DEV.native.json",
+            "public_native": "verification/BIDICT-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIDICT-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIDICT-O06-DEV-SCENE",
+      "title": "共享保持实时关联的成对只读双向视图",
+      "goal": "共享保持实时关联的成对只读双向视图",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIDICT-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIDICT-O06-DEV",
+          "kind": "modify",
+          "goal": "共享保持实时关联的成对只读双向视图",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bidict.readonly.ReadOnlyBidictProxy as a read-only BidirectionalMapping with live forward/inverse lookups, stable inverse.inverse identity and inv alias. Preserve source order and live views after additions/deletions/clear, reject mutation in either direction and do not expose writable source through ordinary views. copy() returns an independent frozen snapshot. Preserve None, accept existing bidirectional subclasses and document that values are not deeply frozen and concurrency is not isolated.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-bidict-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIDICT-O06-DEV-contract.md",
+            "materials/BIDICT-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bidict/readonly.py",
+            "library/tests/test_development_bidict_o06_dev.py",
+            "library/docs/development-bidict-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIDICT-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIDICT-O06-DEV.native.json",
+            "public_native": "verification/BIDICT-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIDICT-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

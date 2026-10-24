@@ -1,0 +1,13 @@
+{
+  "script": "verification/SC-WEEKDAYS-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_sc_weekdays_dev.py"
+}

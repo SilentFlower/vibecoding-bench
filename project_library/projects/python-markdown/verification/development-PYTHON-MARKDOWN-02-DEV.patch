@@ -1,0 +1,65 @@
+--- a/library/docs/development-python-markdown-02-dev.md
++++ b/library/docs/development-python-markdown-02-dev.md
+@@ -0,0 +1,5 @@
++# 目录显式排除指定标题且保留正文、锚点与子节
++
++路线06：TOC新增默认关闭的精确排除属性，启用后仅排除标题目录项，标题/id/正文及锚点保留，子节继续按真实层级归入目录。控制属性是否移除明确可选，不混同data-toc-label。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/markdown/extensions/toc.py
++++ b/library/markdown/extensions/toc.py
+@@ -242,6 +242,8 @@
+     def __init__(self, md: Markdown, config: dict[str, Any]):
+         super().__init__(md)
+ 
++        self.unlisted_attribute = config["unlisted_attribute"]
++        self.remove_unlisted_attribute = config["remove_unlisted_attribute"]
+         self.marker: str = config["marker"]
+         self.title: str = config["title"]
+         self.base_level = int(config["baselevel"]) - 1
+@@ -388,7 +390,10 @@
+                     # Remove the data-toc-label attribute as it is no longer needed
+                     del el.attrib['data-toc-label']
+ 
+-                if int(el.tag[-1]) >= self.toc_top and int(el.tag[-1]) <= self.toc_bottom:
++                unlisted = bool(self.unlisted_attribute and self.unlisted_attribute in el.attrib)
++                if unlisted and self.remove_unlisted_attribute:
++                    del el.attrib[self.unlisted_attribute]
++                if not unlisted and int(el.tag[-1]) >= self.toc_top and int(el.tag[-1]) <= self.toc_bottom:
+                     toc_tokens.append({
+                         'level': int(el.tag[-1]),
+                         'id': unescape(el.attrib["id"]),
+@@ -422,6 +427,8 @@
+ 
+     def __init__(self, **kwargs):
+         self.config = {
++            'unlisted_attribute': ['', '显式排除目录项的属性名，空串关闭。'],
++            'remove_unlisted_attribute': [True, '启用时是否从标题移除该控制属性。'],
+             'marker': [
+                 '[TOC]',
+                 'Text to find and replace with Table of Contents. Set to an empty string to disable. '
+--- a/library/tests/test_development_python_markdown_02_dev.py
++++ b/library/tests/test_development_python_markdown_02_dev.py
+@@ -0,0 +1,22 @@
++"""目录控制属性只排除该目录项，不丢标题、锚点或后代正文。"""
++import markdown
++
++
++def test_opt_in_exclusion_keeps_heading_and_promotes_children():
++    """排除标题仍有id和permalink，子节继续进入目录。@return None。"""
++    md=markdown.Markdown(extensions=['markdown.extensions.toc','markdown.extensions.attr_list'],extension_configs={'markdown.extensions.toc':{'unlisted_attribute':'data-toc-unlisted','permalink':True}})
++    output=md.convert('# Visible\n\n## Hidden {data-toc-unlisted}\n\n### Child\n\nBody')
++    assert 'id="hidden"' in output and 'Hidden' in output and 'Body' in output
++    assert 'data-toc-unlisted' not in output
++    assert md.toc_tokens[0]['children'][0]['name']=='Child'
++    assert 'Hidden' not in md.toc and 'Child' in md.toc
++
++
++def test_default_and_attribute_retention_policy():
++    """默认关闭保持旧TOC，控制属性保留由选项决定。@return None。"""
++    text='# Heading {data-toc-unlisted=true}'
++    normal=markdown.Markdown(extensions=['markdown.extensions.toc','markdown.extensions.attr_list']);normal.convert(text)
++    assert normal.toc_tokens[0]['name']=='Heading'
++    md=markdown.Markdown(extensions=['markdown.extensions.toc','markdown.extensions.attr_list'],extension_configs={'markdown.extensions.toc':{'unlisted_attribute':'data-toc-unlisted','remove_unlisted_attribute':False}})
++    output=md.convert(text)
++    assert md.toc_tokens==[] and 'data-toc-unlisted="true"' in output

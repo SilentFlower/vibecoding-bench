@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-PPTX-06-DEV",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add pptx.layout.align_shapes/distribute_shapes for unique same-parent nonrotated axis-aligned shapes. Align left/right/top/bottom/centers to collective bounding box, centers floor to EMU integer. Distribution stable by position, preserve outermost edges, subtract actual unequal sizes and use rational gaps with nearest-even integer rounding, reject negative available gap. Validate full batch before mutation and rollback coordinate setter failure; preserve dimensions, shape IDs/Z order/content/relationships and input order return. Reject cross-space/rotated cases rather than claiming visual bounding boxes; saved geometry/reopen proof.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

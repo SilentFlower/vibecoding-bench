@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CF-LITERAL-DEV",
+  "source_commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement confuse.literal.Literal(expected,default=REQUIRED) as a real Template. Require recursive type-and-value equality for scalars, dict keys/values and sequences: True,1,1.0 differ and list differs from tuple. Constructor detaches expected and validates explicit default against it. Conversion raises normal ConfigValueError with view path on mismatch, missing required values retain NotFoundError. Returned mutable values and defaults must be independent copies, without changing legacy Choice or coercive templates.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

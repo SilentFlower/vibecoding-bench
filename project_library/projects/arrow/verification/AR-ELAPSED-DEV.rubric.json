@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AR-ELAPSED-DEV",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Arrow.elapsed(other) returning self-minus-other timedelta on the UTC timeline, and Arrow.shift_elapsed(**units) returning a new Arrow in the original zone/fold. Other must be Arrow or aware datetime; reject naive values. Fixed elapsed units are weeks/days/hours/minutes/seconds/microseconds with finite int/float values excluding booleans; reject calendar months/years and unknown units. Preserve wall-time subtraction and calendar shift unchanged. Retain exact microseconds, negative shifts, subclass construction and natural datetime overflow behavior across DST gaps/folds.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

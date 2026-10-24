@@ -1,0 +1,106 @@
+--- a/library/development_tests/test_development_sj_lines_dev.py
++++ b/library/development_tests/test_development_sj_lines_dev.py
+@@ -0,0 +1,25 @@
++"""公开JSON Lines真实流回归。"""
++from io import StringIO
++import pytest
++from simplejson.lines import iterloads,iterdumps,dump
++
++def test_mixed_bytes_bom_blank_and_physical_error_line():
++    result=list(iterloads([b'\xef\xbb\xbf{"v":1}\r\n','\n','{"a":1,"a":2}\n','false\n'],errors='collect'))
++    assert [(row.line,row.status) for row in result]==[(1,'passed'),(3,'error'),(4,'passed')]
++    assert result[2].value is False
++
++def test_reader_and_writer_are_lazy_and_keep_one_record_per_line():
++    calls=[]
++    def source():
++        for value in (1,2): calls.append(value);yield str(value)
++    reader=iterloads(source());assert calls==[] and next(reader)==1 and calls==[1]
++    assert list(iterdumps([{'b':2,'a':1},None]))==['{"a":1,"b":2}\n','null\n']
++
++def test_limit_and_raise_line_are_explicit():
++    with pytest.raises(ValueError,match='2'): list(iterloads(['1\n','1234\n'],max_chars=3))
++    with pytest.raises(ValueError): iterloads(iter([]),errors='skip')
++
++def test_bad_record_never_writes_its_partial_json():
++    stream=StringIO()
++    with pytest.raises(TypeError): dump([{'ok':1},{'bad':set([1])}],stream)
++    assert stream.getvalue()=='{"ok":1}\n'
+--- a/library/docs/development-sj-lines-dev.md
++++ b/library/docs/development-sj-lines-dev.md
+@@ -0,0 +1,5 @@
++# 实现惰性JSON Lines读写和可定位逐行错误结果
++
++逐行数据流保留物理行号，空行计数但忽略，错误可抛出或收集后继续。复用严格解析与稳定编码，单行预算在解析前生效；逐记录完整编码再写入，不预读整份数据。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/simplejson/lines.py
++++ b/library/simplejson/lines.py
+@@ -0,0 +1,67 @@
++"""逐物理行读取及逐记录编码，保留可靠错误行号。"""
++from dataclasses import dataclass
++from .strict import strict_loads
++from .stable import stable_dumps
++
++
++@dataclass(frozen=True)
++class LineResult:
++    """collect策略中的单行实际结果，不保存异常对象。"""
++    line: int
++    status: str
++    value: object=None
++    error: object=None
++
++
++def iterloads(lines,*,errors='raise',use_decimal=False,max_chars=None):
++    """惰性解码物理行。@param lines 文本或UTF8字节行迭代器。@param errors raise或collect。
++    @param use_decimal 精度策略。@param max_chars 单行最大字符数，不含CRLF。
++    @return 记录迭代器；空白行忽略但计入行号。
++    """
++    if errors not in ('raise','collect') or (max_chars is not None and (type(max_chars) is not int or max_chars<1)):
++        raise ValueError('需要有效错误策略及正整数行预算')
++    iterator=iter(lines)
++    def produce():
++        for number,raw in enumerate(iterator,1):
++            try:
++                if isinstance(raw,bytes):
++                    text=raw.decode('utf-8')
++                elif isinstance(raw,str):
++                    text=raw
++                else:
++                    raise TypeError('每条输入必须为文本或字节行')
++                if number==1 and text.startswith('\ufeff'):
++                    text=text[1:]
++                text=text.rstrip('\r\n')
++                if max_chars is not None and len(text)>max_chars:
++                    raise ValueError('JSON行超过字符预算')
++                if not text.strip():
++                    continue
++                value=strict_loads(text,use_decimal=use_decimal)
++            except (ValueError,TypeError) as error:
++                if errors=='raise':
++                    raise ValueError('JSON行'+str(number)+': '+str(error)) from error
++                yield LineResult(number,'error',error=str(error))
++            else:
++                yield LineResult(number,'passed',value=value) if errors=='collect' else value
++    return produce()
++
++
++def iterdumps(records):
++    """逐条完整编码后产出一行。@param records JSON记录迭代器。@return 带LF文本行迭代器。
++    """
++    for record in records:
++        yield stable_dumps(record)+'\n'
++
++
++def dump(records,stream):
++    """向文本流逐条写入。@param records JSON记录。@param stream 文本写入流。
++    @return 已成功完整写入的记录数；单条失败不写入该条的片段。
++    """
++    count=0
++    for line in iterdumps(records):
++        written=stream.write(line)
++        if written is not None and written!=len(line):
++            raise OSError('JSON行未完整写入')
++        count+=1
++    return count

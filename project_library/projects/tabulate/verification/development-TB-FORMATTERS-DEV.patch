@@ -1,0 +1,73 @@
+--- a/library/development_tests/test_development_tb_formatters_dev.py
++++ b/library/development_tests/test_development_tb_formatters_dev.py
+@@ -0,0 +1,31 @@
++"""公开按列业务格式化回归。"""
++import pytest
++from tabulate import tabulate,SEPARATING_LINE
++from tabulate.formatters import tabulate_with_formatters
++
++def test_column_callbacks_receive_business_coordinates():
++    seen=[];rows=[[1,'a'],SEPARATING_LINE,[2,'b']]
++    def convert(value,row,column):
++        seen.append((value,row,column))
++        return str(value)+' units'
++    result=tabulate_with_formatters(rows,formatters=[convert],tablefmt='plain')
++    assert seen==[(1,0,0),(2,1,0)] and '1 units' in result and rows[0]==[1,'a']
++
++def test_mapping_keys_and_disabled_numeric_parse_are_preserved():
++    result=tabulate_with_formatters([{'code':1}],headers='keys',formatters=[lambda value,row,col:'001'],disable_numparse=True,tablefmt='plain')
++    assert 'code' in result and '001' in result
++
++def test_ragged_cells_are_not_synthesized_for_callbacks():
++    seen=[]
++    tabulate_with_formatters([[1],[2,3]],formatters=[None,lambda value,row,col:not seen.append((value,row,col))])
++    assert seen==[(3,1,1)]
++
++def test_invalid_and_failing_callbacks_leave_input_unchanged():
++    rows=[[1]]
++    with pytest.raises(TypeError):
++        tabulate_with_formatters(rows,formatters=[3])
++    def fail(*args):
++        raise LookupError('synthetic')
++    with pytest.raises(LookupError):
++        tabulate_with_formatters(rows,formatters=[fail])
++    assert rows==[[1]]
+--- a/library/docs/development-tb-formatters-dev.md
++++ b/library/docs/development-tb-formatters-dev.md
+@@ -0,0 +1,5 @@
++# 对归一化业务列执行显式格式化回调再渲染
++
++报表需要按列展示金额、状态等业务值。先沿用原数据归一化，再用显式回调转换，分隔线及缺失的稀疏单元格不调用回调。业务行号稳定、输入不变，最后仍走原渲染选项，不引入全局注册表。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tabulate/formatters.py
++++ b/library/tabulate/formatters.py
+@@ -0,0 +1,28 @@
++"""在原数据归一化之后按列转换业务展示值。"""
++from tabulate import tabulate, _normalize_tabular_data, _is_separating_line
++
++
++def tabulate_with_formatters(data,headers=(),*,formatters=(),**options):
++    """按列格式化再渲染。@param data 原表数据。@param headers 原表头选项。
++    @param formatters callable(value,row_index,column_index)或None序列。@param options 原渲染选项。
++    @return 原格式器的结果；分隔线不调用回调，不修改输入，异常原样传播。
++    """
++    callbacks=tuple(formatters)
++    if any(callback is not None and not callable(callback) for callback in callbacks):
++        raise TypeError('列格式器必须可调用或None')
++    rows,normalized,padding=_normalize_tabular_data(data,headers,showindex='never')
++    width=max([len(normalized),*(len(row) for row in rows if not _is_separating_line(row))],default=0)
++    if len(callbacks)>width:
++        raise ValueError('格式器列数超过表宽')
++    result=[];row_index=0
++    for row in rows:
++        if _is_separating_line(row):
++            result.append(row)
++            continue
++        rendered=list(row)
++        for column,callback in enumerate(callbacks):
++            if callback is not None and column<len(rendered):
++                rendered[column]=callback(rendered[column],row_index,column)
++        result.append(rendered)
++        row_index+=1
++    return tabulate(result,headers=normalized,**options)

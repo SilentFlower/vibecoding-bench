@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DATASET-O06-DEV",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add keyword-only on_error=\"flush\"|\"discard\" to actual ChunkedInsert/ChunkedUpdate and validate positive non-bool chunksize. Default flush preserves existing behavior. In discard mode normal exit still flushes, while an application exception clears only the pending queue (and pending insert field set), invokes no callback/write and preserves the original exception; already committed chunks remain. Empty flush is an idempotent no-op. Preserve callback/write failures as failures and explicit outer Database transaction rollback behavior. Demonstrate real SQLite insert/update, pending state reuse and full-chunk vs tail distinction; never claim discard undoes committed chunks.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

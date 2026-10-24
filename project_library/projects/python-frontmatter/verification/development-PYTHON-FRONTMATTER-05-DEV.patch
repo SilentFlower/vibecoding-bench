@@ -1,0 +1,57 @@
+--- a/library/docs/development-python-frontmatter-05-dev.md
++++ b/library/docs/development-python-frontmatter-05-dev.md
+@@ -0,0 +1,5 @@
++# 标准二进制文档流按显式编码可靠读取与往返输出
++
++路线05：二进制流在格式识别前按显式编码解码，导出按标准二进制流类型一次编码；文本流仍写str，路径encoding兼容。保留当前游标及调用方流所有权，不捕获TypeError重试而造成重复写入。真实往返覆盖先前TOML/JSON和保留键能力。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/frontmatter/__init__.py
++++ b/library/frontmatter/__init__.py
+@@ -169,6 +169,7 @@
+     else:
+         raise ValueError(f"Cannot open filename using type {type(fd)}")
+ 
++    text = u(text, encoding)
+     handler = handler or detect_format(text, handlers)
+     return loads(text, encoding, handler, **defaults)
+ 
+@@ -240,7 +241,8 @@
+     """
+     content = dumps(post, handler, **kwargs)
+     if is_writable(fd):
+-        fd.write(content)
++        payload = content.encode(encoding) if isinstance(fd, (io.BufferedIOBase, io.RawIOBase)) else content
++        fd.write(payload)
+ 
+     elif can_open(fd):
+         with open(fd, "w", encoding=encoding) as f:
+--- a/library/tests/test_development_python_frontmatter_05_dev.py
++++ b/library/tests/test_development_python_frontmatter_05_dev.py
+@@ -0,0 +1,26 @@
++"""标准二进制文档流按指定编码读写，调用方保留所有权。"""
++import io
++import unittest
++import frontmatter
++from frontmatter.default_handlers import JSONHandler,TOMLHandler
++
++
++def test_binary_read_current_cursor_and_encoding():
++    """从当前游标解码，不把bytes送入正则。@return None。"""
++    raw='  \n+++\ncontent="摘要"\n+++\n正文'.encode('utf-16-le')
++    stream=io.BytesIO(b'prefix'+raw);stream.seek(6)
++    post=frontmatter.load(stream,encoding='utf-16-le')
++    assert isinstance(post.handler,TOMLHandler) and post.metadata['content']=='摘要'
++    assert post.content=='正文' and not stream.closed
++
++
++def test_binary_dump_roundtrip_and_error_is_not_retried():
++    """输出编码只用于二进制流；错误不能造成二次写入。@return None。"""
++    post=frontmatter.loads('{"content":"摘要"}\n正文')
++    stream=io.BytesIO();frontmatter.dump(post,stream,encoding='utf-16-le',ensure_ascii=False)
++    assert not stream.closed
++    stream.seek(0);again=frontmatter.load(stream,encoding='utf-16-le')
++    assert isinstance(again.handler,JSONHandler) and again.metadata==post.metadata and again.content=='正文'
++    text=io.StringIO();frontmatter.dump(post,text,ensure_ascii=False)
++    assert isinstance(text.getvalue(),str)
++    with unittest.TestCase().assertRaises(UnicodeDecodeError):frontmatter.load(io.BytesIO(b'\xff'))

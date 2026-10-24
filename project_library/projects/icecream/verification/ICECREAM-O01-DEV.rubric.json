@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "ICECREAM-O01-DEV",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix actual IceCreamDebugger._formatArgs so ast.Starred expansion never truncates calculated values via zip. Preserve reliably identifiable ordinary prefix/suffix expressions; label indeterminate expanded middle values explicitly by index without guessing source lengths or reevaluating/reiterating expressions/generators. Support multiple/empty expansions, ordinary args between stars, no-source fallback and single/multiple passthrough object identity. Keep ordinary nonstar source/literal formatting unchanged and ensure every calculated argument appears once in output.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

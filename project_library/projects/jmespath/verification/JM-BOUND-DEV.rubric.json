@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JM-BOUND-DEV",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement jmespath.bound.BoundExpression(expression,options=None) with read-only expression and search(data,options=sentinel). Compile once, snapshot Options dict_cls/custom_functions references at binding so later mutation of the Options container does not change defaults, and create the normal interpreter per call. Omitted override uses binding, explicit None uses standard defaults, explicit Options affects one call. Retain custom function object identity, actual parser/errors and input field semantics; require completed literal isolation so callers cannot poison repeated template results.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

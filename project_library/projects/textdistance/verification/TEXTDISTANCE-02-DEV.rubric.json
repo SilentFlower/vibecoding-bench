@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TEXTDISTANCE-02-DEV",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair LCSSeq and LCSStr preparation/reconstruction for qval=None words, qval>1 qgrams and qval=1 ordinary str/list/tuple inputs. Prepare exactly once; recursive multi-input LCSSeq must not retokenize prepared units. Strings at qval=1 retain str results; words/qgrams return lists of original units; ordinary list/tuple preserve first-input representation and unhashable tokens work. Empty/single/multi-input and the 200-element branch boundary follow the same contract. similarity and normalized maximum count prepared units, never concatenated character lengths. Preserve the previously delivered custom-predicate LCSSeq behavior and old character results/tie rules. This is one complete sequence-unit repair across both algorithms, not separate micro-goals for each branch.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

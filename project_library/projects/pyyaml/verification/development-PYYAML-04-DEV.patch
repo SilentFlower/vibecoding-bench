@@ -1,0 +1,94 @@
+--- a/library/docs/development-pyyaml-04-dev.md
++++ b/library/docs/development-pyyaml-04-dev.md
+@@ -0,0 +1,5 @@
++# 未知YAML标签可作为安全数据保留并往返转储
++
++路线08：未知标签存TaggedValue(tag/种类/安全值)，标量原文及递归/共享别名保真，明确dumper读回；python/object/apply也只是惰性数据，不导入执行，默认safe拒绝保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/lib/yaml/tagged.py
++++ b/library/lib/yaml/tagged.py
+@@ -0,0 +1,58 @@
++"""未知标签仅作为惰性数据保留，不执行标签目标。"""
++from dataclasses import dataclass
++from yaml.loader import SafeLoader
++from yaml.dumper import SafeDumper
++from yaml.nodes import ScalarNode,SequenceNode,MappingNode
++
++
++@dataclass
++class TaggedValue:
++    """未知标签数据。@param tag 完整tag。@param kind scalar/sequence/mapping。@param value 原标量文本或安全容器。@return 不执行的值。"""
++    tag: str
++    kind: str
++    value: object
++
++
++class PreservingLoader(SafeLoader):
++    """未知标签保留，其余标签保持SafeLoader构造。"""
++
++
++class PreservingDumper(SafeDumper):
++    """只为TaggedValue显式重建原标签。"""
++
++
++def _construct(loader,node):
++    """为递归容器先注册占位值，保别名身份。"""
++    if isinstance(node,ScalarNode):
++        yield TaggedValue(node.tag,"scalar",node.value)
++    elif isinstance(node,SequenceNode):
++        value=TaggedValue(node.tag,"sequence",[]);yield value
++        value.value.extend(loader.construct_sequence(node))
++    elif isinstance(node,MappingNode):
++        value=TaggedValue(node.tag,"mapping",{});yield value
++        value.value.update(loader.construct_mapping(node))
++    else:raise ValueError("未知节点类型")
++
++
++def _represent(dumper,value):
++    """代表器只输出数据，不导入未知tag。"""
++    if value.kind=="scalar":return dumper.represent_scalar(value.tag,value.value)
++    if value.kind=="sequence":return dumper.represent_sequence(value.tag,value.value)
++    if value.kind=="mapping":return dumper.represent_mapping(value.tag,value.value)
++    raise ValueError("无效TaggedValue.kind")
++
++
++PreservingLoader.add_constructor(None,_construct)
++PreservingDumper.add_representer(TaggedValue,_represent)
++
++
++def load_preserving(stream):
++    """惰性保留未知标签。@param stream YAML输入。@return 安全值或TaggedValue图。"""
++    from yaml import load
++    return load(stream,Loader=PreservingLoader)
++
++
++def dump_preserving(value,**kwargs):
++    """转储惰性标签图。@param value 已构造数据。@param kwargs 标准dump选项。@return YAML。"""
++    from yaml import dump
++    return dump(value,Dumper=PreservingDumper,**kwargs)
+--- a/library/tests/test_development_pyyaml_04_dev.py
++++ b/library/tests/test_development_pyyaml_04_dev.py
+@@ -0,0 +1,22 @@
++"""未知标签可编辑读回，但python/object仍只是数据。"""
++import unittest
++import yaml
++from yaml.tagged import TaggedValue,load_preserving,dump_preserving
++
++def test_scalar_sequence_mapping_roundtrip_without_type_guessing():
++    """未知scalar保原文，普通嵌套safe类型仍构造。@return None。"""
++    value=load_preserving('region: !Region cn\nports: !Ports [80, 443]\nconfig: !Config {active: true}')
++    assert value['region']==TaggedValue('!Region','scalar','cn')
++    assert value['ports'].value==[80,443] and value['config'].value=={'active':True}
++    restored=load_preserving(dump_preserving(value))
++    assert restored==value
++    with unittest.TestCase().assertRaises(yaml.constructor.ConstructorError):yaml.safe_load('!Region cn')
++
++def test_recursive_alias_and_python_tag_are_nonexecuting_data():
++    """递归标签身份保留，Python标签绝不导入对象。@return None。"""
++    value=load_preserving('&a !Items [*a]')
++    assert value.value[0] is value
++    restored=load_preserving(dump_preserving(value))
++    assert restored.value[0] is restored
++    value=load_preserving('!!python/object/apply:unavailable.module [opaque]')
++    assert isinstance(value,TaggedValue) and value.tag.endswith('python/object/apply:unavailable.module')

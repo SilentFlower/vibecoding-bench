@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TN-RANDOM-SOURCE-DEV",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add keyword-only random_source=None to wait_random, wait_random_exponential and wait_exponential_jitter. None retains the existing random module and mockability; an explicit source supplies random() or uniform() as required. Validate the needed method, preserve bounds, exponential overflow handling, existing positional parameters and every old wait result formula. Independent random.Random sources must be reproducible without reseeding or consuming global random state. Composition must still work; do not add dependencies.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

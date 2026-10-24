@@ -62,9 +62,10 @@ CREATE TABLE IF NOT EXISTS projects_submissions (
 AGENT_GUIDE = '''你是这个账号唯一的项目负责人和 Claude Code 操作者。
 你完整决定业务交流和终端下一步，不依赖固定对话轮次或程序匹配某句回复。
 先使用 account_state 了解现有工作及项目池，再通过 project_read 阅读公开研究和工程目标。
-account_state 中 available_objectives 是当前授权池全部未完成工程目标的权威清单。
-清单非空时从中自主选择目标，不能根据少数研究项目的抽查结果宣称整个项目池没有任务。
-先完成或恢复已有未完成工作；仅在没有未完成工作且 available_objectives 为空时报告目标已全部完成。
+account_state 中 remaining_objective_count 是全部未完成目标数量，available_objectives 完整列出前置已通过的可启动目标，waiting_objectives 完整列出等待前置的目标。
+只从 available_objectives 中选择新目标；等待前置不代表完成，不能跳过工程依赖或根据少数项目的抽查结果宣称没有任务。
+先完成或恢复已有未完成工作；仅在没有未完成工作且 remaining_objective_count 为0时报告目标全部完成。
+每个目标都是调查、方案确认、修改真实源码或应用、独立程序验收及失败返工的完整工程交付；问答、测试和文档步骤不能单独计为完成目标。
 从已选项目中选择尚未通过的工程目标，以 claude_start 创建或恢复同一项目工作区和 Claude 原会话。
 用 claude_observe 取得终端画面和原生会话事件；没有变化时使用它的 wait_sec 等待，避免无意义的模型循环。
 你可以发送文本，使用 Enter、方向键、Tab、Escape、Ctrl-C 等处理真正看到的交互。
@@ -336,11 +337,104 @@ class ProjectsService:
                 return 'blocked', '原工作账号身份已变化，请先核对'
             if work['work_sec'] >= agent['budget_sec']:
                 return 'blocked', '原任务累计预算已用尽，请调整预算或停止目标；定时运行不会重置预算'
+            assets = self.catalog.for_work(work)
+            _, definition = assets.objective(work['project_key'], work['objective_id'])
+            if self._missing_prerequisites(agent['account_id'], assets, work['project_key'], definition):
+                return 'blocked', '原目标的工程前置缺少同账号、同项目和当前身份的有效通过证明'
             return None, None
-        available = self.state(agent['account_id'])['agents'][0]['available_objectives']
-        if not available:
+        state = self.state(agent['account_id'])['agents'][0]
+        if not state['remaining_objectives']:
             return 'completed', '授权项目池暂无未完成工程目标，等待更新项目池或目标'
+        if not state['available_objectives']:
+            return 'blocked', '尚有未完成目标等待工程前置，需先核对前置交付、账号身份或未确认输入'
         return None, None
+
+    def _dependency_proofs(self, account_id: int) -> list[dict]:
+        """读取有独立通过交付且没有未知输入的本账号前置事实。
+
+        :param account_id: 可信账号 ID。
+        :return: 仅作为内部依赖门禁使用的已通过工作。
+        """
+        return self._rows("SELECT w.* FROM projects_work w WHERE w.account_id=? AND w.status='passed' "
+            "AND EXISTS(SELECT 1 FROM projects_submissions s WHERE s.work_id=w.id AND s.status='passed' "
+            "AND s.generation=w.generation AND s.report_json IS NOT NULL) "
+            "AND NOT EXISTS(SELECT 1 FROM projects_actions a WHERE a.work_id=w.id AND a.status IN ('intent','unknown'))",
+            (account_id,))
+
+    def _missing_prerequisites(self, account_id: int, assets, key: str, definition: dict,
+                               proofs: list[dict] | None = None, identity: str | None = None) -> list[str]:
+        """按冻结 DAG 核实完整前置闭包，旧全库版本可凭同一合同继续使用。
+
+        :param account_id: 可信账号 ID。
+        :param assets: 当前或原工作冻结的内容目录。
+        :param key: 当前项目键，禁止跨项目借用通过记录。
+        :param definition: 当前完整工程目标。
+        :param proofs: 页面批量读取的前置事实；启动时省略以重新查询。
+        :param identity: 可复用的当前身份；启动时由账号权威状态读取。
+        :return: 缺少可信通过证明的前置目标 ID，包含传递依赖。
+        """
+        if not definition.get('requires'):
+            return []
+        project, _ = assets.objective(key, definition['id'])
+        expected, pending = {}, list(definition['requires'])
+        while pending:
+            dependency = pending.pop()
+            task_id = dependency['task_id']
+            if task_id in expected:
+                continue
+            _, requirement = assets.objective(key, task_id)
+            expected[task_id] = requirement
+            pending.extend(requirement.get('requires', []))
+        proofs = self._dependency_proofs(account_id) if proofs is None else proofs
+        account = self.account(account_id)
+        identity = self.identity(account) if identity is None and account else identity
+        satisfied = set()
+        for proof in proofs:
+            task_id = proof['objective_id']
+            if (not identity or proof['account_id'] != account_id or proof['project_key'] != key
+                    or proof['account_identity'] != identity or task_id not in expected):
+                continue
+            try:
+                frozen = assets.for_work(proof)
+                previous, contract = frozen.objective(key, task_id)
+                # 新目录添加其他目标会改变全库摘要；同 seed、同原合同的既有通过仍可作前置。
+                if (previous.manifest['seed_digest'] == project.manifest['seed_digest']
+                        and contract == expected[task_id] == json.loads(proof['definition_json'])):
+                    satisfied.add(task_id)
+            except (ValueError, OSError, KeyError, TypeError):
+                continue
+        return sorted(set(expected) - satisfied)
+
+    def accepted_work(self, work: dict) -> list[dict]:
+        """为累计项目交付返回应保持通过的冻结历史，不接受模型指定名单。
+
+        :param work: 本次交付工作，仅用 ID 从数据库重新取得权威归属。
+        :return: 同账号、项目、seed 和当前身份的已独立通过工作，不含本次工作。
+        """
+        with self.lock:
+            current = self._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+            if not current:
+                raise ValueError('当前交付工作不存在，不能推断历史验收范围')
+            account = self.account(current['account_id'])
+            identity = self.identity(account) if account else None
+            if not identity or current['account_identity'] != identity:
+                raise ValueError('当前交付账号身份不符，不能省略原成果验收')
+            proofs = self._dependency_proofs(current['account_id'])
+        assets = self.catalog.for_work(current)
+        project, _ = assets.objective(current['project_key'], current['objective_id'])
+        accepted = []
+        for proof in sorted(proofs, key=lambda item: (item['created_at'], item['id'])):
+            if (proof['id'] == current['id'] or proof['project_key'] != current['project_key']
+                    or proof['account_identity'] != identity):
+                continue
+            frozen = self.catalog.for_work(proof)
+            previous, definition = frozen.objective(proof['project_key'], proof['objective_id'])
+            if previous.manifest['seed_digest'] != project.manifest['seed_digest']:
+                continue
+            if definition != json.loads(proof['definition_json']):
+                raise ValueError('既有成果的冻结验收合同不符，不能静默省略')
+            accepted.append(proof)
+        return accepted
 
     def _wait_gate(self, agent: dict, gate: dict, now: float) -> None:
         retryable = gate.get('retryable', True)
@@ -403,11 +497,31 @@ class ProjectsService:
             agent['claude_usage']['complete'] = bool(native) and all(item.get('complete') for item in native)
             agent['passed'] = self._rows("SELECT project_key,objective_id,goal FROM projects_work WHERE account_id=? AND status='passed'", (agent['account_id'],))
             completed = {(item['project_key'], item['objective_id']) for item in agent['passed']}
-            agent['available_objectives'] = [
+            objectives = [(key, objective) for key in agent['project_keys']
+                for objective in self.catalog.project(key, detail=False)['objectives']]
+            requirements = {(key, objective['id']): objective.get('requires', []) for key, objective in objectives}
+            agent['remaining_objectives'] = [
                 {'project_key': key, 'objective_id': objective['id'], 'goal': objective['goal']}
-                for key in agent['project_keys']
-                for objective in self.catalog.project(key, detail=False)['objectives']
+                for key, objective in objectives
                 if (key, objective['id']) not in completed]
+            agent['available_objectives'], agent['waiting_objectives'] = [], []
+            proofs, dependency_identity = None, None
+            for objective in agent['remaining_objectives']:
+                key = objective['project_key']
+                if not requirements[(key, objective['objective_id'])]:
+                    agent['available_objectives'].append(objective)
+                    continue
+                _, definition = self.catalog.objective(key, objective['objective_id'])
+                if definition.get('requires') and proofs is None:
+                    proofs = self._dependency_proofs(agent['account_id'])
+                    account = self.account(agent['account_id'])
+                    dependency_identity = self.identity(account) if account else None
+                missing = self._missing_prerequisites(agent['account_id'], self.catalog, key, definition,
+                    proofs, dependency_identity)
+                if missing:
+                    agent['waiting_objectives'].append({**objective, 'missing_prerequisites': missing})
+                else:
+                    agent['available_objectives'].append(objective)
             usage = self._rows("SELECT payload_json FROM projects_events WHERE account_id=? AND kind='usage'", (agent['account_id'],))
             agent['pi_usage'] = {'input_tokens': 0, 'output_tokens': 0, 'cache_read_tokens': 0, 'cache_write_tokens': 0}
             for row in usage:
@@ -465,8 +579,9 @@ class ProjectsService:
             elapsed = work['work_sec'] if work else 0
             if work and work['segment_started_at']:
                 elapsed += max(0, time.time() - work['segment_started_at'])
-            agent['progress'] = {'completed': completed, 'remaining': len(agent['available_objectives']),
-                'total': completed + len(agent['available_objectives']), 'elapsed_work_sec': elapsed,
+            agent['progress'] = {'completed': completed, 'remaining': len(agent['remaining_objectives']),
+                'ready': len(agent['available_objectives']), 'waiting': len(agent['waiting_objectives']),
+                'total': completed + len(agent['remaining_objectives']), 'elapsed_work_sec': elapsed,
                 'remaining_work_sec': max(0, agent['budget_sec'] - elapsed) if work else agent['budget_sec']}
             event = self._one("SELECT kind,payload_json,created_at FROM projects_events WHERE account_id=? "
                 "AND kind IN ('pi','input','started','verification','error','gate_wait') ORDER BY id DESC LIMIT 1", (agent['account_id'],))
@@ -858,7 +973,11 @@ class ProjectsService:
                 raise ValueError('工具名或参数不符合已注册能力')
             agent, work = self._current(account_id, generation)
             if name == 'account_state':
-                return self.state(account_id)
+                state = self.state(account_id)
+                for item in state['agents']:
+                    # 两类清单已覆盖所有未完成目标，600项规模下不向模型重复发送第三份相同正文。
+                    item['remaining_objective_count'] = len(item.pop('remaining_objectives'))
+                return state
             if name == 'project_read':
                 if args['project_key'] not in json.loads(agent['project_keys_json']):
                     raise ValueError('项目不在本账号授权池中')
@@ -902,6 +1021,11 @@ class ProjectsService:
             raise ValueError('项目不在本账号授权池中')
         assets = self.catalog.for_work(work) if work and work['status'] not in ('passed', 'stopped') else self.catalog
         project, definition = assets.objective(key, objective_id)
+        with self.lock:
+            self._current(account_id, generation)
+            missing = self._missing_prerequisites(account_id, assets, key, definition)
+            if missing:
+                raise ValueError('工程前置尚未通过或证明已失效：' + ', '.join(missing))
         if work and work['status'] not in ('passed', 'stopped'):
             if work['project_key'] != key or work['objective_id'] != objective_id:
                 raise ValueError('先完成或人工停止原工作，不能将新需求混入原会话')
@@ -919,6 +1043,10 @@ class ProjectsService:
                 self._current(account_id, generation)
                 identity = self.identity(self.account(account_id))
                 with self.write_lock:
+                    # 发布目标前重新读取真实通过事实，不能用页面或 Pi 先前看到的就绪快照授权。
+                    missing = self._missing_prerequisites(account_id, assets, key, definition, identity=identity)
+                    if missing:
+                        raise ValueError('工程前置尚未通过或证明已失效：' + ', '.join(missing))
                     connection = self.database()
                     try:
                         # 目标与控制者指针必须同事务发布，中断不能留下占用唯一索引的孤儿工作。
@@ -953,6 +1081,10 @@ class ProjectsService:
                 self._current(account_id, generation)
                 if stop and stop.is_set():
                     raise ValueError('启动已取消或超过工作预算')
+                # 环境准备包含锁外 I/O；前置或身份在此期间改变时收口刚创建的终端。
+                missing = self._missing_prerequisites(account_id, assets, key, definition)
+                if missing:
+                    raise ValueError('环境准备期间工程前置证明已失效：' + ', '.join(missing))
                 gate = self.admission(self.account(account_id), work)
                 if not gate['allowed']:
                     raise ValueError('环境准备后账号门禁发生改变')

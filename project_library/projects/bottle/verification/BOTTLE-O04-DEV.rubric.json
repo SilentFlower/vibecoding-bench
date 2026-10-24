@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BOTTLE-O04-DEV",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add BaseResponse.charset setter that validates a real codec before mutating Content-Type, replaces all case-insensitive/quoted charset parameters with one selected charset and preserves media type and unrelated parameters including quoted semicolons. Getter must read quoted/case-insensitive parameters correctly. Real Bottle string output must use the selected encoding; bytes behavior and direct content_type assignment remain unchanged. Invalid/empty codecs leave headers intact.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

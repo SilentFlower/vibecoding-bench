@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BF-REUSE-DEV",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair reuse of the same on_exception or on_predicate decorator factory: each wrapped target must receive exactly one configured default backoff/giveup log and each user callback exactly once per event. Snapshot user handler iterables once per factory (including generators), do not mutate caller lists, and keep previously wrapped targets stable. Preserve normal success, exception identities, logger=None, custom levels and synchronous/asynchronous behavior. Do not suppress logging globally.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

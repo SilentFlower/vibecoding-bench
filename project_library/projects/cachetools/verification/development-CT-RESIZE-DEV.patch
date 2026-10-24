@@ -1,0 +1,64 @@
+--- a/library/development_tests/test_development_ct_resize_dev.py
++++ b/library/development_tests/test_development_ct_resize_dev.py
+@@ -0,0 +1,28 @@
++"""公开运行中容量调整回归。"""
++import pytest
++from cachetools import LRUCache,FIFOCache,TTLCache
++
++def test_lru_shrink_preserves_original_policy_order():
++    cache=LRUCache(4)
++    for key in 'abcd':
++        cache[key]=key
++    cache['a']
++    assert cache.resize(2)==(('b','b'),('c','c')) and cache.maxsize==2 and set(cache)=={'a','d'}
++
++def test_weighted_resize_and_growth_are_consistent():
++    cache=FIFOCache(8,getsizeof=len);cache['a']='aaa';cache['b']='bb';cache['c']='c'
++    assert cache.resize(3)==(('a','aaa'),) and cache.currsize==3
++    assert cache.resize(10)==() and cache.maxsize==10
++
++def test_expired_items_do_not_cause_empty_pop_failure():
++    clock=[0];cache=TTLCache(2,1,timer=lambda:clock[0]);cache['a']=1;clock[0]=2
++    assert cache.resize(0)==() and cache.currsize==0 and cache.maxsize==0
++    with pytest.raises(ValueError):
++        cache['b']=2
++
++def test_invalid_capacity_leaves_values_and_limit_unchanged():
++    cache=LRUCache(2);cache['a']=1
++    for size in (-1,float('nan'),True,'2'):
++        with pytest.raises(ValueError):
++            cache.resize(size)
++    assert cache.maxsize==2 and cache['a']==1
+--- a/library/docs/development-ct-resize-dev.md
++++ b/library/docs/development-ct-resize-dev.md
+@@ -0,0 +1,5 @@
++# 运行中调整缓存容量并沿用各策略淘汰顺序
++
++应用运行中调整缓存预算时，应沿用LRU、LFU等现有淘汰规则和加权大小，先处理自然过期，再收缩到目标容量，返回容量淘汰结果，保留剩余条目的策略历史。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/cachetools/__init__.py
++++ b/library/src/cachetools/__init__.py
+@@ -151,6 +151,22 @@
+         self.__data.clear()
+         self.__size.clear()
+         self.__currsize = 0
++
++    def resize(self,maxsize):
++        """按原淘汰策略调整容量。@param maxsize 非负实数，允许正无穷。
++        @return 仅因容量收缩而淘汰的(key,value)元组；正常过期清理单独发生。
++        """
++        import math
++        if type(maxsize) not in (int,float) or math.isnan(maxsize) or maxsize<0:
++            raise ValueError('容量必须为非负实数')
++        expire=getattr(self,'expire',None)
++        if callable(expire):
++            expire()
++        removed=[]
++        while self.__currsize>maxsize:
++            removed.append(self.popitem())
++        self.__maxsize=maxsize
++        return tuple(removed)
+ 
+     @property
+     def maxsize(self):

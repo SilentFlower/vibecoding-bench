@@ -1,0 +1,74 @@
+--- a/library/docs/development-cattrs-o02-dev.md
++++ b/library/docs/development-cattrs-o02-dev.md
+@@ -0,0 +1,5 @@
++# 为真实转换器配置精确Decimal字符串传输
++
++给单个真实转换器配置成对Decimal钩子，以字符串保持金额精度、指数及负零。拒绝二进制float、bool和坏文本，NaN/Infinity必须明确允许；嵌套记录可经既有JSON往返，其他实例和后注册用户钩子保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/cattrs/strategies/decimal.py
++++ b/library/src/cattrs/strategies/decimal.py
+@@ -0,0 +1,27 @@
++"""显式使用十进制字符串传输精确金额。"""
++from decimal import Decimal, InvalidOperation
++
++
++def configure_decimal(converter, *, allow_special=False):
++    """给单个真实转换器配置成对Decimal钩子。
++
++    :param converter: BaseConverter/Converter或现有JSON/YAML预配置转换器。
++    :param allow_special: 是否明确允许NaN和Infinity。
++    :return: 同一转换器；不改变全局默认和其他实例。
++    """
++    def checked(value):
++        """校验精确值和特殊值政策。@param value Decimal。@return 同一值。"""
++        if not allow_special and not value.is_finite():
++            raise ValueError('十进制值必须有限')
++        return value
++    def structure(value, target):
++        """只从精确文本或整数结构。@param value 值。@param target 目标。@return Decimal。"""
++        if isinstance(value, bool) or not isinstance(value, (str, int, Decimal)):
++            raise TypeError('Decimal输入必须为精确文本或整数')
++        try:
++            return checked(Decimal(value))
++        except InvalidOperation as error:
++            raise ValueError('无效十进制文本') from error
++    converter.register_structure_hook(Decimal, structure)
++    converter.register_unstructure_hook(Decimal, lambda value: str(checked(value)))
++    return converter
+--- a/library/tests/test_development_cattrs_o02_dev.py
++++ b/library/tests/test_development_cattrs_o02_dev.py
+@@ -0,0 +1,33 @@
++"""精确金额策略必须通过真实JSON转换器往返。"""
++from dataclasses import dataclass
++from decimal import Decimal
++import pytest
++from cattrs.preconf.json import make_converter
++
++def test_precise_json_roundtrip():
++    """高精度与负零以字符串往返而不经过float。@return None。"""
++    from cattrs.strategies.decimal import configure_decimal
++    @dataclass
++    class Money:
++        """金额记录。"""
++        amount: Decimal
++    converter = configure_decimal(make_converter())
++    value = Money(Decimal('123456789.1234567890123456789'))
++    assert converter.loads(converter.dumps(value), Money) == value
++    assert converter.unstructure(Decimal('-0.00')) == '-0.00'
++
++def test_invalid_and_special_policy():
++    """无效数字、float和默认非有限值拒绝。@return None。"""
++    from cattrs.strategies.decimal import configure_decimal
++    converter = configure_decimal(make_converter())
++    for value in ['bad', 'NaN', 'Infinity']:
++        with pytest.raises(ValueError): converter.structure(value, Decimal)
++    with pytest.raises(TypeError): converter.structure(0.1, Decimal)
++    assert configure_decimal(make_converter(), allow_special=True).structure('Infinity', Decimal).is_infinite()
++
++def test_user_hook_after_configuration():
++    """后注册用户钩子仍优先。@return None。"""
++    from cattrs.strategies.decimal import configure_decimal
++    converter = configure_decimal(make_converter())
++    converter.register_unstructure_hook(Decimal, lambda value: 'custom')
++    assert converter.unstructure(Decimal(1)) == 'custom'

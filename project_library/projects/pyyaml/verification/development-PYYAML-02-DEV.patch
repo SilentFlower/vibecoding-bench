@@ -1,0 +1,82 @@
+--- a/library/docs/development-pyyaml-02-dev.md
++++ b/library/docs/development-pyyaml-02-dev.md
+@@ -0,0 +1,5 @@
++# 非法显式标量通过带源位置YAML构造错误统一报告
++
++路线02：仅内建bool/int/float/timestamp预期转换错误规范为ConstructorError并保位置/cause；timestamp无匹配先检查，合法值不改，不吞任意内部或用户构造器错误。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/lib/yaml/constructor.py
++++ b/library/lib/yaml/constructor.py
+@@ -167,6 +167,16 @@
+         if not 'yaml_multi_constructors' in cls.__dict__:
+             cls.yaml_multi_constructors = cls.yaml_multi_constructors.copy()
+         cls.yaml_multi_constructors[tag_prefix] = multi_constructor
++
++def _checked_scalar(function):
++    """仅规范内建标量解析错误。@param function 标量构造器。@return 带源位置和cause的同协议函数。"""
++    def checked(self,node):
++        try:return function(self,node)
++        except (ValueError,KeyError,IndexError,OverflowError) as error:
++            raise ConstructorError("while constructing a scalar",node.start_mark,
++                "invalid value for "+node.tag,node.start_mark) from error
++    return checked
++
+ 
+ class SafeConstructor(BaseConstructor):
+ 
+@@ -233,10 +243,12 @@
+         'off':      False,
+     }
+ 
++    @_checked_scalar
+     def construct_yaml_bool(self, node):
+         value = self.construct_scalar(node)
+         return self.bool_values[value.lower()]
+ 
++    @_checked_scalar
+     def construct_yaml_int(self, node):
+         value = self.construct_scalar(node)
+         value = value.replace('_', '')
+@@ -270,6 +282,7 @@
+         inf_value *= inf_value
+     nan_value = -inf_value/inf_value   # Trying to make a quiet NaN (like C99).
+ 
++    @_checked_scalar
+     def construct_yaml_float(self, node):
+         value = self.construct_scalar(node)
+         value = value.replace('_', '').lower()
+@@ -322,9 +335,12 @@
+                 (?:[ \t]*(?P<tz>Z|(?P<tz_sign>[-+])(?P<tz_hour>[0-9][0-9]?)
+                 (?::(?P<tz_minute>[0-9][0-9]))?))?)?$''', re.X)
+ 
++    @_checked_scalar
+     def construct_yaml_timestamp(self, node):
+         value = self.construct_scalar(node)
+         match = self.timestamp_regexp.match(node.value)
++        if match is None:
++            raise ConstructorError("while constructing a timestamp",node.start_mark,"invalid timestamp",node.start_mark)
+         values = match.groupdict()
+         year = int(values['year'])
+         month = int(values['month'])
+--- a/library/tests/test_development_pyyaml_02_dev.py
++++ b/library/tests/test_development_pyyaml_02_dev.py
+@@ -0,0 +1,18 @@
++"""坏显式标量统一为YAMLError带位置，不泄漏裸内部转换错误。"""
++import unittest
++import yaml
++from yaml.constructor import ConstructorError
++
++def test_invalid_bool_int_float_timestamp_and_ranges_are_marked():
++    """四类非法标签及真实日期范围错误都能用YAMLError捕获。@return None。"""
++    for source in ('!!bool maybe','!!int nope','!!float nope','!!timestamp nope','!!int ""','!!float "+"','!!timestamp 2024-02-30'):
++        with unittest.TestCase().assertRaises(ConstructorError) as context:yaml.safe_load('value: '+source)
++        assert isinstance(context.exception,yaml.YAMLError) and context.exception.problem_mark.line==0
++        assert context.exception.problem_mark.column==7
++
++def test_legal_values_and_nested_position_keep_types():
++    """合法显式值不改，不吞未知自定义构造器程序错误。@return None。"""
++    result=yaml.safe_load('a: !!bool yes\nb: !!int 0x10\nc: !!float 1.25\nd: !!timestamp 2024-01-02')
++    assert result['a'] is True and result['b']==16 and result['c']==1.25 and result['d'].year==2024
++    with unittest.TestCase().assertRaises(ConstructorError) as context:yaml.safe_load('a:\n  b: !!int nope')
++    assert context.exception.problem_mark.line==1 and isinstance(context.exception.__cause__,ValueError)

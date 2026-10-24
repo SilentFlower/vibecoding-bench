@@ -1,0 +1,76 @@
+--- a/library/cli_helpers/tabular_output/json_output_adapter.py
++++ b/library/cli_helpers/tabular_output/json_output_adapter.py
+@@ -12,9 +12,18 @@
+ 
+ 
+ class CustomEncoder(json.JSONEncoder):
++    def __init__(self,*args,decimal_policy='float',strict_json=False,**kwargs):
++        """创建本次JSON编码器。@param decimal_policy float或string。@param strict_json 拒绝非有限数。
++        @param args 原JSON参数。@param kwargs 原JSON参数。@return None。
++        """
++        self._decimal_policy,self._strict_json=decimal_policy,strict_json
++        super().__init__(*args,**kwargs)
++
+     def default(self, o):
+         if isinstance(o, Decimal):
+-            return float(o)
++            if self._strict_json and not o.is_finite():
++                raise ValueError('严格JSON不支持非有限Decimal')
++            return str(o) if self._decimal_policy=='string' else float(o)
+         else:
+             return super(CustomEncoder, self).default(o)
+ 
+@@ -28,10 +37,17 @@
+     else:
+         raise ValueError("Invalid table_format specified.")
+ 
++    decimal_policy=_kwargs.get('decimal_policy','float')
++    strict_json=_kwargs.get('strict_json',False)
++    if decimal_policy not in ('float','string') or type(strict_json) is not bool:
++        raise ValueError('JSON精度或有限数策略无效')
+     for row in chain(data):
+         yield json.dumps(
+             dict(zip(headers, row, strict=True)),
+             cls=CustomEncoder,
++            decimal_policy=decimal_policy,
++            strict_json=strict_json,
++            allow_nan=not strict_json,
+             separators=(",", ":"),
+             ensure_ascii=ensure_ascii,
+         )
+--- a/library/development_tests/test_development_ch_json_precision_dev.py
++++ b/library/development_tests/test_development_ch_json_precision_dev.py
+@@ -0,0 +1,25 @@
++"""公开JSON精度及有限数回归。"""
++from decimal import Decimal
++import json
++import pytest
++from cli_helpers.tabular_output.json_output_adapter import adapter
++
++def test_decimal_string_policy_preserves_precision_and_scale():
++    value=Decimal('12345678901234567890.1200')
++    assert json.loads(next(adapter([[value]],['amount'],decimal_policy='string')))['amount']==str(value)
++
++def test_nested_decimal_is_exact_and_large_integer_stays_numeric():
++    value={'nested':[Decimal('0.00100')],'count':10**30}
++    result=json.loads(next(adapter([[value]],['data'],decimal_policy='string')))
++    assert result=={'data':{'nested':['0.00100'],'count':10**30}}
++
++def test_strict_json_rejects_nonfinite_float_and_decimal_in_all_policies():
++    for value in (float('nan'),float('inf'),Decimal('NaN'),{'x':Decimal('Infinity')}):
++        for policy in ('float','string'):
++            with pytest.raises(ValueError):
++                next(adapter([[value]],['a'],strict_json=True,decimal_policy=policy))
++
++def test_old_default_and_later_calls_do_not_inherit_policy():
++    value=Decimal('1.20')
++    assert json.loads(next(adapter([[value]],['a'],decimal_policy='string')))['a']=='1.20'
++    assert json.loads(next(adapter([[value]],['a'])))['a']==1.2
+--- a/library/docs/development-ch-json-precision-dev.md
++++ b/library/docs/development-ch-json-precision-dev.md
+@@ -0,0 +1,5 @@
++# 为JSON导出提供无损Decimal文本与严格有限数策略
++
++金额导出可显式选择Decimal精确文本，保留精度与尾零；严格JSON模式拒绝任意层级的非有限数。编码器设置仅对本次调用生效，旧默认浮点行为及整数、Unicode输出继续兼容。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

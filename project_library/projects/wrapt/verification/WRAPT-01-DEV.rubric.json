@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WRAPT-01-DEV",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair wrapt.lru_cache classmethod handling so actual calling class participates in shared cache keys rather than capturing first bound method. Both @lru_cache/@classmethod orders, Base/Derived calls in either order and instance access must return actual cls. Keep ordinary per-instance cache isolation/GC, static/plain functions, cache_info/cache_parameters and shared class cache_clear behavior. Class-key references follow normal functools retention until eviction/clear; do not claim weak class storage.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

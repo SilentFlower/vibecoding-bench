@@ -1,0 +1,306 @@
+{
+  "schema": 3,
+  "project_key": "deepdiff",
+  "title": "DeepDiff对象变更工作场景",
+  "category": "深度比较与变更预览",
+  "description": "固定真实源码上的完整工程交付：修复复数负虚部精度格式化并贯通真实比较哈希；让墙钟截断正确区分日期时长和具体时间；按固定偏移真实语义比较时区并同步哈希；交付显式策略的独立JSON树组合深合并；交付按共同基线判定冲突的完整三方JSON合并；在独立差异报告保留路径并按子树遮蔽值。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "8ebe7ccc10deb0a3a3a3d4ec966dd5e50c0b35f855be0013c5ed8f1a3c1a6e82",
+  "environment": "deepdiff-py312",
+  "source": {
+    "repository": "https://github.com/qlustered/deepdiff",
+    "commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DEEPDIFF-O01-DEV-SCENE",
+      "title": "修复复数负虚部精度格式化并贯通真实比较哈希",
+      "goal": "修复复数负虚部精度格式化并贯通真实比较哈希",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DEEPDIFF-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DEEPDIFF-O01-DEV",
+          "kind": "modify",
+          "goal": "修复复数负虚部精度格式化并贯通真实比较哈希",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix helper.number_to_string complex precision without string-concatenating an invalid real+-imagj representation. Apply the existing recursive precision and f/e notation separately to real/imag components, reconstruct numerically preserving supported complex subclasses and existing signed-zero/nonfinite policies. Prove four quadrants, pure imaginary, zero digits, small exponents, NaN/Infinity and supported subclasses, plus actual DeepDiff/DeepHash and ignore_order paths. Keep noncomplex numeric behavior and native precision rules unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-deepdiff-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DEEPDIFF-O01-DEV-contract.md",
+            "materials/DEEPDIFF-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/deepdiff/helper.py",
+            "library/tests/test_development_deepdiff_o01_dev.py",
+            "library/docs/development-deepdiff-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DEEPDIFF-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DEEPDIFF-O01-DEV.native.json",
+            "public_native": "verification/DEEPDIFF-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DEEPDIFF-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "DEEPDIFF-O02-DEV-SCENE",
+      "title": "让墙钟截断正确区分日期时长和具体时间",
+      "goal": "让墙钟截断正确区分日期时长和具体时间",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DEEPDIFF-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DEEPDIFF-O02-DEV",
+          "kind": "modify",
+          "goal": "让墙钟截断正确区分日期时长和具体时间",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual datetime_normalize temporal capability dispatch: plain date/subclasses retain date identity/value and timedelta remains a duration, neither receiving invalid hour/minute/second replace fields for any truncate setting. datetime/time continue existing truncation/timezone normalization. Do not promote date to datetime or suppress real type changes. Prove every accepted precision, nested DeepDiff, mixed date/datetime types, duration differences and DeepHash consistency, preserving all old datetime behavior.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-deepdiff-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DEEPDIFF-O02-DEV-contract.md",
+            "materials/DEEPDIFF-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/deepdiff/helper.py",
+            "library/tests/test_development_deepdiff_o02_dev.py",
+            "library/docs/development-deepdiff-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DEEPDIFF-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DEEPDIFF-O02-DEV.native.json",
+            "public_native": "verification/DEEPDIFF-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DEEPDIFF-O02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "DEEPDIFF-O03-DEV-SCENE",
+      "title": "按固定偏移真实语义比较时区并同步哈希",
+      "goal": "按固定偏移真实语义比较时区并同步哈希",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DEEPDIFF-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DEEPDIFF-O03-DEV",
+          "kind": "modify",
+          "goal": "按固定偏移真实语义比较时区并同步哈希",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd explicit datetime.timezone value handling in actual DeepDiff dispatch and DeepHash preparation. Compare native fixed offsets (including negative, fractional hour and microsecond offsets), ignoring display names exactly like Python equality. Different offsets report values_changed, including nested and ignore_order structures, and canonical hashes must agree with equality. Preserve dynamic tzinfo/other-class type rules and existing datetime normalization; do not claim arbitrary timezone-rule comparison.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-deepdiff-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DEEPDIFF-O03-DEV-contract.md",
+            "materials/DEEPDIFF-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/deepdiff/diff.py",
+            "library/deepdiff/deephash.py",
+            "library/tests/test_development_deepdiff_o03_dev.py",
+            "library/docs/development-deepdiff-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DEEPDIFF-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DEEPDIFF-O03-DEV.native.json",
+            "public_native": "verification/DEEPDIFF-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DEEPDIFF-O03-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "DEEPDIFF-O04-DEV-SCENE",
+      "title": "交付显式策略的独立JSON树组合深合并",
+      "goal": "交付显式策略的独立JSON树组合深合并",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DEEPDIFF-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DEEPDIFF-O04-DEV",
+          "kind": "modify",
+          "goal": "交付显式策略的独立JSON树组合深合并",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement deepdiff.merge.deep_merge(left,right,*,lists=\"replace\",conflicts=\"right\"), MergeConflict(path), validate_json_tree and actual-DeepDiff-based json_equal. Recursively union dict keys preserving left then right order; lists explicitly replace or append with duplicate preservation; conflicting leaves/types choose right/left or raise at exact tuple path. Preserve bool-vs-int and None semantics, input independence, reject nonstring dict keys, unsupported objects, nonfinite floats and cycles while allowing acyclic shared references. Do not change Delta or merge arbitrary object attributes; prove native Delta still performs target replacement.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-deepdiff-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DEEPDIFF-O04-DEV-contract.md",
+            "materials/DEEPDIFF-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/deepdiff/merge.py",
+            "library/tests/test_development_deepdiff_o04_dev.py",
+            "library/docs/development-deepdiff-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DEEPDIFF-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DEEPDIFF-O04-DEV.native.json",
+            "public_native": "verification/DEEPDIFF-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DEEPDIFF-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DEEPDIFF-O05-DEV-SCENE",
+      "title": "交付按共同基线判定冲突的完整三方JSON合并",
+      "goal": "交付按共同基线判定冲突的完整三方JSON合并",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DEEPDIFF-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DEEPDIFF-O05-DEV",
+          "kind": "modify",
+          "goal": "交付按共同基线判定冲突的完整三方JSON合并",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nBuild deepdiff.merge3.merge3(base,left,right,*,arrays=\"atomic\") on the accepted JSON-tree validation and DeepDiff equality. Return Merge3Result(value,conflicts,complete) recursively combining disjoint dict edits, equal edits, additions and deletions. Explicitly distinguish absent from null. Preserve base at unresolved conflicts with exact component path and independent present/value snapshots for all three sides, never automatically choose left/right. Arrays are atomic business values, so index shifts or divergent arrays conflict; no speculative positional merge. Validate JSON/cycles, reject other array policies and preserve all inputs.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-deepdiff-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "DEEPDIFF-O04-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/DEEPDIFF-O05-DEV-contract.md",
+            "materials/DEEPDIFF-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/deepdiff/merge3.py",
+            "library/tests/test_development_deepdiff_o05_dev.py",
+            "library/docs/development-deepdiff-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DEEPDIFF-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DEEPDIFF-O05-DEV.native.json",
+            "public_native": "verification/DEEPDIFF-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DEEPDIFF-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DEEPDIFF-O06-DEV-SCENE",
+      "title": "在独立差异报告保留路径并按子树遮蔽值",
+      "goal": "在独立差异报告保留路径并按子树遮蔽值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DEEPDIFF-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DEEPDIFF-O06-DEV",
+          "kind": "modify",
+          "goal": "在独立差异报告保留路径并按子树遮蔽值",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd deepdiff.reporting.redacted_report(diff,*,redact_paths=(),mask=\"[已遮蔽]\",left_label=\"left\",right_label=\"right\",default_mapping=None) for explicit JSON-tree diff categories. Use actual verbose text representation from text/tree input, preserve category/path/type facts and independent display labels while masking matching values before serialization. Support exact/ancestor paths and native component * / ** wildcards without confusing a literal star key; also traverse coarse parent replacement payloads so child redactions cannot leak. Drop value-bearing multiline diff text when redaction is enabled. Reject unsupported pathless/set categories and invalid labels/paths, apply custom type serializers only after masking, return JSON-safe schema1 report and never mutate original Diff/Delta or source trees.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-deepdiff-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DEEPDIFF-O06-DEV-contract.md",
+            "materials/DEEPDIFF-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/deepdiff/reporting.py",
+            "library/tests/test_development_deepdiff_o06_dev.py",
+            "library/docs/development-deepdiff-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DEEPDIFF-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DEEPDIFF-O06-DEV.native.json",
+            "public_native": "verification/DEEPDIFF-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DEEPDIFF-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

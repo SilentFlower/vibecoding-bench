@@ -1,0 +1,120 @@
+--- a/library/development_tests/test_development_sm_journal_dev.py
++++ b/library/development_tests/test_development_sm_journal_dev.py
+@@ -0,0 +1,36 @@
++"""公开事件日志真实往返回归。"""
++import json
++import pytest
++from statemachine.runner import MachineRunner
++from statemachine.journal import dumps_journal,loads_journal
++from statemachine import StateMachine,State
++
++class Flow(StateMachine):
++    draft=State(initial=True)
++    ready=State()
++    done=State(final=True)
++    advance=draft.to(ready)
++    finish=ready.to(done)
++    reset=ready.to(draft)
++
++def test_actual_events_and_errors_round_trip_as_data_only():
++    rows=list(MachineRunner(Flow()).run(['finish','advance','finish'],errors='collect'));document=dumps_journal(rows);restored=loads_journal(document)
++    assert [row.call.event for row in restored]==['finish','advance','finish'] and restored[-1].after.states==('done',)
++    assert restored[0].status=='error' and restored[1].before==rows[1].before
++
++def test_empty_journal_and_unicode_arguments_are_supported():
++    assert loads_journal(dumps_journal([]))==()
++    rows=list(MachineRunner(Flow()).run(['advance']));data=json.loads(dumps_journal(rows));data['records'][0]['kwargs']={'text':'中文'}
++    assert loads_journal(json.dumps(data))[0].call.kwargs=={'text':'中文'}
++
++def test_bad_version_index_and_duplicate_keys_are_rejected():
++    with pytest.raises(ValueError): loads_journal('{"schema":1,"schema":1,"records":[]}')
++    with pytest.raises(ValueError): loads_journal('{"schema":2,"records":[]}')
++    data=json.loads(dumps_journal(list(MachineRunner(Flow()).run(['advance']))));data['records'][0]['index']=2
++    with pytest.raises(ValueError): loads_journal(json.dumps(data))
++
++def test_count_budget_and_hidden_scheduling_fields_are_rejected():
++    rows=list(MachineRunner(Flow()).run(['advance','finish']))
++    with pytest.raises(ValueError): dumps_journal(rows,max_records=1)
++    data=json.loads(dumps_journal(rows));data['records'][0]['kwargs']={'delay':4}
++    with pytest.raises(ValueError): loads_journal(json.dumps(data))
+--- a/library/docs/development-sm-journal-dev.md
++++ b/library/docs/development-sm-journal-dev.md
+@@ -0,0 +1,5 @@
++# 序列化真实事件与前后配置为受校验的可重放JSON日志
++
++真实事件与配置记录为固定JSON合同，可恢复独立数据用于后续重放。版本、索引、状态、参数、重复键和数量上限均验证，不执行日志内容或凭字符串导入机器类。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/statemachine/journal.py
++++ b/library/statemachine/journal.py
+@@ -0,0 +1,70 @@
++"""以固定JSON结构记录真实事件与前后状态，不导入或执行日志内容。"""
++import json
++from collections.abc import Mapping
++from dataclasses import dataclass
++from .runner import EventCall,EventResult,normalize_call
++from .snapshots import StateSnapshot,freeze
++
++
++def _plain(value):
++    if isinstance(value,Mapping):
++        return {key:_plain(item) for key,item in value.items()}
++    if isinstance(value,(list,tuple)):
++        return [_plain(item) for item in value]
++    return value
++
++
++def _state(value):
++    return {'states':list(value.states),'values':_plain(value.values),'allowed_events':list(value.allowed_events)}
++
++
++def _snapshot(value):
++    if not isinstance(value,dict) or set(value)!={'states','values','allowed_events'} or any(not isinstance(value[key],list) for key in value):
++        raise ValueError('日志状态结构不符')
++    if any(not isinstance(item,str) for item in value['states']+value['allowed_events']) or len(value['states'])!=len(value['values']):
++        raise ValueError('日志状态字段不符')
++    return StateSnapshot(tuple(value['states']),tuple(freeze(item) for item in value['values']),tuple(value['allowed_events']))
++
++
++def dumps_journal(results,*,max_records=10000):
++    """编码完整真实事件记录。@param results EventResult迭代器。@param max_records 正整数上限。
++    @return 固定schema1的JSON文本；不支持的回调值明确失败。
++    """
++    if type(max_records) is not int or max_records<1:
++        raise ValueError('日志记录上限必须为正整数')
++    records=[]
++    for index,result in enumerate(results):
++        if index>=max_records or not isinstance(result,EventResult) or result.index!=index or result.status not in ('passed','error'):
++            raise ValueError('日志需要连续有序的真实事件结果')
++        call=normalize_call(result.call)
++        records.append({'index':index,'event':call.event,'args':list(call.args),'kwargs':call.kwargs,
++            'status':result.status,'before':_state(result.before),'after':_state(result.after),'result':result.result,'error':result.error})
++    return json.dumps({'schema':1,'records':records},ensure_ascii=False,allow_nan=False,separators=(',',':'))
++
++
++def _pairs(items):
++    result={}
++    for key,value in items:
++        if key in result:
++            raise ValueError('日志对象键重复')
++        result[key]=value
++    return result
++
++
++def loads_journal(document,*,max_records=10000):
++    """校验日志并恢复独立记录。@param document JSON文本。@param max_records 正整数上限。
++    @return EventResult元组，只产生数据，不调用状态机或任意对象构造器。
++    """
++    if type(max_records) is not int or max_records<1:
++        raise ValueError('日志记录上限必须为正整数')
++    data=json.loads(document,object_pairs_hook=_pairs,parse_constant=lambda value:(_ for _ in ()).throw(ValueError('日志包含非有限值')))
++    if not isinstance(data,dict) or set(data)!={'schema','records'} or type(data['schema']) is not int or data['schema']!=1 or not isinstance(data['records'],list) or len(data['records'])>max_records:
++        raise ValueError('日志格式或数量不符')
++    freeze(data)
++    rows=[];fields={'index','event','args','kwargs','status','before','after','result','error'}
++    for index,row in enumerate(data['records']):
++        if not isinstance(row,dict) or set(row)!=fields or type(row['index']) is not int or row['index']!=index or row['status'] not in ('passed','error') or not isinstance(row['args'],list) or not isinstance(row['kwargs'],dict):
++            raise ValueError('日志事件结构不符')
++        call=normalize_call(EventCall(row['event'],tuple(row['args']),row['kwargs']))
++        rows.append(EventResult(index,call,row['status'],_snapshot(row['before']),_snapshot(row['after']),row['result'],row['error']))
++    return tuple(rows)

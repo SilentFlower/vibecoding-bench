@@ -1,0 +1,55 @@
+--- a/library/docs/development-markdownify-o01-dev.md
++++ b/library/docs/development-markdownify-o01-dev.md
+@@ -0,0 +1,5 @@
++# 让代码围栏真实容纳内嵌反引号并拒绝信息行注入
++
++对应路线03：按真实正文最长反引号选择外层围栏，保留strip_pre和语言回调；信息行类型与结构字符明确拒绝，普通代码块输出保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/markdownify/__init__.py
++++ b/library/markdownify/__init__.py
+@@ -702,7 +702,14 @@
+         else:
+             raise ValueError('Invalid value for strip_pre: %s' % self.options['strip_pre'])
+ 
+-        return '\n\n```%s\n%s\n```\n\n' % (code_language, text)
++        if not isinstance(code_language, str):
++            raise TypeError('代码语言必须为字符串')
++        if any(character in code_language for character in ('`', '\n', '\r')):
++            raise ValueError('代码语言不能破坏围栏信息行')
++        # 关闭围栏必须长于正文任意反引号串，否则真实Markdown会提前结束代码块。
++        longest = max((len(match.group()) for match in re_backtick_runs.finditer(text)), default=0)
++        fence = '`' * max(3, longest + 1)
++        return '\n\n%s%s\n%s\n%s\n\n' % (fence, code_language, text, fence)
+ 
+     def convert_q(self, el, text, parent_tags):
+         return '"' + text + '"'
+--- a/library/tests/test_development_markdownify_o01_dev.py
++++ b/library/tests/test_development_markdownify_o01_dev.py
+@@ -0,0 +1,26 @@
++"""代码块必须在真实Markdown围栏语法下完整容纳正文。"""
++from markdownify import markdownify,MarkdownConverter
++import pytest
++
++def test_internal_backticks_cannot_close_outer_fence():
++    """围栏比正文最长连续反引号更长，三行内部块仍完整。@return None。"""
++    text='first\n```python\ninside\n```\nlast'
++    actual=markdownify('<pre>'+text+'</pre>',code_language='text')
++    assert actual=='````text\n'+text+'\n````'
++    for width in [1,2,4,8]:
++        body='a\n'+'`'*width+'\nb'
++        result=markdownify('<pre>'+body+'</pre>')
++        assert result.splitlines()[0]=='`'*max(3,width+1)
++        assert '\n'.join(result.splitlines()[1:-1])==body
++
++def test_strip_modes_and_language_callback_are_kept():
++    """去空白和回调仍按既有配置作用于实际pre元素。@return None。"""
++    converter=MarkdownConverter(code_language='text',code_language_callback=lambda el:el.get('data-language'),strip_pre=None)
++    assert converter.convert('<pre data-language="py">\n```\n</pre>')=='````py\n\n```\n\n````'
++    assert markdownify('<pre>simple</pre>')=='```\nsimple\n```'
++
++def test_invalid_information_line_is_rejected_not_injected():
++    """信息行不能通过换行/反引号注入围栏结构。@return None。"""
++    for value in ['py\n# escaped','py\rplain','py`']:
++        with pytest.raises(ValueError):markdownify('<pre>code</pre>',code_language=value)
++    with pytest.raises(TypeError):markdownify('<pre>code</pre>',code_language_callback=lambda el:123)

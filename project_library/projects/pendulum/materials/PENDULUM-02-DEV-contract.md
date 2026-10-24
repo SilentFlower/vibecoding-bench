@@ -1,0 +1,3 @@
+# DateTime减Duration保留日历分量而非统一换算秒数
+
+路线03：DateTime减Duration复用完整声明分量，与subtract参数逐项一致；日历日和24小时保持不同，普通timedelta与Interval原路径不动。

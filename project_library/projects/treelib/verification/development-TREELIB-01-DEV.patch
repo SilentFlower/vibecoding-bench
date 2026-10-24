@@ -1,0 +1,113 @@
+--- a/library/docs/development-treelib-01-dev.md
++++ b/library/docs/development-treelib-01-dev.md
+@@ -0,0 +1,5 @@
++# 分类映射完整预检后构造同类树并保留所有合法记录
++
++路线02/03合并为完整映射导入交付：全量根、父引用及可达性预检，孤儿和离线环不静默丢失；转换标识每项只调用一次并检查碰撞。合法乱序保留兄弟顺序，工厂尊重cls及显式构造参数，不猜业务上下文。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_treelib_01_dev.py
++++ b/library/tests/test_development_treelib_01_dev.py
+@@ -0,0 +1,26 @@
++"""全量映射导入不能静默丢掉孤儿或离线环。"""
++import unittest
++from treelib import Tree,Node
++
++
++def test_invalid_graph_is_rejected_before_callbacks():
++    """离线环、缺父与多根不触发转换业务副作用。@return None。"""
++    for mapping in ({'root':None,'lost':'missing'},{'root':None,'a':'b','b':'a'},{'root':None,'a':'a'},{'a':None,'b':None},{}):
++        calls=[]
++        with unittest.TestCase().assertRaises(ValueError):Tree.from_map(mapping,id_func=lambda key:calls.append(key) or key)
++        assert not calls
++
++
++def test_out_of_order_subclass_and_single_id_conversion():
++    """合法乱序全导入、子类和显式构造参数保持。@return None。"""
++    class CatalogTree(Tree):
++        """带业务上下文的真实子类。"""
++        def __init__(self,*,tenant,**kwargs):
++            """保存显式业务上下文。@param tenant 租户。@param kwargs 树构造。@return None。"""
++            self.tenant=tenant;super().__init__(**kwargs)
++    calls=[]
++    tree=CatalogTree.from_map({'leaf':'branch','root':None,'branch':'root'},id_func=lambda key:calls.append(key) or key.upper(),data_func=lambda key:{'name':key},tenant='catalog')
++    assert isinstance(tree,CatalogTree) and tree.tenant=='catalog'
++    assert len(calls)==len(set(calls))==len(tree)==3
++    assert tree.parent('LEAF').identifier=='BRANCH' and tree['LEAF'].data=={'name':'leaf'}
++    with unittest.TestCase().assertRaises(ValueError):Tree.from_map({'r':None,'c':'r'},id_func=lambda key:'same')
+--- a/library/treelib/tree.py
++++ b/library/treelib/tree.py
+@@ -2163,45 +2163,32 @@
+         f.close()
+ 
+     @classmethod
+-    def from_map(
+-        cls,
+-        child_parent_dict: Dict[str, Optional[str]],
+-        id_func: Optional[Callable[[str], str]] = None,
+-        data_func: Optional[Callable[[str], Any]] = None,
+-    ) -> "Tree":
+-        """
+-        takes a dict with child:parent, and form a tree
+-        """
+-        tree = Tree()
+-        if tree is None or tree.size() > 0:
+-            raise ValueError("need to pass in an empty tree")
+-        id_func = id_func if id_func else lambda x: x
+-        data_func = data_func if data_func else lambda x: None
+-        parent_child_dict = {}
+-        root_node = None
+-        for k, v in child_parent_dict.items():
+-            if v is None and root_node is None:
+-                root_node = k
+-            elif v is None and root_node is not None:
+-                raise ValueError("invalid input, more than 1 child has no parent")
+-            else:
+-                if v in parent_child_dict:
+-                    parent_child_dict[v].append(k)
+-                else:
+-                    parent_child_dict[v] = [k]
+-        if root_node is None:
+-            raise ValueError("cannot find root")
+-
+-        tree.create_node(root_node, id_func(root_node), data=data_func(root_node))
+-        queue = [root_node]
+-        while len(queue) > 0:
+-            parent_node = queue.pop()
+-            for child in parent_child_dict.get(parent_node, []):
+-                tree.create_node(
+-                    child,
+-                    id_func(child),
+-                    parent=id_func(parent_node),
+-                    data=data_func(child),
+-                )
+-                queue.append(child)
++    def from_map(cls, child_parent_dict, id_func=None, data_func=None, **tree_kwargs):
++        """完整验证映射再构造同类树。@param child_parent_dict 全量父映射。@param id_func 标识转换。@param data_func 数据转换。@param tree_kwargs 显式构造参数。@return 同类完整树。"""
++        records=dict(child_parent_dict)
++        roots=[key for key,parent in records.items() if parent is None]
++        if len(roots)!=1:raise ValueError('映射必须恰好一个根')
++        children={key:[] for key in records}
++        for key,parent in records.items():
++            if parent is not None:
++                if parent not in records:raise ValueError('缺失父节点: '+repr(key))
++                children[parent].append(key)
++        order=[];pending=[roots[0]]
++        while pending:
++            key=pending.pop()
++            order.append(key);pending.extend(reversed(children[key]))
++        if len(order)!=len(records):raise ValueError('映射含与根断开的环: '+repr([key for key in records if key not in set(order)]))
++        identify=id_func or (lambda key:key)
++        payload=data_func or (lambda key:None)
++        identifiers={key:identify(key) for key in order}
++        if any(value is None for value in identifiers.values()):raise ValueError('转换后标识不能为None')
++        try:unique=set(identifiers.values())
++        except TypeError as error:raise ValueError('转换后标识不可哈希') from error
++        if len(unique)!=len(identifiers):raise ValueError('转换后标识重复')
++        data={key:payload(key) for key in order}
++        tree=cls(**tree_kwargs)
++        if tree.size():raise ValueError('构造器必须返回空树')
++        for key in order:
++            parent=records[key]
++            tree.create_node(key,identifiers[key],parent=identifiers[parent] if parent is not None else None,data=data[key])
+         return tree

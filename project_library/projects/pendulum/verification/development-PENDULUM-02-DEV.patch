@@ -1,0 +1,41 @@
+--- a/library/docs/development-pendulum-02-dev.md
++++ b/library/docs/development-pendulum-02-dev.md
+@@ -0,0 +1,5 @@
++# DateTime减Duration保留日历分量而非统一换算秒数
++
++路线03：DateTime减Duration复用完整声明分量，与subtract参数逐项一致；日历日和24小时保持不同，普通timedelta与Interval原路径不动。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pendulum/datetime.py
++++ b/library/src/pendulum/datetime.py
+@@ -695,6 +695,9 @@
+         Remove timedelta duration from the instance.
+         """
+         if isinstance(delta, pendulum.Duration):
++            if not isinstance(delta, pendulum.Interval) and hasattr(delta,"_signature"):
++                # 日历天与经过24小时不同；与加法一样保留调用方完整分量声明。
++                return self.subtract(**delta._signature)
+             return self.subtract(
+                 years=delta.years, months=delta.months, seconds=delta._total
+             )
+--- a/library/tests/test_development_pendulum_02_dev.py
++++ b/library/tests/test_development_pendulum_02_dev.py
+@@ -0,0 +1,18 @@
++"""Duration日历分量减法与subtract声明保持一致。"""
++from datetime import timedelta
++import pendulum
++
++def test_calendar_day_and_elapsed_hours_across_dst_are_distinct():
++    """纽约跳时日减日历一天仍在前一天相同钟点。@return None。"""
++    value=pendulum.datetime(2026,3,8,12,tz='America/New_York')
++    assert value-pendulum.duration(days=1)==value.subtract(days=1)
++    assert (value-pendulum.duration(days=1)).hour==12
++    assert value-timedelta(days=1)==value.subtract(seconds=86400)
++
++def test_mixed_calendar_signature_negative_and_month_end():
++    """年/月/周/日与固定小时全部按原声明进入subtract。@return None。"""
++    value=pendulum.datetime(2024,3,31,12,tz='Europe/Paris')
++    options={'years':1,'months':1,'weeks':1,'days':2,'hours':3,'microseconds':7}
++    assert value-pendulum.duration(**options)==value.subtract(**options)
++    options={'days':-1,'hours':2}
++    assert value-pendulum.duration(**options)==value.subtract(**options)

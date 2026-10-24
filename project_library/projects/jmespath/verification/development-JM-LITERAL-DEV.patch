@@ -1,0 +1,48 @@
+--- a/library/development_tests/test_development_jm_literal_dev.py
++++ b/library/development_tests/test_development_jm_literal_dev.py
+@@ -0,0 +1,20 @@
++"""公开可变查询字面量隔离回归。"""
++import jmespath
++
++def test_compiled_literal_results_are_detached_on_each_search():
++    query=jmespath.compile('`{"items":[1]}`');first=query.search({});first['items'].append(2)
++    assert query.search({})=={'items':[1]} and query.parsed['value']=={'items':[1]}
++
++def test_global_compile_cache_is_not_polluted_by_result_mutation():
++    expression='`[{"count":1}]`';first=jmespath.search(expression,{})
++    first[0]['count']=9
++    assert jmespath.search(expression,{})==[{'count':1}]
++
++def test_projected_literal_instances_do_not_alias_each_other():
++    result=jmespath.search('items[].{values: `[]`}',{'items':[1,2]})
++    result[0]['values'].append('changed')
++    assert result[1]=={'values':[]}
++
++def test_actual_input_field_identity_and_scalar_literals_are_preserved():
++    value=[];source={'field':value}
++    assert jmespath.search('field',source) is value and jmespath.search('`false`',source) is False
+--- a/library/docs/development-jm-literal-dev.md
++++ b/library/docs/development-jm-literal-dev.md
+@@ -0,0 +1,5 @@
++# 隔离编译表达式的可变JSON字面量结果
++
++编译表达式中的对象或数组常量不能被一次结果修改污染后续查询。仅对字面量求值做深层隔离，保留输入字段本来的引用语义和编译缓存，不靠清缓存或复制整份输入绕过。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/jmespath/visitor.py
++++ b/library/jmespath/visitor.py
+@@ -1,4 +1,5 @@
+ import operator
++from copy import deepcopy
+ 
+ from jmespath import functions
+ from jmespath.compat import string_type
+@@ -225,7 +226,7 @@
+         return self.visit(node['children'][0], value)
+ 
+     def visit_literal(self, node, value):
+-        return node['value']
++        return deepcopy(node['value'])
+ 
+     def visit_multi_select_dict(self, node, value):
+         if value is None:

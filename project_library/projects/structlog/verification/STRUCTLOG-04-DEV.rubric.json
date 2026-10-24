@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "STRUCTLOG-04-DEV",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add EventProjector(fields,keep=(),missing=\"error\"/\"omit\"/\"default\",default=None). Explicit output-alias to tuple/list path segments, str dict keys and nonnegative int list indexes, no implicit dotted-path interpretation or Python attribute access. Only retain requested top-level fields plus projections; reject alias/keep collision and invalid paths before processing. Actual None is present, missing paths follow explicit policy. Return new outer event preserving payload identity and source; do not infer entire schema or expand object tree.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

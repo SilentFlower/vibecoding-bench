@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TZ-DISSOC-IN-DEV",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add dissoc_in(d, keys, factory=dict, *, strict=False, prune=False). Copy only affected mapping branches and delete the leaf, retain untouched references and input data, preserve empty ancestors by default or prune them explicitly. Missing paths return a shallow root copy unless strict=True; empty paths raise ValueError and scalar ancestors raise TypeError. Support one-shot key paths, mapping factories and toolz/curried/tlz exports in the frozen environment. Keep existing dissoc/assoc_in/update_in semantics unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,3 @@
+# Duration持久化与拷贝保留完整日历声明和子类行为
+
+路线05：Duration reducer保存完整日历声明及原属性，所有协议/浅深拷贝保同一锚点运算；AbsoluteDuration规范重建并保状态，Interval自身端点reducer和旧读取不变。

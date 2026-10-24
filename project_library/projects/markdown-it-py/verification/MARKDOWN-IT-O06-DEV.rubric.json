@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWN-IT-O06-DEV",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add SyntaxTreeNode.insert_child(index,node), append_child(node), remove_child(node) and replace_child(old,new). Maintain exactly one parent and consistent sibling traversal, moving an existing node out of its old parent; insertion indices are pre-move positions 0..len(children), adjusted when moving a preceding same-parent node. Reject root/self/ancestor insertion, leaf containers, wrong old parents and invalid indices before detaching anything. Synchronize actual token.children for inline/image containers so to_tokens followed by real rendering reflects edits. Keep existing read APIs and do not claim direct external list mutations are protected. Return inserted/removed nodes as documented, including idempotent self-replacement.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

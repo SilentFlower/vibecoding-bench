@@ -1,0 +1,88 @@
+--- a/library/development_tests/test_development_sc_error_policy_dev.py
++++ b/library/development_tests/test_development_sc_error_policy_dev.py
+@@ -0,0 +1,41 @@
++"""公开连续失败取消策略回归。"""
++import pytest
++import schedule
++from schedule.policies import with_error_policy
++
++def test_limit_cancels_job_and_notifies_original_exception():
++    scheduler=schedule.Scheduler();errors=[];failure=ValueError('synthetic')
++    def fail(value):
++        assert value==3
++        raise failure
++    job=with_error_policy(scheduler.every().second.do(fail,3),max_failures=2,on_error=lambda error,count:errors.append((error,count)))
++    scheduler._run_job(job);scheduler._run_job(job)
++    assert job not in scheduler.jobs and errors==[(failure,1),(failure,2)]
++
++def test_success_resets_consecutive_count_and_preserves_result():
++    outcomes=iter([ValueError(),42,ValueError()])
++    def callback():
++        value=next(outcomes)
++        if isinstance(value,Exception):
++            raise value
++        return value
++    job=with_error_policy(schedule.Scheduler().every().second.do(callback),max_failures=2)
++    assert job.run() is None and job.consecutive_failures==1
++    assert job.run()==42 and job.consecutive_failures==0
++    assert job.run() is None and job.consecutive_failures==1
++
++def test_baseexception_and_handler_failure_propagate():
++    def abort():
++        raise KeyboardInterrupt()
++    job=with_error_policy(schedule.Scheduler().every().second.do(abort))
++    with pytest.raises(KeyboardInterrupt):
++        job.run()
++
++def test_unconfigured_double_wrap_and_invalid_limits_fail():
++    with pytest.raises(schedule.ScheduleValueError):
++        with_error_policy(schedule.Job(1))
++    job=with_error_policy(schedule.Scheduler().every().second.do(lambda:None))
++    with pytest.raises(schedule.ScheduleValueError):
++        with_error_policy(job)
++    with pytest.raises(schedule.ScheduleValueError):
++        with_error_policy(job,max_failures=True)
+--- a/library/docs/development-sc-error-policy-dev.md
++++ b/library/docs/development-sc-error-policy-dev.md
+@@ -0,0 +1,5 @@
++# 对显式选中的任务按连续失败次数取消调度
++
++长期运行的调度需要可选的连续失败熔断：仅包装选中任务，正常节奏每次执行一次，成功清零，达到上限自动取消。保留原异常对象的通知，处理器异常及BaseException仍传播，普通任务不受影响。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/schedule/policies.py
++++ b/library/schedule/policies.py
+@@ -0,0 +1,33 @@
++"""显式选择的连续失败取消策略，不在一次执行中重试。"""
++import functools
++from . import CancelJob, ScheduleValueError
++
++
++def with_error_policy(job, *, max_failures=3, on_error=None):
++    """为已配置任务添加有界失败策略。@param job 已绑定回调的Job。
++    @param max_failures 取消前连续失败次数。@param on_error 可选(exception,count)通知。
++    @return 原Job；失败抑制并按原节奏调度，达到上限返回CancelJob，成功清零。
++    """
++    if type(max_failures) is not int or max_failures < 1:
++        raise ScheduleValueError('失败上限必须为正整数')
++    if job.job_func is None or getattr(job, '_error_policy_installed', False):
++        raise ScheduleValueError('策略要求未包装的已配置任务')
++    if on_error is not None and not callable(on_error):
++        raise TypeError('错误通知必须可调用')
++    original = job.job_func
++    job.consecutive_failures = 0
++    @functools.wraps(original)
++    def invoke():
++        try:
++            result = original()
++        except Exception as error:
++            job.consecutive_failures += 1
++            if on_error is not None:
++                on_error(error, job.consecutive_failures)
++            return CancelJob if job.consecutive_failures >= max_failures else None
++        job.consecutive_failures = 0
++        return result
++    job.job_func = functools.partial(invoke)
++    functools.update_wrapper(job.job_func, original)
++    job._error_policy_installed = True
++    return job

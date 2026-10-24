@@ -1,0 +1,3 @@
+# 缓存键按真实参数默认值规范化并允许明确业务ID策略
+
+路线05：独立canonical_cache先signature.bind/apply_defaults，位置/命名/默认及kwargs顺序规范化；typed明确区分类型，自定义BoundArguments业务键可提ID，默认不深hash可变对象，签名错误先拒绝。

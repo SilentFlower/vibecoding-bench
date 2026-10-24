@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JINJA-O06-DEV",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add jinja2.loaders.ResourcesLoader(BaseLoader) accepting an explicit Traversable root, encoding, reload=\"content\"|\"immutable\" and nonnegative inventory budgets. Read real resource text through the protocol and reuse BaseLoader compilation/inheritance/cache; support filesystem Path and zipfile.Path without fspath coercion. Validate template components against traversal/absolute/backslash/NUL names, additionally resolve/confine filesystem Path symlinks, and return sorted inventory without silently truncating beyond depth/count budgets. content rechecks source instead of pretending generic resources have mtime; immutable explicitly caches. Preserve existing FileSystem/Package loaders, propagate encoding/resource errors and state that a supplied abstract resource implementation is trusted rather than a universal OS sandbox.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

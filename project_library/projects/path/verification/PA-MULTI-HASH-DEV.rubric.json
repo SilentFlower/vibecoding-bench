@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PA-MULTI-HASH-DEV",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Path.read_hashes(algorithms,*,chunk_size=8192,hex=True), returning insertion-ordered algorithm->digest mapping. Materialize/deduplicate algorithm names, validate fixed-size hash objects and positive integer chunk size before opening, read one stream once and update every digest for each bounded chunk. Support empty/binary/large files and raw digest output, close stream on read errors and propagate them. Reject empty algorithms, bool sizes, unknown hashes and XOFs requiring a length; preserve old hash APIs.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

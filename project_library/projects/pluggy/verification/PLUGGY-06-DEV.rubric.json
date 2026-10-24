@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PLUGGY-06-DEV",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add pluggy.discovery EntryPointCandidate/DiscoveryReport, discover_entrypoints(group,name=None) and load_entrypoint(manager,candidate). Discovery reads actual metadata fields and reports per-distribution metadata errors separately, never ep.load or plugin execution. Explicit loading re-reads group/name/value/distribution/version, requires exactly one complete matching candidate and no metadata errors, rejects stale/ambiguous inventory before import, and loads only the selected entry. Existing/blocked names return None without import. Commit through the earlier register_entrypoint verified path so rejected/None/renamed plugins never corrupt dist associations. Preserve default existing load API, and do not claim metadata preview proves runtime behavior safe.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

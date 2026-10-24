@@ -1,0 +1,69 @@
+--- a/library/docs/development-pydash-06-dev.md
++++ b/library/docs/development-pydash-06-dev.md
+@@ -0,0 +1,5 @@
++# 混合同步异步业务flow遵守调用方事件循环与取消语义
++
++路线12：异步flow逐步await普通协程或自定义awaitable，首步原参数转发；异常/取消立即传播，不抢占调用方循环，旧同步flow不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pydash/__init__.py
++++ b/library/src/pydash/__init__.py
+@@ -114,6 +114,7 @@
+     sort_by,
+ )
+ from .exceptions import InvalidMethod
++from .async_flow import async_flow
+ from .functions import (
+     after,
+     ary,
+--- a/library/src/pydash/async_flow.py
++++ b/library/src/pydash/async_flow.py
+@@ -0,0 +1,19 @@
++"""显式异步flow，不创建或接管调用方事件循环。"""
++from inspect import isawaitable
++
++
++def async_flow(*functions):
++    """组合同步与异步步骤。@param functions 首步接全部参数，后续接上步结果。@return 可await组合函数，空链返回单输入或None。"""
++    if any(not callable(function) for function in functions):raise TypeError('所有步骤必须可调用')
++    async def invoke(*args,**kwargs):
++        """依次执行并传播异常与取消。@param args 首步位置参数。@param kwargs 首步命名参数。@return 末步已完成值。"""
++        if not functions:
++            if kwargs or len(args)>1:raise TypeError('空链仅接受零或一个位置参数')
++            return args[0] if args else None
++        result=functions[0](*args,**kwargs)
++        if isawaitable(result):result=await result
++        for function in functions[1:]:
++            result=function(result)
++            if isawaitable(result):result=await result
++        return result
++    return invoke
+--- a/library/tests/test_development_pydash_06_dev.py
++++ b/library/tests/test_development_pydash_06_dev.py
+@@ -0,0 +1,26 @@
++"""业务同步提取、异步处理与同步汇总保顺序。"""
++import asyncio
++import unittest
++import pydash
++
++def test_mixed_flow_runs_in_callers_loop_with_original_parameters():
++    """不能用内部asyncio.run，首步完整转发参数。@return None。"""
++    async def run():
++        events=[]
++        def first(x,*,offset):events.append('first');return x+offset
++        async def second(x):await asyncio.sleep(0);events.append('second');return x*2
++        def third(x):events.append('third');return {'total':x}
++        assert await pydash.async_flow(first,second,third)(3,offset=2)=={'total':10}
++        assert events==['first','second','third']
++    asyncio.run(run())
++
++def test_exception_cancellation_and_empty_chain_do_not_continue():
++    """错误与取消不执行后续步骤，空链语义明确。@return None。"""
++    async def run():
++        seen=[]
++        async def fail(x):raise ValueError('stage')
++        with unittest.TestCase().assertRaises(ValueError):await pydash.async_flow(fail,lambda x:seen.append(x))(1)
++        async def cancel(x):raise asyncio.CancelledError()
++        with unittest.TestCase().assertRaises(asyncio.CancelledError):await pydash.async_flow(cancel,lambda x:seen.append(x))(1)
++        assert seen==[] and await pydash.async_flow()(4)==4 and await pydash.async_flow()() is None
++    asyncio.run(run())

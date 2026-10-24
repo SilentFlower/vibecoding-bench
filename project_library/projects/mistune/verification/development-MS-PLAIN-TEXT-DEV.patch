@@ -1,0 +1,112 @@
+--- a/library/development_tests/test_development_ms_plain_text_dev.py
++++ b/library/development_tests/test_development_ms_plain_text_dev.py
+@@ -0,0 +1,23 @@
++"""公开原生纯文本渲染回归。"""
++import mistune
++from mistune.renderers.text import PlainTextRenderer
++
++def test_inline_formatting_code_and_entities_keep_visible_text():
++    md=mistune.create_markdown(renderer=PlainTextRenderer())
++    result=md('**bold** and *em* with `a < b` &amp; text')
++    assert result=='bold and em with a < b & text\n' and '<strong>' not in result
++
++def test_lists_and_paragraphs_keep_structural_boundaries():
++    md=mistune.create_markdown(renderer=PlainTextRenderer())
++    result=md('# Title\n\nfirst\n\n3. one\n4. two\n')
++    assert 'Title\n\nfirst' in result and '3. one\n4. two' in result
++
++def test_optional_urls_and_image_alt_are_visible_without_html():
++    md=mistune.create_markdown(renderer=PlainTextRenderer(include_urls=True))
++    result=md('[site](https://example.invalid) ![alt](image.png)')
++    assert result=='site <https://example.invalid> alt <image.png>\n'
++
++def test_raw_html_empty_documents_and_plugin_tables_are_supported():
++    md=mistune.create_markdown(renderer=PlainTextRenderer(),plugins=['table'])
++    assert md('')=='' and md('before <b>inside</b> after')=='before inside after\n'
++    assert 'a\tb' in md('|a|b|\n|-|-|\n|1|2|')
+--- a/library/docs/development-ms-plain-text-dev.md
++++ b/library/docs/development-ms-plain-text-dev.md
+@@ -0,0 +1,5 @@
++# 把真实Markdown结构渲染为保留代码和层次的纯文本
++
++文档检索及终端预览需要原生纯文本渲染，保留代码、段落、列表和表格边界，去掉HTML标签但保留文字。可选择附加链接地址，沿用真实令牌而不是简单删除HTML，重复调用不泄漏文档状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/mistune/renderers/text.py
++++ b/library/src/mistune/renderers/text.py
+@@ -0,0 +1,75 @@
++"""将真实Markdown令牌渲染为可读纯文本，不输出HTML标签。"""
++from html import unescape
++from html.parser import HTMLParser
++from ..core import BaseRenderer
++
++
++class _TextContent(HTMLParser):
++    def __init__(self):
++        super().__init__(convert_charrefs=True)
++        self.parts=[]
++    def handle_data(self,data):
++        self.parts.append(data)
++    def handle_starttag(self,tag,attrs):
++        if tag in ('br','p','div','li'):
++            self.parts.append('\n')
++
++
++class PlainTextRenderer(BaseRenderer):
++    """保留文本、代码、结构边界及可选链接地址的原生renderer。"""
++    NAME='text'
++    def __init__(self,*,include_urls=False):
++        """配置渲染。@param include_urls 是否附加链接／图片地址。@return None。
++        """
++        super().__init__()
++        if type(include_urls) is not bool:
++            raise TypeError('include_urls必须为布尔值')
++        self.include_urls=include_urls
++
++    def render_token(self,token,state):
++        """渲染实际令牌。@param token 令牌。@param state 当前状态。@return 纯文本。
++        """
++        kind=token['type']
++        if kind=='list':
++            attrs=token.get('attrs',{});ordered=attrs.get('ordered',False);start=attrs.get('start',1)
++            rows=[]
++            for index,child in enumerate(token.get('children',[])):
++                text=self.render_tokens(child.get('children',[]),state).strip('\n')
++                if child['type']=='task_list_item':
++                    text=('[x] ' if child.get('attrs',{}).get('checked') else '[ ] ')+text
++                prefix=str(start+index)+'. ' if ordered else '- '
++                rows.append(prefix+text.replace('\n','\n  '))
++            return '\n'.join(rows)+'\n\n'
++        if 'children' in token:
++            text=self.render_tokens(token['children'],state)
++        else:
++            text=str(token.get('raw',''))
++            if kind not in ('codespan','block_code'):
++                text=unescape(text)
++        if kind in ('inline_html','block_html'):
++            parser=_TextContent();parser.feed(text);text=''.join(parser.parts)
++        if kind in ('link','image'):
++            url=token.get('attrs',{}).get('url','')
++            if self.include_urls and url and url!=text:
++                text+=' <'+url+'>'
++        if kind in ('softbreak','linebreak'):
++            return '\n'
++        if kind=='blank_line':
++            return ''
++        if kind=='thematic_break':
++            return '\n'
++        if kind=='footnote_ref':
++            return '['+str(token.get('attrs',{}).get('index',''))+']'
++        if kind in ('paragraph','heading','block_quote','block_code','block_html','table','footnotes'):
++            return text.rstrip('\n')+'\n\n'
++        if kind in ('table_row','table_head'):
++            return text.rstrip('\t')+'\n'
++        if kind=='table_cell':
++            return text+'\t'
++        return text
++
++    def __call__(self,tokens,state):
++        """规范文档边界。@param tokens 令牌。@param state 状态。@return 末尾一个换行的纯文本。
++        """
++        result=self.render_tokens(tokens,state).strip('\n')
++        return result+'\n' if result else ''

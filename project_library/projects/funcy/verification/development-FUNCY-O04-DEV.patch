@@ -1,0 +1,112 @@
+--- a/library/docs/development-funcy-o04-dev.md
++++ b/library/docs/development-funcy-o04-dev.md
+@@ -0,0 +1,5 @@
++# 迭代遍历真实嵌套树并交付带路径成对事件
++
++对应路线12：迭代栈遍历真实树并输出带键/下标路径的pre/post事件，剪枝发生在访问children前；深树、祖先循环、共享节点和深度预算明确。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/funcy/walktree.py
++++ b/library/funcy/walktree.py
+@@ -0,0 +1,68 @@
++"""迭代式树事件遍历，保留真实节点与键/下标路径。"""
++from collections.abc import Mapping
++from dataclasses import dataclass
++from funcy.types import is_seqcont
++
++
++@dataclass(frozen=True)
++class WalkEvent:
++    """独立事件元数据，node是输入节点身份而非递归副本。"""
++    event: str
++    path: tuple
++    depth: int
++    node: object
++    pruned: bool
++
++
++class TreeCycleError(ValueError):
++    """携带回到祖先的确切路径。"""
++    def __init__(self, path):
++        """保存循环位置。@return None。"""
++        self.path = path
++        super().__init__('树存在祖先循环：%s' % (path,))
++
++
++def tree_walk(root, *, children=None, follow=None, prune=None, max_depth=None):
++    """惰性生成pre/post事件，不用Python递归栈。
++
++    :param root: 根节点。
++    :param children: 可选node到(key,child)迭代器，默认mapping.items/序列enumerate。
++    :param follow: 明确哪些节点可访问children，默认Mapping或Funcy序列容器。
++    :param prune: 接收pre事件的剪枝谓词，在children调用前执行。
++    :param max_depth: 可选非负最大深度，达到边界仍交付成对事件。
++    :return: WalkEvent迭代器，祖先循环失败，共享无环节点按每个路径遍历。
++    """
++    if max_depth is not None and (isinstance(max_depth, bool) or not isinstance(max_depth, int) or max_depth < 0):
++        raise ValueError('max_depth必须为非负整数')
++    if follow is None:
++        follow = lambda node: isinstance(node, Mapping) or is_seqcont(node)
++    if children is None:
++        children = lambda node: node.items() if isinstance(node, Mapping) else enumerate(node)
++    stack, active = [('enter', root, ())], set()
++    while stack:
++        action, node, path = stack.pop()
++        if action == 'children':
++            iterator = node
++            try:
++                key, child = next(iterator)
++            except StopIteration:
++                continue
++            stack.append(('children', iterator, path))
++            stack.append(('enter', child, path + (key,)))
++            continue
++        if action == 'leave':
++            active.remove(id(node))
++            yield WalkEvent('post', path, len(path), node, False)
++            continue
++        container = bool(follow(node))
++        if container and id(node) in active:
++            raise TreeCycleError(path)
++        event = WalkEvent('pre', path, len(path), node, False)
++        pruned = (max_depth is not None and len(path) >= max_depth) or bool(prune and prune(event))
++        yield WalkEvent('pre', path, len(path), node, pruned)
++        if container and not pruned:
++            active.add(id(node))
++            stack.append(('leave', node, path))
++            stack.append(('children', iter(children(node)), path))
++        else:
++            yield WalkEvent('post', path, len(path), node, pruned)
+--- a/library/tests/test_development_funcy_o04_dev.py
++++ b/library/tests/test_development_funcy_o04_dev.py
+@@ -0,0 +1,30 @@
++"""路径、剪枝、共享节点和深树事件完整可证伪。"""
++import pytest
++
++def test_mapping_sequence_paths_and_balanced_order():
++    """默认按真实键/下标输出，字符串为叶子。@return None。"""
++    from funcy.walktree import tree_walk
++    rows=list(tree_walk({'a':[1,2],'b':'text'}))
++    assert [(r.event,r.path) for r in rows]==[('pre',()),('pre',('a',)),('pre',('a',0)),('post',('a',0)),('pre',('a',1)),('post',('a',1)),('post',('a',)),('pre',('b',)),('post',('b',)),('post',())]
++    assert all(row.depth==len(row.path) for row in rows)
++
++def test_prune_before_children_and_depth_budget():
++    """剪枝绝不调用被剪节点children，边界仍有pre/post。@return None。"""
++    from funcy.walktree import tree_walk
++    touched=[]
++    def children(node):touched.append(node);return node.items()
++    root={'skip':{'never':1},'keep':{}}
++    rows=list(tree_walk(root,follow=lambda n:isinstance(n,dict),children=children,prune=lambda event:event.path==('skip',)))
++    assert root['skip'] not in touched and [r.event for r in rows if r.path==('skip',)]==['pre','post']
++    assert len(list(tree_walk(root,max_depth=0)))==2
++
++def test_deep_shared_and_cycle_identity():
++    """不受递归深度限制，共享叶可多路访问，祖先循环明确失败。@return None。"""
++    from funcy.walktree import tree_walk,TreeCycleError
++    root=1
++    for _ in range(1500):root=[root]
++    assert sum(1 for row in tree_walk(root) if row.event=='pre')==1501
++    shared=[1];assert sum(1 for row in tree_walk([shared,shared]) if row.event=='pre')==5
++    cyclic=[];cyclic.append(cyclic)
++    with pytest.raises(TreeCycleError) as error:list(tree_walk(cyclic))
++    assert error.value.path==(0,)

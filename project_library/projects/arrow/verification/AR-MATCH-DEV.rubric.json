@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AR-MATCH-DEV",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add DateTimeParser.parse_match(text, format_or_list, normalize_whitespace=False) returning immutable ParsedDateTimeMatch with value datetime, selected format, original span/matched/prefix/suffix and a separate normalized_span. Select the earliest calendar-valid match across formats, breaking equal-position ties by format order; skip invalid dates and empty/literal-only matches. Preserve raw Unicode and whitespace exactly. If whitespace is normalized for matching, map every matched normalized character back to its original span rather than pretending normalized indices refer to raw input. Use the complete strict token parser and preserve old parse return types and boundaries.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

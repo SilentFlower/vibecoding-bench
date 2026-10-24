@@ -1,0 +1,101 @@
+--- a/library/development_tests/test_development_sm_snapshot_dev.py
++++ b/library/development_tests/test_development_sm_snapshot_dev.py
+@@ -0,0 +1,37 @@
++"""公开真实状态配置快照回归。"""
++from dataclasses import FrozenInstanceError
++import pytest
++from statemachine.snapshots import snapshot,freeze
++from statemachine import StateMachine,State
++
++class Flow(StateMachine):
++    draft=State(initial=True)
++    ready=State()
++    done=State(final=True)
++    advance=draft.to(ready)
++    finish=ready.to(done)
++    reset=ready.to(draft)
++
++def test_snapshot_observes_actual_configuration_and_changes_only_after_send():
++    machine=Flow();first=snapshot(machine);machine.send('advance');second=snapshot(machine)
++    assert first.states==('draft',) and second.states==('ready',) and first.values==('draft',)
++    assert set(second.allowed_events)=={'finish','reset'}
++
++def test_snapshot_never_evaluates_guards():
++    calls=[]
++    class Guarded(StateMachine):
++        start=State(initial=True);done=State(final=True)
++        finish=start.to(done,cond=lambda:calls.append(1) or False)
++    machine=Guarded();assert snapshot(machine).allowed_events==('finish',) and calls==[]
++
++def test_frozen_result_and_nested_values_are_independent():
++    original={'a':[1]};value=freeze(original);original['a'].append(2)
++    assert value['a']==(1,)
++    with pytest.raises(TypeError): value['a']=()
++    result=snapshot(Flow())
++    with pytest.raises(FrozenInstanceError): result.states=()
++
++def test_invalid_values_are_rejected_instead_of_stringified():
++    value=[];value.append(value)
++    with pytest.raises(ValueError): freeze(value)
++    with pytest.raises(TypeError): freeze(object())
+--- a/library/docs/development-sm-snapshot-dev.md
++++ b/library/docs/development-sm-snapshot-dev.md
+@@ -0,0 +1,5 @@
++# 只读捕获真实活动配置与结构候选事件的不可变快照
++
++只读捕获实际活动配置、状态值和结构允许事件，不运行守卫、回调或隐式激活。JSON兼容值深层冻结，结构候选不能误称为守卫已通过，原模型与监听器保持原样。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/statemachine/snapshots.py
++++ b/library/statemachine/snapshots.py
+@@ -0,0 +1,50 @@
++"""只读捕获活动配置，不运行守卫或激活回调。"""
++import math
++from collections.abc import Mapping
++from dataclasses import dataclass
++from types import MappingProxyType
++from .statemachine import StateChart
++
++
++def freeze(value,active=None):
++    """冻结JSON兼容配置值。@param value 标准配置值。@param active 递归身份集合。
++    @return 不可变值，拒绝非有限数、循环和不支持对象。
++    """
++    if value is None or type(value) in (str,bool,int):
++        return value
++    if type(value) is float:
++        if not math.isfinite(value):
++            raise ValueError('状态值不能为非有限数')
++        return value
++    if not isinstance(value,(dict,list,tuple)):
++        raise TypeError('快照只支持JSON兼容状态值')
++    active=set() if active is None else active
++    if id(value) in active:
++        raise ValueError('状态值存在循环')
++    active.add(id(value))
++    try:
++        if isinstance(value,dict):
++            if any(not isinstance(key,str) for key in value):
++                raise TypeError('快照映射键必须为文本')
++            return MappingProxyType({key:freeze(item,active) for key,item in value.items()})
++        return tuple(freeze(item,active) for item in value)
++    finally:
++        active.remove(id(value))
++
++
++@dataclass(frozen=True)
++class StateSnapshot:
++    """按活动配置顺序保存状态ID、值和结构允许事件。"""
++    states: tuple
++    values: tuple
++    allowed_events: tuple
++
++
++def snapshot(machine):
++    """捕获实际活动状态。@param machine StateChart实例。@return 独立StateSnapshot。
++    允许事件只表示结构候选，不表示守卫已通过；异步初态不由此函数激活。
++    """
++    if not isinstance(machine,StateChart):
++        raise TypeError('需要真实状态机')
++    states=tuple(machine.configuration)
++    return StateSnapshot(tuple(state.id for state in states),tuple(freeze(state.value) for state in states),tuple(dict.fromkeys(str(event) for event in machine.allowed_events)))

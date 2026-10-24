@@ -1,0 +1,301 @@
+{
+  "schema": 3,
+  "project_key": "markdown-it-py",
+  "title": "Markdown-it-py编辑预览工作场景",
+  "category": "结构化文档与预览",
+  "description": "固定真实源码上的完整工程交付：让解析规则上下文在异常及嵌套退出后可靠恢复；让多链规则启停正确重放一次性迭代器且失败前不半修改；让真实围栏高亮回调明确声明完整块或内部片段；给真实Token缓存提供保持对象图语义的深复制；为真实语法树提供同步父链及Token来源的受控编辑；为命令行加入显式UTF8解码策略并保留默认兼容输出。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "365a7e1f9ae974597c53c307760df1944c9a27182ccfa5629cd9a576e7ecdec5",
+  "environment": "markdown-it-py-py312",
+  "source": {
+    "repository": "https://github.com/executablebooks/markdown-it-py",
+    "commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+    "license_files": [
+      "seed/library/LICENSE.markdown-it",
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MARKDOWN-IT-O01-DEV-SCENE",
+      "title": "让解析规则上下文在异常及嵌套退出后可靠恢复",
+      "goal": "让解析规则上下文在异常及嵌套退出后可靠恢复",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWN-IT-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWN-IT-O01-DEV",
+          "kind": "modify",
+          "goal": "让解析规则上下文在异常及嵌套退出后可靠恢复",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual MarkdownIt.reset_rules to restore the entering active-rule sets across core, block, inline and inline2 in a finally block, on normal return, exceptions and BaseException cancellation. Nested contexts restore their own entering state, including initially disabled rules, and original exceptions propagate unchanged. Verify actual rendering after failure. Do not promise rollback of newly registered/replaced rule functions, replace parser objects or suppress consumer failures.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdown_it_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-markdown-it-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWN-IT-O01-DEV-contract.md",
+            "materials/MARKDOWN-IT-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdown_it/main.py",
+            "library/tests/test_development_markdown_it_o01_dev.py",
+            "library/docs/development-markdown-it-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWN-IT-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWN-IT-O01-DEV.native.json",
+            "public_native": "verification/MARKDOWN-IT-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWN-IT-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWN-IT-O02-DEV-SCENE",
+      "title": "让多链规则启停正确重放一次性迭代器且失败前不半修改",
+      "goal": "让多链规则启停正确重放一次性迭代器且失败前不半修改",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWN-IT-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWN-IT-O02-DEV",
+          "kind": "modify",
+          "goal": "让多链规则启停正确重放一次性迭代器且失败前不半修改",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual MarkdownIt.enable/disable to fully materialize a nonstring Iterable once before dispatching names across all parser rule chains and missed-name detection. List/tuple/generator/one-shot iterators must produce identical active sets and rendering; unknown generator names still raise unless ignoreInvalid. If iteration itself raises after yielding a name, no rule chain may already be mutated. Preserve string, duplicate-name, empty input and existing rule-manager semantics; do not add pretend rules or special-case table alone.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdown_it_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-markdown-it-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWN-IT-O02-DEV-contract.md",
+            "materials/MARKDOWN-IT-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdown_it/main.py",
+            "library/tests/test_development_markdown_it_o02_dev.py",
+            "library/docs/development-markdown-it-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWN-IT-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWN-IT-O02-DEV.native.json",
+            "public_native": "verification/MARKDOWN-IT-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWN-IT-O02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWN-IT-O03-DEV-SCENE",
+      "title": "让真实围栏高亮回调明确声明完整块或内部片段",
+      "goal": "让真实围栏高亮回调明确声明完整块或内部片段",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWN-IT-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWN-IT-O03-DEV",
+          "kind": "modify",
+          "goal": "让真实围栏高亮回调明确声明完整块或内部片段",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd immutable HighlightResult(html: str, block: bool=False) and integrate it into actual RendererHTML.fence. A nonempty explicit block result is returned as its complete trusted container with exactly one existing/added terminal newline, even when it starts with div/section rather than pre. Explicit inline HTML is wrapped by the real pre/code renderer including language attrs, without legacy pre-prefix inference. Empty explicit results fall back to escaped source. Preserve old string callbacks/pre heuristic and callback arguments, reject invalid result field/types and propagate callback failures. This is trusted highlighter output, not an HTML sanitizer.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdown_it_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-markdown-it-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWN-IT-O03-DEV-contract.md",
+            "materials/MARKDOWN-IT-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdown_it/renderer.py",
+            "library/tests/test_development_markdown_it_o03_dev.py",
+            "library/docs/development-markdown-it-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWN-IT-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWN-IT-O03-DEV.native.json",
+            "public_native": "verification/MARKDOWN-IT-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWN-IT-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWN-IT-O05-DEV-SCENE",
+      "title": "给真实Token缓存提供保持对象图语义的深复制",
+      "goal": "给真实Token缓存提供保持对象图语义的深复制",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWN-IT-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWN-IT-O05-DEV",
+          "kind": "modify",
+          "goal": "给真实Token缓存提供保持对象图语义的深复制",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Token.deep_copy() for actual token graphs, isolating nested children/image-alt tokens, attrs, map and supported arbitrary meta while preserving shared aliases and cycles within the copied graph. Original Token.copy(**changes) remains shallow. Standard deepcopy-compatible custom values participate normally; uncopyable opaque meta raises its original failure and must never be silently shared or partially mutate the original. Demonstrate independent rendered document edits and self-referential metadata, not serialization that drops types or cycle relationships.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdown_it_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-markdown-it-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWN-IT-O05-DEV-contract.md",
+            "materials/MARKDOWN-IT-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdown_it/token.py",
+            "library/tests/test_development_markdown_it_o05_dev.py",
+            "library/docs/development-markdown-it-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWN-IT-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWN-IT-O05-DEV.native.json",
+            "public_native": "verification/MARKDOWN-IT-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWN-IT-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWN-IT-O06-DEV-SCENE",
+      "title": "为真实语法树提供同步父链及Token来源的受控编辑",
+      "goal": "为真实语法树提供同步父链及Token来源的受控编辑",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWN-IT-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWN-IT-O06-DEV",
+          "kind": "modify",
+          "goal": "为真实语法树提供同步父链及Token来源的受控编辑",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd SyntaxTreeNode.insert_child(index,node), append_child(node), remove_child(node) and replace_child(old,new). Maintain exactly one parent and consistent sibling traversal, moving an existing node out of its old parent; insertion indices are pre-move positions 0..len(children), adjusted when moving a preceding same-parent node. Reject root/self/ancestor insertion, leaf containers, wrong old parents and invalid indices before detaching anything. Synchronize actual token.children for inline/image containers so to_tokens followed by real rendering reflects edits. Keep existing read APIs and do not claim direct external list mutations are protected. Return inserted/removed nodes as documented, including idempotent self-replacement.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdown_it_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-markdown-it-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWN-IT-O06-DEV-contract.md",
+            "materials/MARKDOWN-IT-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdown_it/tree.py",
+            "library/tests/test_development_markdown_it_o06_dev.py",
+            "library/docs/development-markdown-it-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWN-IT-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWN-IT-O06-DEV.native.json",
+            "public_native": "verification/MARKDOWN-IT-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWN-IT-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWN-IT-O04-DEV-SCENE",
+      "title": "为命令行加入显式UTF8解码策略并保留默认兼容输出",
+      "goal": "为命令行加入显式UTF8解码策略并保留默认兼容输出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWN-IT-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWN-IT-O04-DEV",
+          "kind": "modify",
+          "goal": "为命令行加入显式UTF8解码策略并保留默认兼容输出",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd --encoding-errors strict|replace|ignore to real CLI conversion while preserving its existing default ignore behavior and exact ordinary file output. Route the explicit policy through main/convert/convert_file and raw-buffer stdin where available, keeping existing direct calls valid with keyword-only errors=\"ignore\" defaults. Explicit strict decoding exits nonzero before publishing that document and reports only input source plus byte position on stderr, without echoing content. Explicit replace/ignore follow standard codec semantics; valid Unicode output is unchanged and unknown policies are rejected. Do not treat strict decoding failures as successful truncated documents.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdown_it_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-markdown-it-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWN-IT-O04-DEV-contract.md",
+            "materials/MARKDOWN-IT-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdown_it/cli/parse.py",
+            "library/tests/test_development_markdown_it_o04_dev.py",
+            "library/docs/development-markdown-it-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWN-IT-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWN-IT-O04-DEV.native.json",
+            "public_native": "verification/MARKDOWN-IT-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWN-IT-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+--- a/library/docs/development-charset-normalizer-o06-dev.md
++++ b/library/docs/development-charset-normalizer-o06-dev.md
+@@ -0,0 +1,5 @@
++# 严格检测编码完成后原子归一化本地文件
++
++基于严格转码，先有界读取、真实检测并完成编码，再同目录原子发布。支持原位或另存，保留已有权限、新文件私有，编码或发布失败保持原字节并只清理自有临时文件；默认检测API仍只读。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/charset_normalizer/atomic.py
++++ b/library/src/charset_normalizer/atomic.py
+@@ -0,0 +1,47 @@
++"""完成严格检测和编码后，同目录原子发布归一化文件。"""
++import os
++import stat
++from pathlib import Path
++from tempfile import mkstemp
++from charset_normalizer import from_bytes
++
++
++def normalize_file_atomic(source, destination=None, *, encoding='utf-8', errors='strict', max_input_bytes=16777216, **options):
++    """显式写入已检测文本，任意失败保持旧目标。
++
++    :param source: 普通本地源文件。
++    :param destination: 默认原位替换，显式路径可另存。
++    :param encoding: 目标codec，其BOM默认由codec决定。
++    :param errors: delivered transcode的显式损失政策，默认strict。
++    :param max_input_bytes: 正整数输入上限。
++    :param options: 实际from_bytes选项。
++    :return: 源检测编码、写入字节数及损失数量，不改默认检测API。
++    """
++    if not isinstance(max_input_bytes, int) or isinstance(max_input_bytes, bool) or max_input_bytes <= 0:
++        raise ValueError('输入上限必须为正整数')
++    source = Path(source)
++    destination = source if destination is None else Path(destination)
++    if source.is_symlink() or destination.is_symlink():
++        raise ValueError('原子归一化仅接受普通路径，不跟随符号链接')
++    with source.open('rb') as stream:
++        payload = stream.read(max_input_bytes + 1)
++    if len(payload) > max_input_bytes:
++        raise ValueError('输入文件超出预算')
++    match = from_bytes(payload, **options).best()
++    if match is None:
++        raise ValueError('没有可归一化文本候选')
++    converted = match.transcode(encoding, errors=errors)
++    mode = stat.S_IMODE(destination.stat().st_mode) if destination.exists() else 0o600
++    descriptor, temporary = mkstemp(prefix='.charset-normalize-', dir=str(destination.parent))
++    try:
++        with os.fdopen(descriptor, 'wb') as stream:
++            stream.write(converted['output'])
++            stream.flush()
++            os.fsync(stream.fileno())
++            os.fchmod(stream.fileno(), mode)
++        os.replace(temporary, destination)
++    finally:
++        if os.path.exists(temporary):
++            os.unlink(temporary)
++    return {'source_encoding': match.encoding, 'target_encoding': converted['encoding'],
++        'written_bytes': len(converted['output']), 'unencodable_codepoints': converted['unencodable_codepoints']}
+--- a/library/tests/test_development_charset_normalizer_o06_dev.py
++++ b/library/tests/test_development_charset_normalizer_o06_dev.py
+@@ -0,0 +1,37 @@
++"""归一化仅在完整编码成功后原子替换目标。"""
++import os
++import stat
++
++def test_success_and_permissions(tmp_path):
++    """实际规范化内容且保留目标权限。@param tmp_path 临时目录。@return None。"""
++    from charset_normalizer.atomic import normalize_file_atomic
++    source = tmp_path / 'text'
++    source.write_bytes('café'.encode('latin-1'))
++    source.chmod(0o640)
++    result = normalize_file_atomic(source, cp_isolation=['latin-1'])
++    assert source.read_text() == 'café' and result['unencodable_codepoints'] == 0
++    assert stat.S_IMODE(source.stat().st_mode) == 0o640
++
++def test_encoding_failure_preserves_source(tmp_path):
++    """目标无法编码时不改变旧字节。@param tmp_path 临时目录。@return None。"""
++    import pytest
++    from charset_normalizer.atomic import normalize_file_atomic
++    source = tmp_path / 'text'
++    original = '中文'.encode('utf-8')
++    source.write_bytes(original)
++    with pytest.raises(UnicodeEncodeError): normalize_file_atomic(source, encoding='ascii', cp_isolation=['utf-8'])
++    assert source.read_bytes() == original and list(tmp_path.glob('.charset-normalize-*')) == []
++
++def test_replace_failure_and_separate_output(tmp_path, monkeypatch):
++    """替换失败保留旧目标，清理仅本次临时文件。@param tmp_path 临时目录。@param monkeypatch 故障注入。@return None。"""
++    import pytest
++    import charset_normalizer.atomic as module
++    source, destination = tmp_path / 'source', tmp_path / 'target'
++    source.write_bytes(b'new')
++    destination.write_bytes(b'old')
++    def fail(left, right):
++        """模拟发布错误。@param left 临时。@param right 目标。@return 不返回。"""
++        raise OSError('replace')
++    monkeypatch.setattr(module.os, 'replace', fail)
++    with pytest.raises(OSError): module.normalize_file_atomic(source, destination)
++    assert source.read_bytes() == b'new' and destination.read_bytes() == b'old' and list(tmp_path.glob('.charset-normalize-*')) == []

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SC-ERROR-POLICY-DEV",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement schedule.policies.with_error_policy(job, *, max_failures=3, on_error=None) for configured jobs. Preserve its bound callback arguments and return the original Job. Suppress Exception from that callback only, increment job.consecutive_failures, notify optional (original_exception,count) once, and return CancelJob when consecutive failures reach the positive integer limit; otherwise let normal Job.run reschedule once. Success resets the count and preserves return/CancelJob. Do not catch BaseException, suppress handler errors, double-wrap a job, retry immediately, or change unwrapped jobs exception behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,59 @@
+--- a/library/alive_progress/core/configuration.py
++++ b/library/alive_progress/core/configuration.py
+@@ -114,11 +114,20 @@
+     def _input(x):
+         if not isinstance(x, str):
+             return bool(x)
+-        fvars = parser.parse(x)
+-        if any(f[1] not in allowed_all for f in fvars):
+-            # f is a tuple (literal_text, field_name, format_spec, conversion)
+-            return ERROR
+-        return x
++        def valid(spec,depth=0):
++            for literal,field,nested,conversion in parser.parse(spec):
++                if field not in allowed_all or conversion not in (None,'s','r','a'):
++                    return False
++                # 内层占位符也会运行格式化，必须在启动渲染线程前完整校验。
++                if field is not None and depth>1:
++                    return False
++                if nested and not valid(nested,depth+1):
++                    return False
++            return True
++        try:
++            return x if valid(x) else ERROR
++        except ValueError:
++            return ERROR
+ 
+     allowed = allowed.split()
+     # I want to accept only some field names, and pure text.
+--- a/library/development_tests/test_development_ap_format_dev.py
++++ b/library/development_tests/test_development_ap_format_dev.py
+@@ -0,0 +1,20 @@
++"""公开进度格式完整结构验证回归。"""
++from alive_progress.core.configuration import _format_input_factory,ERROR
++
++def test_unknown_nested_fields_are_rejected():
++    validate=_format_input_factory('count total')
++    assert validate('{count:{missing}}') is ERROR
++
++def test_valid_nested_width_and_escaped_braces_are_preserved():
++    validate=_format_input_factory('count total')
++    assert validate('{count!s:>{total}}')=='{count!s:>{total}}'
++    assert validate('{{literal}} {count}')=='{{literal}} {count}'
++
++def test_bad_conversions_traversal_and_braces_are_rejected():
++    validate=_format_input_factory('count total')
++    for text in ('{count!q}','{count.attr}','{count[0]}','{count','{count:{total:{count}}}'):
++        assert validate(text) is ERROR
++
++def test_legacy_plain_and_boolean_inputs_keep_existing_behavior():
++    validate=_format_input_factory('count')
++    assert validate('plain')=='plain' and validate(False) is False and validate(True) is True
+--- a/library/docs/development-ap-format-dev.md
++++ b/library/docs/development-ap-format-dev.md
+@@ -0,0 +1,5 @@
++# 启动渲染前验证嵌套格式字段和转换符
++
++进度格式的内层字段和转换符也会执行，必须在启动线程前验证，避免运行中才报错。保留允许字段、合法动态宽度和转义括号，拒绝未知嵌套引用及无效转换，继续使用原ERROR协议。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

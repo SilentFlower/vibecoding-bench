@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BIBTEXPARSER-O01-DEV",
+  "source_commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement bibtexparser.crossref.ResolveCrossrefMiddleware(missing=\"error\") as a non-mutating LibraryMiddleware. Resolve nested case-sensitive crossref dependencies, inherit only missing fields, map parent title to booktitle for inproceedings/incollection and preserve explicit child values including empty strings. Record inherited field sources in parser metadata, reject cycles and failed/duplicate blocks, and allow explicit missing=\"ignore\". Keep the default parse stack unchanged and preserve source object isolation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

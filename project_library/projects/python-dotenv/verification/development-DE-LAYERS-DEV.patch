@@ -1,0 +1,74 @@
+--- a/library/development_tests/test_development_de_layers_dev.py
++++ b/library/development_tests/test_development_de_layers_dev.py
+@@ -0,0 +1,27 @@
++"""公开分层配置与来源回归。"""
++import os
++import pytest
++from dotenv.layers import load_layers
++from dotenv.validation import ConfigValidationError
++
++def test_layers_and_origin_follow_last_definition():
++    result = load_layers(iter([('base','A=one\nB=${A}\n'),('local','A=two\nC=${A}/${B}\n')]))
++    assert dict(result.values) == {'A':'two','B':'one','C':'two/one'}
++    assert result.origins['A'] == ('local',1) and result.origins['C'] == ('local',2)
++
++def test_override_uses_only_explicit_environment():
++    sources = [('base','A=config\nB=${A}\n')]
++    assert load_layers(sources, environment={'A':'external'}, override=False).values['B'] == 'external'
++    assert load_layers(sources, environment={'A':'external'}).values['B'] == 'config'
++
++def test_disabled_interpolation_and_valueless_entries():
++    result = load_layers([('base','A\nB=${UNKNOWN:-fallback}\n')], interpolate=False)
++    assert result.values['A'] is None and result.values['B'] == '${UNKNOWN:-fallback}'
++
++def test_duplicate_layers_and_invalid_late_input_fail_without_environment_changes():
++    before = dict(os.environ)
++    with pytest.raises(ValueError):
++        load_layers([('x','A=1'),('x','A=2')])
++    with pytest.raises(ConfigValidationError):
++        load_layers([('x','A=1'),('bad','A="bad')])
++    assert dict(os.environ) == before
+--- a/library/docs/development-de-layers-dev.md
++++ b/library/docs/development-de-layers-dev.md
+@@ -0,0 +1,5 @@
++# 确定性合并命名配置层并保留每键来源
++
++应用需要可重复的基础／环境／本地配置合并。所有层先严格解析，插值仅使用显式快照和已解析键，每个最终值保留层名与行号；不隐式依赖宿主环境，禁用插值及无值键语义明确。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/dotenv/layers.py
++++ b/library/src/dotenv/layers.py
+@@ -0,0 +1,33 @@
++"""基于显式环境快照的分层配置接入。"""
++from dataclasses import dataclass
++from types import MappingProxyType
++from .validation import parse_config
++from .variables import parse_variables
++
++
++@dataclass(frozen=True)
++class LayeredValues:
++    """合并结果与每个最终键的层名、原始行。"""
++    values: object
++    origins: object
++
++
++def load_layers(sources, *, environment=None, override=True, interpolate=True):
++    """合并有限命名文本层。@param sources (唯一层名,文本)的可迭代对象。
++    @param environment 显式只读外部环境。@param override 配置是否优先于外部环境。
++    @param interpolate 是否按原变量语法展开。@return 只读LayeredValues，不修改任何输入。
++    """
++    sources = list(sources)
++    names = [name for name, text in sources]
++    if any(not isinstance(name, str) or not name for name in names) or len(names) != len(set(names)):
++        raise ValueError('层名必须非空且唯一')
++    parsed = [(name, parse_config(text, duplicates='last')) for name, text in sources]
++    external, values, origins = dict(environment or {}), {}, {}
++    for name, layer in parsed:
++        for key, value in layer.values.items():
++            if interpolate and value is not None:
++                scope = {**external, **values} if override else {**values, **external}
++                value = ''.join(atom.resolve(scope) for atom in parse_variables(value))
++            values[key] = value
++            origins[key] = (name, layer.lines[key])
++    return LayeredValues(MappingProxyType(values), MappingProxyType(origins))

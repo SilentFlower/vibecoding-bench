@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JINJA-O04-DEV",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend actual TemplateStream.dump to recognize str/bytes/os.PathLike via os.fspath before opening owned binary files, keeping default UTF-8 and explicit encoding/errors. Never coerce arbitrary objects with str. Preserve buffered/unbuffered streamed output, existing file-like writelines/write behavior and caller-owned stream lifetime; owned files close on write/encode failure. Reject bad __fspath__ return types through standard semantics and prove Unicode byte parity with string paths.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

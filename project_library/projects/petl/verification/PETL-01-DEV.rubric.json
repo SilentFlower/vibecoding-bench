@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PETL-01-DEV",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add explicit cat(..., duplicate_fields=\"occurrence\") policy using (field name, occurrence number); default duplicate_fields=\"first\" preserves ALL original frozen duplicate-first behavior. The opt-in policy must implement preserving every value for a single table and N-source union headers with maximum occurrence counts in stable discovery order. Explicit output header occurrence order, short rows, missing markers, empty sources and normal unique-field alignment remain correct. Build mapping once per source, do not silently select first occurrence for all duplicates or discard repeated columns.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

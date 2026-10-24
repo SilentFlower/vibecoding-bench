@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JM-LITERAL-DEV",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix TreeInterpreter.visit_literal so mutable JSON literal results cannot mutate the cached parsed expression or later searches. Deeply detach object/array literal nodes on each evaluation, including literals nested in multi-select/projections and custom functions. Preserve scalar literal values, input field identity semantics, parser cache use and existing equality/type rules. Do not deepcopy every input document or purge compilation caches as a workaround.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

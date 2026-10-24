@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML2TEXT-O01-DEV",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add opt-in HTML2Text.adaptive_inline_code (default False), integrated into real code/kbd/tt tag/data handling. Buffer a single inline-code span, normalize line endings to spaces, choose a backtick delimiter strictly longer than any body run and apply CommonMark edge-backtick/double-ended-space padding so independent decoding restores the exact body. Ignore nested formatting markup while preserving its text/entities, handle multiple spans, empty spans and unclosed EOF without state leakage to later handle calls. Preserve default compatibility and pre paths. Do not merely escape source backticks or replace the entire document with a different converter.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

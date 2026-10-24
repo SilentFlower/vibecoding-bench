@@ -1,0 +1,14 @@
+{
+  "script": "verification/development-SJ-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "app/test_tool_output.py"
+}

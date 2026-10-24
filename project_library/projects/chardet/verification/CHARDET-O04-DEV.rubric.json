@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARDET-O04-DEV",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement chardet.batch.detect_many(records, *, on_error=\"continue\", should_rename_legacy=False). Lazily process (id, bytes/bytearray) pairs with fresh real detect calls, preserve index/order/duplicate identifiers and local error facts, and provide continue/stop/raise policies. A failed record has no successful result, stop/close must not consume the tail, upstream generator errors propagate and raw bytes must not be misinterpreted as an iterable batch. Preserve standard detection/fallback facts.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

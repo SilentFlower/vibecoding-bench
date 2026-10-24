@@ -1,0 +1,103 @@
+--- a/library/docs/development-transitions-03-dev.md
++++ b/library/docs/development-transitions-03-dev.md
+@@ -0,0 +1,5 @@
++# Markup与模型代码生成读取配置时不消耗调用方容器
++
++路线03：Markup和generate_base_model先复制配置内建容器再pop/派生，保共享别名与回调/模型身份，循环拒绝；只读外层Mapping可复用，嵌套来源不消耗。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_transitions_03_dev.py
++++ b/library/tests/test_development_transitions_03_dev.py
+@@ -0,0 +1,25 @@
++"""配置可供生成器和多个流程重复使用，不能pop调用方models。"""
++from types import MappingProxyType
++from transitions.extensions.markup import MarkupMachine,HierarchicalMarkupMachine
++from transitions.experimental.utils import generate_base_model
++
++def test_reusing_markup_preserves_models_and_nested_configuration():
++    """models空列表也必须原样保留，嵌套状态不被消费。@return None。"""
++    config={'states':['a','b'],'initial':'a','auto_transitions':False,'transitions':[['go','a','b']],'models':[]}
++    before=repr(config)
++    first=MarkupMachine(markup=config);second=MarkupMachine(markup=MappingProxyType(config))
++    assert repr(config)==before and config['models']==[]
++    assert first.states.keys()==second.states.keys()
++    first._markup['initial']='b';assert config['initial']=='a'
++
++def test_code_generation_does_not_consume_models_or_copy_callbacks():
++    """同一配置重复生成结果一致，不深拷贝不透明对象。@return None。"""
++    config={'states':['a','b'],'initial':'a','auto_transitions':False,'transitions':[['go','a','b']],'models':[]}
++    first=generate_base_model(config);second=generate_base_model(config)
++    assert first==second and config['models']==[] and 'def go(' in first
++    from transitions._config import clone_config
++    class Callback:
++        """不允许任意对象复制。"""
++        def __deepcopy__(self,memo):raise AssertionError('opaque')
++    callback=Callback();shared=[callback];copied=clone_config({'a':shared,'b':shared})
++    assert copied['a'] is copied['b'] and copied['a'] is not shared and copied['a'][0] is callback
+--- a/library/transitions/_config.py
++++ b/library/transitions/_config.py
+@@ -0,0 +1,28 @@
++"""只复制配置内建容器，保留模型和回调身份。"""
++
++
++def clone_config(value, memo=None, active=None):
++    """隔离配置容器。@param value 配置值。@param memo 已复制别名。@param active 当前路径。@return 独立容器或原不透明对象。"""
++    if type(value) not in (dict, list, tuple):
++        return value
++    memo = {} if memo is None else memo
++    active = set() if active is None else active
++    identity = id(value)
++    if identity in active:
++        raise ValueError("配置容器不能循环")
++    if identity in memo:
++        return memo[identity]
++    active.add(identity)
++    try:
++        if type(value) is dict:
++            result = {
++                key: clone_config(item, memo, active) for key, item in value.items()
++            }
++        else:
++            result = [clone_config(item, memo, active) for item in value]
++            if type(value) is tuple:
++                result = tuple(result)
++        memo[identity] = result
++        return result
++    finally:
++        active.remove(identity)
+--- a/library/transitions/experimental/utils.py
++++ b/library/transitions/experimental/utils.py
+@@ -1,5 +1,6 @@
+ from collections import deque, defaultdict
+ 
++from transitions._config import clone_config
+ from transitions.core import Machine, listify
+ from transitions.extensions.markup import HierarchicalMarkupMachine, MarkupMachine
+ 
+@@ -22,6 +23,7 @@
+         else:
+             raise ValueError("The provided machine must be an instance of MarkupMachine or HierarchicalMarkupMachine.")
+     else:
++        config = clone_config(dict(config))
+         _ = config.pop("models", None)  # remove models to prevent inheritance errors
+         m = HierarchicalMarkupMachine(**config)
+     triggers = set()
+--- a/library/transitions/extensions/markup.py
++++ b/library/transitions/extensions/markup.py
+@@ -27,6 +27,7 @@
+         """This is just an EnumMeta stub for Python 2 and Python 3.3 and before without Enum support."""
+ 
+ from ..core import Machine
++from .._config import clone_config
+ from .nesting import HierarchicalMachine
+ 
+ 
+@@ -47,7 +48,7 @@
+                  queued=False, prepare_event=None, finalize_event=None, model_attribute='state',
+                  model_override=False, on_exception=None, on_final=None, markup=None, auto_transitions_markup=False,
+                  **kwargs):
+-        self._markup = markup or {}
++        self._markup = clone_config(dict(markup)) if markup is not None else {}
+         self._auto_transitions_markup = auto_transitions_markup
+         self._needs_update = True
+ 

@@ -1,0 +1,3 @@
+# 业务日志时间戳显式指定时区和ISO精度且拒绝无时区时钟
+
+路线09：独立ZonedTimeStamper明确tzinfo/ZoneInfo、ISO精度与注入aware时钟，真实瞬间转换并输出offset；拒绝naive/无效精度，原TimeStamper不动。

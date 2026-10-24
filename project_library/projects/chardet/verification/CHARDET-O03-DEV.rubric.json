@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARDET-O03-DEV",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement chardet.files.detect_file(source, *, preserve_position=True, chunk_size=65536, max_bytes=None) on the delivered split-BOM detector. Support text/PathLike paths and caller-owned binary streams, short reads and exact nonnegative byte budgets without lookahead. Restore seekable caller positions on success/failure, never close caller streams, close owned files, and report actual read_bytes/eof/budget_exhausted without claiming an inspected prefix validates the whole file. Zero budget performs no reads; nonseekable preserving mode and text reads fail explicitly.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BO-JSONL-WRITER-DEV",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add jsonutils.JSONLWriter(stream,*,binary=False,encoding=\"utf-8\",dumps=None), write(value), write_many(iterable), flush() and successful count. Serialize and validate one complete JSON text before writing exactly one LF-terminated record; reject physical CR/LF, nonstring or invalid custom serializer results without writing that record. Binary mode encodes first; preserve caller stream ownership and lazy consumption, detect reported short writes, propagate serialization/I/O errors and keep prior successful records/count. No whole-batch rollback or silent stream closure.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

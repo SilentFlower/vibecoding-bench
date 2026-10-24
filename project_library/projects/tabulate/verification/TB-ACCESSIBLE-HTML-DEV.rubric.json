@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TB-ACCESSIBLE-HTML-DEV",
+  "source_commit": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement tabulate.accessibility.accessible_html(data,headers=(),*,caption=None,table_id=None,row_headers=False,**options). Render via safe html format, add escaped caption/optional quoted id, scope=col to real column header th elements and optional scope=row to the first cell of each body row. Preserve other cells, alignment and data escaping; never convert escaped user markup into actual tags. Reject overriding tablefmt, nonboolean row_headers and invalid caption/id values before rendering. Keep old html/unsafehtml output unchanged and do not alter tabulate public signature.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

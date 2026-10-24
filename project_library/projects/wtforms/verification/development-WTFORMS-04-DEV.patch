@@ -1,0 +1,100 @@
+--- a/library/docs/development-wtforms-04-dev.md
++++ b/library/docs/development-wtforms-04-dev.md
+@@ -0,0 +1,5 @@
++# 局部编辑按显式嵌套字段路径验证且保留未选状态
++
++路线05：局部编辑显式段路径支持嵌套FormField/FieldList，先完整预检掩码，再按真实字段协议校验所选项；extra后inline，未选错误保留并返回独立路径快照。所选通过不等于整表通过，全局跨字段规则须完整验证。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wtforms/partial.py
++++ b/library/src/wtforms/partial.py
+@@ -0,0 +1,49 @@
++"""字段路径掩码验证，不将未检查字段宣称为有效。"""
++import copy
++from dataclasses import dataclass
++from .fields import FormField,FieldList
++
++
++@dataclass(frozen=True)
++class PartialResult:
++    """本轮掩码结果。@param valid 所选字段是否通过。@param validated 实际路径。@param errors 路径与错误快照。"""
++    valid: bool
++    validated: tuple
++    errors: tuple
++
++
++def _resolve(form,path):
++    """按真实FormField/FieldList关系定位所有者和字段。@param form 根表单。@param path 路径tuple。@return 所有者、字段和inline名称。"""
++    current=form;owner=form;field=None;name=None
++    for index,segment in enumerate(path):
++        if hasattr(current,'_fields'):
++            if not isinstance(segment,str) or segment not in current._fields:raise ValueError('未知字段路径: '+repr(path))
++            owner=current;field=current._fields[segment];name=segment
++        elif isinstance(current,FieldList):
++            if type(segment) is not int or not 0<=segment<len(current.entries):raise ValueError('列表索引无效')
++            field=current.entries[segment];name=None
++        else:raise ValueError('字段不是嵌套容器')
++        if index<len(path)-1:
++            if isinstance(field,FormField):current=field.form
++            elif isinstance(field,FieldList):current=field
++            else:raise ValueError('路径跨越普通字段')
++    return owner,field,name
++
++
++def validate_fields(form,paths,extra_validators=None):
++    """只验证显式路径并保留未选错误。@param form 表单。@param paths tuple路径列表。@param extra_validators 路径到附加规则。@return PartialResult。"""
++    selected=[tuple(path) if not isinstance(path,str) else () for path in paths]
++    if any(not path for path in selected) or len(set(selected))!=len(selected):raise ValueError('路径必须为不重复的非空段序列')
++    if any(left!=right and len(left)<len(right) and right[:len(left)]==left for left in selected for right in selected):raise ValueError('不能同时验证容器及其子路径')
++    extras=dict(extra_validators or {})
++    if set(extras)-set(selected):raise ValueError('附加规则只能作用所选路径')
++    targets=[_resolve(form,path) for path in selected]
++    valid=True;errors=[]
++    for path,(owner,field,name) in zip(selected,targets):
++        rules=list(extras.get(path,()))
++        inline=getattr(type(owner),'validate_'+name,None) if name is not None else None
++        if inline is not None:rules.append(inline)
++        accepted=field.validate(owner,rules)
++        valid=bool(accepted) and valid
++        if field.errors:errors.append({'path':path,'errors':copy.deepcopy(field.errors)})
++    return PartialResult(valid,tuple(selected),tuple(errors))
+--- a/library/tests/test_development_wtforms_04_dev.py
++++ b/library/tests/test_development_wtforms_04_dev.py
+@@ -0,0 +1,37 @@
++"""只校验字段掩码，不清未选字段旧错误或宣称整表有效。"""
++import unittest
++from wtforms import Form,StringField,IntegerField,FormField,FieldList
++from wtforms.validators import InputRequired,ValidationError
++from wtforms.partial import validate_fields
++
++
++def test_selected_inline_extra_and_unselected_errors_survive():
++    """真实inline和extra顺序保持，未选错误不被改写。@return None。"""
++    calls=[]
++    class Product(Form):
++        """库存与名称。"""
++        name=StringField();quantity=IntegerField(validators=[InputRequired()])
++        def validate_name(self,field):
++            """inline业务规则。@param field 字段。@return None。"""
++            calls.append('inline')
++    form=Product(data={'name':'ok'});form.quantity.errors=['previous']
++    def extra(owner,field):
++        """附加业务规则先执行。@param owner 表单。@param field 字段。@return None。"""
++        calls.append('extra')
++    result=validate_fields(form,[('name',)],{('name',):[extra]})
++    assert result.valid and result.validated==(('name',),) and calls==['extra','inline']
++    assert form.quantity.errors==['previous'] and not form.validate()
++
++
++def test_nested_list_paths_and_preflight_mask_errors():
++    """嵌套路径按真实索引选中，未知掩码在任何校验前拒绝。@return None。"""
++    class Inner(Form):
++        """嵌套SKU。"""
++        sku=StringField(validators=[InputRequired()])
++    class Outer(Form):
++        """数组嵌套表单。"""
++        rows=FieldList(FormField(Inner),min_entries=1)
++    form=Outer();result=validate_fields(form,[('rows',0,'sku')])
++    assert not result.valid and result.errors[0]['path']==('rows',0,'sku')
++    with unittest.TestCase().assertRaises(ValueError):validate_fields(form,[('rows',),('rows',0,'sku')])
++    with unittest.TestCase().assertRaises(ValueError):validate_fields(form,[('missing',)])

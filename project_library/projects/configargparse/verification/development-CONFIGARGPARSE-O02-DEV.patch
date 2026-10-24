@@ -1,0 +1,108 @@
+--- a/library/configargparse.py
++++ b/library/configargparse.py
+@@ -347,6 +347,71 @@
+         config.write(stream)
+         stream.seek(0)
+         return stream.read()
++
++
++class JSONConfigFileParser(ConfigFileParser):
++    """零附加依赖的严格JSON配置对象解析器。
++
++    :param duplicates: last、warn或error重复键政策。
++    :return: 可供ArgumentParser直接使用的解析器实例。
++    """
++
++    def __init__(self, *, duplicates='error'):
++        """验证重复政策，不访问输入。@return None。"""
++        if duplicates not in ('last', 'warn', 'error'):
++            raise ValueError('未知JSON重复键政策')
++        self.duplicates = duplicates
++
++    def get_syntax_description(self):
++        """说明扁平JSON对象和标量列表边界。@return 描述。"""
++        return 'JSON object of scalar values or scalar lists; null and nested objects rejected.'
++
++    def _load_object(self, stream):
++        """解码原始对象，禁止非有限JSON数字和重复键静默丢失。@return 字典。"""
++        def pairs(items):
++            result = OrderedDict()
++            for key, value in items:
++                if key in result and self.duplicates != 'last':
++                    message = '重复JSON键：%s' % key
++                    if self.duplicates == 'error':
++                        raise ConfigFileParserException(message)
++                    warnings.warn(message, UserWarning, stacklevel=3)
++                result[key] = value
++            return result
++        def reject_constant(value):
++            raise ConfigFileParserException('JSON不允许非有限数值')
++        try:
++            result = json.load(stream, object_pairs_hook=pairs, parse_constant=reject_constant)
++        except (ValueError, UnicodeError) as error:
++            raise ConfigFileParserException('无效JSON配置：%s' % getattr(stream, 'name', 'stream')) from error
++        if not isinstance(result, dict):
++            raise ConfigFileParserException('JSON配置根必须是对象')
++        return result
++
++    def convert_value(self, value):
++        """转换真实JSON标量供现有Action消费。
++
++        :param value: JSON标量或平面标量列表。
++        :return: 字符串或字符串列表；null及嵌套值失败。
++        """
++        if isinstance(value, list):
++            if any(isinstance(item, (list, dict)) for item in value):
++                raise ConfigFileParserException('JSON配置列表不能嵌套')
++            return [self.convert_value(item) for item in value]
++        if value is None or isinstance(value, dict):
++            raise ConfigFileParserException('JSON配置值不能是null或嵌套对象')
++        if isinstance(value, bool):
++            return 'true' if value else 'false'
++        return str(value)
++
++    def parse(self, stream):
++        """把一个JSON对象转换为原生Action输入。@param stream 输入流。@return 有序字段。"""
++        return OrderedDict((key, self.convert_value(value)) for key, value in self._load_object(stream).items())
++
++    def serialize(self, items):
++        """写出可重读的扁平JSON对象，不改调用者对象。@return JSON文本。"""
++        self.parse(StringIO(json.dumps(items, allow_nan=False)))
++        return json.dumps(items, ensure_ascii=False, allow_nan=False) + '\n'
+ 
+ 
+ class YAMLConfigFileParser(ConfigFileParser):
+--- a/library/docs/development-configargparse-o02-dev.md
++++ b/library/docs/development-configargparse-o02-dev.md
+@@ -0,0 +1,5 @@
++# 让零依赖JSON配置真正驱动参数动作
++
++对应路线06：增加零可选依赖的严格JSON解析器，布尔、数字和列表走真实Action；拒绝null、嵌套和非有限数，重复政策明确并可往返。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_configargparse_o02_dev.py
++++ b/library/tests/test_development_configargparse_o02_dev.py
+@@ -0,0 +1,23 @@
++"""JSON标量通过实际Argparse动作，拒绝歧义配置。"""
++from io import StringIO
++import pytest
++import configargparse as c
++
++def test_actual_parser_actions():
++    """类型、布尔及追加动作实际消费JSON。@return None。"""
++    p=c.ArgumentParser(config_file_parser_class=c.JSONConfigFileParser)
++    p.add('--port',type=int);p.add('--flag',action='store_true');p.add('--tag',action='append')
++    ns=p.parse_args([],config_file_contents='{"port":42,"flag":true,"tag":["x","y"]}',env_vars={})
++    assert (ns.port,ns.flag,ns.tag)==(42,True,['x','y'])
++
++def test_bad_roots_null_duplicates_nonfinite():
++    """错误结构不能转换为看似合法字符串。@return None。"""
++    for text in ['[]','{"x":null}','{"x":{}}','{"x":[[]]}','{"x":NaN}','{"x":1,"x":2}']:
++        with pytest.raises(c.ConfigFileParserException): c.JSONConfigFileParser().parse(StringIO(text))
++
++def test_repeat_policy_and_unicode_roundtrip():
++    """显式最后值和往返编码。@return None。"""
++    p=c.JSONConfigFileParser(duplicates='last')
++    assert p.parse(StringIO('{"x":1,"x":2}'))=={'x':'2'}
++    original={'城市':'杭州','tags':['a,b','with space']}
++    assert p.parse(StringIO(p.serialize(original)))==original

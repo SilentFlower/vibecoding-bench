@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CERBERUS-O03-DEV",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add actual compare_to rule with schema-validated {field, operator, missing} using only lt/le/eq/ne/ge/gt. Resolve existing sibling/dotted/root ^ paths through the real lookup protocol after normalization, distinguish missing targets from existing None, default missing to error or explicitly ignore, and report failed/incomparable comparisons in native field error trees. Reject unknown operators at schema validation, never eval strings or alter dependencies/min/max semantics.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

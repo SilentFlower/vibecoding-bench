@@ -1,0 +1,84 @@
+--- a/library/development_tests/test_development_sj_stable_dev.py
++++ b/library/development_tests/test_development_sj_stable_dev.py
+@@ -0,0 +1,22 @@
++"""公开稳定JSON编码回归。"""
++from decimal import Decimal
++import pytest
++from simplejson.stable import stable_dumps,stable_bytes
++
++def test_nested_mapping_order_and_utf8_bytes_are_stable():
++    value={'中':1,'a':{'z':2,'a':'é'}}
++    assert stable_dumps(value)=='{"a":{"a":"é","z":2},"中":1}'
++    assert stable_bytes(value)==stable_dumps(value).encode('utf-8')
++
++def test_decimal_precision_and_false_are_preserved():
++    assert stable_dumps({'v':Decimal('1.2300'),'b':False})=='{"b":false,"v":1.2300}'
++
++def test_nonfinite_and_nonstring_keys_fail_at_any_depth():
++    for value in ({'x':float('nan')},{'x':Decimal('Infinity')},{'x':{1:'a'}}):
++        with pytest.raises((ValueError,TypeError)): stable_dumps(value)
++
++def test_cycles_surrogates_and_nonjson_containers_are_rejected():
++    value=[];value.append(value)
++    with pytest.raises(ValueError): stable_dumps(value)
++    with pytest.raises(UnicodeEncodeError): stable_dumps('\ud800')
++    with pytest.raises(TypeError): stable_dumps((1,2))
+--- a/library/docs/development-sj-stable-dev.md
++++ b/library/docs/development-sj-stable-dev.md
+@@ -0,0 +1,5 @@
++# 提供明确表示合同的稳定UTF8编码并拒绝隐式类型丢失
++
++为可复现数据交换提供稳定UTF8表示，递归拒绝非字符串键、非有限数、循环和隐式类型转换。键排序且紧凑输出，保留Decimal表示，不把接口误称为JCS数值归一化。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/simplejson/stable.py
++++ b/library/simplejson/stable.py
+@@ -0,0 +1,48 @@
++"""确定性UTF8 JSON表示；不宣称实现JCS数值归一化。"""
++import math
++from decimal import Decimal
++from . import dumps
++
++
++def _validate(value,active):
++    if value is None or type(value) in (str,bool,int):
++        return
++    if type(value) is float:
++        if not math.isfinite(value):
++            raise ValueError('不能编码非有限数')
++        return
++    if isinstance(value,Decimal):
++        if not value.is_finite():
++            raise ValueError('不能编码非有限十进制数')
++        return
++    if not isinstance(value,(dict,list)):
++        raise TypeError('只支持JSON树及有限Decimal')
++    if id(value) in active:
++        raise ValueError('JSON树存在循环')
++    active.add(id(value))
++    try:
++        if isinstance(value,dict):
++            if any(type(key) is not str for key in value):
++                raise TypeError('JSON对象键必须为字符串')
++            children=value.values()
++        else:
++            children=value
++        for child in children:
++            _validate(child,active)
++    finally:
++        active.remove(id(value))
++
++
++def stable_dumps(value):
++    """按字符串键排序并紧凑编码。@param value JSON树及有限Decimal。@return 严格UTF8可编码文本。
++    """
++    _validate(value,set())
++    result=dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':'),allow_nan=False,use_decimal=True)
++    result.encode('utf-8')
++    return result
++
++
++def stable_bytes(value):
++    """产生稳定UTF8字节。@param value 支持的JSON树。@return UTF8字节，无BOM或尾换行。
++    """
++    return stable_dumps(value).encode('utf-8')

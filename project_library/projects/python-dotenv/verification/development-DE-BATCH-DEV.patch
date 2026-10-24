@@ -1,0 +1,88 @@
+--- a/library/development_tests/test_development_de_batch_dev.py
++++ b/library/development_tests/test_development_de_batch_dev.py
+@@ -0,0 +1,30 @@
++"""公开原子批量配置编辑回归。"""
++import os
++import pytest
++from dotenv import dotenv_values
++from dotenv.editing import update_keys
++
++def test_multiple_changes_preserve_non_target_bytes_and_remove_duplicates(tmp_path):
++    path = tmp_path/'config.env'
++    path.write_bytes(b'# keep\r\nKEEP=x\r\nA=old\r\nA=duplicate\r\nDELETE=yes\r\nTAIL=last')
++    assert update_keys(path, {'A':'new','NEW':'value'}, remove=['DELETE']) == (('A','NEW'),('DELETE',))
++    assert path.read_bytes() == b"# keep\r\nKEEP=x\r\nA='new'\nTAIL=last\nNEW='value'\n"
++
++def test_quoted_backslash_and_multiline_values_round_trip(tmp_path):
++    path=tmp_path/'config.env'
++    values={'A':"a\\b'c",'B':'one\ntwo'}
++    update_keys(path, values)
++    assert dict(dotenv_values(path, interpolate=False)) == values
++
++def test_late_invalid_input_does_not_create_or_modify_files(tmp_path):
++    path=tmp_path/'config.env'
++    with pytest.raises(ValueError):
++        update_keys(path, {'A':'ok','BAD\nKEY':'wrong'})
++    assert not path.exists() and list(tmp_path.iterdir()) == []
++
++def test_original_file_mode_survives_replacement(tmp_path):
++    path=tmp_path/'config.env'
++    path.write_text('A=old\n')
++    path.chmod(0o640)
++    update_keys(path, {'A':'new'})
++    assert path.stat().st_mode & 0o777 == 0o640
+--- a/library/docs/development-de-batch-dev.md
++++ b/library/docs/development-de-batch-dev.md
+@@ -0,0 +1,5 @@
++# 单次原子替换配置中的多项更新与删除
++
++配置编辑器一次提交多项更新和删除，只进行一次原子替换。先校验并序列化全部输入，保留非目标原始字节，去掉目标重复定义，缺失项按顺序追加，正确转义多行、反斜杠与引号，继续保留文件权限和失败清理。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/dotenv/editing.py
++++ b/library/src/dotenv/editing.py
+@@ -0,0 +1,44 @@
++"""单次原子替换多项配置，原始非目标记录逐字保留。"""
++import io
++from collections.abc import Mapping
++from .main import rewrite
++from .parser import parse_stream
++
++
++def update_keys(path, updates, *, remove=(), encoding='utf-8', follow_symlinks=False):
++    """原子批量编辑。@param path 文件。@param updates 合法键到字符串值的映射。
++    @param remove 删除键序列。@param encoding 编码。@param follow_symlinks 是否跟随符号链接。
++    @return 更新键及删除键元组；校验或序列化失败不打开目标。
++    """
++    if not isinstance(updates, Mapping):
++        raise TypeError('更新必须是映射')
++    updates, remove = dict(updates), tuple(dict.fromkeys(remove))
++    for key in (*updates, *remove):
++        if not isinstance(key, str) or not key or any(c in key for c in "\r\n\x00='\"# \t"):
++            raise ValueError('无效配置键')
++    if set(updates).intersection(remove):
++        raise ValueError('同一键不能同时更新与删除')
++    for value in updates.values():
++        if not isinstance(value, str) or '\x00' in value:
++            raise ValueError('配置值必须为无NUL字符串')
++    lines = {key: key + "='" + value.replace('\\', '\\\\').replace("'", "\\'") + "'\n" for key, value in updates.items()}
++    with rewrite(path, encoding=encoding, follow_symlinks=follow_symlinks) as (source, destination):
++        seen, ended = set(), True
++        for binding in parse_stream(source):
++            if binding.key in remove:
++                continue
++            if binding.key in updates:
++                if binding.key not in seen:
++                    destination.write(lines[binding.key])
++                    ended = True
++                    seen.add(binding.key)
++            else:
++                destination.write(binding.original.string)
++                if binding.original.string:
++                    ended = binding.original.string.endswith(('\n', '\r'))
++        for key in (key for key in updates if key not in seen):
++            if not ended:
++                destination.write('\n')
++            destination.write(lines[key])
++            ended = True
++    return tuple(updates), remove

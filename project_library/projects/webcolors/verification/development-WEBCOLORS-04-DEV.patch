@@ -1,0 +1,81 @@
+--- a/library/docs/development-webcolors-04-dev.md
++++ b/library/docs/development-webcolors-04-dev.md
+@@ -0,0 +1,5 @@
++# 主题配置直接解析并序列化声明范围的CSS颜色函数
++
++路线06：主题配置新增CSS rgb/rgba函数文本转换，支持明确声明的旧逗号和现代空格斜线语法，结果统一用RGBA字节；通道裁剪及半值向上量化明确。混合分隔符、非有限、none/calc/var及尾部垃圾拒绝，稳定序列化可逐字节往返。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/webcolors/css_rgb.py
++++ b/library/src/webcolors/css_rgb.py
+@@ -0,0 +1,48 @@
++"""声明范围的CSS rgb/rgba文本解析与稳定序列化。"""
++import math
++import re
++from .rgba import RGBA
++
++_NUMBER=re.compile(r'[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?',re.ASCII)
++_SPACE=' \t\r\n\f'
++
++
++def _number(token, scale):
++    """完整有限数字转换并按范围裁剪。@param token 文本。@param scale 数值上限。@return 比例。"""
++    percent=token.endswith('%')
++    raw=token[:-1] if percent else token
++    if _NUMBER.fullmatch(raw) is None:raise ValueError('不支持的CSS分量')
++    value=float(raw)
++    if not math.isfinite(value):raise ValueError('分量必须有限')
++    return min(1.0,max(0.0,value/(100 if percent else scale)))
++
++
++def parse_css_rgb(text):
++    """解析声明的逗号或空格斜线语法。@param text rgb/rgba函数。@return 量化到字节的RGBA。"""
++    if not isinstance(text,str):raise ValueError('颜色函数必须为字符串')
++    match=re.fullmatch(r'(rgb|rgba)\((.*)\)',text.strip(_SPACE),re.IGNORECASE|re.DOTALL|re.ASCII)
++    if match is None:raise ValueError('只支持rgb或rgba函数')
++    name,body=match.groups()
++    alpha='1'
++    if ',' in body:
++        if '/' in body:raise ValueError('不能混用逗号与斜线')
++        parts=[part.strip(_SPACE) for part in body.split(',')]
++        expected=4 if name.lower()=='rgba' else 3
++        if len(parts)!=expected:raise ValueError('逗号语法通道数错误')
++        channels=parts[:3]
++        if len(parts)==4:alpha=parts[3]
++        if len({part.endswith('%') for part in channels})!=1:raise ValueError('逗号语法不能混用百分比和数字通道')
++    else:
++        segments=body.split('/')
++        if len(segments)>2:raise ValueError('alpha只能声明一次')
++        channels=re.split(r'[ \t\r\n\f]+',segments[0].strip(_SPACE))
++        if len(channels)!=3:raise ValueError('必须有三个颜色通道')
++        if len(segments)==2:alpha=segments[1].strip(_SPACE)
++    values=[_number(token,255) for token in channels]+[_number(alpha,1)]
++    return RGBA(*(int(math.floor(value*255+0.5)) for value in values))
++
++
++def serialize_css_rgb(value):
++    """输出可往返的现代语法。@param value RGBA或四元组。@return CSS文本。"""
++    color=value if isinstance(value,RGBA) else RGBA(*value)
++    return f'rgb({color.red} {color.green} {color.blue} / {color.alpha/255:.12g})'
+--- a/library/tests/test_development_webcolors_04_dev.py
++++ b/library/tests/test_development_webcolors_04_dev.py
+@@ -0,0 +1,19 @@
++"""CSS函数真实解析到RGBA而非凭分隔符猜通道。"""
++import unittest
++from webcolors.rgba import RGBA
++from webcolors.css_rgb import parse_css_rgb,serialize_css_rgb
++
++
++def test_legacy_modern_and_percent_equivalence():
++    """两种语法的数值与百分比得到同一字节。@return None。"""
++    expected=RGBA(255,0,128,128)
++    assert parse_css_rgb('rgba(255,0,128,0.5)')==expected
++    assert parse_css_rgb('rgb(100% 0% 50% / 50%)')==expected
++    assert parse_css_rgb('RGB(300 -2 1e2)')==RGBA(255,0,100,255)
++    assert parse_css_rgb(serialize_css_rgb(expected))==expected
++
++
++def test_malformed_or_unsupported_syntax_is_not_partially_consumed():
++    """混合语法、非有限及未支持表达式明确拒绝。@return None。"""
++    for raw in ('rgb(1,2,3 / .5)','rgb(1,2%,3)','rgb(1 2)','rgb(1 2 3 / 0.5 / 1)','rgb(nan 2 3)','rgb(1e999 2 3)','rgb(calc(1) 2 3)','rgb(1 2 none)','rgb(1 2 3)tail'):
++        with unittest.TestCase().assertRaises(ValueError):parse_css_rgb(raw)

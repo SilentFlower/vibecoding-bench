@@ -1,0 +1,62 @@
+--- a/library/docs/development-sqlparse-05-dev.md
++++ b/library/docs/development-sqlparse-05-dev.md
+@@ -0,0 +1,5 @@
++# Token匹配显式选择原文大小写策略且保持默认兼容
++
++路线13：Token.match增加显式大小写政策，None完全保留默认；True按原文精确、False普通字符串casefold，regex按Python flags而不改写表达式。保持生成器、类型匹配及原token值；这是可选增强，非误报默认Keyword缺陷。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/sqlparse/sql.py
++++ b/library/sqlparse/sql.py
+@@ -97,7 +97,7 @@
+         """Resolve subgroups."""
+         yield self
+ 
+-    def match(self, ttype, values, regex=False):
++    def match(self, ttype, values, regex=False, case_sensitive=None):
+         """Checks whether the token matches the given arguments.
+ 
+         *ttype* is a token type as defined in `sqlparse.tokens`. If it does
+@@ -109,6 +109,16 @@
+         If *regex* is ``True``, the given values are treated as regular
+         expressions. Partial matches are allowed. Defaults to ``False``.
+         """
++        if case_sensitive is not None:
++            if type(case_sensitive) is not bool:raise ValueError('case_sensitive必须为bool或None')
++            type_matched=self.ttype is ttype
++            if not type_matched or values is None:return type_matched
++            choices=(values,) if isinstance(values,str) else values
++            if regex:
++                flags=0 if case_sensitive else re.IGNORECASE
++                return any(re.compile(value,flags).search(self.value) for value in choices)
++            actual=self.value if case_sensitive else self.value.casefold()
++            return any(actual==(value if case_sensitive else value.casefold()) for value in choices)
+         type_matched = self.ttype is ttype
+         if not type_matched or values is None:
+             return type_matched
+--- a/library/tests/test_development_sqlparse_05_dev.py
++++ b/library/tests/test_development_sqlparse_05_dev.py
+@@ -0,0 +1,23 @@
++"""可选择精确原写法或不敏感匹配，默认原规则不变。"""
++import unittest
++from sqlparse.sql import Token
++from sqlparse import tokens as T
++
++
++def test_explicit_name_and_keyword_policy_keeps_original_value():
++    """标识符可不敏感，关键字可按原文精确。@return None。"""
++    name=Token(T.Name,'Products');keyword=Token(T.Keyword,'select')
++    assert not name.match(T.Name,'products') and name.match(T.Name,'products',case_sensitive=False)
++    assert keyword.match(T.Keyword,'SELECT') and not keyword.match(T.Keyword,'SELECT',case_sensitive=True)
++    assert keyword.match(T.Keyword,'select',case_sensitive=True)
++    assert name.value=='Products' and keyword.value=='select'
++
++
++def test_regex_generators_unicode_and_type_mismatch():
++    """普通模式casefold，regex采用Python flags且不重写表达式。@return None。"""
++    token=Token(T.Name,'Straße')
++    assert token.match(T.Name,(value for value in ['other','STRASSE']),case_sensitive=False)
++    assert token.match(T.Name,r'^STRA',regex=True,case_sensitive=False)
++    assert not token.match(T.Name,r'^STRA',regex=True,case_sensitive=True)
++    assert not token.match(T.Keyword,None,case_sensitive=False)
++    with unittest.TestCase().assertRaises(ValueError):token.match(T.Name,'x',case_sensitive='no')

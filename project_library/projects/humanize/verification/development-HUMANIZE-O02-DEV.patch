@@ -1,0 +1,156 @@
+--- a/library/docs/development-humanize-o02-dev.md
++++ b/library/docs/development-humanize-o02-dev.md
+@@ -0,0 +1,5 @@
++# 以任务区域上下文隔离异步报表并可靠恢复嵌套选择
++
++对应路线09，实际复用已交付源隔离目录加载：ContextVar保存翻译和分隔符，异步交错与嵌套恢复确定；旧线程activate在显式scope内被遮盖，不污染别任务。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/humanize/context.py
++++ b/library/src/humanize/context.py
+@@ -0,0 +1,38 @@
++"""可嵌套且异步任务隔离的显式Humanize区域作用域。"""
++from humanize.i18n import _CONTEXT, _load_translation
++
++
++class LocaleScope:
++    """以ContextVar令牌恢复当前任务的区域，不修改线程活动选择。
++
++    :param locale: 请求locale。
++    :param path: 显式目录或默认目录。
++    :return: 支持with的单次活动实例；退出后可再次进入。
++    """
++    def __init__(self, locale, path=None):
++        """只保存声明，不提前激活。@return None。"""
++        self.locale, self.path, self._token = locale, path, None
++
++    def __enter__(self):
++        """成功加载后才切换本任务，拒绝同实例同时重复进入。@return 实际翻译。"""
++        if self._token is not None:
++            raise RuntimeError('同一LocaleScope不能重入')
++        selected = _load_translation(self.locale, self.path)
++        self._token = _CONTEXT.set(selected)
++        return selected[1]
++
++    def __exit__(self, exc_type, exc_value, traceback):
++        """异常或取消路径也恢复外层任务上下文。@return False。"""
++        token, self._token = self._token, None
++        _CONTEXT.reset(token)
++        return False
++
++
++def locale_scope(locale, path=None):
++    """创建独立区域作用域，线程activate/deactivate仅在作用域外可见。
++
++    :param locale: 语言或None默认英语。
++    :param path: 可选本地消息目录。
++    :return: 新LocaleScope。
++    """
++    return LocaleScope(locale, path)
+--- a/library/src/humanize/i18n.py
++++ b/library/src/humanize/i18n.py
+@@ -4,6 +4,7 @@
+ 
+ import gettext as gettext_module
+ from threading import local
++from contextvars import ContextVar
+ 
+ TYPE_CHECKING = False
+ if TYPE_CHECKING:
+@@ -16,6 +17,7 @@
+     None: gettext_module.NullTranslations()
+ }
+ _CURRENT = local()
++_CONTEXT = ContextVar("humanize_locale_scope", default=None)
+ 
+ 
+ # Mapping of locale to thousands separator
+@@ -89,6 +91,9 @@
+ 
+ 
+ def get_translation() -> gettext_module.NullTranslations:
++    selected = _CONTEXT.get()
++    if selected is not None:
++        return selected[1]
+     return getattr(_CURRENT, "translation", None) or _TRANSLATIONS[None]
+ 
+ 
+@@ -213,7 +218,9 @@
+     Returns:
+          str: Thousands separator.
+     """
+-    return _THOUSANDS_SEPARATOR.get(getattr(_CURRENT, "locale", None), ",")
++    selected = _CONTEXT.get()
++    locale = selected[0] if selected is not None else getattr(_CURRENT, 'locale', None)
++    return _THOUSANDS_SEPARATOR.get(locale, ',')
+ 
+ 
+ def decimal_separator() -> str:
+@@ -222,4 +229,6 @@
+     Returns:
+          str: Decimal separator.
+     """
+-    return _DECIMAL_SEPARATOR.get(getattr(_CURRENT, "locale", None), ".")
++    selected = _CONTEXT.get()
++    locale = selected[0] if selected is not None else getattr(_CURRENT, 'locale', None)
++    return _DECIMAL_SEPARATOR.get(locale, '.')
+--- a/library/tests/test_development_humanize_o02_dev.py
++++ b/library/tests/test_development_humanize_o02_dev.py
+@@ -0,0 +1,57 @@
++"""区域上下文在同线程异步交错、嵌套和异常中隔离。"""
++import asyncio
++import humanize
++from humanize import i18n
++import pytest
++def catalog(root,word):
++    """构造合成GNU消息目录，供实际gettext读取。@return 根路径。"""
++    import struct
++    entries={'':'Content-Type: text/plain; charset=UTF-8\nLanguage: xx\nPlural-Forms: nplurals=2; plural=(n != 1);\n','one':word,'%s and %s':'%s et %s'}
++    pairs=sorted((key.encode(),value.encode()) for key,value in entries.items());count=len(pairs)
++    ids=b'\0'.join(key for key,value in pairs)+b'\0';values=b'\0'.join(value for key,value in pairs)+b'\0'
++    head=28;id_start=head+count*16;value_start=id_start+len(ids);out=struct.pack('<7I',0x950412de,0,count,head,head+count*8,0,0)
++    offset=0
++    for key,value in pairs:out+=struct.pack('<2I',len(key),id_start+offset);offset+=len(key)+1
++    offset=0
++    for key,value in pairs:out+=struct.pack('<2I',len(value),value_start+offset);offset+=len(value)+1
++    target=root/'xx'/'LC_MESSAGES'/'humanize.mo';target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(out+ids+values)
++    return root
++
++def test_event_coordinated_tasks_do_not_share_context(tmp_path):
++    """两个任务确定交错后仍保留各自真实GNU翻译。@return None。"""
++    from humanize.context import locale_scope
++    first=catalog(tmp_path/'one','uno');second=catalog(tmp_path/'two','dos')
++    async def run():
++        ready,other=asyncio.Event(),asyncio.Event()
++        async def a():
++            with locale_scope('xx',first):
++                ready.set();await other.wait();return humanize.apnumber(1)
++        async def b():
++            await ready.wait()
++            with locale_scope('xx',second):
++                other.set();await asyncio.sleep(0);return humanize.apnumber(1)
++        return await asyncio.gather(a(),b())
++    assert asyncio.run(run())==['uno','dos'] and humanize.apnumber(1)=='one'
++
++def test_nested_default_and_exception_restore(tmp_path):
++    """嵌套英语作用域覆盖已激活区域，异常退出恢复外层。@return None。"""
++    from humanize.context import locale_scope
++    root=catalog(tmp_path/'one','uno')
++    with locale_scope('xx',root):
++        assert humanize.apnumber(1)=='uno'
++        with pytest.raises(RuntimeError):
++            with locale_scope(None):
++                assert humanize.apnumber(1)=='one';raise RuntimeError('app')
++        assert humanize.apnumber(1)=='uno'
++    assert humanize.apnumber(1)=='one'
++
++def test_manual_thread_state_hidden_and_reentry(tmp_path):
++    """手工activate不污染当前scope，同实例重复进入拒绝。@return None。"""
++    from humanize.context import locale_scope
++    root=catalog(tmp_path/'one','uno');scope=locale_scope('xx',root)
++    try:
++        with scope:
++            i18n.deactivate();assert humanize.apnumber(1)=='uno'
++            with pytest.raises(RuntimeError):scope.__enter__()
++        with scope:assert humanize.apnumber(1)=='uno'
++    finally:i18n.deactivate()

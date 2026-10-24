@@ -1,0 +1,92 @@
+--- a/library/docs/development-loguru-o05-dev.md
++++ b/library/docs/development-loguru-o05-dev.md
+@@ -0,0 +1,5 @@
++# 为实际模块名记录提供不冲突的可配置前缀缩写格式
++
++对应路线17：非None实际模块名使用str兼容RecordName，显式short:N保留末N段并缩写前缀，可叠加标准对齐；原名称/JSON/pickle/数字宽度及None元数据保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/loguru/_logger.py
++++ b/library/loguru/_logger.py
+@@ -121,7 +121,7 @@
+ from ._get_frame import get_frame
+ from ._handler import Handler
+ from ._locks_machinery import create_logger_lock
+-from ._recattrs import RecordException, RecordFile, RecordLevel, RecordProcess, RecordThread
++from ._recattrs import RecordException, RecordFile, RecordLevel, RecordName, RecordProcess, RecordThread
+ from ._simple_sinks import AsyncSink, CallableSink, StandardSink, StreamSink
+ 
+ if sys.version_info >= (3, 6):
+@@ -2154,7 +2154,7 @@
+             "line": f_lineno,
+             "message": str(message),
+             "module": splitext(file_name)[0],
+-            "name": name,
++            "name": RecordName(name) if name is not None else None,
+             "process": RecordProcess(process.ident, process.name),
+             "template": str(message),
+             "thread": RecordThread(thread.ident, thread.name),
+--- a/library/loguru/_recattrs.py
++++ b/library/loguru/_recattrs.py
+@@ -291,3 +291,25 @@
+             return cls(type_, None, traceback_)
+         else:
+             return cls(type_, value, traceback_)
++
++
++class RecordName(str):
++    """保留原模块名称的字符串，在显式short:N格式中缩写前缀。
++
++    :param value: 原模块名称字符串。
++    :return: 标准字符串兼容记录，旧宽度/对齐格式仍由str处理。
++    """
++    def __format__(self, spec):
++        """支持short:N和可选|标准字符串格式。@return 格式化名称。"""
++        if not spec.startswith('short:'):
++            return str.__format__(self, spec)
++        count, separator, formatting = spec[6:].partition('|')
++        if not count.isdecimal() or int(count) < 1:
++            raise ValueError('short保留段数必须为正整数')
++        keep = int(count)
++        parts = self.split('.')
++        boundary = max(0, len(parts) - keep)
++        text = '.'.join([part[:1] for part in parts[:boundary]] + parts[boundary:])
++        return format(text, formatting if separator else '')
++
++
+--- a/library/tests/test_development_loguru_o05_dev.py
++++ b/library/tests/test_development_loguru_o05_dev.py
+@@ -0,0 +1,33 @@
++"""显式模块名缩写格式保留原record数据及标准字符串格式。"""
++from copy import deepcopy
++from loguru import logger
++import json
++import pytest
++
++def test_record_name_explicit_short_format_and_standard_width():
++    """真实记录对象仍是原名字符串，新格式不挪用旧数字宽度。@return None。"""
++    from loguru._recattrs import RecordName
++    value=RecordName('application.backend.catalog.service')
++    assert value=='application.backend.catalog.service' and isinstance(value,str)
++    assert format(value,'short:2')=='a.b.catalog.service' and format(value,'short:1')=='a.b.c.service'
++    assert format(value,'short:9')==str(value)
++    assert format(value,'40')==format(str(value),'40') and format(value,'short:1|>20')==format('a.b.c.service','>20')
++
++def test_actual_logger_formatting_and_json_keep_full_name():
++    """通过真实调用者模块记录进入formatter，JSON仍为完整原名称。@return None。"""
++    logger.remove();log=deepcopy(logger);log.remove();text=[];encoded=[]
++    log.add(text.append,format='{name:short:1}:{message}',catch=False)
++    log.add(encoded.append,serialize=True,format='{message}')
++    namespace={'__name__':'application.backend.catalog.service','log':log}
++    exec("log.info('hello')",namespace)
++    assert ''.join(text)=='a.b.c.service:hello\n' and json.loads(encoded[0])['record']['name']=='application.backend.catalog.service'
++    log.remove()
++
++def test_unicode_empty_segments_pickle_and_invalid_specs():
++    """Unicode按段首字符，空段保留，记录可pickle且非法策略明确拒绝。@return None。"""
++    import pickle
++    from loguru._recattrs import RecordName
++    value=RecordName('应用..业务.服务')
++    assert format(value,'short:1')=='应..业.服务' and format(pickle.loads(pickle.dumps(value)),'short:2')=='应..业务.服务'
++    for spec in ['short:0','short:-1','short:x']:
++        with pytest.raises(ValueError):format(value,spec)

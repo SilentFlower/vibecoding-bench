@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PA-ATOMIC-WRITE-DEV",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Path.atomic_write(content,*,encoding=\"utf-8\",if_changed=False). Validate and encode str/bytes before creating a same-directory temp, flush/fsync, retain old mode or use 0600 when new, replace atomically and clean failure paths. Reject symlinks; if_changed=True preserves inode/mtime/mode when bytes match and returns False, otherwise True. Serialization/replace failures preserve old bytes. Keep ordinary write methods unchanged and do not promise concurrent compare-and-swap or directory-fsync crash guarantees.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

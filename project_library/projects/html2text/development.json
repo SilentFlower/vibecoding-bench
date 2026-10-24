@@ -1,0 +1,300 @@
+{
+  "schema": 3,
+  "project_key": "html2text",
+  "title": "html2text文档归档工作场景",
+  "category": "文本转换与归档归属",
+  "description": "固定真实源码上的完整工程交付：以显式模式让真实行内代码动态定界且保留原始正文；让实际表格caption成为独立可读段落且不污染首行表头；让图片组及图说明在真实输出中保持段落关系和图片配置；在真实图片转换中按明确像素密度选择离线srcset来源；以明确可见正文模式略去template及HTML隐藏子树并清理状态；提供不可变严格配置并在实际转换前校验类型范围及组合。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "1a451940c2585086e77570a3c9ba83f41234e8b48825ca4f2fe69a5831407fa5",
+  "environment": "html2text-py312",
+  "source": {
+    "repository": "https://github.com/Alir3z4/html2text",
+    "commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "HTML2TEXT-O01-DEV-SCENE",
+      "title": "以显式模式让真实行内代码动态定界且保留原始正文",
+      "goal": "以显式模式让真实行内代码动态定界且保留原始正文",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "HTML2TEXT-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HTML2TEXT-O01-DEV",
+          "kind": "modify",
+          "goal": "以显式模式让真实行内代码动态定界且保留原始正文",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd opt-in HTML2Text.adaptive_inline_code (default False), integrated into real code/kbd/tt tag/data handling. Buffer a single inline-code span, normalize line endings to spaces, choose a backtick delimiter strictly longer than any body run and apply CommonMark edge-backtick/double-ended-space padding so independent decoding restores the exact body. Ignore nested formatting markup while preserving its text/entities, handle multiple spans, empty spans and unclosed EOF without state leakage to later handle calls. Preserve default compatibility and pre paths. Do not merely escape source backticks or replace the entire document with a different converter.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_html2text_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-html2text-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/HTML2TEXT-O01-DEV-contract.md",
+            "materials/HTML2TEXT-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/html2text/__init__.py",
+            "library/test/test_development_html2text_o01_dev.py",
+            "library/docs/development-html2text-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/HTML2TEXT-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/HTML2TEXT-O01-DEV.native.json",
+            "public_native": "verification/HTML2TEXT-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/HTML2TEXT-O01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "HTML2TEXT-O02-DEV-SCENE",
+      "title": "让实际表格caption成为独立可读段落且不污染首行表头",
+      "goal": "让实际表格caption成为独立可读段落且不污染首行表头",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "HTML2TEXT-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HTML2TEXT-O02-DEV",
+          "kind": "modify",
+          "goal": "让实际表格caption成为独立可读段落且不污染首行表头",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd table_caption_mode=\"legacy\"|\"paragraph\" to real HTML2Text table conversion, defaulting to compatibility. Paragraph mode separates each nonempty caption from surrounding content and the actual table header/data while preserving existing inline emphasis/link conversion, repeated/empty captions and normal header separator generation. Keep bypass_tables/ignore_tables semantics with readable captions, ordinary caption-free tables and default output unchanged; reject unknown strategy when a caption is encountered. Do not duplicate caption text, rewrite the header as a title or alter original regression fixtures.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_html2text_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-html2text-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/HTML2TEXT-O02-DEV-contract.md",
+            "materials/HTML2TEXT-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/html2text/__init__.py",
+            "library/test/test_development_html2text_o02_dev.py",
+            "library/docs/development-html2text-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/HTML2TEXT-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/HTML2TEXT-O02-DEV.native.json",
+            "public_native": "verification/HTML2TEXT-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/HTML2TEXT-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "HTML2TEXT-O03-DEV-SCENE",
+      "title": "让图片组及图说明在真实输出中保持段落关系和图片配置",
+      "goal": "让图片组及图说明在真实输出中保持段落关系和图片配置",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "HTML2TEXT-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HTML2TEXT-O03-DEV",
+          "kind": "modify",
+          "goal": "让图片组及图说明在真实输出中保持段落关系和图片配置",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd figure_mode=\"legacy\"|\"group\" to actual figure/figcaption/image processing. Group mode creates readable paragraph boundaries around the group, each image and each caption, preserving source order, original alt text, inline caption formatting, multiple/nested figures, caption-only/empty cases and neighboring body text. Existing ignore_images/images_to_alt/images-as-HTML behavior remains authoritative; never replace alt with caption or drop captions when images are disabled. Reset grouping depth at finish including unclosed EOF, retain default compatibility and reject unknown figure strategies.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_html2text_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-html2text-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/HTML2TEXT-O03-DEV-contract.md",
+            "materials/HTML2TEXT-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/html2text/__init__.py",
+            "library/test/test_development_html2text_o03_dev.py",
+            "library/docs/development-html2text-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/HTML2TEXT-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/HTML2TEXT-O03-DEV.native.json",
+            "public_native": "verification/HTML2TEXT-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/HTML2TEXT-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "HTML2TEXT-O04-DEV-SCENE",
+      "title": "在真实图片转换中按明确像素密度选择离线srcset来源",
+      "goal": "在真实图片转换中按明确像素密度选择离线srcset来源",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "HTML2TEXT-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HTML2TEXT-O04-DEV",
+          "kind": "modify",
+          "goal": "在真实图片转换中按明确像素密度选择离线srcset来源",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd image_density=None opt-in selection to actual img conversion, not a standalone unused parser. For finite positive nonbool numeric targets, parse unordered x-density srcset candidates (unmarked means 1x), select the smallest density >= target or largest available, and resolve through existing baseurl/link behavior. Permit missing src when srcset is sufficient. Explicitly reject duplicate/nonpositive/nonfinite/malformed/mixed w descriptors; document data: sets containing ambiguous commas as unsupported and retain src. Default None uses src unchanged, images_to_alt/ignore_images bypass unused source parsing, and HTML-image output uses the chosen source. Do not fetch resources or infer CSS layout.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_html2text_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-html2text-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/HTML2TEXT-O04-DEV-contract.md",
+            "materials/HTML2TEXT-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/html2text/__init__.py",
+            "library/test/test_development_html2text_o04_dev.py",
+            "library/docs/development-html2text-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/HTML2TEXT-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/HTML2TEXT-O04-DEV.native.json",
+            "public_native": "verification/HTML2TEXT-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/HTML2TEXT-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "HTML2TEXT-O05-DEV-SCENE",
+      "title": "以明确可见正文模式略去template及HTML隐藏子树并清理状态",
+      "goal": "以明确可见正文模式略去template及HTML隐藏子树并清理状态",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "HTML2TEXT-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HTML2TEXT-O05-DEV",
+          "kind": "modify",
+          "goal": "以明确可见正文模式略去template及HTML隐藏子树并清理状态",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd visible_content=False and a per-handle hidden_regions count integrated before actual tag/data side effects. In opt-in mode omit entire template or HTML hidden-attribute subtrees (attribute presence including hidden=\"false\"), including nested formatting/resources; handle void hidden elements without hiding following siblings and recover matching ancestor closes without corrupting existing quiet/head/style/script accounting. Unclosed hidden EOF hides the remainder of only that document and state resets before reuse. Default text remains unchanged, do not infer CSS/script visibility or claim sanitization; counts report top-level omitted regions.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_html2text_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-html2text-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/HTML2TEXT-O05-DEV-contract.md",
+            "materials/HTML2TEXT-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/html2text/__init__.py",
+            "library/test/test_development_html2text_o05_dev.py",
+            "library/docs/development-html2text-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/HTML2TEXT-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/HTML2TEXT-O05-DEV.native.json",
+            "public_native": "verification/HTML2TEXT-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/HTML2TEXT-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "HTML2TEXT-O06-DEV-SCENE",
+      "title": "提供不可变严格配置并在实际转换前校验类型范围及组合",
+      "goal": "提供不可变严格配置并在实际转换前校验类型范围及组合",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "HTML2TEXT-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "HTML2TEXT-O06-DEV",
+          "kind": "modify",
+          "goal": "提供不可变严格配置并在实际转换前校验类型范围及组合",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd public immutable Options.from_mapping with declared body_width and common link/image/wrapping switches, and HTML2Text.from_options(options, *, out=None, baseurl=\"\") integrated through the actual constructor/property conversion path. Reject unknown keys, nonbool switches, bool/noninteger/negative widths, conflicting image rendering modes and single_line_break with nonzero width in this explicit strict mode. Options detach input, expose independent as_dict copies and are reusable across independent converters. Preserve ordinary construction/dynamic property assignments, default byte output, custom out and baseurl. This task covers API strict configuration; do not claim unimplemented CLI integration or globally forbid legacy combinations.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_html2text_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-html2text-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/HTML2TEXT-O06-DEV-contract.md",
+            "materials/HTML2TEXT-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/html2text/__init__.py",
+            "library/test/test_development_html2text_o06_dev.py",
+            "library/docs/development-html2text-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/HTML2TEXT-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/HTML2TEXT-O06-DEV.native.json",
+            "public_native": "verification/HTML2TEXT-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/HTML2TEXT-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

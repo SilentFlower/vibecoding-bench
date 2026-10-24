@@ -1,0 +1,14 @@
+{
+  "script": "verification/HTML2TEXT-O05-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/test/test_development_html2text_o05_dev.py"
+}

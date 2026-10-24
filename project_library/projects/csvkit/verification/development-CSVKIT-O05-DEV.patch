@@ -1,0 +1,114 @@
+--- a/library/csvkit/headers.py
++++ b/library/csvkit/headers.py
+@@ -0,0 +1,35 @@
++"""按原始精确列名安全重命名，不触碰任何数据字段。"""
++
++
++def rename_columns(names, mapping, *, collision='error'):
++    """返回独立重命名表头，目标冲突有显式政策。
++
++    :param names: 原始完整表头，映射发生在选列之前。
++    :param mapping: 精确原名到非空目标名的字典。
++    :param collision: error或suffix；后者避开全部预留原始目标名。
++    :return: 与输入长度及顺序相同的新表头。
++    """
++    if collision not in ('error', 'suffix') or not isinstance(mapping, dict):
++        raise ValueError('映射或冲突政策无效')
++    for old, new in mapping.items():
++        if not isinstance(old, str) or not isinstance(new, str) or not new:
++            raise ValueError('重命名必须由文本原名指向非空文本')
++        if names.count(old) != 1:
++            raise ValueError('映射源名不存在或不唯一')
++    requested = [mapping.get(name, name) for name in names]
++    if len(set(requested)) == len(requested):
++        return requested
++    if collision == 'error':
++        raise ValueError('重命名产生重复列名')
++    reserved, used, output = set(requested), set(), []
++    for name in requested:
++        candidate, suffix = name, 2
++        if candidate in used:
++            while True:
++                candidate = name + '_' + str(suffix)
++                suffix += 1
++                if candidate not in used and candidate not in reserved:
++                    break
++        output.append(candidate)
++        used.add(candidate)
++    return output
+--- a/library/csvkit/utilities/csvcut.py
++++ b/library/csvkit/utilities/csvcut.py
+@@ -10,10 +10,12 @@
+ """
+ 
+ import sys
++import json
+ 
+ import agate
+ 
+ from csvkit.cli import CSVKitUtility
++from csvkit.headers import rename_columns
+ 
+ 
+ class CSVCut(CSVKitUtility):
+@@ -40,6 +42,9 @@
+             help='Ignore identifiers in --columns (-c) that do not match a column in the input, '
+                  'instead of erroring.')
+ 
++        self.argparser.add_argument('--rename-columns-json', help='精确原列名到目标名的JSON映射。')
++        self.argparser.add_argument('--rename-collision', choices=['error','suffix'], default='error')
++
+     def main(self):
+         if self.args.names_only:
+             self.print_column_names()
+@@ -49,6 +54,15 @@
+             sys.stderr.write('No input file or piped data provided. Waiting for standard input:\n')
+ 
+         rows, column_names, column_ids = self.get_rows_and_column_names_and_column_ids(**self.reader_kwargs)
++
++        if self.args.rename_columns_json is not None:
++            if self.args.no_header_row:
++                self.argparser.error('无表头输入不能按原名重命名')
++            try:
++                mapping = json.loads(self.args.rename_columns_json)
++                column_names = rename_columns(column_names, mapping, collision=self.args.rename_collision)
++            except (ValueError, TypeError):
++                self.argparser.error('无效的重命名映射或列名冲突')
+ 
+         output = agate.csv.writer(self.output_file, **self.writer_kwargs)
+         output.writerow([column_names[column_id] for column_id in column_ids])
+--- a/library/docs/development-csvkit-o05-dev.md
++++ b/library/docs/development-csvkit-o05-dev.md
+@@ -0,0 +1,5 @@
++# 在真实CSV管道中按精确原名一致重命名列
++
++对应路线12：公共header映射与真实csvcut集成，原名选列不变，仅改输出表头；冲突默认拒绝或稳定后缀避开后续保留名，不改数据单元格。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_csvkit_o05_dev.py
++++ b/library/tests/test_development_csvkit_o05_dev.py
+@@ -0,0 +1,24 @@
++"""显式映射进入真实csvcut管道，数据和原选列标识保持。"""
++from io import StringIO
++import csv,json
++import pytest
++
++def test_actual_cut_maps_before_output_after_original_selection(tmp_path):
++    """仍按原列名选择，只改输出表头。@return None。"""
++    from csvkit.utilities.csvcut import CSVCut
++    path=tmp_path/'input.csv';path.write_text('城市,code\n杭州,001\n');output=StringIO()
++    CSVCut(['-c','code,城市','--rename-columns-json',json.dumps({'城市':'city','code':'id'}),str(path)],output_file=output).run()
++    assert list(csv.reader(StringIO(output.getvalue())))==[['id','city'],['001','杭州']]
++
++def test_collisions_suffix_reserves_later_names():
++    """自动后缀避开尚未遍历的真实目标名。@return None。"""
++    from csvkit.headers import rename_columns
++    with pytest.raises(ValueError):rename_columns(['a','b'],{'a':'b'})
++    assert rename_columns(['a','b','b_2'],{'a':'b'},collision='suffix')==['b','b_3','b_2']
++
++def test_unknown_ambiguous_empty_and_input_isolation():
++    """未知、重复源和空目标不能静默漏改。@return None。"""
++    from csvkit.headers import rename_columns
++    for names,mapping in [(['a'],{'b':'x'}),(['a','a'],{'a':'x'}),(['a'],{'a':''})]:
++        with pytest.raises(ValueError):rename_columns(names,mapping)
++    names=['a'];mapping={'a':'x'};assert rename_columns(names,mapping)==['x'] and names==['a'] and mapping=={'a':'x'}

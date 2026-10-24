@@ -1,0 +1,88 @@
+--- a/library/development_tests/test_development_if_template_dev.py
++++ b/library/development_tests/test_development_if_template_dev.py
+@@ -0,0 +1,22 @@
++"""公开受限业务报表模板回归。"""
++import pytest
++from inflect import engine
++from inflect.templates import ReportTemplate
++
++def test_compiled_fields_and_real_business_formats():
++    template=ReportTemplate('{name}: {n:counted(child)}; {n:ordinal}; {word:article}')
++    assert template.fields==('name','n','word')
++    assert template.render(engine(),{'name':'A','n':2,'word':'hour'})=='A: 2 children; 2nd; an hour'
++
++def test_literal_braces_and_values_are_not_reparsed():
++    template=ReportTemplate('{{{name}}} {name}')
++    assert template.render(engine(),{'name':'{bad}'})=='{{bad}} {bad}'
++
++def test_unsafe_and_unknown_formats_fail_at_construction():
++    for text in ('{x.__class__}','{x[0]}','{x!r}','{x:unknown}','{x:{y}}'):
++        with pytest.raises(ValueError): ReportTemplate(text)
++
++def test_custom_rules_join_and_original_state_are_preserved():
++    target=engine();target.num(7);target.defnoun('widget','widgeten')
++    result=ReportTemplate('{n:counted(widget)}: {names:join}').render(target,{'n':2,'names':iter(['a','b','c'])})
++    assert result=='2 widgeten: a, b, and c' and target.persistent_count==7
+--- a/library/docs/development-if-template-dev.md
++++ b/library/docs/development-if-template-dev.md
+@@ -0,0 +1,5 @@
++# 实现受限且可复用的命名英语报表模板
++
++模板只允许明确命名字段与固定业务格式，不执行表达式或访问对象属性。复用真实数字、冠词、数量短语和流式连接接口，渲染前检查缺失字段并隔离引擎状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/inflect/templates.py
++++ b/library/inflect/templates.py
+@@ -0,0 +1,52 @@
++"""只允许命名字段与固定业务转换的报表模板。"""
++import re
++from string import Formatter
++from .scopes import clone
++from .counted import counted
++from .streams import iter_join
++
++
++class ReportTemplate:
++    """编译时拒绝属性访问、下标、转换符与任意表达式。"""
++    def __init__(self,text):
++        """编译受限模板。@param text 支持转义大括号的模板文本。@return None。
++        """
++        if not isinstance(text,str):
++            raise TypeError('模板必须为文本')
++        self._parts=[]
++        for literal,name,spec,conversion in Formatter().parse(text):
++            if name is not None:
++                if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*',name) or conversion is not None:
++                    raise ValueError('仅允许简单命名字段')
++                if spec not in ('','words','ordinal','article','join') and not re.fullmatch(r'counted\([^{}()]+\)',spec):
++                    raise ValueError('不支持的业务格式')
++            self._parts.append((literal,name,spec))
++        self.fields=tuple(dict.fromkeys(name for _,name,_ in self._parts if name is not None))
++
++    def render(self,target,values):
++        """格式化业务记录。@param target 原引擎。@param values 名称到值映射。
++        @return 完整文本；先检查所有缺失字段且不修改原引擎。
++        """
++        for name in self.fields:
++            if name not in values:
++                raise KeyError(name)
++        working=clone(target);output=[]
++        for literal,name,spec in self._parts:
++            output.append(literal)
++            if name is None:
++                continue
++            value=values[name]
++            if spec.startswith('counted('):
++                rendered=counted(working,spec[8:-1],value)
++            elif spec=='words':
++                rendered=working.number_to_words(value)
++            elif spec=='ordinal':
++                rendered=working.ordinal(value)
++            elif spec=='article':
++                rendered=working.a(value)
++            elif spec=='join':
++                rendered=''.join(iter_join(value))
++            else:
++                rendered=str(value)
++            output.append(rendered)
++        return ''.join(output)

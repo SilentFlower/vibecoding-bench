@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TD-PATH-DEV",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Query.at_path(segments), appending a nonempty finite iterable of string keys to the current query path. Treat dots, slashes, empty strings and names of Query methods as literal keys. Preserve Query subclasses, immutability of the original builder, full-path cache identity and uncacheable map paths. Reject plain string/bytes inputs and nonstring segments before returning a query; preserve missing-path false behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

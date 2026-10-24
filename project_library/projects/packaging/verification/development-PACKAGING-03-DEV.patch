@@ -1,0 +1,53 @@
+--- a/library/docs/development-packaging-03-dev.md
++++ b/library/docs/development-packaging-03-dev.md
+@@ -0,0 +1,5 @@
++# 依赖声明按所选extras与同一目标环境判断适用性
++
++路线05：Requirement.applies逐个规范化所选extra，完整表达式使用同一绑定，空选集按基础extra；环境复制且不混淆Requirement.extras或lock_file集合变量。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/packaging/requirements.py
++++ b/library/src/packaging/requirements.py
+@@ -120,6 +120,22 @@
+             self.marker = Marker.__new__(Marker)
+             self.marker._markers = _normalize_extra_values(parsed.marker)
+             self.marker._serialized = None
++
++    def applies(self,selected_extras=(),environment=None):
++        """判断已选择extras的依赖适用性。@param selected_extras 消费方选择名称集合。@param environment 目标环境覆盖。@return 任一同一extra绑定满足标记。"""
++        if isinstance(selected_extras,(str,bytes)):
++            raise TypeError("selected_extras必须为名称迭代器")
++        extras=tuple(selected_extras)
++        if any(not isinstance(extra,str) for extra in extras):
++            raise TypeError("extra名称必须为str")
++        if self.marker is None:
++            return True
++        for extra in extras or ("",):
++            target=dict(environment or {})
++            target["extra"]=canonicalize_name(extra) if extra else ""
++            if self.marker.evaluate(target,context="metadata"):
++                return True
++        return False
+ 
+     def __replace__(
+         self,
+--- a/library/tests/test_development_packaging_03_dev.py
++++ b/library/tests/test_development_packaging_03_dev.py
+@@ -0,0 +1,17 @@
++"""所选extras按每个singular绑定求值，不能跨extra拼接条件。"""
++from packaging.requirements import Requirement
++
++def test_selected_extras_normalization_empty_and_no_marker():
++    """test/docs任一满足，空集合使用基础extra。@return None。"""
++    requirement=Requirement('library; extra == "some-extra"')
++    assert requirement.applies({'docs','Some_Extra'}) and not requirement.applies({'docs'})
++    assert Requirement('library').applies(()) and Requirement('library; extra == ""').applies(())
++    assert not Requirement('library; extra == "test"').applies(())
++
++def test_same_binding_environment_and_source_ownership():
++    """and两边必须使用同一个extra，来源映射不改。@return None。"""
++    requirement=Requirement('library; extra == "test" and extra == "docs"')
++    assert not requirement.applies({'test','docs'})
++    environment={'os_name':'target','extra':'not-selected'}
++    assert Requirement('library; extra == "test" and os_name == "target"').applies(['test'],environment)
++    assert environment=={'os_name':'target','extra':'not-selected'}

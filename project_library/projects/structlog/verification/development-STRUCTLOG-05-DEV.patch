@@ -1,0 +1,77 @@
+--- a/library/docs/development-structlog-05-dev.md
++++ b/library/docs/development-structlog-05-dev.md
+@@ -0,0 +1,5 @@
++# 日志捕获器按明确容量留存并公开总量丢弃和快照
++
++路线18：CapturingLogger/Factory可选容量与保旧/保新政策，默认无限list/工厂复用保持；total/dropped和外层独立快照清楚，零容量明确、不虚构并发保证。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/structlog/testing.py
++++ b/library/src/structlog/testing.py
+@@ -181,8 +181,16 @@
+ 
+     calls: list[CapturedCall]
+ 
+-    def __init__(self) -> None:
++    def __init__(self,capacity=None,*,overflow="drop_oldest") -> None:
++        """创建捕获器。@param capacity 非负条数或None。@param overflow drop_oldest/reject_new。@return None。"""
++        if capacity is not None and (type(capacity) is not int or capacity<0):raise ValueError("capacity必须为非负整数")
++        if overflow not in ("drop_oldest","reject_new"):raise ValueError("未知overflow")
++        self.capacity=capacity;self.overflow=overflow;self.total=0;self.dropped=0
+         self.calls = []
++
++    def snapshot(self):
++        """返回独立外层和kwargs映射的当前快照。@return CapturedCall tuple，嵌套业务值不深复制。"""
++        return tuple(CapturedCall(call.method_name,call.args,dict(call.kwargs)) for call in self.calls)
+ 
+     def __repr__(self) -> str:
+         return f"<CapturingLogger with {len(self.calls)} call(s)>"
+@@ -193,6 +201,11 @@
+         """
+ 
+         def log(*args: Any, **kw: Any) -> None:
++            self.total+=1
++            if self.capacity is not None and len(self.calls)>=self.capacity:
++                self.dropped+=1
++                if self.capacity==0 or self.overflow=="reject_new":return
++                del self.calls[0]
+             self.calls.append(CapturedCall(name, args, kw))
+ 
+         return log
+@@ -215,8 +228,9 @@
+ 
+     logger: CapturingLogger
+ 
+-    def __init__(self) -> None:
+-        self.logger = CapturingLogger()
++    def __init__(self,capacity=None,*,overflow="drop_oldest") -> None:
++        """配置同一捕获器工厂。@param capacity 容量。@param overflow 超限策略。@return None。"""
++        self.logger = CapturingLogger(capacity,overflow=overflow)
+ 
+     def __call__(self, *args: Any) -> CapturingLogger:
+         return self.logger
+--- a/library/tests/test_development_structlog_05_dev.py
++++ b/library/tests/test_development_structlog_05_dev.py
+@@ -0,0 +1,22 @@
++"""长时间本地诊断有界留存，计数和快照可查。"""
++from structlog.testing import CapturingLogger,CapturingLoggerFactory
++
++def test_oldest_or_newest_retention_total_and_dropped():
++    """保留策略明确，默认仍无限list。@return None。"""
++    for policy,expected in (('drop_oldest',[2,3]),('reject_new',[0,1])):
++        logger=CapturingLogger(2,overflow=policy)
++        for index in range(4):logger.info(index)
++        assert [call.args[0] for call in logger.calls]==expected
++        assert logger.total==4 and logger.dropped==2 and isinstance(logger.calls,list)
++    logger=CapturingLogger()
++    for index in range(4):logger.info(index)
++    assert len(logger.calls)==4 and logger.dropped==0
++
++def test_zero_capacity_factory_reuse_and_snapshot_independence():
++    """快照不被后续记录或kwargs修改覆盖，嵌套身份政策明确。@return None。"""
++    factory=CapturingLoggerFactory(1);logger=factory();assert factory('name') is logger
++    logger.info('first',key='old');snapshot=logger.snapshot();logger.info('second',key='new')
++    assert snapshot[0].args==('first',) and snapshot[0].kwargs=={'key':'old'}
++    snapshot[0].kwargs['key']='changed';assert logger.calls[0].kwargs=={'key':'new'}
++    logger=CapturingLogger(0);logger.error('ignored')
++    assert logger.calls==[] and logger.total==1 and logger.dropped==1

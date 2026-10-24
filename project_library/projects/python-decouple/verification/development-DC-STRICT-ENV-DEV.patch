@@ -1,0 +1,71 @@
+--- a/library/decouple.py
++++ b/library/decouple.py
+@@ -157,16 +157,22 @@
+     """
+     Retrieves option keys from .env files with fall back to os.environ.
+     """
+-    def __init__(self, source, encoding=DEFAULT_ENCODING):
++    def __init__(self, source, encoding=DEFAULT_ENCODING, *, strict=False):
+         self.data = {}
+ 
+         with open(source, encoding=encoding) as file_:
+-            for line in _repository_lines(file_, encoding):
++            for number, line in enumerate(_repository_lines(file_, encoding), 1):
+                 line = line.strip()
+-                if not line or line.startswith('#') or '=' not in line:
++                if not line or line.startswith('#'):
++                    continue
++                if '=' not in line:
++                    if strict:
++                        raise ValueError('ENV文件第%d行缺少等号：%s' % (number, source))
+                     continue
+                 k, v = line.split('=', 1)
+                 k = k.strip()
++                if strict and (not k or k in self.data):
++                    raise ValueError('ENV文件第%d行存在空键或重复键：%s' % (number, source))
+                 v = v.strip()
+                 if len(v) >= 2 and ((v[0] == "'" and v[-1] == "'") or (v[0] == '"' and v[-1] == '"')):
+                     v = v[1:-1]
+--- a/library/docs/development-dc-strict-env-dev.md
++++ b/library/docs/development-dc-strict-env-dev.md
+@@ -0,0 +1,5 @@
++# 为ENV文件提供不泄漏值的严格解析诊断
++
++在已交付BOM读取边界上增加显式strict模式，保留UTF-8首BOM及内部标记。坏行、空键和重复键给出真实文件路径及物理行号，错误不回显原行或值。合法空值、首等号分割、引用、编码和文件系统错误保持；默认宽容跳过及末值覆盖不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_dc_strict_env_dev.py
++++ b/library/tests/test_development_dc_strict_env_dev.py
+@@ -0,0 +1,32 @@
++"""严格ENV模式定位坏行且不暴露配置值。"""
++import pytest
++from decouple import RepositoryEnv
++
++
++def test_strict_rejects_malformed(tmp_path):
++    """坏行包含行号与路径，不回显敏感文本。@param tmp_path 临时目录。@return None。"""
++    path = tmp_path / 'settings.env'
++    path.write_text('# comment\nPRIVATE-NO-EQUALS\n', encoding='utf-8')
++    with pytest.raises(ValueError) as result:
++        RepositoryEnv(str(path), strict=True)
++    assert '2' in str(result.value) and str(path) in str(result.value)
++    assert 'PRIVATE-NO-EQUALS' not in str(result.value)
++
++
++def test_strict_duplicate_and_empty(tmp_path):
++    """重复和空键不会默默覆盖。@param tmp_path 临时目录。@return None。"""
++    path = tmp_path / 'settings.env'
++    for content in ['A=1\nA=2', '=empty']:
++        path.write_text(content, encoding='utf-8')
++        with pytest.raises(ValueError):
++            RepositoryEnv(str(path), strict=True)
++
++
++def test_default_tolerant_and_valid_strict(tmp_path):
++    """默认宽容不变，严格模式读取合法空值及引用。@param tmp_path 临时目录。@return None。"""
++    path = tmp_path / 'settings.env'
++    path.write_text('BAD\nA=1\nA=2', encoding='utf-8')
++    assert RepositoryEnv(str(path))['A'] == '2'
++    path.write_text('A=\nB="x=y"', encoding='utf-8')
++    repository = RepositoryEnv(str(path), strict=True)
++    assert repository['A'] == '' and repository['B'] == 'x=y'

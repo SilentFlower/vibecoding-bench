@@ -1,0 +1,87 @@
+--- a/library/development_tests/test_development_fg_pages_dev.py
++++ b/library/development_tests/test_development_fg_pages_dev.py
+@@ -0,0 +1,31 @@
++"""公开订阅分页与真实导航回归。"""
++from urllib.parse import urlsplit,parse_qs
++import pytest
++from feedgen.feed import FeedGenerator
++from feedgen.pagination import paginate
++
++def make(count):
++    feed=FeedGenerator();feed.id('urn:feed');feed.title('Feed');feed.author(name='Editor');feed.link(href='https://example.test',rel='alternate')
++    for index in range(count):
++        entry=feed.add_entry(order='append');entry.id('urn:'+str(index));entry.title(str(index));entry.content('Text')
++    return feed
++
++def test_middle_page_entries_and_navigation_keep_query_parameters():
++    page=paginate(make(5),2,2,'https://example.test/feed?tag=a&tag=b&page=9&page=8#x')
++    assert page.total_pages==3 and page.total_entries==5 and [entry.id() for entry in page.feed.entry()]==['urn:2','urn:3']
++    links={link['rel']:link['href'] for link in page.feed.link()}
++    assert parse_qs(urlsplit(links['self']).query)=={'tag':['a','b'],'page':['2']} and urlsplit(links['next']).fragment=='x'
++
++def test_first_last_and_empty_page_links_are_correct():
++    first=paginate(make(3),1,2,'https://example.test/feed');last=paginate(make(3),2,2,'https://example.test/feed')
++    assert 'prev' not in {link['rel'] for link in first.feed.link()} and 'next' not in {link['rel'] for link in last.feed.link()}
++    assert paginate(make(0),1,2,'https://example.test/feed').total_pages==1
++
++def test_source_links_and_entry_values_are_independent():
++    feed=make(3);page=paginate(feed,1,2,'https://example.test/feed');page.feed.entry()[0].title('Changed')
++    assert feed.entry()[0].title()=='0' and [link['rel'] for link in feed.link()]==['alternate']
++    assert b'urn:feed' in page.feed.atom_str()
++
++def test_invalid_pages_and_relative_urls_fail():
++    with pytest.raises(ValueError): paginate(make(1),2,2,'https://example.test/feed')
++    with pytest.raises(ValueError): paginate(make(1),1,2,'/feed')
+--- a/library/docs/development-fg-pages-dev.md
++++ b/library/docs/development-fg-pages-dev.md
+@@ -0,0 +1,5 @@
++# 生成独立分页订阅并维护准确的导航链接
++
++分页生成独立订阅并保留原身份与其他链接，只更新分页导航。处理空订阅、边界页、重复page参数和可选真实时间排序，不能直接切片原条目列表并修改来源。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/feedgen/pagination.py
++++ b/library/feedgen/pagination.py
+@@ -0,0 +1,42 @@
++"""按实际条目分页，保留其他链接与原订阅身份。"""
++from dataclasses import dataclass
++from urllib.parse import urlsplit,urlunsplit,parse_qsl,urlencode
++from .ordering import copy_feed,sorted_feed
++
++
++@dataclass(frozen=True)
++class FeedPage:
++    """一页独立订阅及全局条目／页数。"""
++    feed: object
++    number: int
++    total_pages: int
++    total_entries: int
++
++
++def paginate(feed,page,page_size,base_url,*,order_by=None,reverse=True):
++    """构建可序列化的独立分页。@param feed 原订阅。@param page 从1开始页码。
++    @param page_size 正整数容量。@param base_url HTTP(S)基础URL。@param order_by 可选真实时间排序。
++    @param reverse 排序方向。@return FeedPage，原来源不变。
++    """
++    if type(page) is not int or type(page_size) is not int or page<1 or page_size<1 or not isinstance(base_url,str):
++        raise ValueError('需要正整数分页参数和基础URL')
++    url=urlsplit(base_url)
++    if url.scheme not in ('http','https') or not url.netloc:
++        raise ValueError('基础URL必须为HTTP(S)绝对地址')
++    source=sorted_feed(feed,by=order_by,reverse=reverse) if order_by is not None else feed
++    entries=list(source.entry());pages=max(1,(len(entries)+page_size-1)//page_size)
++    if page>pages:
++        raise ValueError('页码超出订阅范围')
++    result=copy_feed(source,entries[(page-1)*page_size:page*page_size])
++    query=[(key,value) for key,value in parse_qsl(url.query,keep_blank_values=True) if key!='page']
++    def address(number):
++        return urlunsplit((url.scheme,url.netloc,url.path,urlencode(query+[('page',str(number))]),url.fragment))
++    controlled={'self','first','last','prev','next'}
++    links=[link for link in result.link() or [] if link.get('rel','alternate') not in controlled]
++    links.extend({'href':address(number),'rel':rel,'type':'application/atom+xml'} for rel,number in [('self',page),('first',1),('last',pages)])
++    if page>1:
++        links.append({'href':address(page-1),'rel':'prev'})
++    if page<pages:
++        links.append({'href':address(page+1),'rel':'next'})
++    result.link(links,replace=True)
++    return FeedPage(result,page,pages,len(entries))

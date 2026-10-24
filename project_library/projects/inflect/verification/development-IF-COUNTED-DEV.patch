@@ -1,0 +1,50 @@
+--- a/library/development_tests/test_development_if_counted_dev.py
++++ b/library/development_tests/test_development_if_counted_dev.py
+@@ -0,0 +1,20 @@
++"""公开业务数量短语回归。"""
++import pytest
++from inflect import engine
++from inflect.counted import counted
++
++def test_real_irregular_inflection_and_spelled_count():
++    target=engine();assert counted(target,'child',2)=='2 children'
++    assert counted(target,'child',1,words=True)=='one child'
++
++def test_zero_label_and_separator_are_explicit():
++    assert counted(engine(),'cat',0,zero='no')=='no cats'
++    assert counted(engine(),'cat',2,separator=':')=='2:cats'
++
++def test_custom_rules_and_persistent_count_are_preserved():
++    target=engine();target.num(1);target.defnoun('widget','widgeten')
++    assert counted(target,'widget',3)=='3 widgeten' and target.persistent_count==1
++
++def test_invalid_counts_fail_without_coercion():
++    for count in (True,-1,1.2,'2'):
++        with pytest.raises(ValueError): counted(engine(),'cat',count)
+--- a/library/docs/development-if-counted-dev.md
++++ b/library/docs/development-if-counted-dev.md
+@@ -0,0 +1,5 @@
++# 按显式业务数量生成不污染引擎状态的单位短语
++
++数量短语必须调用实际引擎与当前业务规则，不能靠加s实现。数量显式传递，支持零值文案、数字拼写和分隔符，使用克隆隔离持久数量与数字转换临时状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/inflect/counted.py
++++ b/library/inflect/counted.py
+@@ -0,0 +1,16 @@
++"""按显式数量生成单位短语，不改变调用方引擎。"""
++from .scopes import clone
++
++
++def counted(target,noun,count,*,words=False,zero='0',separator=' '):
++    """生成数量名词短语。@param target 实际引擎。@param noun 非空单位。
++    @param count 非负整数。@param words 是否拼写数字。@param zero 零值显示文本。
++    @param separator 数量与单位分隔。@return 报表短语。
++    """
++    if not isinstance(noun,str) or not noun or type(count) is not int or count<0 or type(words) is not bool:
++        raise ValueError('需要非空名词及非负整数数量')
++    if not isinstance(zero,str) or not isinstance(separator,str):
++        raise TypeError('显示文本必须为字符串')
++    working=clone(target)
++    label=zero if count==0 else working.number_to_words(count) if words else str(count)
++    return label+separator+working.plural_noun(noun,count)

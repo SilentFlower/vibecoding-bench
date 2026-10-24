@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BF-CALLABLE-DEV",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair default backoff/giveup logging for functools.partial and callable instances without __name__. Unwrap nested partials to a safe function name when available, otherwise use a stable type name; never call repr or expose bound arguments. Logs must not replace real return values or original exceptions with AttributeError. Preserve existing functions/methods, logger=None, levels and both predicate/exception modes without changing target call counts.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,76 @@
+--- a/library/development_tests/test_development_ck_new_path_dev.py
++++ b/library/development_tests/test_development_ck_new_path_dev.py
+@@ -0,0 +1,32 @@
++"""公开未占用输出路径回归。"""
++from pathlib import Path
++import pytest
++import click
++from click.testing import CliRunner
++from click.newpath import NewPath
++
++def test_existing_file_directory_and_dangling_link_are_rejected(tmp_path):
++    file=tmp_path/'existing';file.write_text('keep');link=tmp_path/'link';link.symlink_to(tmp_path/'absent')
++    for path in (file,tmp_path,link):
++        with pytest.raises(click.BadParameter):
++            NewPath().convert(str(path),None,None)
++    assert file.read_text()=='keep'
++
++def test_missing_path_preserves_requested_type_and_is_not_created(tmp_path):
++    path=tmp_path/'new'
++    assert NewPath(path_type=Path).convert(str(path),None,None)==path and not path.exists()
++
++def test_real_command_does_not_run_for_occupied_output(tmp_path):
++    calls=[]
++    @click.command()
++    @click.option('--output',type=NewPath())
++    def command(output):
++        calls.append(output)
++    result=CliRunner().invoke(command,['--output',str(tmp_path)])
++    assert result.exit_code==2 and calls==[]
++
++def test_incompatible_flags_and_dash_are_rejected():
++    with pytest.raises(TypeError):
++        NewPath(exists=True)
++    with pytest.raises(click.BadParameter):
++        NewPath().convert('-',None,None)
+--- a/library/docs/development-ck-new-path-dev.md
++++ b/library/docs/development-ck-new-path-dev.md
+@@ -0,0 +1,5 @@
++# 让输出路径参数明确拒绝已有文件、目录及悬空链接
++
++导出命令应明确要求一个尚未占用的输出位置，已有文件、目录和悬空链接都不能被当成可写空位。保持原Path返回类型和解析选项，不创建或预留文件，也不承诺并发创建时的原子占用。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/click/newpath.py
++++ b/library/src/click/newpath.py
+@@ -0,0 +1,30 @@
++"""明确要求输出目标尚不存在的参数类型。"""
++import os
++from .types import Path
++
++
++class NewPath(Path):
++    """仅校验未占用的目标路径，不创建或原子预留文件。"""
++    def __init__(self,**options):
++        """配置原Path检查选项。@param options 不含exists/allow_dash的Path选项。@return None。
++        """
++        if 'exists' in options or 'allow_dash' in options:
++            raise TypeError('NewPath固定要求未存在且不接受标准流占位符')
++        super().__init__(exists=False,allow_dash=False,**options)
++
++    def convert(self,value,param,ctx):
++        """拒绝现有文件、目录和悬空链接。@param value 输入路径。@param param 参数。
++        @param ctx 上下文。@return 原Path指定的路径类型，不写文件系统。
++        """
++        if value in ('-',b'-'):
++            self.fail('输出路径不能使用标准流占位符',param,ctx)
++        try:
++            occupied=os.path.lexists(value)
++        except (TypeError,ValueError):
++            self.fail('无效输出路径',param,ctx)
++        if occupied:
++            self.fail('输出路径已经存在',param,ctx)
++        result=super().convert(value,param,ctx)
++        if os.path.lexists(result):
++            self.fail('输出路径已经存在',param,ctx)
++        return result

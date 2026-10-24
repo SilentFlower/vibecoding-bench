@@ -1,0 +1,52 @@
+--- a/library/docs/development-pyrsistent-05-dev.md
++++ b/library/docs/development-pyrsistent-05-dev.md
+@@ -0,0 +1,5 @@
++# 持久映射批量更新接受有序键值对流并保留冲突合并语义
++
++路线07：update/update_with接受mapping或单次pairs流，多来源与重复键按从左到右覆盖/冲突折叠；生成器只消费一次，异常不改变原持久映射，CheckedPMap校验仍真实执行。既有构造与union不重算新能力。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyrsistent/_pmap.py
++++ b/library/pyrsistent/_pmap.py
+@@ -346,7 +346,8 @@
+         """
+         evolver = self.evolver()
+         for map in maps:
+-            for key, value in map.items():
++            pairs = map.items() if hasattr(map, "items") else map
++            for key, value in pairs:
+                 evolver.set(key, update_fn(evolver[key], value) if key in evolver else value)
+ 
+         return evolver.persistent()
+--- a/library/tests/test_development_pyrsistent_05_dev.py
++++ b/library/tests/test_development_pyrsistent_05_dev.py
+@@ -0,0 +1,29 @@
++"""批量更新接受一次性pairs，不重复现成的pmap构造能力。"""
++import operator
++import unittest
++from pyrsistent import pmap,CheckedPMap
++
++
++def test_mapping_pairs_generators_duplicate_keys_and_merge_order():
++    """多输入从左到右，重复pairs也按本轮先后合并。@return None。"""
++    original=pmap({'x':1})
++    assert original.update([('x',2),('x',3),('y',4)])=={'x':3,'y':4}
++    assert original.update_with(operator.add,(item for item in [('x',2),('x',3)]),{'x':4})=={'x':10}
++    assert original=={'x':1}
++
++
++def test_malformed_iteration_or_conflict_failure_leaves_original():
++    """持久原对象不因输入中途失败而留下部分更新。@return None。"""
++    original=pmap({'x':1})
++    def broken():
++        """真实一次性输入失败。@return pairs迭代器。"""
++        yield 'y',2
++        raise RuntimeError('source failed')
++    with unittest.TestCase().assertRaises(RuntimeError):original.update(broken())
++    with unittest.TestCase().assertRaises(ValueError):original.update([('bad',)])
++    assert original=={'x':1}
++    class Checked(CheckedPMap):
++        """真实类型规则保持。"""
++        __key_type__=str;__value_type__=int
++    assert Checked({'a':1}).update([('b',2)])=={'a':1,'b':2}
++    with unittest.TestCase().assertRaises(TypeError):Checked({'a':1}).update([('b','bad')])

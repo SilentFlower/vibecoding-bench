@@ -1,0 +1,78 @@
+--- a/library/development_tests/test_development_xw_report_dev.py
++++ b/library/development_tests/test_development_xw_report_dev.py
+@@ -0,0 +1,26 @@
++"""公开自动分表报表端到端回归。"""
++from zipfile import ZipFile
++import xml.etree.ElementTree as ET
++import pytest
++from xlsxwriter.records import Column
++from xlsxwriter.report import export_report
++
++def test_real_report_splits_rows_and_repeats_headers(tmp_path):
++    path=tmp_path/'report.xlsx';result=export_report(path,[Column('v','Value')],({'v':i} for i in range(5)),max_rows=3)
++    assert result.row_count==5 and result.sheets==('Report','Report (2)','Report (3)')
++    with ZipFile(path) as archive:
++        counts=[len(list(ET.fromstring(archive.read('xl/worksheets/sheet'+str(i)+'.xml')).iter('{http://schemas.openxmlformats.org/spreadsheetml/2006/main}row'))) for i in (1,2,3)]
++    assert counts==[3,3,2]
++
++def test_empty_input_creates_one_usable_header_sheet(tmp_path):
++    result=export_report(tmp_path/'empty.xlsx',[Column('v','Value')],[])
++    assert result.row_count==0 and result.sheets==('Report',)
++
++def test_late_bad_record_preserves_old_report(tmp_path):
++    path=tmp_path/'report.xlsx';path.write_bytes(b'previous')
++    with pytest.raises(ValueError): export_report(path,[Column('v','Value','number')],[{'v':1},{'v':'bad'}],max_rows=2)
++    assert path.read_bytes()==b'previous' and len(list(tmp_path.iterdir()))==1
++
++def test_constant_memory_and_sanitized_names_are_supported(tmp_path):
++    result=export_report(tmp_path/'report.xlsx',[Column('v','V')],[{'v':'=1+1'},{'v':'x'}],sheet='a/b',max_rows=2,workbook_options={'constant_memory':True})
++    assert result.sheets==('a_b','a_b (2)') and result.row_count==2
+--- a/library/docs/development-xw-report-dev.md
++++ b/library/docs/development-xw-report-dev.md
+@@ -0,0 +1,5 @@
++# 组合类型列与原子文件实现自动分表的完整报表导出
++
++把原子文件、唯一工作表名和类型列真正组合成可交付报表。按包含标题的行预算自动分表，流式输入仅消费一次；晚期记录出错也保留旧报表，成功落盘后才返回实际表名和总行数。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/xlsxwriter/report.py
++++ b/library/xlsxwriter/report.py
+@@ -0,0 +1,38 @@
++"""组合原子文件、类型记录与工作表命名完成实际分卷报表。"""
++from dataclasses import dataclass
++from .atomic import atomic_workbook
++from .sheet_names import add_named_worksheet
++from .records import _columns,write_records
++
++
++@dataclass(frozen=True)
++class ReportSummary:
++    """成功落盘后的工作表名与业务记录总数。"""
++    sheets: tuple
++    row_count: int
++
++
++def export_report(destination,columns,records,*,sheet='Report',max_rows=1048576,workbook_options=None):
++    """流式导出并按行界限分卷。@param destination 目标文件。@param columns 类型列。
++    @param records 单次迭代记录。@param sheet 业务表名。@param max_rows 每表最大行数，含标题。
++    @param workbook_options 原工作簿选项。@return 成功替换后的ReportSummary。
++    """
++    columns=_columns(columns)
++    if type(max_rows) is not int or not 2<=max_rows<=1048576 or not isinstance(sheet,str):
++        raise ValueError('每表行数必须在2至Excel上限之间')
++    names=[];count=0
++    with atomic_workbook(destination,workbook_options) as workbook:
++        worksheet=None;row=max_rows
++        for record in records:
++            if row>=max_rows:
++                worksheet=add_named_worksheet(workbook,sheet)
++                names.append(worksheet.get_name())
++                write_records(worksheet,0,columns,[])
++                worksheet.freeze_panes(1,0)
++                row=1
++            write_records(worksheet,row,columns,[record],headers=False)
++            row+=1;count+=1
++        if worksheet is None:
++            worksheet=add_named_worksheet(workbook,sheet);names.append(worksheet.get_name())
++            write_records(worksheet,0,columns,[]);worksheet.freeze_panes(1,0)
++    return ReportSummary(tuple(names),count)

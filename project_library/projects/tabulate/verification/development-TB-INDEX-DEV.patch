@@ -1,0 +1,96 @@
+--- a/library/development_tests/test_development_tb_index_dev.py
++++ b/library/development_tests/test_development_tb_index_dev.py
+@@ -0,0 +1,22 @@
++"""公开分隔行自定义索引回归。"""
++import pytest
++from tabulate import tabulate,SEPARATING_LINE
++
++def test_sized_indices_count_only_business_rows():
++    rows=[['a'],SEPARATING_LINE,['b']]
++    result=tabulate(rows,showindex=['first','second'],tablefmt='grid')
++    assert 'first' in result and 'second' in result
++
++def test_list_tuple_and_iterator_indices_render_equally():
++    rows=[['a'],SEPARATING_LINE,['b']]
++    values=['one','two']
++    assert tabulate(rows,showindex=values)==tabulate(rows,showindex=tuple(values))==tabulate(rows,showindex=iter(values))
++    assert values==['one','two']
++
++def test_wrong_business_index_count_is_rejected():
++    with pytest.raises(ValueError):
++        tabulate([['a'],SEPARATING_LINE,['b']],showindex=['one','two','extra'])
++
++def test_empty_and_separator_only_tables_do_not_consume_indices():
++    assert tabulate([],showindex=[])==''
++    assert tabulate([SEPARATING_LINE],showindex=[])==tabulate([SEPARATING_LINE],showindex=iter([]))
+--- a/library/docs/development-tb-index-dev.md
++++ b/library/docs/development-tb-index-dev.md
+@@ -0,0 +1,5 @@
++# 让分隔行不消耗自定义业务行索引
++
++报表中的分隔线不代表业务记录，不应占用自定义行号。修复长度校验与实际消费逻辑不一致，列表、元组和一次性索引都按真实数据行工作，分隔位置及原API签名保留。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tabulate/__init__.py
++++ b/library/tabulate/__init__.py
+@@ -1401,12 +1401,12 @@
+     """Add a left-most index column."""
+     if index is None or index is False:
+         return rows
+-    if isinstance(index, Sized) and len(index) != len(rows):
++    sans_rows, separating_lines = _remove_separating_lines(rows)
++    if isinstance(index, Sized) and len(index) != len(sans_rows):
+         raise ValueError(
+             "index must be as long as the number of data rows: "
+-            f"len(index)={len(index)} len(rows)={len(rows)}"
++            f"len(index)={len(index)} len(rows)={len(sans_rows)}"
+         )
+-    sans_rows, separating_lines = _remove_separating_lines(rows)
+     new_rows = []
+     index_iter = iter(index)
+     for row in sans_rows:
+@@ -1599,7 +1599,7 @@
+         rows = _prepend_row_index(rows, showindex)
+     elif showindex == "always" or (_bool(showindex) and not showindex_is_a_str):
+         if index is None:
+-            index = list(range(len(rows)))
++            index = list(range(sum(not _is_separating_line(row) for row in rows)))
+         rows = _prepend_row_index(rows, index)
+     elif showindex == "never" or (not _bool(showindex) and not showindex_is_a_str):
+         pass
+@@ -2449,6 +2449,9 @@
+     ra_default = rowalign if isinstance(rowalign, str) else None
+     rowaligns = _expand_iterable(rowalign, len(rows), ra_default)
+     _reinsert_separating_lines(rows, separating_lines)
++    if separating_lines:
++        for position in separating_lines:
++            rowaligns.insert(position,None)
+ 
+     return _format_table(
+         tablefmt,
+@@ -2650,14 +2653,17 @@
+                 )
+             _append_line(lines, padded_widths, colaligns, fmt.linebetweenrows)
+         # the last row without a line below
+-        append_row(
+-            lines,
+-            pad_row(rows[-1], pad),
+-            padded_widths,
+-            colaligns,
+-            fmt.datarow,
+-            rowalign=rowaligns[-1],
+-        )
++        if rows[-1] == SEPARATING_LINE:
++            _append_line(lines,padded_widths,colaligns,fmt.linebetweenrows)
++        else:
++            append_row(
++                lines,
++                pad_row(rows[-1], pad),
++                padded_widths,
++                colaligns,
++                fmt.datarow,
++                rowalign=rowaligns[-1],
++            )
+     else:
+         separating_line = (
+             fmt.linebetweenrows

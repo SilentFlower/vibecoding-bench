@@ -1,0 +1,64 @@
+--- a/library/docs/development-pydash-02-dev.md
++++ b/library/docs/development-pydash-02-dev.md
+@@ -0,0 +1,5 @@
++# 重试通知支持假值回调且保持尝试次数与错误边界
++
++路线02：仅None表示未提供通知；falsey callable仍验证并按每次失败调用，回调自身错误不重试，原次数/休眠/异常政策保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pydash/utilities.py
++++ b/library/src/pydash/utilities.py
+@@ -1218,13 +1218,13 @@
+     ):
+         raise TypeError("exceptions must be a tuple of Exception types")
+ 
+-    if on_exception and not callable(on_exception):
++    if on_exception is not None and not callable(on_exception):
+         raise TypeError("on_exception must be a callable")
+ 
+     if jitter and not isinstance(jitter, tuple):
+         jitter = (0, jitter)
+ 
+-    on_exc_argcount = getargcount(on_exception, maxargs=2) if on_exception else None
++    on_exc_argcount = getargcount(on_exception, maxargs=2) if on_exception is not None else None
+ 
+     def decorator(func):
+         @wraps(func)
+@@ -1236,7 +1236,7 @@
+                 try:
+                     return func(*args, **kwargs)
+                 except exceptions as exc:
+-                    if on_exception:
++                    if on_exception is not None:
+                         callit(on_exception, exc, attempt, argcount=on_exc_argcount)
+ 
+                     if attempt == attempts:
+--- a/library/tests/test_development_pydash_02_dev.py
++++ b/library/tests/test_development_pydash_02_dev.py
+@@ -0,0 +1,26 @@
++"""合法falsey回调不丢失，非法回调在调用前拒绝。"""
++import unittest
++import pydash
++
++def test_falsey_callable_gets_each_exception_and_attempt():
++    """失败三次时通知包含最终一次。@return None。"""
++    seen=[]
++    class Callback:
++        """自定义假值但可调用。"""
++        def __bool__(self):return False
++        def __call__(self,error,attempt):seen.append((str(error),attempt))
++    @pydash.retry(attempts=3,delay=0,on_exception=Callback())
++    def fail():raise ValueError('bad')
++    with unittest.TestCase().assertRaises(ValueError):fail()
++    assert seen==[('bad',1),('bad',2),('bad',3)]
++
++def test_falsey_invalid_and_callback_exception_are_not_retried():
++    """回调本身错误不被被包装函数的重试吞掉。@return None。"""
++    for invalid in (False,0,'',[]):
++        with unittest.TestCase().assertRaises(TypeError):pydash.retry(on_exception=invalid)
++    calls=[]
++    def callback(error,attempt):raise LookupError('callback')
++    @pydash.retry(attempts=4,delay=0,on_exception=callback)
++    def fail():calls.append(1);raise ValueError('operation')
++    with unittest.TestCase().assertRaises(LookupError):fail()
++    assert calls==[1]

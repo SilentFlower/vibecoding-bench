@@ -1,0 +1,138 @@
+--- a/library/docs/development-funcy-o06-dev.md
++++ b/library/docs/development-funcy-o06-dev.md
+@@ -0,0 +1,5 @@
++# 交付命名同步阶段及保留原始cause的业务流水线
++
++对应路线20：命名同步业务阶段复用真实Funcy函数选择器，输入/输出适配及阶段报告明确，失败保留位置与cause且不保存中间数据，原compose快速路径保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/funcy/pipeline.py
++++ b/library/funcy/pipeline.py
+@@ -0,0 +1,89 @@
++"""命名同步阶段流水线，保留Funcy函数选择器与失败cause。"""
++from dataclasses import dataclass
++import inspect
++from funcy.funcmakers import make_func
++
++
++@dataclass(frozen=True)
++class Stage:
++    """单个完整业务阶段，可显式适配输入和输出。"""
++    name: str
++    function: object
++    input_adapter: object = None
++    output_adapter: object = None
++
++
++@dataclass(frozen=True)
++class PipelineResult:
++    """只保存最终结果及不含中间值的阶段事件。"""
++    ok: bool
++    value: object
++    events: tuple
++    failed_stage: object = None
++
++
++class PipelineStageError(RuntimeError):
++    """携带失败名称、下标和阶段内部位置，不打印业务输入。"""
++    def __init__(self, stage, index, phase):
++        """保存实际失败位置。@return None。"""
++        self.stage, self.index, self.phase = stage, index, phase
++        super().__init__('流水线阶段%s在%s失败' % (stage, phase))
++
++
++class Pipeline:
++    """声明式命名同步阶段，默认失败抛异常，不保存所有中间数据。
++
++    :param stages: Stage实例序列，名称非空且唯一。
++    :param on_error: raise或report。
++    :return: 支持普通单值调用和可选报告的业务流水线。
++    """
++    def __init__(self, stages, *, on_error='raise'):
++        """验证阶段并复用Funcy make_func处理函数选择器。@return None。"""
++        if on_error not in ('raise', 'report'):
++            raise ValueError('未知流水线错误政策')
++        prepared, names = [], set()
++        for stage in stages:
++            if not isinstance(stage, Stage) or not isinstance(stage.name, str) or not stage.name.strip() or stage.name in names:
++                raise ValueError('阶段必须有唯一非空名字')
++            function = make_func(stage.function)
++            if inspect.iscoroutinefunction(function) or inspect.isasyncgenfunction(function):
++                raise TypeError('本入口只接受同步阶段')
++            if any(adapter is not None and (not callable(adapter) or inspect.iscoroutinefunction(adapter) or inspect.isasyncgenfunction(adapter)) for adapter in (stage.input_adapter, stage.output_adapter)):
++                raise TypeError('阶段适配器必须同步可调用')
++            names.add(stage.name)
++            prepared.append(Stage(stage.name, function, stage.input_adapter, stage.output_adapter))
++        self.stages, self.on_error = tuple(prepared), on_error
++
++    def __call__(self, value):
++        """以普通单值函数协议执行，report政策始终返回固定结果。@return 最终值或PipelineResult。"""
++        return self.run(value, report=self.on_error == 'report')
++
++    def run(self, value, *, report=False):
++        """按序运行实际阶段，不重试或重新执行副作用回调。
++
++        :param value: 首个业务输入。
++        :param report: 成功时是否返回结构化事件；report错误政策下总返回结果。
++        :return: 最终值或PipelineResult，错误保留原cause。
++        """
++        def synchronous(result):
++            if inspect.isawaitable(result):
++                if inspect.iscoroutine(result):
++                    result.close()
++                raise TypeError('同步流水线不能接收awaitable结果')
++            return result
++        events = []
++        for index, stage in enumerate(self.stages):
++            phase = 'input'
++            try:
++                current = synchronous(stage.input_adapter(value)) if stage.input_adapter is not None else value
++                phase = 'function'
++                current = synchronous(stage.function(current))
++                phase = 'output'
++                value = synchronous(stage.output_adapter(current)) if stage.output_adapter is not None else current
++            except Exception as error:
++                events.append({'stage': stage.name, 'index': index, 'state': 'failed', 'phase': phase, 'error_kind': type(error).__name__})
++                if self.on_error == 'raise':
++                    raise PipelineStageError(stage.name, index, phase) from error
++                return PipelineResult(False, None, tuple(events), stage.name)
++            events.append({'stage': stage.name, 'index': index, 'state': 'passed'})
++        return PipelineResult(True, value, tuple(events)) if report or self.on_error == 'report' else value
+--- a/library/tests/test_development_funcy_o06_dev.py
++++ b/library/tests/test_development_funcy_o06_dev.py
+@@ -0,0 +1,35 @@
++"""命名业务流水线真实执行选择器和适配器，失败位置准确。"""
++import pytest
++
++def test_three_real_stages_adapters_and_optional_report():
++    """解析、规范和验证按同一真实顺序执行。@return None。"""
++    from funcy.pipeline import Pipeline,Stage
++    events=[]
++    p=Pipeline([Stage('parse',lambda text:int(text),input_adapter=str.strip),Stage('scale',lambda value:value*2),Stage('check',lambda value:events.append(value) or value,output_adapter=str)])
++    assert p(' 3 ')=='6' and events==[6]
++    report=p.run('4',report=True);assert report.ok and report.value=='8' and [e['stage'] for e in report.events]==['parse','scale','check']
++
++def test_failure_context_cause_report_and_no_later_stage():
++    """默认抛携带cause的阶段错误，report模式不泄露异常值。@return None。"""
++    from funcy.pipeline import Pipeline,Stage,PipelineStageError
++    original=ValueError('secret-input');calls=[]
++    def fail(value):raise original
++    p=Pipeline([Stage('bad',fail),Stage('later',lambda x:calls.append(x))])
++    with pytest.raises(PipelineStageError) as error:p('secret')
++    assert error.value.stage=='bad' and error.value.__cause__ is original and calls==[] and 'secret' not in str(error.value)
++    report=Pipeline([Stage('bad',fail)],on_error='report')('secret')
++    assert not report.ok and report.failed_stage=='bad' and report.events[0]['error_kind']=='ValueError'
++
++def test_empty_identity_selector_and_invalid_stage_config():
++    """空流水线为identity，原Funcy索引选择器可直接用。@return None。"""
++    from funcy.pipeline import Pipeline,Stage
++    value=object();assert Pipeline([])(value) is value
++    assert Pipeline([Stage('first',0)])([3,4])==3
++    with pytest.raises(ValueError):Pipeline([Stage('same',lambda x:x),Stage('same',lambda x:x)])
++    with pytest.raises(TypeError):Pipeline([Stage('bad',lambda x:x,input_adapter=3)])
++    async def adapter(value):return value
++    with pytest.raises(TypeError):Pipeline([Stage('bad',lambda x:x,output_adapter=adapter)])
++    from funcy.pipeline import PipelineStageError
++    coroutine=adapter(1)
++    with pytest.raises(PipelineStageError):Pipeline([Stage('bad',lambda x:x,output_adapter=lambda value:coroutine)])(1)
++    assert coroutine.cr_frame is None

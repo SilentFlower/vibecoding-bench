@@ -1,0 +1,130 @@
+--- a/library/development_tests/test_development_tn_history_dev.py
++++ b/library/development_tests/test_development_tn_history_dev.py
+@@ -0,0 +1,39 @@
++"""公开有界无载荷尝试历史回归。"""
++import asyncio
++import pytest
++from tenacity import Retrying,AsyncRetrying,stop_after_attempt
++from tenacity.history import RetryHistory
++
++def test_retry_attempts_and_success_are_recorded_with_bounds():
++    history=RetryHistory(2);calls=[];result=object()
++    def work(secret):
++        calls.append(secret)
++        if len(calls)<3:
++            raise ValueError('private')
++        return result
++    assert Retrying(stop=stop_after_attempt(4),sleep=lambda _:None)(history.wrap(work),'secret') is result
++    records=history.records
++    assert [r.sequence for r in records]==[2,3] and [r.succeeded for r in records]==[False,True]
++    assert records[0].exception_type=='builtins.ValueError' and all(r.elapsed>=0 for r in records)
++    assert 'secret' not in repr(records) and 'private' not in repr(records)
++
++def test_clear_does_not_reuse_sequence_and_snapshot_is_stable():
++    history=RetryHistory();wrapped=history.wrap(lambda:1)
++    wrapped();snapshot=history.records;history.clear();wrapped()
++    assert snapshot[0].sequence==1 and history.records[0].sequence==2
++
++def test_same_exception_object_is_propagated():
++    history=RetryHistory();error=LookupError('private')
++    def fail():
++        raise error
++    with pytest.raises(LookupError) as caught:
++        history.wrap(fail)()
++    assert caught.value is error and history.records[0].exception_type=='builtins.LookupError'
++
++def test_async_target_is_recorded_after_awaiting():
++    history=RetryHistory()
++    async def work():
++        return 7
++    wrapped=history.wrap(work);coroutine=wrapped()
++    assert history.records==()
++    assert asyncio.run(coroutine)==7 and history.records[0].succeeded
+--- a/library/docs/development-tn-history-dev.md
++++ b/library/docs/development-tn-history-dev.md
+@@ -0,0 +1,5 @@
++# 为真实同步和异步尝试记录无业务载荷的有界历史
++
++长期任务需查看最近真实尝试，但不能积累业务参数、结果或异常载荷。提供有界不可变元数据历史，同步和异步目标均在实际结束后记录，保持返回及原异常，线程安全读取快照且清空后序号不复用。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tenacity/history.py
++++ b/library/tenacity/history.py
+@@ -0,0 +1,77 @@
++"""只保留无参数、无结果、无异常消息的有界尝试元数据。"""
++import functools
++import inspect
++import threading
++import time
++from collections import deque
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True)
++class AttemptRecord:
++    """单次真实目标调用的不可变元数据。"""
++    sequence: int
++    elapsed: float
++    succeeded: bool
++    exception_type: object
++
++
++class RetryHistory:
++    """跨调用共享的有界历史；锁保护快照，不保存业务对象。"""
++    def __init__(self,max_entries=20):
++        """建立历史。@param max_entries 正整数上限。@return None。
++        """
++        if type(max_entries) is not int or max_entries<1:
++            raise ValueError('历史上限必须是正整数')
++        self._records=deque(maxlen=max_entries)
++        self._lock=threading.Lock()
++        self._sequence=0
++
++    @property
++    def records(self):
++        """读取不可变快照。@return AttemptRecord元组。
++        """
++        with self._lock:
++            return tuple(self._records)
++
++    def clear(self):
++        """清空记录而不复用序号。@return None。
++        """
++        with self._lock:
++            self._records.clear()
++
++    def _record(self,start,error):
++        elapsed=max(0,time.monotonic()-start)
++        with self._lock:
++            self._sequence+=1
++            self._records.append(AttemptRecord(self._sequence,elapsed,error is None,
++                type(error).__module__+'.'+type(error).__qualname__ if error is not None else None))
++
++    def wrap(self,fn):
++        """包装真实同步或协程目标。@param fn 可调用对象。@return 保留结果及异常的包装函数。
++        """
++        if not callable(fn):
++            raise TypeError('历史目标必须可调用')
++        if inspect.iscoroutinefunction(fn):
++            @functools.wraps(fn)
++            async def asynchronous(*args,**kwargs):
++                start=time.monotonic()
++                try:
++                    result=await fn(*args,**kwargs)
++                except BaseException as error:
++                    self._record(start,error)
++                    raise
++                self._record(start,None)
++                return result
++            return asynchronous
++        @functools.wraps(fn)
++        def synchronous(*args,**kwargs):
++            start=time.monotonic()
++            try:
++                result=fn(*args,**kwargs)
++            except BaseException as error:
++                self._record(start,error)
++                raise
++            self._record(start,None)
++            return result
++        return synchronous

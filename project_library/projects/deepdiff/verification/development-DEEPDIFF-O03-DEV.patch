@@ -1,0 +1,63 @@
+--- a/library/deepdiff/deephash.py
++++ b/library/deepdiff/deephash.py
+@@ -677,6 +677,10 @@
+         elif isinstance(obj, Path):
+             result = self._prep_path(obj)
+ 
++        elif isinstance(obj, datetime.timezone):
++            # 展示名称不参与原生timezone相等；偏移摘要与比较必须一致。
++            result = 'timezone:' + str(obj.utcoffset(None))
++
+         elif isinstance(obj, times):
+             result = self._prep_datetime(obj)  # type: ignore
+ 
+--- a/library/deepdiff/diff.py
++++ b/library/deepdiff/diff.py
+@@ -2161,6 +2161,11 @@
+             else:
+                 self._diff_str(level, local_tree=local_tree)
+ 
++        elif isinstance(level.t1, datetime.timezone):
++            # 原生固定偏移对象没有可遍历属性，应直接比较Python的偏移相等语义。
++            if level.t1 != level.t2:
++                self._report_result('values_changed', level, local_tree=local_tree)
++
+         elif isinstance(level.t1, datetime.datetime):
+             self._diff_datetime(level, local_tree=local_tree)
+ 
+--- a/library/docs/development-deepdiff-o03-dev.md
++++ b/library/docs/development-deepdiff-o03-dev.md
+@@ -0,0 +1,5 @@
++# 按固定偏移真实语义比较时区并同步哈希
++
++对应路线04：原生datetime.timezone没有可遍历业务属性，按Python固定偏移相等语义报告差异，并使Hash与无序匹配一致；不扩张为任意动态时区。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_deepdiff_o03_dev.py
++++ b/library/tests/test_development_deepdiff_o03_dev.py
+@@ -0,0 +1,25 @@
++"""固定偏移时区比较及Hash不再把不同对象误判为相同空属性。"""
++from datetime import timezone,timedelta,tzinfo
++from deepdiff import DeepDiff,DeepHash
++
++def test_actual_offsets_and_same_offset_different_name():
++    """同偏移名称不参与相等，偏移不同会报告值差异。@return None。"""
++    a=timezone(timedelta(hours=1),'name-a');b=timezone(timedelta(hours=1),'name-b')
++    assert DeepDiff(a,b)=={}
++    assert 'values_changed' in DeepDiff(timezone.utc,a)
++    assert DeepHash(a)[a]==DeepHash(b)[b]
++
++def test_negative_fractional_and_nested_hash_pairing():
++    """负偏移、非整小时及无序容器都区分实际偏移。@return None。"""
++    a=timezone(timedelta(hours=-3,minutes=-30));b=timezone(timedelta(hours=5,minutes=45))
++    assert DeepDiff({'zone':a},{'zone':b})
++    assert DeepHash(a)[a]!=DeepHash(b)[b]
++    assert DeepDiff([a],[b],ignore_order=True)
++
++def test_identity_zero_and_dynamic_tzinfo_type_rules():
++    """不同tzinfo类继续按原类型规则，不扩大成动态时区承诺。@return None。"""
++    assert DeepDiff(timezone.utc,timezone(timedelta(0),'zero'))=={}
++    class Dynamic(tzinfo):
++        """不同的动态时区类型。"""
++        def utcoffset(self,dt):return timedelta(0)
++    assert 'type_changes' in DeepDiff(timezone.utc,Dynamic())

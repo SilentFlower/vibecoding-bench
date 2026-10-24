@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TREELIB-06-DEV",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add treelib.navigation.resolve_path, lowest_common_ancestor and path_between. Use actual current-tree parent/successor relationships, never tag equality as identity. resolve_path consumes literal string segments (not an implicitly split string), absolute paths include root tag; explicit start provides relative paths. Zero matches is None/[], ambiguity raises by default or returns all nodes in current sibling order. Slash-containing tags and duplicate tags remain usable. path_between includes both endpoints in source-to-target order; LCA is nearest common ancestor, same-node/shared-view/missing-ID and corrupted parent chains are explicit. Iterative parent walks avoid recursion limits; this is tree navigation, not an arbitrary graph shortest-path engine.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

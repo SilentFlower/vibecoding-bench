@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CF-SNAPSHOT-DEV",
+  "source_commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add ConfigView.snapshot(template=REQUIRED,*,redact=False) and confuse.snapshots.snapshot(view,...). Without template resolve nested mappings across sources and list subviews using existing view precedence; explicit templates use view.get(template). Deep-freeze dictionaries as read-only mappings and lists/tuples as tuples, retain standard immutable configuration scalar/date/Decimal/Path values, reject cycles and unsupported mutable objects. Snapshot detaches all future source changes. Redact relative marked paths including list elements and whole views as REDACTED. Do not silently serialize values or alter flatten/get.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

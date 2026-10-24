@@ -1,0 +1,104 @@
+--- a/library/development_tests/test_development_sm_graph_dev.py
++++ b/library/development_tests/test_development_sm_graph_dev.py
+@@ -0,0 +1,35 @@
++"""公开真实状态声明路径规划回归。"""
++import pytest
++from statemachine.transition_graph import TransitionGraph
++from statemachine import StateMachine,State
++
++class Flow(StateMachine):
++    draft=State(initial=True)
++    ready=State()
++    done=State(final=True)
++    advance=draft.to(ready)
++    finish=ready.to(done)
++    reset=ready.to(draft)
++
++def test_shortest_candidate_path_and_cycle_are_stable():
++    graph=TransitionGraph(Flow)
++    assert graph.shortest_path('draft','done')==('advance','finish') and graph.shortest_path('ready','draft')==('reset',)
++    assert graph.shortest_path('done','draft') is None and graph.shortest_path('draft','draft')==()
++
++def test_budget_and_unknown_states_are_explicit():
++    graph=TransitionGraph(Flow);assert graph.shortest_path('draft','done',max_depth=1) is None
++    with pytest.raises(KeyError): graph.shortest_path('unknown','done')
++    with pytest.raises(ValueError): graph.shortest_path('draft','done',max_depth=True)
++
++def test_guard_and_initial_callbacks_are_never_executed():
++    calls=[]
++    class Guarded(StateMachine):
++        start=State(initial=True);done=State(final=True)
++        finish=start.to(done,cond=lambda:calls.append('guard') or False)
++        def on_enter_start(self): calls.append('enter')
++    assert TransitionGraph(Guarded).shortest_path('start','done')==('finish',) and calls==[]
++
++def test_declaration_edges_are_detached_from_later_graph_queries():
++    graph=TransitionGraph(Flow);before=tuple(Flow.draft.transitions)
++    graph.shortest_path('draft','done');assert tuple(Flow.draft.transitions)==before
++    assert [(edge.source,edge.target,edge.event) for edge in graph.edges]==[('draft','ready','advance'),('ready','done','finish'),('ready','draft','reset')]
+--- a/library/docs/development-sm-graph-dev.md
++++ b/library/docs/development-sm-graph-dev.md
+@@ -0,0 +1,5 @@
++# 为平面状态机实现不执行回调的声明图与有界候选路径规划
++
++真实平面状态定义生成静态声明图，用有界广度搜索规划最少事件候选。不实例化机器或执行守卫，明确拒绝不能按平面图处理的层级、并行与多目标定义，不把候选路径冒称可执行结论。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/statemachine/transition_graph.py
++++ b/library/statemachine/transition_graph.py
+@@ -0,0 +1,55 @@
++"""为平面状态机提供不执行守卫的声明图与候选事件路径。"""
++from collections import deque
++from dataclasses import dataclass
++from .statemachine import StateMachine
++
++
++@dataclass(frozen=True)
++class Edge:
++    """声明事件的一条平面转换边；不表示运行时守卫必定满足。"""
++    source: str
++    target: str
++    event: str
++
++
++class TransitionGraph:
++    """仅支持平面命名事件图，层级／并行／无事件／多目标明确拒绝。"""
++    def __init__(self,machine_class):
++        """捕获声明图。@param machine_class 真实StateMachine子类。@return None。
++        """
++        if not isinstance(machine_class,type) or not issubclass(machine_class,StateMachine):
++            raise TypeError('需要StateMachine类')
++        states=list(machine_class.states_map.values())
++        if any(state.parent is not None or state.states or state.parallel for state in states):
++            raise ValueError('声明路径规划只支持平面状态机')
++        self.nodes=tuple(state.id for state in states);edges=[]
++        for state in states:
++            for transition in state.transitions:
++                if len(transition.targets)>1 or not list(transition.events):
++                    raise ValueError('仅支持命名事件单目标或无目标转换')
++                target=transition.target.id if transition.target is not None else state.id
++                for event in transition.events:
++                    edge=Edge(state.id,target,str(event))
++                    if edge not in edges:
++                        edges.append(edge)
++        self.edges=tuple(edges)
++
++    def shortest_path(self,start,target,*,max_depth=1000):
++        """规划最少事件候选路径。@param start 状态ID。@param target 状态ID。
++        @param max_depth 非负事件深度。@return 事件名元组；无候选路径返回None，不执行机器。
++        """
++        if start not in self.nodes or target not in self.nodes:
++            raise KeyError('状态ID不存在')
++        if type(max_depth) is not int or max_depth<0:
++            raise ValueError('路径预算必须为非负整数')
++        queue=deque([(start,())]);visited={start}
++        while queue:
++            state,path=queue.popleft()
++            if state==target:
++                return path
++            if len(path)>=max_depth:
++                continue
++            for edge in self.edges:
++                if edge.source==state and edge.target not in visited:
++                    visited.add(edge.target);queue.append((edge.target,path+(edge.event,)))
++        return None

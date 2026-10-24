@@ -1,0 +1,73 @@
+--- a/library/docs/development-cattrs-o04-dev.md
++++ b/library/docs/development-cattrs-o04-dev.md
+@@ -0,0 +1,5 @@
++# 为原始类型配置精确且可组合的严格结构策略
++
++严格原始类型策略仅显式启用，不通过构造器把文本、bool或子类强制变成目标类型。整数扩展浮点和非有限值政策明确；真实注册钩子影响嵌套记录并保留框架错误路径，其他实例及导出不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/cattrs/strategies/strict.py
++++ b/library/src/cattrs/strategies/strict.py
+@@ -0,0 +1,24 @@
++"""只在显式启用的转换器执行严格原始类型结构。"""
++from math import isfinite
++
++
++def configure_strict_primitives(converter, *, allow_int_float=False, finite_float=True):
++    """注册不通过构造强制转换的原始类型检查。
++
++    :param converter: 当前真实转换器。
++    :param allow_int_float: 是否允许真实int扩展为float，bool始终拒绝。
++    :param finite_float: 是否拒绝NaN/Infinity。
++    :return: 同一转换器，未配置实例保持原宽松策略。
++    """
++    def strict(value, target):
++        """校验当前目标原始类型。@param value 值。@param target 类型。@return 合法值。"""
++        if target is float and allow_int_float and type(value) is int:
++            value = float(value)
++        if type(value) is not target:
++            raise TypeError('严格结构类型不匹配：' + target.__name__)
++        if target is float and finite_float and not isfinite(value):
++            raise ValueError('严格浮点必须为有限值')
++        return value
++    for target in (bool, int, float, str, bytes):
++        converter.register_structure_hook(target, strict)
++    return converter
+--- a/library/tests/test_development_cattrs_o04_dev.py
++++ b/library/tests/test_development_cattrs_o04_dev.py
+@@ -0,0 +1,35 @@
++"""严格策略必须影响真实嵌套结构而非只包一层示例。"""
++from dataclasses import dataclass
++import pytest
++from cattrs import Converter
++
++def test_exact_primitives():
++    """字符串整数与bool整数不能误通过。@return None。"""
++    from cattrs.strategies.strict import configure_strict_primitives
++    converter = configure_strict_primitives(Converter())
++    for value in ('2', True):
++        with pytest.raises(TypeError): converter.structure(value, int)
++    assert converter.structure(2, int) == 2 and converter.structure(False, bool) is False
++    assert Converter().structure('2', int) == 2
++
++def test_nested_path_and_float_policy():
++    """嵌套字段错误保持框架路径，浮点扩展明确。@return None。"""
++    from cattrs.strategies.strict import configure_strict_primitives
++    from cattrs.v import transform_error
++    @dataclass
++    class Record:
++        """库存记录。"""
++        quantity: int
++    converter = configure_strict_primitives(Converter())
++    with pytest.raises(Exception) as result: converter.structure({'quantity': '3'}, Record)
++    assert 'quantity' in str(transform_error(result.value))
++    assert configure_strict_primitives(Converter(), allow_int_float=True).structure(3, float) == 3.0
++
++def test_nonfinite_and_subclass():
++    """非有限浮点和非精确子类的政策可证伪。@return None。"""
++    from cattrs.strategies.strict import configure_strict_primitives
++    converter = configure_strict_primitives(Converter())
++    with pytest.raises(ValueError): converter.structure(float('nan'), float)
++    class Text(str):
++        """自定义文本子类。"""
++    with pytest.raises(TypeError): converter.structure(Text('x'), str)

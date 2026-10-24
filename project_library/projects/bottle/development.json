@@ -1,0 +1,310 @@
+{
+  "schema": 3,
+  "project_key": "bottle",
+  "title": "Bottle轻量Web工作场景",
+  "category": "WSGI与HTTP入口",
+  "description": "固定真实源码上的完整工程交付：在原生文件入口识别真实PathLike并保持流所有权；隔离模板引擎和实例的默认扩展名搜索；前缀克隆合并原生路由并保留来源应用；安全设置响应charset并影响实际字符串编码；原子或排他发布上传文件并恢复输入位置；输出不执行回调且不泄漏配置的真实路由清单。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "cf0efc66f121c844754472ff5fb9ba92d4cebaf46da0a66410434312cad7e17d",
+  "environment": "bottle-py312",
+  "source": {
+    "repository": "https://github.com/bottlepy/bottle",
+    "commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BOTTLE-O01-DEV-SCENE",
+      "title": "在原生文件入口识别真实PathLike并保持流所有权",
+      "goal": "在原生文件入口识别真实PathLike并保持流所有权",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BOTTLE-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BOTTLE-O01-DEV",
+          "kind": "modify",
+          "goal": "在原生文件入口识别真实PathLike并保持流所有权",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend FileUpload.save, static_file, BaseTemplate name/lookup and ResourceManager.add_path boundaries to accept str/bytes/os.PathLike via os.fspath/fsdecode, including custom PathLike and Unicode. Distinguish real paths from writable streams, support upload target directories and one directory lookup input, preserve caller stream ownership/cursor and existing file conflict/static containment rules. Invalid __fspath__ return types must fail instead of being stringified. Do not reinterpret template source text as filenames.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bottle_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-bottle-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BOTTLE-O01-DEV-contract.md",
+            "materials/BOTTLE-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bottle.py",
+            "library/test/test_development_bottle_o01_dev.py",
+            "library/docs/development-bottle-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BOTTLE-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BOTTLE-O01-DEV.native.json",
+            "public_native": "verification/BOTTLE-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BOTTLE-O01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BOTTLE-O02-DEV-SCENE",
+      "title": "隔离模板引擎和实例的默认扩展名搜索",
+      "goal": "隔离模板引擎和实例的默认扩展名搜索",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BOTTLE-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BOTTLE-O02-DEV",
+          "kind": "modify",
+          "goal": "隔离模板引擎和实例的默认扩展名搜索",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend the delivered PathLike-aware template lookup: give MakoTemplate/Jinja2Template/CheetahTemplate their own engine suffixes ahead of existing legacy extensions, and allow BaseTemplate instances to append explicit extensions without mutating parent or other instances. Extend search to accept an explicit extension sequence used by initialization; preserve PathLike names/directories, direct filename search, lookup priority and legacy .tpl fallback. Validate bad path-like suffixes and prove SimpleTemplate actually renders an instance-only extension without requiring optional engines.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bottle_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-bottle-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "BOTTLE-O01-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/BOTTLE-O02-DEV-contract.md",
+            "materials/BOTTLE-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bottle.py",
+            "library/test/test_development_bottle_o02_dev.py",
+            "library/docs/development-bottle-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BOTTLE-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BOTTLE-O02-DEV.native.json",
+            "public_native": "verification/BOTTLE-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BOTTLE-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BOTTLE-O03-DEV-SCENE",
+      "title": "前缀克隆合并原生路由并保留来源应用",
+      "goal": "前缀克隆合并原生路由并保留来源应用",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BOTTLE-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BOTTLE-O03-DEV",
+          "kind": "modify",
+          "goal": "前缀克隆合并原生路由并保留来源应用",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Bottle.merge(routes, prefix=None). None must preserve legacy route identity/owner. An explicit absolute prefix clones routes with target ownership, copied route-specific plugins/skip/config and original callback, normalizes trailing slashes and supports dynamic built-in filters/reverse URLs without changing source rules. Target app plugin policy applies to clones, source app plugins are not implicitly copied. Reject bad prefixes and duplicate route names before adding any clones; preserve original source registration and callback behavior.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bottle_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-bottle-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BOTTLE-O03-DEV-contract.md",
+            "materials/BOTTLE-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bottle.py",
+            "library/test/test_development_bottle_o03_dev.py",
+            "library/docs/development-bottle-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BOTTLE-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BOTTLE-O03-DEV.native.json",
+            "public_native": "verification/BOTTLE-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BOTTLE-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BOTTLE-O04-DEV-SCENE",
+      "title": "安全设置响应charset并影响实际字符串编码",
+      "goal": "安全设置响应charset并影响实际字符串编码",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BOTTLE-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BOTTLE-O04-DEV",
+          "kind": "modify",
+          "goal": "安全设置响应charset并影响实际字符串编码",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd BaseResponse.charset setter that validates a real codec before mutating Content-Type, replaces all case-insensitive/quoted charset parameters with one selected charset and preserves media type and unrelated parameters including quoted semicolons. Getter must read quoted/case-insensitive parameters correctly. Real Bottle string output must use the selected encoding; bytes behavior and direct content_type assignment remain unchanged. Invalid/empty codecs leave headers intact.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bottle_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-bottle-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BOTTLE-O04-DEV-contract.md",
+            "materials/BOTTLE-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bottle.py",
+            "library/test/test_development_bottle_o04_dev.py",
+            "library/docs/development-bottle-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BOTTLE-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BOTTLE-O04-DEV.native.json",
+            "public_native": "verification/BOTTLE-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BOTTLE-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BOTTLE-O05-DEV-SCENE",
+      "title": "原子或排他发布上传文件并恢复输入位置",
+      "goal": "原子或排他发布上传文件并恢复输入位置",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BOTTLE-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BOTTLE-O05-DEV",
+          "kind": "modify",
+          "goal": "原子或排他发布上传文件并恢复输入位置",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd FileUpload.save_atomic(destination, *, overwrite=False, chunk_size=65536) for real path/directory targets. Complete copying in a private same-directory temporary file before publication; overwrite=True atomically replaces, False uses exclusive publication that cannot overwrite a competitor. Restore original input cursor on success and read/write/replace failures, preserve existing destination bytes on failures, clean only owned temporary files and validate positive chunk sizes. Leave existing save/stream behavior unchanged and do not claim crash durability.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bottle_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-bottle-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BOTTLE-O05-DEV-contract.md",
+            "materials/BOTTLE-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bottle.py",
+            "library/test/test_development_bottle_o05_dev.py",
+            "library/docs/development-bottle-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BOTTLE-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BOTTLE-O05-DEV.native.json",
+            "public_native": "verification/BOTTLE-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BOTTLE-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BOTTLE-O06-DEV-SCENE",
+      "title": "输出不执行回调且不泄漏配置的真实路由清单",
+      "goal": "输出不执行回调且不泄漏配置的真实路由清单",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BOTTLE-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BOTTLE-O06-DEV",
+          "kind": "modify",
+          "goal": "输出不执行回调且不泄漏配置的真实路由清单",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nBuild on delivered prefix cloning and add Bottle.inspect_routes() returning stable registration-order JSON metadata for actual rule/method/name/current-or-external owner, safe callback name, dynamic filter names and route-specific plugin names. Correctly explain legacy external owners and prefixed target-owned clones. Introspection must never execute callbacks, apply plugins, expose configuration/closure values or use address-bearing repr. Handle callable instances and unnamed/empty routes while preserving registration and dispatch.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bottle_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-bottle-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "BOTTLE-O03-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/BOTTLE-O06-DEV-contract.md",
+            "materials/BOTTLE-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bottle.py",
+            "library/test/test_development_bottle_o06_dev.py",
+            "library/docs/development-bottle-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BOTTLE-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BOTTLE-O06-DEV.native.json",
+            "public_native": "verification/BOTTLE-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BOTTLE-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

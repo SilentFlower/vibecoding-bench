@@ -1,0 +1,95 @@
+--- a/library/alive_progress/asyncio.py
++++ b/library/alive_progress/asyncio.py
+@@ -0,0 +1,22 @@
++"""不预取下一项的原生异步进度迭代适配。"""
++import inspect
++from .core.progress import alive_bar
++
++
++async def alive_async_it(source,total=None,*,finalize=None,**options):
++    """跟踪异步数据源。@param source 异步可迭代对象。@param total 显式总量或None。
++    @param finalize 正常耗尽后的同步／异步回调。@param options 原alive_bar配置。
++    @return 保持元素身份与顺序的异步迭代器；关闭、取消和源异常不调用成功收尾。
++    """
++    if options.get('manual'):
++        raise UserWarning('异步迭代适配器不能使用手动模式')
++    if finalize is not None and not callable(finalize):
++        raise TypeError('finalize必须可调用或None')
++    with alive_bar(total,**options) as bar:
++        async for item in source:
++            yield item
++            bar()
++        if finalize is not None:
++            result=finalize(bar)
++            if inspect.isawaitable(result):
++                await result
+--- a/library/development_tests/test_development_ap_async_dev.py
++++ b/library/development_tests/test_development_ap_async_dev.py
+@@ -0,0 +1,59 @@
++"""公开异步进度生命周期回归。"""
++import asyncio
++import pytest
++from alive_progress.asyncio import alive_async_it
++
++def test_order_no_prefetch_and_completion_snapshot():
++    async def scenario():
++        seen=[];finished=[]
++        async def source():
++            for value in range(3):
++                seen.append(value)
++                yield value
++        iterator=alive_async_it(source(),total=3,disable=True,finalize=lambda bar:finished.append(bar.snapshot()))
++        assert await anext(iterator)==0 and seen==[0] and finished==[]
++        rest=[value async for value in iterator]
++        assert rest==[1,2] and finished[0].count==3
++    asyncio.run(scenario())
++
++def test_empty_input_and_awaitable_falsey_finalizer_run_once():
++    async def scenario():
++        calls=[]
++        class Ending:
++            def __bool__(self):
++                return False
++            async def __call__(self,bar):
++                calls.append(bar.snapshot().count)
++        async def source():
++            if False:
++                yield 1
++        assert [value async for value in alive_async_it(source(),disable=True,finalize=Ending())]==[]
++        assert calls==[0]
++    asyncio.run(scenario())
++
++def test_early_close_and_source_error_do_not_finalize():
++    async def scenario():
++        calls=[]
++        async def source():
++            yield 1
++            raise LookupError('synthetic')
++        iterator=alive_async_it(source(),disable=True,finalize=lambda bar:calls.append(1))
++        assert await anext(iterator)==1
++        await iterator.aclose()
++        with pytest.raises(LookupError):
++            async for value in alive_async_it(source(),disable=True,finalize=lambda bar:calls.append(1)):
++                pass
++        assert calls==[]
++    asyncio.run(scenario())
++
++def test_cancellation_propagates_and_keeps_success_callback_absent():
++    async def scenario():
++        calls=[]
++        async def source():
++            raise asyncio.CancelledError()
++            yield 1
++        with pytest.raises(asyncio.CancelledError):
++            async for value in alive_async_it(source(),disable=True,finalize=lambda bar:calls.append(1)):
++                pass
++        assert calls==[]
++    asyncio.run(scenario())
+--- a/library/docs/development-ap-async-dev.md
++++ b/library/docs/development-ap-async-dev.md
+@@ -0,0 +1,5 @@
++# 直接消费异步输入并按完整生命周期跟踪进度
++
++异步数据源直接使用原进度条，不预取下一项，消费者继续后才确认上一项完成。正常耗尽可同步或异步收尾，空输入及假值回调也正确；提前关闭、取消或源错误不误报成功，快照可核对真实进度。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

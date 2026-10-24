@@ -1,0 +1,109 @@
+--- a/library/docs/development-humanize-o04-dev.md
++++ b/library/docs/development-humanize-o04-dev.md
+@@ -0,0 +1,5 @@
++# 让两个日期格式器共享明确参考日及时区边界
++
++对应路线16：naturalday/naturaldate显式when共享参考日及年份阈值；aware参考转入目标时区，混用和错误参考明确拒绝，不改已有naturaltime.when。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/humanize/time.py
++++ b/library/src/humanize/time.py
+@@ -325,7 +325,24 @@
+     return value
+ 
+ 
+-def naturalday(value: dt.date | dt.datetime, format: str = "%b %d") -> str:
++def _explicit_reference_date(value, when):
++    """解析显式参考日，拒绝aware/naive datetime混用。@return date。"""
++    import datetime as dt
++    if not isinstance(when, dt.date):
++        raise TypeError('when必须为date或datetime')
++    if isinstance(when, dt.datetime):
++        if isinstance(value, dt.datetime):
++            value_aware = value.tzinfo is not None and value.utcoffset() is not None
++            when_aware = when.tzinfo is not None and when.utcoffset() is not None
++            if value_aware != when_aware:
++                raise ValueError('显式参考datetime不能混用aware与naive')
++            if value_aware:
++                when = when.astimezone(value.tzinfo)
++        return when.date()
++    return when
++
++
++def naturalday(value: dt.date | dt.datetime, format: str = "%b %d", *, when=None) -> str:
+     """Return a natural day.
+ 
+     For date values that are tomorrow, today or yesterday compared to
+@@ -335,10 +352,13 @@
+     """
+     import datetime as dt
+ 
++    reference = None if when is None else _explicit_reference_date(value, when)
+     try:
+         # When value is a tz-aware datetime, compute "today" in that timezone
+         # so the comparison uses the correct local date.
+-        if isinstance(value, dt.datetime) and value.tzinfo is not None:
++        if reference is not None:
++            today = reference
++        elif isinstance(value, dt.datetime) and value.tzinfo is not None:
+             today = dt.datetime.now(value.tzinfo).date()
+         else:
+             today = dt.date.today()  # noqa: DTZ011
+@@ -363,13 +383,16 @@
+     return value.strftime(format)
+ 
+ 
+-def naturaldate(value: dt.date | dt.datetime) -> str:
++def naturaldate(value: dt.date | dt.datetime, *, when=None) -> str:
+     """Like `naturalday`, but append a year for dates more than ~five months away."""
+     import datetime as dt
+ 
+     original_value = value
++    reference = None if when is None else _explicit_reference_date(value, when)
+     try:
+-        if isinstance(value, dt.datetime) and value.tzinfo is not None:
++        if reference is not None:
++            today = reference
++        elif isinstance(value, dt.datetime) and value.tzinfo is not None:
+             today = dt.datetime.now(value.tzinfo).date()
+         else:
+             today = dt.date.today()  # noqa: DTZ011
+@@ -382,8 +405,8 @@
+         return str(value)
+     delta = _abs_timedelta(value - today)
+     if delta.days >= 5 * 365 / 12:
+-        return naturalday(original_value, "%b %d %Y")
+-    return naturalday(original_value)
++        return naturalday(original_value, "%b %d %Y", when=when)
++    return naturalday(original_value, when=when)
+ 
+ 
+ def _quotient_and_remainder(
+--- a/library/tests/test_development_humanize_o04_dev.py
++++ b/library/tests/test_development_humanize_o04_dev.py
+@@ -0,0 +1,25 @@
++"""日期显示围绕显式参考日，不依赖真实墙钟。"""
++from datetime import date,datetime,timedelta,timezone
++import humanize
++import pytest
++
++def test_fixed_reference_both_formatters_and_distant_year():
++    """两个API共享参考日及远期年份阈值。@return None。"""
++    ref=date(2000,1,2)
++    assert humanize.naturalday(date(2000,1,1),when=ref)=='yesterday'
++    assert humanize.naturaldate(date(2000,1,3),when=ref)=='tomorrow'
++    assert humanize.naturaldate(date(2001,1,2),when=ref)=='Jan 02 2001'
++    assert humanize.naturalday('not date',when=ref)=='not date'
++
++def test_aware_reference_converted_into_value_timezone():
++    """跨午夜依据目标时区比较，date参考是明确日历日。@return None。"""
++    value=datetime(2024,1,2,1,tzinfo=timezone(timedelta(hours=9)))
++    ref=datetime(2024,1,1,20,tzinfo=timezone.utc)
++    assert humanize.naturalday(value,when=ref)=='today'
++    assert humanize.naturalday(value,when=date(2024,1,1))=='tomorrow'
++
++def test_mixed_awareness_and_invalid_reference_rejected():
++    """不把不一致显式参考悄悄降级成原字符串。@return None。"""
++    with pytest.raises(ValueError):humanize.naturalday(datetime(2024,1,1),when=datetime(2024,1,1,tzinfo=timezone.utc))
++    with pytest.raises(TypeError):humanize.naturaldate(date(2024,1,1),when='today')
++    assert humanize.naturalday(date.min,when=date.min)=='today'

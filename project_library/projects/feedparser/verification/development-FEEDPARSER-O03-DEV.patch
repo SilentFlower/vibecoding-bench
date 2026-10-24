@@ -1,0 +1,159 @@
+--- a/library/docs/development-feedparser-o03-dev.md
++++ b/library/docs/development-feedparser-o03-dev.md
+@@ -0,0 +1,5 @@
++# 给真实单次订阅解析提供隔离不可变日期处理器注册集
++
++对应路线07：不可变DateHandlerRegistry按调用ContextVar作用真实日期路径，退出恢复；自定义去重/九元组校验/失败继续，内建冻结回退、全局默认与并发隔离保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/feedparser/__init__.py
++++ b/library/feedparser/__init__.py
+@@ -26,7 +26,7 @@
+ # POSSIBILITY OF SUCH DAMAGE."""
+ 
+ from .api import parse
+-from .datetimes import registerDateHandler
++from .datetimes import registerDateHandler, DateHandlerRegistry
+ from .exceptions import (
+     CharacterEncodingOverride,
+     CharacterEncodingUnknown,
+@@ -53,6 +53,7 @@
+ __all__ = (
+     "parse",
+     "registerDateHandler",
++    "DateHandlerRegistry",
+     "FeedParserDict",
+     "FeedparserError",
+     "CharacterEncodingOverride",
+--- a/library/feedparser/api.py
++++ b/library/feedparser/api.py
+@@ -154,6 +154,7 @@
+     resolve_relative_uris: bool | None = None,
+     sanitize_html: bool | None = None,
+     optimistic_encoding_detection: bool | None = None,
++    date_handlers=None,
+ ) -> FeedParserDict:
+     """Parse a feed from a URL, file, stream, or string.
+ 
+@@ -191,6 +192,18 @@
+ 
+     """
+ 
++    if date_handlers is not None:
++        from .datetimes import DateHandlerRegistry, _date_registry
++        if not isinstance(date_handlers, DateHandlerRegistry):
++            raise TypeError('date_handlers必须为DateHandlerRegistry')
++        token = _date_registry.set(date_handlers)
++        try:
++            return parse(url_file_stream_or_string, response_headers=response_headers,
++                         resolve_relative_uris=resolve_relative_uris, sanitize_html=sanitize_html,
++                         optimistic_encoding_detection=optimistic_encoding_detection)
++        finally:
++            _date_registry.reset(token)
++
+     result = FeedParserDict(
+         bozo=False,
+         entries=[],
+--- a/library/feedparser/datetimes/__init__.py
++++ b/library/feedparser/datetimes/__init__.py
+@@ -26,6 +26,7 @@
+ # POSSIBILITY OF SUCH DAMAGE.
+ 
+ from collections.abc import Callable
++from contextvars import ContextVar
+ from time import struct_time
+ 
+ from .asctime import _parse_date_asctime
+@@ -40,6 +41,32 @@
+ _date_handlers: list[Callable[[str], struct_time | None]] = []
+ 
+ 
++_date_registry = ContextVar('feedparser_date_registry', default=None)
++
++
++class DateHandlerRegistry:
++    """调用级不可变日期处理器集合，不改全局注册顺序。
++
++    :param handlers: 按优先级的自定义可调用处理器。
++    :param include_builtin: 是否在自定义处理器后冻结当前全局回退列表。
++    :return: 不可变注册集合。
++    """
++    __slots__ = ('handlers',)
++    def __init__(self, handlers=(), *, include_builtin=True):
++        """固定并按身份去重，拒绝非函数。@return None。"""
++        values = list(handlers) + (list(_date_handlers) if include_builtin else [])
++        if not all(callable(value) for value in values):
++            raise TypeError('日期处理器必须可调用')
++        unique = []
++        for value in values:
++            if not any(existing is value for existing in unique):
++                unique.append(value)
++        object.__setattr__(self, 'handlers', tuple(unique))
++    def __setattr__(self, name, value):
++        """拒绝注册集创建后的修改。@return 永不返回。"""
++        raise AttributeError('日期注册集不可变')
++
++
+ def registerDateHandler(func):
+     """Register a date handler function (takes string, returns 9-tuple date in GMT)"""
+     _date_handlers.insert(0, func)
+@@ -48,6 +75,18 @@
+ def _parse_date(date_string):
+     """Parses a variety of date formats into a 9-tuple in GMT"""
+     if not date_string:
++        return None
++    registry = _date_registry.get()
++    if registry is not None:
++        for handler in registry.handlers:
++            try:
++                value = handler(date_string)
++                if not isinstance(value, (tuple, list)) or len(value) != 9 or any(not isinstance(item, int) or isinstance(item, bool) for item in value):
++                    continue
++                return value
++            except Exception:
++                # 显式注册集把处理器输入失败当不匹配，取消类BaseException仍传播。
++                continue
+         return None
+     for handler in _date_handlers:
+         try:
+--- a/library/tests/test_development_feedparser_o03_dev.py
++++ b/library/tests/test_development_feedparser_o03_dev.py
+@@ -0,0 +1,38 @@
++"""两个真实解析调用有独立日期注册集，不触碰全局处理器。"""
++import feedparser,io
++from concurrent.futures import ThreadPoolExecutor
++import pytest
++
++def parse(value,registry=None):
++    """实际RSS内存解析，日期来自真实pubDate。@return 条目。"""
++    return feedparser.parse(io.StringIO('<rss version="2.0"><channel><title>T</title><item><title>I</title><pubDate>'+value+'</pubDate></item></channel></rss>'),date_handlers=registry).entries[0]
++
++def test_registry_interleaving_and_real_xml_and_json_calls_stay_local():
++    """各自私有格式只在自己的调用生效，内建日期仍可回退。@return None。"""
++    from feedparser import DateHandlerRegistry
++    a=DateHandlerRegistry([lambda text:(2026,1,2,3,4,5,4,2,0) if text=='private-a' else None])
++    b=DateHandlerRegistry([lambda text:(2025,2,3,4,5,6,0,34,0) if text=='private-b' else None])
++    assert parse('private-a',a).published_parsed[:3]==(2026,1,2)
++    assert parse('private-a',b).published_parsed is None and parse('private-a').published_parsed is None
++    assert parse('Fri, 02 Jan 2026 00:00:00 GMT',a).published_parsed[:3]==(2026,1,2)
++
++def test_bad_returns_failures_duplicates_and_registry_immutability():
++    """坏处理器继续下一个，不重复调用同一函数，也不接受错误九元组。@return None。"""
++    from feedparser import DateHandlerRegistry
++    calls=[]
++    def broken(text):calls.append('broken');raise ValueError('mismatch')
++    def wrong(text):return 42
++    def valid(text):calls.append('valid');return (2026,1,1,0,0,0,3,1,0)
++    registry=DateHandlerRegistry([broken,broken,wrong,valid],include_builtin=False)
++    assert parse('custom',registry).published_parsed[0]==2026 and calls==['broken','valid']
++    with pytest.raises(AttributeError):registry.handlers=()
++    with pytest.raises(TypeError):DateHandlerRegistry([42])
++
++def test_concurrent_registry_calls_and_error_reset_do_not_share_state():
++    """并发线程各得自身日期，错误调用后默认解析不记住私有处理器。@return None。"""
++    from feedparser import DateHandlerRegistry
++    def work(year):
++        registry=DateHandlerRegistry([lambda text:(year,1,1,0,0,0,0,1,0)],include_builtin=False)
++        return parse('private',registry).published_parsed[0]
++    with ThreadPoolExecutor(max_workers=4) as pool:assert list(pool.map(work,[2024,2025,2026,2027]))==[2024,2025,2026,2027]
++    assert parse('private').published_parsed is None

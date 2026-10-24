@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SQLPARSE-06-DEV",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add immutable formatter.SUPPORTED_OPTIONS for actual supported input keys and validate_options(options,strict=False); expose opt-in sqlparse.format(...,strict_options=True). Strict mode rejects every unknown key including None values, lists all offenders and offers deterministic nearest real-key suggestions. Require a real bool strict flag and keep existing known-value/combination validation. Default remains compatible and tolerant of extras, including current CLI filename/outfile/inplace metadata; do not accidentally enable strict over vars(args). Internal computed indent_char is not a public input option. Do not add speculative filters or silently accept a registration key that has no real implementation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

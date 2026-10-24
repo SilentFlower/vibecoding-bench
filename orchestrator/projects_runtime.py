@@ -6,10 +6,12 @@ import json
 import os
 import shutil
 import time
+from contextlib import ExitStack
 from datetime import datetime
 from math import isfinite
 from pathlib import Path
 from socket import SHUT_WR
+from stat import S_ISREG
 from tempfile import TemporaryDirectory
 from threading import RLock
 
@@ -78,30 +80,8 @@ class ProjectsTerminal:
                     raise ValueError('Pi 终端需要支持逐作业监督的 v3 账号环境')
                 runtime.sync_credentials(row, account)
                 root = runtime._root(row)
-                alias = 'workspace-' + hashlib.sha256(
-                    f"{account['id']}:{work['project_key']}:{project.manifest['seed_digest']}".encode()).hexdigest()[:16]
-                workspace = root / 'projects' / alias
-                marker = root / 'runtime/projects-workspaces' / (alias + '.json')
-                identity = {'account_id': account['id'], 'environment_id': row['environment_id'],
-                    'project_key': work['project_key'], 'seed_digest': project.manifest['seed_digest']}
-                if marker.exists():
-                    if read_document(marker) != identity or workspace.is_symlink() or not workspace.is_dir():
-                        raise ValueError('项目工作区的账号或初始版本证明不符')
-                else:
-                    if workspace.exists() or workspace.is_symlink():
-                        raise ValueError('未登记的项目工作区需要先核对，不能覆盖')
-                    objects = runtime.data / 'projects/objects'
-                    initial = snapshot_tree(project.root / 'seed', objects)
-                    materialize_snapshot(initial, objects, workspace)
-                    for relative in dict.fromkeys([*definition['materials'], *definition.get('owner_materials', [])]):
-                        destination = workspace / safe_relative(relative)
-                        destination.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copyfile(project.root / safe_relative(relative), destination)
-                    for current, directories, files in os.walk(workspace):
-                        os.chown(current, 1000, 1000, follow_symlinks=False)
-                        for name in files:
-                            os.chown(Path(current) / name, 1000, 1000, follow_symlinks=False)
-                    atomic_json(marker, identity)
+                workspace = self._prepare_workspace(root, row, account, work, project, definition)
+                alias = workspace.name
                 cwd = '/home/node/projects/' + alias
                 handle = hashlib.sha256(source.encode()).hexdigest()[:20]
                 runtime_job = root / 'runtime/jobs' / handle
@@ -181,6 +161,96 @@ class ProjectsTerminal:
                 if quota_admitted and self.quota_release:
                     self.quota_release(account, source, not launched)
                 raise
+
+    def _prepare_workspace(self, root: Path, row: dict, account: dict, work: dict,
+                           project, definition: dict) -> Path:
+        """复用项目累计成果，并在新目标开始前一次性补齐其公开输入。
+
+        :param root: 已领取租约的账号持久目录。
+        :param row: 已核对的账号环境。
+        :param account: 当前账号。
+        :param work: 冻结目标及原工作基线。
+        :param project: 已校验的固定项目定义。
+        :param definition: 当前完整工程目标。
+        :return: 保留此前修改的累计项目目录。
+        """
+        alias = 'workspace-' + hashlib.sha256(
+            f"{account['id']}:{work['project_key']}:{project.manifest['seed_digest']}".encode()).hexdigest()[:16]
+        workspace = root / 'projects' / alias
+        marker = root / 'runtime/projects-workspaces' / (alias + '.json')
+        identity = {'account_id': account['id'], 'environment_id': row['environment_id'],
+            'project_key': work['project_key'], 'seed_digest': project.manifest['seed_digest']}
+        if marker.exists():
+            if read_document(marker) != identity or workspace.is_symlink() or not workspace.is_dir():
+                raise ValueError('项目工作区的账号或初始版本证明不符')
+        else:
+            if workspace.exists() or workspace.is_symlink():
+                raise ValueError('未登记的项目工作区需要先核对，不能覆盖')
+            objects = self.runtime.data / 'projects/objects'
+            materialize_snapshot(snapshot_tree(project.root / 'seed', objects), objects, workspace)
+            for current, directories, files in os.walk(workspace):
+                os.chown(current, 1000, 1000, follow_symlinks=False)
+                for name in files:
+                    os.chown(Path(current) / name, 1000, 1000, follow_symlinks=False)
+            atomic_json(marker, identity)
+        sources = [(relative, relative) for relative in dict.fromkeys(
+            [*definition['materials'], *definition.get('owner_materials', [])])]
+        sources.extend((item['source'], item['target']) for item in definition.get('setup', []))
+        inputs = {}
+        for source, target in sources:
+            source, target = safe_relative(source), safe_relative(target)
+            content = (project.root / source).read_bytes()
+            if target in inputs and inputs[target] != content:
+                raise ValueError('工程目标向同一路径声明了不同输入')
+            inputs[target] = content
+        receipt = {**identity, 'objective_id': work['objective_id'], 'library_digest': work['library_digest'],
+            'inputs': {name: hashlib.sha256(content).hexdigest() for name, content in sorted(inputs.items())}}
+        input_marker = root / 'runtime/projects-inputs' / (digest_json(receipt) + '.json')
+        if input_marker.exists():
+            saved = read_document(input_marker)
+            if {key: value for key, value in saved.items() if key != 'legacy_existing_work'} != receipt:
+                raise ValueError('原工程目标输入凭据不符')
+            return workspace
+        if work.get('baseline_json'):
+            # 已开始的旧工作沿用原冻结基线；恢复时补文件会把控制端输入误记为候选改动。
+            atomic_json(input_marker, {**receipt, 'legacy_existing_work': True})
+            return workspace
+        with ExitStack() as opened:
+            descriptor = os.open(workspace, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+            opened.callback(os.close, descriptor)
+            planned = []
+            for relative, content in inputs.items():
+                parent = descriptor
+                parts = relative.split('/')
+                for name in parts[:-1]:
+                    try:
+                        os.mkdir(name, mode=0o755, dir_fd=parent)
+                        os.chown(name, 1000, 1000, dir_fd=parent, follow_symlinks=False)
+                    except FileExistsError:
+                        pass
+                    child = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+                    opened.callback(os.close, child)
+                    parent = child
+                try:
+                    existing = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=parent)
+                except FileNotFoundError:
+                    planned.append((parent, parts[-1], content))
+                    continue
+                with os.fdopen(existing, 'rb') as current:
+                    if not S_ISREG(os.fstat(current.fileno()).st_mode):
+                        raise ValueError('工程目标输入位置不是普通文件：' + relative)
+                    if current.read(len(content) + 1) != content:
+                        raise ValueError('新目标输入与已有工作文件冲突，保留原文件：' + relative)
+            # 先核对全部目标再写入，后续任务不能借 setup 覆盖上一轮成果或经链接越出项目。
+            for parent, name, content in planned:
+                target = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=parent)
+                with os.fdopen(target, 'wb') as output:
+                    os.fchown(output.fileno(), 1000, 1000)
+                    output.write(content)
+                    output.flush()
+                    os.fsync(output.fileno())
+        atomic_json(input_marker, receipt)
+        return workspace
 
     def _prepare_python(self, row: dict, project, library) -> dict:
         runtime = self.runtime

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MM-UNION-DEV",
+  "source_commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement marshmallow.discriminated.DiscriminatedNested(discriminator,schemas,**kwargs) as a Field. schemas is a nonempty mapping of nonempty string tags to real Schema instances. Select by external discriminator, remove that tag before selected schema.load/dump(many=False), then restore it; do not mutate input. Preserve selected nested errors/unknown policy and partial propagation. Missing or unknown tags produce structured ValidationError at the tag. Schema outputs must be mappings not occupying the external tag; allow_none and normal field lifecycle still work. Do not guess schema variants.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

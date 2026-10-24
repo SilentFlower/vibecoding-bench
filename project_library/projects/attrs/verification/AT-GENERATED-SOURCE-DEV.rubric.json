@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AT-GENERATED-SOURCE-DEV",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add generated_sources(cls, names=None) under attr.introspection and attrs.introspection. Inspect actual current class/MRO descriptors without invoking properties or methods. Default to methods with existing attrs-generated code filenames; explicit finite unique method names also report custom/missing entries. Return nested read-only metadata generated/status/source/filename/owner, obtaining real generated source through inspect/linecache. If source is absent report unavailable; if a method is replaced report its current custom status, never stale generated source. Do not synthesize a whole class or export closure values; ordinary fields/inspect remain unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

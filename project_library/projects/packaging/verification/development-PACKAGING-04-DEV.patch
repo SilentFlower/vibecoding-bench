@@ -1,0 +1,86 @@
+--- a/library/docs/development-packaging-04-dev.md
++++ b/library/docs/development-packaging-04-dev.md
+@@ -0,0 +1,5 @@
++# 离线RECORD清单用严格CSV模型读写并诊断坏条目
++
++路线09：不可变RECORD三列模型正确处理CSV与空字段，严格SHA256/384/512无padding摘要、大小和重复诊断；解析不读取磁盘，写回语义稳定。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/packaging/record.py
++++ b/library/src/packaging/record.py
+@@ -0,0 +1,53 @@
++"""离线RECORD清单，解析不会读取磁盘。"""
++import base64
++import binascii
++import csv
++import io
++import re
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True)
++class RecordEntry:
++    """不可变RECORD条目。@param path CSV文件路径。@param hash hash字段或None。@param size 大小或None。@return 已验证条目。"""
++    path: str
++    hash: str | None = None
++    size: int | None = None
++
++    def __post_init__(self):
++        """校验三列字段，不解析路径为宿主文件。@return None。"""
++        if not isinstance(self.path,str) or not self.path:raise ValueError("path不能为空")
++        if self.size is not None and (type(self.size) is not int or self.size<0):raise ValueError("size必须为非负整数")
++        if self.hash is not None:
++            if not isinstance(self.hash,str) or self.hash.count("=")!=1:raise ValueError("hash必须为算法=无padding摘要")
++            algorithm,digest=self.hash.split("=")
++            sizes={"sha256":32,"sha384":48,"sha512":64}
++            if algorithm not in sizes or not re.fullmatch(r"[A-Za-z0-9_-]+",digest):raise ValueError("不支持的算法或摘要")
++            try:data=base64.b64decode(digest+"="*(-len(digest)%4),altchars=b"-_",validate=True)
++            except (ValueError,binascii.Error) as error:raise ValueError("无效摘要") from error
++            if len(data)!=sizes[algorithm] or base64.urlsafe_b64encode(data).rstrip(b"=").decode()!=digest:raise ValueError("摘要长度或编码不规范")
++
++
++def parse_record(text):
++    """读取严格三列CSV。@param text RECORD文本。@return 不可变条目tuple，重复路径拒绝。"""
++    if not isinstance(text,str):raise TypeError("text必须为str")
++    rows=[];seen=set()
++    for row in csv.reader(io.StringIO(text,newline=""),strict=True):
++        if len(row)!=3:raise ValueError("RECORD必须为三列")
++        path,digest,size=row
++        if size and not re.fullmatch(r"0|[1-9][0-9]*",size):raise ValueError("无效size")
++        entry=RecordEntry(path,digest or None,int(size) if size else None)
++        if entry.path in seen:raise ValueError("重复path")
++        seen.add(entry.path);rows.append(entry)
++    return tuple(rows)
++
++
++def format_record(entries):
++    """稳定写回CSV。@param entries RecordEntry迭代器。@return 换行为LF的文本。"""
++    output=io.StringIO(newline="");writer=csv.writer(output,lineterminator="\n")
++    seen=set()
++    for entry in entries:
++        if not isinstance(entry,RecordEntry):raise TypeError("需要RecordEntry")
++        if entry.path in seen:raise ValueError("重复path")
++        seen.add(entry.path);writer.writerow((entry.path,entry.hash or "",entry.size if entry.size is not None else ""))
++    return output.getvalue()
+--- a/library/tests/test_development_packaging_04_dev.py
++++ b/library/tests/test_development_packaging_04_dev.py
+@@ -0,0 +1,19 @@
++"""逗号、Unicode、空hash与精确size的CSV往返。"""
++import base64
++import hashlib
++import unittest
++from packaging.record import RecordEntry,parse_record,format_record
++
++def test_record_roundtrip_csv_and_hashless_self_entry():
++    """内容地址只校验字段，解析阶段不读文件。@return None。"""
++    digest=base64.urlsafe_b64encode(hashlib.sha256(b'payload').digest()).rstrip(b'=').decode()
++    entries=(RecordEntry('pkg/data,中文.txt','sha256='+digest,7),RecordEntry('pkg.dist-info/RECORD'))
++    text=format_record(entries)
++    assert text.startswith('"pkg/data,中文.txt",sha256=') and parse_record(text)==entries
++    assert parse_record('a,,0\n')[0].size==0
++
++def test_invalid_columns_duplicates_sizes_and_hashes():
++    """不默默接受重复路径、负值或伪摘要。@return None。"""
++    for text in ('a,b\n','a,,\na,,\n','a,,-1\n','a,,01\n','a,sha256=bad,1\n'):
++        with unittest.TestCase().assertRaises(ValueError):parse_record(text)
++    with unittest.TestCase().assertRaises(ValueError):RecordEntry('a',size=True)

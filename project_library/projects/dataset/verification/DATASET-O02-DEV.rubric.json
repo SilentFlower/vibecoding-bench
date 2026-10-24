@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DATASET-O02-DEV",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Table.find _columns=None|string|sequence and forward through real find_one. Build an actual SQLAlchemy select of requested columns in order, preserving filters, hidden sort keys, offset/limit, streaming and configured row_type. Default full rows remain identical. Normalize through existing column naming, reject empty/duplicate/unknown projections, safely quote spaces and never interpolate SQL. No-match and nonexistent-table behavior remains empty/None without creating a table. Prove omitted fields are absent from both streamed and find_one results.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

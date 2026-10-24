@@ -1,0 +1,82 @@
+--- a/library/development_tests/test_development_if_scopes_dev.py
++++ b/library/development_tests/test_development_if_scopes_dev.py
+@@ -0,0 +1,31 @@
++"""公开词形引擎隔离回归。"""
++import pytest
++from inflect import engine
++from inflect.scopes import clone,temporary_options
++
++def test_clone_preserves_custom_rules_without_aliasing():
++    original=engine();original.defnoun('widget','widgeten');copy=clone(original)
++    copy.defnoun('gadget','gadgeten')
++    assert copy.plural_noun('widget')=='widgeten' and original.plural_noun('gadget')!='gadgeten'
++
++def test_nested_count_scope_restores_parent_and_original():
++    target=engine();target.num(3)
++    with temporary_options(target,count=1):
++        assert target.plural_noun('cat')=='cat'
++        with temporary_options(target,count=None): assert target.persistent_count is None
++        assert target.persistent_count==1
++    assert target.persistent_count==3
++
++def test_failed_entry_and_body_exception_restore_every_state_value():
++    target=engine();before=target.classical_dict.copy()
++    with pytest.raises(Exception):
++        with temporary_options(target,classical={'all':True},gender='invalid'): pass
++    assert target.classical_dict==before
++    with pytest.raises(RuntimeError):
++        with temporary_options(target,count=1): target.defnoun('widget','widgeten');raise RuntimeError()
++    assert target.plural_noun('widget')!='widgeten' and target.persistent_count is None
++
++def test_all_mode_works_inside_scope_and_does_not_leak():
++    target=engine();before=target.classical_dict.copy()
++    with temporary_options(target,classical={'all':True}): assert all(target.classical_dict.values())
++    assert target.classical_dict==before
+--- a/library/docs/development-if-scopes-dev.md
++++ b/library/docs/development-if-scopes-dev.md
+@@ -0,0 +1,5 @@
++# 实现完整引擎克隆与可嵌套临时选项作用域
++
++克隆保留引擎子类型、自定义规则与选项但不共享可变状态。临时作用域支持嵌套及失败回滚，数量None可明确清除，作用域内新增规则也撤销，不承诺内部容器身份和并发隔离。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/inflect/scopes.py
++++ b/library/inflect/scopes.py
+@@ -0,0 +1,37 @@
++"""隔离可变词形引擎并精确限定临时选项生命周期。"""
++from contextlib import contextmanager
++from copy import deepcopy
++from . import engine
++
++
++_UNSET=object()
++
++
++def clone(target):
++    """复制实际引擎及自定义规则。@param target 引擎实例。@return 独立同类型引擎。
++    """
++    if not isinstance(target,engine):
++        raise TypeError('需要inflect引擎')
++    return deepcopy(target)
++
++
++@contextmanager
++def temporary_options(target,*,classical=None,count=_UNSET,gender=None):
++    """临时变更并恢复全部引擎状态值。@param target 原引擎。@param classical 模式映射。
++    @param count 持久数量，None清除。@param gender 代词性别。@return 原引擎上下文。
++    不保证内部容器身份或并发隔离；作用域内规则修改同样撤销。
++    """
++    if not isinstance(target,engine):
++        raise TypeError('需要inflect引擎')
++    before=deepcopy(target.__dict__)
++    try:
++        if classical is not None:
++            target.classical(**classical)
++        if count is not _UNSET:
++            target.num(count)
++        if gender is not None:
++            target.gender(gender)
++        yield target
++    finally:
++        target.__dict__.clear()
++        target.__dict__.update(before)

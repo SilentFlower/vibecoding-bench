@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HUMANIZE-O01-DEV",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix i18n translation cache identity to include locale plus resolved catalog root, including PathLike/relative aliases, using actual GNUTranslations bytes. Extend activate(locale,path=None,*,reload=False) with explicit per-source reload that bypasses gettext stale cache without clearing unrelated sources. Load before changing current state; failure preserves prior selection. Preserve default English/None/deactivate and explicit legacy default _TRANSLATIONS injection, but never let injected/default locale objects shadow an explicit different directory. Demonstrate synthetic real GNU catalogs, source reuse, reload, failure and separator compatibility.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

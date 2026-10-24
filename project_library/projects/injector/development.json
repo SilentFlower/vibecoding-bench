@@ -1,0 +1,300 @@
+{
+  "schema": 3,
+  "project_key": "injector",
+  "title": "Injector对象装配工作场景",
+  "category": "配置、对象生命周期与聚合",
+  "description": "固定真实源码上的完整工程交付：让部分预设BoundKey继续执行真实构造注入；让类级非注入声明准确作用于dataclass及继承构造；安装Module类时使用容器真实构造注入；以显式任务上下文作用域隔离真实注入实例；公开本作用域目标失效和只清当前线程的缓存协议；无副作用交付有效绑定及多绑定来源只读快照。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "017fc90fb9b0367e8ad811410b45e33fcff674e69f4ed23224b384d243235912",
+  "environment": "injector-py312",
+  "source": {
+    "repository": "https://github.com/python-injector/injector",
+    "commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "INJECTOR-O01-DEV-SCENE",
+      "title": "让部分预设BoundKey继续执行真实构造注入",
+      "goal": "让部分预设BoundKey继续执行真实构造注入",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "INJECTOR-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "INJECTOR-O01-DEV",
+          "kind": "modify",
+          "goal": "让部分预设BoundKey继续执行真实构造注入",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual BoundKey proxy construction through Injector.create_object with explicit resolved provider kwargs. Remaining @inject constructor dependencies must still resolve; prebound providers override automatic/default values and are evaluated once. Flatten nested BoundKey declarations before evaluation with outer explicit overrides. Preserve noninject constructor and NoInject missing-argument behavior, source provider exceptions and ordinary AssistedBuilder restrictions. Prove actual constructed values/call counts rather than provider metadata alone.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_injector_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-injector-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/INJECTOR-O01-DEV-contract.md",
+            "materials/INJECTOR-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/injector/__init__.py",
+            "library/tests/test_development_injector_o01_dev.py",
+            "library/docs/development-injector-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/INJECTOR-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/INJECTOR-O01-DEV.native.json",
+            "public_native": "verification/INJECTOR-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/INJECTOR-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "INJECTOR-O02-DEV-SCENE",
+      "title": "让类级非注入声明准确作用于dataclass及继承构造",
+      "goal": "让类级非注入声明准确作用于dataclass及继承构造",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "INJECTOR-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "INJECTOR-O02-DEV",
+          "kind": "modify",
+          "goal": "让类级非注入声明准确作用于dataclass及继承构造",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix noninjectable applied to classes by validating/storing exclusions on the final __init__, preserving original class identity and both inject/noninjectable decorator orders. Handle kw-only/frozen dataclasses and merged multiple exclusions. When restricting an inherited constructor, create a subclass-local metadata wrapper instead of mutating the shared base method. Preserve function/method behavior, get_bindings exclusion, explicit additional_kwargs priority and UnknownArgument for nonexistent parameters; missing manual values must fail rather than auto-inject int zero.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_injector_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-injector-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/INJECTOR-O02-DEV-contract.md",
+            "materials/INJECTOR-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/injector/__init__.py",
+            "library/tests/test_development_injector_o02_dev.py",
+            "library/docs/development-injector-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/INJECTOR-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/INJECTOR-O02-DEV.native.json",
+            "public_native": "verification/INJECTOR-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/INJECTOR-O02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "INJECTOR-O03-DEV-SCENE",
+      "title": "安装Module类时使用容器真实构造注入",
+      "goal": "安装Module类时使用容器真实构造注入",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "INJECTOR-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "INJECTOR-O03-DEV",
+          "kind": "modify",
+          "goal": "安装Module类时使用容器真实构造注入",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix Binder.install(ModuleSubclass) through the owning Injector.create_object before normal module invocation, honoring existing constructor injection rather than direct module(). Preserve explicit module instances and configuration functions without reconstructing them, allow existing parent bindings and never assume bindings declared later by that same module are already available. Keep missing unannotated/uninjected parameters and original construction/configuration exceptions visible; prove actual constructor count and installed values.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_injector_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-injector-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/INJECTOR-O03-DEV-contract.md",
+            "materials/INJECTOR-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/injector/__init__.py",
+            "library/tests/test_development_injector_o03_dev.py",
+            "library/docs/development-injector-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/INJECTOR-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/INJECTOR-O03-DEV.native.json",
+            "public_native": "verification/INJECTOR-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/INJECTOR-O03-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "INJECTOR-O04-DEV-SCENE",
+      "title": "以显式任务上下文作用域隔离真实注入实例",
+      "goal": "以显式任务上下文作用域隔离真实注入实例",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "INJECTOR-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "INJECTOR-O04-DEV",
+          "kind": "modify",
+          "goal": "以显式任务上下文作用域隔离真实注入实例",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ContextScope(Scope), contextscope decorator and enter() context using an instance-owned ContextVar plus thread/task ownership. Actual Injector.get of a bound class reuses one successful instance within its explicit active scope, nested enter gets fresh instances then restores outer tokens, and exit/failure/cancellation removes scope state. Concurrent asyncio tasks each explicitly enter and remain isolated; inherited parent context in a child task is not implicitly owned and must reject get until entering. Failed providers never populate cache. Preserve NoScope/Singleton/ThreadLocal semantics and do not implicitly close unmanaged resources or use a global mutable task cache.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_injector_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-injector-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/INJECTOR-O04-DEV-contract.md",
+            "materials/INJECTOR-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/injector/__init__.py",
+            "library/tests/test_development_injector_o04_dev.py",
+            "library/docs/development-injector-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/INJECTOR-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/INJECTOR-O04-DEV.native.json",
+            "public_native": "verification/INJECTOR-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/INJECTOR-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "INJECTOR-O05-DEV-SCENE",
+      "title": "公开本作用域目标失效和只清当前线程的缓存协议",
+      "goal": "公开本作用域目标失效和只清当前线程的缓存协议",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "INJECTOR-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "INJECTOR-O05-DEV",
+          "kind": "modify",
+          "goal": "公开本作用域目标失效和只清当前线程的缓存协议",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd evict(key)->bool and clear()->count to actual SingletonScope and ThreadLocalScope. Remove cached Providers under existing singleton lock, leave binding definitions and externally held objects untouched, perform no implicit close or dependency cascade. ThreadLocalScope operations affect only the calling thread, never another thread cache. Nonexistent keys and repeated clear are safe; subsequent actual Injector.get reconstructs only invalidated targets while unrelated singleton identity remains. For parent-shared instances document scope ownership and require calling the actual owning scope rather than promising child-local invalidation refreshes parent cache.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_injector_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-injector-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/INJECTOR-O05-DEV-contract.md",
+            "materials/INJECTOR-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/injector/__init__.py",
+            "library/tests/test_development_injector_o05_dev.py",
+            "library/docs/development-injector-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/INJECTOR-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/INJECTOR-O05-DEV.native.json",
+            "public_native": "verification/INJECTOR-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/INJECTOR-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "INJECTOR-O06-DEV-SCENE",
+      "title": "无副作用交付有效绑定及多绑定来源只读快照",
+      "goal": "无副作用交付有效绑定及多绑定来源只读快照",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "INJECTOR-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "INJECTOR-O06-DEV",
+          "kind": "modify",
+          "goal": "无副作用交付有效绑定及多绑定来源只读快照",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Binder.bindings_snapshot(*,include_parents=True) returning frozen BindingInfo tuples for existing effective bindings only: interface, provider_type, scope, owner_depth, explicit and immutable multi-contribution provider/scope type metadata. Preserve child-over-parent precedence and current registration order, mark ImplicitBinding accurately and inspect _bindings directly under existing lock without get_binding/auto_bind/provider invocation. Never expose mutable Binding objects or business instances; later rebind does not mutate prior snapshots, and include_parents must be actual bool. Special ProviderOf/AssistedBuilder capabilities must not be auto-created merely by inspection.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_injector_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-injector-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/INJECTOR-O06-DEV-contract.md",
+            "materials/INJECTOR-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/injector/__init__.py",
+            "library/tests/test_development_injector_o06_dev.py",
+            "library/docs/development-injector-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/INJECTOR-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/INJECTOR-O06-DEV.native.json",
+            "public_native": "verification/INJECTOR-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/INJECTOR-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

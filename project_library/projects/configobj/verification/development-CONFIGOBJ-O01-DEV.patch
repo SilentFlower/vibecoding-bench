@@ -1,0 +1,64 @@
+--- a/library/docs/development-configobj-o01-dev.md
++++ b/library/docs/development-configobj-o01-dev.md
+@@ -0,0 +1,5 @@
++# 深复制仍保留原始插值表达式与配置图
++
++对应路线03：从真实底层存储复制表达式及Section图，保留元数据和共享引用隔离；复制不求值，之后读取仍按复制树重新插值。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/configobj/__init__.py
++++ b/library/src/configobj/__init__.py
+@@ -473,6 +473,22 @@
+     def __setstate__(self, state):
+         dict.update(self, state[0])
+         self.__dict__.update(state[1])
++
++    def __deepcopy__(self, memo):
++        """保留原始插值表达式及整个Section图的复制关系。
++
++        :param memo: copy模块的共享引用与循环备忘录。
++        :return: 独立的同类配置或子节。
++        """
++        from copy import deepcopy
++        clone = self.__class__.__new__(self.__class__)
++        memo[id(self)] = clone
++        dict.__init__(clone)
++        # 直接读字典存储；items()/getitem会把插值表达式提前求值。
++        clone.__dict__.update(deepcopy(self.__dict__, memo))
++        for key, value in dict.items(self):
++            dict.__setitem__(clone, deepcopy(key, memo), deepcopy(value, memo))
++        return clone
+ 
+     def __reduce__(self):
+         state = (dict(self), self.__dict__)
+--- a/library/tests/test_development_configobj_o01_dev.py
++++ b/library/tests/test_development_configobj_o01_dev.py
+@@ -0,0 +1,28 @@
++"""复制保留原始插值表达式、图连接和元数据。"""
++from copy import deepcopy
++from configobj import ConfigObj
++
++def test_copy_recalculates_without_freezing_expression():
++    """复制后修改变量会重新计算，原对象不变。@return None。"""
++    source=ConfigObj(['foo=bar','baz=%(foo)s.txt'])
++    assert source['baz']=='bar.txt'
++    clone=deepcopy(source);clone['foo']='new'
++    assert clone['baz']=='new.txt' and source['baz']=='bar.txt'
++    assert dict.__getitem__(clone,'baz')=='%(foo)s.txt'
++
++def test_nested_parents_lists_and_comments():
++    """嵌套父指针及列表原值都归复制树。@return None。"""
++    source=ConfigObj(['root=base','# child','[section]','values=%(root)s, x'])
++    clone=deepcopy(source);clone['root']='next'
++    assert clone['section']['values']==['next','x']
++    assert clone['section'].parent is clone and clone['section'].main is clone
++    clone.comments['section'].append('changed');assert source.comments['section']==['# child']
++
++def test_copy_cycle_error_and_explicit_dict_semantics():
++    """循环只在读取时报原错误，dict仍为求值快照。@return None。"""
++    import pytest
++    from configobj import InterpolationLoopError
++    source=ConfigObj(['a=%(a)s']);clone=deepcopy(source)
++    with pytest.raises(InterpolationLoopError):clone['a']
++    valid=ConfigObj(['a=one','b=%(a)s'])
++    assert valid.dict()['b']=='one'

@@ -1,0 +1,62 @@
+--- a/library/docs/development-sortedcontainers-01-dev.md
++++ b/library/docs/development-sortedcontainers-01-dev.md
+@@ -0,0 +1,5 @@
++# 同优先级任务可明确左插或右插且跨块索引一致
++
++路线03：显式add_left/add_right控制同优先级队列，左插跨块找到最早等键位置、右插保持到达顺序，缓存key/块/索引一致，不开放无序insert。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/sortedcontainers/sortedlist.py
++++ b/library/src/sortedcontainers/sortedlist.py
+@@ -189,6 +189,29 @@
+         self._offset = 0
+ 
+     _clear = clear
++
++    def add_left(self,value):
++        """向相等排序键的最左侧加入值。@param value 新值。@return None。"""
++        _lists=self._lists
++        keyed=hasattr(self,"_keys")
++        key=self._key(value) if keyed else value
++        if self._maxes:
++            pos=bisect_left(self._maxes,key)
++            if pos==len(self._maxes):
++                pos-=1;idx=len(_lists[pos])
++            else:idx=bisect_left(self._keys[pos] if keyed else _lists[pos],key)
++            _lists[pos].insert(idx,value)
++            if keyed:self._keys[pos].insert(idx,key)
++            self._maxes[pos]=(self._keys[pos] if keyed else _lists[pos])[-1]
++            self._expand(pos)
++        else:
++            _lists.append([value]);self._maxes.append(key)
++            if keyed:self._keys.append([key])
++        self._len+=1
++
++    def add_right(self,value):
++        """保留原add的同键右插策略。@param value 新值。@return None。"""
++        self.add(value)
+ 
+     def add(self, value):
+         """Add `value` to sorted list.
+--- a/library/tests/test_development_sortedcontainers_01_dev.py
++++ b/library/tests/test_development_sortedcontainers_01_dev.py
+@@ -0,0 +1,19 @@
++"""同优先级任务可显式抢前或保持到达顺序。"""
++from sortedcontainers import SortedList,SortedKeyList
++
++def test_equal_key_left_right_preserve_payload_identity():
++    """同排序键不等值记录按调用端选择排队。@return None。"""
++    first={'priority':2,'id':'first'};second={'priority':2,'id':'second'};urgent={'priority':2,'id':'urgent'}
++    values=SortedKeyList([first],key=lambda item:item['priority'])
++    values.add_right(second);values.add_left(urgent)
++    assert [item['id'] for item in values]==['urgent','first','second']
++    assert values[0] is urgent;values._check()
++
++def test_cross_blocks_empty_and_natural_values():
++    """跨块左边界正确，所有内部索引保持同步。@return None。"""
++    values=SortedKeyList(key=lambda item:item[0]);values._reset(4)
++    for index in range(40):values.add_right((1,index))
++    values.add_left((1,-1));values.add_right((1,40))
++    assert [item[1] for item in values]==list(range(-1,41));values._check()
++    plain=SortedList();plain.add_left(3);plain.add_left(1);plain.add_right(2)
++    assert list(plain)==[1,2,3];plain._check()

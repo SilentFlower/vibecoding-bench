@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML2TEXT-O05-DEV",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add visible_content=False and a per-handle hidden_regions count integrated before actual tag/data side effects. In opt-in mode omit entire template or HTML hidden-attribute subtrees (attribute presence including hidden=\"false\"), including nested formatting/resources; handle void hidden elements without hiding following siblings and recover matching ancestor closes without corrupting existing quiet/head/style/script accounting. Unclosed hidden EOF hides the remainder of only that document and state resets before reuse. Default text remains unchanged, do not infer CSS/script visibility or claim sanitization; counts report top-level omitted regions.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

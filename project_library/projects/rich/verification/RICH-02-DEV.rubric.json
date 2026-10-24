@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "RICH-02-DEV",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Traceback.extract for the entire cause/context/ExceptionGroup graph using exception object identity IDs, not hashing or equality/text. Each exception appears at most once, self/multi-object cycles terminate, shared group members and unhashable custom exceptions work, normal chain order/is_cause/__suppress_context__ remain correct and notes belong to the actual current exception rather than being copied from the first. Propagate the same visited set through group recursion without prematurely marking unprocessed children. Preserve normal frame extraction/rendering and control test baseline cycles in a bounded subprocess so regression cannot hang indefinitely.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

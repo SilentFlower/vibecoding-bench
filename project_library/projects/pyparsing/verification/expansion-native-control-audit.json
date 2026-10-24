@@ -1,0 +1,48 @@
+{
+  "purpose": "只规范六个StringIO参数地址，完整原生集合与结果保持",
+  "original_contract_sha256": "6720c50640ee7b3575dc969902a2d9517b4870a9b8fcdadc68cf94c6609b92db",
+  "new_contract_sha256": "69728096827739a8f86defb6535bd075e2a38af5882f3295be8ef752467fbb59",
+  "main_nodes": 2175,
+  "subtests": 2089,
+  "normalized_fields": 6,
+  "normalization_scope": [
+    {
+      "parent_nodeid": "tests/test_unit.py::Test02_WithoutPackrat::testParseFile",
+      "ordinal": 1,
+      "when": "call",
+      "field": "context.kwargs.input_file"
+    },
+    {
+      "parent_nodeid": "tests/test_unit.py::Test04_WithPackrat::testParseFile",
+      "ordinal": 1,
+      "when": "call",
+      "field": "context.kwargs.input_file"
+    },
+    {
+      "parent_nodeid": "tests/test_unit.py::Test06_WithBoundedPackrat::testParseFile",
+      "ordinal": 1,
+      "when": "call",
+      "field": "context.kwargs.input_file"
+    },
+    {
+      "parent_nodeid": "tests/test_unit.py::Test08_WithUnboundedPackrat::testParseFile",
+      "ordinal": 1,
+      "when": "call",
+      "field": "context.kwargs.input_file"
+    },
+    {
+      "parent_nodeid": "tests/test_unit.py::Test09_WithLeftRecursionParsing::testParseFile",
+      "ordinal": 1,
+      "when": "call",
+      "field": "context.kwargs.input_file"
+    },
+    {
+      "parent_nodeid": "tests/test_unit.py::Test10_WithLeftRecursionParsingBoundedMemo::testParseFile",
+      "ordinal": 1,
+      "when": "call",
+      "field": "context.kwargs.input_file"
+    }
+  ],
+  "original_assets_changed": false,
+  "result_archive": "canonical-json+gzip+base64全量可恢复，附原文/压缩SHA与计数"
+}

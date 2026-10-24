@@ -1,0 +1,75 @@
+--- a/library/docs/development-pyrsistent-01-dev.md
++++ b/library/docs/development-pyrsistent-01-dev.md
+@@ -0,0 +1,5 @@
++# 嵌套校验映射与可选字段完整传递额外属性导入策略
++
++路线01：CheckedPMap递归键/值构造及可选pmap_field完整传递ignore_extra；默认拒绝额外字段、已有实例复用，类型和不变量错误不吞。多层map/record/class及None实际验收，普通非checked工厂不强加参数。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyrsistent/_checked_types.py
++++ b/library/pyrsistent/_checked_types.py
+@@ -510,8 +510,8 @@
+         checked_value_type = next((t for t in value_types if issubclass(t, CheckedType)), None)
+ 
+         if checked_key_type or checked_value_type:
+-            return cls(dict((checked_key_type.create(key) if checked_key_type and not any(isinstance(key, t) for t in key_types) else key,
+-                             checked_value_type.create(value) if checked_value_type and not any(isinstance(value, t) for t in value_types) else value)
++            return cls(dict((checked_key_type.create(key, ignore_extra=ignore_extra) if checked_key_type and not any(isinstance(key, t) for t in key_types) else key,
++                             checked_value_type.create(value, ignore_extra=ignore_extra) if checked_value_type and not any(isinstance(value, t) for t in value_types) else value)
+                             for key, value in source_data.items()))
+ 
+         return cls(source_data)
+--- a/library/pyrsistent/_field_common.py
++++ b/library/pyrsistent/_field_common.py
+@@ -319,11 +319,11 @@
+     TheMap = _make_pmap_field_type(key_type, value_type)
+ 
+     if optional:
+-        def factory(argument):
++        def factory(argument, _factory_fields=None, ignore_extra=False):
++            """可选映射沿调用方策略创建。@param argument 数据。@param _factory_fields 原协议。@param ignore_extra 是否忽略额外字段。@return 映射或None。"""
+             if argument is None:
+                 return None
+-            else:
+-                return TheMap.create(argument)
++            return TheMap.create(argument, _factory_fields=_factory_fields, ignore_extra=ignore_extra)
+     else:
+         factory = TheMap.create
+ 
+--- a/library/tests/test_development_pyrsistent_01_dev.py
++++ b/library/tests/test_development_pyrsistent_01_dev.py
+@@ -0,0 +1,34 @@
++"""嵌套映射导入时ignore_extra不能在中途丢失。"""
++import unittest
++from pyrsistent import PClass,PRecord,CheckedPMap,field,pmap_field,pvector_field
++
++
++class Item(PClass):
++    """真实受校验商品。"""
++    quantity=field(type=int,mandatory=True)
++
++
++class Items(CheckedPMap):
++    """值应递归构造为Item。"""
++    __key_type__=str
++    __value_type__=Item
++
++
++def test_map_and_optional_record_propagate_declared_policy():
++    """额外展示字段按True忽略、默认仍拒绝。@return None。"""
++    raw={'a':{'quantity':2,'label':'display'}}
++    assert Items.create(raw,ignore_extra=True)['a']==Item(quantity=2)
++    with unittest.TestCase().assertRaises(AttributeError):Items.create(raw)
++    class Record(PRecord):
++        """可选映射组合。"""
++        items=pmap_field(str,Item,optional=True)
++    assert Record.create({'items':raw},ignore_extra=True)['items']['a'].quantity==2
++    assert Record.create({'items':None},ignore_extra=True)['items'] is None
++
++
++def test_existing_instances_and_type_errors_are_not_replaced():
++    """已有实例复用、非额外字段错误不能吞掉。@return None。"""
++    item=Item(quantity=2);items=Items({'a':item})
++    assert Items.create(items,ignore_extra=True) is items
++    assert Items.create({'a':item},ignore_extra=True)['a'] is item
++    with unittest.TestCase().assertRaises(TypeError):Items.create({'a':{'quantity':'wrong','label':'x'}},ignore_extra=True)

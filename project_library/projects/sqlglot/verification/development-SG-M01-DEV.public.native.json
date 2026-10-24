@@ -1,0 +1,14 @@
+{
+  "script": "verification/development-SG-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 6,
+    "failures": 0
+  },
+  "test_file": "app/test_lineage_render.py"
+}

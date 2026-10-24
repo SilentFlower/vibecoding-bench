@@ -1,0 +1,122 @@
+--- a/library/docs/development-icecream-o02-dev.md
++++ b/library/docs/development-icecream-o02-dev.md
+@@ -0,0 +1,5 @@
++# 让同一计时器安全嵌套并按执行上下文隔离状态
++
++对应路线04：同一Timer以ContextVar不可变栈记录独立区间，并校验线程/任务归属；先弹状态再输出，异常/禁用路径也收口，保留原匿名文本及私有兼容字段。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/icecream/icecream.py
++++ b/library/icecream/icecream.py
+@@ -35,6 +35,8 @@
+ from datetime import datetime
+ import functools
+ from contextlib import contextmanager
++from contextvars import ContextVar
++from threading import get_ident
+ from os.path import basename, realpath
+ from textwrap import dedent
+ 
+@@ -548,6 +550,7 @@
+     def __init__(self, ic: IceCreamDebugger):
+         self._ic = ic
+         self._enter_time: Optional[float] = None
++        self._entries = ContextVar("icecream_timer_entries", default=())
+ 
+     def format_duration(self, seconds: float) -> str:
+         if seconds < 1e-6:
+@@ -585,16 +588,44 @@
+ 
+         return wrapper
+ 
++    def _owner(self):
++        """区分线程及当前异步任务，禁止子任务关闭继承的父记录。@return 身份元组。"""
++        import asyncio
++        try:
++            task = asyncio.current_task()
++        except RuntimeError:
++            task = None
++        return get_ident(), id(task) if task is not None else None
++
++    def _start(self, label=''):
++        """向当前执行上下文压入独立开始记录。@return None。"""
++        started = time.perf_counter()
++        self._entries.set(self._entries.get() + ((started, label, self._owner()),))
++        self._enter_time = started
++
+     def __enter__(self) -> "Timer":
+-        self._enter_time = time.perf_counter()
++        """支持同一计时器嵌套，兼容匿名上下文输出。@return self。"""
++        self._start()
+         return self
+ 
+-    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_value: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
+-        if self._enter_time is None:
+-            raise RuntimeError("Timer.__exit__ called without __enter__. ")
+-        duration: float = time.perf_counter() - self._enter_time
+-        self._output(duration)
+-        self._enter_time = None
++    def __exit__(self, exc_type, exc_value, traceback) -> None:
++        """先移除当前记录再输出，异常退出也不泄漏嵌套状态。@return None。"""
++        entries = self._entries.get()
++        if not entries or entries[-1][2] != self._owner():
++            raise RuntimeError('Timer.__exit__ called without __enter__. ')
++        started, label, owner = entries[-1]
++        remaining = entries[:-1]
++        self._entries.set(remaining)
++        self._enter_time = remaining[-1][0] if remaining else None
++        duration = time.perf_counter() - started
++        if exc_type is None:
++            self._output(duration, label)
++        else:
++            try:
++                self._output(duration, label)
++            except Exception:
++                # 原业务异常优先；无业务异常时输出器失败照常传播。
++                pass
+ 
+ 
+ ic = IceCreamDebugger()
+--- a/library/tests/test_development_icecream_o02_dev.py
++++ b/library/tests/test_development_icecream_o02_dev.py
+@@ -0,0 +1,40 @@
++"""同一Timer嵌套测完整区间，并按真实上下文管理状态。"""
++from icecream import IceCreamDebugger
++import icecream.icecream as module
++import pytest
++
++def test_reused_timer_nested_exact_durations(monkeypatch):
++    """内层退出后外层起点保持，兼容_enter_time清空。@return None。"""
++    output=[];timer=IceCreamDebugger(outputFunction=output.append).timer;times=iter([0,1,3,5])
++    monkeypatch.setattr(module.time,'perf_counter',lambda:next(times))
++    with timer:
++        with timer:pass
++    assert output==['2.00s','5.00s'] and timer._enter_time is None
++    with pytest.raises(RuntimeError):timer.__exit__(None,None,None)
++
++def test_exception_and_output_failure_do_not_leave_entry(monkeypatch):
++    """业务异常不被输出器遮蔽，记录总会先弹出。@return None。"""
++    def broken(message):raise OSError('sink')
++    timer=IceCreamDebugger(outputFunction=broken).timer
++    with pytest.raises(ValueError,match='business'):
++        with timer:raise ValueError('business')
++    assert timer._enter_time is None
++    with pytest.raises(OSError):
++        with timer:pass
++    assert timer._enter_time is None
++
++def test_child_task_cannot_exit_parent_frame_and_disabled():
++    """继承ContextVar的子任务不拥有父进入记录。@return None。"""
++    import asyncio
++    output=[];debug=IceCreamDebugger(outputFunction=output.append);timer=debug.timer
++    async def run():
++        with timer:
++            async def child():
++                with pytest.raises(RuntimeError):timer.__exit__(None,None,None)
++                with timer:pass
++            await asyncio.create_task(child())
++    asyncio.run(run());assert len(output)==2
++    debug.disable()
++    with timer:
++        with timer:pass
++    assert len(output)==2

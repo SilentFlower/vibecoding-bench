@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SQLITE-UTILS-06-DEV",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Queryable.export_csv(stream,columns=None,where=None,where_args=None,order_by=None,limit=None,offset=None,dialect=\"excel\"), available on real Table/View. Validate requested column order/no duplicates against actual schema before writing, then csv.writer header and iterate rows_where lazily with quoted selected identifiers and bound where_args. Return actual data row count; empty table still header, Unicode/commas/quotes/multiline fields roundtrip through csv.reader, NULL follows CSV empty-field convention. Never close caller stream, materialize all rows, mutate DB or claim lossless SQLite type encoding. Existing CLI export remains.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

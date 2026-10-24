@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "LOGURU-O01-DEV",
+  "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Logger.handler_snapshot() returning an id-sorted tuple of immutable detached scalar mappings: id, sink_type (actual adapter class), level, formatter static/callable, filter none/callable, enqueue, serialize and stopped. Capture under the existing core lock for consistent concurrent add/remove views. Never expose core/handler/sink/callback objects, call their business methods or repr, or mutate configuration while inspecting it. Old snapshots remain stable after removal. Keep existing repr/add/remove semantics and demonstrate multiple actual sink types and concurrent configuration reads.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

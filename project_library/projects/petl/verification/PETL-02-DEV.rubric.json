@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PETL-02-DEV",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add top-level/Table.convert_report(table,converters,errorvalue=None), eagerly consume source exactly once and return immutable replayable (table,issues) tuples. Validate converter callables and unique existing field names; retain header/order/other fields. Each failed field (including short-row access) gets replacement and ordered 1-based data row/field/error_type issue, never raw value or exception message. Report multiple errors per row, preserve successful conversions and support empty/one-shot sources. Existing lazy convert failure defaults remain unchanged; explicit snapshot memory semantics, not a streaming claim.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

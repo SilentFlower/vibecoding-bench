@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "XW-ATOMIC-DEV",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement xlsxwriter.atomic.atomic_workbook(destination,options=None) yielding a real Workbook writing to a same-directory temporary file. Only after body success and successful close/fsync replace the destination atomically; retain existing regular file permissions. Body/close/replace failures must preserve old destination and clean temporary files without masking original errors. Reject symlink/nonfile destinations, support new files and ordinary Workbook options without mutating caller mappings. This is a single local file operation, not a multi-file or hostile-race transaction.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

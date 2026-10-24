@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-FRONTMATTER-06-DEV",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add frontmatter.atomic.atomic_update(path, transform, encoding=\"utf-8\", expected_sha256=None) and UpdateConflict for an existing regular file. Strictly validate frontmatter using parse_result, read with the binary-stream loading ability, call transform once with a fresh Post and require a returned Post. Render and encode before touching the target. Use a same-directory temporary, preserve mode/owner, flush+fsync, then os.replace. Clean temporary files and preserve original bytes for every failure before replace. Reject symlink targets, expected-version mismatch and changes observed during the transform before commit; do not claim a lock-free check is a linearizable compare-and-swap against uncooperative external writers. Preserve the already delivered compact/nested JSON, TOML format, reserved metadata, Unicode and body. Missing/malformed documents and transform/encoding/IO failures remain explicit. This is a complete safe-edit API, not just a utility-test step.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

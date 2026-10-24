@@ -3,7 +3,7 @@
   "project_key": "pydantic-settings",
   "title": "Pydantic Settings 商品工具配置场景",
   "category": "configuration",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
   "seed_digest": "f30d58a0c3d9bb34414581134720a29c375746e006f7e470c567bc15127c0f01",
   "environment": "pydantic-settings-py312",
   "source": {
@@ -59,6 +59,241 @@
           ],
           "development_cycle": "bug",
           "branches": []
+        }
+      ]
+    },
+    {
+      "id": "PYDANTIC-SETTINGS-02-DEV-SCENE",
+      "title": "有前缀的CLI按禁别名配置保留真实业务字段值",
+      "goal": "有前缀的CLI按禁别名配置保留真实业务字段值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYDANTIC-SETTINGS-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYDANTIC-SETTINGS-02-DEV",
+          "kind": "modify",
+          "goal": "有前缀的CLI按禁别名配置保留真实业务字段值",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair _CliArg.dest so a validation_alias only strips the CLI/env prefix when alias validation is actually enabled. With cli_prefix and validate_by_alias=False, --app.apple must update apple even when Field(alias=...) or validation_alias exists. Preserve normal alias validation, plain fields, no-prefix behavior, nested prefix and kebab-case. Disabled aliases remain rejected; do not enable alias validation or accept both names to mask loss.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pydantic_settings_02_dev.py, and Chinese compatibility documentation at library/docs/development-pydantic-settings-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYDANTIC-SETTINGS-02-DEV-contract.md",
+            "materials/PYDANTIC-SETTINGS-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYDANTIC-SETTINGS-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/pydantic_settings/sources/providers/cli.py",
+            "library/tests/test_development_pydantic_settings_02_dev.py",
+            "library/docs/development-pydantic-settings-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYDANTIC-SETTINGS-02-DEV.rubric.json",
+            "native": "verification/PYDANTIC-SETTINGS-02-DEV.native.json",
+            "public_native": "verification/PYDANTIC-SETTINGS-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYDANTIC-SETTINGS-03-DEV-SCENE",
+      "title": "冻结集合与队列配置通过真实CLI序列化后完整恢复",
+      "goal": "冻结集合与队列配置通过真实CLI序列化后完整恢复",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYDANTIC-SETTINGS-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYDANTIC-SETTINGS-03-DEV",
+          "kind": "modify",
+          "goal": "冻结集合与队列配置通过真实CLI序列化后完整恢复",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend existing _serialize_value container handling to frozenset and collections.deque using existing pydantic_core.to_jsonable_python before JSON encoding. Real CliApp.serialize/run roundtrip must preserve values and model container types; deque order and duplicates remain, frozenset order is not promised. Complete JSON-array arguments for these two containers must decode JSON escapes exactly once, including Unicode, quotes, newlines and backslashes, retaining the existing numeric-string coercion. Cover empty containers replacing nonempty defaults, commas and enum members. Existing shorthand input, NoDecode, list/dict/set/tuple and scalar policies remain.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pydantic_settings_03_dev.py, and Chinese compatibility documentation at library/docs/development-pydantic-settings-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYDANTIC-SETTINGS-03-DEV-contract.md",
+            "materials/PYDANTIC-SETTINGS-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYDANTIC-SETTINGS-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/pydantic_settings/sources/providers/cli.py",
+            "library/tests/test_development_pydantic_settings_03_dev.py",
+            "library/docs/development-pydantic-settings-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYDANTIC-SETTINGS-03-DEV.rubric.json",
+            "native": "verification/PYDANTIC-SETTINGS-03-DEV.native.json",
+            "public_native": "verification/PYDANTIC-SETTINGS-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYDANTIC-SETTINGS-04-DEV-SCENE",
+      "title": "显式用户目录pyproject配置可正确加载且保留搜索边界",
+      "goal": "显式用户目录pyproject配置可正确加载且保留搜索边界",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYDANTIC-SETTINGS-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYDANTIC-SETTINGS-04-DEV",
+          "kind": "modify",
+          "goal": "显式用户目录pyproject配置可正确加载且保留搜索边界",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExpand explicit PyprojectTomlConfigSettingsSource Path with expanduser before resolve. A local ~/pyproject.toml must read exactly the same bytes/table as its absolute Path. Preserve ordinary relative/absolute paths, missing-file empty source, custom table header and current depth/cwd discovery; no cwd mutation or new search location. Unknown user expansion errors propagate clearly. Use synthetic HOME and temporary files only.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pydantic_settings_04_dev.py, and Chinese compatibility documentation at library/docs/development-pydantic-settings-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYDANTIC-SETTINGS-04-DEV-contract.md",
+            "materials/PYDANTIC-SETTINGS-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYDANTIC-SETTINGS-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/pydantic_settings/sources/providers/pyproject.py",
+            "library/tests/test_development_pydantic_settings_04_dev.py",
+            "library/docs/development-pydantic-settings-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYDANTIC-SETTINGS-04-DEV.rubric.json",
+            "native": "verification/PYDANTIC-SETTINGS-04-DEV.native.json",
+            "public_native": "verification/PYDANTIC-SETTINGS-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYDANTIC-SETTINGS-05-DEV-SCENE",
+      "title": "CLI未知参数序列化保持父子命令归属并可多层往返",
+      "goal": "CLI未知参数序列化保持父子命令归属并可多层往返",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYDANTIC-SETTINGS-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYDANTIC-SETTINGS-05-DEV",
+          "kind": "modify",
+          "goal": "CLI未知参数序列化保持父子命令归属并可多层往返",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair CliApp serialization to keep each CliUnknownArgs sequence at its own command level: after known optional/positional arguments of that level and before its selected subcommand. Do not hoist child unknowns into the root trailing sequence. Real parse/serialize/parse must preserve each parent/child unknown list, duplicates, known values and multi-level ownership. Existing no-subcommand and leaf end-of-options behavior remain; do not manufacture impossible parent end-marker+selected-child states.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pydantic_settings_05_dev.py, and Chinese compatibility documentation at library/docs/development-pydantic-settings-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYDANTIC-SETTINGS-05-DEV-contract.md",
+            "materials/PYDANTIC-SETTINGS-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYDANTIC-SETTINGS-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/pydantic_settings/sources/providers/cli.py",
+            "library/tests/test_development_pydantic_settings_05_dev.py",
+            "library/docs/development-pydantic-settings-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYDANTIC-SETTINGS-05-DEV.rubric.json",
+            "native": "verification/PYDANTIC-SETTINGS-05-DEV.native.json",
+            "public_native": "verification/PYDANTIC-SETTINGS-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYDANTIC-SETTINGS-06-DEV-SCENE",
+      "title": "命名模型别名的多层嵌套环境配置按真实结构解码",
+      "goal": "命名模型别名的多层嵌套环境配置按真实结构解码",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYDANTIC-SETTINGS-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYDANTIC-SETTINGS-06-DEV",
+          "kind": "modify",
+          "goal": "命名模型别名的多层嵌套环境配置按真实结构解码",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair EnvSettingsSource.next_field to resolve TypeAliasType, parameterized named aliases and outer Annotated wrappers before inspecting Union/model/dataclass/dict structure. Optional named model aliases must decode nested list fields like direct models, preserving None and whole-object JSON. Follow alias layers without unbounded traversal into recursive model fields; inspect actual provided path only. Preserve field validation metadata, case policy, generic substitutions, invalid input rejection and existing plain/Union handling. Do not remove model aliases or globally force JSON parsing.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pydantic_settings_06_dev.py, and Chinese compatibility documentation at library/docs/development-pydantic-settings-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PYDANTIC-SETTINGS-06-DEV-contract.md",
+            "materials/PYDANTIC-SETTINGS-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYDANTIC-SETTINGS-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/pydantic_settings/sources/providers/env.py",
+            "library/tests/test_development_pydantic_settings_06_dev.py",
+            "library/docs/development-pydantic-settings-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYDANTIC-SETTINGS-06-DEV.rubric.json",
+            "native": "verification/PYDANTIC-SETTINGS-06-DEV.native.json",
+            "public_native": "verification/PYDANTIC-SETTINGS-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
         }
       ]
     }

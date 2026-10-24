@@ -1,0 +1,124 @@
+--- a/library/docs/development-rich-02-dev.md
++++ b/library/docs/development-rich-02-dev.md
+@@ -0,0 +1,5 @@
++# 循环与共享异常链按身份有界提取且保留各自说明
++
++路线02/14合并为完整异常图提取修复：cause/context及group共享对象按身份全图去重，各异常至多一次，支持不可hash子类和循环，保留抑制规则及真实链顺序；notes随实际节点，不从首异常串到后续。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/rich/traceback.py
++++ b/library/rich/traceback.py
+@@ -442,7 +442,7 @@
+         locals_max_depth: Optional[int] = None,
+         locals_hide_dunder: bool = True,
+         locals_hide_sunder: bool = False,
+-        _visited_exceptions: Optional[Set[BaseException]] = None,
++        _visited_exceptions: Optional[Set[int]] = None,
+     ) -> Trace:
+         """Extract traceback information.
+ 
+@@ -469,7 +469,7 @@
+ 
+         notes: List[str] = getattr(exc_value, "__notes__", None) or []
+ 
+-        grouped_exceptions: Set[BaseException] = (
++        grouped_exceptions: Set[int] = (
+             set() if _visited_exceptions is None else _visited_exceptions
+         )
+ 
+@@ -481,6 +481,10 @@
+                 return "<exception str() failed>"
+ 
+         while True:
++            identity=id(exc_value)
++            if identity in grouped_exceptions:break
++            grouped_exceptions.add(identity)
++            notes = getattr(exc_value,"__notes__",None) or []
+             stack = Stack(
+                 exc_type=safe_str(exc_type.__name__),
+                 exc_value=safe_str(exc_value),
+@@ -492,9 +496,8 @@
+                 if isinstance(exc_value, (BaseExceptionGroup, ExceptionGroup)):
+                     stack.is_group = True
+                     for exception in exc_value.exceptions:
+-                        if exception in grouped_exceptions:
++                        if id(exception) in grouped_exceptions:
+                             continue
+-                        grouped_exceptions.add(exception)
+                         stack.exceptions.append(
+                             Traceback.extract(
+                                 type(exception),
+@@ -596,26 +599,25 @@
+                 if frame_summary.f_locals.get("_rich_traceback_guard", False):
+                     del stack.frames[:]
+ 
+-            if not grouped_exceptions:
+-                cause = getattr(exc_value, "__cause__", None)
+-                if cause is not None and cause is not exc_value:
+-                    exc_type = cause.__class__
+-                    exc_value = cause
+-                    # __traceback__ can be None, e.g. for exceptions raised by the
+-                    # 'multiprocessing' module
+-                    traceback = cause.__traceback__
+-                    is_cause = True
+-                    continue
+-
+-                cause = exc_value.__context__
+-                if cause is not None and not getattr(
+-                    exc_value, "__suppress_context__", False
+-                ):
+-                    exc_type = cause.__class__
+-                    exc_value = cause
+-                    traceback = cause.__traceback__
+-                    is_cause = False
+-                    continue
++            cause = getattr(exc_value, "__cause__", None)
++            if cause is not None and cause is not exc_value:
++                exc_type = cause.__class__
++                exc_value = cause
++                # __traceback__ can be None, e.g. for exceptions raised by the
++                # 'multiprocessing' module
++                traceback = cause.__traceback__
++                is_cause = True
++                continue
++
++            cause = exc_value.__context__
++            if cause is not None and not getattr(
++                exc_value, "__suppress_context__", False
++            ):
++                exc_type = cause.__class__
++                exc_value = cause
++                traceback = cause.__traceback__
++                is_cause = False
++                continue
+             # No cover, code is reached but coverage doesn't recognize it.
+             break  # pragma: no cover
+ 
+--- a/library/tests/test_development_rich_02_dev.py
++++ b/library/tests/test_development_rich_02_dev.py
+@@ -0,0 +1,25 @@
++"""整个异常链与ExceptionGroup按对象身份有界提取。"""
++import json
++import subprocess
++import sys
++from rich.traceback import Traceback
++
++
++def test_cycle_is_extracted_once_under_hard_test_timeout():
++    """子进程超时保护原版循环缺陷，参考实现两对象各一次。@return None。"""
++    script="from rich.traceback import Traceback; a=ValueError('a'); b=TypeError('b'); a.__cause__=b; b.__cause__=a; result=Traceback.extract(type(a),a,None); print(len(result.stacks))"
++    result=subprocess.run([sys.executable,'-c',script],capture_output=True,text=True,timeout=2,check=True)
++    assert result.stdout.strip()=='2'
++
++
++def test_unhashable_shared_exception_and_per_object_notes():
++    """不能靠异常hash或文本去重，notes绑定实际节点。@return None。"""
++    class UnhashableError(Exception):
++        """显式不可hash的合法异常子类。"""
++        __hash__=None
++    a=UnhashableError('same');b=UnhashableError('same');a.add_note('A');b.add_note('B');a.__cause__=b
++    result=Traceback.extract(type(a),a,None)
++    assert len(result.stacks)==2 and [stack.notes for stack in result.stacks]==[['A'],['B']]
++    group=ExceptionGroup('group',[a,b,a]);trace=Traceback.extract(type(group),group,None)
++    count=sum(len(child.stacks) for child in trace.stacks[0].exceptions)
++    assert count==2

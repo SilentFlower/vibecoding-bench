@@ -3,7 +3,7 @@
   "project_key": "python-frontmatter",
   "title": "python-frontmatter 文档资料开发任务",
   "category": "文档处理",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
   "seed_digest": "a9181e19224379b7c3593996869c4c80f4b8afa19a4126d25bd0e2115f84eca2",
   "environment": "python-frontmatter-py312",
   "source": {
@@ -56,6 +56,274 @@
             "disclosure/FM-FX-01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-FRONTMATTER-02-DEV-SCENE",
+      "title": "带前导空白的文档保持真实格式及业务元数据",
+      "goal": "带前导空白的文档保持真实格式及业务元数据",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-FRONTMATTER-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-FRONTMATTER-02-DEV",
+          "kind": "modify",
+          "goal": "带前导空白的文档保持真实格式及业务元数据",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair format detection across checks/check/load/loads/parse: the same leading whitespace and CRLF normalization already accepted by parse must not lose the actual YAML/TOML handler when building a Post. Preserve explicit handler identity, body trimming, reserved business metadata and default no-frontmatter behavior. Roundtripping a leading-blank TOML document must remain TOML, not silently switch to YAML. Do not broaden this delivery to BOM guessing or arbitrary body delimiter search.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_frontmatter_02_dev.py, and Chinese compatibility documentation at library/docs/development-python-frontmatter-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "FM-FX-01-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/PYTHON-FRONTMATTER-02-DEV-contract.md",
+            "materials/PYTHON-FRONTMATTER-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-FRONTMATTER-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/frontmatter/__init__.py",
+            "library/tests/test_development_python_frontmatter_02_dev.py",
+            "library/docs/development-python-frontmatter-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-FRONTMATTER-02-DEV.rubric.json",
+            "native": "verification/PYTHON-FRONTMATTER-02-DEV.native.json",
+            "public_native": "verification/PYTHON-FRONTMATTER-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-FRONTMATTER-03-DEV-SCENE",
+      "title": "JSON文档按完整对象语法分离嵌套元数据与正文",
+      "goal": "JSON文档按完整对象语法分离嵌套元数据与正文",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-FRONTMATTER-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-FRONTMATTER-03-DEV",
+          "kind": "modify",
+          "goal": "JSON文档按完整对象语法分离嵌套元数据与正文",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nReplace JSON-handler line-delimiter splitting with real JSON-object boundary recognition. Accept compact, empty, pretty and nested objects, escaped braces/quotes, non-ASCII metadata and a body that itself contains braces or JSON-looking lines. Consume exactly the first complete object and preserve the trailing body. Keep actual JSONHandler attachment, reserved business metadata, existing JSON serialization options and malformed-JSON exceptions. Non-object arbitrary prose remains ordinary content; no YAML/TOML behavior regression.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_frontmatter_03_dev.py, and Chinese compatibility documentation at library/docs/development-python-frontmatter-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "FM-FX-01-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/PYTHON-FRONTMATTER-03-DEV-contract.md",
+            "materials/PYTHON-FRONTMATTER-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-FRONTMATTER-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/frontmatter/default_handlers.py",
+            "library/tests/test_development_python_frontmatter_03_dev.py",
+            "library/docs/development-python-frontmatter-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-FRONTMATTER-03-DEV.rubric.json",
+            "native": "verification/PYTHON-FRONTMATTER-03-DEV.native.json",
+            "public_native": "verification/PYTHON-FRONTMATTER-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-FRONTMATTER-04-DEV-SCENE",
+      "title": "批量导入可区分损坏头部并选择严格解析结果",
+      "goal": "批量导入可区分损坏头部并选择严格解析结果",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-FRONTMATTER-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-FRONTMATTER-04-DEV",
+          "kind": "modify",
+          "goal": "批量导入可区分损坏头部并选择严格解析结果",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd frontmatter.parsing ParseResult/ParseError/parse_result(text, encoding=\"utf-8\", handler=None, defaults=None, strict=False). Results expose status (absent/present/malformed/non_mapping), independent metadata, stripped content, actual handler and error. Explicitly distinguish malformed/split failure and non-mapping roots from absent metadata; empty/null YAML is a valid empty mapping. Strict mode raises ParseError carrying the same result for malformed/non_mapping only. Preserve legacy parse/loads behavior and custom-handler authority. Compact/nested JSON introduced by the earlier delivery must work through the new result API. Decode errors remain real decode errors, never absent status.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_frontmatter_04_dev.py, and Chinese compatibility documentation at library/docs/development-python-frontmatter-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "PYTHON-FRONTMATTER-03-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/PYTHON-FRONTMATTER-04-DEV-contract.md",
+            "materials/PYTHON-FRONTMATTER-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-FRONTMATTER-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/frontmatter/parsing.py",
+            "library/tests/test_development_python_frontmatter_04_dev.py",
+            "library/docs/development-python-frontmatter-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-FRONTMATTER-04-DEV.rubric.json",
+            "native": "verification/PYTHON-FRONTMATTER-04-DEV.native.json",
+            "public_native": "verification/PYTHON-FRONTMATTER-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-FRONTMATTER-05-DEV-SCENE",
+      "title": "标准二进制文档流按显式编码可靠读取与往返输出",
+      "goal": "标准二进制文档流按显式编码可靠读取与往返输出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-FRONTMATTER-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-FRONTMATTER-05-DEV",
+          "kind": "modify",
+          "goal": "标准二进制文档流按显式编码可靠读取与往返输出",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair load() for standard binary streams by decoding before format detection, using the requested encoding from the current cursor. Extend dump() to io.BufferedIOBase/io.RawIOBase including BytesIO and real wb files, encoding exactly once; text streams receive str and paths retain their existing explicit encoding behavior. Do not catch TypeError to retry writes; do not rewind, truncate or close caller-owned streams. Decode/encode/write errors propagate. Roundtrip leading-blank TOML, compact JSON and reserved business metadata from prior deliveries without losing the handler or Unicode content.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_frontmatter_05_dev.py, and Chinese compatibility documentation at library/docs/development-python-frontmatter-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "PYTHON-FRONTMATTER-02-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "PYTHON-FRONTMATTER-03-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/PYTHON-FRONTMATTER-05-DEV-contract.md",
+            "materials/PYTHON-FRONTMATTER-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-FRONTMATTER-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/frontmatter/__init__.py",
+            "library/tests/test_development_python_frontmatter_05_dev.py",
+            "library/docs/development-python-frontmatter-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-FRONTMATTER-05-DEV.rubric.json",
+            "native": "verification/PYTHON-FRONTMATTER-05-DEV.native.json",
+            "public_native": "verification/PYTHON-FRONTMATTER-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PYTHON-FRONTMATTER-06-DEV-SCENE",
+      "title": "文档编辑通过严格解析和原子替换避免半写及版本冲突",
+      "goal": "文档编辑通过严格解析和原子替换避免半写及版本冲突",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PYTHON-FRONTMATTER-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PYTHON-FRONTMATTER-06-DEV",
+          "kind": "modify",
+          "goal": "文档编辑通过严格解析和原子替换避免半写及版本冲突",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd frontmatter.atomic.atomic_update(path, transform, encoding=\"utf-8\", expected_sha256=None) and UpdateConflict for an existing regular file. Strictly validate frontmatter using parse_result, read with the binary-stream loading ability, call transform once with a fresh Post and require a returned Post. Render and encode before touching the target. Use a same-directory temporary, preserve mode/owner, flush+fsync, then os.replace. Clean temporary files and preserve original bytes for every failure before replace. Reject symlink targets, expected-version mismatch and changes observed during the transform before commit; do not claim a lock-free check is a linearizable compare-and-swap against uncooperative external writers. Preserve the already delivered compact/nested JSON, TOML format, reserved metadata, Unicode and body. Missing/malformed documents and transform/encoding/IO failures remain explicit. This is a complete safe-edit API, not just a utility-test step.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_frontmatter_06_dev.py, and Chinese compatibility documentation at library/docs/development-python-frontmatter-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "PYTHON-FRONTMATTER-04-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "PYTHON-FRONTMATTER-05-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/PYTHON-FRONTMATTER-06-DEV-contract.md",
+            "materials/PYTHON-FRONTMATTER-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PYTHON-FRONTMATTER-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/frontmatter/atomic.py",
+            "library/tests/test_development_python_frontmatter_06_dev.py",
+            "library/docs/development-python-frontmatter-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PYTHON-FRONTMATTER-06-DEV.rubric.json",
+            "native": "verification/PYTHON-FRONTMATTER-06-DEV.native.json",
+            "public_native": "verification/PYTHON-FRONTMATTER-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
         }
       ]
     }

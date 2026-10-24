@@ -1,0 +1,300 @@
+{
+  "schema": 3,
+  "project_key": "markdownify",
+  "title": "Markdownify文档迁移工作场景",
+  "category": "内容转换与导出合同",
+  "description": "固定真实源码上的完整工程交付：让代码围栏真实容纳内嵌反引号并拒绝信息行注入；把HTML直接任务勾选框转换为真实GFM任务列表；统一解析链接图像视频及海报的真实目的地；按CSS真实提取并排除DOM且不污染调用者文档；让标题层级整体迁移并明确处理超过六级的文档；隔离复用转换器的本次配置及已绑定分派缓存。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "34251fa06be2b1d654495eca70f3af818c608bd285132f7039ed3963f3a8d50f",
+  "environment": "markdownify-py312",
+  "source": {
+    "repository": "https://github.com/matthewwithanm/python-markdownify",
+    "commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MARKDOWNIFY-O01-DEV-SCENE",
+      "title": "让代码围栏真实容纳内嵌反引号并拒绝信息行注入",
+      "goal": "让代码围栏真实容纳内嵌反引号并拒绝信息行注入",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWNIFY-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWNIFY-O01-DEV",
+          "kind": "modify",
+          "goal": "让代码围栏真实容纳内嵌反引号并拒绝信息行注入",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual MarkdownConverter.convert_pre to choose a backtick fence of at least three characters and strictly longer than every consecutive backtick run in the converted code body. Preserve body content, existing strip_pre modes and language callback/fallback behavior. Validate the effective language as a string with no backtick, CR or LF, refusing structural info-line injection. Simple existing pre output must remain unchanged; demonstrate entire embedded fenced samples surviving as one outer code block, not only the presence of a helper.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdownify_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-markdownify-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWNIFY-O01-DEV-contract.md",
+            "materials/MARKDOWNIFY-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdownify/__init__.py",
+            "library/tests/test_development_markdownify_o01_dev.py",
+            "library/docs/development-markdownify-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWNIFY-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWNIFY-O01-DEV.native.json",
+            "public_native": "verification/MARKDOWNIFY-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWNIFY-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWNIFY-O02-DEV-SCENE",
+      "title": "把HTML直接任务勾选框转换为真实GFM任务列表",
+      "goal": "把HTML直接任务勾选框转换为真实GFM任务列表",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWNIFY-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWNIFY-O02-DEV",
+          "kind": "modify",
+          "goal": "把HTML直接任务勾选框转换为真实GFM任务列表",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd opt-in task_lists conversion in actual convert_li. A task checkbox is exclusively the first direct non-whitespace/non-comment content node, an input whose type is case-insensitive checkbox; checked attribute presence means checked regardless of attribute text. Emit [x]/[ ] after existing unordered or ordered bullet, retaining empty tasks, nested list ownership and multiline indentation. Default conversion remains unchanged. Never infer parent tasks from descendant labels/lists or later inputs, and never interpret other input types as checkboxes.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdownify_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-markdownify-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWNIFY-O02-DEV-contract.md",
+            "materials/MARKDOWNIFY-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdownify/__init__.py",
+            "library/tests/test_development_markdownify_o02_dev.py",
+            "library/docs/development-markdownify-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWNIFY-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWNIFY-O02-DEV.native.json",
+            "public_native": "verification/MARKDOWNIFY-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWNIFY-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWNIFY-O03-DEV-SCENE",
+      "title": "统一解析链接图像视频及海报的真实目的地",
+      "goal": "统一解析链接图像视频及海报的真实目的地",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWNIFY-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWNIFY-O03-DEV",
+          "kind": "modify",
+          "goal": "统一解析链接图像视频及海报的真实目的地",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd base_url and url_transform options integrated into real a/img/video/source-fallback/poster conversion. Use urllib.parse.urljoin for nonempty relative destinations with a string base while preserving fragment-only references, empty destinations and absolute URI semantics. Call optional transform(resolved_url, kind) exactly once per actual nonempty destination, with kind link/image/video/poster, after resolution; a None result suppresses that destination and invalid return types raise TypeError. Preserve titles, inline-image rules, autolinks, source ordering and default output. Perform no network requests.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdownify_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-markdownify-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWNIFY-O03-DEV-contract.md",
+            "materials/MARKDOWNIFY-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdownify/__init__.py",
+            "library/tests/test_development_markdownify_o03_dev.py",
+            "library/docs/development-markdownify-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWNIFY-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWNIFY-O03-DEV.native.json",
+            "public_native": "verification/MARKDOWNIFY-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWNIFY-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWNIFY-O04-DEV-SCENE",
+      "title": "按CSS真实提取并排除DOM且不污染调用者文档",
+      "goal": "按CSS真实提取并排除DOM且不污染调用者文档",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWNIFY-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWNIFY-O04-DEV",
+          "kind": "modify",
+          "goal": "按CSS真实提取并排除DOM且不污染调用者文档",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nIntegrate include_selectors/exclude_selectors into actual convert_soup. None include means the whole remaining tree, an empty include sequence means no content; accept a selector string or sequence. Work on a detached copy whenever selection is requested, apply exclusions before inclusions and truly remove excluded descendants. Emit selected roots in original document order, deduplicate overlapping selectors and ancestor/descendant selections by node identity, and preserve caller-supplied BeautifulSoup unmodified. Invalid selectors must propagate rather than silently selecting all. Keep default conversion and existing strip/convert tag-format semantics intact.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdownify_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-markdownify-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWNIFY-O04-DEV-contract.md",
+            "materials/MARKDOWNIFY-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdownify/__init__.py",
+            "library/tests/test_development_markdownify_o04_dev.py",
+            "library/docs/development-markdownify-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWNIFY-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWNIFY-O04-DEV.native.json",
+            "public_native": "verification/MARKDOWNIFY-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWNIFY-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWNIFY-O05-DEV-SCENE",
+      "title": "让标题层级整体迁移并明确处理超过六级的文档",
+      "goal": "让标题层级整体迁移并明确处理超过六级的文档",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWNIFY-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWNIFY-O05-DEV",
+          "kind": "modify",
+          "goal": "让标题层级整体迁移并明确处理超过六级的文档",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual convert_hN with heading_offset (integer, default zero), heading_minimum (integer 1..6, default one), and heading_overflow clamp/bold/error (default clamp). Map depth to max(minimum, original_depth+offset) before choosing Setext or ATX style; clamp at six, render a normalized bold paragraph, or raise for overflow according to the explicit policy. Reject bool/noninteger offsets and invalid minima/policies. Preserve existing default rendering, nonstandard hN handling, empty bold overflow and existing inline table/heading contexts. This is a real document-level hierarchy conversion, not post-hoc string substitution.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdownify_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-markdownify-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWNIFY-O05-DEV-contract.md",
+            "materials/MARKDOWNIFY-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdownify/__init__.py",
+            "library/tests/test_development_markdownify_o05_dev.py",
+            "library/docs/development-markdownify-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWNIFY-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWNIFY-O05-DEV.native.json",
+            "public_native": "verification/MARKDOWNIFY-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWNIFY-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MARKDOWNIFY-O06-DEV-SCENE",
+      "title": "隔离复用转换器的本次配置及已绑定分派缓存",
+      "goal": "隔离复用转换器的本次配置及已绑定分派缓存",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MARKDOWNIFY-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MARKDOWNIFY-O06-DEV",
+          "kind": "modify",
+          "goal": "隔离复用转换器的本次配置及已绑定分派缓存",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd actual MarkdownConverter.convert_with_options(html, **overrides), leaving convert(html) and subclass convert_* signatures intact. Reuse subclass behavior without rerunning a potentially required-argument constructor; isolate nested dict/list/tuple/set configuration containers from both base and caller overrides while preserving opaque callbacks by identity. Normalize bs4_options as the constructor does, enforce strip/convert exclusion, and build fresh conversion-function cache bound to this isolated converter. Previously cached base methods, sequential calls, simultaneous calls and callback/errors must not mutate base options/cache or caller option containers. Demonstrate actual differing converted documents, not just returned option dictionaries.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_markdownify_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-markdownify-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MARKDOWNIFY-O06-DEV-contract.md",
+            "materials/MARKDOWNIFY-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/markdownify/__init__.py",
+            "library/tests/test_development_markdownify_o06_dev.py",
+            "library/docs/development-markdownify-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MARKDOWNIFY-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MARKDOWNIFY-O06-DEV.native.json",
+            "public_native": "verification/MARKDOWNIFY-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MARKDOWNIFY-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-FRONTMATTER-05-DEV",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair load() for standard binary streams by decoding before format detection, using the requested encoding from the current cursor. Extend dump() to io.BufferedIOBase/io.RawIOBase including BytesIO and real wb files, encoding exactly once; text streams receive str and paths retain their existing explicit encoding behavior. Do not catch TypeError to retry writes; do not rewind, truncate or close caller-owned streams. Decode/encode/write errors propagate. Roundtrip leading-blank TOML, compact JSON and reserved business metadata from prior deliveries without losing the handler or Unicode content.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

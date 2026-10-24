@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FG-ORDER-DEV",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement feedgen.ordering.sorted_feed(feed,*,by=\"updated\",reverse=True,missing=\"last\",since=None,limit=None) and reusable copy_feed(feed,entries). Compare actual updated/published instants across offsets, retain original order on ties, explicitly place or reject missing dates independent of reverse. Inclusive aware since excludes undated entries, nonnegative limit supports zero. Return deeply independent FeedGenerator preserving metadata/extensions/entry content; never reorder or mutate original feed. Reject naive boundaries and invalid modes before changing anything.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

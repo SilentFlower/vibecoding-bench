@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "NATSORT-05-DEV",
+  "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add natsort.search.NaturalSortedIndex(iterable,*,key=None,alg=ns.DEFAULT,reverse=False). Snapshot original record order and precomputed natural keys, reject unordered input without sorting, support rank(value,side), count(value), and between(start,stop,include_start,include_stop) with None for unbounded ranges. Query values are already extracted fields; results preserve original records and input direction. Equal natural keys and reverse indexes need correct binary boundaries. Locale changes invalidate locale indexes; caller rebuilds after record/key-policy mutation. Do not change ordinary natsort.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

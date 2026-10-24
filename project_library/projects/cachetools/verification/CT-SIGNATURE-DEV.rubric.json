@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CT-SIGNATURE-DEV",
+  "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add cachetools.keys.signature_key(func,*,typed=False,namespace=None,ignore=()), returning a key callable. Use signature.bind/apply_defaults so equivalent positional/keyword/default calls share a key, include variadic positional order and sorted variadic keywords, and optionally top-level value types (including variadic item types). Default namespace is function identity; allow explicit shared hashable namespace and explicit known ignored parameter names. Preserve binding errors and reject unhashable values without stringifying them. Do not mutate kwargs, execute the wrapped function or change existing key functions.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

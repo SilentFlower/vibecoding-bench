@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TD-ATOMIC-STORAGE-DEV",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement tinydb.atomic.AtomicJSONStorage(Storage) with TinyDB-compatible read/write/close and constructor (path, *, create_dirs=False, encoding=\"utf-8\", **json_options). Serialize completely before opening a same-directory temporary file, flush/fsync and atomically os.replace; preserve existing mode, use 0600 for new files, clean temporary files and retain old bytes on serialization/write/replace failure. Read current path each time, return None for absent/empty files, reject nonmapping JSON roots and symlink targets, and reject reads/writes after close. Verify reopen and shrinking data. Preserve existing JSONStorage and do not claim cross-process locking, hostile-directory race protection or parent-directory crash durability.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

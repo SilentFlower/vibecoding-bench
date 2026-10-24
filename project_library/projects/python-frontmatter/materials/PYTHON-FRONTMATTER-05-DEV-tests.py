@@ -1,0 +1,27 @@
+"""标准二进制文档流按指定编码读写，调用方保留所有权。"""
+import io
+import unittest
+import frontmatter
+from frontmatter.default_handlers import JSONHandler,TOMLHandler
+
+
+def test_binary_read_current_cursor_and_encoding():
+    """从当前游标解码，不把bytes送入正则。@return None。"""
+    raw='  \n+++\ncontent="摘要"\n+++\n正文'.encode('utf-16-le')
+    stream=io.BytesIO(b'prefix'+raw);stream.seek(6)
+    post=frontmatter.load(stream,encoding='utf-16-le')
+    assert isinstance(post.handler,TOMLHandler) and post.metadata['content']=='摘要'
+    assert post.content=='正文' and not stream.closed
+
+
+def test_binary_dump_roundtrip_and_error_is_not_retried():
+    """输出编码只用于二进制流；错误不能造成二次写入。@return None。"""
+    post=frontmatter.loads('{"content":"摘要"}\n正文')
+    stream=io.BytesIO();frontmatter.dump(post,stream,encoding='utf-16-le',ensure_ascii=False)
+    assert not stream.closed
+    stream.seek(0);again=frontmatter.load(stream,encoding='utf-16-le')
+    assert isinstance(again.handler,JSONHandler) and again.metadata==post.metadata and again.content=='正文'
+    text=io.StringIO();frontmatter.dump(post,text,ensure_ascii=False)
+    assert isinstance(text.getvalue(),str)
+    with unittest.TestCase().assertRaises(UnicodeDecodeError):frontmatter.load(io.BytesIO(b'\xff'))
+

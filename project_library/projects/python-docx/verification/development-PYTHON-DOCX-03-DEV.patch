@@ -1,0 +1,68 @@
+--- a/library/docs/development-python-docx-03-dev.md
++++ b/library/docs/development-python-docx-03-dev.md
+@@ -0,0 +1,5 @@
++# 批注创建前校验主文档归属与完整范围顺序避免悬挂引用
++
++路线03：add_comment先核全部Run的当前主文档part/XML归属与顺序，拒绝跨包/页眉/文本框/倒序/重复/空；失败不创建comments或标记，正常单run与跨段保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/docx/document.py
++++ b/library/src/docx/document.py
+@@ -9,6 +9,7 @@
+ 
+ from docx.blkcntnr import BlockItemContainer
+ from docx.enum.section import WD_SECTION
++from docx.oxml.ns import qn
+ from docx.enum.text import WD_BREAK
+ from docx.section import Section, Sections
+ from docx.shared import ElementProxy, Emu, Inches, Length
+@@ -75,7 +76,20 @@
+         when no `initials` argument is provided.
+         """
+         # -- normalize `runs` to a sequence of runs --
+-        runs = [runs] if isinstance(runs, Run) else runs
++        runs = [runs] if isinstance(runs, Run) else list(runs)
++        if not runs or any(not isinstance(run,Run) for run in runs):
++            raise ValueError("批注需要非空Run范围")
++        ordered=list(self._element.iter(qn("w:r")))
++        positions={element:index for index,element in enumerate(ordered)}
++        indices=[]
++        for run in runs:
++            if run.part is not self.part or run._r not in positions:
++                raise ValueError("批注范围必须属于当前主文档")
++            if any(parent.tag==qn("w:txbxContent") for parent in run._r.iterancestors()):
++                raise ValueError("不支持文本框story批注")
++            indices.append(positions[run._r])
++        if any(left>=right for left,right in zip(indices,indices[1:])):
++            raise ValueError("批注范围必须按文档顺序且不得重复")
+         first_run = runs[0]
+         last_run = runs[-1]
+ 
+--- a/library/tests/test_development_python_docx_03_dev.py
++++ b/library/tests/test_development_python_docx_03_dev.py
+@@ -0,0 +1,25 @@
++"""批注必须先核归属/顺序，再创建部件和范围标记。"""
++from io import BytesIO
++from zipfile import ZipFile
++import unittest
++from docx import Document
++
++def test_foreign_empty_reversed_and_header_ranges_have_no_side_effects():
++    """两个包都不应出现悬挂comments关系或范围。@return None。"""
++    target=Document();a=target.add_paragraph('a').runs[0];b=target.add_paragraph('b').runs[0]
++    foreign=Document();other=foreign.add_paragraph('foreign').runs[0]
++    header=target.sections[0].header.paragraphs[0].add_run('header')
++    before=target._element.xml;foreign_before=foreign._element.xml
++    for runs in ([other],[],[b,a],[a,other],[header],[a,a]):
++        with unittest.TestCase().assertRaises(ValueError):target.add_comment(runs,'invalid')
++        assert target._element.xml==before and foreign._element.xml==foreign_before
++    output=BytesIO();target.save(output)
++    with ZipFile(output) as archive:assert 'word/comments.xml' not in archive.namelist()
++
++def test_same_document_cross_paragraph_comment_saves_with_consistent_ids():
++    """首末边界允许跨段，中间内容自然包含，不要求逐个传run。@return None。"""
++    document=Document();first=document.add_paragraph('first').runs[0];last=document.add_paragraph('last').runs[0]
++    comment=document.add_comment([first,last],'review',author='Reviewer')
++    assert comment.text=='review'
++    output=BytesIO();document.save(output);output.seek(0);restored=Document(output)
++    assert len(restored.comments)==1 and next(iter(restored.comments)).text=='review'

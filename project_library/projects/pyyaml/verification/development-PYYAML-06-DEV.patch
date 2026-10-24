@@ -1,0 +1,72 @@
+--- a/library/docs/development-pyyaml-06-dev.md
++++ b/library/docs/development-pyyaml-06-dev.md
+@@ -0,0 +1,5 @@
++# 配置构造值通过结构路径侧表追溯真实源码范围
++
++路线09：同一安全构造节点图生成值与结构路径SourceSpan，零起始字符位置，不包装普通值；merge来源、显式覆盖、别名多路径和有限环侧表准确，侧表不持有输入buffer。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/lib/yaml/marked.py
++++ b/library/lib/yaml/marked.py
+@@ -0,0 +1,39 @@
++"""值类型不包装，源位置使用不保留输入buffer的结构路径侧表。"""
++from dataclasses import dataclass
++from yaml.loader import SafeLoader
++from yaml.nodes import MappingNode,SequenceNode
++
++
++@dataclass(frozen=True)
++class SourceSpan:
++    """零起始字符位置。@param start 开始字符索引。@param end 结束字符索引。@param line 开始行。@param column 开始列。@return 轻量源范围。"""
++    start: int
++    end: int
++    line: int
++    column: int
++
++
++def load_with_marks(stream):
++    """同时返回标准安全值与路径位置。@param stream YAML输入。@return (value,{tuple路径:SourceSpan})，环只记录当前路径一次。"""
++    loader=SafeLoader(stream)
++    try:
++        node=loader.get_single_node()
++        if node is None:return None,{}
++        value=loader.construct_document(node)
++        spans={}
++        def visit(current,path,active):
++            """别名多路径分别记录，活动环停止递归以保持有限侧表。"""
++            spans[path]=SourceSpan(current.start_mark.index,current.end_mark.index,current.start_mark.line,current.start_mark.column)
++            if id(current) in active:return
++            active.add(id(current))
++            try:
++                if isinstance(current,SequenceNode):
++                    for index,child in enumerate(current.value):visit(child,path+(index,),active)
++                elif isinstance(current,MappingNode):
++                    for key,child in current.value:
++                        actual=loader.construct_object(key,deep=True)
++                        visit(child,path+(actual,),active)
++            finally:active.remove(id(current))
++        visit(node,(),set())
++        return value,spans
++    finally:loader.dispose()
+--- a/library/tests/test_development_pyyaml_06_dev.py
++++ b/library/tests/test_development_pyyaml_06_dev.py
+@@ -0,0 +1,19 @@
++"""结构路径来源不改变普通Python值类型。"""
++from yaml.marked import load_with_marks
++
++def test_nested_paths_unicode_and_exact_source_slice():
++    """路径中的键与列表索引准确，坐标不是UTF8字节偏移。@return None。"""
++    text='name: 中文\nservice:\n  ports: [80, 443]\n'
++    value,marks=load_with_marks(text)
++    assert value=={'name':'中文','service':{'ports':[80,443]}}
++    span=marks[('service','ports',1)]
++    assert text[span.start:span.end]=='443' and span.line==2
++    assert text[marks[('name',)].start:marks[('name',)].end]=='中文'
++
++def test_alias_paths_share_value_origin_and_recursive_graph_terminates():
++    """别名每个结构路径都指向原锚点位置，环不能无限展开。@return None。"""
++    value,marks=load_with_marks('a: &a [1]\nb: *a')
++    assert value['a'] is value['b'] and marks[('a',0)]==marks[('b',0)]
++    value,marks=load_with_marks('&a [*a]')
++    assert value[0] is value and (0,) in marks and len(marks)==2
++    assert load_with_marks('')==(None,{})

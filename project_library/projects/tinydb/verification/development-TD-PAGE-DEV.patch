@@ -1,0 +1,77 @@
+--- a/library/development_tests/test_development_td_page_dev.py
++++ b/library/development_tests/test_development_td_page_dev.py
+@@ -0,0 +1,34 @@
++"""公开文档ID分页回归。"""
++import pytest
++from tinydb import TinyDB, Query
++from tinydb.storages import MemoryStorage
++
++def test_pages_and_last_cursor_are_exact():
++    with TinyDB(storage=MemoryStorage) as db:
++        db.insert_multiple([{'n':i} for i in range(5)])
++        rows,cursor=db.query_page(limit=2)
++        assert [d.doc_id for d in rows]==[1,2] and cursor==2
++        rows,cursor=db.query_page(limit=2,after=cursor)
++        assert [d.doc_id for d in rows]==[3,4] and cursor==4
++        rows,cursor=db.query_page(limit=2,after=cursor)
++        assert [d.doc_id for d in rows]==[5] and cursor is None
++
++def test_sparse_ids_and_filters_do_not_use_offset():
++    with TinyDB(storage=MemoryStorage) as db:
++        db.insert_multiple([{'n':i} for i in range(6)])
++        db.remove(doc_ids=[2,4])
++        rows,cursor=db.query_page(Query().n>=2,limit=1,after=1)
++        assert [d.doc_id for d in rows]==[3] and cursor==3
++
++def test_return_values_and_predicate_are_detached():
++    with TinyDB(storage=MemoryStorage) as db:
++        db.insert({'nested':{'value':1}})
++        rows,cursor=db.query_page(lambda doc:not doc['nested'].update(value=3))
++        rows[0]['nested']['value']=9
++        assert db.get(doc_id=1)['nested']['value']==1
++
++def test_invalid_page_arguments_are_rejected():
++    with TinyDB(storage=MemoryStorage) as db:
++        for options in ({'limit':0},{'limit':True},{'after':-1},{'after':False}):
++            with pytest.raises(ValueError):
++                db.query_page(**options)
+--- a/library/docs/development-td-page-dev.md
++++ b/library/docs/development-td-page-dev.md
+@@ -0,0 +1,5 @@
++# 按文档ID稳定分页查询并隔离返回对象
++
++订单列表使用文档ID游标分页，删除或追加后不靠偏移跳页。筛选和返回对象都与存储隔离，仅在还有匹配记录时返回下一游标，明确大小和游标边界，不承诺跨页快照。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tinydb/table.py
++++ b/library/tinydb/table.py
+@@ -245,6 +245,29 @@
+         # conversion.
+ 
+         return list(iter(self))
++
++    def query_page(self, cond=None, *, limit=100, after=None):
++        """按整数文档ID游标分页。@param cond 可选筛选查询。@param limit 1至1000。
++        @param after 上页最后ID或None。@return (独立Document列表,有后续时的最后ID或None)。
++        """
++        from copy import deepcopy
++
++        if type(limit) is not int or not 1 <= limit <= 1000:
++            raise ValueError('分页大小必须为1至1000的整数')
++        if after is not None and (type(after) is not int or after < 0):
++            raise ValueError('游标必须为非负整数或None')
++        if cond is not None and not callable(cond):
++            raise TypeError('筛选条件必须可调用')
++        rows = []
++        for doc_id, value in sorted((self.document_id_class(key), value) for key, value in self._read_table().items()):
++            if after is not None and doc_id <= after:
++                continue
++            document = self.document_class(deepcopy(value), doc_id)
++            if cond is None or cond(document):
++                rows.append(document)
++                if len(rows) > limit:
++                    return rows[:limit], rows[limit - 1].doc_id
++        return rows, None
+ 
+     def search(self, cond: QueryLike) -> list[Document]:
+         """

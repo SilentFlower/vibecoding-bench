@@ -1,0 +1,83 @@
+--- a/library/development_tests/test_development_ck_dynamic_choice_dev.py
++++ b/library/development_tests/test_development_ck_dynamic_choice_dev.py
+@@ -0,0 +1,30 @@
++"""公开上下文动态选项回归。"""
++import click
++from click.testing import CliRunner
++from click.dynamic import DynamicChoice
++
++def test_distinct_contexts_do_not_share_choices():
++    @click.command()
++    @click.option('--target',type=DynamicChoice(lambda ctx:ctx.obj))
++    def command(target):
++        click.echo(target)
++    runner=CliRunner()
++    assert runner.invoke(command,['--target','one'],obj=['one']).exit_code==0
++    assert runner.invoke(command,['--target','one'],obj=['two']).exit_code==2
++
++def test_help_and_completion_use_current_values():
++    type_=DynamicChoice(lambda ctx:ctx.obj)
++    command=click.Command('tool');ctx=click.Context(command,obj=['alpha','beta']);param=click.Option(['--target'],type=type_)
++    assert 'alpha' in type_.get_metavar(param,ctx)
++    assert [item.value for item in type_.shell_complete(ctx,param,'b')]==['beta']
++
++def test_case_normalization_returns_original_choice_object():
++    class Value:
++        def __str__(self):
++            return 'Ready'
++    value=Value();type_=DynamicChoice(lambda ctx:[value],case_sensitive=False)
++    assert type_.convert('READY',None,None) is value
++
++def test_metadata_does_not_query_provider():
++    calls=[];type_=DynamicChoice(lambda ctx:not calls.append(ctx) and ['a'])
++    assert type_.to_info_dict()['dynamic'] and calls==[]
+--- a/library/docs/development-ck-dynamic-choice-dev.md
++++ b/library/docs/development-ck-dynamic-choice-dev.md
+@@ -0,0 +1,5 @@
++# 按本次上下文生成真实选项并同步帮助与补全
++
++命令可用环境、账号或状态随上下文变化，动态选项在每次操作读取独立快照，转换、帮助和补全保持一致。返回原选项对象，不跨调用缓存，也不在无上下文的元数据查看时访问提供者。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/click/dynamic.py
++++ b/library/src/click/dynamic.py
+@@ -0,0 +1,39 @@
++"""每次操作按当前上下文读取可用业务选项。"""
++from .types import ParamType, Choice
++
++
++class DynamicChoice(ParamType):
++    """不跨调用缓存选项的Choice适配器。"""
++    name='choice'
++    def __init__(self,provider,*,case_sensitive=True):
++        """建立动态类型。@param provider 接受Context或None并返回有限选项。
++        @param case_sensitive 是否区分大小写。@return None。
++        """
++        if not callable(provider) or type(case_sensitive) is not bool:
++            raise TypeError('动态选项需要可调用提供者及布尔大小写策略')
++        self.provider,self.case_sensitive=provider,case_sensitive
++
++    def _choice(self,ctx):
++        return Choice(tuple(self.provider(ctx)),case_sensitive=self.case_sensitive)
++
++    def convert(self,value,param,ctx):
++        """按本次快照转换。@param value 输入。@param param 参数。@param ctx 上下文。
++        @return 原提供者中的实际选项对象。
++        """
++        return self._choice(ctx).convert(value,param,ctx)
++
++    def get_metavar(self,param,ctx):
++        """格式化当前帮助占位符。@param param 参数。@param ctx 上下文。@return 文本。
++        """
++        return self._choice(ctx).get_metavar(param,ctx)
++
++    def shell_complete(self,ctx,param,incomplete):
++        """补全当前可用选项。@param ctx 上下文。@param param 参数。@param incomplete 前缀。
++        @return 原Choice补全项列表。
++        """
++        return self._choice(ctx).shell_complete(ctx,param,incomplete)
++
++    def to_info_dict(self):
++        """返回不提前调用外部提供者的类型信息。@return 信息映射。
++        """
++        return {**super().to_info_dict(),'dynamic':True,'case_sensitive':self.case_sensitive}

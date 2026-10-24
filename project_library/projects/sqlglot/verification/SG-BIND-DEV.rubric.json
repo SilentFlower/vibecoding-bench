@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SG-BIND-DEV",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement sqlglot.report_binding.parameter_names(tree) and bind_parameters(query,values,*,strict=True,dialect=None) on completed single-query copies. Replace named Placeholder nodes with real exp literal conversions, repeated uses get independent nodes; literals/comments/identifiers containing colon text stay unchanged. Support None/bool/int/finite float/finite Decimal/str/bytes/date/time/datetime and recursive lists, reject nonfinite/cyclic/unsupported objects and SQL Expr values. Missing parameters always fail; strict rejects extras, nonstrict ignores unused values. Reject positional placeholders explicitly and preserve original AST parents. Never parse parameter text as SQL.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

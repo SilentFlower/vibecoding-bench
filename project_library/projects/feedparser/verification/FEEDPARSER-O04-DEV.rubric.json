@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FEEDPARSER-O04-DEV",
+  "source_commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add feedparser.records.entry_identity for actual parsed entry mappings. Prefer a nonempty native string id with reliable=True; otherwise compute deterministic SHA256 from explicit selected actual fields with configurable NFC string normalization, canonical JSON and reliable=False/source=fields metadata. Never inject an id, read compatibility alias fallbacks as real facts, strip tracking parameters or identify entries merely by similar titles. Reject missing usable data, duplicate/invalid field names, nonstring native ids and unsupported/nonfinite JSON values explicitly. Preserve inputs, distinguish equal titles with different links and document fallback collision/stability scope.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

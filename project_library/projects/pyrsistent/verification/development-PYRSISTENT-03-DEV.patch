@@ -1,0 +1,95 @@
+--- a/library/docs/development-pyrsistent-03-dev.md
++++ b/library/docs/development-pyrsistent-03-dev.md
+@@ -0,0 +1,5 @@
++# 有界持久队列完整遵守序列切片及零容量边界
++
++路线03/04作为完整有界队列边界修复：slice.indices统一切片，空/超界/负端点/逆序/步长0与list一致；单位步长保留双列表共享。容量0不保留元素，切片、反转、删除及pickle派生仍保留容量，原对象不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyrsistent/_pdeque.py
++++ b/library/pyrsistent/_pdeque.py
+@@ -272,13 +272,13 @@
+         pdeque([1, 2])
+         """
+         try:
+-            return PDeque(self._left_list.remove(elem), self._right_list, self._length - 1)
++            return PDeque(self._left_list.remove(elem), self._right_list, self._length - 1, self._maxlen)
+         except ValueError:
+             # Value not found in left list, try the right list
+             try:
+                 # This is severely inefficient with a double reverse, should perhaps implement a remove_last()?
+                 return PDeque(self._left_list,
+-                              self._right_list.reverse().remove(elem).reverse(), self._length - 1)
++                              self._right_list.reverse().remove(elem).reverse(), self._length - 1, self._maxlen)
+             except ValueError as e:
+                 raise ValueError('{0} not found in PDeque'.format(elem)) from e
+ 
+@@ -294,7 +294,7 @@
+         >>> reversed(pdeque([1, 2, 3]))
+         pdeque([3, 2, 1])
+         """
+-        return PDeque(self._right_list, self._left_list, self._length)
++        return PDeque(self._right_list, self._left_list, self._length, self._maxlen)
+     __reversed__ = reverse
+ 
+     def rotate(self, steps):
+@@ -318,18 +318,11 @@
+         return pdeque, (list(self), self._maxlen)
+ 
+     def __getitem__(self, index):
+-        if isinstance(index, slice):
+-            if index.step is not None and index.step != 1:
+-                # Too difficult, no structural sharing possible
+-                return pdeque(tuple(self)[index], maxlen=self._maxlen)
+-
+-            result = self
+-            if index.start is not None:
+-                result = result.popleft(index.start % self._length)
+-            if index.stop is not None:
+-                result = result.pop(self._length - (index.stop % self._length))
+-
+-            return result
++        if isinstance(index,slice):
++            start,stop,step=index.indices(self._length)
++            if step!=1:return pdeque(tuple(self)[index],maxlen=self._maxlen)
++            if stop<=start:return pdeque(maxlen=self._maxlen)
++            return self.popleft(start).pop(self._length-stop)
+ 
+         if not isinstance(index, Integral):
+             raise TypeError("'%s' object cannot be interpreted as an index" % type(index).__name__)
+@@ -362,7 +355,7 @@
+     """
+     t = tuple(iterable)
+     if maxlen is not None:
+-        t = t[-maxlen:]
++        t = t[-maxlen:] if maxlen else ()
+     length = len(t)
+     pivot = int(length / 2)
+     left = plist(t[:pivot])
+--- a/library/tests/test_development_pyrsistent_03_dev.py
++++ b/library/tests/test_development_pyrsistent_03_dev.py
+@@ -0,0 +1,24 @@
++"""有界持久队列切片遵守list边界并完整保持容量。"""
++import pickle
++import unittest
++from pyrsistent import pdeque
++
++
++def test_slice_normalization_matches_list_and_preserves_maxlen():
++    """len端点、超界、负值、逆序与空队列都精确。@return None。"""
++    for values in ([],[1],[1,2,3]):
++        queue=pdeque(values,maxlen=5)
++        for selected in (slice(None,len(values)),slice(len(values),None),slice(20,None),slice(-20,20),slice(2,1),slice(None,None,-1)):
++            result=queue[selected]
++            assert list(result)==values[selected] and result.maxlen==5
++        with unittest.TestCase().assertRaises(ValueError):queue[::0]
++        assert list(queue)==values
++
++
++def test_zero_capacity_and_editing_derived_queue_keep_policy():
++    """容量零从构造到两端添加始终为空，派生操作不丢容量。@return None。"""
++    queue=pdeque([1,2],maxlen=0)
++    for result in (queue,queue.append(3),queue.appendleft(3),queue.extend([3,4]),queue.extendleft([3,4]),queue[:],pickle.loads(pickle.dumps(queue))):
++        assert list(result)==[] and result.maxlen==0
++    queue=pdeque([1,2,3],maxlen=3)
++    assert queue.reverse().maxlen==queue.remove(1).maxlen==3

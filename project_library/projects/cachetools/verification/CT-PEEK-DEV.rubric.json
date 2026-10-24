@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CT-PEEK-DEV",
+  "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Cache.peek(key,default=marker), returning a live value without invoking subclass __getitem__, __missing__, recency/frequency updates or expiry cleanup. Use each cache existing membership semantics, so TTL/TLRU expired entries behave missing; explicit defaults including None are returned, otherwise raise KeyError. Support all built-in cache policies, weighted sizes and custom __missing__ subclasses. Preserve ordinary get/item access behavior and all internal policy accounting.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

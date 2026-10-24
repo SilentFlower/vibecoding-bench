@@ -1,0 +1,63 @@
+--- a/library/docs/development-wtforms-02-dev.md
++++ b/library/docs/development-wtforms-02-dev.md
+@@ -0,0 +1,5 @@
++# 对象数据可选字段按真实非空值继续业务校验
++
++路线01：显式DataOptional在无请求时依据已处理对象值，0/False继续后续规则，None/空容器/按政策空白可跳过；转换失败不能被误清。明确空请求仍沿原Optional清错语义，旧Optional保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wtforms/data_optional.py
++++ b/library/src/wtforms/data_optional.py
+@@ -0,0 +1,17 @@
++"""按已处理业务值选择可选校验，旧Optional请求语义不变。"""
++from .validators import Optional,StopValidation
++
++
++class DataOptional(Optional):
++    """对象数据也参与非空校验，零和False不是缺失。@param strip_whitespace 是否视空白为空。"""
++    def __call__(self,form,field):
++        """请求值沿用Optional；无请求时看处理后值。@param form 表单。@param field 字段。@return None或StopValidation。"""
++        if field.raw_data is not None:
++            return super().__call__(form,field)
++        # 转换错误不能因data变None而被误清；原始明确空请求仍沿用旧Optional清错合同。
++        if field.process_errors:return
++        value=field.data
++        empty=value is None or isinstance(value,str) and not self.string_check(value) or isinstance(value,(list,tuple,dict,set,frozenset)) and not value
++        if empty:
++            field.errors[:]=[]
++            raise StopValidation()
+--- a/library/tests/test_development_wtforms_02_dev.py
++++ b/library/tests/test_development_wtforms_02_dev.py
+@@ -0,0 +1,32 @@
++"""对象非空值继续验证，真正空值才停止链。"""
++from wtforms import Form,IntegerField,StringField
++from wtforms.validators import NumberRange,Length,Optional
++from wtforms.data_optional import DataOptional
++
++
++def test_data_source_nonempty_zero_and_default_optional_compatibility():
++    """对象99应范围失败，对象0必须继续而非误当空值。@return None。"""
++    class Product(Form):
++        """库存表单。"""
++        quantity=IntegerField(validators=[DataOptional(),NumberRange(min=0,max=5)])
++    assert not Product(data={'quantity':99}).validate()
++    assert Product(data={'quantity':0}).validate()
++    assert Product(data={'quantity':None}).validate()
++    class Legacy(Form):
++        """旧默认Optional不改变。"""
++        quantity=IntegerField(validators=[Optional(),NumberRange(min=0,max=5)])
++    assert Legacy(data={'quantity':99}).validate()
++
++
++def test_whitespace_policy_and_conversion_errors():
++    """空白政策明确，错误对象转换不能被当成缺失。@return None。"""
++    class Product(Form):
++        """字符串与数值业务校验。"""
++        name=StringField(validators=[DataOptional(),Length(min=2)])
++        quantity=IntegerField(validators=[DataOptional(),NumberRange(min=0,max=5)])
++    assert Product(data={'name':'   '}).validate()
++    assert not Product(data={'quantity':'invalid'}).validate()
++    class Exact(Form):
++        """关闭strip后空格继续长度校验。"""
++        name=StringField(validators=[DataOptional(strip_whitespace=False),Length(min=5)])
++    assert not Exact(data={'name':' '}).validate()

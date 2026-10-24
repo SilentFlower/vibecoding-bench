@@ -1,0 +1,18 @@
+{
+  "script": "verification/JINJA-O02-DEV-observe.py",
+  "args": [],
+  "python_paths": [
+    "library/src",
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "business": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/native_regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

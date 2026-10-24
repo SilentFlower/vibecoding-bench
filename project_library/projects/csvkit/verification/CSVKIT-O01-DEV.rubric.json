@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSVKIT-O01-DEV",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement csvkit.cleaning.clean_rows(reader, *,max_rows=10000,max_errors=1000,**RowChecker_options), clean_file(stream,reader_options=None,**options), immutable CleanResult(schema,header,rows,errors) and CleanIssue(line_number,code,message). Reuse the actual RowChecker and agate reader, including physical multiline line numbers and late empty-column removal, without returning before file-level checks. Do not retain raw error rows, close caller streams, write stdout/stderr or call sys.exit. Enforce nonnegative non-bool budgets, conflicting fixes, full completion and explicit CleanLimitError instead of partial success; propagate IO/errors. Preserve RowChecker/CLI APIs.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

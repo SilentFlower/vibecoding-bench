@@ -1,0 +1,65 @@
+--- a/library/cssselect/formstates.py
++++ b/library/cssselect/formstates.py
+@@ -0,0 +1,26 @@
++"""仅依据静态HTML语义确定必填与可选资格。"""
++from cssselect.xpath import HTMLTranslator
++
++
++class FormStateTranslator(HTMLTranslator):
++    """扩展真实HTML翻译，普通enabled/checked等规则保持。
++
++    :param xhtml: 沿用原HTMLTranslator大小写模式。
++    :return: 支持required/optional的静态翻译器。
++    """
++    _form_namespace = "(namespace-uri() = '' or namespace-uri() = 'http://www.w3.org/1999/xhtml')"
++    _normalized_type = "translate(@type, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
++    _non_required_types = ('hidden', 'range', 'color', 'button', 'submit', 'reset', 'image')
++
++    def _required_eligible(self):
++        """与控件资格绑定，任意div required不成为表单状态。@return XPath谓词。"""
++        excluded = ' or '.join(self._normalized_type + " = '" + value + "'" for value in self._non_required_types)
++        return self._form_namespace + " and (local-name() = 'select' or local-name() = 'textarea' or (local-name() = 'input' and not(" + excluded + ')))'
++
++    def xpath_required_pseudo(self, xpath):
++        """有资格且声明required，disabled不更改声明状态。@return XPathExpr。"""
++        return xpath.add_condition('(' + self._required_eligible() + ') and @required')
++
++    def xpath_optional_pseudo(self, xpath):
++        """有资格且未声明required，与required仅在资格集合内互补。@return XPathExpr。"""
++        return xpath.add_condition('(' + self._required_eligible() + ') and not(@required)')
+--- a/library/docs/development-cssselect-o05-dev.md
++++ b/library/docs/development-cssselect-o05-dev.md
+@@ -0,0 +1,5 @@
++# 按真实HTML资格完整区分必填与可选控件
++
++对应路线07：完整交付required/optional互补能力，真实表单资格、类型、大小写及命名空间受控；禁用不改变required声明，非控件不混入集合。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cssselect_o05_dev.py
++++ b/library/tests/test_development_cssselect_o05_dev.py
+@@ -0,0 +1,25 @@
++"""表单状态资格来自真实控件与类型，不等同属性存在。"""
++from lxml import etree
++import cssselect
++import pytest
++
++def test_eligible_controls_and_complement():
++    """所有有资格控件分为required和optional。@return None。"""
++    from cssselect.formstates import FormStateTranslator
++    root=etree.fromstring('<root><input id="a" required=""/><input id="b"/><select id="c" required=""/><textarea id="d"/><input id="e" type="checkbox" required=""/></root>')
++    p=FormStateTranslator()
++    assert [x.get('id') for x in root.xpath(p.css_to_xpath(':required'))]==['a','c','e']
++    assert [x.get('id') for x in root.xpath(p.css_to_xpath(':optional'))]==['b','d']
++
++def test_excluded_types_unknown_type_and_disabled():
++    """排除无资格类型，未知类型按text，禁用仍保留声明。@return None。"""
++    from cssselect.formstates import FormStateTranslator
++    root=etree.fromstring('<root><input id="x" type="HIDDEN" required=""/><div required=""/><input id="a" type="unknown" required=""/><input id="b" disabled="" required=""/></root>')
++    assert [x.get('id') for x in root.xpath(FormStateTranslator().css_to_xpath(':required'))]==['a','b']
++    with pytest.raises(cssselect.ExpressionError):cssselect.GenericTranslator().css_to_xpath(':required')
++
++def test_xhtml_namespace_and_foreign_names():
++    """XHTML控件有资格，外部命名空间同名节点不误选。@return None。"""
++    from cssselect.formstates import FormStateTranslator
++    root=etree.fromstring('<root xmlns:h="http://www.w3.org/1999/xhtml" xmlns:o="urn:other"><h:input id="yes" required=""/><o:input id="no" required=""/></root>')
++    assert [x.get('id') for x in root.xpath(FormStateTranslator(xhtml=True).css_to_xpath(':required'))]==['yes']

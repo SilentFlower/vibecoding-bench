@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SM-ASYNC-DEV",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement statemachine.async_runner.AsyncMachineRunner using completed EventCall validation, EventResult and snapshots. dispatch awaits actual activate_initial_state and send only when awaitable, records actual completed states/results and supports normal sync machines. run accepts sync or async event sources, stays lazy, awaits one event before reading the next, stable indices and collect only TransitionNotAllowed. Propagate cancellation, callback and source errors. No nested asyncio.run, hidden threads, tasks or no-op guard shortcuts; preserve actual lifecycle and callback parameter isolation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

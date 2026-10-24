@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TN-IDLE-BUDGET-DEV",
+  "source_commit": "32ac68f0941319c0d2f4fb927f96e4ee29bb46c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add tenacity.stop.stop_before_idle_budget(budget) as stop_base. Accept nonnegative finite seconds or timedelta, rejecting booleans/nonfinite/negative values. Stop when retry_state.idle_for + upcoming_sleep is greater than or equal to budget, before that next sleep is issued. Count only retry waiting, not target execution elapsed time; a zero budget stops after the first rejected attempt even for zero wait. Integrate with actual Retrying and AsyncRetrying and stop_any/stop_all without storing mutable per-call counters in the shared policy. Preserve other stop and wait semantics.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

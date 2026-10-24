@@ -1,0 +1,81 @@
+--- a/library/docs/development-wrapt-05-dev.md
++++ b/library/docs/development-wrapt-05-dev.md
+@@ -0,0 +1,5 @@
++# 缓存键按真实参数默认值规范化并允许明确业务ID策略
++
++路线05：独立canonical_cache先signature.bind/apply_defaults，位置/命名/默认及kwargs顺序规范化；typed明确区分类型，自定义BoundArguments业务键可提ID，默认不深hash可变对象，签名错误先拒绝。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wrapt/canonical_cache.py
++++ b/library/src/wrapt/canonical_cache.py
+@@ -0,0 +1,43 @@
++"""按真实函数签名绑定参数的显式规范键缓存，不深hash业务对象。"""
++import inspect
++from collections import OrderedDict,namedtuple
++from functools import wraps
++from threading import RLock
++CacheInfo=namedtuple('CacheInfo','hits misses maxsize currsize')
++
++def canonical_cache(*,maxsize=128,typed=False,key_func=None):
++    """建立规范参数缓存。@param maxsize 容量。@param typed 是否区分直接参数类型。@param key_func 可选BoundArguments到hashable业务键。@return 同步函数/方法装饰器。"""
++    if type(maxsize) is not int or maxsize<0 or key_func is not None and not callable(key_func):raise ValueError('容量或键函数无效')
++    def decorate(function):
++        signature=inspect.signature(function);cache=OrderedDict();lock=RLock();hits=misses=0
++        def make_key(args,kwargs):
++            bound=signature.bind(*args,**kwargs);bound.apply_defaults()
++            if key_func is not None:key=key_func(bound)
++            else:
++                pairs=[]
++                for name,value in bound.arguments.items():
++                    if signature.parameters[name].kind is inspect.Parameter.VAR_KEYWORD:value=tuple(sorted(value.items()))
++                    pairs.append((name,(type(value),value) if typed else value))
++                key=tuple(pairs)
++            hash(key);return key
++        @wraps(function)
++        def invoke(*args,**kwargs):
++            nonlocal hits,misses
++            key=make_key(args,kwargs)
++            with lock:
++                if key in cache:hits+=1;cache.move_to_end(key);return cache[key]
++                misses+=1;value=function(*args,**kwargs)
++                if maxsize:
++                    cache[key]=value
++                    while len(cache)>maxsize:cache.popitem(last=False)
++                return value
++        def cache_info():
++            """查询规范键命中与容量。@return CacheInfo。"""
++            with lock:return CacheInfo(hits,misses,maxsize,len(cache))
++        def cache_clear():
++            """清全缓存和统计。@return None。"""
++            nonlocal hits,misses
++            with lock:cache.clear();hits=misses=0
++        invoke.cache_info=cache_info;invoke.cache_clear=cache_clear
++        return invoke
++    return decorate
+--- a/library/tests/test_development_wrapt_05_dev.py
++++ b/library/tests/test_development_wrapt_05_dev.py
+@@ -0,0 +1,24 @@
++"""按真实绑定签名规范参数，不按调用拼写重复缓存。"""
++import unittest
++from wrapt.canonical_cache import canonical_cache
++
++def test_equivalent_defaults_varargs_kwargs_and_typed_policy():
++    """位置/命名/显式默认等价，kwargs顺序也归一。@return None。"""
++    calls=[]
++    @canonical_cache(maxsize=3)
++    def value(x,y=2,*,z=3):calls.append(1);return x+y+z
++    assert value(1)==value(x=1)==value(1,y=2,z=3)==6 and calls==[1]
++    @canonical_cache(typed=True)
++    def typed(x):return type(x)
++    assert typed(1) is int and typed(True) is bool and typed.cache_info().misses==2
++
++def test_custom_business_key_supports_mapping_and_invalid_calls_still_reject():
++    """自定义键只看id；函数签名仍先验证，碰撞由业务负责。@return None。"""
++    calls=[]
++    @canonical_cache(key_func=lambda bound:bound.arguments['record']['id'])
++    def value(record):calls.append(1);return record['name']
++    assert value({'id':7,'name':'first'})==value({'id':7,'name':'second'})=='first' and calls==[1]
++    with unittest.TestCase().assertRaises(TypeError):value()
++    @canonical_cache()
++    def plain(record):return record
++    with unittest.TestCase().assertRaises(TypeError):plain({})

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYYAML-06-DEV",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add yaml.marked.load_with_marks returning (ordinary SafeLoader value, tuple-path->immutable SourceSpan(start,end,line,column)). Zero-based CHARACTER offsets/line/column, root path (), mapping actual constructed keys and list indices. Use same composed node graph as actual construction, including flattened merge value origin, explicit override, alias multiple paths and finite recursive alias metadata. Do not wrap/change str/int/list/dict values, guess byte offsets, retain full Mark buffer in side table or silently load multiple documents. Empty returns (None,{}).",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

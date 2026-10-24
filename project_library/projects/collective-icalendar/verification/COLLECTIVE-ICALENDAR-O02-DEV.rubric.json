@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "COLLECTIVE-ICALENDAR-O02-DEV",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Component.from_ical_strict(st, multiple=False), inherited by Calendar and LazyCalendar, as an explicit strict component-boundary parsing API. Before constructing any parser/model or caching any timezone, inspect all unfolded BEGIN/END markers with a textual stack: reject orphan END, case-insensitive name mismatch, cross-layer closure, and unfinished BEGIN at EOF. Include actual and expected names in mismatch errors. Accept str, bytes and Path (read once), valid nested and unknown X components, and preserve the multiple return contract plus subclass parser dispatch. Use a shared private ComponentIcalParser boundary validator and then the existing cls.from_ical path. This checks structural component boundaries, not every RFC property. Preserve the original from_ical signature and permissive behavior, all frozen tests, custom factories and lazy parsing; do not hardcode old malformed fixtures or make strictness the default.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

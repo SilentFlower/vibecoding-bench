@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TYPER-02-DEV",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend the already delivered app/shop.py product/export application with real import-csv SOURCE --output NEW_JSON. Require exactly sku/name/quantity CSV headers in any order; UTF8/BOM, normal CSV quoted commas/newlines and Unicode supported, integer ASCII nonnegative quantity and unique nonempty sku/name. Validate all rows before publishing canonical three-field JSON in input order; header-only emits []. Preserve original input, refuse existing/symlink/same-path output, use same-directory completed temp+exclusive link so no partial/overwrite race. Add reusable app/inventory_store.py and command-module registration to support subsequent real business commands without replacing delivered product/export. Do not modify Typer library or dependency environment.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

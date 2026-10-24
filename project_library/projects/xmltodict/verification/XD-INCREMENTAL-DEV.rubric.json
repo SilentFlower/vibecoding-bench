@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "XD-INCREMENTAL-DEV",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add IncrementalParser(encoding=None,*,process_namespaces=False,namespace_separator=\":\",disable_entities=True,process_comments=False,**handler_options) with feed(chunk) and close(). Reuse pinned SAX handler, including completed resource budgets, item callbacks and postprocessor. Support UTF8 byte boundaries and text chunks, require consistent bytes/str chunk types, finalize incomplete XML with original ExpatError, make successful close idempotent and prohibit feed after close or any parse failure. Entity declarations remain disabled by default and callback interruption propagates immediately. No threads, buffering an entire input document, or restarting after failure.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

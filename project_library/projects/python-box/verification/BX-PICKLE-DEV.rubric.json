@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BX-PICKLE-DEV",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair trusted-local pickle roundtrips for Box subclasses: root, direct/deep mapping children and mappings inside BoxList must preserve their actual classes and configuration for protocols 2 through the highest supported protocol. Preserve values, existing shared references, custom instance state, default_box/conversion_box/frozen_box options and frozen mutation guards. Restore configuration before replaying items, do not rerun business __init__, globally register pickle hooks or change normal construction and YAML/JSON conversion. Ordinary Box and BoxList must retain frozen upstream behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

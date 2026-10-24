@@ -3,7 +3,7 @@
   "project_key": "simplejson",
   "title": "SimpleJSON数据交换开发任务",
   "category": "JSON精度与文件格式化",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实JSON交换工程交付：安全CLI、严格解码、指针、原子补丁、稳定编码和逐行流；独立和累计验收。",
   "seed_digest": "2112b7802ed21a5cf2f6aa67b1924fc63f3d741ee5c101d2fbf92ddee021f249",
   "environment": "simplejson-py312",
   "source": {
@@ -55,6 +55,255 @@
             "disclosure/SJ-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "SJ-STRICT-DEV-SCENE",
+      "title": "提供拒绝重复键与非有限数的严格JSON解码入口",
+      "goal": "提供拒绝重复键与非有限数的严格JSON解码入口",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SJ-STRICT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-STRICT-DEV",
+          "kind": "modify",
+          "goal": "提供拒绝重复键与非有限数的严格JSON解码入口",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement simplejson.strict.strict_loads(document,*,use_decimal=False) using the real decoder. Reject duplicate object keys at every depth after escape decoding, NaN/Infinity and finite-text numbers that overflow binary float. use_decimal=True preserves exact finite Decimal values and integer behavior. Accept normal UTF-8 bytes and text, preserve native JSON syntax errors and do not change existing loads defaults or globally toggle decoder engines.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sj_strict_dev.py and concise Chinese compatibility documentation at library/docs/development-sj-strict-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SJ-STRICT-DEV-contract.md",
+            "materials/SJ-STRICT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/simplejson/strict.py",
+            "library/development_tests/test_development_sj_strict_dev.py",
+            "library/docs/development-sj-strict-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SJ-STRICT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-STRICT-DEV.native.json",
+            "public_native": "verification/SJ-STRICT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SJ-STRICT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SJ-POINTER-DEV-SCENE",
+      "title": "实现严格文本JSON Pointer和规范数组寻址",
+      "goal": "实现严格文本JSON Pointer和规范数组寻址",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SJ-POINTER-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-POINTER-DEV",
+          "kind": "modify",
+          "goal": "实现严格文本JSON Pointer和规范数组寻址",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement simplejson.pointer.tokens(pointer), index(token,length,*,append=False) and resolve(document,pointer). Support empty root, empty mapping keys and RFC6901 ~0/~1 escapes with exact one-pass semantics. Reject malformed escapes, URI fragments, non-string pointers and non-canonical array indices (negative, leading zero, bool-like, dash except append mode). Mappings keep numeric-looking string keys; arrays use bounds-checked numeric indices. Resolution returns the original referenced value and never mutates the input.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sj_pointer_dev.py and concise Chinese compatibility documentation at library/docs/development-sj-pointer-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SJ-POINTER-DEV-contract.md",
+            "materials/SJ-POINTER-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/simplejson/pointer.py",
+            "library/development_tests/test_development_sj_pointer_dev.py",
+            "library/docs/development-sj-pointer-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SJ-POINTER-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-POINTER-DEV.native.json",
+            "public_native": "verification/SJ-POINTER-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SJ-POINTER-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SJ-PATCH-DEV-SCENE",
+      "title": "在独立副本上执行有序且原子的JSON Patch",
+      "goal": "在独立副本上执行有序且原子的JSON Patch",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SJ-PATCH-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-PATCH-DEV",
+          "kind": "modify",
+          "goal": "在独立副本上执行有序且原子的JSON Patch",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement simplejson.patch.apply_patch(document,operations) supporting RFC6902 add/remove/replace/move/copy/test on the completed pointer semantics. Work on a deep copy; inputs and operation values must remain unchanged on success or any later error. Array add inserts and dash appends; move resolves destination after removal and rejects moving a parent into its child. Test uses JSON equality with booleans distinct from numbers. Root replacement/add is supported and root remove returns None by explicit API convention. Missing members, invalid operations and paths fail clearly.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sj_patch_dev.py and concise Chinese compatibility documentation at library/docs/development-sj-patch-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "SJ-POINTER-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/SJ-PATCH-DEV-contract.md",
+            "materials/SJ-PATCH-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/simplejson/patch.py",
+            "library/development_tests/test_development_sj_patch_dev.py",
+            "library/docs/development-sj-patch-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SJ-PATCH-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-PATCH-DEV.native.json",
+            "public_native": "verification/SJ-PATCH-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SJ-PATCH-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SJ-STABLE-DEV-SCENE",
+      "title": "提供明确表示合同的稳定UTF8编码并拒绝隐式类型丢失",
+      "goal": "提供明确表示合同的稳定UTF8编码并拒绝隐式类型丢失",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SJ-STABLE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-STABLE-DEV",
+          "kind": "modify",
+          "goal": "提供明确表示合同的稳定UTF8编码并拒绝隐式类型丢失",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement simplejson.stable.stable_dumps(value) and stable_bytes(value): recursively require string object keys, JSON lists/scalars and finite Decimal values; reject cycles, unsupported Python containers, NaN/Infinity including Decimal variants, and lone surrogates not representable in UTF-8. Encode sorted Unicode keys, no insignificant spaces, no ASCII escaping, BOM or trailing newline. Preserve Decimal representation and standard numeric formatting; explicitly do not claim JCS normalization. Never mutate input or change legacy encoder defaults.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sj_stable_dev.py and concise Chinese compatibility documentation at library/docs/development-sj-stable-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SJ-STABLE-DEV-contract.md",
+            "materials/SJ-STABLE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/simplejson/stable.py",
+            "library/development_tests/test_development_sj_stable_dev.py",
+            "library/docs/development-sj-stable-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SJ-STABLE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-STABLE-DEV.native.json",
+            "public_native": "verification/SJ-STABLE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SJ-STABLE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SJ-LINES-DEV-SCENE",
+      "title": "实现惰性JSON Lines读写和可定位逐行错误结果",
+      "goal": "实现惰性JSON Lines读写和可定位逐行错误结果",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SJ-LINES-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SJ-LINES-DEV",
+          "kind": "modify",
+          "goal": "实现惰性JSON Lines读写和可定位逐行错误结果",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement simplejson.lines.iterloads(lines,*,errors=\"raise\",use_decimal=False,max_chars=None), iterdumps(records), dump(records,stream) and frozen LineResult(line,status,value,error). Inputs are physical text/UTF-8 byte lines, optional BOM only on first line, blank lines ignored but counted. Validate options before consuming data. Reuse strict_loads duplicate/finite policy; collect returns a result per nonblank or invalid line and keeps later records, raise reports the physical line. Bound character size before parsing. Output uses stable_dumps, exactly one LF per record, validates each full record before its write, stays lazy and does not buffer all records. Detect short writes.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sj_lines_dev.py and concise Chinese compatibility documentation at library/docs/development-sj-lines-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "SJ-STRICT-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "SJ-STABLE-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/SJ-LINES-DEV-contract.md",
+            "materials/SJ-LINES-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/simplejson/lines.py",
+            "library/development_tests/test_development_sj_lines_dev.py",
+            "library/docs/development-sj-lines-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SJ-LINES-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SJ-LINES-DEV.native.json",
+            "public_native": "verification/SJ-LINES-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SJ-LINES-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

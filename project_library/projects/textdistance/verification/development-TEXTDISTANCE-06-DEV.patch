@@ -1,0 +1,73 @@
+--- a/library/docs/development-textdistance-06-dev.md
++++ b/library/docs/development-textdistance-06-dev.md
+@@ -0,0 +1,5 @@
++# 标题候选TopK检索保留原始身份与稳定分数解释
++
++路线11：流式有界TopK保留原始身份、值、实际评分及输入索引，距离/相似度方向和包含阈值明确，O(K)结果存储及稳定并列不比较业务ID。重复记录不合并，零K不消费，预算不足不伪造完整结果。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_textdistance_06_dev.py
++++ b/library/tests/test_development_textdistance_06_dev.py
+@@ -0,0 +1,24 @@
++"""候选检索保持真实身份与稳定并列，分数方向明确。"""
++import unittest
++import textdistance
++from textdistance.retrieval import extract
++
++
++def test_distance_similarity_duplicate_identity_and_ties():
++    """不比较不可排序ID，不把重复值静默去重。@return None。"""
++    choices=[({'id':1},'cot'),({'id':2},'cat'),({'id':3},'cut'),({'id':4},'cot')]
++    result=extract('cat',iter(choices),textdistance.Levenshtein(external=False),k=3,threshold=1)
++    assert [item.index for item in result]==[1,0,2]
++    result=extract('a b',[(1,'a b'),(2,'a c'),(3,'x')],textdistance.Jaccard(qval=None),k=2,direction='similarity')
++    assert [item.id for item in result]==[1,2] and result[0].score==1
++
++
++def test_no_consumption_zero_budget_and_bad_score():
++    """零K不消费，预算不足及坏评分不能变成部分成功。@return None。"""
++    def forbidden():
++        """模拟不应消费的数据源。@return 不返回。"""
++        raise AssertionError('不应消费')
++        yield None
++    assert extract('a',forbidden(),lambda a,b:0,k=0)==[]
++    with unittest.TestCase().assertRaises(ValueError):extract('a',[(1,'a'),(2,'b')],lambda a,b:0,max_candidates=1)
++    with unittest.TestCase().assertRaises(ValueError):extract('a',[(1,'a')],lambda a,b:float('nan'))
+--- a/library/textdistance/retrieval.py
++++ b/library/textdistance/retrieval.py
+@@ -0,0 +1,35 @@
++"""保留候选身份、方向和稳定并列次序的有界TopK检索。"""
++import heapq
++import math
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True)
++class Match:
++    """检索结果。@param id 输入身份。@param value 原值。@param score 实际分数。@param index 原顺序。"""
++    id: object
++    value: object
++    score: float
++    index: int
++
++
++def extract(query, choices, scorer, k=5, direction='distance', threshold=None, max_candidates=None):
++    """流式检索最优K项，不合并重复值或身份。@param query 查询。@param choices (id,value)流。@param scorer callable。@param k 结果上限。@param direction 距离/相似度。@param threshold 包含边界的筛选。@param max_candidates 显式预算。@return 稳定Match列表。"""
++    if type(k) is not int or k<0:raise ValueError('k必须是非负整数')
++    if direction not in ('distance','similarity'):raise ValueError('未知方向')
++    if max_candidates is not None and (type(max_candidates) is not int or max_candidates<0):raise ValueError('预算必须是非负整数')
++    if threshold is not None and (isinstance(threshold,bool) or not isinstance(threshold,(int,float)) or not math.isfinite(threshold)):raise ValueError('阈值必须有限')
++    if not k:return []
++    heap=[]
++    for index,record in enumerate(choices):
++        if max_candidates is not None and index>=max_candidates:raise ValueError('候选预算不足，未返回不完整检索')
++        identity,value=record
++        score=scorer(query,value)
++        if isinstance(score,bool) or not isinstance(score,(int,float)) or not math.isfinite(score):raise ValueError('评分必须有限')
++        if threshold is not None and (score>threshold if direction=='distance' else score<threshold):continue
++        # 堆顶保留当前最差项，原输入索引确定并列，不比较业务ID或值。
++        quality=-score if direction=='distance' else score
++        entry=(quality,-index,Match(identity,value,score,index))
++        if len(heap)<k:heapq.heappush(heap,entry)
++        elif entry[:2]>heap[0][:2]:heapq.heapreplace(heap,entry)
++    return [entry[2] for entry in sorted(heap,key=lambda item:(-item[0],-item[1]))]

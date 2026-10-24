@@ -1,0 +1,76 @@
+--- a/library/docs/development-tz-keymap-dev.md
++++ b/library/docs/development-tz-keymap-dev.md
+@@ -0,0 +1,5 @@
++# 为映射键转换增加可选择的碰撞处理
++
++keymap新增显式first/error/combine碰撞政策，默认last保持。每个原键只转换一次，严格错误报告冲突原键，归并按顺序执行。保留输入、工厂、插入顺序、curried及回调错误，不改其他映射函数覆盖规则。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/toolz/dicttoolz.py
++++ b/library/toolz/dicttoolz.py
+@@ -86,7 +86,7 @@
+     return rv
+ 
+ 
+-def keymap(func, d, factory=dict):
++def keymap(func, d, factory=dict, *, collision='last', combine=None):
+     """ Apply function to keys of dictionary
+ 
+     >>> bills = {"Alice": [20, 15, 30], "Bob": [10, 35]}
+@@ -97,8 +97,23 @@
+         valmap
+         itemmap
+     """
+-    rv = factory()
+-    rv.update(zip(map(func, d.keys()), d.values()))
++    if collision not in ('last', 'first', 'error', 'combine'):
++        raise ValueError('未知映射键冲突政策')
++    if collision == 'combine' and not callable(combine):
++        raise TypeError('合并政策必须提供combine函数')
++    rv = factory()
++    origins = {}
++    for key, value in d.items():
++        transformed = func(key)
++        if transformed in rv:
++            if collision == 'error':
++                raise ValueError('映射键转换冲突：%r与%r' % (origins[transformed], key))
++            if collision == 'first':
++                continue
++            if collision == 'combine':
++                value = combine(rv[transformed], value)
++        rv[transformed] = value
++        origins.setdefault(transformed, key)
+     return rv
+ 
+ 
+--- a/library/toolz/tests/test_development_tz_keymap_dev.py
++++ b/library/toolz/tests/test_development_tz_keymap_dev.py
+@@ -0,0 +1,28 @@
++"""键归一化冲突不能只能静默覆盖。"""
++import pytest
++from toolz import keymap
++
++
++def test_collision_policies():
++    """默认末项兼容，首项和严格政策显式生效。@return None。"""
++    values = {'A': 1, 'a': 2}
++    assert keymap(str.lower, values) == {'a': 2}
++    assert keymap(str.lower, values, collision='first') == {'a': 1}
++    with pytest.raises(ValueError):
++        keymap(str.lower, values, collision='error')
++    assert values == {'A': 1, 'a': 2}
++
++
++def test_combiner_and_once():
++    """转换每键一次，业务归并按顺序执行。@return None。"""
++    calls = []
++    assert keymap(lambda key: calls.append(key) or key.lower(), {'A': 2, 'a': 3}, collision='combine', combine=lambda left, right: left + right) == {'a': 5}
++    assert calls == ['A', 'a']
++
++
++def test_factory_and_curried():
++    """工厂和curried入口保留。@return None。"""
++    from collections import OrderedDict
++    from toolz.curried import keymap as curried
++    result = curried(str.lower)({'A': 1, 'a': 2}, factory=OrderedDict, collision='first')
++    assert isinstance(result, OrderedDict) and list(result.items()) == [('a', 1)]

@@ -1,0 +1,110 @@
+--- a/library/docs/development-python-pptx-02-dev.md
++++ b/library/docs/development-python-pptx-02-dev.md
+@@ -0,0 +1,5 @@
++# 演示页面公开设置切换效果与点击定时前进
++
++路线04：Slide.transition提供fade/push/wipe、XSD方向/速度和点击/定时前进，整体校验后按schema顺序写；未知效果先显式clear，保扩展和声音，不执行播放或冒认视觉时长。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pptx/slide.py
++++ b/library/src/pptx/slide.py
+@@ -179,6 +179,12 @@
+     part: SlidePart  # pyright: ignore[reportIncompatibleMethodOverride]
+ 
+     @property
++    def transition(self):
++        """页面切换设置，读取不新增XML。@return SlideTransition。"""
++        from pptx.transition import SlideTransition
++        return SlideTransition(self._element)
++
++    @property
+     def follow_master_background(self):
+         """|True| if this slide inherits the slide master background.
+ 
+--- a/library/src/pptx/transition.py
++++ b/library/src/pptx/transition.py
+@@ -0,0 +1,52 @@
++"""页面切换代理，契约来自仓内pml.xsd，不启动播放。"""
++from copy import deepcopy
++from pptx.oxml.ns import qn
++from pptx.oxml.xmlchemy import OxmlElement
++
++
++class SlideTransition:
++    """编辑既有Slide的p:transition。@param element 当前幻灯片XML。@return 轻量代理。"""
++    def __init__(self,element):
++        """保存同一元素。@param element CT_Slide。@return None。"""
++        self.element=element
++
++    @property
++    def configuration(self):
++        """读取当前真实设置，不伪装已知未知效果。@return dict或None。"""
++        node=self.element.find(qn("p:transition"))
++        if node is None:return None
++        effects=[child for child in node if child.tag not in (qn("p:sndAc"),qn("p:extLst"))]
++        effect=effects[0].tag.rsplit("}",1)[-1] if effects else None
++        return {"effect":effect,"direction":effects[0].get("dir") if effects else None,"speed":node.get("spd","fast"),"advance_on_click":node.get("advClick","true") not in ("0","false"),"advance_after_ms":int(node.get("advTm")) if node.get("advTm") is not None else None}
++
++    def configure(self,effect,*,direction=None,speed="med",advance_on_click=True,advance_after_ms=None):
++        """整体验证后提交已知效果。@param effect fade/push/wipe。@param direction push/wipe的l/r/u/d。@param speed slow/med/fast。@param advance_on_click 点击前进。@param advance_after_ms 定时毫秒或None。@return 同一代理。"""
++        if effect not in ("fade","push","wipe") or speed not in ("slow","med","fast"):raise ValueError("未知效果/速度")
++        if effect=="fade" and direction is not None:raise ValueError("fade不支持direction")
++        if effect!="fade" and direction not in (None,"l","r","u","d"):raise ValueError("未知方向")
++        if type(advance_on_click) is not bool:raise TypeError("advance_on_click必须为bool")
++        if advance_after_ms is not None and (type(advance_after_ms) is not int or not 0<=advance_after_ms<=4294967295):raise ValueError("advance_after_ms须unsignedInt")
++        old=self.element.find(qn("p:transition"))
++        if old is not None:
++            unknown=[child for child in old if child.tag not in tuple(qn("p:"+name) for name in ("fade","push","wipe","sndAc","extLst"))]
++            if unknown:raise ValueError("当前未知效果仅支持显式clear后替换")
++        node=OxmlElement("p:transition")
++        if old is not None:
++            node.attrib.update(old.attrib)
++        node.set("spd",speed);node.set("advClick","1" if advance_on_click else "0")
++        if advance_after_ms is None:node.attrib.pop("advTm",None)
++        else:node.set("advTm",str(advance_after_ms))
++        child=OxmlElement("p:"+effect)
++        if effect!="fade":child.set("dir",direction or "l")
++        node.append(child)
++        if old is not None:
++            for child in old:
++                if child.tag in (qn("p:sndAc"),qn("p:extLst")):node.append(deepcopy(child))
++            self.element.replace(old,node)
++        else:self.element.insert_element_before(node,"p:timing","p:extLst")
++        return self
++
++    def clear(self):
++        """显式移除整个切换配置。@return None。"""
++        node=self.element.find(qn("p:transition"))
++        if node is not None:self.element.remove(node)
+--- a/library/tests/test_development_python_pptx_02_dev.py
++++ b/library/tests/test_development_python_pptx_02_dev.py
+@@ -0,0 +1,29 @@
++"""切换XML与实际重开设置一致，未知内容不静默丢失。"""
++from io import BytesIO
++from zipfile import ZipFile
++import unittest
++from pptx import Presentation
++from pptx.oxml.xmlchemy import OxmlElement
++
++def test_fade_timed_advance_and_push_roundtrip():
++    """速度是XSD枚举，定时前进以毫秒存，不声称渲染时长。@return None。"""
++    presentation=Presentation();slide=presentation.slides.add_slide(presentation.slide_layouts[6])
++    assert slide.transition.configuration is None
++    slide.transition.configure('fade',advance_after_ms=3000,advance_on_click=False,speed='slow')
++    output=BytesIO();presentation.save(output)
++    with ZipFile(output) as archive:assert b'advTm="3000"' in archive.read('ppt/slides/slide1.xml')
++    output.seek(0);slide=Presentation(output).slides[0]
++    assert slide.transition.configuration=={'effect':'fade','direction':None,'speed':'slow','advance_on_click':False,'advance_after_ms':3000}
++    slide.transition.configure('push',direction='u')
++    assert slide.transition.configuration['direction']=='u'
++
++def test_invalid_or_unknown_changes_are_atomic_and_clear_is_explicit():
++    """原未知效果不能因为设置新效果而被默默删除。@return None。"""
++    presentation=Presentation();slide=presentation.slides.add_slide(presentation.slide_layouts[6])
++    slide.transition.configure('wipe',direction='r');before=slide._element.xml
++    with unittest.TestCase().assertRaises(ValueError):slide.transition.configure('fade',direction='l')
++    assert slide._element.xml==before
++    slide.transition.clear();node=OxmlElement('p:transition');node.append(OxmlElement('p:wheel'));slide._element.append(node)
++    before=slide._element.xml
++    with unittest.TestCase().assertRaises(ValueError):slide.transition.configure('fade')
++    assert slide._element.xml==before;slide.transition.clear();assert slide.transition.configuration is None

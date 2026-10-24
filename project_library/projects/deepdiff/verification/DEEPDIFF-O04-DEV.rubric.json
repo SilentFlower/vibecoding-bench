@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DEEPDIFF-O04-DEV",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement deepdiff.merge.deep_merge(left,right,*,lists=\"replace\",conflicts=\"right\"), MergeConflict(path), validate_json_tree and actual-DeepDiff-based json_equal. Recursively union dict keys preserving left then right order; lists explicitly replace or append with duplicate preservation; conflicting leaves/types choose right/left or raise at exact tuple path. Preserve bool-vs-int and None semantics, input independence, reject nonstring dict keys, unsupported objects, nonfinite floats and cycles while allowing acyclic shared references. Do not change Delta or merge arbitrary object attributes; prove native Delta still performs target replacement.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

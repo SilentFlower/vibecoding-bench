@@ -1,0 +1,84 @@
+--- a/library/babel/numbers.py
++++ b/library/babel/numbers.py
+@@ -1233,6 +1233,47 @@
+     return parsed
+ 
+ 
++def parse_currency(string, currency, locale=None, *, strict=True, numbering_system='latn'):
++    """解析指定币种的区域化金额。@param string 完整文本。@param currency 显式币种。
++    @param locale 区域。@param strict 是否要求格式器规范表示。@param numbering_system 编号系统。
++    @return Decimal金额，不自动猜币种。
++    """
++    validate_currency(currency)
++    resolved = Locale.parse(locale or LC_NUMERIC)
++    if not isinstance(string, str):
++        raise TypeError('金额文本必须是字符串')
++    symbol = get_currency_symbol(currency, resolved)
++    # 只支持真实标准／会计模板的前后缀，拒绝正文中任意剥离货币字符。
++    for kind in ('standard', 'accounting'):
++        pattern = resolved.currency_formats.get(kind)
++        if pattern is None:
++            continue
++        for sign, prefix, suffix in zip((1, -1), pattern.prefix, pattern.suffix):
++            prefix = prefix.replace('¤¤', currency).replace('¤', symbol).replace("'", '')
++            suffix = suffix.replace('¤¤', currency).replace('¤', symbol).replace("'", '')
++            for old, new in ((symbol, currency),):
++                variants = ((prefix, suffix), (prefix.replace(old, new), suffix.replace(old, new)))
++                for before, after in variants:
++                    if not string.startswith(before) or not string.endswith(after):
++                        continue
++                    end = len(string) - len(after) if after else len(string)
++                    body = string[len(before):end]
++                    if not body or body[0] in '+-' or any(c in body for c in '()'):
++                        continue
++                    try:
++                        value = parse_decimal(body, locale=resolved, strict=strict, numbering_system=numbering_system) * sign
++                    except NumberFormatError:
++                        continue
++                    if not value.is_finite():
++                        continue
++                    if strict:
++                        expected = format_currency(value, currency, locale=resolved, format_type=kind, numbering_system=numbering_system)
++                        if string not in (expected, expected.replace(symbol, currency)):
++                            continue
++                    return value
++    raise NumberFormatError('文本不是指定币种的完整金额')
++
++
+ def _remove_trailing_zeros_after_decimal(string: str, decimal_symbol: str) -> str:
+     """
+     Remove trailing zeros from the decimal part of a numeric string.
+--- a/library/development_tests/test_development_ba_parse_currency_dev.py
++++ b/library/development_tests/test_development_ba_parse_currency_dev.py
+@@ -0,0 +1,23 @@
++"""公开显式币种金额输入回归。"""
++from decimal import Decimal
++import pytest
++from babel.numbers import parse_currency, format_currency, NumberFormatError
++
++def test_standard_amounts_round_trip_across_locales():
++    for locale, currency in (('en_US', 'USD'), ('de_DE', 'EUR'), ('ja_JP', 'JPY')):
++        for value in (Decimal('1234'), Decimal('-42')):
++            assert parse_currency(format_currency(value, currency, locale=locale), currency, locale) == value
++
++def test_accounting_negative_and_iso_code_are_supported():
++    assert parse_currency('($42.00)', 'USD', 'en_US') == -42
++    assert parse_currency('USD42.00', 'USD', 'en_US') == 42
++
++def test_currency_and_full_input_are_required():
++    for text in ('42.00', '€42.00', '$42.00junk', '$+42.00', '($42.00', '$NaN'):
++        with pytest.raises(NumberFormatError):
++            parse_currency(text, 'USD', 'en_US')
++
++def test_strict_precision_and_relaxed_grouping_are_explicit():
++    with pytest.raises(NumberFormatError):
++        parse_currency('$4.2', 'USD', 'en_US')
++    assert parse_currency('$4.2', 'USD', 'en_US', strict=False) == Decimal('4.2')
+--- a/library/docs/development-ba-parse-currency-dev.md
++++ b/library/docs/development-ba-parse-currency-dev.md
+@@ -0,0 +1,5 @@
++# 按显式币种解析本地金额及会计负数
++
++金额表单必须指定币种后才解析，支持区域标准／会计负数和编号系统；严格模式要求金额规范精度。不能全局删币种字符、猜测符号币种或吞掉尾部垃圾，不影响旧parse_decimal。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

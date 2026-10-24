@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AN-CLONE-DEV",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add anytree.util.clone_subtree(node, *, factory=None, copy_attributes=None). Traverse children iteratively and clone __dict__-backed nodes into new AnyNode instances by default, preserving order and all nonstructural attributes. Default attribute payload copying is shallow; an explicit callable can choose deep copy or filtering and must return a mapping without structural fields. An optional kwargs factory can preserve a desired node class but must return distinct detached empty NodeMixin/LightNodeMixin nodes, never original nodes. Validate every result before attaching copies. Do not clone external parents or traverse symbolic targets. Reject repeated/cyclic structure and unsupported slots-only source nodes explicitly; preserve the source tree.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

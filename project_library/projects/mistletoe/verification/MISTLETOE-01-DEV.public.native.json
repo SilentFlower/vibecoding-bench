@@ -1,0 +1,14 @@
+{
+  "script": "verification/MISTLETOE-01-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_mistletoe_01_dev.py"
+}

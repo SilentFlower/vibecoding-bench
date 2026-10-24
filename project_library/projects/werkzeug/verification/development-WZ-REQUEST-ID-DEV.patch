@@ -1,0 +1,77 @@
+--- a/library/development_tests/test_development_wz_request_id_dev.py
++++ b/library/development_tests/test_development_wz_request_id_dev.py
+@@ -0,0 +1,31 @@
++"""公开请求标识真实WSGI生命周期回归。"""
++import pytest
++from werkzeug.wrappers import Response
++from werkzeug.test import Client,EnvironBuilder
++from werkzeug.request_id import RequestIdMiddleware
++
++def test_valid_incoming_id_is_shared_with_application_and_response():
++    def app(environ,start_response): return Response(environ['werkzeug.request_id'])(environ,start_response)
++    response=Client(RequestIdMiddleware(app),Response).get('/',headers={'X-Request-ID':'abc-123'})
++    assert response.text=='abc-123' and response.headers.getlist('X-Request-ID')==['abc-123']
++
++def test_invalid_input_uses_factory_and_duplicate_response_ids_are_replaced():
++    def app(environ,start_response):
++        start_response('200 OK',[('x-request-id','wrong'),('X-Request-ID','wrong2'),('Set-Cookie','a=1'),('Set-Cookie','b=2')]);return [b'ok']
++    middleware=RequestIdMiddleware(app,factory=lambda:'generated')
++    response=Client(middleware,Response).get('/',headers={'X-Request-ID':'bad value'})
++    assert response.headers.getlist('X-Request-ID')==['generated'] and response.headers.getlist('Set-Cookie')==['a=1','b=2']
++
++def test_original_iterable_is_returned_without_consumption_or_close_change():
++    class Stream:
++        def __init__(self): self.consumed=False;self.closed=False
++        def __iter__(self): self.consumed=True;yield b'data'
++        def close(self): self.closed=True
++    stream=Stream()
++    def app(environ,start_response): start_response('200 OK',[]);return stream
++    result=RequestIdMiddleware(app,factory=lambda:'id')(EnvironBuilder().get_environ(),lambda status,headers:None)
++    assert result is stream and not stream.consumed and not stream.closed
++    result.close();assert stream.closed
++
++def test_invalid_generated_id_fails_before_application():
++    with pytest.raises(ValueError): RequestIdMiddleware(lambda e,s:[],factory=lambda:'bad\nvalue')({},lambda *args:None)
+--- a/library/docs/development-wz-request-id-dev.md
++++ b/library/docs/development-wz-request-id-dev.md
+@@ -0,0 +1,5 @@
++# 实现保留WSGI流生命周期的请求标识中间件
++
++请求标识经过明确字符与长度验证后传入环境，并与响应唯一标识一致。保留其他重复头、原应用迭代器、关闭和异常语义，不能为加一个响应头而预读流。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/werkzeug/request_id.py
++++ b/library/src/werkzeug/request_id.py
+@@ -0,0 +1,32 @@
++"""在真实WSGI生命周期中传递一个经过验证的请求标识。"""
++import re
++from uuid import uuid4
++
++
++_PATTERN=re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,63}')
++
++
++class RequestIdMiddleware:
++    """透明保留应用迭代器、write返回与关闭行为。"""
++    def __init__(self,app,*,factory=None):
++        """建立中间件。@param app 原WSGI应用。@param factory 可选标识生成函数。@return None。
++        """
++        if not callable(app) or (factory is not None and not callable(factory)):
++            raise TypeError('应用及标识工厂必须可调用')
++        self.app=app;self.factory=factory or (lambda:uuid4().hex)
++
++    def __call__(self,environ,start_response):
++        """执行一次请求。@param environ WSGI环境。@param start_response 原开始响应函数。
++        @return 原应用迭代器，不预读、不替换其close。
++        """
++        value=environ.get('HTTP_X_REQUEST_ID')
++        if not isinstance(value,str) or not _PATTERN.fullmatch(value):
++            value=self.factory()
++        if not isinstance(value,str) or not _PATTERN.fullmatch(value):
++            raise ValueError('生成的请求标识不满足合同')
++        environ['werkzeug.request_id']=value
++        def begin(status,headers,exc_info=None):
++            headers=[(key,item) for key,item in headers if key.lower()!='x-request-id']
++            headers.append(('X-Request-ID',value))
++            return start_response(status,headers,exc_info) if exc_info is not None else start_response(status,headers)
++        return self.app(environ,begin)

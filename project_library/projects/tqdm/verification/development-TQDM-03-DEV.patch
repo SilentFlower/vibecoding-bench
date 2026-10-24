@@ -1,0 +1,73 @@
+--- a/library/docs/development-tqdm-03-dev.md
++++ b/library/docs/development-tqdm-03-dev.md
+@@ -0,0 +1,5 @@
++# IO进度包装按真实成功写入量计数并保留短写与返回值
++
++路线04：write先实际调用，再按有效整数返回量更新，二进制buffer按nbytes、文本按字符，短写和0准确且原返回值透传。None明确沿旧len回退；非法量及写异常不回调，不擅自重试短写，read保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_tqdm_03_dev.py
++++ b/library/tests/test_development_tqdm_03_dev.py
+@@ -0,0 +1,36 @@
++"""IO进度报告真实成功量，不把memoryview元素数当字节数。"""
++import io
++import array
++import unittest
++from tqdm.utils import CallbackIOWrapper
++
++
++def test_binary_memoryview_and_short_write_return_value():
++    """真实BytesIO按12字节更新，短写只更新返回部分。@return None。"""
++    values=[];stream=io.BytesIO();wrapped=CallbackIOWrapper(values.append,stream,method='write')
++    view=memoryview(array.array('I',[1,2,3]));result=wrapped.write(view)
++    assert result==view.nbytes and values==[view.nbytes] and len(stream.getvalue())==view.nbytes
++    class Short:
++        """合法短写流。"""
++        def write(self,data):
++            """只写前两字节。@param data 输入。@return 2。"""
++            return 2
++    values=[];assert CallbackIOWrapper(values.append,Short(),method='write').write(b'abcdef')==2
++    assert values==[2]
++
++
++def test_text_none_zero_and_write_error_do_not_overcount():
++    """文本按字符，None兼容回退，错误不先更新。@return None。"""
++    values=[];stream=io.StringIO();assert CallbackIOWrapper(values.append,stream,method='write').write('中文')==2 and values==[2]
++    class Custom:
++        """可控制返回和异常的流。"""
++        def __init__(self,value):self.value=value
++        def write(self,data):
++            """真实调用后才计量。@param data 输入。@return 配置值。"""
++            if isinstance(self.value,Exception):raise self.value
++            return self.value
++    values=[];assert CallbackIOWrapper(values.append,Custom(None),method='write').write(b'abc') is None and values==[3]
++    values=[];assert CallbackIOWrapper(values.append,Custom(0),method='write').write(b'abc')==0 and values==[0]
++    values=[]
++    with unittest.TestCase().assertRaises(OSError):CallbackIOWrapper(values.append,Custom(OSError('failed')),method='write').write(b'abc')
++    assert values==[]
+--- a/library/tqdm/utils.py
++++ b/library/tqdm/utils.py
+@@ -6,6 +6,7 @@
+ import sys
+ from functools import partial, partialmethod, wraps
+ from inspect import signature
++from operator import index
+ # TODO consider using wcswidth third-party package for 0-width characters
+ from unicodedata import east_asian_width
+ from warnings import warn
+@@ -218,7 +219,14 @@
+             @wraps(func)
+             def write(data, *args, **kwargs):
+                 res = func(data, *args, **kwargs)
+-                callback(len(data))
++                if res is None:
++                    count=len(data)  # 兼容未声明写入量的旧流，单位仍由原数据len定义。
++                else:
++                    if isinstance(res,bool):raise TypeError('write返回值不能是bool')
++                    count=index(res)
++                    capacity=len(data) if isinstance(data,str) else memoryview(data).nbytes
++                    if count<0 or count>capacity:raise ValueError('write返回成功量越界')
++                callback(count)
+                 return res
+             self.wrapper_setattr('write', write)
+         elif method == "read":

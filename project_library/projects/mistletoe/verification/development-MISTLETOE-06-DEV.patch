@@ -1,0 +1,48 @@
+--- a/library/docs/development-mistletoe-06-dev.md
++++ b/library/docs/development-mistletoe-06-dev.md
+@@ -0,0 +1,5 @@
++# LaTeX文本转义完整保留字面反斜线与波浪
++
++路线20：普通文本中的反斜线和波浪输出字面LaTeX控制序列，单遍处理不二次转义生成字符；现有特殊字符和数学、代码明确不转义通道保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/mistletoe/latex_renderer.py
++++ b/library/mistletoe/latex_renderer.py
+@@ -78,11 +78,13 @@
+         return self.render_inner(token)
+ 
+     def render_raw_text(self, token, escape=True):
+-        return (token.content.replace('$', '\\$').replace('#', '\\#')
+-                             .replace('{', '\\{').replace('}', '\\}')
+-                             .replace('&', '\\&').replace('_', '\\_')
+-                             .replace('%', '\\%').replace('^', '\\^{}')
+-               ) if escape else token.content
++        """一次遍历转义字面文本，不重写代码或数学路径。@param token 文本。@param escape 转义开关。@return LaTeX。"""
++        if not escape:
++            return token.content
++        substitutions = {'\\': r'\textbackslash{}', '~': r'\textasciitilde{}',
++            '$': r'\$', '#': r'\#', '{': r'\{', '}': r'\}', '&': r'\&',
++            '_': r'\_', '%': r'\%', '^': r'\^{}'}
++        return ''.join(substitutions.get(character, character) for character in token.content)
+ 
+     def render_heading(self, token):
+         inner = self.render_inner(token)
+--- a/library/tests/test_development_mistletoe_06_dev.py
++++ b/library/tests/test_development_mistletoe_06_dev.py
+@@ -0,0 +1,16 @@
++"""LaTeX文本模式保留字面反斜线及波浪，不污染明确原文路径。"""
++from mistletoe.latex_renderer import LaTeXRenderer
++from mistletoe.span_token import RawText
++
++
++def test_literal_backslash_and_tilde():
++    """单遍转义不把生成的控制序列重复处理。@return None。"""
++    with LaTeXRenderer() as renderer:
++        assert renderer.render_raw_text(RawText(r'\alpha ~'))==r'\textbackslash{}alpha \textasciitilde{}'
++
++
++def test_existing_symbols_and_unescaped_mode():
++    """已有特殊字符保持既有形式，代码与数学的原文路径不变。@return None。"""
++    with LaTeXRenderer() as renderer:
++        assert renderer.render_raw_text(RawText('${}_%^'))==r'\$\{\}\_\%\^{}'
++        assert renderer.render_raw_text(RawText(r'\alpha ~'),escape=False)==r'\alpha ~'

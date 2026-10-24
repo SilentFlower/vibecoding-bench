@@ -1,8 +1,11 @@
 """真实项目场景的冻结内容校验与候选可见投影。"""
 from __future__ import annotations
 
+import json
+import os
 import re
 from pathlib import Path
+from stat import S_ISREG
 
 from project_library import canonical_json, read_document, safe_relative, snapshot_tree
 
@@ -12,6 +15,7 @@ DEVELOPMENT_SCHEMA = 3
 TASK_KINDS = frozenset({'understand', 'consult', 'diagnose', 'plan', 'modify'})
 CONTENT_ID = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,79}$')
 CHECKSUM = re.compile(r'^[a-f0-9]{64}$')
+MAX_NATIVE_CONTRACT_BYTES = 16 * 1024 * 1024
 
 
 def _text(value: object, label: str) -> str:
@@ -150,7 +154,8 @@ def validate_scenario_project(root: Path, manifest: object, key: str) -> None:
                 if expanded==possible:
                     break
                 possible=expanded
-            if any(dependency['task_id'] not in possible for task_id in possible for dependency in scenario_tasks[task_id]['requires']):
+            if not development and any(dependency['task_id'] not in possible
+                    for task_id in possible for dependency in scenario_tasks[task_id]['requires']):
                 raise ValueError('入口选择的任务缺少可达的必需前置任务')
     visiting, visited = set(), set()
 
@@ -163,8 +168,8 @@ def validate_scenario_project(root: Path, manifest: object, key: str) -> None:
         for dependency in edges[task_id]:
             if dependency not in tasks:
                 raise ValueError(f'任务依赖不存在：{dependency}')
-            # 首版场景工作区独立；跨场景代码继承必须有显式物化契约才能开放。
-            if owners[dependency] != owners[task_id]:
+            # 完整开发目标共用项目工作区，允许项目内 DAG；旧短场景仍保持原隔离边界。
+            if manifest['schema'] != DEVELOPMENT_SCHEMA and owners[dependency] != owners[task_id]:
                 raise ValueError('首版任务依赖必须位于同一场景')
             visit(dependency)
         visiting.remove(task_id)
@@ -236,6 +241,10 @@ def _validate_task(root: Path, task: dict, *, development: bool = False) -> None
             raise ValueError('候选交付证据引用许可必须是布尔值')
     if evaluation.get('native') is not None:
         _native_specification(root,evaluation['native'])
+    if evaluation.get('public_native') is not None:
+        if not development:
+            raise ValueError('逐目标公开测试仅适用于完整开发合同')
+        _native_specification(root,evaluation['public_native'])
     if task['kind'] == 'modify' and not evaluation.get('native'):
         raise ValueError('工程修改必须有独立原生行为验收')
     branches = task.get('branches', [])
@@ -251,6 +260,28 @@ def _validate_task(root: Path, task: dict, *, development: bool = False) -> None
         if (not isinstance(activate, list) or any(not isinstance(item, str) for item in activate)
                 or len(set(activate)) != len(activate)):
             raise ValueError('分支激活任务不合法')
+
+
+def read_native_contract(path: Path) -> object:
+    """读取完整原生回归合同，单独容纳大量冻结测试节点。
+
+    :param path: 调用方已限定在冻结 verification 目录内的合同文件。
+    :return: JSON 对象；拒绝链接、非普通文件或超过 16 MiB 的内容。
+    """
+    # 只扩大逐节点回归证据；项目清单、验收参数、rubric 与环境仍使用通用 4 MiB 上限。
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        metadata = os.fstat(descriptor)
+        if not S_ISREG(metadata.st_mode) or metadata.st_size > MAX_NATIVE_CONTRACT_BYTES:
+            raise ValueError('原生回归合同类型或大小不合法')
+    except BaseException:
+        os.close(descriptor)
+        raise
+    with os.fdopen(descriptor, 'rb') as source:
+        value = source.read(MAX_NATIVE_CONTRACT_BYTES + 1)
+    if len(value) > MAX_NATIVE_CONTRACT_BYTES:
+        raise ValueError('原生回归合同超出大小上限')
+    return json.loads(value)
 
 
 def _native_specification(root: Path, relative: str) -> None:
@@ -272,7 +303,7 @@ def _native_specification(root: Path, relative: str) -> None:
         if not isinstance(regression,dict):
             raise ValueError('原生回归定义必须是对象')
         _file(root,regression.get('runner'),'verification')
-        contract=read_document(_file(root,regression.get('contract'),'verification'))
+        contract=read_native_contract(_file(root,regression.get('contract'),'verification'))
         if (not isinstance(contract,dict) or contract.get('schema')!=1 or not isinstance(contract.get('nodes'),list)
                 or not contract['nodes'] or any(not isinstance(node,dict) or set(node)!={'id','kind','outcome'} for node in contract['nodes'])):
             raise ValueError('原生回归缺少冻结节点合同')

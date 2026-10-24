@@ -1,0 +1,13 @@
+{
+  "script": "verification/development-CK-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 2,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_exceptions/test_click_exception.py"
+}

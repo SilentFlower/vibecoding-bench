@@ -1,0 +1,112 @@
+--- a/library/docs/development-transitions-06-dev.md
++++ b/library/docs/development-transitions-06-dev.md
+@@ -0,0 +1,5 @@
++# 流程规则诊断报告真实短路条件并保留未执行项
++
++路线04：explain_event明确执行prepare与规则并报告真实pass/fail/skipped/error，遵循短路且不额外评估；不执行迁移回调/改态，与只读结构预览分开。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_transitions_06_dev.py
++++ b/library/tests/test_development_transitions_06_dev.py
+@@ -0,0 +1,27 @@
++"""规则诊断明确有prepare/guard副作用，但不额外执行被短路项。"""
++from transitions import Machine
++
++def test_failed_condition_marks_remaining_skipped_without_transition_callbacks():
++    """False后面的规则不为显示而执行，状态保持。@return None。"""
++    seen=[]
++    def prepare():seen.append('prepare')
++    def false():seen.append('false');return False
++    def untouched():seen.append('unreachable');return True
++    machine=Machine(states=['draft','packed'],initial='draft',auto_transitions=False,prepare_event=prepare)
++    machine.add_transition('pack','draft','packed',conditions=[false,untouched],before=lambda:seen.append('before'))
++    report=machine.explain_event(machine,'pack')
++    assert not report['allowed'] and [item['status'] for item in report['candidates'][0]['conditions']]==['fail','skipped']
++    assert seen==['prepare','false'] and machine.state=='draft'
++
++def test_unless_candidates_success_shortcircuits_and_errors_are_visible():
++    """候选命中后后续候选也不执行，unless反向规则真实判断。@return None。"""
++    machine=Machine(states=['a','b','c'],initial='a',auto_transitions=False)
++    machine.add_transition('go','a','b',unless=lambda:False)
++    machine.add_transition('go','a','c',conditions=lambda:(_ for _ in ()).throw(AssertionError('must skip')))
++    report=machine.explain_event(machine,'go')
++    assert report['allowed'] and report['candidates'][0]['conditions'][0]['target'] is False
++    assert report['candidates'][1]['status']=='skipped' and machine.state=='a'
++    broken=Machine(states=['a','b'],initial='a',auto_transitions=False)
++    broken.add_transition('go','a','b',conditions=lambda:1/0)
++    row=broken.explain_event(broken,'go')['candidates'][0]
++    assert row['status']=='error' and row['conditions'][0]['error_type']=='ZeroDivisionError'
+--- a/library/transitions/core.py
++++ b/library/transitions/core.py
+@@ -1159,6 +1159,71 @@
+                 delattr(model, trigger)
+             del self.events[trigger]
+ 
++    def explain_event(self, model, trigger, *args, **kwargs):
++        """显式执行同步平面规则诊断。@param model 绑定模型。@param trigger 事件。@param args 事件参数。@param kwargs 命名参数。@return 条件pass/fail/skipped/error与整体allowed，不执行迁移。"""
++        if self.has_queue:
++            raise ValueError("仅支持同步非排队规则诊断")
++        if not any(item is model for item in self.models):
++            raise ValueError("模型未绑定")
++        state = self.get_model_state(model)
++        event = self.events.get(trigger)
++        candidates = []
++        allowed = False
++        finished = False
++        for ordinal, transition in enumerate(
++            event.transitions.get(state.name, ()) if event is not None else ()
++        ):
++            row = {
++                "ordinal": ordinal,
++                "source": transition.source,
++                "dest": transition.dest,
++                "status": "skipped",
++                "conditions": [
++                    {
++                        "index": index,
++                        "target": condition.target,
++                        "status": "skipped",
++                        "error_type": None,
++                    }
++                    for index, condition in enumerate(transition.conditions)
++                ],
++                "error_type": None,
++            }
++            candidates.append(row)
++            if finished:
++                continue
++            data = EventData(state, event, self, model, args, kwargs)
++            data.transition = transition
++            try:
++                self.callbacks(self.prepare_event, data)
++                self.callbacks(transition.prepare, data)
++                row["status"] = "passed"
++                for condition, result in zip(transition.conditions, row["conditions"]):
++                    try:
++                        passed = condition.check(data)
++                    except Exception as error:
++                        result["status"] = "error"
++                        result["error_type"] = type(error).__name__
++                        raise
++                    result["status"] = "pass" if passed else "fail"
++                    if not passed:
++                        row["status"] = "failed"
++                        break
++            except Exception as error:
++                row["status"] = "error"
++                row["error_type"] = type(error).__name__
++                finished = True
++            else:
++                if row["status"] == "passed":
++                    allowed = True
++                    finished = True
++        return {
++            "trigger": trigger,
++            "state": state.name,
++            "allowed": allowed,
++            "candidates": candidates,
++        }
++
+     def dispatch(self, trigger, *args, **kwargs):
+         """Trigger an event on all models assigned to the machine.
+         Args:

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DATASET-O04-DEV",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend actual ResultIter with context management and robust idempotent close. Early break, exhaustion, upstream fetch or row_type conversion failure must release result and dedicated streamed connection without closing shared Database. Detach owned resources before cleanup, attempt both even if cursor close fails, retain the first cleanup error for direct close, and preserve an existing business/conversion exception during cleanup. A closed iterator yields nothing; repeated close is safe. Test real SQLite streamed resources plus synthetic cleanup failures and existing empty/nonstreamed iteration behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

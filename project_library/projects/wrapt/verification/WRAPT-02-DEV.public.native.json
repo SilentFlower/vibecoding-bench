@@ -1,0 +1,14 @@
+{
+  "script": "verification/WRAPT-02-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 2,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_wrapt_02_dev.py"
+}

@@ -1,0 +1,85 @@
+--- a/library/backoff/_common.py
++++ b/library/backoff/_common.py
+@@ -91,10 +91,25 @@
+     return handlers
+ 
+ 
++def _target_name(target):
++    """为日志取得稳定目标名称，避免repr泄漏partial绑定实参。
++
++    :param target: 实际调用目标。
++    :return: 函数名或类型名。
++    """
++    while isinstance(target, functools.partial):
++        target = target.func
++    try:
++        name = target.__name__
++    except Exception:
++        name = None
++    return name if isinstance(name, str) and name else type(target).__name__
++
++
+ # Default backoff handler
+ def _log_backoff(details, logger, log_level):
+     msg = "Backing off %s(...) for %.1fs (%s)"
+-    log_args = [details['target'].__name__, details['wait']]
++    log_args = [_target_name(details['target']), details['wait']]
+ 
+     exc_typ, exc, _ = sys.exc_info()
+     if exc is not None:
+@@ -108,7 +123,7 @@
+ # Default giveup handler
+ def _log_giveup(details, logger, log_level):
+     msg = "Giving up %s(...) after %d tries (%s)"
+-    log_args = [details['target'].__name__, details['tries']]
++    log_args = [_target_name(details['target']), details['tries']]
+ 
+     exc_typ, exc, _ = sys.exc_info()
+     if exc is not None:
+--- a/library/docs/development-bf-callable-dev.md
++++ b/library/docs/development-bf-callable-dev.md
+@@ -0,0 +1,5 @@
++# 为partial和可调用对象提供安全日志名称
++
++默认重试日志安全取得partial底层函数名或可调用对象类型名，不调用repr、不输出绑定实参。日志不得用AttributeError覆盖原始异常或返回值；保留目标执行次数、日志级别、普通函数和禁用日志行为。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bf_callable_dev.py
++++ b/library/tests/test_development_bf_callable_dev.py
+@@ -0,0 +1,36 @@
++"""日志名称不可掩盖可调用实例和partial的真实业务异常。"""
++from functools import partial
++import logging
++import pytest
++import backoff
++
++
++def test_partial_preserves_error(caplog):
++    """绑定实参不进入日志，原异常对象保持。@return None。"""
++    error = ValueError('target')
++    def fail(secret):
++        """抛出业务异常。@param secret 合成绑定实参。@return 不返回。"""
++        raise error
++    target = backoff.on_exception(backoff.constant, ValueError, max_tries=1)(partial(fail, 'hidden-token'))
++    with caplog.at_level(logging.ERROR, logger='backoff'):
++        with pytest.raises(ValueError) as result:
++            target()
++    assert result.value is error
++    assert 'fail' in caplog.text and 'hidden-token' not in caplog.text
++
++
++def test_callable_instance(caplog):
++    """无__name__目标使用类型名。@return None。"""
++    class Endpoint:
++        """返回重试失败值的业务目标。"""
++        def __call__(self):
++            """返回0。@return 0。"""
++            return 0
++    with caplog.at_level(logging.ERROR, logger='backoff'):
++        assert backoff.on_predicate(backoff.constant, max_tries=1)(Endpoint())() == 0
++    assert 'Endpoint' in caplog.text
++
++
++def test_logger_none_unchanged():
++    """禁用日志仍直接返回真实结果。@return None。"""
++    assert backoff.on_predicate(backoff.constant, max_tries=1, logger=None)(partial(lambda x: x, 8))() == 8

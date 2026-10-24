@@ -3,7 +3,7 @@
   "project_key": "boltons",
   "title": "Boltons批处理与数据清理开发任务",
   "category": "记录处理与迭代工具",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实批处理工具工程目标，覆盖业务键、排序、时区、JSONL输入输出及月度排期；独立程序和累计完整回归。",
   "seed_digest": "8b27857287b3a2ff35a5474654e914ce7c033627d0e521f076c92ef0f3ed9e9b",
   "environment": "boltons-py312",
   "source": {
@@ -56,6 +56,241 @@
             "disclosure/BO-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "BO-SORT-KEY-DEV-SCENE",
+      "title": "异构排序为每个元素只求值一次业务键",
+      "goal": "异构排序为每个元素只求值一次业务键",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BO-SORT-KEY-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-SORT-KEY-DEV",
+          "kind": "modify",
+          "goal": "异构排序为每个元素只求值一次业务键",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix iterutils.untyped_sorted so a supplied key is evaluated exactly once per input occurrence before comparisons, matching sorted key semantics. Preserve heterogeneous-type fallback order, stable equal keys, reverse and falsey callable support; validate noncallable keys, propagate key/comparison errors and leave input unchanged. Do not cache by object identity or return wrappers instead of original objects.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_sort_key_dev.py and concise Chinese compatibility documentation at library/docs/development-bo-sort-key-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BO-SORT-KEY-DEV-contract.md",
+            "materials/BO-SORT-KEY-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/boltons/iterutils.py",
+            "library/development_tests/test_development_bo_sort_key_dev.py",
+            "library/docs/development-bo-sort-key-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BO-SORT-KEY-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-SORT-KEY-DEV.native.json",
+            "public_native": "verification/BO-SORT-KEY-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BO-SORT-KEY-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "BO-TIMESTAMP-DEV-SCENE",
+      "title": "根据实际UTC偏移判断自定义时区对象的时间语义",
+      "goal": "根据实际UTC偏移判断自定义时区对象的时间语义",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BO-TIMESTAMP-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-TIMESTAMP-DEV",
+          "kind": "modify",
+          "goal": "根据实际UTC偏移判断自定义时区对象的时间语义",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix timeutils.dt_to_timestamp to classify awareness by tzinfo is not None and dt.utcoffset() is not None, rather than tzinfo truthiness. Falsey tzinfo with a real offset must convert correctly; tzinfo objects returning None are naive and retain the existing implied-UTC convention. Preserve negative epochs, fractional seconds, fold-specific offsets and original offset errors; do not silently use host local timezone or alter datetime objects.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_timestamp_dev.py and concise Chinese compatibility documentation at library/docs/development-bo-timestamp-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BO-TIMESTAMP-DEV-contract.md",
+            "materials/BO-TIMESTAMP-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/boltons/timeutils.py",
+            "library/development_tests/test_development_bo_timestamp_dev.py",
+            "library/docs/development-bo-timestamp-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BO-TIMESTAMP-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-TIMESTAMP-DEV.native.json",
+            "public_native": "verification/BO-TIMESTAMP-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BO-TIMESTAMP-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "BO-JSONL-DECODER-DEV-SCENE",
+      "title": "为逐行JSON读取注入本次解码器并保持反向和错误策略",
+      "goal": "为逐行JSON读取注入本次解码器并保持反向和错误策略",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BO-JSONL-DECODER-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-JSONL-DECODER-DEV",
+          "kind": "modify",
+          "goal": "为逐行JSON读取注入本次解码器并保持反向和错误策略",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd keyword-only loads=None to JSONLIterator, selecting json.loads by default or a validated explicit callable. Call it once per nonblank candidate line, preserve exact returned object, reverse/rel_seek behavior and existing ignore_errors handling for decoder exceptions. Do not mutate global json.loads, preload the file, or close caller-owned streams. Validate decoder before reading or seeking; support Decimal parse_float and object_pairs_hook through caller-provided decoder functions.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_jsonl_decoder_dev.py and concise Chinese compatibility documentation at library/docs/development-bo-jsonl-decoder-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BO-JSONL-DECODER-DEV-contract.md",
+            "materials/BO-JSONL-DECODER-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/boltons/jsonutils.py",
+            "library/development_tests/test_development_bo_jsonl_decoder_dev.py",
+            "library/docs/development-bo-jsonl-decoder-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BO-JSONL-DECODER-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-JSONL-DECODER-DEV.native.json",
+            "public_native": "verification/BO-JSONL-DECODER-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BO-JSONL-DECODER-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BO-JSONL-WRITER-DEV-SCENE",
+      "title": "逐条完整序列化JSONL并支持文本或二进制输出",
+      "goal": "逐条完整序列化JSONL并支持文本或二进制输出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BO-JSONL-WRITER-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-JSONL-WRITER-DEV",
+          "kind": "modify",
+          "goal": "逐条完整序列化JSONL并支持文本或二进制输出",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd jsonutils.JSONLWriter(stream,*,binary=False,encoding=\"utf-8\",dumps=None), write(value), write_many(iterable), flush() and successful count. Serialize and validate one complete JSON text before writing exactly one LF-terminated record; reject physical CR/LF, nonstring or invalid custom serializer results without writing that record. Binary mode encodes first; preserve caller stream ownership and lazy consumption, detect reported short writes, propagate serialization/I/O errors and keep prior successful records/count. No whole-batch rollback or silent stream closure.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_jsonl_writer_dev.py and concise Chinese compatibility documentation at library/docs/development-bo-jsonl-writer-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BO-JSONL-WRITER-DEV-contract.md",
+            "materials/BO-JSONL-WRITER-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/boltons/jsonutils.py",
+            "library/development_tests/test_development_bo_jsonl_writer_dev.py",
+            "library/docs/development-bo-jsonl-writer-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BO-JSONL-WRITER-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-JSONL-WRITER-DEV.native.json",
+            "public_native": "verification/BO-JSONL-WRITER-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BO-JSONL-WRITER-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BO-MONTH-RANGE-DEV-SCENE",
+      "title": "按固定起始日和显式月底策略生成月度日期序列",
+      "goal": "按固定起始日和显式月底策略生成月度日期序列",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BO-MONTH-RANGE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BO-MONTH-RANGE-DEV",
+          "kind": "modify",
+          "goal": "按固定起始日和显式月底策略生成月度日期序列",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd timeutils.month_range(start,stop,step=1,*,inclusive=False,month_end=\"clip\") for actual date objects. Use absolute month arithmetic with the original start.day as anchor; clip/skip/raise explicitly controls months lacking that day, without drifting March to a February-clipped day. Support negative month steps, leap years and exclusive/inclusive bounds, reject zero/bool/noninteger step and unknown policy. Preserve existing daterange and never model a calendar month as a fixed number of days.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_month_range_dev.py and concise Chinese compatibility documentation at library/docs/development-bo-month-range-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BO-MONTH-RANGE-DEV-contract.md",
+            "materials/BO-MONTH-RANGE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/boltons/timeutils.py",
+            "library/development_tests/test_development_bo_month_range_dev.py",
+            "library/docs/development-bo-month-range-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BO-MONTH-RANGE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BO-MONTH-RANGE-DEV.native.json",
+            "public_native": "verification/BO-MONTH-RANGE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BO-MONTH-RANGE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

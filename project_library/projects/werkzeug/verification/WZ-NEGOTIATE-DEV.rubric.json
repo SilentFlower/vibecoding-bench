@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WZ-NEGOTIATE-DEV",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement werkzeug.negotiated_json.json_response(value,request,*,offers=(\"application/json\",),status=200). Validate unique offered application/json or application/*+json media types, use actual request.accept_mimetypes.best_match for quality/specificity/wildcards, preserve offered order on ties and default first only when Accept is absent. Unacceptable including q=0 raises 406. Encode finite UTF8 JSON preserving false/null/Unicode, set selected Content-Type, exact length and Vary: Accept. Do not equate vendor JSON with plain JSON without an actual matching offer or silently emit a disallowed representation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

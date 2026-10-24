@@ -1,0 +1,86 @@
+--- a/library/babel/dates.py
++++ b/library/babel/dates.py
+@@ -1020,6 +1020,48 @@
+             return pattern.replace('{0}', str(value))
+ 
+     return ''
++
++
++def format_duration(delta, *, units=('day', 'hour', 'minute', 'second'), max_parts=None, length='long', locale=None):
++    """格式化固定时长的多个单位。@param delta 非负秒数或timedelta。
++    @param units 严格降序固定单位。@param max_parts 最多非零分量。@param length 单位宽度。
++    @param locale 区域。@return 使用区域化单位和列表规则的时长。
++    """
++    from decimal import Decimal
++    from babel.lists import format_list
++    from babel.units import format_unit
++
++    scales = {'week': 604800, 'day': 86400, 'hour': 3600, 'minute': 60, 'second': 1}
++    units = tuple(units)
++    if not units or any(unit not in scales for unit in units) or any(scales[a] <= scales[b] for a, b in zip(units, units[1:])):
++        raise ValueError('时长单位必须唯一且严格降序')
++    if max_parts is not None and (type(max_parts) is not int or max_parts < 1):
++        raise ValueError('分量上限必须是正整数')
++    if length not in ('long', 'short', 'narrow'):
++        raise ValueError('未知单位宽度')
++    if isinstance(delta, datetime.timedelta):
++        seconds = Decimal(delta.days * 86400 + delta.seconds) + Decimal(delta.microseconds) / 1000000
++    else:
++        seconds = Decimal(str(delta))
++    if not seconds.is_finite() or seconds < 0:
++        raise ValueError('时长必须是非负有限数')
++    rendered = []
++    for index, unit in enumerate(units):
++        if index == len(units) - 1:
++            value = seconds / scales[unit]
++        else:
++            value = seconds // scales[unit]
++            seconds -= value * scales[unit]
++        if value:
++            rendered.append(format_unit(value, 'duration-' + unit, length, locale=locale))
++        if max_parts is not None and len(rendered) == max_parts:
++            break
++    if not rendered:
++        rendered = [format_unit(0, 'duration-' + units[-1], length, locale=locale)]
++    try:
++        return format_list(rendered, style={'long':'unit', 'short':'unit-short', 'narrow':'unit-narrow'}[length], locale=locale)
++    except KeyError:
++        return format_list(rendered, style='standard', locale=locale)
+ 
+ 
+ def _format_fallback_interval(
+--- a/library/development_tests/test_development_ba_duration_dev.py
++++ b/library/development_tests/test_development_ba_duration_dev.py
+@@ -0,0 +1,24 @@
++"""公开多分量持续时间回归。"""
++from datetime import timedelta
++import pytest
++from babel.dates import format_duration
++from babel.units import format_unit
++from babel.lists import format_list
++
++def test_multiple_components_use_locale_unit_lists():
++    expected = format_list([format_unit(1,'duration-hour',locale='en'), format_unit(2,'duration-minute',locale='en'), format_unit(3,'duration-second',locale='en')], style='unit', locale='en')
++    assert format_duration(3723, locale='en') == expected
++
++def test_fractional_smallest_unit_and_timedelta_are_preserved():
++    assert format_duration(timedelta(seconds=1, microseconds=500000), locale='en') == format_unit(1.5,'duration-second',locale='en')
++
++def test_zero_and_maximum_components_have_defined_behavior():
++    assert format_duration(0, units=('hour','minute'), locale='fr') == format_unit(0,'duration-minute',locale='fr')
++    assert format_duration(3723, max_parts=1, locale='en') == format_unit(1,'duration-hour',locale='en')
++
++def test_invalid_values_and_calendar_units_are_rejected():
++    for options in ({'units':('second','hour')}, {'units':('month',)}, {'units':()}, {'max_parts':0}):
++        with pytest.raises(ValueError):
++            format_duration(2, locale='en', **options)
++    with pytest.raises(ValueError):
++        format_duration(-1, locale='en')
+--- a/library/docs/development-ba-duration-dev.md
++++ b/library/docs/development-ba-duration-dev.md
+@@ -0,0 +1,5 @@
++# 按固定单位分解并本地化多分量时长
++
++倒计时和作业耗时需要“1小时2分钟”这样的多分量表达。按显式固定单位分解、保留末级小数，沿用复数规则及区域列表连接；省略零分量，可限制显示数量，不把月份年份当固定秒数。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

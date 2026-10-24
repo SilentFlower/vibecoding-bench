@@ -1,0 +1,129 @@
+--- a/library/docs/development-pluggy-04-dev.md
++++ b/library/docs/development-pluggy-04-dev.md
+@@ -0,0 +1,5 @@
++# 历史hook显式限制与清理保留事件并稳定重放当前快照
++
++路线17：历史容量默认无限，可显式保留最新N或零存储但仍实时交付；清理返回数量，选择器错误不提交。重放使用开始快照，期间清空/追加只影响未来，子集共享原政策，并继承前置调用时浅快照。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pluggy/_caller.py
++++ b/library/src/pluggy/_caller.py
+@@ -57,6 +57,7 @@
+     """A caller of all registered implementations of a hook specification."""
+ 
+     __slots__ = (
++        "_history_limit",
+         "_call_history",
+         "_hookexec",
+         "_hookimpls",
+@@ -83,6 +84,7 @@
+         # 5. wrappers
+         # 6. tryfirst wrappers
+         self._hookimpls: Final[list[HookImpl]] = []
++        self._history_limit = None
+         self._call_history: _CallHistory | None = None
+         # TODO: Document, or make private.
+         self.spec: HookSpec | None = None
+@@ -216,6 +218,8 @@
+         kwargs = dict(self._apply_defaults(kwargs))
+         self._verify_all_args_are_provided(kwargs)
+         self._call_history.append((kwargs, result_callback))
++        if self._history_limit is not None:
++            del self._call_history[:max(0,len(self._call_history)-self._history_limit)]
+         # Historizing hooks don't return results.
+         # Remember firstresult isn't compatible with historic.
+         # Copy because plugins may register other plugins during iteration (#438).
+@@ -225,6 +229,21 @@
+         if isinstance(res, list):
+             for x in res:
+                 result_callback(x)
++
++    def set_history_limit(self,limit=None):
++        """设置只影响未来重放的历史容量。@param limit None无限或非负整数。@return None。"""
++        if not self.is_historic():raise ValueError('只有historic hook可设置历史')
++        if limit is not None and (type(limit) is not int or limit<0):raise ValueError('历史容量必须非负整数')
++        self._history_limit=limit
++        if limit is not None:del self._call_history[:max(0,len(self._call_history)-limit)]
++
++    def clear_history(self,predicate=None):
++        """删除历史快照选中的事件，不撤回已交付调用。@param predicate 可选只读kwargs选择器。@return 删除数。"""
++        if not self.is_historic():raise ValueError('只有historic hook可清历史')
++        original=tuple(self._call_history)
++        kept=[] if predicate is None else [entry for entry in original if not predicate(dict(entry[0]))]
++        self._call_history[:]=kept
++        return len(original)-len(kept)
+ 
+     def call_extra(
+         self, methods: Sequence[Callable[..., object]], kwargs: Mapping[str, object]
+@@ -265,7 +284,7 @@
+         """Apply call history to a new hookimpl if it is marked as historic."""
+         if self.is_historic():
+             assert self._call_history is not None
+-            for kwargs, result_callback in self._call_history:
++            for kwargs, result_callback in tuple(self._call_history):
+                 res = self._hookexec(self.name, [method], kwargs, False)
+                 if res and result_callback is not None:
+                     # XXX: remember firstresult isn't compat with historic
+@@ -315,6 +334,16 @@
+         return self._orig.spec
+ 
+     @property
++    def _history_limit(self):
++        """子集共享原hook历史政策。@return 容量。"""
++        return self._orig._history_limit
++
++    @_history_limit.setter
++    def _history_limit(self,value):
++        """更新原hook容量。@param value 容量。@return None。"""
++        self._orig._history_limit=value
++
++    @property
+     def _call_history(self) -> _CallHistory | None:  # type: ignore[override]
+         return self._orig._call_history
+ 
+--- a/library/tests/test_development_pluggy_04_dev.py
++++ b/library/tests/test_development_pluggy_04_dev.py
+@@ -0,0 +1,43 @@
++"""历史容量只影响稍后重放，实时事件照常交付。"""
++import unittest
++from pluggy import PluginManager,HookspecMarker,HookimplMarker
++spec=HookspecMarker('app');impl=HookimplMarker('app')
++
++
++def manager():
++    """建立真实历史hook。@return PluginManager。"""
++    class Specs:
++        @spec(historic=True)
++        def event(self,value):pass
++    pm=PluginManager('app');pm.add_hookspecs(Specs);return pm
++
++
++def test_capacity_zero_clear_and_parameter_snapshot():
++    """末三条按原事件快照重放，上限零仍实时调用。@return None。"""
++    pm=manager();pm.hook.event.set_history_limit(3)
++    for index in range(5):
++        given={'value':index};pm.hook.event.call_historic(kwargs=given);given['value']=99
++    seen=[]
++    class Plugin:
++        @impl
++        def event(self,value):seen.append(value)
++    pm.register(Plugin(),'first');assert seen==[2,3,4]
++    pm.hook.event.set_history_limit(0);pm.hook.event.call_historic(kwargs={'value':5})
++    assert seen==[2,3,4,5] and pm.hook.event._call_history==[]
++    assert pm.hook.event.clear_history()==0
++
++
++def test_replay_snapshot_survives_clear_and_selector_failures():
++    """重放中清空只影响未来插件，本轮稳定迭代；选择器异常不提交。@return None。"""
++    pm=manager()
++    for value in (1,2,3):pm.hook.event.call_historic(kwargs={'value':value})
++    before=list(pm.hook.event._call_history)
++    with unittest.TestCase().assertRaises(ZeroDivisionError):pm.hook.event.clear_history(lambda kwargs:1/0)
++    assert pm.hook.event._call_history==before
++    seen=[]
++    class Plugin:
++        @impl
++        def event(self,value):
++            seen.append(value)
++            if value==1:pm.hook.event.clear_history()
++    pm.register(Plugin());assert seen==[1,2,3] and pm.hook.event._call_history==[]

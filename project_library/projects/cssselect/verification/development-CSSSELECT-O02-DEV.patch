@@ -1,0 +1,66 @@
+--- a/library/cssselect/batch.py
++++ b/library/cssselect/batch.py
+@@ -0,0 +1,25 @@
++"""逐记录批量翻译，输入组和输入批次绝不混淆。"""
++from cssselect.parser import SelectorSyntaxError
++from cssselect.xpath import ExpressionError, GenericTranslator
++
++
++def translate_many(records, *, translator=None, prefix='descendant-or-self::', fail_fast=False):
++    """惰性按输入顺序翻译带业务标识的选择器。
++
++    :param records: (业务标识,完整CSS组)的可迭代序列，允许重复标识。
++    :param translator: 实际translator实例，默认GenericTranslator。
++    :param prefix: 转发给真实翻译器。
++    :param fail_fast: 原生语法/翻译错误是否立即传播。
++    :return: 逐记录结果迭代器，语法与不支持错误分阶段。
++    """
++    selected = GenericTranslator() if translator is None else translator
++    for identifier, css in records:
++        try:
++            xpath = selected.css_to_xpath(css, prefix=prefix)
++        except (SelectorSyntaxError, ExpressionError) as error:
++            if fail_fast:
++                raise
++            yield {'id': identifier, 'css': css, 'ok': False, 'xpath': None,
++                   'error': {'phase': 'parse' if isinstance(error, SelectorSyntaxError) else 'translate', 'kind': type(error).__name__}}
++        else:
++            yield {'id': identifier, 'css': css, 'ok': True, 'xpath': xpath, 'error': None}
+--- a/library/docs/development-cssselect-o02-dev.md
++++ b/library/docs/development-cssselect-o02-dev.md
+@@ -0,0 +1,5 @@
++# 保留业务标识并隔离批量选择器局部失败
++
++对应路线14：按业务记录惰性批量调用真实translator，局部语法/不支持错误分阶段隔离，保留重复ID和完整组，输入生成器异常继续传播。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cssselect_o02_dev.py
++++ b/library/tests/test_development_cssselect_o02_dev.py
+@@ -0,0 +1,27 @@
++"""批次隔离错误，真实CSS组中的逗号保持语义。"""
++import pytest
++import cssselect
++
++def test_mixed_batch_order_and_group():
++    """失败不吞掉后续规则或重复ID。@return None。"""
++    from cssselect.batch import translate_many
++    rows=list(translate_many([('same','p,a'),('bad','['),('same','div')]))
++    assert [r['id'] for r in rows]==['same','bad','same'] and [r['ok'] for r in rows]==[True,False,True]
++    assert rows[0]['xpath']==cssselect.GenericTranslator().css_to_xpath('p,a') and rows[1]['error']['phase']=='parse'
++
++def test_laziness_generator_failure_and_failfast():
++    """只消费请求项，输入生成器异常不能伪装翻译失败。@return None。"""
++    from cssselect.batch import translate_many
++    def records():
++        yield ('a','p')
++        raise RuntimeError('upstream')
++    result=translate_many(records());assert next(result)['ok']
++    with pytest.raises(RuntimeError):next(result)
++    with pytest.raises(cssselect.ExpressionError):list(translate_many([('bad',':unknown')],fail_fast=True))
++
++def test_html_prefix_and_empty_batch():
++    """调用方真实翻译配置保留，空批次不产生记录。@return None。"""
++    from cssselect.batch import translate_many
++    assert list(translate_many([]))==[]
++    row=next(translate_many([('upper','DIV')],translator=cssselect.HTMLTranslator(),prefix='self::'))
++    assert row['xpath']=='self::div'

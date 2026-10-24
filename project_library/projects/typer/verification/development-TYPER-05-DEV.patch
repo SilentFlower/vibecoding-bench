@@ -1,0 +1,63 @@
+--- a/app/development_tests/test_development_typer_05_dev.py
++++ b/app/development_tests/test_development_typer_05_dev.py
+@@ -0,0 +1,23 @@
++"""实盘绝对数对账区分未盘点、无差异和零库存。"""
++import json,tempfile
++from pathlib import Path
++from typer.testing import CliRunner
++import shop
++
++def test_partial_counts_zero_and_unchanged_records_keep_order_and_exact_diff():
++    """未盘点不当作零，无变化不制造差异。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'catalog';counts=base/'counts';out=base/'out'
++        source.write_text('[{"sku":"a","name":"A","quantity":3},{"sku":"b","name":"B","quantity":2},{"sku":"c","name":"C","quantity":4}]')
++        counts.write_text('[{"sku":"c","quantity":4},{"sku":"a","quantity":0}]');before=source.read_bytes()
++        result=CliRunner().invoke(shop.app,['reconcile',str(source),str(counts),'--output',str(out)])
++        assert result.exit_code==0 and [x['quantity'] for x in json.loads(out.read_text())]==[0,2,4]
++        assert json.loads(result.stdout)=={'counted':2,'changed':1,'differences':[{'sku':'a','before':3,'after':0,'delta':-3}]} and source.read_bytes()==before
++
++def test_duplicate_unknown_negative_bool_and_existing_output_reject_whole_batch():
++    """盘点不采用最后值悄悄盖重复记录。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'catalog';counts=base/'counts';source.write_text('[{"sku":"a","name":"A","quantity":1}]')
++        for n,items in enumerate(([{'sku':'a','quantity':0},{'sku':'a','quantity':1}],[{'sku':'x','quantity':1}],[{'sku':'a','quantity':-1}],[{'sku':'a','quantity':True}])):
++            counts.write_text(json.dumps(items));out=base/str(n)
++            assert CliRunner().invoke(shop.app,['reconcile',str(source),str(counts),'--output',str(out)]).exit_code!=0 and not out.exists()
+--- a/app/docs/development-typer-05-dev.md
++++ b/app/docs/development-typer-05-dev.md
+@@ -0,0 +1,5 @@
++# 实盘库存对账以绝对数量交付新账面并准确列出业务差异
++
++完整实盘对账接受每sku一次绝对非负数量，未盘点保留/零是真零/无变化不报差；未知重复或坏数量整批拒绝，一次发布新账面并列真实前后差异，不把它当delta或订单扣减。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/app/inventory_reconcile.py
++++ b/app/inventory_reconcile.py
+@@ -0,0 +1,26 @@
++"""实盘库存对账按明确SKU绝对数量生成新账面与差异。"""
++import json
++from pathlib import Path
++from typing import Annotated
++import typer
++from inventory_store import load,save_catalog
++
++def register(app):
++    """注册reconcile命令。@param app 既有应用。@return None。"""
++    @app.command('reconcile')
++    def reconcile(source:Path,counts:Path,output:Annotated[Path,typer.Option('--output')]):
++        """对账完整盘点输入。@param source 原账面。@param counts 明确sku/实盘quantity数组。@param output 新账面。@return None，缺席商品保原量，未知/重复/负量拒绝。"""
++        try:
++            values=load(source);catalog={item['sku']:item for item in values};raw=json.loads(counts.read_text(encoding='utf-8'))
++            if not isinstance(raw,list):raise ValueError('盘点须为数组')
++            seen=set();differences=[]
++            for item in raw:
++                if not isinstance(item,dict) or not isinstance(item.get('sku'),str) or type(item.get('quantity')) is not int or item['quantity']<0:raise ValueError('盘点sku/非负整数quantity无效')
++                sku=item['sku']
++                if sku in seen or sku not in catalog:raise ValueError('盘点sku重复或未知')
++                seen.add(sku);record=catalog[sku];before=record['quantity'];after=item['quantity'];record['quantity']=after
++                if before!=after:differences.append({'sku':sku,'before':before,'after':after,'delta':after-before})
++            save_catalog(output,values,inputs=(source,counts))
++        except (OSError,UnicodeError,ValueError) as error:
++            typer.echo('对账失败：'+str(error),err=True);raise typer.Exit(1) from error
++        typer.echo(json.dumps({'counted':len(seen),'changed':len(differences),'differences':differences},ensure_ascii=False))

@@ -1,0 +1,123 @@
+--- a/library/dataset/chunked.py
++++ b/library/dataset/chunked.py
+@@ -20,7 +20,13 @@
+         table: "Table",
+         chunksize: int,
+         callback: _Callback | None,
++        on_error: str = "flush",
+     ) -> None:
++        if on_error not in ('flush', 'discard'):
++            raise ValueError('on_error必须为flush或discard')
++        if isinstance(chunksize, bool) or not isinstance(chunksize, int) or chunksize < 1:
++            raise ValueError('chunksize必须为正整数')
++        self.on_error = on_error
+         self.queue: list[MutableRow] = []
+         self.table: Table = table
+         self.chunksize: int = chunksize
+@@ -39,8 +45,16 @@
+     def __enter__(self) -> "_Chunker":
+         return self
+ 
++    def _discard(self):
++        """只丢弃尚未提交队列，不伪装撤销既有批次。@return None。"""
++        self.queue.clear()
++
+     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+-        self.flush()
++        """正常退出照常提交；异常时按显式待提交政策。@return None。"""
++        if exc_type is not None and self.on_error == 'discard':
++            self._discard()
++        else:
++            self.flush()
+ 
+ 
+ class ChunkedInsert(_Chunker):
+@@ -59,15 +73,23 @@
+         table: "Table",
+         chunksize: int = 1000,
+         callback: _Callback | None = None,
++        *, on_error: str = "flush",
+     ) -> None:
+         self.fields: set[str] = set()
+-        super().__init__(table, chunksize, callback)
++        super().__init__(table, chunksize, callback, on_error=on_error)
+ 
+     def insert(self, item: WriteRow) -> None:
+         self.fields.update(item.keys())
+         super()._queue_add(item)
+ 
++    def _discard(self):
++        """丢弃输入同时重置未提交字段集合。@return None。"""
++        self.fields.clear()
++        super()._discard()
++
+     def flush(self) -> None:
++        if not self.queue:
++            return
+         for item in self.queue:
+             for field in self.fields:
+                 item[field] = item.get(field)
+@@ -94,14 +116,17 @@
+         keys: Sequence[str],
+         chunksize: int = 1000,
+         callback: _Callback | None = None,
++        *, on_error: str = "flush",
+     ) -> None:
+         self.keys: Sequence[str] = keys
+-        super().__init__(table, chunksize, callback)
++        super().__init__(table, chunksize, callback, on_error=on_error)
+ 
+     def update(self, item: WriteRow) -> None:
+         super()._queue_add(item)
+ 
+     def flush(self) -> None:
++        if not self.queue:
++            return
+         if self.callback is not None:
+             self.callback(self.queue)
+         self.queue.sort(key=dict.keys)
+--- a/library/docs/development-dataset-o06-dev.md
++++ b/library/docs/development-dataset-o06-dev.md
+@@ -0,0 +1,5 @@
++# 为Chunked异常退出提供明确待提交丢弃政策
++
++对应路线20：异常时可明确丢弃尚未提交尾批，正常退出照常flush；保持默认兼容、回调边界、原异常和外层事务，不冒充撤销已提交批次。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_dataset_o06_dev.py
++++ b/library/test/test_development_dataset_o06_dev.py
+@@ -0,0 +1,34 @@
++"""异常退出只处理未提交队列，不承诺撤销此前批次。"""
++import dataset
++from dataset.chunked import ChunkedInsert,ChunkedUpdate
++import pytest
++
++def test_discard_only_pending_and_original_error_preserved():
++    """已满批次保留，异常时尾部不写且应用异常不变。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items']
++    with pytest.raises(RuntimeError,match='application'):
++        with ChunkedInsert(t,chunksize=2,on_error='discard') as writer:
++            writer.insert({'n':1});writer.insert({'n':2});writer.insert({'n':3});raise RuntimeError('application')
++    assert [row['n'] for row in t.find(order_by='n')]==[1,2]
++    assert writer.queue==[] and writer.fields==set();db.close()
++
++def test_default_flush_and_normal_discard_mode_completion():
++    """默认异常仍flush兼容，discard只在异常时生效。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items']
++    with pytest.raises(RuntimeError):
++        with ChunkedInsert(t) as writer:writer.insert({'n':1});raise RuntimeError('app')
++    with ChunkedInsert(t,on_error='discard') as writer:writer.insert({'n':2})
++    assert t.count()==2;db.close()
++
++def test_update_discard_callback_and_transaction_rollback():
++    """丢弃不调用callback，外层事务仍可回滚已刷批次。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items'];t.insert({'key':'a','n':1});calls=[]
++    with pytest.raises(RuntimeError):
++        with ChunkedUpdate(t,['key'],on_error='discard',callback=lambda rows:calls.append(rows)) as writer:
++            writer.update({'key':'a','n':9});raise RuntimeError('app')
++    assert calls==[] and t.find_one()['n']==1
++    with pytest.raises(RuntimeError):
++        with db:
++            with ChunkedInsert(t,chunksize=1,on_error='discard') as writer:
++                writer.insert({'key':'b','n':2});raise RuntimeError('app')
++    assert t.count()==1;db.close()

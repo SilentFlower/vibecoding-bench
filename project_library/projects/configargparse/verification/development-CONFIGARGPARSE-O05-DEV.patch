@@ -1,0 +1,101 @@
+--- a/library/configargparse.py
++++ b/library/configargparse.py
+@@ -803,6 +803,60 @@
+         config.write(stream)
+         stream.seek(0)
+         return stream.read()
++
++
++class DispatchConfigFileParser(ConfigFileParser):
++    """按应用预声明扩展名选择真实解析器，不猜测内容或导入模块。
++
++    :param parsers: 扩展名到ConfigFileParser实例或无参类的映射。
++    :param fallback: 无扩展名或未知扩展名时显式使用的解析器。
++    :param output_format: 序列化时明确选定的注册扩展名。
++    :return: 独立的分派解析器。
++    """
++
++    def __init__(self, parsers, *, fallback=None, output_format=None):
++        """验证注册表，重复规范扩展名失败。@return None。"""
++        def instance(value):
++            if isinstance(value, type) and issubclass(value, ConfigFileParser):
++                value = value()
++            if not isinstance(value, ConfigFileParser):
++                raise TypeError('分派目标必须是配置解析器')
++            return value
++        self.parsers = {}
++        for suffix, parser in parsers.items():
++            if not isinstance(suffix, str) or not suffix.startswith('.') or len(suffix) < 2 or '/' in suffix or '\\' in suffix:
++                raise ValueError('必须使用带点的字面扩展名')
++            suffix = suffix.lower()
++            if suffix in self.parsers:
++                raise ValueError('重复扩展名')
++            self.parsers[suffix] = instance(parser)
++        self.fallback = None if fallback is None else instance(fallback)
++        self.output_format = None if output_format is None else output_format.lower()
++        if self.output_format is not None and self.output_format not in self.parsers:
++            raise ValueError('输出格式未注册')
++
++    def get_syntax_description(self):
++        """返回预声明格式，不访问输入。@return 描述。"""
++        return 'Explicit extension dispatch: ' + ', '.join(self.parsers)
++
++    def parse(self, stream):
++        """按源名扩展名一次分派，流只由选中解析器消费。
++
++        :param stream: 可选name的文件流，不要求seek。
++        :return: 选中解析器返回的真实配置映射。
++        """
++        name = getattr(stream, 'name', None)
++        suffix = os.path.splitext(os.fsdecode(name))[1].lower() if isinstance(name, (str, bytes, os.PathLike)) else ''
++        parser = self.parsers.get(suffix, self.fallback)
++        if parser is None:
++            raise ConfigFileParserException('未注册的配置扩展名：%s' % suffix)
++        return parser.parse(stream)
++
++    def serialize(self, items):
++        """仅按显式输出格式序列化，不用输入猜测输出。@return 配置文本。"""
++        if self.output_format is None:
++            raise ConfigFileParserException('序列化必须显式声明output_format')
++        return self.parsers[self.output_format].serialize(items)
+ 
+ 
+ class CompositeConfigParser(ConfigFileParser):
+--- a/library/docs/development-configargparse-o05-dev.md
++++ b/library/docs/development-configargparse-o05-dev.md
+@@ -0,0 +1,5 @@
++# 按预声明文件扩展名分派真实配置解析器
++
++对应路线20：根据应用注册的扩展名一次分派真实解析器，未知格式只能显式fallback；不探测内容、不rewind、不动态导入，输出格式也必须显式。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_configargparse_o05_dev.py
++++ b/library/tests/test_development_configargparse_o05_dev.py
+@@ -0,0 +1,27 @@
++"""扩展名分派实际解析器且无需可回退流。"""
++from io import StringIO
++import configargparse as c
++import pytest
++
++def test_case_insensitive_suffix_real_parsers():
++    """不同扩展名使用预声明解析器，不按内容猜测。@return None。"""
++    p=c.DispatchConfigFileParser({'.simple':c.DefaultConfigFileParser,'.ini':c.ConfigparserConfigFileParser})
++    a=StringIO('x=2');a.name='settings.SIMPLE'
++    b=StringIO('[section]\nx=3');b.name='settings.ini'
++    assert p.parse(a)=={'x':'2'} and p.parse(b)=={'x':'3'}
++
++def test_nonseek_fallback_and_unknown():
++    """一次消费非seek流，未知扩展名仅显式fallback。@return None。"""
++    class NoSeek(StringIO):
++        def seek(self,*args):raise AssertionError('seek')
++    stream=NoSeek('x=7');stream.name='unknown'
++    p=c.DispatchConfigFileParser({},fallback=c.DefaultConfigFileParser)
++    assert p.parse(stream)=={'x':'7'}
++    with pytest.raises(c.ConfigFileParserException):c.DispatchConfigFileParser({}).parse(StringIO('x=2'))
++
++def test_registry_validation_output_and_errors():
++    """拒绝重复注册，输出格式显式，错误不吞掉。@return None。"""
++    with pytest.raises(ValueError):c.DispatchConfigFileParser({'.INI':c.DefaultConfigFileParser,'.ini':c.DefaultConfigFileParser})
++    with pytest.raises(TypeError):c.DispatchConfigFileParser({'.x':object()})
++    p=c.DispatchConfigFileParser({'.x':c.DefaultConfigFileParser},output_format='.X')
++    assert p.serialize({'a':'z'})=='a = z\n'

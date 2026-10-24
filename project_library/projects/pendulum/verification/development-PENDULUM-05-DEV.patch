@@ -1,0 +1,81 @@
+--- a/library/docs/development-pendulum-05-dev.md
++++ b/library/docs/development-pendulum-05-dev.md
+@@ -0,0 +1,5 @@
++# 区间日程点支持显式边界和最大产出且拒绝无进度
++
++路线06：range增加遍历首尾closed与产出limit，正整数步长拒绝无进度；默认两端含、倒序和原锚点月底恢复保持，端点不溢出。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pendulum/interval.py
++++ b/library/src/pendulum/interval.py
+@@ -287,22 +287,30 @@
+ 
+         return separator.join(parts)
+ 
+-    def range(self, unit: str, amount: int = 1) -> Iterator[_T]:
+-        method = "add"
+-        op = operator.le
+-        if not self._absolute and self.invert:
+-            method = "subtract"
+-            op = operator.ge
+-
+-        start, end = self.start, self.end
+-
+-        i = amount
+-        while op(start, end):
+-            yield start
+-
+-            start = getattr(self.start, method)(**{unit: i})
+-
+-            i += amount
++    def range(self, unit: str, amount: int = 1, *, closed="both", limit=None) -> Iterator[_T]:
++        """生成有限策略的锚点序列。@param unit 时间单位。@param amount 正整数步长。@param closed both/left/right/neither，左右为遍历首尾。@param limit 非负最大产出或None。@return 逐项迭代器。"""
++        amount=operator.index(amount)
++        if amount<=0:raise ValueError("amount必须大于0")
++        if closed not in ("both","left","right","neither"):raise ValueError("无效closed")
++        if unit not in ("years","months","weeks","days","hours","minutes","seconds","microseconds"):
++            raise ValueError("无效unit")
++        if limit is not None:
++            limit=operator.index(limit)
++            if limit<0:raise ValueError("limit不能为负")
++        method="subtract" if not self._absolute and self.invert else "add"
++        op=operator.ge if method=="subtract" else operator.le
++        current,end=self.start,self.end
++        index=0;emitted=0
++        while op(current,end):
++            if limit is not None and emitted>=limit:return
++            include=(index!=0 or closed in ("both","left")) and (current!=end or closed in ("both","right"))
++            if include:
++                yield current
++                emitted+=1
++            if current==end:return
++            index+=1
++            try:current=getattr(self.start,method)(**{unit:index*amount})
++            except OverflowError:return
+ 
+     def as_duration(self) -> Duration:
+         """
+--- a/library/tests/test_development_pendulum_05_dev.py
++++ b/library/tests/test_development_pendulum_05_dev.py
+@@ -0,0 +1,21 @@
++"""区间点生成显式边界与上限，不改变原锚点月底策略。"""
++import unittest
++import pendulum
++
++def test_closed_bounds_limit_reverse_and_month_anchor():
++    """月末恢复仍由原锚点累计步数决定。@return None。"""
++    a=pendulum.datetime(2023,1,31);b=pendulum.datetime(2023,4,30)
++    value=pendulum.interval(a,b)
++    assert [d.day for d in value.range('months')]==[31,28,31,30]
++    assert [d.month for d in value.range('months',closed='left')]==[1,2,3]
++    assert [d.month for d in value.range('months',closed='right',limit=2)]==[2,3]
++    assert list(value.range('months',limit=0))==[]
++    assert [d.day for d in pendulum.interval(pendulum.date(2024,1,3),pendulum.date(2024,1,1)).range('days',closed='left')]==[3,2]
++
++def test_invalid_progress_units_and_single_point_policies():
++    """零/负步长不得成为无限相同点，首尾同点按both包含。@return None。"""
++    value=pendulum.interval(pendulum.date(2024,1,1),pendulum.date(2024,1,2))
++    for kwargs in ({'amount':0},{'amount':-1},{'closed':'bad'},{'limit':-1}):
++        with unittest.TestCase().assertRaises(ValueError):list(value.range('days',**kwargs))
++    same=pendulum.interval(value.start,value.start)
++    assert list(same.range('days'))==[value.start] and list(same.range('days',closed='neither'))==[]

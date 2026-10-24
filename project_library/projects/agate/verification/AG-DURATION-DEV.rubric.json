@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AG-DURATION-DEV",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend Median and Percentiles to TimeDelta columns while preserving the existing CDF rank rule and Number behavior. Return timedelta values and report a TimeDelta aggregate type for Median. Ignore nulls using the existing warning policy, return None values for empty data, and compute duration midpoints without overflow at timedelta extremes or floating-point loss. Fractional microseconds round to nearest even. Preserve original source tests and Quantiles behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

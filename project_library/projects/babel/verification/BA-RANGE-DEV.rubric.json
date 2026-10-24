@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BA-RANGE-DEV",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add babel.numbers.format_number_range(start, end, *, currency=None, locale=None, collapse=True, **options). Require finite ordered Decimal-compatible endpoints. Format complete endpoints using existing format_decimal or format_currency with its options and numbering system, and join using the locale interval fallback pattern. Collapse equal rendered endpoints only when requested; do not elide currency/signs or change the old formatters. Reject reversed/nonfinite ranges and unknown currency codes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

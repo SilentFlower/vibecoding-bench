@@ -1,0 +1,120 @@
+--- a/library/docs/development-loguru-o04-dev.md
++++ b/library/docs/development-loguru-o04-dev.md
+@@ -0,0 +1,5 @@
++# 为每个真实sink提供隔离record的一次序列化回调
++
++对应路线08：真实Handler格式化后、入队前一次调用每sink serializer，传隔离record图；其他sink与extra不受回调写入影响，字符串终止符自定、错误沿catch政策，原JSON保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/loguru/_handler.py
++++ b/library/loguru/_handler.py
+@@ -45,7 +45,8 @@
+         error_interceptor,
+         exception_formatter,
+         id_,
+-        levels_ansi_codes
++        levels_ansi_codes,
++        serializer=None
+     ):
+         self._name = name
+         self._sink = sink
+@@ -55,6 +56,7 @@
+         self._filter = filter_
+         self._colorize = colorize
+         self._serialize = serialize
++        self._serializer = serializer
+         self._enqueue = enqueue
+         self._multiprocessing_context = multiprocessing_context
+         self._error_interceptor = error_interceptor
+@@ -191,7 +193,16 @@
+                     formatter_record["message"] = coloring_message
+                     formatted = self._format_record(precomputed_format, formatter_record)
+ 
+-            if self._serialize:
++            if self._serializer is not None:
++                from copy import deepcopy
++                exception = record['exception']
++                # traceback不支持deepcopy但本身只读；其余可复制对象图必须与共享record隔离。
++                memo = {} if exception is None or exception.traceback is None else {id(exception.traceback): exception.traceback}
++                snapshot = deepcopy(record, memo)
++                formatted = self._serializer(snapshot, formatted)
++                if not isinstance(formatted, str):
++                    raise TypeError('serializer必须返回字符串并自行选择终止符')
++            elif self._serialize:
+                 formatted = self._serialize_record(formatted, record)
+ 
+             str_record = Message(formatted)
+--- a/library/loguru/_logger.py
++++ b/library/loguru/_logger.py
+@@ -279,6 +279,7 @@
+         filter=_defaults.LOGURU_FILTER,
+         colorize=_defaults.LOGURU_COLORIZE,
+         serialize=_defaults.LOGURU_SERIALIZE,
++        serializer=None,
+         backtrace=_defaults.LOGURU_BACKTRACE,
+         diagnose=_defaults.LOGURU_DIAGNOSE,
+         enqueue=_defaults.LOGURU_ENQUEUE,
+@@ -835,6 +836,10 @@
+         >>> stream_object = RandomStream(seed=12345, threshold=0.25)
+         >>> logger.add(stream_object, level="INFO")
+         """
++        if serializer is not None and not callable(serializer):
++            raise TypeError('serializer必须可调用')
++        if serializer is not None and serialize:
++            raise ValueError('serializer与serialize=True不能同时指定')
+         with self._core.lock:
+             handler_id = self._core.handlers_count
+             self._core.handlers_count += 1
+@@ -1053,6 +1058,7 @@
+                 filter_=filter_func,
+                 colorize=colorize,
+                 serialize=serialize,
++                serializer=serializer,
+                 enqueue=enqueue,
+                 multiprocessing_context=context,
+                 id_=handler_id,
+--- a/library/tests/test_development_loguru_o04_dev.py
++++ b/library/tests/test_development_loguru_o04_dev.py
+@@ -0,0 +1,42 @@
++"""每sink真实序列化一次，在进入队列前取得隔离record。"""
++from copy import deepcopy
++from loguru import logger
++import json
++import pytest
++
++def clean():
++    """创建独立logger。@return Logger。"""
++    logger.remove();log=deepcopy(logger);log.remove();return log
++
++def test_per_sink_callback_and_shared_record_are_isolated():
++    """一个sink定制JSON，另一sink仍有原始extra和格式。@return None。"""
++    log=clean();encoded=[];plain=[];calls=[]
++    def serializer(record,text):
++        calls.append(text);record['extra']['nested'].append('private');record['level'].name='changed'
++        return json.dumps({'message':record['message'],'extra':record['extra']},ensure_ascii=False)+'\n'
++    log.add(encoded.append,format='{message}',serializer=serializer,catch=False)
++    log.add(plain.append,format='{level}:{message}:{extra[nested]}')
++    source=['original'];log.bind(nested=source).info('中文')
++    assert calls==['中文\n'] and source==['original'] and ''.join(plain)=="INFO:中文:['original']\n"
++    assert json.loads(encoded[0])=={'message':'中文','extra':{'nested':['original','private']}}
++    log.remove()
++
++def test_queue_producer_callback_once_and_builtin_json_stays_same():
++    """回调在业务生产线程一次执行，原serialize=True仍走固定schema。@return None。"""
++    import threading
++    log=clean();messages=[];threads=[]
++    def serializer(record,text):threads.append(threading.get_ident());return 'custom:'+text
++    log.add(messages.append,serializer=serializer,enqueue=True,format='{message}',catch=False)
++    log.info('one');log.complete();assert ''.join(messages)=='custom:one\n' and threads==[threading.get_ident()]
++    log.remove();encoded=[];log.add(encoded.append,serialize=True,format='{message}');log.info('two')
++    assert json.loads(encoded[0])['record']['message']=='two';log.remove()
++
++def test_invalid_config_result_and_callback_failure_are_explicit():
++    """参数预检不注册半成品，catch=False传播回调/返回类型错误。@return None。"""
++    log=clean()
++    with pytest.raises(TypeError):log.add(lambda message:None,serializer=42)
++    with pytest.raises(ValueError):log.add(lambda message:None,serialize=True,serializer=lambda record,text:text)
++    assert not log._core.handlers
++    log.add(lambda message:None,serializer=lambda record,text:b'wrong',catch=False)
++    with pytest.raises(TypeError):log.info('x')
++    log.remove()

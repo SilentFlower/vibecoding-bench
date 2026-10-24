@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TEXTDISTANCE-05-DEV",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add textdistance.bounded.bounded_levenshtein(left,right,cutoff,qval=1,test_func=None) returning the exact unit-cost distance when <= cutoff and None otherwise. Implement valid length-difference rejection and a banded dynamic program with sparse rows, not a full matrix followed by cosmetic truncation. Preserve prepared words/qgrams, arbitrary equality predicates, Unicode and exact cutoff equality. Validate strict nonnegative integer cutoff (not bool); no normalized cutoff ambiguity or optional-backend bypass. Demonstrate actual reduced comparisons for long narrow-band inputs and never expose None as a real score.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

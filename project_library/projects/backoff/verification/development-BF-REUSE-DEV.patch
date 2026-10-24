@@ -1,0 +1,153 @@
+--- a/library/backoff/_decorator.py
++++ b/library/backoff/_decorator.py
+@@ -80,21 +80,24 @@
+             args will first be evaluated and their return values passed.
+             This is useful for runtime configuration.
+     """
++    # 用户处理器在工厂创建时快照一次，避免复用装饰器时重复叠加默认日志。
++    on_success = _config_handlers(on_success)
++    on_backoff = _config_handlers(on_backoff)
++    on_giveup = _config_handlers(on_giveup)
++
+     def decorate(target):
+-        nonlocal logger, on_success, on_backoff, on_giveup
+-
+-        logger = _prepare_logger(logger)
+-        on_success = _config_handlers(on_success)
+-        on_backoff = _config_handlers(
++        prepared_logger = _prepare_logger(logger)
++        configured_on_success = _config_handlers(on_success)
++        configured_on_backoff = _config_handlers(
+             on_backoff,
+             default_handler=_log_backoff,
+-            logger=logger,
++            logger=prepared_logger,
+             log_level=backoff_log_level
+         )
+-        on_giveup = _config_handlers(
++        configured_on_giveup = _config_handlers(
+             on_giveup,
+             default_handler=_log_giveup,
+-            logger=logger,
++            logger=prepared_logger,
+             log_level=giveup_log_level
+         )
+ 
+@@ -110,9 +113,9 @@
+             max_tries=max_tries,
+             max_time=max_time,
+             jitter=jitter,
+-            on_success=on_success,
+-            on_backoff=on_backoff,
+-            on_giveup=on_giveup,
++            on_success=configured_on_success,
++            on_backoff=configured_on_backoff,
++            on_giveup=configured_on_giveup,
+             wait_gen_kwargs=wait_gen_kwargs
+         )
+ 
+@@ -180,21 +183,24 @@
+             args will first be evaluated and their return values passed.
+             This is useful for runtime configuration.
+     """
++    # 用户处理器在工厂创建时快照一次，避免复用装饰器时重复叠加默认日志。
++    on_success = _config_handlers(on_success)
++    on_backoff = _config_handlers(on_backoff)
++    on_giveup = _config_handlers(on_giveup)
++
+     def decorate(target):
+-        nonlocal logger, on_success, on_backoff, on_giveup
+-
+-        logger = _prepare_logger(logger)
+-        on_success = _config_handlers(on_success)
+-        on_backoff = _config_handlers(
++        prepared_logger = _prepare_logger(logger)
++        configured_on_success = _config_handlers(on_success)
++        configured_on_backoff = _config_handlers(
+             on_backoff,
+             default_handler=_log_backoff,
+-            logger=logger,
++            logger=prepared_logger,
+             log_level=backoff_log_level,
+         )
+-        on_giveup = _config_handlers(
++        configured_on_giveup = _config_handlers(
+             on_giveup,
+             default_handler=_log_giveup,
+-            logger=logger,
++            logger=prepared_logger,
+             log_level=giveup_log_level,
+         )
+ 
+@@ -211,9 +217,9 @@
+             max_time=max_time,
+             jitter=jitter,
+             giveup=giveup,
+-            on_success=on_success,
+-            on_backoff=on_backoff,
+-            on_giveup=on_giveup,
++            on_success=configured_on_success,
++            on_backoff=configured_on_backoff,
++            on_giveup=configured_on_giveup,
+             raise_on_giveup=raise_on_giveup,
+             wait_gen_kwargs=wait_gen_kwargs
+         )
+--- a/library/docs/development-bf-reuse-dev.md
++++ b/library/docs/development-bf-reuse-dev.md
+@@ -0,0 +1,5 @@
++# 复用装饰器时隔离每个目标的日志和回调
++
++同一重试工厂可以装饰多个同步或异步目标。每个事件只执行一次默认日志及用户回调；用户处理器在工厂创建时快照一次，一次性生成器可复用，不修改调用者列表。已创建目标、异常对象、日志级别和禁用日志行为保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bf_reuse_dev.py
++++ b/library/tests/test_development_bf_reuse_dev.py
+@@ -0,0 +1,48 @@
++"""复用重试装饰器时，每个目标拥有独立日志和回调集合。"""
++import asyncio
++import logging
++import pytest
++import backoff
++
++
++def test_reuse_exception_decorator(caplog):
++    """三次装饰分别只记录一次放弃日志。@return None。"""
++    calls = []
++    decorate = backoff.on_exception(backoff.constant, ValueError, max_tries=1,
++        logger='development.reuse', on_giveup=calls.append)
++    def fail():
++        """产生真实业务异常。@return 不返回。"""
++        raise ValueError('target')
++    with caplog.at_level(logging.ERROR, logger='development.reuse'):
++        for _ in range(3):
++            caplog.clear()
++            with pytest.raises(ValueError):
++                decorate(fail)()
++            assert len(caplog.records) == 1
++    assert len(calls) == 3
++
++
++def test_reuse_predicate_and_generator_handlers(caplog):
++    """一次性用户处理器也可在每个目标上恰好执行一次。@return None。"""
++    calls = []
++    decorate = backoff.on_predicate(backoff.constant, max_tries=1,
++        logger='development.predicate', on_giveup=(h for h in [calls.append]))
++    with caplog.at_level(logging.ERROR, logger='development.predicate'):
++        for _ in range(3):
++            caplog.clear()
++            assert decorate(lambda: False)() is False
++            assert len(caplog.records) == 1
++    assert len(calls) == 3
++
++
++def test_reuse_mixed_sync_async(caplog):
++    """同一工厂装饰同步和异步函数不相互积累默认日志。@return None。"""
++    decorate = backoff.on_predicate(backoff.constant, max_tries=1, logger='development.mixed')
++    async def target():
++        """返回需要放弃的值。@return False。"""
++        return False
++    with caplog.at_level(logging.ERROR, logger='development.mixed'):
++        decorate(lambda: False)()
++        caplog.clear()
++        assert asyncio.run(decorate(target)()) is False
++        assert len(caplog.records) == 1

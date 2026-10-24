@@ -3,7 +3,7 @@
   "project_key": "xlsxwriter",
   "title": "XlsxWriter库存报表开发任务",
   "category": "Excel包生成与交付",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实工作簿工程交付：公式边界、UTC时间、工作表命名、原子文件、类型记录和分表报表；独立和累计验收。",
   "seed_digest": "c0c06f90a56b44cabee5c41f2ae37b3d52a34f7542d13936123dac2eddf5098b",
   "environment": "xlsxwriter-py312",
   "source": {
@@ -55,6 +55,259 @@
             "disclosure/XW-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "XW-UTC-DEV-SCENE",
+      "title": "为带时区报表时间提供显式UTC写入接口",
+      "goal": "为带时区报表时间提供显式UTC写入接口",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XW-UTC-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-UTC-DEV",
+          "kind": "modify",
+          "goal": "为带时区报表时间提供显式UTC写入接口",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement xlsxwriter.utc.as_utc(datetime,*,naive=\"raise\") and write_utc(worksheet,row,col,value,cell_format=None,*,naive=\"raise\"). Convert aware values by instant to naive UTC before actual write_datetime, preserving fractional seconds and input identity. Default rejects naive datetimes; explicit naive=\"utc\" accepts them. Use utcoffset semantics and DST fold correctly, keep workbook 1900/1904 date modes and native return codes/formats, never globally enable remove_timezone or silently discard offsets. Existing write_datetime behavior stays compatible.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xw_utc_dev.py and concise Chinese compatibility documentation at library/docs/development-xw-utc-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/XW-UTC-DEV-contract.md",
+            "materials/XW-UTC-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xlsxwriter/utc.py",
+            "library/development_tests/test_development_xw_utc_dev.py",
+            "library/docs/development-xw-utc-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XW-UTC-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-UTC-DEV.native.json",
+            "public_native": "verification/XW-UTC-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XW-UTC-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XW-SHEET-NAMES-DEV-SCENE",
+      "title": "为业务名称分配符合Excel约束的唯一工作表",
+      "goal": "为业务名称分配符合Excel约束的唯一工作表",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XW-SHEET-NAMES-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-SHEET-NAMES-DEV",
+          "kind": "modify",
+          "goal": "为业务名称分配符合Excel约束的唯一工作表",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement xlsxwriter.sheet_names.add_named_worksheet(workbook,desired). Sanitize Excel forbidden characters/control chars, trim whitespace and leading/trailing apostrophes, provide fallback Sheet, avoid reserved History and limit to 31 Unicode codepoints. Compare against actual workbook.worksheets names case-insensitively with casefold, allocate stable \" (2)\" suffixes while re-truncating base. Return the actual new worksheet and never rename/overwrite existing sheets. Handle long names, all-invalid names, repeated collisions and inputs differing only by case.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xw_sheet_names_dev.py and concise Chinese compatibility documentation at library/docs/development-xw-sheet-names-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/XW-SHEET-NAMES-DEV-contract.md",
+            "materials/XW-SHEET-NAMES-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xlsxwriter/sheet_names.py",
+            "library/development_tests/test_development_xw_sheet_names_dev.py",
+            "library/docs/development-xw-sheet-names-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XW-SHEET-NAMES-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-SHEET-NAMES-DEV.native.json",
+            "public_native": "verification/XW-SHEET-NAMES-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XW-SHEET-NAMES-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XW-ATOMIC-DEV-SCENE",
+      "title": "提供关闭成功后才替换目标文件的原子工作簿上下文",
+      "goal": "提供关闭成功后才替换目标文件的原子工作簿上下文",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XW-ATOMIC-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-ATOMIC-DEV",
+          "kind": "modify",
+          "goal": "提供关闭成功后才替换目标文件的原子工作簿上下文",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement xlsxwriter.atomic.atomic_workbook(destination,options=None) yielding a real Workbook writing to a same-directory temporary file. Only after body success and successful close/fsync replace the destination atomically; retain existing regular file permissions. Body/close/replace failures must preserve old destination and clean temporary files without masking original errors. Reject symlink/nonfile destinations, support new files and ordinary Workbook options without mutating caller mappings. This is a single local file operation, not a multi-file or hostile-race transaction.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xw_atomic_dev.py and concise Chinese compatibility documentation at library/docs/development-xw-atomic-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/XW-ATOMIC-DEV-contract.md",
+            "materials/XW-ATOMIC-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xlsxwriter/atomic.py",
+            "library/development_tests/test_development_xw_atomic_dev.py",
+            "library/docs/development-xw-atomic-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XW-ATOMIC-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-ATOMIC-DEV.native.json",
+            "public_native": "verification/XW-ATOMIC-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XW-ATOMIC-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XW-RECORDS-DEV-SCENE",
+      "title": "实现类型列驱动的流式记录写入与文本公式边界",
+      "goal": "实现类型列驱动的流式记录写入与文本公式边界",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XW-RECORDS-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-RECORDS-DEV",
+          "kind": "modify",
+          "goal": "实现类型列驱动的流式记录写入与文本公式边界",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement xlsxwriter.records.Column(key,header,kind=\"auto\",cell_format=None) and write_records(worksheet,start_row,columns,records,*,start_col=0,headers=True,missing=\"blank\"). Use actual typed worksheet methods, never generic write for strings, so formula-looking and URL-looking text remain literal; only kind=\"formula\" executes explicit formulas. Support strict number/boolean/text/datetime_utc/auto, None blanks, UTC feature, header aliases/formats and missing blank/raise. Prevalidate each complete row before its first cell, reject duplicate columns/oversize text/nonfinite values and bounds, detect write return failures, consume records once without whole-input buffering. Return count.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xw_records_dev.py and concise Chinese compatibility documentation at library/docs/development-xw-records-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "XW-UTC-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/XW-RECORDS-DEV-contract.md",
+            "materials/XW-RECORDS-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xlsxwriter/records.py",
+            "library/development_tests/test_development_xw_records_dev.py",
+            "library/docs/development-xw-records-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XW-RECORDS-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-RECORDS-DEV.native.json",
+            "public_native": "verification/XW-RECORDS-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XW-RECORDS-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XW-REPORT-DEV-SCENE",
+      "title": "组合类型列与原子文件实现自动分表的完整报表导出",
+      "goal": "组合类型列与原子文件实现自动分表的完整报表导出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XW-REPORT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XW-REPORT-DEV",
+          "kind": "modify",
+          "goal": "组合类型列与原子文件实现自动分表的完整报表导出",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement xlsxwriter.report.export_report(destination,columns,records,*,sheet=\"Report\",max_rows=1048576,workbook_options=None) and frozen ReportSummary(sheets,row_count). Reuse completed atomic_workbook, safe sheet naming and typed write_records. Stream records once, split at explicit per-sheet row budget including repeated headers, freeze first row, create one header-only sheet for empty input and return actual names/count only after successful replacement. Preserve UTC and literal-formula semantics in constant_memory mode. Any bad later record or source exception preserves the old target without partial report files. Validate budgets/schema before iterating.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xw_report_dev.py and concise Chinese compatibility documentation at library/docs/development-xw-report-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "XW-ATOMIC-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "XW-SHEET-NAMES-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "XW-RECORDS-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/XW-REPORT-DEV-contract.md",
+            "materials/XW-REPORT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xlsxwriter/report.py",
+            "library/development_tests/test_development_xw_report_dev.py",
+            "library/docs/development-xw-report-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XW-REPORT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XW-REPORT-DEV.native.json",
+            "public_native": "verification/XW-REPORT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XW-REPORT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

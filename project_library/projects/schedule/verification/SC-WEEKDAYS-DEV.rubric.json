@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SC-WEEKDAYS-DEV",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Job.on_weekdays(*weekdays) for every(1).day(s) jobs, accepting nonempty integer weekdays 0..6 (Monday=0), deduplicating them and returning self. Integrate selection into _schedule_next_run in its configured timezone before existing UTC correction, preserving .at clock and strict-future scheduling. Revalidate eligibility if job attributes change; reject other intervals/units/start_day and invalid weekday values. Do not alter legacy .monday/.weeks or unconstrained daily schedules.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

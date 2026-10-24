@@ -1,0 +1,14 @@
+{
+  "script": "verification/development-TY-M01-DEV.public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 2,
+    "failures": 0
+  },
+  "test_file": "app/tests/test_shop.py"
+}

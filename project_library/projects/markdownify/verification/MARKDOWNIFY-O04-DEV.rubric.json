@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWNIFY-O04-DEV",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Integrate include_selectors/exclude_selectors into actual convert_soup. None include means the whole remaining tree, an empty include sequence means no content; accept a selector string or sequence. Work on a detached copy whenever selection is requested, apply exclusions before inclusions and truly remove excluded descendants. Emit selected roots in original document order, deduplicate overlapping selectors and ancestor/descendant selections by node identity, and preserve caller-supplied BeautifulSoup unmodified. Invalid selectors must propagate rather than silently selecting all. Keep default conversion and existing strip/convert tag-format semantics intact.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

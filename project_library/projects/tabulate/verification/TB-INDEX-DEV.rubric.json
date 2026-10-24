@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TB-INDEX-DEV",
+  "source_commit": "268615a5c27dc40e5c22454c07b44d5c50410da0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix sized custom showindex validation to count data rows after excluding SEPARATING_LINE records, matching the actual index-consumption loop. Preserve separators at their positions, use one index per real row for list/tuple/iterator inputs, reject sized index length mismatch against real rows, and keep rendering/numeric alignment and inputs unchanged. Do not change tabulate public signature or frozen tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

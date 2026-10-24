@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SORTEDCONTAINERS-02-DEV",
+  "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add SortedKeyList.refresh_at(index) with Python index protocol/negative indexes. A caller explicitly changed one payload key: remove by STORED index (never search with new key), rebuild a candidate index and reinsert at current key, then atomically commit only if all comparisons/key evaluations succeed. Return original payload identity. Other payload keys are required stable; a failed refresh preserves original stored ordering/key caches, without claiming rollback of caller object changes or key callback side effects. Maintain original key-stability default contract.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HUMANIZE-O04-DEV",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add keyword-only when=None to actual naturalday/naturaldate, retaining their default current-date behavior and existing naturaltime.when. An explicit date is a calendar reference; explicit aware datetime converts into an aware value datetime timezone, date values use reference own date, and aware/naive datetime mismatch or invalid when is rejected explicitly before fallback handling. naturaldate year-threshold and delegated naturalday must use the same reference. Preserve invalid value pass-through, custom format, locale translation and extreme dates; prove fixed historical references and cross-midnight offsets without wall-clock waiting.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

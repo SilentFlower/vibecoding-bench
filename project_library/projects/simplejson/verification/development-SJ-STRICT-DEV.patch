@@ -1,0 +1,64 @@
+--- a/library/development_tests/test_development_sj_strict_dev.py
++++ b/library/development_tests/test_development_sj_strict_dev.py
+@@ -0,0 +1,21 @@
++"""公开严格解码回归。"""
++from decimal import Decimal
++import pytest
++import simplejson
++from simplejson.strict import strict_loads
++
++def test_duplicate_nested_and_escaped_keys_are_rejected():
++    with pytest.raises(ValueError): strict_loads('{"v":{"a":1,"\\u0061":2}}')
++
++def test_nonfinite_constants_and_float_overflow_are_rejected():
++    for value in ('NaN','Infinity','-Infinity','1e999'):
++        with pytest.raises(ValueError): strict_loads(value)
++
++def test_decimal_mode_preserves_exact_value_and_normal_integers():
++    result=strict_loads('{"price":1.2300,"n":12345678901234567890}',use_decimal=True)
++    assert result['price']==Decimal('1.2300') and result['price'].as_tuple().exponent==-4
++    assert type(result['n']) is int
++
++def test_real_bytes_and_legacy_default_behavior_are_preserved():
++    assert strict_loads(b'{"x":false}')=={'x':False}
++    assert simplejson.loads('{"a":1,"a":2}')=={'a':2}
+--- a/library/docs/development-sj-strict-dev.md
++++ b/library/docs/development-sj-strict-dev.md
+@@ -0,0 +1,5 @@
++# 提供拒绝重复键与非有限数的严格JSON解码入口
++
++严格交换入口逐层拒绝重复键，转义后同名也算重复；拒绝非有限数及浮点溢出。可显式保留十进制精度，沿用真实解析器和旧接口默认行为。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/simplejson/strict.py
++++ b/library/simplejson/strict.py
+@@ -0,0 +1,29 @@
++"""用于可信交换的明确JSON解码策略。"""
++import math
++from decimal import Decimal
++from . import loads
++
++
++def _pairs(items):
++    result={}
++    for key,value in items:
++        if key in result:
++            raise ValueError('JSON对象键重复：'+key)
++        result[key]=value
++    return result
++
++
++def _finite(text):
++    value=float(text)
++    if not math.isfinite(value):
++        raise ValueError('JSON数值超出有限浮点范围')
++    return value
++
++
++def strict_loads(document,*,use_decimal=False):
++    """严格解码并拒绝任意层重复键和非有限数。@param document JSON文本或UTF8字节。
++    @param use_decimal 是否保留十进制精度。@return 实际JSON值。
++    """
++    if type(use_decimal) is not bool:
++        raise TypeError('use_decimal必须为布尔值')
++    return loads(document,object_pairs_hook=_pairs,parse_float=Decimal if use_decimal else _finite,allow_nan=False)

@@ -1,0 +1,13 @@
+{
+  "script": "verification/development-PA-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 2,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_path.py"
+}

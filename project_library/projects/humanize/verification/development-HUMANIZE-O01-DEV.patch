@@ -1,0 +1,169 @@
+--- a/library/docs/development-humanize-o01-dev.md
++++ b/library/docs/development-humanize-o01-dev.md
+@@ -0,0 +1,5 @@
++# 按真实消息目录身份隔离翻译缓存并支持受控重载
++
++对应路线08：真实GNU目录按locale和规范化来源缓存，加载成功才切换线程状态；可仅重载本源，不清空别源，保留默认英语和旧默认目录显式注入。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/humanize/i18n.py
++++ b/library/src/humanize/i18n.py
+@@ -50,51 +50,66 @@
+         return pkg / "locale"
+ 
+ 
++_CATALOGS = {}
++
++
++def _load_translation(locale, path=None, *, reload=False):
++    """取得目录身份隔离的翻译，不修改任何活动线程状态。
++
++    :param locale: 实际locale或None/英语默认。
++    :param path: 可选本地catalog根，规范为解析后的绝对身份。
++    :param reload: 是否重新读取本目录消息字节。
++    :return: (实际locale,真实gettext翻译对象)。
++    """
++    from pathlib import Path
++    if not isinstance(reload, bool):
++        raise TypeError('reload必须为bool')
++    if locale is None or (isinstance(locale, str) and locale.startswith('en')):
++        return None, _TRANSLATIONS[None]
++    if not isinstance(locale, str) or not locale:
++        raise ValueError('locale必须为非空文本或None')
++    default_path = path is None
++    if default_path:
++        path = _get_default_locale_path()
++    if path is None:
++        raise FileNotFoundError("Humanize cannot determinate the default location of the 'locale' folder. You need to pass the path explicitly.")
++    identity = str(Path(path).expanduser().resolve())
++    key = (locale, identity)
++    # 旧应用显式注入的默认目录翻译仍有效，但绝不覆盖另一个显式目录。
++    if default_path and locale in _TRANSLATIONS and not reload:
++        return locale, _TRANSLATIONS[locale]
++    if reload or key not in _CATALOGS:
++        filename = gettext_module.find('humanize', identity, [locale])
++        if filename is None:
++            raise FileNotFoundError('未找到请求的本地Humanize消息目录')
++        with open(filename, 'rb') as stream:
++            translation = gettext_module.GNUTranslations(stream)
++        _CATALOGS[key] = translation
++    return locale, _CATALOGS[key]
++
++
+ def get_translation() -> gettext_module.NullTranslations:
+-    return _TRANSLATIONS.get(getattr(_CURRENT, "locale", None), _TRANSLATIONS[None])
+-
+-
+-def activate(
+-    locale: str | None, path: str | os.PathLike[str] | None = None
+-) -> gettext_module.NullTranslations:
+-    """Activate internationalisation.
+-
+-    Set `locale` as current locale. Search for locale in directory `path`.
+-
+-    Args:
+-        locale (str | None): Language name, e.g. `en_GB`. If `None`, defaults to no
+-            translation. Similar to calling ``deactivate()``.
+-        path (str | pathlib.Path): Path to search for locales.
+-
+-    Returns:
+-        dict: Translations.
+-
+-    Raises:
+-        FileNotFoundError: If humanize cannot find the locale folder.
+-    """
+-    if locale is None or locale.startswith("en"):
+-        _CURRENT.locale = None
+-        return _TRANSLATIONS[None]
+-
+-    if path is None:
+-        path = _get_default_locale_path()
+-
+-    if path is None:
+-        msg = (
+-            "Humanize cannot determinate the default location of the 'locale' folder. "
+-            "You need to pass the path explicitly."
+-        )
+-        raise FileNotFoundError(msg)
+-    if locale not in _TRANSLATIONS:
+-        translation = gettext_module.translation("humanize", path, [locale])
+-        _TRANSLATIONS[locale] = translation
+-    _CURRENT.locale = locale
+-    return _TRANSLATIONS[locale]
++    return getattr(_CURRENT, "translation", None) or _TRANSLATIONS[None]
++
++
++def activate(locale, path=None, *, reload=False):
++    """为当前线程激活明确目录身份的真实翻译。
++
++    :param locale: 请求语言，None或英语切回默认。
++    :param path: 可选PathLike目录；相对和绝对同源共享缓存。
++    :param reload: 显式重新读取当前目录，不清空其他来源缓存。
++    :return: 实际gettext翻译对象；加载失败保持先前活动状态。
++    """
++    effective, translation = _load_translation(locale, path, reload=reload)
++    _CURRENT.locale = effective
++    _CURRENT.translation = translation
++    return translation
+ 
+ 
+ def deactivate() -> None:
+     """Deactivate internationalisation."""
+     _CURRENT.locale = None
++    _CURRENT.translation = None
+ 
+ 
+ def _gettext(message: str) -> str:
+--- a/library/tests/test_development_humanize_o01_dev.py
++++ b/library/tests/test_development_humanize_o01_dev.py
+@@ -0,0 +1,50 @@
++"""同locale不同真实目录不串缓存，重读及失败原子保持。"""
++from pathlib import Path
++import humanize
++from humanize import i18n
++import pytest
++def catalog(root,word):
++    """构造合成GNU消息目录，供实际gettext读取。@return 根路径。"""
++    import struct
++    entries={'':'Content-Type: text/plain; charset=UTF-8\nLanguage: xx\nPlural-Forms: nplurals=2; plural=(n != 1);\n','one':word,'%s and %s':'%s et %s'}
++    pairs=sorted((key.encode(),value.encode()) for key,value in entries.items());count=len(pairs)
++    ids=b'\0'.join(key for key,value in pairs)+b'\0';values=b'\0'.join(value for key,value in pairs)+b'\0'
++    head=28;id_start=head+count*16;value_start=id_start+len(ids);out=struct.pack('<7I',0x950412de,0,count,head,head+count*8,0,0)
++    offset=0
++    for key,value in pairs:out+=struct.pack('<2I',len(key),id_start+offset);offset+=len(key)+1
++    offset=0
++    for key,value in pairs:out+=struct.pack('<2I',len(value),value_start+offset);offset+=len(value)+1
++    target=root/'xx'/'LC_MESSAGES'/'humanize.mo';target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(out+ids+values)
++    return root
++
++def test_two_real_catalog_sources_and_canonical_alias(tmp_path,monkeypatch):
++    """同名locale不同来源使用实际不同GNU消息。@return None。"""
++    first=catalog(tmp_path/'one','uno');second=catalog(tmp_path/'two','dos')
++    try:
++        a=i18n.activate('xx',first);assert humanize.apnumber(1)=='uno'
++        b=i18n.activate('xx',second);assert humanize.apnumber(1)=='dos' and a is not b
++        monkeypatch.chdir(tmp_path)
++        assert i18n.activate('xx',Path('one')) is a and humanize.apnumber(1)=='uno'
++    finally:i18n.deactivate()
++
++def test_reload_only_current_source_and_failed_load_keeps_active(tmp_path):
++    """当前目录重载不清空另一目录，失败不会激活半份配置。@return None。"""
++    first=catalog(tmp_path/'one','uno');second=catalog(tmp_path/'two','dos')
++    try:
++        a=i18n.activate('xx',first);b=i18n.activate('xx',second)
++        catalog(first,'nuevo');assert i18n.activate('xx',first) is a
++        assert i18n.activate('xx',first,reload=True).gettext('one')=='nuevo'
++        with pytest.raises(FileNotFoundError):i18n.activate('xx',tmp_path/'missing')
++        assert humanize.apnumber(1)=='nuevo' and i18n.activate('xx',second) is b
++    finally:i18n.deactivate()
++
++def test_default_injected_catalog_and_english_reset(tmp_path,monkeypatch):
++    """原默认目录注入兼容，显式其他目录不继承它。@return None。"""
++    import gettext
++    with (catalog(tmp_path/'one','uno')/'xx'/'LC_MESSAGES'/'humanize.mo').open('rb') as stream:translation=gettext.GNUTranslations(stream)
++    monkeypatch.setitem(i18n._TRANSLATIONS,'xx',translation)
++    try:
++        assert i18n.activate('xx') is translation
++        i18n.activate('en_US');assert humanize.apnumber(1)=='one'
++        i18n.activate(None);assert i18n.get_translation().gettext('one')=='one'
++    finally:i18n.deactivate()

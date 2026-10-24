@@ -1,0 +1,13 @@
+{
+  "script": "verification/development-XD-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_xmltodict.py"
+}

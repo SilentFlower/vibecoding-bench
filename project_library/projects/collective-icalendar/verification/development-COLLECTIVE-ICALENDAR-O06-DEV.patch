@@ -1,0 +1,81 @@
+--- a/library/docs/development-collective-icalendar-o06-dev.md
++++ b/library/docs/development-collective-icalendar-o06-dev.md
+@@ -0,0 +1,5 @@
++# 生成带规范版本和忽略政策的日历语义摘要
++
++摘要明确版本、算法和忽略政策，在既有排序序列化之外规范子组件多重集顺序并保留重复、日期类型及未知扩展。默认全部字段参与，仅允许显式忽略导出时间戳；真实业务变更摘要不同，原对象不变且深度有界。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/icalendar/fingerprint.py
++++ b/library/src/icalendar/fingerprint.py
+@@ -0,0 +1,35 @@
++"""声明规范范围和忽略政策的版本化日历摘要。"""
++from copy import deepcopy
++from hashlib import sha256
++from json import dumps
++
++
++def calendar_fingerprint(component, *, profile='icalendar-canonical-v1', ignore_fields=(), max_depth=64):
++    """规范属性/参数及子组件顺序，同时保留未知扩展和重复关系。
++
++    :param component: 真实Calendar或Component。
++    :param profile: 当前唯一受支持的摘要规范版本。
++    :param ignore_fields: 仅允许显式忽略DTSTAMP/CREATED/LAST-MODIFIED。
++    :param max_depth: 非负规范深度预算。
++    :return: schema/profile/algorithm/ignore_fields/digest，默认不忽略业务字段。
++    """
++    ignored = sorted({name.upper() for name in ignore_fields})
++    if profile != 'icalendar-canonical-v1' or any(name not in ('DTSTAMP', 'CREATED', 'LAST-MODIFIED') for name in ignored):
++        raise ValueError('未知摘要规范或不允许忽略的字段')
++    if not isinstance(max_depth, int) or isinstance(max_depth, bool) or max_depth < 0:
++        raise ValueError('摘要深度预算必须为非负整数')
++    def canonical(node, depth):
++        """保留子组件多重集，不把对象repr当内容。@param node 组件。@param depth 深度。@return 规范树。"""
++        if depth > max_depth:
++            raise ValueError('日历超出摘要深度预算')
++        node = deepcopy(node)
++        children = [canonical(child, depth + 1) for child in node.subcomponents]
++        node.subcomponents = []
++        for name in ignored:
++            node.pop(name, None)
++        children.sort(key=lambda child: dumps(child, ensure_ascii=False, separators=(',', ':')))
++        return [node.name.upper(), node.to_ical(sorted=True).hex(), children]
++    facts = {'schema': 1, 'profile': profile, 'algorithm': 'sha256', 'ignore_fields': ignored,
++        'tree': canonical(component, 0)}
++    digest = sha256(dumps(facts, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode('utf-8')).hexdigest()
++    return {key: value for key, value in facts.items() if key != 'tree'} | {'digest': digest}
+--- a/library/tests/test_development_collective_icalendar_o06_dev.py
++++ b/library/tests/test_development_collective_icalendar_o06_dev.py
+@@ -0,0 +1,32 @@
++"""摘要忽略声明范围内排版，不忽略真实日程改变。"""
++from datetime import date, datetime, timezone
++from icalendar import Calendar, Event
++
++def test_property_and_component_order():
++    """属性和子组件重排不改变规范摘要。@return None。"""
++    from icalendar.fingerprint import calendar_fingerprint
++    one, two = Calendar(), Calendar()
++    a = Event(); a.add('UID', 'a'); a.add('SUMMARY', 'A'); a.add('DTSTART', date(2026, 1, 1))
++    b = Event(); b.add('DTSTART', date(2026, 1, 2)); b.add('UID', 'b')
++    one.add_component(a); one.add_component(b)
++    two.add_component(b.copy(recursive=True)); two.add_component(a.copy(recursive=True))
++    assert calendar_fingerprint(one) == calendar_fingerprint(two)
++
++def test_real_changes_and_explicit_ignore():
++    """真实SUMMARY变更有差异，时间戳只按白名单显式忽略。@return None。"""
++    from icalendar.fingerprint import calendar_fingerprint
++    event = Event(); event.add('UID', 'a'); event.add('SUMMARY', 'A')
++    other = event.copy(recursive=True); other['SUMMARY'] = 'B'
++    assert calendar_fingerprint(event) != calendar_fingerprint(other)
++    other = event.copy(recursive=True); other.add('DTSTAMP', datetime(2026, 1, 1, tzinfo=timezone.utc))
++    assert calendar_fingerprint(event) != calendar_fingerprint(other)
++    assert calendar_fingerprint(event, ignore_fields=['DTSTAMP']) == calendar_fingerprint(other, ignore_fields=['dtstamp'])
++
++def test_unknown_preserved_and_bad_profile():
++    """未知扩展参与摘要，业务字段不准静默忽略。@return None。"""
++    import pytest
++    from icalendar.fingerprint import calendar_fingerprint
++    event = Event(); event.add('X-PRIVATE', 'one')
++    other = Event(); other.add('X-PRIVATE', 'two')
++    assert calendar_fingerprint(event)['digest'] != calendar_fingerprint(other)['digest']
++    with pytest.raises(ValueError): calendar_fingerprint(event, ignore_fields=['SUMMARY'])

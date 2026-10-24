@@ -1,0 +1,114 @@
+--- a/library/docs/development-docutils-o02-dev.md
++++ b/library/docs/development-docutils-o02-dev.md
+@@ -0,0 +1,5 @@
++# 为RST提供真实表格节点及CSV边界的显式分段列表指令
++
++对应路线12：显式segmented-list复用真实RST行内与table节点，必需columns、竖线CSV/引号/空格及中文可发布；非法行宽/引号/标题真实诊断，不改普通冒号/旧表格语法。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/docutils/docutils/parsers/rst/directives/__init__.py
++++ b/library/docutils/docutils/parsers/rst/directives/__init__.py
+@@ -52,6 +52,7 @@
+       'table': ('tables', 'RSTTable'),
+       'csv-table': ('tables', 'CSVTable'),
+       'list-table': ('tables', 'ListTable'),
++      'segmented-list': ('segmented', 'SegmentedList'),
+       'image': ('images', 'Image'),
+       'figure': ('images', 'Figure'),
+       'contents': ('parts', 'Contents'),
+--- a/library/docutils/docutils/parsers/rst/directives/segmented.py
++++ b/library/docutils/docutils/parsers/rst/directives/segmented.py
+@@ -0,0 +1,50 @@
++"""显式RST分段列表，复用真实表格节点及行内解析，不改普通冒号文本。"""
++import csv
++from docutils import nodes
++from docutils.parsers.rst import Directive, directives
++
++
++class SegmentedList(Directive):
++    """使用竖线CSV行与必需columns标题生成有语义的真实表格。
++
++    :param arguments: 可选表格标题。
++    :return: table节点及真实行内诊断列表。
++    """
++    optional_arguments = 1
++    final_argument_whitespace = True
++    option_spec = {'columns': directives.unchanged_required,
++                   'class': directives.class_option, 'name': directives.unchanged}
++    has_content = True
++
++    def run(self):
++        """验证列数后构造tgroup/thead/tbody及真实格式化单元格。@return 节点列表。"""
++        self.assert_has_content()
++        if 'columns' not in self.options:
++            raise self.error('segmented-list必须提供columns')
++        try:
++            headings = next(csv.reader([self.options['columns']], delimiter='|', skipinitialspace=True, strict=True))
++            records = list(csv.reader(self.content, delimiter='|', skipinitialspace=True, strict=True))
++        except (csv.Error, StopIteration) as error:
++            raise self.error('分段列表CSV语法错误: ' + str(error))
++        if not headings or any(not value.strip() for value in headings):
++            raise self.error('分段列表列标题不能为空')
++        records = [record for record in records if record]
++        if any(len(record) != len(headings) for record in records):
++            raise self.error('分段列表每行列数必须与columns一致')
++        table = nodes.table(classes=self.options.get('class', []))
++        table.source, table.line = self.state_machine.get_source_and_line(self.lineno)
++        self.add_name(table)
++        messages = []
++        if self.arguments:
++            text, more = self.state.inline_text(self.arguments[0], self.lineno)
++            table += nodes.title(self.arguments[0], '', *text);messages.extend(more)
++        group = nodes.tgroup(cols=len(headings));table += group
++        for unused in headings:group += nodes.colspec(colwidth=1)
++        head = nodes.thead();body = nodes.tbody();group += head;group += body
++        for index, record in enumerate([headings] + records):
++            row = nodes.row();(head if index == 0 else body).append(row)
++            for value in record:
++                entry = nodes.entry();row += entry
++                text, more = self.state.inline_text(value.strip(), self.content_offset + index + 1)
++                entry += nodes.paragraph(value, '', *text);messages.extend(more)
++        return [table] + messages
+--- a/library/docutils/docutils/parsers/rst/languages/en.py
++++ b/library/docutils/docutils/parsers/rst/languages/en.py
+@@ -44,6 +44,7 @@
+       'table': 'table',
+       'csv-table': 'csv-table',
+       'list-table': 'list-table',
++      'segmented-list': 'segmented-list',
+       'meta': 'meta',
+       # 'imagemap': 'imagemap',
+       'image': 'image',
+--- a/library/tests/test_development_docutils_o02_dev.py
++++ b/library/tests/test_development_docutils_o02_dev.py
+@@ -0,0 +1,30 @@
++"""显式分段列表经过真实RST解析并生成可发布的表格节点。"""
++from docutils.core import publish_doctree,publish_parts
++from docutils import nodes
++import io
++
++def settings():
++    """隔离警告输出并阻止错误中止，允许检查真实system_message。@return 参数。"""
++    return {'warning_stream':io.StringIO(),'halt_level':6,'report_level':5}
++
++def test_real_table_headers_cells_inline_markup_and_title():
++    """中文、标题、格式化单元格及HTML列关系都真实存在。@return None。"""
++    source='.. segmented-list:: Product data\n   :columns: 名称 | 数量\n   :name: products\n\n   **苹果** | 2\n   Pear | 3\n'
++    document=publish_doctree(source,settings_overrides=settings());table=next(document.findall(nodes.table))
++    assert table['ids']==['products'] and next(table.findall(nodes.title)).astext()=='Product data'
++    assert [entry.astext() for entry in table.findall(nodes.entry)]==['名称','数量','苹果','2','Pear','3']
++    assert len(list(table.findall(nodes.strong)))==1
++    html=publish_parts(source,writer='html5',settings_overrides=settings())['html_body'];assert '<table' in html and '苹果' in html and '<th' in html
++
++def test_quoted_delimiter_empty_cells_and_original_plain_text_are_preserved():
++    """CSV引号允许单元内竖线，空单元保留，普通冒号语句不被重解释。@return None。"""
++    source='.. segmented-list::\n   :columns: Name | Value\n\n   "A|B"|\n\nordinary: text\n'
++    document=publish_doctree(source,settings_overrides=settings());table=next(document.findall(nodes.table))
++    assert [entry.astext() for entry in table.findall(nodes.entry)]==['Name','Value','A|B','']
++    assert 'ordinary: text' in document.astext()
++
++def test_missing_headers_bad_column_count_and_bad_quotes_are_real_diagnostics():
++    """非法数据不生成貌似合法的半表格。@return None。"""
++    for source in ['.. segmented-list::\n\n   A | B\n','.. segmented-list::\n   :columns: A | B\n\n   only-one\n','.. segmented-list::\n   :columns: A | B\n\n   "unclosed | B\n']:
++        document=publish_doctree(source,settings_overrides=settings())
++        assert list(document.findall(nodes.system_message)) and not list(document.findall(nodes.table))

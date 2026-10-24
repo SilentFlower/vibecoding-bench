@@ -1,0 +1,78 @@
+--- a/library/docs/development-markdownify-o04-dev.md
++++ b/library/docs/development-markdownify-o04-dev.md
+@@ -0,0 +1,5 @@
++# 按CSS真实提取并排除DOM且不污染调用者文档
++
++对应路线11：CSS选择复制DOM后先排除再提取，按文档顺序去重父子重叠；None全树、空列表无内容，错误选择器传播，调用者树及strip/convert旧含义不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/markdownify/__init__.py
++++ b/library/markdownify/__init__.py
+@@ -223,7 +223,36 @@
+         return self.convert_soup(soup)
+ 
+     def convert_soup(self, soup):
+-        return self.process_tag(soup, parent_tags=set())
++        """转换已解析DOM；选择模式复制树，不能删除调用方节点。
++
++        :param soup: BeautifulSoup文档。
++        :return: 按文档顺序提取并转换的Markdown。
++        """
++        include = self.options.get('include_selectors')
++        exclude = self.options.get('exclude_selectors')
++        if include is None and exclude is None:
++            return self.process_tag(soup, parent_tags=set())
++        from copy import deepcopy
++        working = deepcopy(soup)
++        def selectors(value):
++            """把一个CSS选择器或其序列统一为独立列表。@return 选择器列表。"""
++            result = [value] if isinstance(value, str) else list(value or [])
++            if not all(isinstance(item, str) for item in result):
++                raise TypeError('CSS选择器必须为字符串')
++            return result
++        for selector in selectors(exclude):
++            for node in list(working.select(selector)):
++                # 先移除父项后，先前匹配到的后代可能已无父节点。
++                if node.parent is not None:
++                    node.decompose()
++        if include is None:
++            return self.process_tag(working, parent_tags=set())
++        selected = {id(node) for selector in selectors(include) for node in working.select(selector)}
++        extracted = BeautifulSoup('', **self.options['bs4_options'])
++        for node in working.find_all(True):
++            if id(node) in selected and not any(id(parent) in selected for parent in node.parents):
++                extracted.append(deepcopy(node))
++        return self.process_tag(extracted, parent_tags=set())
+ 
+     def process_element(self, node, parent_tags=None):
+         if isinstance(node, NavigableString):
+--- a/library/tests/test_development_markdownify_o04_dev.py
++++ b/library/tests/test_development_markdownify_o04_dev.py
+@@ -0,0 +1,27 @@
++"""CSS选择是真正DOM提取，不是strip标签后仍保留内容。"""
++from markdownify import MarkdownConverter,markdownify
++from bs4 import BeautifulSoup
++import pytest
++
++def test_include_exclude_remove_content_before_conversion():
++    """只提取正文并实际删除导航内容，默认及strip语义不变。@return None。"""
++    html='<nav>outer</nav><article><h2>Title</h2><nav>hidden</nav><p>body</p></article><footer>end</footer>'
++    actual=markdownify(html,include_selectors='article',exclude_selectors='nav')
++    assert actual=='Title\n-----\n\nbody'
++    assert 'hidden' in markdownify(html,strip=['nav'])
++
++def test_overlap_dedup_document_order_and_empty_selection():
++    """按DOM顺序输出而非选择器顺序，父子重叠只出现一次。@return None。"""
++    html='<section id="a"><p>A</p><p>B</p></section><section id="c"><p>C</p></section>'
++    actual=markdownify(html,include_selectors=['#c','p','#a'])
++    assert actual=='A\n\nB\n\nC'
++    assert markdownify(html,include_selectors=[])==''
++    assert markdownify(html,include_selectors='missing')==''
++    assert markdownify(html,include_selectors='p',exclude_selectors='section')==''
++
++def test_caller_soup_stays_unchanged_and_invalid_selector_propagates():
++    """调用者DOM不可被删除，选择器错误不能悄悄变成全页转换。@return None。"""
++    soup=BeautifulSoup('<article><nav>secret</nav><p>keep</p></article>','html.parser');before=str(soup)
++    assert MarkdownConverter(exclude_selectors='nav').convert_soup(soup)=='keep'
++    assert str(soup)==before and soup.nav.text=='secret'
++    with pytest.raises(Exception):markdownify('<p>x</p>',include_selectors='[')

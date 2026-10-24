@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AN-FOLD-DEV",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add anytree.util.fold_subtree(node, reducer) and NodeResultMap. Use iterative postorder, call reducer once per node with (actual_node, tuple_of_ordered_child_results), and return a read-only mapping keyed by node identity, including unhashable or equal-but-distinct NodeMixin subclasses. Retain references, preserve child order and original nodes, follow children only (not SymlinkNode targets), propagate reducer exceptions and reject structural cycles/repeated identities. Deep trees must not depend on Python recursion limits. Do not attach result attributes or caches to nodes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

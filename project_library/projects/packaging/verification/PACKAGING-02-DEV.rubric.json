@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PACKAGING-02-DEV",
+  "source_commit": "1a62a26afe0f4881593e31bed4f7753bd1c8fe27",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add keyword-only strict=False to Marker.evaluate. Default environment overlay behavior remains byte-compatible. Opt-in strict=True starts from no host variables and uses only caller mapping plus existing context defaults (metadata extra=\"\", lock_file empty extras/dependency_groups). Missing referenced variables raise UndefinedEnvironmentName, including RHS variables. Repair supplied python_full_version dev suffix only if present, normalize supplied extra and never mutate caller mappings. Do not query host default_environment in strict mode or invent values for unrelated variables.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

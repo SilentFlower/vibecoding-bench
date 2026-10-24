@@ -1,0 +1,114 @@
+--- a/library/dataset/table.py
++++ b/library/dataset/table.py
+@@ -293,32 +293,49 @@
+         the other parameters.
+         """
+         keys = ensure_strings(keys)
+-
+-        chunk: list[MutableRow] = []
+-        columns: list[str] = []
+-        for index, row in enumerate(rows):
+-            columns.extend(
+-                col for col in row if (col not in columns) and (col not in keys)
+-            )
+-
+-            # bindparam requires names to not conflict (cannot be "id" for id)
+-            row_ = dict(row)
++        if not keys or len(set(keys)) != len(keys):
++            raise ValueError('批量更新必须指定唯一匹配键')
++        if isinstance(chunk_size, bool) or not isinstance(chunk_size, int) or chunk_size < 1:
++            raise ValueError('chunk_size必须为正整数')
++        # 完整检查Sequence的匹配键后才做任何DDL或DML，缺键不能留下已更新前缀。
++        for row in rows:
+             for key in keys:
+-                row_[f"_{key}"] = row_[key]
+-                row_.pop(key)
+-            chunk.append(row_)
+-
+-            # Update when chunk_size is fulfilled or this is the last row
+-            if len(chunk) == chunk_size or index == len(rows) - 1:
+-                cl = [self.table.c[k] == bindparam(f"_{k}") for k in keys]
+-                stmt = (
+-                    self.table.update()
+-                    .where(and_(True, *cl))
+-                    .values({col: bindparam(col, required=False) for col in columns})
+-                )
+-                self.db.executable.execute(stmt, chunk)
++                if key not in row:
++                    raise KeyError(key)
++        if not rows:
++            return
++        sample = {}
++        for row in rows:
++            for column, value in row.items():
++                if column not in sample or sample[column] is None:
++                    sample[column] = value
++        synced = self._sync_columns(sample, ensure, types=types)
++        normalized_keys = [self._get_column_name(key) for key in keys]
++        if any(key not in synced for key in normalized_keys):
++            raise ValueError('匹配键没有对应数据库列')
++        groups = {}
++        for original in rows:
++            row = self._sync_columns(original, False)
++            values = tuple(column for column in row if column not in normalized_keys)
++            if values:
++                groups.setdefault(values, []).append(row)
++        for columns, group in groups.items():
++            bound_names = {}
++            for index, key in enumerate(normalized_keys):
++                name = '__dataset_match_' + str(index)
++                while name in self.table.c or name in bound_names.values():
++                    name = '_' + name
++                bound_names[key] = name
++            clauses = [self.table.c[key] == bindparam(name) for key, name in bound_names.items()]
++            statement = self.table.update().where(and_(*clauses)).values({column: bindparam(column) for column in columns})
++            for offset in range(0, len(group), chunk_size):
++                parameters = []
++                for row in group[offset:offset + chunk_size]:
++                    item = {column: row[column] for column in columns}
++                    item.update((name, row[key]) for key, name in bound_names.items())
++                    parameters.append(item)
++                self.db.executable.execute(statement, parameters)
+                 self.db._auto_commit()
+-                chunk = []
+ 
+     def upsert(
+         self,
+--- a/library/docs/development-dataset-o01-dev.md
++++ b/library/docs/development-dataset-o01-dev.md
+@@ -0,0 +1,5 @@
++# 让批量更新真正同步新列并保护省略字段
++
++对应路线01：真实批量UPDATE先检查全部匹配键并同步schema/types，按实际字段形状分组，省略字段保持、不补NULL；空输入和ensure=False语义明确。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_dataset_o01_dev.py
++++ b/library/test/test_development_dataset_o01_dev.py
+@@ -0,0 +1,27 @@
++"""批量更新真实同步schema，缺字段不变成NULL。"""
++import dataset
++import pytest
++from sqlalchemy import Integer
++
++def test_new_column_override_type_and_partial_row_shapes():
++    """原生SQL实际创建并更新新增列，省略字段保持原值。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items'];t.insert_many([{'key':'a','keep':'old-a'},{'key':'b','keep':'old-b'}])
++    t.update_many([{'key':'a','score':3},{'key':'b','keep':'next'}],['key'],types={'score':Integer})
++    assert t.find_one(key='a')['score']==3 and t.find_one(key='a')['keep']=='old-a'
++    assert t.find_one(key='b')['keep']=='next' and isinstance(t.table.c.score.type,Integer)
++    db.close()
++
++def test_missing_keys_checked_before_any_update_or_schema():
++    """后行缺匹配键也不能先写前行或建新列。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items'];t.insert({'key':'a','x':1})
++    with pytest.raises(KeyError):t.update_many([{'key':'a','new':2},{'new':3}],['key'],chunk_size=1)
++    assert 'new' not in t.columns and t.find_one(key='a')['x']==1
++    db.close()
++
++def test_ensure_false_empty_and_bind_name_collision():
++    """禁用自动schema丢弃未知字段，空输入不建表。@return None。"""
++    db=dataset.connect('sqlite://');empty=db['empty'];empty.update_many([],['id']);assert not empty.exists
++    t=db['items'];t.insert({'key':'a','_key':1})
++    t.update_many([{'key':'a','_key':2,'unknown':9}],['key'],ensure=False)
++    assert 'unknown' not in t.columns and t.find_one(key='a')['_key']==2
++    db.close()

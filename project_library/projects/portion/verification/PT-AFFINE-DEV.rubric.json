@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PT-AFFINE-DEV",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Interval.affine(scale, offset=0) and translate(offset) for continuous intervals. Positive scales preserve bounds, negative scales swap endpoints and openness, zero maps every nonempty input to a singleton and empty remains empty. Preserve disjoint pieces, infinity direction, Decimal arithmetic and concrete continuous subclasses; reject nonfinite/NaN parameters and explicitly reject AbstractDiscreteInterval images that cannot generally be represented as continuous intervals. Do not change subtraction, replace or apply semantics.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,87 @@
+--- a/library/docs/development-wrapt-04-dev.md
++++ b/library/docs/development-wrapt-04-dev.md
+@@ -0,0 +1,5 @@
++# 本地派生结果按单调时间与容量双重失效并保持准确边界
++
++路线04：独立ttl_cache从成功计算完成时计时，TTL边界/零预算/全过期清理/容量LRU明确；注入单调时钟不sleep，拒NaN/回退，异常不缓存，计算与clear在RLock串行。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wrapt/ttl_cache.py
++++ b/library/src/wrapt/ttl_cache.py
+@@ -0,0 +1,45 @@
++"""按注入单调时钟从计算完成时计TTL的独立缓存。"""
++import math
++import time
++from collections import OrderedDict,namedtuple
++from functools import wraps
++from threading import RLock
++CacheInfo=namedtuple('CacheInfo','hits misses maxsize currsize')
++
++def ttl_cache(ttl,*,maxsize=128,clock=time.monotonic):
++    """创建同步TTL缓存。@param ttl 有限非负秒，零禁缓存。@param maxsize 容量。@param clock 单调时钟。@return 普通函数/方法装饰器；计算在可重入锁内串行。"""
++    if isinstance(ttl,bool) or not isinstance(ttl,(int,float)) or not math.isfinite(ttl) or ttl<0:raise ValueError('ttl无效')
++    if type(maxsize) is not int or maxsize<0 or not callable(clock):raise ValueError('容量/时钟无效')
++    def decorate(function):
++        cache=OrderedDict();lock=RLock();hits=misses=0;last=None
++        def now():
++            nonlocal last
++            value=clock()
++            if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or last is not None and value<last:raise ValueError('时钟必须有限且单调不回退')
++            last=value;return value
++        def purge(current):
++            for key,(expires,_) in list(cache.items()):
++                if current>=expires:del cache[key]
++        @wraps(function)
++        def invoke(*args,**kwargs):
++            nonlocal hits,misses
++            key=(args,tuple(sorted(kwargs.items())));hash(key)
++            with lock:
++                current=now();purge(current)
++                if key in cache:hits+=1;cache.move_to_end(key);return cache[key][1]
++                misses+=1;value=function(*args,**kwargs)
++                completed=now()
++                if ttl and maxsize:
++                    cache[key]=(completed+ttl,value)
++                    while len(cache)>maxsize:cache.popitem(last=False)
++                return value
++        def cache_info():
++            """查询时同步清理所有过期条目。@return CacheInfo。"""
++            with lock:purge(now());return CacheInfo(hits,misses,maxsize,len(cache))
++        def cache_clear():
++            """清所有条目和统计，仍保单调时钟界限。@return None。"""
++            nonlocal hits,misses
++            with lock:cache.clear();hits=misses=0
++        invoke.cache_info=cache_info;invoke.cache_clear=cache_clear
++        return invoke
++    return decorate
+--- a/library/tests/test_development_wrapt_04_dev.py
++++ b/library/tests/test_development_wrapt_04_dev.py
+@@ -0,0 +1,28 @@
++"""TTL按完成时开始，所有判断用假时钟无需真实sleep。"""
++import unittest
++from wrapt.ttl_cache import ttl_cache
++
++def test_ttl_completion_boundary_lru_and_expired_cleanup():
++    """耗时计算不吃掉可复用期，边界恰好过期。@return None。"""
++    clock=[0];calls=[]
++    @ttl_cache(5,maxsize=2,clock=lambda:clock[0])
++    def value(x):calls.append(x);clock[0]+=2;return x*3
++    assert value(1)==3 and clock[0]==2
++    clock[0]=6;assert value(1)==3 and calls==[1]
++    clock[0]=7;assert value(1)==3 and calls==[1,1]
++    value(2);value(3);assert value.cache_info().currsize==2
++    clock[0]+=6;assert value.cache_info().currsize==0
++
++def test_zero_policy_errors_and_backward_clock_are_explicit():
++    """零TTL不缓存，异常不缓存，不接受NaN/回退时钟。@return None。"""
++    calls=[]
++    @ttl_cache(0,clock=lambda:0)
++    def value(x):calls.append(x);return x
++    value(1);value(1);assert calls==[1,1] and value.cache_info().currsize==0
++    for ttl in (-1,float('nan'),True):
++        with unittest.TestCase().assertRaises(ValueError):ttl_cache(ttl)
++    clock=[5]
++    @ttl_cache(2,clock=lambda:clock[0])
++    def f():return 1
++    f();clock[0]=4
++    with unittest.TestCase().assertRaises(ValueError):f()

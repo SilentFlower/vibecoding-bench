@@ -1,0 +1,60 @@
+--- a/library/docs/development-pyparsing-03-dev.md
++++ b/library/docs/development-pyparsing-03-dev.md
+@@ -0,0 +1,5 @@
++# 本地化金额按显式地区分组规则解析为精确Decimal
++
++路线09：金额使用明确小数符/分组符/组宽/小数位上限，直接Decimal不经float，不读取宿主locale；严格分组、NBSP、符号、大精度与原有number完全分离。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyparsing/decimal_input.py
++++ b/library/pyparsing/decimal_input.py
+@@ -0,0 +1,24 @@
++"""地区数值按明确字符规则解析为精确Decimal，不读取宿主locale。"""
++import re
++from decimal import Decimal
++from .core import Regex
++
++def localized_decimal(*,decimal_separator='.',group_separator=None,group_size=3,max_fraction=None):
++    """构建数值语法。@param decimal_separator 小数点。@param group_separator 可选分组符。@param group_size 组宽。@param max_fraction 可选最大小数位。@return 真实ParserElement，结果为Decimal。"""
++    if not isinstance(decimal_separator,str) or len(decimal_separator)!=1 or decimal_separator.isdigit() or decimal_separator in '+-':raise ValueError('小数符无效')
++    if group_separator is not None and (not isinstance(group_separator,str) or len(group_separator)!=1 or group_separator==decimal_separator or group_separator.isdigit() or group_separator in '+-'):raise ValueError('分组符无效')
++    if type(group_size) is not int or group_size<1:raise ValueError('分组宽度无效')
++    if max_fraction is not None and (type(max_fraction) is not int or max_fraction<0):raise ValueError('小数位数无效')
++    integer=r'[0-9]+'
++    if group_separator is not None:
++        grouped=r'[0-9]{1,'+str(group_size)+'}(?:'+re.escape(group_separator)+r'[0-9]{'+str(group_size)+'})+'
++        integer='(?:'+grouped+'|'+integer+')'
++    fractional=r'[0-9]+' if max_fraction is None else r'[0-9]{1,'+str(max_fraction)+'}'
++    suffix='' if max_fraction==0 else '(?:'+re.escape(decimal_separator)+fractional+')?'
++    pattern='[+-]?'+integer+suffix
++    def convert(tokens):
++        """只转换已匹配文本。@return 精确Decimal。"""
++        text=tokens[0]
++        if group_separator is not None:text=text.replace(group_separator,'')
++        return Decimal(text.replace(decimal_separator,'.'))
++    return Regex(pattern).set_parse_action(convert)
+--- a/library/tests/test_development_pyparsing_03_dev.py
++++ b/library/tests/test_development_pyparsing_03_dev.py
+@@ -0,0 +1,22 @@
++"""显式地区分组和高精度数值，不经过float。"""
++from decimal import Decimal
++import unittest
++import pyparsing as pp
++from pyparsing.decimal_input import localized_decimal
++
++def test_german_french_negative_and_exact_precision():
++    """精度与尾零保持，法国空格必须是明确的NBSP。@return None。"""
++    de=localized_decimal(decimal_separator=',',group_separator='.')
++    assert de.parse_string('-1.234,500',parse_all=True)[0]==Decimal('-1234.500')
++    fr=localized_decimal(decimal_separator=',',group_separator='\u00a0')
++    value=fr.parse_string('12\u00a0345,67',parse_all=True)[0]
++    assert value==Decimal('12345.67') and isinstance(value,Decimal)
++    assert de.parse_string('123456789012345678901234,12',parse_all=True)[0]==Decimal('123456789012345678901234.12')
++
++def test_invalid_grouping_fraction_budget_and_configuration_reject():
++    """错误分组不能静默去掉分隔符，科学记法不冒认支持。@return None。"""
++    parser=localized_decimal(decimal_separator=',',group_separator='.',max_fraction=2)
++    for value in ('12.34,5','1.23.456','1,234','1e3'):
++        with unittest.TestCase().assertRaises(pp.ParseException):parser.parse_string(value,parse_all=True)
++    for kwargs in ({'decimal_separator':'.','group_separator':'.'},{'group_size':0},{'max_fraction':True}):
++        with unittest.TestCase().assertRaises(ValueError):localized_decimal(**kwargs)

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BX-JSONL-DEV",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add BoxList.iter_jsonl_records(records, **json_kwargs), iter_jsonl(**json_kwargs) and write_jsonl(destination, *, encoding=\"utf-8\", **json_kwargs). Encode one record at a time with standard JSON semantics and one trailing newline, preserve Unicode/options and nested Box values, and never materialize the complete input before yielding. Reject multiline indentation, report a safe one-based record number for encoding failures, support empty input and early generator close. Write to paths or caller-owned text streams without closing caller streams; preserve existing JSON/JSONL import behavior and state that write failures may leave a written prefix.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

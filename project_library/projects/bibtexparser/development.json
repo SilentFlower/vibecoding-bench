@@ -1,0 +1,300 @@
+{
+  "schema": 3,
+  "project_key": "bibtexparser",
+  "title": "BibTeXParser文献整理工作场景",
+  "category": "导入、作者与派生文献归属",
+  "description": "固定真实源码上的完整工程交付：显式继承书目交叉引用并记录来源；按版本化规则校验真实书目字段；仅对明确数字页码范围执行可追溯规范化；双向处理保护括号与转义的书目关键词；本地规范书目标识符并保留无效原值证据；比较书目内容语义并区分字段和外围块变化。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "f9de251eb3b2f2fbf1aabf5d953df25526fa7f2d7c8aa52d0f1a20d5f3be976c",
+  "environment": "bibtexparser-py312",
+  "source": {
+    "repository": "https://github.com/sciunto-org/python-bibtexparser",
+    "commit": "af329ca482b29691caff69cb2f8e6099670a105f",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "BIBTEXPARSER-O01-DEV-SCENE",
+      "title": "显式继承书目交叉引用并记录来源",
+      "goal": "显式继承书目交叉引用并记录来源",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIBTEXPARSER-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIBTEXPARSER-O01-DEV",
+          "kind": "modify",
+          "goal": "显式继承书目交叉引用并记录来源",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bibtexparser.crossref.ResolveCrossrefMiddleware(missing=\"error\") as a non-mutating LibraryMiddleware. Resolve nested case-sensitive crossref dependencies, inherit only missing fields, map parent title to booktitle for inproceedings/incollection and preserve explicit child values including empty strings. Record inherited field sources in parser metadata, reject cycles and failed/duplicate blocks, and allow explicit missing=\"ignore\". Keep the default parse stack unchanged and preserve source object isolation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-bibtexparser-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIBTEXPARSER-O01-DEV-contract.md",
+            "materials/BIBTEXPARSER-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bibtexparser/crossref.py",
+            "library/tests/test_development_bibtexparser_o01_dev.py",
+            "library/docs/development-bibtexparser-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIBTEXPARSER-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIBTEXPARSER-O01-DEV.native.json",
+            "public_native": "verification/BIBTEXPARSER-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIBTEXPARSER-O01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIBTEXPARSER-O02-DEV-SCENE",
+      "title": "按版本化规则校验真实书目字段",
+      "goal": "按版本化规则校验真实书目字段",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIBTEXPARSER-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIBTEXPARSER-O02-DEV",
+          "kind": "modify",
+          "goal": "按版本化规则校验真实书目字段",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bibtexparser.validation.validate_entries(library, *, rules=None, version=\"bibtex-v1\"). Supply explicit article/book rules, required fields and alternative author/editor groups; treat empty/None as absent and allow custom required/one_of/allowed rules. Return ordered structured diagnostics with key, field, stable code and real available source line. Unknown types/fields must be reported without deleting data. Preserve original Library and permissive parser behavior; reject unsupported rule versions.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-bibtexparser-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIBTEXPARSER-O02-DEV-contract.md",
+            "materials/BIBTEXPARSER-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bibtexparser/validation.py",
+            "library/tests/test_development_bibtexparser_o02_dev.py",
+            "library/docs/development-bibtexparser-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIBTEXPARSER-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIBTEXPARSER-O02-DEV.native.json",
+            "public_native": "verification/BIBTEXPARSER-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIBTEXPARSER-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIBTEXPARSER-O03-DEV-SCENE",
+      "title": "仅对明确数字页码范围执行可追溯规范化",
+      "goal": "仅对明确数字页码范围执行可追溯规范化",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIBTEXPARSER-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIBTEXPARSER-O03-DEV",
+          "kind": "modify",
+          "goal": "仅对明确数字页码范围执行可追溯规范化",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bibtexparser.pages.NormalizePages as an opt-in non-mutating BlockMiddleware. Normalize complete ascending numeric page ranges separated by commas from hyphen/en-dash/em-dash to BibTeX double hyphens, preserving digit text and first original_pages metadata. Leave electronic/single/Roman/decimal/descending or mixed unknown formats wholly unchanged. Modify only pages, preserve other fields and default stacks, and remain idempotent.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-bibtexparser-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIBTEXPARSER-O03-DEV-contract.md",
+            "materials/BIBTEXPARSER-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bibtexparser/pages.py",
+            "library/tests/test_development_bibtexparser_o03_dev.py",
+            "library/docs/development-bibtexparser-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIBTEXPARSER-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIBTEXPARSER-O03-DEV.native.json",
+            "public_native": "verification/BIBTEXPARSER-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIBTEXPARSER-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIBTEXPARSER-O04-DEV-SCENE",
+      "title": "双向处理保护括号与转义的书目关键词",
+      "goal": "双向处理保护括号与转义的书目关键词",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIBTEXPARSER-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIBTEXPARSER-O04-DEV",
+          "kind": "modify",
+          "goal": "双向处理保护括号与转义的书目关键词",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bibtexparser.keywords.SplitKeywords and MergeKeywords as opt-in non-mutating BlockMiddleware classes. Split only top-level single-character delimiters, preserving nested braces and backslash-escaped delimiters, with explicit keep_empty behavior. Reject unbalanced braces, preserve keyword order/duplicates and support custom delimiters. Merge actual string lists back to reversible strings, protecting unbraced delimiter-containing items. Do not reuse author splitting or change default parse/write stacks.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-bibtexparser-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIBTEXPARSER-O04-DEV-contract.md",
+            "materials/BIBTEXPARSER-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bibtexparser/keywords.py",
+            "library/tests/test_development_bibtexparser_o04_dev.py",
+            "library/docs/development-bibtexparser-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIBTEXPARSER-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIBTEXPARSER-O04-DEV.native.json",
+            "public_native": "verification/BIBTEXPARSER-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIBTEXPARSER-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIBTEXPARSER-O05-DEV-SCENE",
+      "title": "本地规范书目标识符并保留无效原值证据",
+      "goal": "本地规范书目标识符并保留无效原值证据",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIBTEXPARSER-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIBTEXPARSER-O05-DEV",
+          "kind": "modify",
+          "goal": "本地规范书目标识符并保留无效原值证据",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bibtexparser.identifiers.NormalizeIdentifiers(fields=(\"doi\", \"isbn\"), strict=False) as an opt-in non-mutating BlockMiddleware. Canonicalize DOI URL/doi prefixes and case without stripping potentially valid punctuation, normalize ISBN10/13 whitespace/hyphens and verify check digits including X. Preserve original values/status in metadata; invalid values remain unchanged unless strict requests failure. Only selected fields change, no external lookup or guessed repairs, and normal parsing/writing remains compatible.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-bibtexparser-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIBTEXPARSER-O05-DEV-contract.md",
+            "materials/BIBTEXPARSER-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bibtexparser/identifiers.py",
+            "library/tests/test_development_bibtexparser_o05_dev.py",
+            "library/docs/development-bibtexparser-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIBTEXPARSER-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIBTEXPARSER-O05-DEV.native.json",
+            "public_native": "verification/BIBTEXPARSER-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIBTEXPARSER-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BIBTEXPARSER-O06-DEV-SCENE",
+      "title": "比较书目内容语义并区分字段和外围块变化",
+      "goal": "比较书目内容语义并区分字段和外围块变化",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BIBTEXPARSER-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BIBTEXPARSER-O06-DEV",
+          "kind": "modify",
+          "goal": "比较书目内容语义并区分字段和外围块变化",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement bibtexparser.diff.diff_libraries(before, after, *, ignore_fields=()). Compare real entries by exact citation key, case-normalized entry/field names and actual values independent of formatting/field order. Return stable ordered added/removed/changed records, distinguish missing fields from None, support explicit ignored fields, and separately report string-macro/comment/failed-block changes preserving multiplicity. Reports must own copied mutable values and never mutate or merge input Libraries; avoid repr-based unstable facts.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-bibtexparser-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BIBTEXPARSER-O06-DEV-contract.md",
+            "materials/BIBTEXPARSER-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/bibtexparser/diff.py",
+            "library/tests/test_development_bibtexparser_o06_dev.py",
+            "library/docs/development-bibtexparser-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BIBTEXPARSER-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BIBTEXPARSER-O06-DEV.native.json",
+            "public_native": "verification/BIBTEXPARSER-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BIBTEXPARSER-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

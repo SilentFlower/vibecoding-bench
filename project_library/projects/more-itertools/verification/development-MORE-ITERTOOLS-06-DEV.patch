@@ -1,0 +1,69 @@
+--- a/library/docs/development-more-itertools-06-dev.md
++++ b/library/docs/development-more-itertools-06-dev.md
+@@ -0,0 +1,5 @@
++# 带长度流在严格模式按实际消费报告声明不符
++
++路线20：strict按实际消费验证声明长度，短流耗尽或首个多余项时明确失败；len保持声明、默认不校验，提前停止不冒称全量验证。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/more_itertools/more.py
++++ b/library/more_itertools/more.py
+@@ -597,12 +597,31 @@
+     a value that reflects reality.
+     """
+ 
+-    def __init__(self, iterable, length):
++    def __init__(self, iterable, length, *, strict=False):
+         self._iterator = iter(iterable)
+         self._length = length
++        self._strict = strict
++        self._seen = 0
++        self._failed = False
++        if strict:
++            import operator
++            self._length=operator.index(length)
++            if isinstance(length,bool) or self._length<0:raise ValueError("length必须为非负整数")
+ 
+     def __next__(self):
+-        return next(self._iterator)
++        if not self._strict:return next(self._iterator)
++        if self._failed:raise StopIteration
++        try:value=next(self._iterator)
++        except StopIteration:
++            if self._seen!=self._length:
++                self._failed=True
++                raise ValueError("实际长度少于声明")
++            raise
++        self._seen+=1
++        if self._seen>self._length:
++            self._failed=True
++            raise ValueError("实际长度超过声明")
++        return value
+ 
+     def __iter__(self):
+         return self
+--- a/library/tests/test_development_more_itertools_06_dev.py
++++ b/library/tests/test_development_more_itertools_06_dev.py
+@@ -0,0 +1,22 @@
++"""严格长度只在实际观察到不符时报告，不提前物化。"""
++import unittest
++from more_itertools import sized_iterator
++
++def test_exact_short_long_zero_and_stable_reported_len():
++    """len仍为声明值，不变成剩余项计数。@return None。"""
++    value=sized_iterator(iter([1,2]),2,strict=True)
++    assert next(value)==1 and len(value)==2 and list(value)==[2]
++    assert list(sized_iterator([],0,strict=True))==[]
++    for iterable,length in (([1],2),([1,2],1),([1],0)):
++        with unittest.TestCase().assertRaises(ValueError):list(sized_iterator(iterable,length,strict=True))
++
++def test_prefix_consumption_and_default_unchecked_policy():
++    """额外项被取到时才错误，默认仍不校验历史契约。@return None。"""
++    seen=[]
++    def source():
++        for value in range(5):seen.append(value);yield value
++    value=sized_iterator(source(),1,strict=True)
++    assert next(value)==0 and seen==[0]
++    with unittest.TestCase().assertRaises(ValueError):next(value)
++    assert seen==[0,1]
++    assert list(sized_iterator([1,2],1))==[1,2]

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWN-IT-O02-DEV",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix actual MarkdownIt.enable/disable to fully materialize a nonstring Iterable once before dispatching names across all parser rule chains and missed-name detection. List/tuple/generator/one-shot iterators must produce identical active sets and rendering; unknown generator names still raise unless ignoreInvalid. If iteration itself raises after yielding a name, no rule chain may already be mutated. Preserve string, duplicate-name, empty input and existing rule-manager semantics; do not add pretend rules or special-case table alone.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

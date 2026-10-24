@@ -1,0 +1,87 @@
+--- a/library/cssselect/compiled.py
++++ b/library/cssselect/compiled.py
+@@ -0,0 +1,44 @@
++"""不可变的选择器编译结果，不绑定文档或强制引入lxml。"""
++from dataclasses import dataclass
++from cssselect.parser import parse
++from cssselect.xpath import GenericTranslator, HTMLTranslator
++
++
++@dataclass(frozen=True)
++class CompiledSelector:
++    """保存一次完整选择器组的编译事实。
++
++    :param canonical: 按原分支顺序的规范CSS。
++    :param specificity: 各分支specificity，不能将组错误相加。
++    :param xpath: 可由调用方在任意树求值的XPath字符串。
++    :param mode: xml或html。
++    :param xhtml: HTML大小写政策。
++    :param prefix: 实际作用域前缀。
++    :return: 不持有可变语法树的冻结对象。
++    """
++    canonical: tuple[str, ...]
++    specificity: tuple[tuple[int, int, int], ...]
++    xpath: str
++    mode: str
++    xhtml: bool
++    prefix: str
++
++
++def compile_selector(css, *, mode='xml', xhtml=False, prefix='descendant-or-self::'):
++    """一次解析并保存每个真实分支的翻译事实。
++
++    :param css: 一个完整CSS选择器组，不手工按逗号拆分。
++    :param mode: xml或html。
++    :param xhtml: 仅html模式接受True。
++    :param prefix: 交给原生translator的前缀。
++    :return: CompiledSelector；原生语法或不支持错误照常传播。
++    """
++    if mode not in ('xml', 'html') or (mode == 'xml' and xhtml):
++        raise ValueError('无效文档模式')
++    if not isinstance(css, str) or not isinstance(prefix, str):
++        raise TypeError('选择器与前缀必须为文本')
++    translator = HTMLTranslator(xhtml=xhtml) if mode == 'html' else GenericTranslator()
++    selectors = parse(css)
++    paths = tuple(translator.selector_to_xpath(selector, prefix, translate_pseudo_elements=True) for selector in selectors)
++    return CompiledSelector(tuple(selector.canonical() for selector in selectors),
++        tuple(selector.specificity() for selector in selectors), ' | '.join(paths), mode, bool(xhtml), prefix)
+--- a/library/docs/development-cssselect-o01-dev.md
++++ b/library/docs/development-cssselect-o01-dev.md
+@@ -0,0 +1,5 @@
++# 一次编译并复用不可变选择器组事实
++
++对应路线12：在真实parse/translator基础上一次编译，冻结各分支canonical、specificity、XPath及模式前缀，不绑定文档、不引入运行期lxml依赖。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cssselect_o01_dev.py
++++ b/library/tests/test_development_cssselect_o01_dev.py
+@@ -0,0 +1,29 @@
++"""编译后可在不同真实树求值，不暴露可变解析树。"""
++from lxml import etree
++import cssselect
++import pytest
++
++def test_group_specificity_and_two_trees():
++    """分支specificity保持各自值，XPath不绑定树。@return None。"""
++    from cssselect.compiled import compile_selector
++    result=compile_selector('p.item, #chosen')
++    assert result.specificity==((0,1,1),(1,0,0)) and result.canonical==('p.item','#chosen')
++    for text in ['<root><p class="item"/></root>','<root><x id="chosen"/></root>']:
++        assert len(etree.fromstring(text).xpath(result.xpath))==1
++    assert result.xpath==cssselect.GenericTranslator().css_to_xpath('p.item, #chosen')
++
++def test_modes_and_prefix_do_not_mix():
++    """HTML大小写模式和作用域都是结果事实。@return None。"""
++    from cssselect.compiled import compile_selector
++    html=compile_selector('DIV',mode='html',prefix='self::')
++    xml=compile_selector('DIV',prefix='self::')
++    assert html.xpath=='self::div' and xml.xpath=='self::DIV' and html.mode=='html'
++    assert compile_selector('DIV',mode='html',xhtml=True).xpath.endswith('DIV')
++
++def test_immutable_and_native_errors():
++    """结果不可改写，伪元素和语法继续拒绝。@return None。"""
++    from dataclasses import FrozenInstanceError
++    from cssselect.compiled import compile_selector
++    with pytest.raises(FrozenInstanceError):compile_selector('p').xpath='changed'
++    with pytest.raises(cssselect.ExpressionError):compile_selector('p::before')
++    with pytest.raises(cssselect.SelectorSyntaxError):compile_selector('[')

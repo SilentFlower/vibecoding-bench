@@ -1,0 +1,72 @@
+--- a/library/backoff/_wait_gen.py
++++ b/library/backoff/_wait_gen.py
+@@ -2,6 +2,7 @@
+ 
+ import itertools
+ import math
++from decimal import Decimal, localcontext
+ from typing import Any, Callable, Generator, Iterable, Optional, Union
+ 
+ 
+@@ -24,7 +25,17 @@
+     yield  # type: ignore[misc]
+     n = 0
+     while True:
+-        a = factor * base ** n
++        try:
++            a = 0 if factor == 0 else factor * base ** n
++        except OverflowError:
++            # 只有有穷正递增且有穷封顶的输入才启用高范围后备；普通序列原运算不变。
++            if not (max_value is not None and base > 1 and factor > 0 and max_value > 0
++                    and all(math.isfinite(v) for v in (base, factor, max_value))):
++                raise
++            with localcontext() as context:
++                context.prec = 80
++                value = Decimal.from_float(float(factor)) * Decimal.from_float(float(base)) ** n
++                a = max_value if value >= Decimal.from_float(float(max_value)) else float(value)
+         if max_value is None or a < max_value:
+             yield a
+             n += 1
+--- a/library/docs/development-bf-expo-dev.md
++++ b/library/docs/development-bf-expo-dev.md
+@@ -0,0 +1,5 @@
++# 使有上限指数退避避免中间幂溢出
++
++有穷正递增且设置有穷正上限时，中间幂溢出不能中断退避；乘积尚未到上限时仍返回真实有限结果。普通路径保持原浮点运算和准确序列，保留初始预热、稳定封顶、零因子及衰减底数语义；无上限溢出不掩盖。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bf_expo_dev.py
++++ b/library/tests/test_development_bf_expo_dev.py
+@@ -0,0 +1,32 @@
++"""有上限指数序列不可因中间幂溢出提前失败。"""
++from itertools import islice
++import pytest
++import backoff
++
++
++def test_overflow_caps():
++    """数学值超过上限时稳定输出封顶。@return None。"""
++    values = backoff.expo(base=1e308, factor=1e-308, max_value=5)
++    next(values)
++    assert list(islice(values, 5)) == [1e-308, 0.9999999999999999, 5, 5, 5]
++
++
++def test_intermediate_overflow_below_cap():
++    """中间幂溢出不等于最终乘积已经到上限。@return None。"""
++    values = backoff.expo(base=1e200, factor=1e-300, max_value=1e300)
++    next(values)
++    assert next(values) == 1e-300
++    assert next(values) == 1e-100
++    assert next(values) == pytest.approx(1e100)
++    assert next(values) == pytest.approx(1e300)
++    assert next(values) == 1e300
++
++
++def test_normal_zero_and_decay():
++    """普通序列及零因子和衰减底数保持明确数学意义。@return None。"""
++    values = backoff.expo(base=1e308, factor=0, max_value=5)
++    next(values)
++    assert list(islice(values, 5)) == [0] * 5
++    values = backoff.expo(base=0.5, max_value=2)
++    next(values)
++    assert list(islice(values, 3)) == [1, 0.5, 0.25]

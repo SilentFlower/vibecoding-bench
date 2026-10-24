@@ -1,0 +1,65 @@
+--- a/library/development_tests/test_development_ft_audit_dev.py
++++ b/library/development_tests/test_development_ft_audit_dev.py
+@@ -0,0 +1,24 @@
++"""公开真实文本修复审计回归。"""
++import hashlib
++from dataclasses import FrozenInstanceError
++import pytest
++from ftfy import TextFixerConfig,apply_plan
++from ftfy.audit import repair
++
++def test_actual_plan_replays_result_and_original_is_hashed():
++    source='cafÃ© ﬁ';result=repair(source)
++    assert result.text=='café fi' and result.changed and apply_plan(source,list(result.explanation))==result.text
++    assert result.source_sha256==hashlib.sha256(source.encode()).hexdigest() and result.input_length==len(source)
++
++def test_disabled_explanation_preserves_explicit_policy():
++    result=repair('中文 cafÃ©',TextFixerConfig(explain=False,decode_inconsistent_utf8=False))
++    assert result.text=='中文 cafÃ©' and not result.changed and result.explanation is None
++
++def test_unchanged_text_keeps_empty_plan_and_frozen_result():
++    result=repair('plain')
++    assert not result.changed and result.explanation==()
++    with pytest.raises(FrozenInstanceError): result.changed=True
++
++def test_disabled_ligature_policy_is_kept_with_explanation():
++    result=repair('ﬁ',TextFixerConfig(fix_latin_ligatures=False))
++    assert result.text=='ﬁ' and not result.changed
+--- a/library/docs/development-ft-audit-dev.md
++++ b/library/docs/development-ft-audit-dev.md
+@@ -0,0 +1,5 @@
++# 为真实文本修复提供不可变摘要与可重放解释结果
++
++审计结果必须来自真实修复及可重放解释，关闭解释不能改变修复政策。原文用摘要标识，保留长度、是否变化与实际输出；无变化不等同于没有解释。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/ftfy/audit.py
++++ b/library/ftfy/audit.py
+@@ -0,0 +1,27 @@
++"""记录实际修复结果和可重放解释，不保存原始明文。"""
++import hashlib
++from dataclasses import dataclass
++from . import fix_and_explain,apply_plan
++
++
++@dataclass(frozen=True)
++class RepairResult:
++    """一次真实修复的摘要与可重放计划。"""
++    source_sha256: str
++    input_length: int
++    text: str
++    changed: bool
++    explanation: object
++
++
++def repair(text,config=None):
++    """修复并产出审计结果。@param text 原Unicode文本。@param config 原修复配置。
++    @return 不可变RepairResult；关闭解释时保持政策且explanation为None。
++    """
++    if not isinstance(text,str):
++        raise TypeError('需要Unicode文本')
++    fixed=fix_and_explain(text,config=config)
++    steps=tuple(fixed.explanation) if fixed.explanation is not None else None
++    if steps is not None and apply_plan(text,list(steps))!=fixed.text:
++        raise ValueError('实际解释不能重放修复结果')
++    return RepairResult(hashlib.sha256(text.encode('utf-8',errors='surrogatepass')).hexdigest(),len(text),fixed.text,fixed.text!=text,steps)

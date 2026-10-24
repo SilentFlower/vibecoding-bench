@@ -1,0 +1,80 @@
+--- a/library/development_tests/test_development_tk_merge_dev.py
++++ b/library/development_tests/test_development_tk_merge_dev.py
+@@ -0,0 +1,30 @@
++"""公开配置层合并回归。"""
++import pytest
++import tomlkit
++from tomlkit.merging import merge_documents
++
++def test_recursive_merge_preserves_base_comments_and_inputs():
++    base=tomlkit.parse('# header\n[a]\nx=1 # keep\ny=2\n')
++    result=merge_documents(base,{'a':{'y':3,'z':4}})
++    assert result.unwrap()=={'a':{'x':1,'y':3,'z':4}} and '# keep' in result.as_string()
++    assert base['a']['y']==2
++
++def test_array_policies_are_explicit():
++    base=tomlkit.parse('a=[1,2]\n')
++    assert merge_documents(base,{'a':[2,3]},arrays='replace')['a']==[2,3]
++    assert merge_documents(base,{'a':[2,3]},arrays='append')['a']==[1,2,2,3]
++    assert merge_documents(base,{'a':[2,3]},arrays='unique')['a']==[1,2,3]
++
++def test_conflict_error_leaves_original_byte_identical():
++    base=tomlkit.parse('a=1\n');before=base.as_string()
++    with pytest.raises(ValueError):
++        merge_documents(base,{'a':2},conflicts='error')
++    assert base.as_string()==before
++
++def test_incoming_nodes_are_not_shared_and_invalid_policy_fails():
++    overlay={'a':[{'x':1}]}
++    result=merge_documents(tomlkit.document(),overlay)
++    result['a'][0]['x']=2
++    assert overlay=={'a':[{'x':1}]}
++    with pytest.raises(ValueError):
++        merge_documents(tomlkit.document(),{},arrays='guess')
+--- a/library/docs/development-tk-merge-dev.md
++++ b/library/docs/development-tk-merge-dev.md
+@@ -0,0 +1,5 @@
++# 按明确数组和冲突策略递归合并配置层
++
++发布配置分层合并需要明确数组是替换、追加还是去重，标量冲突可选拒绝。所有工作在独立副本完成，保留基础文档未触及注释和布局，输入节点不共享，最终文本重新解析通过。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tomlkit/merging.py
++++ b/library/tomlkit/merging.py
+@@ -0,0 +1,36 @@
++"""按显式数组及冲突策略合并配置副本。"""
++from collections.abc import Mapping
++from copy import deepcopy
++from tomlkit.api import parse
++from tomlkit.items import Array, AoT
++
++
++def merge_documents(base, overlay, *, arrays='replace', conflicts='replace'):
++    """递归合并配置。@param base 原文档。@param overlay 覆盖映射。
++    @param arrays replace/append/unique。@param conflicts replace/error。@return 独立可解析文档。
++    """
++    if arrays not in ('replace','append','unique') or conflicts not in ('replace','error'):
++        raise ValueError('未知配置合并策略')
++    if not isinstance(overlay, Mapping):
++        raise TypeError('覆盖层必须是映射')
++    working=deepcopy(base)
++    def combine(target, source):
++        for key, value in source.items():
++            if key not in target:
++                target[key]=deepcopy(value)
++            elif isinstance(target[key],Mapping) and isinstance(value,Mapping):
++                combine(target[key],value)
++            elif isinstance(target[key],(list,Array,AoT)) and isinstance(value,(list,Array,AoT)):
++                if arrays=='replace':
++                    target[key]=deepcopy(value)
++                else:
++                    for item in value:
++                        if arrays=='append' or item not in target[key]:
++                            target[key].append(deepcopy(item))
++            elif conflicts=='error' and target[key] != value:
++                raise ValueError('配置值冲突：'+str(key))
++            else:
++                target[key]=deepcopy(value)
++    combine(working,overlay)
++    parse(working.as_string())
++    return working

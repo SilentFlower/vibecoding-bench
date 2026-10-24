@@ -1,0 +1,54 @@
+--- a/library/decouple.py
++++ b/library/decouple.py
+@@ -124,8 +124,13 @@
+     """
+     SECTION = 'settings'
+ 
+-    def __init__(self, source, encoding=DEFAULT_ENCODING):
+-        self.parser = ConfigParser()
++    def __init__(self, source, encoding=DEFAULT_ENCODING, *, section='settings', interpolation=True):
++        if not isinstance(section, text_type) or not section:
++            raise ValueError('INI节名不可为空')
++        if not isinstance(interpolation, bool):
++            raise TypeError('插值策略必须为bool')
++        self.SECTION = section
++        self.parser = ConfigParser() if interpolation else ConfigParser(interpolation=None)
+         with open(source, encoding=encoding) as file_:
+             read_config(self.parser, file_)
+ 
+--- a/library/docs/development-dc-ini-options-dev.md
++++ b/library/docs/development-dc-ini-options-dev.md
+@@ -0,0 +1,5 @@
++# 让INI节和字面百分号读取策略显式可选
++
++RepositoryIni可按实例选择节，显式关闭插值后URL中的%20等字面百分号不再被当插值。默认settings和既有ConfigParser插值保持，DEFAULT继承、键大小写、环境优先和编码不变；禁止修改共享类节名或全局替换百分号。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_dc_ini_options_dev.py
++++ b/library/tests/test_development_dc_ini_options_dev.py
+@@ -0,0 +1,25 @@
++"""INI节与百分号插值必须可以显式选择。"""
++from decouple import Config, RepositoryIni
++
++
++def test_custom_section_literal_url(tmp_path):
++    """自定义节的字面URL保留百分号。@param tmp_path 临时目录。@return None。"""
++    path = tmp_path / 'settings.ini'
++    path.write_text('[web]\nURL=https://x/a%20b\n', encoding='utf-8')
++    config = Config(RepositoryIni(str(path), section='web', interpolation=False))
++    assert config('URL') == 'https://x/a%20b'
++
++
++def test_default_interpolation(tmp_path):
++    """默认settings节及已有插值不变。@param tmp_path 临时目录。@return None。"""
++    path = tmp_path / 'settings.ini'
++    path.write_text('[settings]\nHOST=local\nURL=https://%(HOST)s/\n', encoding='utf-8')
++    assert Config(RepositoryIni(str(path)))('URL') == 'https://local/'
++
++
++def test_default_values_custom_section(tmp_path):
++    """自定义节仍继承DEFAULT且实例互不影响。@param tmp_path 临时目录。@return None。"""
++    path = tmp_path / 'settings.ini'
++    path.write_text('[DEFAULT]\nPORT=7\n[web]\nNAME=one\n[settings]\nNAME=two\n', encoding='utf-8')
++    assert RepositoryIni(str(path), section='web')['PORT'] == '7'
++    assert RepositoryIni(str(path))['NAME'] == 'two'

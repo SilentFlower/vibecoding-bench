@@ -1,0 +1,42 @@
+--- a/library/docs/development-python-dateutil-04-dev.md
++++ b/library/docs/development-python-dateutil-04-dev.md
+@@ -0,0 +1,5 @@
++# ISO周日期拒绝不存在的第53周且保留有效跨年
++
++路线05：计算结果必须返回输入ISO年/周，不存在的第53周拒绝；有效53周与跨公历年边界继续合法，基本/扩展和默认weekday保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/dateutil/parser/isoparser.py
++++ b/library/src/dateutil/parser/isoparser.py
+@@ -325,7 +325,11 @@
+ 
+         # Now add the specific number of weeks and days to get what we want
+         week_offset = (week - 1) * 7 + (day - 1)
+-        return week_1 + timedelta(days=week_offset)
++        result = week_1 + timedelta(days=week_offset)
++        # 第53周只在该ISO年实际拥有它时合法，不能滚入下一ISO年。
++        if result.isocalendar()[:2] != (year, week):
++            raise ValueError('Invalid week: {}'.format(week))
++        return result
+ 
+     def _parse_isotime(self, timestr):
+         len_str = len(timestr)
+--- a/library/tests/test_development_python_dateutil_04_dev.py
++++ b/library/tests/test_development_python_dateutil_04_dev.py
+@@ -0,0 +1,16 @@
++"""ISO第53周按ISO年真实存在性校验。"""
++from datetime import datetime
++import unittest
++from dateutil.parser import isoparse
++
++def test_nonexistent_week53_is_rejected_in_basic_extended_and_default_day():
++    """2021没有第53周，不能被转换为2022的日期。@return None。"""
++    for source in ('2021-W53-1','2021W531','2021-W53','2021W53'):
++        with unittest.TestCase().assertRaises(ValueError):isoparse(source)
++
++def test_valid_week53_and_gregorian_year_boundary_remain_valid():
++    """不能简单禁止所有53周或跨公历年日期。@return None。"""
++    assert isoparse('2020-W53-7')==datetime(2021,1,3)
++    assert isoparse('2015-W53-1')==datetime(2015,12,28)
++    assert isoparse('2020-W01-1')==datetime(2019,12,30)
++    assert isoparse('2024-W01')==datetime(2024,1,1)

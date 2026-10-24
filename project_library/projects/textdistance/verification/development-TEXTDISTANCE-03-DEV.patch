@@ -1,0 +1,87 @@
+--- a/library/docs/development-textdistance-03-dev.md
++++ b/library/docs/development-textdistance-03-dev.md
+@@ -0,0 +1,5 @@
++# 词序无关比较使用真实评分方向与可预检排列预算
++
++路线03：实际可调用的词排列助手，明确距离取小/相似度取大及是否截短，预算在评分前预检，重复词只生成唯一排列。预算不足拒绝而非伪造最优；支持多文本、空文档与普通评分callable，不假设equality属性。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_textdistance_03_dev.py
++++ b/library/tests/test_development_textdistance_03_dev.py
+@@ -0,0 +1,22 @@
++"""公开词排列助手使用真实callable与显式分数方向。"""
++import unittest
++import textdistance
++from textdistance.utils import words_combinations
++
++
++def test_builtin_distance_similarity_and_plain_callable():
++    """不访问内建算法不存在的equality属性。@return None。"""
++    assert words_combinations(textdistance.Levenshtein(external=False),'guide archive','archive guide')==0
++    assert words_combinations(textdistance.Jaccard(qval=None),'a b','b a',direction='similarity')==1
++    assert words_combinations(lambda a,b:abs(len(a)-len(b)),'one','one two')==4
++    assert words_combinations(lambda a,b:abs(len(a)-len(b)),'one','one two',truncate=True)==0
++
++
++def test_duplicate_words_empty_and_budget_preflight():
++    """重复词不重复计预算，预算不足不返回伪最优值。@return None。"""
++    calls=[]
++    assert words_combinations(lambda *items:calls.append(items) or 0,'a a','a',max_permutations=1)==0
++    assert len(calls)==1
++    assert words_combinations(textdistance.Levenshtein(external=False),'','')==0
++    with unittest.TestCase().assertRaises(ValueError):words_combinations(lambda *items:0,'a b c',max_permutations=5)
++    with unittest.TestCase().assertRaises(ValueError):words_combinations(lambda *items:0)
+--- a/library/textdistance/utils.py
++++ b/library/textdistance/utils.py
+@@ -8,20 +8,37 @@
+ __all__ = ['words_combinations', 'find_ngrams']
+ 
+ 
+-def words_combinations(f, *texts) -> float:
+-    m = float('Inf')
+-    # split by words
+-    texts = [t.split() for t in texts]
+-    # permutations
+-    texts = [permutations(words) for words in texts]
+-    # combinations
+-    for subtexts in product(*texts):
+-        if f.equality:
+-            words_min_cnt = len(min(subtexts, key=len))
+-            subtexts = [t[:words_min_cnt] for t in subtexts]
+-        subtexts = [' '.join(t) for t in subtexts]
+-        m = min(m, f(*subtexts))
+-    return m
++def words_combinations(f, *texts, direction='distance', max_permutations=10000, truncate=False) -> float:
++    """在明确方向及工作预算内比较单词排列。@param f 真实评分callable。@param texts 文本。@param direction distance/similarity。@param max_permutations 调用预算。@param truncate 是否截到最短词数。@return 最优真实分数。"""
++    import math
++    if direction not in ('distance','similarity'):raise ValueError('未知分数方向')
++    if type(max_permutations) is not int or max_permutations<1:raise ValueError('预算必须为正整数')
++    if type(truncate) is not bool:raise ValueError('truncate必须为bool')
++    if not texts:raise ValueError('至少需要一份文本')
++    # 先去除重复词排列再做笛卡尔积；每份文本的独立生成也由同一预算约束。
++    options=[]
++    for text in texts:
++        words=text.split()
++        if math.factorial(len(words))>max_permutations and len(set(words))==len(words):raise ValueError('排列预算不足')
++        unique=set()
++        def visit(prefix, remaining):
++            """按词频生成唯一排列，避免重复词阶乘放大。@param prefix 前缀。@param remaining 剩余词。@return None。"""
++            if len(unique)>max_permutations:raise ValueError('排列预算不足')
++            if not remaining:unique.add(tuple(prefix));return
++            for word in sorted(set(remaining)):
++                tail=list(remaining);tail.remove(word)
++                visit(prefix+[word],tail)
++        visit([],words);options.append(sorted(unique))
++    total=math.prod(map(len,options))
++    if total>max_permutations:raise ValueError('排列预算不足')
++    best=None
++    for combination in product(*options):
++        count=min(map(len,combination))
++        items=[' '.join(item[:count] if truncate else item) for item in combination]
++        value=f(*items)
++        if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value):raise ValueError('评分必须为有限数字')
++        if best is None or (value<best if direction=='distance' else value>best):best=value
++    return best
+ 
+ 
+ def find_ngrams(input_list: Sequence, n: int) -> list[tuple]:

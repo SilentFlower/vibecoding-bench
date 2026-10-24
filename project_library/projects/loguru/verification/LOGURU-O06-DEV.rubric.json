@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "LOGURU-O06-DEV",
+  "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Expose loguru.LazyValue(zero_argument_callable) and integrate event-local wrappers into actual Logger argument formatting. Mix ordinary and wrapped positional/keyword values; only actually accessed placeholders evaluate, preserving standard format specs,!s,!r,attribute/index access and color formatting. Repeated references/aliases and multiple sinks share one result per event, but later events compute anew; level/activation short-circuit stays before evaluation. Captured kwargs publish evaluated values or an explicit <unevaluated LazyValue> marker so serialize=True never forces unused computation. Keep opt(lazy=True) old all-callable semantics and propagate computation errors. Top-level argument wrappers are supported; do not silently recurse into arbitrary business containers.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

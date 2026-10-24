@@ -1,0 +1,40 @@
+--- a/library/docs/development-pypika-01-dev.md
++++ b/library/docs/development-pypika-01-dev.md
+@@ -0,0 +1,5 @@
++# 时间报表的负微秒Interval在各方言中保留真实符号
++
++路线01：修复仅负微秒Interval的符号，构造器绝对值存储与is_negative一致；模板与重复调用稳定，正数、零、混合单位、周和季度不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pypika/terms.py
++++ b/library/pypika/terms.py
+@@ -1708,7 +1708,8 @@
+         dialect = self.dialect or kwargs.get("dialect")
+ 
+         if self.largest == "MICROSECOND":
+-            expr = getattr(self, "microseconds")
++            # 构造器以绝对值保存单位，独立微秒也必须使用已记录的符号。
++            expr = -self.microseconds if self.is_negative else self.microseconds
+             unit = "MICROSECOND"
+ 
+         elif hasattr(self, "quarters"):
+--- a/library/tests/test_development_pypika_01_dev.py
++++ b/library/tests/test_development_pypika_01_dev.py
+@@ -0,0 +1,17 @@
++"""负微秒跨模板保持符号，重复序列化不修改对象。"""
++from pypika import Interval
++from pypika.enums import Dialects
++
++def test_signed_microseconds_across_dialects_and_repeat():
++    """五类模板均生成负表达式。@return None。"""
++    for dialect in (Dialects.POSTGRESQL,Dialects.REDSHIFT,Dialects.VERTICA,Dialects.ORACLE,Dialects.MYSQL):
++        value=Interval(microseconds=-7);sql=value.get_sql(dialect=dialect)
++        assert '-7' in sql and sql==value.get_sql(dialect=dialect)
++        assert value.microseconds==7 and value.is_negative
++
++def test_positive_zero_and_large_values_keep_existing_policy():
++    """纯微秒大整数精确，正数和零不添加负号。@return None。"""
++    assert '-1' not in Interval(microseconds=1).get_sql()
++    assert '0' in Interval(microseconds=0).get_sql()
++    assert '-1000000000000000000000' in Interval(microseconds=-(10**21)).get_sql()
++    assert Interval(seconds=-1,microseconds=2).get_sql()==Interval(seconds=-1,microseconds=2).get_sql()

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWNIFY-O06-DEV",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add actual MarkdownConverter.convert_with_options(html, **overrides), leaving convert(html) and subclass convert_* signatures intact. Reuse subclass behavior without rerunning a potentially required-argument constructor; isolate nested dict/list/tuple/set configuration containers from both base and caller overrides while preserving opaque callbacks by identity. Normalize bs4_options as the constructor does, enforce strip/convert exclusion, and build fresh conversion-function cache bound to this isolated converter. Previously cached base methods, sequential calls, simultaneous calls and callback/errors must not mutate base options/cache or caller option containers. Demonstrate actual differing converted documents, not just returned option dictionaries.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

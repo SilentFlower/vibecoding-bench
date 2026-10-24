@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CONFIGARGPARSE-O04-DEV",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add ArgumentParser.discover_config_files() for declared default_config_files only. Return ordered fresh records matching existing glob expansion and duplicate source order: path records contain kind,index,path,exists; unmatched declarations produce exists=false; provider records contain only kind=\"provider\",index,executed=false. Support PathLike and expanduser with path-before-callable precedence. Do not open files, invoke providers, inspect their repr, run argument actions or mutate last parse/source state. Discovery is a filesystem snapshot, not a promise of later readability; real parsing behavior stays unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

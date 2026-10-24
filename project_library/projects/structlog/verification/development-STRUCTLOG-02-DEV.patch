@@ -1,0 +1,75 @@
+--- a/library/docs/development-structlog-02-dev.md
++++ b/library/docs/development-structlog-02-dev.md
+@@ -0,0 +1,5 @@
++# 嵌套事件字节值可显式递归解码且不污染调用方容器
++
++路线02：递归模式仅复制内建dict/list/tuple并解码bytes值，键和不透明对象不动；活动路径环/深度受控、共享DAG合法，默认顶层原地行为不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/structlog/processors.py
++++ b/library/src/structlog/processors.py
+@@ -303,19 +303,39 @@
+     _errors: str
+ 
+     def __init__(
+-        self, encoding: str = "utf-8", errors: str = "replace"
++        self, encoding: str = "utf-8", errors: str = "replace", *, recursive=False, max_depth=32
+     ) -> None:
+         self._encoding = encoding
+         self._errors = errors
++        if type(max_depth) is not int or max_depth<0:raise ValueError("max_depth必须为非负整数")
++        self.recursive=recursive
++        self.max_depth=max_depth
+ 
+     def __call__(
+         self, logger: WrappedLogger, name: str, event_dict: EventDict
+     ) -> EventDict:
++        if self.recursive:
++            return self._decode(event_dict,0,set(),())
+         for key, value in event_dict.items():
+             if isinstance(value, bytes):
+                 event_dict[key] = value.decode(self._encoding, self._errors)
+ 
+         return event_dict
++
++
++    def _decode(self,value,depth,active,path):
++        """复制内建容器并按路径检测环/深度，不触发任意对象getter。"""
++        if isinstance(value,bytes):return value.decode(self._encoding,self._errors)
++        if type(value) not in (dict,list,tuple):return value
++        if depth>self.max_depth:raise ValueError("超过解码深度: "+repr(path))
++        if id(value) in active:raise ValueError("循环解码路径: "+repr(path))
++        active.add(id(value))
++        try:
++            if type(value) is dict:
++                return {key:self._decode(item,depth+1,active,path+(key,)) for key,item in value.items()}
++            result=[self._decode(item,depth+1,active,path+(index,)) for index,item in enumerate(value)]
++            return tuple(result) if type(value) is tuple else result
++        finally:active.remove(id(value))
+ 
+ 
+ class JSONRenderer:
+--- a/library/tests/test_development_structlog_02_dev.py
++++ b/library/tests/test_development_structlog_02_dev.py
+@@ -0,0 +1,21 @@
++"""递归模式解码数据值但不改键或共享输入。"""
++import unittest
++from structlog.processors import UnicodeDecoder
++
++def test_recursive_builtin_containers_preserve_type_keys_and_input():
++    """Unicode值真实转换，tuple/list区分且原树保持。@return None。"""
++    nested={'name':'中文'.encode(),'items':[b'a',(b'b',)]};source={b'key':nested,'opaque':object()}
++    result=UnicodeDecoder(recursive=True)(None,'info',source)
++    assert result[b'key']=={'name':'中文','items':['a',('b',)]}
++    assert source[b'key'] is nested and isinstance(nested['name'],bytes)
++    assert result['opaque'] is source['opaque'] and type(result[b'key']['items'][1]) is tuple
++
++def test_errors_cycle_shared_dag_depth_and_default_shallow():
++    """共享子树不是循环，默认仍只解码顶层。@return None。"""
++    child=[b'x'];source={'a':child,'b':child}
++    assert UnicodeDecoder(recursive=True)(None,'info',source)=={'a':['x'],'b':['x']}
++    cycle=[];cycle.append(cycle)
++    with unittest.TestCase().assertRaisesRegex(ValueError,'循环'):UnicodeDecoder(recursive=True)(None,'info',{'x':cycle})
++    with unittest.TestCase().assertRaises(ValueError):UnicodeDecoder(recursive=True,max_depth=0)(None,'info',{'x':[]})
++    with unittest.TestCase().assertRaises(UnicodeDecodeError):UnicodeDecoder(errors='strict',recursive=True)(None,'info',{'x':[b'\xff']})
++    values={'x':[b'a'],'y':b'b'};assert UnicodeDecoder()(None,'info',values) is values and values=={'x':[b'a'],'y':'b'}

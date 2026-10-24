@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WTFORMS-05-DEV",
+  "source_commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add wtforms.derive.derive_form(base,name,fields,remove=(),replace=False) returning a new Form class through its actual metaclass. Preserve inherited Meta/inline validators and deterministic base-field order, append new mapping-order fields, keep overridden fields in their original slot and support explicit inherited-field removal. Reject reserved/private/invalid names, non-UnboundField values, unknown removals, simultaneous remove/readd and accidental override without replace=True. Do not mutate parent class, caches, field creation counters or existing instances; independent derived forms bind independent Field objects. This is a supported dynamic-class construction feature, not a claim existing WTForms cannot use type()/BaseForm at all.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

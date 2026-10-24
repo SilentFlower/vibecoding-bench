@@ -1,0 +1,78 @@
+--- a/library/development_tests/test_development_at_optional_dev.py
++++ b/library/development_tests/test_development_at_optional_dev.py
+@@ -0,0 +1,42 @@
++"""公开字符串注解可选转换回归。"""
++import typing
++import attrs
++
++def test_string_parameter_and_return_annotations_are_supported():
++    def convert(value: 'str') -> 'int':
++        return int(value)
++    wrapped = attrs.converters.optional(convert)
++    assert wrapped('17') == 17 and wrapped(None) is None
++
++def test_unknown_forward_references_are_not_resolved_during_wrapping():
++    def convert(value):
++        return value
++    convert.__annotations__ = {'value':'UnknownBusinessType', 'return':'UnknownBusinessType'}
++    wrapped = attrs.converters.optional(convert)
++    assert wrapped(3) == 3 and wrapped(None) is None
++
++def test_original_annotations_are_not_changed():
++    def convert(value: 'str') -> 'int':
++        return int(value)
++    before = dict(convert.__annotations__)
++    attrs.converters.optional(convert)
++    assert convert.__annotations__ == before
++
++def test_real_type_annotations_keep_optional_semantics():
++    def convert(value: str) -> int:
++        return int(value)
++    wrapped = attrs.converters.optional(convert)
++    assert wrapped.__annotations__['val'] == typing.Optional[str]
++    assert wrapped.__annotations__['return'] == typing.Optional[int]
++
++def test_builtin_and_unannotated_converters_still_work():
++    assert attrs.converters.optional(int)('4') == 4
++    assert attrs.converters.optional(lambda value: value + 1)(2) == 3
++
++def test_optional_converter_can_be_used_in_a_real_model():
++    def convert(value: 'str') -> 'int':
++        return int(value)
++    @attrs.define
++    class Order:
++        quantity = attrs.field(converter=attrs.converters.optional(convert))
++    assert Order('8').quantity == 8 and Order(None).quantity is None
+--- a/library/docs/development-at-optional-dev.md
++++ b/library/docs/development-at-optional-dev.md
+@@ -0,0 +1,5 @@
++# 让可选转换器兼容未求值的字符串注解
++
++数据模型启用延迟注解后，可选转换器不能在实际转换前就因字符串注解崩溃。修复optional的参数及返回注解包装，未知前向类型不求值，不修改原函数注解，保留Converter实例／字段参数、内置转换和None旁路。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/attr/converters.py
++++ b/library/src/attr/converters.py
+@@ -3,6 +3,8 @@
+ """
+ Commonly useful converters.
+ """
++
++from typing import Optional
+ 
+ from ._compat import _AnnotationExtractor
+ from ._make import NOTHING, Converter, Factory, pipe
+@@ -49,11 +51,11 @@
+ 
+     t = xtr.get_first_param_type()
+     if t:
+-        optional_converter.__annotations__["val"] = t | None
++        optional_converter.__annotations__["val"] = Optional[t] if isinstance(t, str) else t | None
+ 
+     rt = xtr.get_return_type()
+     if rt:
+-        optional_converter.__annotations__["return"] = rt | None
++        optional_converter.__annotations__["return"] = Optional[rt] if isinstance(rt, str) else rt | None
+ 
+     if isinstance(converter, Converter):
+         return Converter(optional_converter, takes_self=True, takes_field=True)

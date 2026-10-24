@@ -1,0 +1,81 @@
+--- a/library/docs/development-configobj-o05-dev.md
++++ b/library/docs/development-configobj-o05-dev.md
+@@ -0,0 +1,5 @@
++# 提供不泄露原值且形状固定的真实校验报告
++
++对应路线19：用真实validate/flatten_errors构建固定JSON报告，正确判定失败字典，记录嵌套路径、转换和默认值但不泄露值；默认只验证克隆。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/configobj/__init__.py
++++ b/library/src/configobj/__init__.py
+@@ -2342,6 +2342,41 @@
+         return out
+ 
+ 
++    def validate_report(self, validator, *, apply=False):
++        """生成固定形状、可JSON编码且不含配置值的验证报告。
++
++        :param validator: 实际Validator实例。
++        :param apply: False时验证独立克隆；True时沿用原验证转换语义。
++        :return: valid、issues、changed_paths、defaulted_paths和applied。
++        """
++        from copy import deepcopy
++        def raw_leaves(section, path=()):
++            values = {}
++            for key, value in dict.items(section):
++                current = path + (key,)
++                if isinstance(value, Section):
++                    values.update(raw_leaves(value, current))
++                else:
++                    values[current] = deepcopy(value)
++            return values
++        before = raw_leaves(self)
++        target = self if apply else deepcopy(self)
++        result = target.validate(validator, preserve_errors=True)
++        issues = [{'path': levels + ([] if key is None else [key]),
++                   'kind': 'missing_or_invalid' if error is False else type(error).__name__}
++                  for levels, key, error in flatten_errors(target, result)]
++        after = raw_leaves(target)
++        changed = [list(path) for path in sorted(set(before) | set(after))
++                   if path not in before or path not in after or type(before[path]) is not type(after[path]) or before[path] != after[path]]
++        defaults = []
++        def collect(section, path=()):
++            defaults.extend(list(path + (key,)) for key in section.defaults)
++            for key in section.sections:
++                collect(dict.__getitem__(section, key), path + (key,))
++        collect(target)
++        return {'valid': result is True, 'issues': issues, 'changed_paths': changed,
++                'defaulted_paths': sorted(defaults), 'applied': bool(apply)}
++
+     def reset(self):
+         """Clear ConfigObj instance and restore to 'freshly created' state."""
+         self.clear()
+--- a/library/tests/test_development_configobj_o05_dev.py
++++ b/library/tests/test_development_configobj_o05_dev.py
+@@ -0,0 +1,26 @@
++"""固定验证报告不被失败字典真值误导，也不输出秘密值。"""
++import json
++from configobj import ConfigObj
++from configobj.validate import Validator
++
++def test_valid_report_and_default_paths_no_mutation():
++    """真实转换和默认路径可以预览，原配置不变。@return None。"""
++    cfg=ConfigObj(['port=42'],configspec=['port=integer','name=string(default=demo)'])
++    report=cfg.validate_report(Validator())
++    assert report['valid'] is True and report['issues']==[] and report['applied'] is False
++    assert report['changed_paths']==[['name'],['port']] and report['defaulted_paths']==[['name']]
++    assert cfg['port']=='42' and 'name' not in cfg
++
++def test_nested_failures_safe_and_json_serializable():
++    """完整节路径和错误类别保留，消息不带原值。@return None。"""
++    cfg=ConfigObj(['[server]','port=secret-value'],configspec=['[server]','port=integer','host=string'])
++    report=cfg.validate_report(Validator())
++    assert report['valid'] is False and len(report['issues'])==2
++    assert ['server','port'] in [row['path'] for row in report['issues']]
++    assert 'secret-value' not in json.dumps(report) and 'integer' not in json.dumps(report)
++
++def test_explicit_apply_preserves_old_validate_api():
++    """只有显式apply执行原生类型转换。@return None。"""
++    cfg=ConfigObj(['x=2'],configspec=['x=integer'])
++    assert cfg.validate_report(Validator(),apply=True)['applied'] is True and cfg['x']==2
++    assert cfg.validate(Validator()) is True

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWN-IT-O03-DEV",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add immutable HighlightResult(html: str, block: bool=False) and integrate it into actual RendererHTML.fence. A nonempty explicit block result is returned as its complete trusted container with exactly one existing/added terminal newline, even when it starts with div/section rather than pre. Explicit inline HTML is wrapped by the real pre/code renderer including language attrs, without legacy pre-prefix inference. Empty explicit results fall back to escaped source. Preserve old string callbacks/pre heuristic and callback arguments, reject invalid result field/types and propagate callback failures. This is trusted highlighter output, not an HTML sanitizer.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

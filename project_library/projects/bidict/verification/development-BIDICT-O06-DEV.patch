@@ -1,0 +1,91 @@
+--- a/library/bidict/readonly.py
++++ b/library/bidict/readonly.py
+@@ -0,0 +1,46 @@
++"""保持实时正反关联的只读双向映射代理。"""
++from bidict import BidirectionalMapping, frozenbidict
++
++
++class ReadOnlyBidictProxy(BidirectionalMapping):
++    """共享实时关系但不公开写入入口，不声称深冻结或线程隔离。
++
++    :param mapping: 需要共享的真实双向映射。
++    """
++    __slots__ = ('__mapping', '__inverse')
++
++    def __init__(self, mapping):
++        """创建相互关联的两侧只读代理。@param mapping 源映射。@return None。"""
++        if not isinstance(mapping, BidirectionalMapping):
++            raise TypeError('源对象必须为双向映射')
++        self.__mapping = mapping
++        inverse = object.__new__(type(self))
++        inverse.__mapping = mapping.inverse
++        inverse.__inverse = self
++        self.__inverse = inverse
++
++    def __getitem__(self, key):
++        """读取实时关系。@param key 键。@return 值。"""
++        return self.__mapping[key]
++
++    def __iter__(self):
++        """保持源遍历顺序。@return 键迭代器。"""
++        return iter(self.__mapping)
++
++    def __len__(self):
++        """返回实时关系数。@return 数量。"""
++        return len(self.__mapping)
++
++    @property
++    def inverse(self):
++        """返回成对只读逆向代理。@return 逆向代理。"""
++        return self.__inverse
++
++    @property
++    def inv(self):
++        """保留常见inverse别名。@return 逆向代理。"""
++        return self.__inverse
++
++    def copy(self):
++        """取得当前关系的独立不可变快照。@return frozenbidict。"""
++        return frozenbidict(self.items())
+--- a/library/docs/development-bidict-o06-dev.md
++++ b/library/docs/development-bidict-o06-dev.md
+@@ -0,0 +1,5 @@
++# 共享保持实时关联的成对只读双向视图
++
++成对只读代理实时反映源映射，两个方向均不授予写入入口，inverse.inverse保持同一对象。保留顺序和活跃视图，copy取得独立冻结快照；与既有frozenbidict快照区别明确，不声称深冻结或线程隔离。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bidict_o06_dev.py
++++ b/library/tests/test_development_bidict_o06_dev.py
+@@ -0,0 +1,31 @@
++"""只读代理与既有冻结快照不同，必须保持实时双向关联。"""
++from bidict import bidict, OrderedBidict
++
++def test_live_pair_identity():
++    """源更新后两个方向均可读且inverse身份稳定。@return None。"""
++    from bidict.readonly import ReadOnlyBidictProxy
++    source = bidict(a=1)
++    proxy = ReadOnlyBidictProxy(source)
++    source['b'] = 2
++    assert proxy['b'] == 2 and proxy.inverse[2] == 'b'
++    assert proxy.inverse.inverse is proxy and proxy.inv is proxy.inverse
++
++def test_write_rejected_both_sides():
++    """代理和逆向代理都不允许赋值删除。@return None。"""
++    import pytest
++    from bidict.readonly import ReadOnlyBidictProxy
++    proxy = ReadOnlyBidictProxy(bidict(a=1))
++    with pytest.raises(TypeError): proxy['a'] = 2
++    with pytest.raises(TypeError): proxy.inverse[1] = 'b'
++    with pytest.raises(TypeError): del proxy['a']
++
++def test_views_clear_and_snapshot():
++    """普通视图不泄漏写入，独立快照不随源clear。@return None。"""
++    from bidict.readonly import ReadOnlyBidictProxy
++    source = OrderedBidict([('b', 2), ('a', 1)])
++    proxy = ReadOnlyBidictProxy(source)
++    keys = proxy.keys()
++    snapshot = proxy.copy()
++    assert list(proxy) == ['b', 'a']
++    source.clear()
++    assert len(keys) == 0 and len(proxy.inverse) == 0 and snapshot == {'b': 2, 'a': 1}

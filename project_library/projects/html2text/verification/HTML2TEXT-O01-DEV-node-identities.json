@@ -1,0 +1,1870 @@
+{
+  "schema": 1,
+  "source_test": "test/test_html2text.py",
+  "source_test_sha256": "5a286ac06e33b25fbdc3fb37ccfc539c4715107f8cc2406ef2246a27ab0f0d12",
+  "original_runner_sha256": "54eb7162fa4f217dc815ab4193d37bdd12f191d897326deab031b65f2713e60c",
+  "original_contract_sha256": "217db082fd43f364791b382a386b57ca5330f1028cb2cca0fcd13f28189a2999",
+  "generator_functions": [
+    "generate_command_testdata",
+    "generate_function_testdata",
+    "generate_module_testdata",
+    "generate_testdata"
+  ],
+  "families": {
+    "test/test_html2text.py::test_module": "module_args",
+    "test/test_html2text.py::test_command": "cmdline_args",
+    "test/test_html2text.py::test_function": "func_args"
+  },
+  "nodes": [
+    {
+      "function": "test_command",
+      "fixture": "GoogleDocMassDownload.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocMassDownload.html-cmdline_args16]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--googledoc"
+      ],
+      "html_sha256": "2a0728383a381860d4ca288eb4fe02b28392d91aa36ab575b050967172f11bf8",
+      "markdown_sha256": "ed7c52b8e7428c8a3160618d9357dd40e5d8d4be8fa2880228d4ff1a8d37093f"
+    },
+    {
+      "function": "test_command",
+      "fixture": "GoogleDocSaved.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocSaved.html-cmdline_args69]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--googledoc"
+      ],
+      "html_sha256": "40bb31c952aff8ab176e9a46b6ba29a99190c444b3a2ddb83598844b0a76aa6f",
+      "markdown_sha256": "ed7c52b8e7428c8a3160618d9357dd40e5d8d4be8fa2880228d4ff1a8d37093f"
+    },
+    {
+      "function": "test_command",
+      "fixture": "GoogleDocSaved_two.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocSaved_two.html-cmdline_args1]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--googledoc"
+      ],
+      "html_sha256": "af5518f739598bcadc5f8153c1c19eabdadee237de3c50ec698d9a35ffd69097",
+      "markdown_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "function": "test_command",
+      "fixture": "abbr_tag.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/abbr_tag.html-cmdline_args10]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "e14a07e0e511789b8a9147755ecdeaa20a67a4fb43af2a7930a911d073abbda4",
+      "markdown_sha256": "def824490cf1b2b01b2ba531e0745747b2f10b52e1bdab8153e9c18c1da2f3da"
+    },
+    {
+      "function": "test_command",
+      "fixture": "anchors.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/anchors.html-cmdline_args43]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "b3a7d235f4bec6ef08f5bec6c933d3a2b38a149a3a2d866bf63da2aac971fa1b",
+      "markdown_sha256": "41366407718b5fe7c393d201659c9da35dcecfd69f9d7c5e0980aec906aa2688"
+    },
+    {
+      "function": "test_command",
+      "fixture": "apos_element.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/apos_element.html-cmdline_args14]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "a907c5eb06acdd342d13179549b927fa6dfa7f0d965b1c5b9e39c8eb2c50900c",
+      "markdown_sha256": "e6ab253c5f96017ea6e588db511c23d610248ae7a411d2532bacb2200cba5729"
+    },
+    {
+      "function": "test_command",
+      "fixture": "backquote_code_style.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/backquote_code_style.html-cmdline_args70]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--backquote-code-style"
+      ],
+      "html_sha256": "45b7cb7d050189400a230a188dd09dfef73d62ac157b9cbeb754cbd6b668a620",
+      "markdown_sha256": "f88635f2c95cac4252cf51e30328f44055e7e1894ccdd7e2bf9920506eb7e054"
+    },
+    {
+      "function": "test_command",
+      "fixture": "blockquote_example.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/blockquote_example.html-cmdline_args9]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "95bae1e32f9955955f4f496224af824197f0749a2c32433ddfde0b164f56f726",
+      "markdown_sha256": "0065c09e0b3bf1d177ce805658bc6eb4aeeb6e4672aa3d3213ee7dd04f6a68ff"
+    },
+    {
+      "function": "test_command",
+      "fixture": "bodywidth_newline.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/bodywidth_newline.html-cmdline_args64]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--body-width=0"
+      ],
+      "html_sha256": "337b975fd2a6e90b8bd3332eb384e9dc610d507020521cc8c265fb266c48b4a2",
+      "markdown_sha256": "1c79560bdf62d66158c43b713f35bf58d099df4bf21e48b662394741e925dc65"
+    },
+    {
+      "function": "test_command",
+      "fixture": "bold_inside_link.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/bold_inside_link.html-cmdline_args49]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "97c1519ac50e28035a72a8dacf8e0d222b58fa1a46b8119c1157d7ef9d286c00",
+      "markdown_sha256": "f3a050329a074f7aede3a0d4ca0de83c5f8005925cef5c69a0cf845911beea1f"
+    },
+    {
+      "function": "test_command",
+      "fixture": "bold_long_line.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/bold_long_line.html-cmdline_args2]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "e603b1a0f2afe44df8156f9f6887748bc839f20f7a4c69ce55d0963a2a8eed8f",
+      "markdown_sha256": "1e434174cbc4c80641782fc89f08edf26defa7436d62f4cf0dd3028ee1bdebfc"
+    },
+    {
+      "function": "test_command",
+      "fixture": "break_preserved_in_blockquote.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/break_preserved_in_blockquote.html-cmdline_args22]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "c9533b1622631d4c851e56ad6a6740e91ddf5daeb255df7039609c7d8faddf3e",
+      "markdown_sha256": "1c9141943d95d751caf32cfb45120ca371bfd51fe20db8b313ed391177314e4a"
+    },
+    {
+      "function": "test_command",
+      "fixture": "css_import_no_semicolon.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/css_import_no_semicolon.html-cmdline_args61]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "f5344feb3896d8b1db0db6f6e1bb0ab0b061e91875cff2581472eefe8857ed09",
+      "markdown_sha256": "851e3f5a00d9e2d2bad8270ded4c630ba91bd6420f365a61dc34ac5be391e3c7"
+    },
+    {
+      "function": "test_command",
+      "fixture": "decript_tage.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/decript_tage.html-cmdline_args51]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "5da82f2a930a82acb3d1c92eedcc847e444dfde983cfd1b4a83419ef59284633",
+      "markdown_sha256": "bee6a5a95661f631451e2cadf8d915e5a90e6c2cea7ce45c8b711d9b681a45a5"
+    },
+    {
+      "function": "test_command",
+      "fixture": "default_image_alt.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/default_image_alt.html-cmdline_args8]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--default-image-alt=Image"
+      ],
+      "html_sha256": "d15ad7ed9e7dca99dc56ba10c55f21e6f0d7ec41bc8d62541cda149e67d94ba6",
+      "markdown_sha256": "30628d37f7b0ee2d7b8c9fc39a0ac5e3e056b80e1bdab01fc4b98402ee57ee5e"
+    },
+    {
+      "function": "test_command",
+      "fixture": "doc_with_table.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table.html-cmdline_args7]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "96e293243e3fbd39e6ac3587c00f2e940e51914c3524c60340426b4b9c375371",
+      "markdown_sha256": "cf93ea7a94eab4948f8434dcfc439f9ba47aa2b3e1b95b2792168127e714d22a"
+    },
+    {
+      "function": "test_command",
+      "fixture": "doc_with_table_bypass.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table_bypass.html-cmdline_args52]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--bypass-tables"
+      ],
+      "html_sha256": "ff8db778a5ee7d18c2427c9498469cb12e2f54611f1f5c567d007536f7f3e1bf",
+      "markdown_sha256": "e313c751c03f896556fe733f6ea5bb79b585d92171189e3e04dd653fb7f7f842"
+    },
+    {
+      "function": "test_command",
+      "fixture": "emdash-para.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/emdash-para.html-cmdline_args23]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "0a87a0836e10120a6ee235943fb06f7d8a9d6ccdf9824ccac6c818075194ca5b",
+      "markdown_sha256": "4fa73c465ac786900900e8f4f071c076e9765171cd6d7c9d0cca17223af01333"
+    },
+    {
+      "function": "test_command",
+      "fixture": "emphasis_preserved_whitespace.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_preserved_whitespace.html-cmdline_args63]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "ca0f9c7a5cc89582ac2a542974fa1562a56ed14511a8378337e493cf832ea964",
+      "markdown_sha256": "e46e4528f6037e1fb8e7de154494e2ebad13bd2b777dfd86ee8da08c90fb1bfa"
+    },
+    {
+      "function": "test_command",
+      "fixture": "emphasis_whitespace.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_whitespace.html-cmdline_args59]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "e518dcd2caee822978ab8fb49f24eae62efcd7c7131a38c62c243168f45b5f9e",
+      "markdown_sha256": "d39ca57e1e6a5fbee6e8699b48d425fdee64f4c9d7e96ed65312201aa132feb8"
+    },
+    {
+      "function": "test_command",
+      "fixture": "empty-img-src.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/empty-img-src.html-cmdline_args71]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "11790a9082c6dbaa99a9e853b6e5c9d948299a891ef2a64c44f84023fff1112d",
+      "markdown_sha256": "75a11da44c802486bc6f65640aa48a730f0f684c5c07a42ba3cd1735eb3fb070"
+    },
+    {
+      "function": "test_command",
+      "fixture": "empty-link.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/empty-link.html-cmdline_args66]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "9e8e8f5bc1b0a09fb8d19caeb32eb5fc3b3dae8fcaae8997aff02d43962ad444",
+      "markdown_sha256": "a5533be13585aa74f67179b83886973b284e5e37358f2a1c32bcc1cf592af744"
+    },
+    {
+      "function": "test_command",
+      "fixture": "empty-title-tag.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/empty-title-tag.html-cmdline_args48]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "583f886d9f2f52a5825080a27b7fe835b57f899ade103c180a160d2b12d18105",
+      "markdown_sha256": "33a58549eec307e8ad6e755c2dafb158d173a3843ed66fabc5abf08b8c432794"
+    },
+    {
+      "function": "test_command",
+      "fixture": "flip_emphasis.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/flip_emphasis.html-cmdline_args55]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "-e"
+      ],
+      "html_sha256": "ab17e0c7e916571af05769eef9e5cdd96d866603ba388cbfde46dbe0a83f52e4",
+      "markdown_sha256": "e2a55792c1cafe17b04768a00babf2bab3c5bf0cfd587f7ee3b3f853f300d725"
+    },
+    {
+      "function": "test_command",
+      "fixture": "google-like_font-properties.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/google-like_font-properties.html-cmdline_args60]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--googledoc"
+      ],
+      "html_sha256": "c4556f592605e027d3411d486472169dd976022ff2f31d00ce1a2aa1432a81d2",
+      "markdown_sha256": "a1b27920ca5f35d60f3b9f5006021dcce61ebff2e0ca3e2f9e04e88594891ace"
+    },
+    {
+      "function": "test_command",
+      "fixture": "header_tags.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/header_tags.html-cmdline_args34]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "eaf5071d8909655d14dcb3d275170f690dcb13847deb721ed66d37c7213e18dc",
+      "markdown_sha256": "eb678f774451699088670156a67cfd7d8bf082bfe94c9b6724100e1483ac937c"
+    },
+    {
+      "function": "test_command",
+      "fixture": "horizontal_rule.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/horizontal_rule.html-cmdline_args11]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "41bd3be81a4f3ae0c15caa02bc927d3b639f342d4c35ecd12378a85ceafac1a6",
+      "markdown_sha256": "f0996e6f1424e6442ac1ad4d244653ff7a75a49b8dc9690bff78589846525c8b"
+    },
+    {
+      "function": "test_command",
+      "fixture": "html-escaping.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/html-escaping.html-cmdline_args72]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "68a977e5dade39d5b68eabe8d6ae0cba915da6c52d029cafaf37ec30cee2d160",
+      "markdown_sha256": "3ee921201da94647dc37d8585b5a612e19db5b947971e9b02fcc6b1eb862dff7"
+    },
+    {
+      "function": "test_command",
+      "fixture": "html_entities_out_of_text.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/html_entities_out_of_text.html-cmdline_args68]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "a11d950011e092bf62fb4c8a2248d8ae9a7991139e9ee1f41ce4940d58ea4270",
+      "markdown_sha256": "eb9aeeb20e9cea21a29e461a77d5089e0364f9f9d4ac59870e2644d1326c0fbf"
+    },
+    {
+      "function": "test_command",
+      "fixture": "images_as_html.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/images_as_html.html-cmdline_args12]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--images-as-html"
+      ],
+      "html_sha256": "ce9b7c253cc53a6c258dbe6b0031d8481e87bdf87f8a52a11ab56817b2fa7688",
+      "markdown_sha256": "501f5c571c6453d85d793ca161a761411b225f2c113f99d14c16b165d293d463"
+    },
+    {
+      "function": "test_command",
+      "fixture": "images_to_alt.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/images_to_alt.html-cmdline_args42]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--images-to-alt"
+      ],
+      "html_sha256": "d5aa5570957643db04f4fac15a1fc375e8af3dbbc0e7d6740731980d30235214",
+      "markdown_sha256": "78f0e4282ee1dc81ebecb2b7d9a099f130fdd8b22d47f8b5091859aad95baf08"
+    },
+    {
+      "function": "test_command",
+      "fixture": "images_with_div_wrap.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_div_wrap.html-cmdline_args37]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "9dc9d3929d78a2b5e067cc717102c6336e7ea8be5659183dc2ec9df5c82ed4f6",
+      "markdown_sha256": "fbcc249122c8e4238841dd5fd94686990c9edccfd82bee466694385c7d9b1040"
+    },
+    {
+      "function": "test_command",
+      "fixture": "images_with_size.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_size.html-cmdline_args5]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--images-with-size"
+      ],
+      "html_sha256": "c94e86449f67814448299f02dab90188843f335eddb72bef1593b09802326a2b",
+      "markdown_sha256": "ad9484bf60749880ea0b004ac9e5bcb11c8981c29b28a2c0715b8e67b73faa78"
+    },
+    {
+      "function": "test_command",
+      "fixture": "img-tag-with-link.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/img-tag-with-link.html-cmdline_args35]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "58852efab0b812c5ec6d74b3bf7225165d824a8036a67d08c5e125c45a72200b",
+      "markdown_sha256": "c87767d778561ebf0bfce0e094be9f691b7411e90af7c0d425c84c928ae1b7ed"
+    },
+    {
+      "function": "test_command",
+      "fixture": "invalid_start.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_start.html-cmdline_args26]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "cdaaa662ea6251f7769d7801b3258075235295b852fadfc36aab367f1d8b3e4b",
+      "markdown_sha256": "e1cab130de0f9d583b31fa04a5d5b7174ca84731c86bca9a35284981e276b12f"
+    },
+    {
+      "function": "test_command",
+      "fixture": "invalid_unicode.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_unicode.html-cmdline_args56]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--unicode-snob"
+      ],
+      "html_sha256": "d45c7ebfa825ec75751e68dcd1041fcee503f7f67293e38c5f0ca3f77429080d",
+      "markdown_sha256": "47510d7a570e3da817906805c5b97c3b7412b3770f24de48e931ac3c6b97af62"
+    },
+    {
+      "function": "test_command",
+      "fixture": "kbd_tag.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/kbd_tag.html-cmdline_args13]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "03d3e90ea6f3036f96b95331c1bbcc1cfec8e4e2158d8cb6c72389f9578bd572",
+      "markdown_sha256": "c4e733eab9feb75035db719b181f15bd55dbb0a016d06b7c877cd59c31b460d5"
+    },
+    {
+      "function": "test_command",
+      "fixture": "link_titles.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/link_titles.html-cmdline_args32]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "b561db2a3471d30b5241acaf6b5c5b9c482dc6ac0af96ddf86297e2159fbf446",
+      "markdown_sha256": "6735fac6c9697a13bebae89bc08aee6d8580f9264f67d55bfddca83773c97aba"
+    },
+    {
+      "function": "test_command",
+      "fixture": "list_tags_example.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/list_tags_example.html-cmdline_args15]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "39daf2a89b1eb761edb6ffe9b618af64a2a5de25eeb9b01310441decec5447ac",
+      "markdown_sha256": "d50ad8dc12dfdda1c839ceeda867ef07a11f40dda6d24e1943fca9f0747e0472"
+    },
+    {
+      "function": "test_command",
+      "fixture": "long_lines.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/long_lines.html-cmdline_args3]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "205053a0c15788e52f22c5a2f968be56568b35a6eee02dc0d1ef5d3caa15611e",
+      "markdown_sha256": "ba26d275783c6fb6286596a0aabe98b18649b42bc21a3ee9a683c1bfa8a295e2"
+    },
+    {
+      "function": "test_command",
+      "fixture": "lrm_after_b.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_b.html-cmdline_args29]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "0a77a25e616c3dba69341a9a03cd3ab0af93419fe6ebe5eac7e1772d98a53006",
+      "markdown_sha256": "78350c85ae0e03da7a372cffa7b6cad86d99bc3386977d682e3e2c0757f018a6"
+    },
+    {
+      "function": "test_command",
+      "fixture": "lrm_after_i.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_i.html-cmdline_args67]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "3cd3c5aa57588c78f89ebc5d6e9cbc96299397fd55999b7c867f8f7f31b69b31",
+      "markdown_sha256": "9fd688eac1a3362db970cfe599394c8e5195f9629b93d45a28fa5acc9d34ef0a"
+    },
+    {
+      "function": "test_command",
+      "fixture": "lrm_inside_i.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_inside_i.html-cmdline_args41]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "3567a57e823ada9f8143e5442f49858532627164712632c9c45abc9062c99de6",
+      "markdown_sha256": "1594c98e9f36ed7cf574bbad276dea366f3bca4fe9a33453ed748c09d4de7ee3"
+    },
+    {
+      "function": "test_command",
+      "fixture": "mark_code.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/mark_code.html-cmdline_args17]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--mark-code"
+      ],
+      "html_sha256": "deeb530f79b71a12a33f088724daaca3d9112372a6d461da76dfaab2ea2e32a7",
+      "markdown_sha256": "01b272d75dbc2e667ed1559a64e079146791db5a6769f05228c94e6d81a5bdc3"
+    },
+    {
+      "function": "test_command",
+      "fixture": "mixed_nested_lists.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/mixed_nested_lists.html-cmdline_args53]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "8eda3761ca5385816332b3cc72834e4cff9ebe75f61715acbb82c39bf9c3a834",
+      "markdown_sha256": "ac7e1e411bc289ae46e0b4ea164cda38c729c8b3f84e38ce73d48edd5a0ca67d"
+    },
+    {
+      "function": "test_command",
+      "fixture": "nbsp.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp.html-cmdline_args46]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "14064811ac17484abc6f48c3a95bf578c3f8fdbe93dbfbb9de6a5798b938190b",
+      "markdown_sha256": "3c54a9a4f8d3998ca4918d5e9caef5b98ecb58b81eb68f658448edf9df06fa96"
+    },
+    {
+      "function": "test_command",
+      "fixture": "nbsp_unicode.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp_unicode.html-cmdline_args33]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--unicode-snob"
+      ],
+      "html_sha256": "16c632cdf9dc456f7eb5dae5e9a4ca324df3c6bbc88675718ca8121db04011ac",
+      "markdown_sha256": "f268d2951892ace82c64916b7c3b654701e28733ebd90c45164b37a0506c4c28"
+    },
+    {
+      "function": "test_command",
+      "fixture": "no_inline_links_example.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_example.html-cmdline_args27]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--reference-links"
+      ],
+      "html_sha256": "cd0b09ebe2cbec99fb8d3515933e56ca5e928e9a393204ad2206bf0edcc2bfb0",
+      "markdown_sha256": "cfb825e655d3bd7624c25bbf8b2ec0c24db25dad6546d722da99348cab6af56a"
+    },
+    {
+      "function": "test_command",
+      "fixture": "no_inline_links_images_to_alt.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_images_to_alt.html-cmdline_args40]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--reference-links"
+      ],
+      "html_sha256": "e35baec64803ab2e4f1fcc6feee8a3fb61ff38fe2029374e309820a60fb12afb",
+      "markdown_sha256": "fce9bfc2bb34f2d839a086e89310e74a8d483e7271180e7da011f05d4371c7cb"
+    },
+    {
+      "function": "test_command",
+      "fixture": "no_inline_links_nested.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_nested.html-cmdline_args58]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--reference-links"
+      ],
+      "html_sha256": "916338a90cbbf3782ec4e0d18f03a18d5ba5b09c17f58af353f15be26f235b10",
+      "markdown_sha256": "7f218de4bee6c5808cf5d3548bbcd0225d13df3a1fe40af178dab5a719968a1f"
+    },
+    {
+      "function": "test_command",
+      "fixture": "no_mailto_links.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_mailto_links.html-cmdline_args6]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--ignore-mailto-links"
+      ],
+      "html_sha256": "46507779088dea3708de6447d6f360084627e5e52ad644c3dc36941717ef807d",
+      "markdown_sha256": "0c5c18a39fba2beabba6d1ee99238fc4da2d1ca783767d12a4d52b6d952c1715"
+    },
+    {
+      "function": "test_command",
+      "fixture": "no_p_in_table.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_p_in_table.html-cmdline_args50]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "8c4b35907b39bdede2fa2e8bf3fd92abbe31d4b0e5a0ca8b719069851a5684cf",
+      "markdown_sha256": "5e663d70871b51363f08e77e3594cc4165cc2badc108a3f4ba7707e2e945e4a5"
+    },
+    {
+      "function": "test_command",
+      "fixture": "no_wrap_links.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_wrap_links.html-cmdline_args31]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--no-wrap-links"
+      ],
+      "html_sha256": "8120c205f3bb4df753d8f4be684a4426d66b59a093dce0c93cd42289fef3bfb5",
+      "markdown_sha256": "fec8681909cf061ceec3ee80ce66cd221f8fe5c6180cb440625cf19d816dafa9"
+    },
+    {
+      "function": "test_command",
+      "fixture": "no_wrap_links_no_inline_links.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/no_wrap_links_no_inline_links.html-cmdline_args20]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--no-wrap-links"
+      ],
+      "html_sha256": "9e949486bba6e2067a9c639d1ab042e9812de766f880c5ce17ebffef1c55c238",
+      "markdown_sha256": "290e8706483f688cabb597566094ae71ddf28285cb505811cdb93005863c7e1b"
+    },
+    {
+      "function": "test_command",
+      "fixture": "normal.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/normal.html-cmdline_args45]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "ab44ddc88d5c2adbfa9bb8d0da5499abba905a0c3b7273bd45ecf0a3918a227d",
+      "markdown_sha256": "656ea9caca44094dc3cbc933b9f1d36b2e8d68e4998e9391e1fadf480424ba1d"
+    },
+    {
+      "function": "test_command",
+      "fixture": "normal_escape_snob.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/normal_escape_snob.html-cmdline_args18]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--escape-all"
+      ],
+      "html_sha256": "e9e16733f2f3bb532e15153443d2b3ae78c225694b8928f7a5e1ce7cdca5083c",
+      "markdown_sha256": "e3f3ebe5cde0bbe68c917abe16a94458cef505098602d99ca86ba1c9f7e8c12d"
+    },
+    {
+      "function": "test_command",
+      "fixture": "pad_table.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table.html-cmdline_args65]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--pad-tables"
+      ],
+      "html_sha256": "a0ef1d95f82c57136a8d5cb540c97775bc4f389b87d549d07617526e886f2f25",
+      "markdown_sha256": "e110da5004aa8ed61c7b74e72e8b76dfa4b1cfb4d1ec45f1f4275cf8937c45b1"
+    },
+    {
+      "function": "test_command",
+      "fixture": "pad_table_empty.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table_empty.html-cmdline_args28]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--pad-tables"
+      ],
+      "html_sha256": "ee8edba9f1bfe3549b6f1d4ed89aba19fe467e0684126d1b19e54255128706af",
+      "markdown_sha256": "963905c9d299a8f1080722329971c5e58839e0d19480636f277dbf74039ca016"
+    },
+    {
+      "function": "test_command",
+      "fixture": "pad_table_no_closed_tr.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table_no_closed_tr.html-cmdline_args24]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--pad-tables"
+      ],
+      "html_sha256": "e3bf8ac40592131ce7c89b422d540b3379222eb2baab7496216024e8e9024485",
+      "markdown_sha256": "32575b07237ef5e7c3ea5fb1a6f65897adf375a12b09c4ddaa1ec7772aaa404b"
+    },
+    {
+      "function": "test_command",
+      "fixture": "pre.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/pre.html-cmdline_args38]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "21324f7b9421e99084bfea44ce86289582d52e7a328b2c86a4192535fa9bb048",
+      "markdown_sha256": "98fb6917e0451b4ef3d0a5e0d94eb7fd092b8657d60925a5ad179e80b4dabaf6"
+    },
+    {
+      "function": "test_command",
+      "fixture": "preformatted_in_list.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/preformatted_in_list.html-cmdline_args25]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "68b331b2fd6289e99e9e682b431fd70dadc2038fecd419032033af8ac253be4d",
+      "markdown_sha256": "44554c218a9e97f2641760f5a400bbc38243179cee87629ea675143de81bf23d"
+    },
+    {
+      "function": "test_command",
+      "fixture": "protect_links.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/protect_links.html-cmdline_args4]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--protect-links"
+      ],
+      "html_sha256": "757322e09fbf04b0fbf97b1d2929d0a016e1e39056bdf00a401a28adfd1bb5cb",
+      "markdown_sha256": "75652f91de7d0e18737638565ba6c31478d497fd2006558afe2e4329e9337290"
+    },
+    {
+      "function": "test_command",
+      "fixture": "q_tag.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/q_tag.html-cmdline_args57]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "751838757a8e685264ed8bbafd056a2a8b67be4047a4d1471e01e34390d4ea99",
+      "markdown_sha256": "99c9b54b79823f721c2d995bc09abc31d985b73cf71a171cd79c5ea3272d700c"
+    },
+    {
+      "function": "test_command",
+      "fixture": "rlm_inside_strong.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/rlm_inside_strong.html-cmdline_args47]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "9313855586d216a2a61ecbbb8fabb8492e9508c995ca0590b4dfdd476e9646e4",
+      "markdown_sha256": "958a82c4dd25b77bea9c124c9b4e3190b45d9ae3e80b4ca17c02fd896ca8670e"
+    },
+    {
+      "function": "test_command",
+      "fixture": "single_line_break.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/single_line_break.html-cmdline_args62]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--body-width=0",
+        "--single-line-break"
+      ],
+      "html_sha256": "a81113ba3d5a0a32551f3275f83004ac7fe72f074e1faca41986b1e5d9290069",
+      "markdown_sha256": "72813836dff3ac13090eb158d28c3bd3b9dabf2e0f53b6686223e3ec1d1d8fc5"
+    },
+    {
+      "function": "test_command",
+      "fixture": "stressed_with_html_entities.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/stressed_with_html_entities.html-cmdline_args44]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "e6150756183483f494bfe074e6ce8be0780515f743688baa3c242c99a6f1e642",
+      "markdown_sha256": "8b83e9822c852850e8d3b75735c2162da71104e285b352f9b8238a7a53715c71"
+    },
+    {
+      "function": "test_command",
+      "fixture": "sub_tag.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/sub_tag.html-cmdline_args0]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--include-sup-sub"
+      ],
+      "html_sha256": "aa43a888cecf8070a6adf4bd26f2eb5a79affbf4ff139e96211340401f5f59f9",
+      "markdown_sha256": "c3f82fb113af9b3d15f2d98a3fecaf6f104cbf02845dad5de25ecdab0e891ccd"
+    },
+    {
+      "function": "test_command",
+      "fixture": "sup_tag.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/sup_tag.html-cmdline_args21]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--include-sup-sub"
+      ],
+      "html_sha256": "68ec99d14a6dc0a23b5008b758f7f528e1f153810b34af7b860a4fc2d32f702b",
+      "markdown_sha256": "8c20039c10d9231c9fa0a0caf9a6922c7dd568bfd1a9e993c89cf0c930be8332"
+    },
+    {
+      "function": "test_command",
+      "fixture": "table_ignore.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/table_ignore.html-cmdline_args39]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--ignore-tables"
+      ],
+      "html_sha256": "49616b0e4cdea29fe03fed3aaeac4efb9f607e33955358f3eba78e7fd334833b",
+      "markdown_sha256": "03e3b9684c0f521880ee1867f5fa999205e2cc404389bac1ec921f945aba769d"
+    },
+    {
+      "function": "test_command",
+      "fixture": "text_after_list.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/text_after_list.html-cmdline_args30]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "565b9b7f32477536398707604398d93d07bbc0e6892f41c1d9d9766da9e95a4a",
+      "markdown_sha256": "e95582b7aa3110b5bf748f779d5234e196e20b321cfd464a6dcd3d1f9ab8e695"
+    },
+    {
+      "function": "test_command",
+      "fixture": "url-escaping.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/url-escaping.html-cmdline_args19]",
+      "argument_name": "cmdline_args",
+      "arguments": [],
+      "html_sha256": "4a72465035b1c0885db9d13ae017181c29e809cbf53c50aee351433503623172",
+      "markdown_sha256": "49454178491421ea681c8209bc08801b6e8c67fa4d6d6f998190e7c1d98ef2ef"
+    },
+    {
+      "function": "test_command",
+      "fixture": "wrap_list_items_example.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/wrap_list_items_example.html-cmdline_args36]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--wrap-list-items"
+      ],
+      "html_sha256": "6291c3e882493cfdd4a35381a93fefc087442e6102e383e0280eeeb8ed24eca5",
+      "markdown_sha256": "ca5865cd0faebe9d82ddaa5b79c4432bd0b2ffd8adfcd3501314dde7edcaeeaa"
+    },
+    {
+      "function": "test_command",
+      "fixture": "wrap_tables.html",
+      "frozen_id": "test/test_html2text.py::test_command[/tmp/bench-native-regression-58qzs8p5/project/test/wrap_tables.html-cmdline_args54]",
+      "argument_name": "cmdline_args",
+      "arguments": [
+        "--wrap-tables"
+      ],
+      "html_sha256": "43507cce60fdfea29fc09d64abfc64a5efceb5858555429be68f1e1ae2b58af0",
+      "markdown_sha256": "bb7b5a5a07be14f2ebc2b073d9b04d7cc16db0160a079cdca23bb85aeff45346"
+    },
+    {
+      "function": "test_function",
+      "fixture": "abbr_tag.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/abbr_tag.html-func_args4]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "e14a07e0e511789b8a9147755ecdeaa20a67a4fb43af2a7930a911d073abbda4",
+      "markdown_sha256": "def824490cf1b2b01b2ba531e0745747b2f10b52e1bdab8153e9c18c1da2f3da"
+    },
+    {
+      "function": "test_function",
+      "fixture": "anchors.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/anchors.html-func_args22]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "b3a7d235f4bec6ef08f5bec6c933d3a2b38a149a3a2d866bf63da2aac971fa1b",
+      "markdown_sha256": "41366407718b5fe7c393d201659c9da35dcecfd69f9d7c5e0980aec906aa2688"
+    },
+    {
+      "function": "test_function",
+      "fixture": "apos_element.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/apos_element.html-func_args7]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "a907c5eb06acdd342d13179549b927fa6dfa7f0d965b1c5b9e39c8eb2c50900c",
+      "markdown_sha256": "e6ab253c5f96017ea6e588db511c23d610248ae7a411d2532bacb2200cba5729"
+    },
+    {
+      "function": "test_function",
+      "fixture": "blockquote_example.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/blockquote_example.html-func_args3]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "95bae1e32f9955955f4f496224af824197f0749a2c32433ddfde0b164f56f726",
+      "markdown_sha256": "0065c09e0b3bf1d177ce805658bc6eb4aeeb6e4672aa3d3213ee7dd04f6a68ff"
+    },
+    {
+      "function": "test_function",
+      "fixture": "bodywidth_newline.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/bodywidth_newline.html-func_args37]",
+      "argument_name": "func_args",
+      "arguments": {
+        "bodywidth": 0
+      },
+      "html_sha256": "337b975fd2a6e90b8bd3332eb384e9dc610d507020521cc8c265fb266c48b4a2",
+      "markdown_sha256": "1c79560bdf62d66158c43b713f35bf58d099df4bf21e48b662394741e925dc65"
+    },
+    {
+      "function": "test_function",
+      "fixture": "bold_inside_link.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/bold_inside_link.html-func_args29]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "97c1519ac50e28035a72a8dacf8e0d222b58fa1a46b8119c1157d7ef9d286c00",
+      "markdown_sha256": "f3a050329a074f7aede3a0d4ca0de83c5f8005925cef5c69a0cf845911beea1f"
+    },
+    {
+      "function": "test_function",
+      "fixture": "bold_long_line.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/bold_long_line.html-func_args0]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "e603b1a0f2afe44df8156f9f6887748bc839f20f7a4c69ce55d0963a2a8eed8f",
+      "markdown_sha256": "1e434174cbc4c80641782fc89f08edf26defa7436d62f4cf0dd3028ee1bdebfc"
+    },
+    {
+      "function": "test_function",
+      "fixture": "break_preserved_in_blockquote.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/break_preserved_in_blockquote.html-func_args10]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "c9533b1622631d4c851e56ad6a6740e91ddf5daeb255df7039609c7d8faddf3e",
+      "markdown_sha256": "1c9141943d95d751caf32cfb45120ca371bfd51fe20db8b313ed391177314e4a"
+    },
+    {
+      "function": "test_function",
+      "fixture": "css_import_no_semicolon.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/css_import_no_semicolon.html-func_args35]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "f5344feb3896d8b1db0db6f6e1bb0ab0b061e91875cff2581472eefe8857ed09",
+      "markdown_sha256": "851e3f5a00d9e2d2bad8270ded4c630ba91bd6420f365a61dc34ac5be391e3c7"
+    },
+    {
+      "function": "test_function",
+      "fixture": "decript_tage.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/decript_tage.html-func_args31]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "5da82f2a930a82acb3d1c92eedcc847e444dfde983cfd1b4a83419ef59284633",
+      "markdown_sha256": "bee6a5a95661f631451e2cadf8d915e5a90e6c2cea7ce45c8b711d9b681a45a5"
+    },
+    {
+      "function": "test_function",
+      "fixture": "doc_with_table.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table.html-func_args2]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "96e293243e3fbd39e6ac3587c00f2e940e51914c3524c60340426b4b9c375371",
+      "markdown_sha256": "cf93ea7a94eab4948f8434dcfc439f9ba47aa2b3e1b95b2792168127e714d22a"
+    },
+    {
+      "function": "test_function",
+      "fixture": "emdash-para.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/emdash-para.html-func_args11]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "0a87a0836e10120a6ee235943fb06f7d8a9d6ccdf9824ccac6c818075194ca5b",
+      "markdown_sha256": "4fa73c465ac786900900e8f4f071c076e9765171cd6d7c9d0cca17223af01333"
+    },
+    {
+      "function": "test_function",
+      "fixture": "emphasis_preserved_whitespace.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_preserved_whitespace.html-func_args36]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "ca0f9c7a5cc89582ac2a542974fa1562a56ed14511a8378337e493cf832ea964",
+      "markdown_sha256": "e46e4528f6037e1fb8e7de154494e2ebad13bd2b777dfd86ee8da08c90fb1bfa"
+    },
+    {
+      "function": "test_function",
+      "fixture": "emphasis_whitespace.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_whitespace.html-func_args34]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "e518dcd2caee822978ab8fb49f24eae62efcd7c7131a38c62c243168f45b5f9e",
+      "markdown_sha256": "d39ca57e1e6a5fbee6e8699b48d425fdee64f4c9d7e96ed65312201aa132feb8"
+    },
+    {
+      "function": "test_function",
+      "fixture": "empty-img-src.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/empty-img-src.html-func_args41]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "11790a9082c6dbaa99a9e853b6e5c9d948299a891ef2a64c44f84023fff1112d",
+      "markdown_sha256": "75a11da44c802486bc6f65640aa48a730f0f684c5c07a42ba3cd1735eb3fb070"
+    },
+    {
+      "function": "test_function",
+      "fixture": "empty-link.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/empty-link.html-func_args38]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "9e8e8f5bc1b0a09fb8d19caeb32eb5fc3b3dae8fcaae8997aff02d43962ad444",
+      "markdown_sha256": "a5533be13585aa74f67179b83886973b284e5e37358f2a1c32bcc1cf592af744"
+    },
+    {
+      "function": "test_function",
+      "fixture": "empty-title-tag.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/empty-title-tag.html-func_args28]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "583f886d9f2f52a5825080a27b7fe835b57f899ade103c180a160d2b12d18105",
+      "markdown_sha256": "33a58549eec307e8ad6e755c2dafb158d173a3843ed66fabc5abf08b8c432794"
+    },
+    {
+      "function": "test_function",
+      "fixture": "header_tags.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/header_tags.html-func_args17]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "eaf5071d8909655d14dcb3d275170f690dcb13847deb721ed66d37c7213e18dc",
+      "markdown_sha256": "eb678f774451699088670156a67cfd7d8bf082bfe94c9b6724100e1483ac937c"
+    },
+    {
+      "function": "test_function",
+      "fixture": "horizontal_rule.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/horizontal_rule.html-func_args5]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "41bd3be81a4f3ae0c15caa02bc927d3b639f342d4c35ecd12378a85ceafac1a6",
+      "markdown_sha256": "f0996e6f1424e6442ac1ad4d244653ff7a75a49b8dc9690bff78589846525c8b"
+    },
+    {
+      "function": "test_function",
+      "fixture": "html-escaping.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/html-escaping.html-func_args42]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "68a977e5dade39d5b68eabe8d6ae0cba915da6c52d029cafaf37ec30cee2d160",
+      "markdown_sha256": "3ee921201da94647dc37d8585b5a612e19db5b947971e9b02fcc6b1eb862dff7"
+    },
+    {
+      "function": "test_function",
+      "fixture": "html_entities_out_of_text.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/html_entities_out_of_text.html-func_args40]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "a11d950011e092bf62fb4c8a2248d8ae9a7991139e9ee1f41ce4940d58ea4270",
+      "markdown_sha256": "eb9aeeb20e9cea21a29e461a77d5089e0364f9f9d4ac59870e2644d1326c0fbf"
+    },
+    {
+      "function": "test_function",
+      "fixture": "images_with_div_wrap.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_div_wrap.html-func_args19]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "9dc9d3929d78a2b5e067cc717102c6336e7ea8be5659183dc2ec9df5c82ed4f6",
+      "markdown_sha256": "fbcc249122c8e4238841dd5fd94686990c9edccfd82bee466694385c7d9b1040"
+    },
+    {
+      "function": "test_function",
+      "fixture": "img-tag-with-link.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/img-tag-with-link.html-func_args18]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "58852efab0b812c5ec6d74b3bf7225165d824a8036a67d08c5e125c45a72200b",
+      "markdown_sha256": "c87767d778561ebf0bfce0e094be9f691b7411e90af7c0d425c84c928ae1b7ed"
+    },
+    {
+      "function": "test_function",
+      "fixture": "inplace_baseurl_substitution.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/inplace_baseurl_substitution.html-func_args25]",
+      "argument_name": "func_args",
+      "arguments": {
+        "baseurl": "http://brettterpstra.com",
+        "bodywidth": 0
+      },
+      "html_sha256": "7777ad159aa608d8c5e6855911ea6ccf4fbcc73e553bb6eb9ad60740887f7696",
+      "markdown_sha256": "e4ca07b94eeb8e1c067bf91c7ba5405814e995b490c3c6018d84be53c9469561"
+    },
+    {
+      "function": "test_function",
+      "fixture": "invalid_start.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_start.html-func_args13]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "cdaaa662ea6251f7769d7801b3258075235295b852fadfc36aab367f1d8b3e4b",
+      "markdown_sha256": "e1cab130de0f9d583b31fa04a5d5b7174ca84731c86bca9a35284981e276b12f"
+    },
+    {
+      "function": "test_function",
+      "fixture": "kbd_tag.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/kbd_tag.html-func_args6]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "03d3e90ea6f3036f96b95331c1bbcc1cfec8e4e2158d8cb6c72389f9578bd572",
+      "markdown_sha256": "c4e733eab9feb75035db719b181f15bd55dbb0a016d06b7c877cd59c31b460d5"
+    },
+    {
+      "function": "test_function",
+      "fixture": "link_titles.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/link_titles.html-func_args16]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "b561db2a3471d30b5241acaf6b5c5b9c482dc6ac0af96ddf86297e2159fbf446",
+      "markdown_sha256": "6735fac6c9697a13bebae89bc08aee6d8580f9264f67d55bfddca83773c97aba"
+    },
+    {
+      "function": "test_function",
+      "fixture": "list_tags_example.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/list_tags_example.html-func_args8]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "39daf2a89b1eb761edb6ffe9b618af64a2a5de25eeb9b01310441decec5447ac",
+      "markdown_sha256": "d50ad8dc12dfdda1c839ceeda867ef07a11f40dda6d24e1943fca9f0747e0472"
+    },
+    {
+      "function": "test_function",
+      "fixture": "long_lines.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/long_lines.html-func_args1]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "205053a0c15788e52f22c5a2f968be56568b35a6eee02dc0d1ef5d3caa15611e",
+      "markdown_sha256": "ba26d275783c6fb6286596a0aabe98b18649b42bc21a3ee9a683c1bfa8a295e2"
+    },
+    {
+      "function": "test_function",
+      "fixture": "lrm_after_b.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_b.html-func_args14]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "0a77a25e616c3dba69341a9a03cd3ab0af93419fe6ebe5eac7e1772d98a53006",
+      "markdown_sha256": "78350c85ae0e03da7a372cffa7b6cad86d99bc3386977d682e3e2c0757f018a6"
+    },
+    {
+      "function": "test_function",
+      "fixture": "lrm_after_i.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_i.html-func_args39]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "3cd3c5aa57588c78f89ebc5d6e9cbc96299397fd55999b7c867f8f7f31b69b31",
+      "markdown_sha256": "9fd688eac1a3362db970cfe599394c8e5195f9629b93d45a28fa5acc9d34ef0a"
+    },
+    {
+      "function": "test_function",
+      "fixture": "lrm_inside_i.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_inside_i.html-func_args21]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "3567a57e823ada9f8143e5442f49858532627164712632c9c45abc9062c99de6",
+      "markdown_sha256": "1594c98e9f36ed7cf574bbad276dea366f3bca4fe9a33453ed748c09d4de7ee3"
+    },
+    {
+      "function": "test_function",
+      "fixture": "mixed_nested_lists.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/mixed_nested_lists.html-func_args32]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "8eda3761ca5385816332b3cc72834e4cff9ebe75f61715acbb82c39bf9c3a834",
+      "markdown_sha256": "ac7e1e411bc289ae46e0b4ea164cda38c729c8b3f84e38ce73d48edd5a0ca67d"
+    },
+    {
+      "function": "test_function",
+      "fixture": "nbsp.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp.html-func_args26]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "14064811ac17484abc6f48c3a95bf578c3f8fdbe93dbfbb9de6a5798b938190b",
+      "markdown_sha256": "3c54a9a4f8d3998ca4918d5e9caef5b98ecb58b81eb68f658448edf9df06fa96"
+    },
+    {
+      "function": "test_function",
+      "fixture": "no_p_in_table.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/no_p_in_table.html-func_args30]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "8c4b35907b39bdede2fa2e8bf3fd92abbe31d4b0e5a0ca8b719069851a5684cf",
+      "markdown_sha256": "5e663d70871b51363f08e77e3594cc4165cc2badc108a3f4ba7707e2e945e4a5"
+    },
+    {
+      "function": "test_function",
+      "fixture": "normal.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/normal.html-func_args24]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "ab44ddc88d5c2adbfa9bb8d0da5499abba905a0c3b7273bd45ecf0a3918a227d",
+      "markdown_sha256": "656ea9caca44094dc3cbc933b9f1d36b2e8d68e4998e9391e1fadf480424ba1d"
+    },
+    {
+      "function": "test_function",
+      "fixture": "pre.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/pre.html-func_args20]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "21324f7b9421e99084bfea44ce86289582d52e7a328b2c86a4192535fa9bb048",
+      "markdown_sha256": "98fb6917e0451b4ef3d0a5e0d94eb7fd092b8657d60925a5ad179e80b4dabaf6"
+    },
+    {
+      "function": "test_function",
+      "fixture": "preformatted_in_list.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/preformatted_in_list.html-func_args12]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "68b331b2fd6289e99e9e682b431fd70dadc2038fecd419032033af8ac253be4d",
+      "markdown_sha256": "44554c218a9e97f2641760f5a400bbc38243179cee87629ea675143de81bf23d"
+    },
+    {
+      "function": "test_function",
+      "fixture": "q_tag.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/q_tag.html-func_args33]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "751838757a8e685264ed8bbafd056a2a8b67be4047a4d1471e01e34390d4ea99",
+      "markdown_sha256": "99c9b54b79823f721c2d995bc09abc31d985b73cf71a171cd79c5ea3272d700c"
+    },
+    {
+      "function": "test_function",
+      "fixture": "rlm_inside_strong.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/rlm_inside_strong.html-func_args27]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "9313855586d216a2a61ecbbb8fabb8492e9508c995ca0590b4dfdd476e9646e4",
+      "markdown_sha256": "958a82c4dd25b77bea9c124c9b4e3190b45d9ae3e80b4ca17c02fd896ca8670e"
+    },
+    {
+      "function": "test_function",
+      "fixture": "stressed_with_html_entities.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/stressed_with_html_entities.html-func_args23]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "e6150756183483f494bfe074e6ce8be0780515f743688baa3c242c99a6f1e642",
+      "markdown_sha256": "8b83e9822c852850e8d3b75735c2162da71104e285b352f9b8238a7a53715c71"
+    },
+    {
+      "function": "test_function",
+      "fixture": "text_after_list.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/text_after_list.html-func_args15]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "565b9b7f32477536398707604398d93d07bbc0e6892f41c1d9d9766da9e95a4a",
+      "markdown_sha256": "e95582b7aa3110b5bf748f779d5234e196e20b321cfd464a6dcd3d1f9ab8e695"
+    },
+    {
+      "function": "test_function",
+      "fixture": "url-escaping.html",
+      "frozen_id": "test/test_html2text.py::test_function[/tmp/bench-native-regression-58qzs8p5/project/test/url-escaping.html-func_args9]",
+      "argument_name": "func_args",
+      "arguments": {},
+      "html_sha256": "4a72465035b1c0885db9d13ae017181c29e809cbf53c50aee351433503623172",
+      "markdown_sha256": "49454178491421ea681c8209bc08801b6e8c67fa4d6d6f998190e7c1d98ef2ef"
+    },
+    {
+      "function": "test_module",
+      "fixture": "GoogleDocMassDownload.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocMassDownload.html-module_args16]",
+      "argument_name": "module_args",
+      "arguments": {
+        "google_doc": true
+      },
+      "html_sha256": "2a0728383a381860d4ca288eb4fe02b28392d91aa36ab575b050967172f11bf8",
+      "markdown_sha256": "ed7c52b8e7428c8a3160618d9357dd40e5d8d4be8fa2880228d4ff1a8d37093f"
+    },
+    {
+      "function": "test_module",
+      "fixture": "GoogleDocSaved.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocSaved.html-module_args70]",
+      "argument_name": "module_args",
+      "arguments": {
+        "google_doc": true
+      },
+      "html_sha256": "40bb31c952aff8ab176e9a46b6ba29a99190c444b3a2ddb83598844b0a76aa6f",
+      "markdown_sha256": "ed7c52b8e7428c8a3160618d9357dd40e5d8d4be8fa2880228d4ff1a8d37093f"
+    },
+    {
+      "function": "test_module",
+      "fixture": "GoogleDocSaved_two.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/GoogleDocSaved_two.html-module_args1]",
+      "argument_name": "module_args",
+      "arguments": {
+        "google_doc": true
+      },
+      "html_sha256": "af5518f739598bcadc5f8153c1c19eabdadee237de3c50ec698d9a35ffd69097",
+      "markdown_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "function": "test_module",
+      "fixture": "abbr_tag.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/abbr_tag.html-module_args10]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "e14a07e0e511789b8a9147755ecdeaa20a67a4fb43af2a7930a911d073abbda4",
+      "markdown_sha256": "def824490cf1b2b01b2ba531e0745747b2f10b52e1bdab8153e9c18c1da2f3da"
+    },
+    {
+      "function": "test_module",
+      "fixture": "anchors.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/anchors.html-module_args43]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "b3a7d235f4bec6ef08f5bec6c933d3a2b38a149a3a2d866bf63da2aac971fa1b",
+      "markdown_sha256": "41366407718b5fe7c393d201659c9da35dcecfd69f9d7c5e0980aec906aa2688"
+    },
+    {
+      "function": "test_module",
+      "fixture": "apos_element.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/apos_element.html-module_args14]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "a907c5eb06acdd342d13179549b927fa6dfa7f0d965b1c5b9e39c8eb2c50900c",
+      "markdown_sha256": "e6ab253c5f96017ea6e588db511c23d610248ae7a411d2532bacb2200cba5729"
+    },
+    {
+      "function": "test_module",
+      "fixture": "backquote_code_style.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/backquote_code_style.html-module_args71]",
+      "argument_name": "module_args",
+      "arguments": {
+        "backquote_code_style": true
+      },
+      "html_sha256": "45b7cb7d050189400a230a188dd09dfef73d62ac157b9cbeb754cbd6b668a620",
+      "markdown_sha256": "f88635f2c95cac4252cf51e30328f44055e7e1894ccdd7e2bf9920506eb7e054"
+    },
+    {
+      "function": "test_module",
+      "fixture": "blockquote_example.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/blockquote_example.html-module_args9]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "95bae1e32f9955955f4f496224af824197f0749a2c32433ddfde0b164f56f726",
+      "markdown_sha256": "0065c09e0b3bf1d177ce805658bc6eb4aeeb6e4672aa3d3213ee7dd04f6a68ff"
+    },
+    {
+      "function": "test_module",
+      "fixture": "bodywidth_newline.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/bodywidth_newline.html-module_args65]",
+      "argument_name": "module_args",
+      "arguments": {
+        "body_width": 0
+      },
+      "html_sha256": "337b975fd2a6e90b8bd3332eb384e9dc610d507020521cc8c265fb266c48b4a2",
+      "markdown_sha256": "1c79560bdf62d66158c43b713f35bf58d099df4bf21e48b662394741e925dc65"
+    },
+    {
+      "function": "test_module",
+      "fixture": "bold_inside_link.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/bold_inside_link.html-module_args50]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "97c1519ac50e28035a72a8dacf8e0d222b58fa1a46b8119c1157d7ef9d286c00",
+      "markdown_sha256": "f3a050329a074f7aede3a0d4ca0de83c5f8005925cef5c69a0cf845911beea1f"
+    },
+    {
+      "function": "test_module",
+      "fixture": "bold_long_line.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/bold_long_line.html-module_args2]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "e603b1a0f2afe44df8156f9f6887748bc839f20f7a4c69ce55d0963a2a8eed8f",
+      "markdown_sha256": "1e434174cbc4c80641782fc89f08edf26defa7436d62f4cf0dd3028ee1bdebfc"
+    },
+    {
+      "function": "test_module",
+      "fixture": "break_preserved_in_blockquote.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/break_preserved_in_blockquote.html-module_args22]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "c9533b1622631d4c851e56ad6a6740e91ddf5daeb255df7039609c7d8faddf3e",
+      "markdown_sha256": "1c9141943d95d751caf32cfb45120ca371bfd51fe20db8b313ed391177314e4a"
+    },
+    {
+      "function": "test_module",
+      "fixture": "css_import_no_semicolon.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/css_import_no_semicolon.html-module_args62]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "f5344feb3896d8b1db0db6f6e1bb0ab0b061e91875cff2581472eefe8857ed09",
+      "markdown_sha256": "851e3f5a00d9e2d2bad8270ded4c630ba91bd6420f365a61dc34ac5be391e3c7"
+    },
+    {
+      "function": "test_module",
+      "fixture": "decript_tage.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/decript_tage.html-module_args52]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "5da82f2a930a82acb3d1c92eedcc847e444dfde983cfd1b4a83419ef59284633",
+      "markdown_sha256": "bee6a5a95661f631451e2cadf8d915e5a90e6c2cea7ce45c8b711d9b681a45a5"
+    },
+    {
+      "function": "test_module",
+      "fixture": "default_image_alt.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/default_image_alt.html-module_args8]",
+      "argument_name": "module_args",
+      "arguments": {
+        "default_image_alt": "Image"
+      },
+      "html_sha256": "d15ad7ed9e7dca99dc56ba10c55f21e6f0d7ec41bc8d62541cda149e67d94ba6",
+      "markdown_sha256": "30628d37f7b0ee2d7b8c9fc39a0ac5e3e056b80e1bdab01fc4b98402ee57ee5e"
+    },
+    {
+      "function": "test_module",
+      "fixture": "doc_with_table.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table.html-module_args7]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "96e293243e3fbd39e6ac3587c00f2e940e51914c3524c60340426b4b9c375371",
+      "markdown_sha256": "cf93ea7a94eab4948f8434dcfc439f9ba47aa2b3e1b95b2792168127e714d22a"
+    },
+    {
+      "function": "test_module",
+      "fixture": "doc_with_table_bypass.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/doc_with_table_bypass.html-module_args53]",
+      "argument_name": "module_args",
+      "arguments": {
+        "bypass_tables": true
+      },
+      "html_sha256": "ff8db778a5ee7d18c2427c9498469cb12e2f54611f1f5c567d007536f7f3e1bf",
+      "markdown_sha256": "e313c751c03f896556fe733f6ea5bb79b585d92171189e3e04dd653fb7f7f842"
+    },
+    {
+      "function": "test_module",
+      "fixture": "emdash-para.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/emdash-para.html-module_args23]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "0a87a0836e10120a6ee235943fb06f7d8a9d6ccdf9824ccac6c818075194ca5b",
+      "markdown_sha256": "4fa73c465ac786900900e8f4f071c076e9765171cd6d7c9d0cca17223af01333"
+    },
+    {
+      "function": "test_module",
+      "fixture": "emphasis_preserved_whitespace.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_preserved_whitespace.html-module_args64]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "ca0f9c7a5cc89582ac2a542974fa1562a56ed14511a8378337e493cf832ea964",
+      "markdown_sha256": "e46e4528f6037e1fb8e7de154494e2ebad13bd2b777dfd86ee8da08c90fb1bfa"
+    },
+    {
+      "function": "test_module",
+      "fixture": "emphasis_whitespace.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/emphasis_whitespace.html-module_args60]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "e518dcd2caee822978ab8fb49f24eae62efcd7c7131a38c62c243168f45b5f9e",
+      "markdown_sha256": "d39ca57e1e6a5fbee6e8699b48d425fdee64f4c9d7e96ed65312201aa132feb8"
+    },
+    {
+      "function": "test_module",
+      "fixture": "empty-img-src.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/empty-img-src.html-module_args72]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "11790a9082c6dbaa99a9e853b6e5c9d948299a891ef2a64c44f84023fff1112d",
+      "markdown_sha256": "75a11da44c802486bc6f65640aa48a730f0f684c5c07a42ba3cd1735eb3fb070"
+    },
+    {
+      "function": "test_module",
+      "fixture": "empty-link.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/empty-link.html-module_args67]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "9e8e8f5bc1b0a09fb8d19caeb32eb5fc3b3dae8fcaae8997aff02d43962ad444",
+      "markdown_sha256": "a5533be13585aa74f67179b83886973b284e5e37358f2a1c32bcc1cf592af744"
+    },
+    {
+      "function": "test_module",
+      "fixture": "empty-title-tag.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/empty-title-tag.html-module_args49]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "583f886d9f2f52a5825080a27b7fe835b57f899ade103c180a160d2b12d18105",
+      "markdown_sha256": "33a58549eec307e8ad6e755c2dafb158d173a3843ed66fabc5abf08b8c432794"
+    },
+    {
+      "function": "test_module",
+      "fixture": "flip_emphasis.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/flip_emphasis.html-module_args56]",
+      "argument_name": "module_args",
+      "arguments": {
+        "emphasis_mark": "*",
+        "strong_mark": "__"
+      },
+      "html_sha256": "ab17e0c7e916571af05769eef9e5cdd96d866603ba388cbfde46dbe0a83f52e4",
+      "markdown_sha256": "e2a55792c1cafe17b04768a00babf2bab3c5bf0cfd587f7ee3b3f853f300d725"
+    },
+    {
+      "function": "test_module",
+      "fixture": "google-like_font-properties.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/google-like_font-properties.html-module_args61]",
+      "argument_name": "module_args",
+      "arguments": {
+        "google_doc": true
+      },
+      "html_sha256": "c4556f592605e027d3411d486472169dd976022ff2f31d00ce1a2aa1432a81d2",
+      "markdown_sha256": "a1b27920ca5f35d60f3b9f5006021dcce61ebff2e0ca3e2f9e04e88594891ace"
+    },
+    {
+      "function": "test_module",
+      "fixture": "header_tags.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/header_tags.html-module_args34]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "eaf5071d8909655d14dcb3d275170f690dcb13847deb721ed66d37c7213e18dc",
+      "markdown_sha256": "eb678f774451699088670156a67cfd7d8bf082bfe94c9b6724100e1483ac937c"
+    },
+    {
+      "function": "test_module",
+      "fixture": "horizontal_rule.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/horizontal_rule.html-module_args11]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "41bd3be81a4f3ae0c15caa02bc927d3b639f342d4c35ecd12378a85ceafac1a6",
+      "markdown_sha256": "f0996e6f1424e6442ac1ad4d244653ff7a75a49b8dc9690bff78589846525c8b"
+    },
+    {
+      "function": "test_module",
+      "fixture": "html-escaping.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/html-escaping.html-module_args73]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "68a977e5dade39d5b68eabe8d6ae0cba915da6c52d029cafaf37ec30cee2d160",
+      "markdown_sha256": "3ee921201da94647dc37d8585b5a612e19db5b947971e9b02fcc6b1eb862dff7"
+    },
+    {
+      "function": "test_module",
+      "fixture": "html_entities_out_of_text.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/html_entities_out_of_text.html-module_args69]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "a11d950011e092bf62fb4c8a2248d8ae9a7991139e9ee1f41ce4940d58ea4270",
+      "markdown_sha256": "eb9aeeb20e9cea21a29e461a77d5089e0364f9f9d4ac59870e2644d1326c0fbf"
+    },
+    {
+      "function": "test_module",
+      "fixture": "images_as_html.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/images_as_html.html-module_args12]",
+      "argument_name": "module_args",
+      "arguments": {
+        "images_as_html": true
+      },
+      "html_sha256": "ce9b7c253cc53a6c258dbe6b0031d8481e87bdf87f8a52a11ab56817b2fa7688",
+      "markdown_sha256": "501f5c571c6453d85d793ca161a761411b225f2c113f99d14c16b165d293d463"
+    },
+    {
+      "function": "test_module",
+      "fixture": "images_to_alt.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/images_to_alt.html-module_args42]",
+      "argument_name": "module_args",
+      "arguments": {
+        "images_to_alt": true
+      },
+      "html_sha256": "d5aa5570957643db04f4fac15a1fc375e8af3dbbc0e7d6740731980d30235214",
+      "markdown_sha256": "78f0e4282ee1dc81ebecb2b7d9a099f130fdd8b22d47f8b5091859aad95baf08"
+    },
+    {
+      "function": "test_module",
+      "fixture": "images_with_div_wrap.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_div_wrap.html-module_args37]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "9dc9d3929d78a2b5e067cc717102c6336e7ea8be5659183dc2ec9df5c82ed4f6",
+      "markdown_sha256": "fbcc249122c8e4238841dd5fd94686990c9edccfd82bee466694385c7d9b1040"
+    },
+    {
+      "function": "test_module",
+      "fixture": "images_with_size.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/images_with_size.html-module_args5]",
+      "argument_name": "module_args",
+      "arguments": {
+        "images_with_size": true
+      },
+      "html_sha256": "c94e86449f67814448299f02dab90188843f335eddb72bef1593b09802326a2b",
+      "markdown_sha256": "ad9484bf60749880ea0b004ac9e5bcb11c8981c29b28a2c0715b8e67b73faa78"
+    },
+    {
+      "function": "test_module",
+      "fixture": "img-tag-with-link.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/img-tag-with-link.html-module_args35]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "58852efab0b812c5ec6d74b3bf7225165d824a8036a67d08c5e125c45a72200b",
+      "markdown_sha256": "c87767d778561ebf0bfce0e094be9f691b7411e90af7c0d425c84c928ae1b7ed"
+    },
+    {
+      "function": "test_module",
+      "fixture": "inplace_baseurl_substitution.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/inplace_baseurl_substitution.html-module_args46]",
+      "argument_name": "module_args",
+      "arguments": {
+        "baseurl": "http://brettterpstra.com",
+        "body_width": 0
+      },
+      "html_sha256": "7777ad159aa608d8c5e6855911ea6ccf4fbcc73e553bb6eb9ad60740887f7696",
+      "markdown_sha256": "e4ca07b94eeb8e1c067bf91c7ba5405814e995b490c3c6018d84be53c9469561"
+    },
+    {
+      "function": "test_module",
+      "fixture": "invalid_start.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_start.html-module_args26]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "cdaaa662ea6251f7769d7801b3258075235295b852fadfc36aab367f1d8b3e4b",
+      "markdown_sha256": "e1cab130de0f9d583b31fa04a5d5b7174ca84731c86bca9a35284981e276b12f"
+    },
+    {
+      "function": "test_module",
+      "fixture": "invalid_unicode.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/invalid_unicode.html-module_args57]",
+      "argument_name": "module_args",
+      "arguments": {
+        "unicode_snob": true
+      },
+      "html_sha256": "d45c7ebfa825ec75751e68dcd1041fcee503f7f67293e38c5f0ca3f77429080d",
+      "markdown_sha256": "47510d7a570e3da817906805c5b97c3b7412b3770f24de48e931ac3c6b97af62"
+    },
+    {
+      "function": "test_module",
+      "fixture": "kbd_tag.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/kbd_tag.html-module_args13]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "03d3e90ea6f3036f96b95331c1bbcc1cfec8e4e2158d8cb6c72389f9578bd572",
+      "markdown_sha256": "c4e733eab9feb75035db719b181f15bd55dbb0a016d06b7c877cd59c31b460d5"
+    },
+    {
+      "function": "test_module",
+      "fixture": "link_titles.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/link_titles.html-module_args32]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "b561db2a3471d30b5241acaf6b5c5b9c482dc6ac0af96ddf86297e2159fbf446",
+      "markdown_sha256": "6735fac6c9697a13bebae89bc08aee6d8580f9264f67d55bfddca83773c97aba"
+    },
+    {
+      "function": "test_module",
+      "fixture": "list_tags_example.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/list_tags_example.html-module_args15]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "39daf2a89b1eb761edb6ffe9b618af64a2a5de25eeb9b01310441decec5447ac",
+      "markdown_sha256": "d50ad8dc12dfdda1c839ceeda867ef07a11f40dda6d24e1943fca9f0747e0472"
+    },
+    {
+      "function": "test_module",
+      "fixture": "long_lines.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/long_lines.html-module_args3]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "205053a0c15788e52f22c5a2f968be56568b35a6eee02dc0d1ef5d3caa15611e",
+      "markdown_sha256": "ba26d275783c6fb6286596a0aabe98b18649b42bc21a3ee9a683c1bfa8a295e2"
+    },
+    {
+      "function": "test_module",
+      "fixture": "lrm_after_b.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_b.html-module_args29]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "0a77a25e616c3dba69341a9a03cd3ab0af93419fe6ebe5eac7e1772d98a53006",
+      "markdown_sha256": "78350c85ae0e03da7a372cffa7b6cad86d99bc3386977d682e3e2c0757f018a6"
+    },
+    {
+      "function": "test_module",
+      "fixture": "lrm_after_i.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_after_i.html-module_args68]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "3cd3c5aa57588c78f89ebc5d6e9cbc96299397fd55999b7c867f8f7f31b69b31",
+      "markdown_sha256": "9fd688eac1a3362db970cfe599394c8e5195f9629b93d45a28fa5acc9d34ef0a"
+    },
+    {
+      "function": "test_module",
+      "fixture": "lrm_inside_i.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/lrm_inside_i.html-module_args41]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "3567a57e823ada9f8143e5442f49858532627164712632c9c45abc9062c99de6",
+      "markdown_sha256": "1594c98e9f36ed7cf574bbad276dea366f3bca4fe9a33453ed748c09d4de7ee3"
+    },
+    {
+      "function": "test_module",
+      "fixture": "mark_code.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/mark_code.html-module_args17]",
+      "argument_name": "module_args",
+      "arguments": {
+        "mark_code": true
+      },
+      "html_sha256": "deeb530f79b71a12a33f088724daaca3d9112372a6d461da76dfaab2ea2e32a7",
+      "markdown_sha256": "01b272d75dbc2e667ed1559a64e079146791db5a6769f05228c94e6d81a5bdc3"
+    },
+    {
+      "function": "test_module",
+      "fixture": "mixed_nested_lists.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/mixed_nested_lists.html-module_args54]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "8eda3761ca5385816332b3cc72834e4cff9ebe75f61715acbb82c39bf9c3a834",
+      "markdown_sha256": "ac7e1e411bc289ae46e0b4ea164cda38c729c8b3f84e38ce73d48edd5a0ca67d"
+    },
+    {
+      "function": "test_module",
+      "fixture": "nbsp.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp.html-module_args47]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "14064811ac17484abc6f48c3a95bf578c3f8fdbe93dbfbb9de6a5798b938190b",
+      "markdown_sha256": "3c54a9a4f8d3998ca4918d5e9caef5b98ecb58b81eb68f658448edf9df06fa96"
+    },
+    {
+      "function": "test_module",
+      "fixture": "nbsp_unicode.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/nbsp_unicode.html-module_args33]",
+      "argument_name": "module_args",
+      "arguments": {
+        "unicode_snob": true
+      },
+      "html_sha256": "16c632cdf9dc456f7eb5dae5e9a4ca324df3c6bbc88675718ca8121db04011ac",
+      "markdown_sha256": "f268d2951892ace82c64916b7c3b654701e28733ebd90c45164b37a0506c4c28"
+    },
+    {
+      "function": "test_module",
+      "fixture": "no_inline_links_example.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_example.html-module_args27]",
+      "argument_name": "module_args",
+      "arguments": {
+        "inline_links": false
+      },
+      "html_sha256": "cd0b09ebe2cbec99fb8d3515933e56ca5e928e9a393204ad2206bf0edcc2bfb0",
+      "markdown_sha256": "cfb825e655d3bd7624c25bbf8b2ec0c24db25dad6546d722da99348cab6af56a"
+    },
+    {
+      "function": "test_module",
+      "fixture": "no_inline_links_images_to_alt.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_images_to_alt.html-module_args40]",
+      "argument_name": "module_args",
+      "arguments": {
+        "inline_links": false
+      },
+      "html_sha256": "e35baec64803ab2e4f1fcc6feee8a3fb61ff38fe2029374e309820a60fb12afb",
+      "markdown_sha256": "fce9bfc2bb34f2d839a086e89310e74a8d483e7271180e7da011f05d4371c7cb"
+    },
+    {
+      "function": "test_module",
+      "fixture": "no_inline_links_nested.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_inline_links_nested.html-module_args59]",
+      "argument_name": "module_args",
+      "arguments": {
+        "inline_links": false
+      },
+      "html_sha256": "916338a90cbbf3782ec4e0d18f03a18d5ba5b09c17f58af353f15be26f235b10",
+      "markdown_sha256": "7f218de4bee6c5808cf5d3548bbcd0225d13df3a1fe40af178dab5a719968a1f"
+    },
+    {
+      "function": "test_module",
+      "fixture": "no_mailto_links.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_mailto_links.html-module_args6]",
+      "argument_name": "module_args",
+      "arguments": {
+        "ignore_mailto_links": true
+      },
+      "html_sha256": "46507779088dea3708de6447d6f360084627e5e52ad644c3dc36941717ef807d",
+      "markdown_sha256": "0c5c18a39fba2beabba6d1ee99238fc4da2d1ca783767d12a4d52b6d952c1715"
+    },
+    {
+      "function": "test_module",
+      "fixture": "no_p_in_table.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_p_in_table.html-module_args51]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "8c4b35907b39bdede2fa2e8bf3fd92abbe31d4b0e5a0ca8b719069851a5684cf",
+      "markdown_sha256": "5e663d70871b51363f08e77e3594cc4165cc2badc108a3f4ba7707e2e945e4a5"
+    },
+    {
+      "function": "test_module",
+      "fixture": "no_wrap_links.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_wrap_links.html-module_args31]",
+      "argument_name": "module_args",
+      "arguments": {
+        "wrap_links": false
+      },
+      "html_sha256": "8120c205f3bb4df753d8f4be684a4426d66b59a093dce0c93cd42289fef3bfb5",
+      "markdown_sha256": "fec8681909cf061ceec3ee80ce66cd221f8fe5c6180cb440625cf19d816dafa9"
+    },
+    {
+      "function": "test_module",
+      "fixture": "no_wrap_links_no_inline_links.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/no_wrap_links_no_inline_links.html-module_args20]",
+      "argument_name": "module_args",
+      "arguments": {
+        "wrap_links": false
+      },
+      "html_sha256": "9e949486bba6e2067a9c639d1ab042e9812de766f880c5ce17ebffef1c55c238",
+      "markdown_sha256": "290e8706483f688cabb597566094ae71ddf28285cb505811cdb93005863c7e1b"
+    },
+    {
+      "function": "test_module",
+      "fixture": "normal.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/normal.html-module_args45]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "ab44ddc88d5c2adbfa9bb8d0da5499abba905a0c3b7273bd45ecf0a3918a227d",
+      "markdown_sha256": "656ea9caca44094dc3cbc933b9f1d36b2e8d68e4998e9391e1fadf480424ba1d"
+    },
+    {
+      "function": "test_module",
+      "fixture": "normal_escape_snob.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/normal_escape_snob.html-module_args18]",
+      "argument_name": "module_args",
+      "arguments": {
+        "escape_snob": true
+      },
+      "html_sha256": "e9e16733f2f3bb532e15153443d2b3ae78c225694b8928f7a5e1ce7cdca5083c",
+      "markdown_sha256": "e3f3ebe5cde0bbe68c917abe16a94458cef505098602d99ca86ba1c9f7e8c12d"
+    },
+    {
+      "function": "test_module",
+      "fixture": "pad_table.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table.html-module_args66]",
+      "argument_name": "module_args",
+      "arguments": {
+        "pad_tables": true
+      },
+      "html_sha256": "a0ef1d95f82c57136a8d5cb540c97775bc4f389b87d549d07617526e886f2f25",
+      "markdown_sha256": "e110da5004aa8ed61c7b74e72e8b76dfa4b1cfb4d1ec45f1f4275cf8937c45b1"
+    },
+    {
+      "function": "test_module",
+      "fixture": "pad_table_empty.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table_empty.html-module_args28]",
+      "argument_name": "module_args",
+      "arguments": {
+        "pad_tables": true
+      },
+      "html_sha256": "ee8edba9f1bfe3549b6f1d4ed89aba19fe467e0684126d1b19e54255128706af",
+      "markdown_sha256": "963905c9d299a8f1080722329971c5e58839e0d19480636f277dbf74039ca016"
+    },
+    {
+      "function": "test_module",
+      "fixture": "pad_table_no_closed_tr.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/pad_table_no_closed_tr.html-module_args24]",
+      "argument_name": "module_args",
+      "arguments": {
+        "pad_tables": true
+      },
+      "html_sha256": "e3bf8ac40592131ce7c89b422d540b3379222eb2baab7496216024e8e9024485",
+      "markdown_sha256": "32575b07237ef5e7c3ea5fb1a6f65897adf375a12b09c4ddaa1ec7772aaa404b"
+    },
+    {
+      "function": "test_module",
+      "fixture": "pre.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/pre.html-module_args38]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "21324f7b9421e99084bfea44ce86289582d52e7a328b2c86a4192535fa9bb048",
+      "markdown_sha256": "98fb6917e0451b4ef3d0a5e0d94eb7fd092b8657d60925a5ad179e80b4dabaf6"
+    },
+    {
+      "function": "test_module",
+      "fixture": "preformatted_in_list.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/preformatted_in_list.html-module_args25]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "68b331b2fd6289e99e9e682b431fd70dadc2038fecd419032033af8ac253be4d",
+      "markdown_sha256": "44554c218a9e97f2641760f5a400bbc38243179cee87629ea675143de81bf23d"
+    },
+    {
+      "function": "test_module",
+      "fixture": "protect_links.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/protect_links.html-module_args4]",
+      "argument_name": "module_args",
+      "arguments": {
+        "protect_links": true
+      },
+      "html_sha256": "757322e09fbf04b0fbf97b1d2929d0a016e1e39056bdf00a401a28adfd1bb5cb",
+      "markdown_sha256": "75652f91de7d0e18737638565ba6c31478d497fd2006558afe2e4329e9337290"
+    },
+    {
+      "function": "test_module",
+      "fixture": "q_tag.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/q_tag.html-module_args58]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "751838757a8e685264ed8bbafd056a2a8b67be4047a4d1471e01e34390d4ea99",
+      "markdown_sha256": "99c9b54b79823f721c2d995bc09abc31d985b73cf71a171cd79c5ea3272d700c"
+    },
+    {
+      "function": "test_module",
+      "fixture": "rlm_inside_strong.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/rlm_inside_strong.html-module_args48]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "9313855586d216a2a61ecbbb8fabb8492e9508c995ca0590b4dfdd476e9646e4",
+      "markdown_sha256": "958a82c4dd25b77bea9c124c9b4e3190b45d9ae3e80b4ca17c02fd896ca8670e"
+    },
+    {
+      "function": "test_module",
+      "fixture": "single_line_break.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/single_line_break.html-module_args63]",
+      "argument_name": "module_args",
+      "arguments": {
+        "body_width": 0,
+        "single_line_break": true
+      },
+      "html_sha256": "a81113ba3d5a0a32551f3275f83004ac7fe72f074e1faca41986b1e5d9290069",
+      "markdown_sha256": "72813836dff3ac13090eb158d28c3bd3b9dabf2e0f53b6686223e3ec1d1d8fc5"
+    },
+    {
+      "function": "test_module",
+      "fixture": "stressed_with_html_entities.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/stressed_with_html_entities.html-module_args44]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "e6150756183483f494bfe074e6ce8be0780515f743688baa3c242c99a6f1e642",
+      "markdown_sha256": "8b83e9822c852850e8d3b75735c2162da71104e285b352f9b8238a7a53715c71"
+    },
+    {
+      "function": "test_module",
+      "fixture": "sub_tag.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/sub_tag.html-module_args0]",
+      "argument_name": "module_args",
+      "arguments": {
+        "include_sup_sub": true
+      },
+      "html_sha256": "aa43a888cecf8070a6adf4bd26f2eb5a79affbf4ff139e96211340401f5f59f9",
+      "markdown_sha256": "c3f82fb113af9b3d15f2d98a3fecaf6f104cbf02845dad5de25ecdab0e891ccd"
+    },
+    {
+      "function": "test_module",
+      "fixture": "sup_tag.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/sup_tag.html-module_args21]",
+      "argument_name": "module_args",
+      "arguments": {
+        "include_sup_sub": true
+      },
+      "html_sha256": "68ec99d14a6dc0a23b5008b758f7f528e1f153810b34af7b860a4fc2d32f702b",
+      "markdown_sha256": "8c20039c10d9231c9fa0a0caf9a6922c7dd568bfd1a9e993c89cf0c930be8332"
+    },
+    {
+      "function": "test_module",
+      "fixture": "table_ignore.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/table_ignore.html-module_args39]",
+      "argument_name": "module_args",
+      "arguments": {
+        "ignore_tables": true
+      },
+      "html_sha256": "49616b0e4cdea29fe03fed3aaeac4efb9f607e33955358f3eba78e7fd334833b",
+      "markdown_sha256": "03e3b9684c0f521880ee1867f5fa999205e2cc404389bac1ec921f945aba769d"
+    },
+    {
+      "function": "test_module",
+      "fixture": "text_after_list.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/text_after_list.html-module_args30]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "565b9b7f32477536398707604398d93d07bbc0e6892f41c1d9d9766da9e95a4a",
+      "markdown_sha256": "e95582b7aa3110b5bf748f779d5234e196e20b321cfd464a6dcd3d1f9ab8e695"
+    },
+    {
+      "function": "test_module",
+      "fixture": "url-escaping.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/url-escaping.html-module_args19]",
+      "argument_name": "module_args",
+      "arguments": {},
+      "html_sha256": "4a72465035b1c0885db9d13ae017181c29e809cbf53c50aee351433503623172",
+      "markdown_sha256": "49454178491421ea681c8209bc08801b6e8c67fa4d6d6f998190e7c1d98ef2ef"
+    },
+    {
+      "function": "test_module",
+      "fixture": "wrap_list_items_example.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/wrap_list_items_example.html-module_args36]",
+      "argument_name": "module_args",
+      "arguments": {
+        "wrap_list_items": true
+      },
+      "html_sha256": "6291c3e882493cfdd4a35381a93fefc087442e6102e383e0280eeeb8ed24eca5",
+      "markdown_sha256": "ca5865cd0faebe9d82ddaa5b79c4432bd0b2ffd8adfcd3501314dde7edcaeeaa"
+    },
+    {
+      "function": "test_module",
+      "fixture": "wrap_tables.html",
+      "frozen_id": "test/test_html2text.py::test_module[/tmp/bench-native-regression-58qzs8p5/project/test/wrap_tables.html-module_args55]",
+      "argument_name": "module_args",
+      "arguments": {
+        "wrap_tables": true
+      },
+      "html_sha256": "43507cce60fdfea29fc09d64abfc64a5efceb5858555429be68f1e1ae2b58af0",
+      "markdown_sha256": "bb7b5a5a07be14f2ebc2b073d9b04d7cc16db0160a079cdca23bb85aeff45346"
+    }
+  ],
+  "explanation": "临时目录和未排序glob产生的参数展示序号不是测试输入；按原fixture字节与固定生成器的原参数精确匹配，完整原196节点及原结果比较保持。"
+}

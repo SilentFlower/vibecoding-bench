@@ -1,0 +1,114 @@
+--- a/library/docs/development-markdown-it-o04-dev.md
++++ b/library/docs/development-markdown-it-o04-dev.md
+@@ -0,0 +1,5 @@
++# 为命令行加入显式UTF8解码策略并保留默认兼容输出
++
++对应路线14：真实CLI新增显式strict/replace/ignore，默认ignore保持原文件输出及直调兼容；strict坏字节非零且只报来源/字节位置，不发布该文档，stdin同策略，合法中文不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/markdown_it/cli/parse.py
++++ b/library/markdown_it/cli/parse.py
+@@ -22,39 +22,51 @@
+     if namespace.enable_tables:
+         md.enable("table")
+     if namespace.filenames:
+-        convert(namespace.filenames, md)
++        convert(namespace.filenames, md, errors=namespace.encoding_errors)
+     elif namespace.stdin:
+-        convert_stdin(md)
++        convert_stdin(md, errors=namespace.encoding_errors)
+     else:
+         interactive(md)
+     return 0
+ 
+ 
+-def convert(filenames: Iterable[str], md: MarkdownIt | None = None) -> None:
++def convert(filenames: Iterable[str], md: MarkdownIt | None = None, *, errors: str = "ignore") -> None:
+     for filename in filenames:
+-        convert_file(filename, md)
++        convert_file(filename, md, errors=errors)
+ 
+ 
+-def convert_stdin(md: MarkdownIt | None = None) -> None:
++def convert_stdin(md: MarkdownIt | None = None, *, errors: str = "ignore") -> None:
+     """
+     Parse a Markdown file and dump the output to stdout.
+     """
+     try:
+-        rendered = (md or MarkdownIt()).render(sys.stdin.read())
++        if errors not in ("strict", "replace", "ignore"):
++            raise ValueError('未知UTF8解码策略')
++        content = sys.stdin.buffer.read().decode('utf8', errors=errors) if hasattr(sys.stdin, 'buffer') else sys.stdin.read()
++        rendered = (md or MarkdownIt()).render(content)
+         print(rendered, end="")
++    except UnicodeDecodeError as error:
++        sys.stderr.write(f'标准输入UTF8解码失败，字节位置{error.start}。\n')
++        sys.exit(1)
+     except OSError:
+         sys.stderr.write("Cannot parse Markdown from the standard input.\n")
+         sys.exit(1)
+ 
+ 
+-def convert_file(filename: str, md: MarkdownIt | None = None) -> None:
++def convert_file(filename: str, md: MarkdownIt | None = None, *, errors: str = "ignore") -> None:
+     """
+     Parse a Markdown file and dump the output to stdout.
+     """
+     try:
+-        with open(filename, encoding="utf8", errors="ignore") as fin:
++        if errors not in ("strict", "replace", "ignore"):
++            raise ValueError('未知UTF8解码策略')
++        with open(filename, encoding="utf8", errors=errors) as fin:
+             rendered = (md or MarkdownIt()).render(fin.read())
+             print(rendered, end="")
++    except UnicodeDecodeError as error:
++        # 只报告来源和位置，不回显可能敏感的原始文档片段。
++        sys.stderr.write(f'文件"{filename}"UTF8解码失败，字节位置{error.start}。\n')
++        sys.exit(1)
+     except OSError:
+         sys.stderr.write(f'Cannot open file "{filename}".\n')
+         sys.exit(1)
+@@ -111,6 +123,7 @@
+         formatter_class=argparse.RawDescriptionHelpFormatter,
+     )
+     parser.add_argument("-v", "--version", action="version", version=version_str)
++    parser.add_argument("--encoding-errors", choices=("strict", "replace", "ignore"), default="ignore", help="UTF8解码策略，默认保持原ignore，可显式strict拒绝坏字节")
+     parser.add_argument(
+         "--stdin", action="store_true", help="read Markdown from standard input"
+     )
+--- a/library/tests/test_development_markdown_it_o04_dev.py
++++ b/library/tests/test_development_markdown_it_o04_dev.py
+@@ -0,0 +1,33 @@
++"""实际CLI显式严格解码与替换，默认输出保留原ignore兼容。"""
++from markdown_it.cli.parse import main,convert_file,convert_stdin
++from io import TextIOWrapper,BytesIO
++import pytest
++
++def test_explicit_strict_file_failure_has_source_position_and_no_document(tmp_path,capsys):
++    """显式strict对坏字节失败，反馈位置且不输出该文档。@return None。"""
++    path=tmp_path/'bad.md';path.write_bytes(b'secret-before\xffafter')
++    with pytest.raises(SystemExit) as error:main(['--encoding-errors','strict',str(path)])
++    output=capsys.readouterr()
++    assert error.value.code==1 and output.out=='' and str(path) in output.err and '13' in output.err
++    assert 'secret-before' not in output.err and 'after' not in output.err
++
++def test_explicit_replace_ignore_and_valid_unicode_remain_available(tmp_path,capsys):
++    """显式replace/ignore语义不同，合法中文默认不变。@return None。"""
++    path=tmp_path/'input.md';path.write_bytes(b'before\xffafter')
++    assert main([str(path)])==0
++    assert capsys.readouterr().out=='<p>beforeafter</p>\n'
++    assert main(['--encoding-errors','replace',str(path)])==0
++    assert 'before\ufffdafter' in capsys.readouterr().out
++    assert main(['--encoding-errors','ignore',str(path)])==0
++    assert 'beforeafter' in capsys.readouterr().out
++    path.write_text('# 你好',encoding='utf8');main([str(path)]);assert '<h1>你好</h1>' in capsys.readouterr().out
++
++def test_raw_stdin_uses_same_policy_and_invalid_policy_is_rejected(monkeypatch,capsys):
++    """stdin读真实buffer后按同一策略解码，不依赖终端预设errors。@return None。"""
++    import sys
++    monkeypatch.setattr(sys,'stdin',TextIOWrapper(BytesIO(b'a\xffb'),encoding='utf8',errors='ignore'))
++    with pytest.raises(SystemExit):convert_stdin(errors='strict')
++    assert capsys.readouterr().out==''
++    monkeypatch.setattr(sys,'stdin',TextIOWrapper(BytesIO(b'a\xffb'),encoding='utf8'))
++    main(['--stdin','--encoding-errors','replace']);assert 'a\ufffdb' in capsys.readouterr().out
++    with pytest.raises(SystemExit):main(['--encoding-errors','unknown'])

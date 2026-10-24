@@ -1,0 +1,91 @@
+--- a/library/development_tests/test_development_ct_signature_dev.py
++++ b/library/development_tests/test_development_ct_signature_dev.py
+@@ -0,0 +1,37 @@
++"""公开函数签名缓存键回归。"""
++import pytest
++from cachetools import cached,LRUCache
++from cachetools.keys import signature_key
++
++def test_equivalent_calls_and_defaults_share_cache_entry():
++    calls=[]
++    def work(a,b=2):
++        calls.append(1)
++        return a+b
++    wrapped=cached(LRUCache(8),key=signature_key(work))(work)
++    assert wrapped(1)==wrapped(a=1,b=2)==wrapped(1,2)==3 and len(calls)==1
++
++def test_variadic_keyword_order_is_normalized_and_types_are_optional():
++    def work(*args,**kwargs):
++        pass
++    key=signature_key(work,typed=True)
++    assert key(1,a=2,b=3)==key(1,b=3,a=2) and key(1)!=key(1.0)
++
++def test_function_namespace_and_explicit_receiver_ignoring():
++    def first(self,value=1):
++        pass
++    def second(self,value=1):
++        pass
++    assert signature_key(first)(None)!=signature_key(second)(None)
++    assert signature_key(first,ignore=('self',))(object(),2)==signature_key(first,ignore=('self',))(object(),value=2)
++
++def test_invalid_binding_unhashable_values_and_unknown_ignore_fail():
++    def work(value):
++        pass
++    key=signature_key(work)
++    with pytest.raises(TypeError):
++        key()
++    with pytest.raises(TypeError):
++        key([])
++    with pytest.raises(ValueError):
++        signature_key(work,ignore=('missing',))
+--- a/library/docs/development-ct-signature-dev.md
++++ b/library/docs/development-ct-signature-dev.md
+@@ -0,0 +1,5 @@
++# 按真实函数签名规范缓存键并隔离共享命名空间
++
++共享缓存中，同一函数的等价调用需要同键，不同函数默认隔离。按真实签名绑定并补默认值，保留可变位置参数顺序、规范关键字顺序，忽略receiver或共享命名空间必须显式指定。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/cachetools/keys.py
++++ b/library/src/cachetools/keys.py
+@@ -64,3 +64,40 @@
+ def typedmethodkey(self, *args, **kwargs):
+     """Return a typed cache key for use with cached methods."""
+     return typedkey(*args, **kwargs)
++
++
++def signature_key(func, *, typed=False, namespace=None, ignore=()):
++    """按真实签名生成规范键函数。@param func 被缓存函数。@param typed 是否包含顶层值类型。
++    @param namespace 显式共享命名空间或默认函数。@param ignore 明确忽略的形参名。
++    @return 接受原函数参数的键函数；绑定错误及不可哈希值原样失败。
++    """
++    from inspect import Parameter, signature
++    spec=signature(func)
++    ignored=frozenset(ignore)
++    if not ignored.issubset(spec.parameters):
++        raise ValueError('忽略列表包含未知参数')
++    if type(typed) is not bool:
++        raise TypeError('typed必须是布尔值')
++    identity=func if namespace is None else namespace
++    hash(identity)
++    def key(*args,**kwargs):
++        bound=spec.bind(*args,**kwargs)
++        bound.apply_defaults()
++        values=[]
++        for name,parameter in spec.parameters.items():
++            if name in ignored:
++                continue
++            value=bound.arguments[name]
++            if parameter.kind is Parameter.VAR_KEYWORD:
++                value=tuple(sorted(value.items()))
++                type_key=tuple((k,type(v)) for k,v in bound.arguments[name].items())
++                type_key=tuple(sorted(type_key))
++            elif parameter.kind is Parameter.VAR_POSITIONAL:
++                type_key=tuple(type(v) for v in value)
++            else:
++                type_key=type(value)
++            values.append((name,value,type_key) if typed else (name,value))
++        result=_HashedTuple((identity,*values))
++        hash(result)
++        return result
++    return key

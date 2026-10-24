@@ -1,0 +1,60 @@
+--- a/library/docs/development-python-frontmatter-03-dev.md
++++ b/library/docs/development-python-frontmatter-03-dev.md
+@@ -0,0 +1,5 @@
++# JSON文档按完整对象语法分离嵌套元数据与正文
++
++路线03：JSON头部按真实对象语法结束，支持紧凑、空对象、嵌套及字符串花括号，正文里的JSON不被消费；保持处理器与保留键元数据。坏JSON沿既有解码异常报告，不将内部闭括号当外层边界。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/frontmatter/default_handlers.py
++++ b/library/frontmatter/default_handlers.py
+@@ -282,10 +282,21 @@
+     START_DELIMITER = ""
+     END_DELIMITER = ""
+ 
++    def detect(self, text: str) -> bool:
++        """识别以对象开头的JSON。@param text 文本。@return 是否为对象前缀。"""
++        return text.lstrip().startswith("{")
++
+     def split(self, text: str) -> tuple[str, str]:
+-        assert self.FM_BOUNDARY is not None
+-        _, fm, content = self.FM_BOUNDARY.split(text, 2)
+-        return "{" + fm + "}", content
++        """用JSON语法确定对象终点。@param text 文本。@return 元数据和余下正文。"""
++        text = text.lstrip()
++        try:
++            metadata, end = json.JSONDecoder().raw_decode(text)
++        except json.JSONDecodeError:
++            # 交给load报告JSON错误，避免parse把解码异常误认成缺少分隔符。
++            return text, ""
++        if not isinstance(metadata, dict):
++            raise ValueError("JSON元数据必须是对象")
++        return text[:end], text[end:]
+ 
+     def load(self, fm: str, **kwargs: object) -> Any:
+         return json.loads(fm, **kwargs)  # type: ignore[arg-type]
+--- a/library/tests/test_development_python_frontmatter_03_dev.py
++++ b/library/tests/test_development_python_frontmatter_03_dev.py
+@@ -0,0 +1,22 @@
++"""JSON边界由语法确定，不能按独立花括号行截断。"""
++import json
++import unittest
++import frontmatter
++from frontmatter.default_handlers import JSONHandler
++
++
++def test_compact_empty_and_nested_objects():
++    """紧凑与嵌套对象只消费一个完整JSON值。@return None。"""
++    for header in ({},{'content':'摘要','handler':'业务','nested':{'list':[{'a':'{x}'}]}}):
++        post=frontmatter.loads(json.dumps(header)+'\nBody {not JSON}')
++        assert isinstance(post.handler,JSONHandler)
++        assert post.metadata==header and post.content=='Body {not JSON}'
++        assert frontmatter.loads(frontmatter.dumps(post)).metadata==header
++
++
++def test_nested_pretty_and_invalid_json():
++    """内部闭括号行不是外层终点；错误JSON不得静默吃掉正文。@return None。"""
++    raw='{\n"nested": {\n"x": 1\n}\n}\nBody'
++    assert frontmatter.loads(raw).metadata=={'nested':{'x':1}}
++    with unittest.TestCase().assertRaises(json.JSONDecodeError):frontmatter.loads('{\n"x": BAD\n}\nbody')
++    assert frontmatter.loads('no JSON here').content=='no JSON here'

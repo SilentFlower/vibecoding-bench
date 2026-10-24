@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-LIQUID-04-DEV",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add liquid.record_rendering.render_records and async-generator render_records_async over lazy (id,Mapping) records, returning immutable RenderedRecord(id,status,output,error-type). Use real BoundTemplate.render/render_async each time so assigns/cycle state does not leak across records. Preserve input order and identity; reject duplicate ids; continue mode records LiquidError without data/error-message leakage, fail-fast rethrows. Ordinary user exceptions and cancellation propagate. Keep work strictly pull-driven with no prefetch/unbounded tasks; closing after one item never executes later records. Both APIs are serial by explicit contract, no concurrency claim.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

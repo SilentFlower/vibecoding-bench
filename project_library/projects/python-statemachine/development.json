@@ -1,0 +1,324 @@
+{
+  "project_key": "python-statemachine",
+  "title": "Python状态机领域集成工作场景",
+  "category": "状态值、校验与异步就绪",
+  "seed_digest": "7da46014ea40c7a318951de64d1b321ee77eb1aacea148f2c3c7a949a95f248a",
+  "environment": "python-statemachine-py312",
+  "source": {
+    "repository": "https://github.com/fgmacedo/python-statemachine",
+    "commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "schema": 3,
+  "description": "六项真实状态机工程交付：活动快照、同步事件、异步事件、JSON日志、真实重放和声明路径图；独立和累计验收。",
+  "scenarios": [
+    {
+      "id": "SM-SNAPSHOT-DEV-SCENE",
+      "title": "只读捕获真实活动配置与结构候选事件的不可变快照",
+      "goal": "只读捕获真实活动配置与结构候选事件的不可变快照",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SM-SNAPSHOT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-SNAPSHOT-DEV",
+          "kind": "modify",
+          "goal": "只读捕获真实活动配置与结构候选事件的不可变快照",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement statemachine.snapshots.snapshot(machine), freeze(value) and frozen StateSnapshot(states,values,allowed_events). Capture actual StateChart.configuration order, state IDs and JSON-compatible values, stable-deduplicate actual allowed_events. Deep-freeze standard containers, reject cycles/nonfinite/unsupported values. Do not run enabled_events/guards, callbacks, sends or implicit async initial activation; an unactivated configuration stays as actually observed. Clarify structural allowed events do not promise guards pass. Preserve original model/configuration/listeners.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_snapshot_dev.py and concise Chinese compatibility documentation at library/docs/development-sm-snapshot-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SM-SNAPSHOT-DEV-contract.md",
+            "materials/SM-SNAPSHOT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/statemachine/snapshots.py",
+            "library/development_tests/test_development_sm_snapshot_dev.py",
+            "library/docs/development-sm-snapshot-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SM-SNAPSHOT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-SNAPSHOT-DEV.native.json",
+            "public_native": "verification/SM-SNAPSHOT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SM-SNAPSHOT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SM-RUNNER-DEV-SCENE",
+      "title": "为真实同步状态机提供惰性事件执行与前后状态记录",
+      "goal": "为真实同步状态机提供惰性事件执行与前后状态记录",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SM-RUNNER-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-RUNNER-DEV",
+          "kind": "modify",
+          "goal": "为真实同步状态机提供惰性事件执行与前后状态记录",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement statemachine.runner.EventCall, EventResult, normalize_call and MachineRunner(machine) with dispatch(call,*,index=0,errors=\"raise\") and run(calls,*,errors=\"raise\"). Invoke actual send with detached positional/keyword callback arguments; reject empty calls and delay/send_id/internal controls in immediate batches. Reuse completed snapshots before/after actual execution, retain real callback result, collect only TransitionNotAllowed as error records and continue when requested. Programming/callback/source exceptions propagate. Stay lazy and sequential, preserve original native transition semantics and do not claim rollback of external callback side effects; async uses separate runner.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_runner_dev.py and concise Chinese compatibility documentation at library/docs/development-sm-runner-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "SM-SNAPSHOT-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/SM-RUNNER-DEV-contract.md",
+            "materials/SM-RUNNER-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/statemachine/runner.py",
+            "library/development_tests/test_development_sm_runner_dev.py",
+            "library/docs/development-sm-runner-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SM-RUNNER-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-RUNNER-DEV.native.json",
+            "public_native": "verification/SM-RUNNER-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SM-RUNNER-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SM-ASYNC-DEV-SCENE",
+      "title": "在原事件循环串行等待状态机激活与异步事件完成",
+      "goal": "在原事件循环串行等待状态机激活与异步事件完成",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SM-ASYNC-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-ASYNC-DEV",
+          "kind": "modify",
+          "goal": "在原事件循环串行等待状态机激活与异步事件完成",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement statemachine.async_runner.AsyncMachineRunner using completed EventCall validation, EventResult and snapshots. dispatch awaits actual activate_initial_state and send only when awaitable, records actual completed states/results and supports normal sync machines. run accepts sync or async event sources, stays lazy, awaits one event before reading the next, stable indices and collect only TransitionNotAllowed. Propagate cancellation, callback and source errors. No nested asyncio.run, hidden threads, tasks or no-op guard shortcuts; preserve actual lifecycle and callback parameter isolation.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_async_dev.py and concise Chinese compatibility documentation at library/docs/development-sm-async-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "SM-RUNNER-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/SM-ASYNC-DEV-contract.md",
+            "materials/SM-ASYNC-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/statemachine/async_runner.py",
+            "library/development_tests/test_development_sm_async_dev.py",
+            "library/docs/development-sm-async-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SM-ASYNC-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-ASYNC-DEV.native.json",
+            "public_native": "verification/SM-ASYNC-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SM-ASYNC-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SM-JOURNAL-DEV-SCENE",
+      "title": "序列化真实事件与前后配置为受校验的可重放JSON日志",
+      "goal": "序列化真实事件与前后配置为受校验的可重放JSON日志",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SM-JOURNAL-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-JOURNAL-DEV",
+          "kind": "modify",
+          "goal": "序列化真实事件与前后配置为受校验的可重放JSON日志",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement statemachine.journal.dumps_journal(results,*,max_records=10000) and loads_journal(document,*,max_records=10000) using completed EventResult/Call/Snapshot types. Schema1 records contain contiguous index, event/args/kwargs, passed/error, before/after configurations and actual result/error; support empty journals and Unicode JSON-compatible values. Validate version, exact record/state structure, counts, order, statuses, duplicate JSON keys, finite values and immediate event control policies. Restore independent data records without importing machine classes, eval or sending events. Unsupported callback result serialization must fail, not stringify objects.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_journal_dev.py and concise Chinese compatibility documentation at library/docs/development-sm-journal-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "SM-RUNNER-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/SM-JOURNAL-DEV-contract.md",
+            "materials/SM-JOURNAL-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/statemachine/journal.py",
+            "library/development_tests/test_development_sm_journal_dev.py",
+            "library/docs/development-sm-journal-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SM-JOURNAL-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-JOURNAL-DEV.native.json",
+            "public_native": "verification/SM-JOURNAL-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SM-JOURNAL-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SM-REPLAY-DEV-SCENE",
+      "title": "在明确工厂的新实例中重放事件日志并核对真实配置",
+      "goal": "在明确工厂的新实例中重放事件日志并核对真实配置",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SM-REPLAY-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-REPLAY-DEV",
+          "kind": "modify",
+          "goal": "在明确工厂的新实例中重放事件日志并核对真实配置",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement statemachine.replay.replay(factory,document,*,verify=True,max_records=10000) returning frozen ReplayResult(machine,results). Fully validate completed JSON journal before calling factory; never import a class name from data. Run each EventCall through completed MachineRunner on the new factory instance and preserve native callback execution. Verify before/after states and values plus passed/error status per index, reject divergence before next event; verify=False returns actual results explicitly. Handle empty journals and expected disallowed events. Do not mutate journal data or claim external callback side effects are rolled back.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_replay_dev.py and concise Chinese compatibility documentation at library/docs/development-sm-replay-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "SM-JOURNAL-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "SM-RUNNER-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/SM-REPLAY-DEV-contract.md",
+            "materials/SM-REPLAY-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/statemachine/replay.py",
+            "library/development_tests/test_development_sm_replay_dev.py",
+            "library/docs/development-sm-replay-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SM-REPLAY-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-REPLAY-DEV.native.json",
+            "public_native": "verification/SM-REPLAY-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SM-REPLAY-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "SM-GRAPH-DEV-SCENE",
+      "title": "为平面状态机实现不执行回调的声明图与有界候选路径规划",
+      "goal": "为平面状态机实现不执行回调的声明图与有界候选路径规划",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SM-GRAPH-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SM-GRAPH-DEV",
+          "kind": "modify",
+          "goal": "为平面状态机实现不执行回调的声明图与有界候选路径规划",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement statemachine.transition_graph.TransitionGraph(machine_class), frozen Edge(source,target,event), nodes/edges tuples and shortest_path(start,target,*,max_depth=1000). Inspect actual StateMachine states/transitions/events, stable-deduplicate edges, support cycles/self/targetless transitions and shortest event sequences with bounded BFS. Same state yields empty path, unavailable path None, unknown IDs error. Explicitly reject hierarchical/parallel/eventless/multitarget definitions rather than pretending flat graph equals runtime. Do not instantiate machines, evaluate guards/callbacks or promise candidate paths will be enabled; preserve declaration objects.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_graph_dev.py and concise Chinese compatibility documentation at library/docs/development-sm-graph-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SM-GRAPH-DEV-contract.md",
+            "materials/SM-GRAPH-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/statemachine/transition_graph.py",
+            "library/development_tests/test_development_sm_graph_dev.py",
+            "library/docs/development-sm-graph-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SM-GRAPH-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/SM-GRAPH-DEV.native.json",
+            "public_native": "verification/SM-GRAPH-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/SM-GRAPH-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TRANSITIONS-06-DEV",
+  "source_commit": "bd42b38f3627e6bca7274fb4d9af2e105f75da7c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add explicit Machine.explain_event for bound core FLAT nonqueued synchronous machines. This is NOT read-only: execute existing prepare_event/transition.prepare and Condition.check in actual candidate/condition order using EventData and send_event args. Report condition index/target/pass/fail/skipped/error type; failure skips remaining conditions then tries next candidate, success skips later candidates, errors stop without exception message. Never execute transition before/after/enter/exit or state change. Unknown event has no candidates/allowedFalse. No all-guards evaluation, pure-rule claim, hierarchical/async support or on_exception/finalize diagnostic callback promise.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

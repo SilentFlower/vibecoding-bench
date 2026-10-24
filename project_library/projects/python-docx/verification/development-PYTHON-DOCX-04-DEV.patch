@@ -1,0 +1,107 @@
+--- a/library/docs/development-python-docx-04-dev.md
++++ b/library/docs/development-python-docx-04-dev.md
+@@ -0,0 +1,5 @@
++# 公开超链接编辑正确维护外部关系与内部跳转
++
++路线04：公开add_hyperlink与地址/fragment/text/remove编辑，真实OOXML/OPC关系支持外链和内部跳转；文本继承首run格式，共享关系按修改前引用计数安全清理，地址不联网。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/docx/text/hyperlink.py
++++ b/library/src/docx/text/hyperlink.py
+@@ -100,6 +100,45 @@
+         """
+         return self._hyperlink.text
+ 
++    @address.setter
++    def address(self,value):
++        """修改外链且按真实引用计数清理旧关系。@param value 新地址，空串转内部链接。@return None。"""
++        from docx.opc.constants import RELATIONSHIP_TYPE
++        if not isinstance(value,str):raise TypeError("address必须为str")
++        if not value and not self.fragment:raise ValueError("不能同时清空地址与fragment")
++        old=self._hyperlink.rId
++        new=self.part.relate_to(value,RELATIONSHIP_TYPE.HYPERLINK,is_external=True) if value else None
++        if old and old!=new:
++            # drop_rel约定调用时当前元素仍引用旧id，避免误删其他链接仅剩的引用。
++            self.part.drop_rel(old)
++        self._hyperlink.rId=new
++
++    @fragment.setter
++    def fragment(self,value):
++        """修改片段/书签名。@param value str，空值移除。@return None。"""
++        if not isinstance(value,str):raise TypeError("fragment必须为str")
++        if not value and not self.address:raise ValueError("不能同时清空地址与fragment")
++        self._hyperlink.anchor=value or None
++
++    @text.setter
++    def text(self,value):
++        """替换链接文字并继承首run格式。@param value 文本。@return None。"""
++        from docx.oxml import OxmlElement
++        if not isinstance(value,str):raise TypeError("text必须为str")
++        runs=self.runs
++        if runs:
++            runs[0].text=value
++            for run in runs[1:]:self._hyperlink.remove(run._r)
++        else:
++            element=OxmlElement("w:r");self._hyperlink.append(element);Run(element,self._parent).text=value
++
++    def remove(self):
++        """移除当前链接，保留仍被其他链接使用的关系。@return None。"""
++        parent=self._hyperlink.getparent()
++        if parent is None:return
++        if self._hyperlink.rId:self.part.drop_rel(self._hyperlink.rId)
++        parent.remove(self._hyperlink)
++
+     @property
+     def url(self) -> str:
+         """Convenience property to get web URLs from hyperlinks that contain them.
+--- a/library/src/docx/text/paragraph.py
++++ b/library/src/docx/text/paragraph.py
+@@ -26,6 +26,22 @@
+     def __init__(self, p: CT_P, parent: t.ProvidesStoryPart):
+         super(Paragraph, self).__init__(parent)
+         self._p = self._element = p
++
++    def add_hyperlink(self,text,address="",fragment="",style=None):
++        """新增外部或内部链接。@param text 显示文字。@param address 外部地址或空。@param fragment 内部书签/外部片段。@param style 可选字符样式。@return Hyperlink。"""
++        from docx.oxml import OxmlElement
++        from docx.opc.constants import RELATIONSHIP_TYPE
++        if any(not isinstance(value,str) for value in (text,address,fragment)):raise TypeError("链接值必须为str")
++        if not address and not fragment:raise ValueError("链接需要address或fragment")
++        element=OxmlElement("w:hyperlink")
++        if fragment:element.anchor=fragment
++        element.history=True
++        run_element=OxmlElement("w:r");element.append(run_element)
++        run=Run(run_element,self);run.text=text
++        if style is not None:run.style=style
++        if address:element.rId=self.part.relate_to(address,RELATIONSHIP_TYPE.HYPERLINK,is_external=True)
++        self._p.append(element)
++        return Hyperlink(element,self)
+ 
+     def add_run(self, text: str | None = None, style: str | CharacterStyle | None = None) -> Run:
+         """Append run containing `text` and having character-style `style`.
+--- a/library/tests/test_development_python_docx_04_dev.py
++++ b/library/tests/test_development_python_docx_04_dev.py
+@@ -0,0 +1,23 @@
++"""链接创建修改删除管理真实OPC关系，保存重开URL与格式一致。"""
++from io import BytesIO
++from zipfile import ZipFile
++from docx import Document
++
++def test_hyperlink_roundtrip_external_internal_text_and_run_format():
++    """外链不发请求，内部片段没有外部relationship。@return None。"""
++    document=Document();paragraph=document.add_paragraph()
++    link=paragraph.add_hyperlink('Original','https://example.invalid/path',fragment='section')
++    link.runs[0].bold=True;link.text='中文 new';link.address='https://other.invalid/new';link.fragment='detail'
++    internal=paragraph.add_hyperlink('Jump',fragment='Bookmark')
++    output=BytesIO();document.save(output);output.seek(0);restored=Document(output).paragraphs[0].hyperlinks
++    assert restored[0].text=='中文 new' and restored[0].url=='https://other.invalid/new#detail' and restored[0].runs[0].bold
++    assert restored[1].address=='' and restored[1].fragment=='Bookmark'
++
++def test_shared_relationship_retained_until_last_reference_removed():
++    """两个链接共享同地址，改单个/删除单个不得破坏另一项。@return None。"""
++    document=Document();paragraph=document.add_paragraph()
++    a=paragraph.add_hyperlink('a','https://same.invalid');b=paragraph.add_hyperlink('b','https://same.invalid')
++    shared=a._hyperlink.rId;assert shared==b._hyperlink.rId
++    a.address='https://new.invalid';assert b.address=='https://same.invalid' and shared in document.part.rels
++    b.remove();assert shared not in document.part.rels and len(paragraph.hyperlinks)==1
++    a.remove();a.remove();assert paragraph.hyperlinks==[]

@@ -1,0 +1,59 @@
+--- a/library/development_tests/test_development_mm_normalize_dev.py
++++ b/library/development_tests/test_development_mm_normalize_dev.py
+@@ -0,0 +1,21 @@
++"""公开Unicode字段规范化回归。"""
++import pytest
++from marshmallow import Schema,ValidationError,validate
++from marshmallow.normalized import NormalizedString
++
++def test_unicode_and_casefold_are_applied_before_length_validation():
++    field=NormalizedString(casefold=True,validate=validate.Length(equal=2))
++    assert field.deserialize('  ß  ')=='ss'
++
++def test_combining_text_is_normalized_without_changing_dump():
++    field=NormalizedString();assert field.deserialize(' e\u0301 ')== 'é'
++    assert field._serialize(' e\u0301 ',None,None)==' e\u0301 '
++
++def test_schema_alias_required_and_none_remain_native():
++    class Item(Schema): name=NormalizedString(data_key='display',required=True,allow_none=True)
++    assert Item().load({'display':None})=={'name':None}
++    with pytest.raises(ValidationError): Item().load({})
++
++def test_invalid_policy_and_bad_bytes_fail():
++    with pytest.raises(ValueError): NormalizedString(form='BAD')
++    with pytest.raises(ValidationError): NormalizedString().deserialize(b'\xff')
+--- a/library/docs/development-mm-normalize-dev.md
++++ b/library/docs/development-mm-normalize-dev.md
+@@ -0,0 +1,5 @@
++# 为字符串字段加入验证前Unicode标准化策略
++
++标准化必须发生在原字段验证器之前，按裁边、大小写折叠和Unicode形式顺序执行。保留原生缺失、空值、默认值、别名和序列化行为，不全局改变String。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/marshmallow/normalized.py
++++ b/library/src/marshmallow/normalized.py
+@@ -0,0 +1,24 @@
++"""在原生验证器之前完成明确的Unicode标准化。"""
++import unicodedata
++from .fields import String
++
++
++class NormalizedString(String):
++    """保留原字符串字段语义，显式选择标准化策略。"""
++    def __init__(self,*,form='NFC',strip=True,casefold=False,**kwargs):
++        """建立字段。@param form Unicode标准化形式或None。@param strip 是否裁边。
++        @param casefold 是否折叠大小写。@param kwargs 原字段选项。@return None。
++        """
++        if form not in (None,'NFC','NFD','NFKC','NFKD') or type(strip) is not bool or type(casefold) is not bool:
++            raise ValueError('无效的标准化策略')
++        self.form=form;self.strip=strip;self.casefold=casefold
++        super().__init__(**kwargs)
++
++    def _deserialize(self,value,attr,data,**kwargs):
++        text=super()._deserialize(value,attr,data,**kwargs)
++        if self.strip:
++            text=text.strip()
++        if self.casefold:
++            text=text.casefold()
++        # 大小写折叠可能产生组合字符，最后执行标准化保证返回值满足指定形式。
++        return unicodedata.normalize(self.form,text) if self.form is not None else text

@@ -1,0 +1,83 @@
+--- a/library/docs/development-cattrs-o05-dev.md
++++ b/library/docs/development-cattrs-o05-dev.md
+@@ -0,0 +1,5 @@
++# 为抽象PathLike字段指定不访问文件的文本策略
++
++抽象PathLike文本注解通过真实谓词钩子导出fspath字符串，并用明确工厂读入。支持嵌套JSON和自定义实现；bytes路径及坏工厂明确拒绝，不隐式解码、不访问文件，既有具体Path能力保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/cattrs/strategies/pathlike.py
++++ b/library/src/cattrs/strategies/pathlike.py
+@@ -0,0 +1,33 @@
++"""抽象文本路径注解的显式双向转换策略，不访问文件。"""
++from os import PathLike, fspath
++from pathlib import Path
++from typing import get_origin
++
++
++def configure_pathlike(converter, *, factory=Path):
++    """为抽象PathLike文本字段绑定显式读入工厂。
++
++    :param converter: 当前真实转换器。
++    :param factory: 接收文本并返回文本PathLike的调用者工厂。
++    :return: 同一转换器，具体Path默认和用户后注册钩子保持。
++    """
++    def supported(target):
++        """只匹配抽象PathLike及其泛型注解。@param target 注解。@return 是否匹配。"""
++        return target is PathLike or get_origin(target) is PathLike
++    def unstructure(value):
++        """严格输出文本路径。@param value PathLike。@return str。"""
++        text = fspath(value)
++        if not isinstance(text, str):
++            raise TypeError('抽象路径策略不解码bytes路径')
++        return text
++    def structure(value, target):
++        """用显式工厂读入文本。@param value 文本。@param target 注解。@return PathLike。"""
++        if not isinstance(value, str):
++            raise TypeError('抽象路径输入必须为文本')
++        result = factory(value)
++        if not isinstance(result, PathLike) or not isinstance(fspath(result), str):
++            raise TypeError('路径工厂必须返回文本PathLike')
++        return result
++    converter.register_unstructure_hook_func(supported, unstructure)
++    converter.register_structure_hook_func(supported, structure)
++    return converter
+--- a/library/tests/test_development_cattrs_o05_dev.py
++++ b/library/tests/test_development_cattrs_o05_dev.py
+@@ -0,0 +1,36 @@
++"""抽象PathLike字段需要明确文本策略及读入目标。"""
++from dataclasses import dataclass
++from os import PathLike
++from pathlib import Path, PurePosixPath
++import pytest
++from cattrs.preconf.json import make_converter
++
++def test_abstract_path_json_roundtrip():
++    """字段真实注解为PathLike[str]时可JSON往返。@return None。"""
++    from cattrs.strategies.pathlike import configure_pathlike
++    @dataclass
++    class Record:
++        """文件索引。"""
++        location: PathLike[str]
++    converter = configure_pathlike(make_converter(), factory=PurePosixPath)
++    result = converter.loads(converter.dumps(Record(PurePosixPath('/virtual/x'))), Record)
++    assert result.location == PurePosixPath('/virtual/x')
++
++def test_custom_fspath_and_bytes_rejected():
++    """自定义fspath可用，bytes不可隐式解码。@return None。"""
++    from cattrs.strategies.pathlike import configure_pathlike
++    converter = configure_pathlike(make_converter())
++    class Custom:
++        """文本路径实现。"""
++        def __fspath__(self):
++            """返回文本。@return str。"""
++            return '/virtual/custom'
++    assert converter.unstructure(Custom(), unstructure_as=PathLike[str]) == '/virtual/custom'
++    with pytest.raises(TypeError): converter.structure(b'/bytes', PathLike[str])
++
++def test_bad_factory_and_concrete_path():
++    """工厂错误明确，具体Path已有能力保留。@return None。"""
++    from cattrs.strategies.pathlike import configure_pathlike
++    converter = configure_pathlike(make_converter(), factory=lambda value: value)
++    with pytest.raises(TypeError): converter.structure('/virtual/x', PathLike[str])
++    assert make_converter().unstructure(Path('/virtual/x')) == '/virtual/x'

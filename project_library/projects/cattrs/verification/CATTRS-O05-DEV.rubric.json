@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CATTRS-O05-DEV",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement cattrs.strategies.pathlike.configure_pathlike(converter, *, factory=Path) for PathLike and PathLike[str] annotations through actual predicate hooks. Unstructure using os.fspath and require str output, structure only str through an explicit factory returning text PathLike, reject byte paths/invalid factory returns without implicit decoding. Support nested JSON records and custom __fspath__, never touch the filesystem, and preserve concrete Path defaults and converter isolation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

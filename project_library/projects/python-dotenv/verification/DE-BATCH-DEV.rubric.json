@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DE-BATCH-DEV",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement dotenv.editing.update_keys(path, updates, *, remove=(), encoding=\"utf-8\", follow_symlinks=False). Validate and serialize the complete mapping/removal list before opening rewrite; reject malformed keys, NUL/nonstring values and conflicting update/delete keys. Reuse rewrite for one atomic replacement, preserve every non-target parsed record and newline byte, update first target occurrence and remove duplicate target definitions, remove all requested-key occurrences, append missing updates in mapping order with a needed separator, and return (updated_keys_tuple, removed_keys_tuple). Single-quote escaping must roundtrip backslashes, quotes and multiline values. Preserve mode, symlink option and failure cleanup.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

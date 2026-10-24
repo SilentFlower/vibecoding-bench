@@ -1,0 +1,58 @@
+--- a/library/development_tests/test_development_sg_bounds_dev.py
++++ b/library/development_tests/test_development_sg_bounds_dev.py
+@@ -0,0 +1,26 @@
++"""公开最终查询边界真实执行回归。"""
++import sqlite3
++import pytest
++from sqlglot import parse_one
++from sqlglot.report_bounds import bounded_query
++
++def test_existing_inner_limit_and_offset_are_not_overwritten():
++    source='SELECT n FROM (SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4) ORDER BY n LIMIT 2 OFFSET 1'
++    result=bounded_query(source,10)
++    assert sqlite3.connect(':memory:').execute(result.sql(dialect='sqlite')).fetchall()==[(2,),(3,)]
++
++def test_outer_offset_and_zero_limit_apply_to_complete_union():
++    source='SELECT 1 AS n UNION ALL SELECT 2 UNION ALL SELECT 3'
++    connection=sqlite3.connect(':memory:')
++    assert connection.execute(bounded_query(source,1,offset=1).sql(dialect='sqlite')).fetchall()==[(2,)]
++    assert connection.execute(bounded_query(source,0).sql(dialect='sqlite')).fetchall()==[]
++
++def test_original_ast_parent_links_and_cte_are_preserved():
++    tree=parse_one('WITH x AS (SELECT 1 AS n) SELECT n FROM x');before=tree.dump()
++    result=bounded_query(tree,3)
++    assert tree.dump()==before and tree.parent is None and 'WITH x AS' in result.sql()
++
++def test_invalid_bounds_and_dialect_generation_are_explicit():
++    for count in (True,-1,1.2):
++        with pytest.raises(ValueError): bounded_query('SELECT 1',count)
++    assert 'TOP 2' in bounded_query('SELECT 1',2).sql(dialect='tsql')
+--- a/library/docs/development-sg-bounds-dev.md
++++ b/library/docs/development-sg-bounds-dev.md
+@@ -0,0 +1,5 @@
++# 对最终查询结果施加独立行数边界而保留内部LIMIT语义
++
++在查询外层限制最终结果，不能覆盖内部原有分页或只给UNION单侧加限制。零行上限合法，偏移与类型严格校验，使用真实语法树生成各方言，原AST不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/sqlglot/report_bounds.py
++++ b/library/sqlglot/report_bounds.py
+@@ -0,0 +1,18 @@
++"""通过外层查询限制最终结果，不覆盖内部集合或已有分页。"""
++from . import exp
++from .report_inspection import query_copy
++
++
++def bounded_query(query,max_rows,*,offset=0,dialect=None):
++    """包装最终结果行数上限。@param query 原单查询。@param max_rows 非负整数上限。
++    @param offset 非负结果偏移。@param dialect 输入方言。@return 独立外层Select。
++    不承诺跨方言隐含顺序；调用者需要确定顺序时须在业务查询中显式排序。
++    """
++    if type(max_rows) is not int or max_rows<0 or type(offset) is not int or offset<0:
++        raise ValueError('行数和偏移必须为非负整数')
++    original=query_copy(query,dialect)
++    result=exp.Select(expressions=[exp.Star()]).from_(original.subquery(alias='__report_limit'))
++    result=result.limit(max_rows)
++    if offset:
++        result=result.offset(offset)
++    return result

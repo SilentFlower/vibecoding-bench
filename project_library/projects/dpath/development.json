@@ -3,7 +3,7 @@
   "project_key": "dpath",
   "title": "Dpath路径数据开发任务",
   "category": "嵌套对象路径操作",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实嵌套配置工程交付，覆盖范围删除、类型化精确读取、有界遍历、转换、事务补丁与业务键合并；逐项及累计验收。",
   "seed_digest": "07c2527be8f5d9424d1f37732b90bb3f087c03525bad4871279ab131c68eaaea",
   "environment": "dpath-py312",
   "source": {
@@ -57,6 +57,255 @@
             "disclosure/DP-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "DP-EXACT-DEV-SCENE",
+      "title": "按原始键类型精确访问含通配字符的嵌套字段",
+      "goal": "按原始键类型精确访问含通配字符的嵌套字段",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DP-EXACT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-EXACT-DEV",
+          "kind": "modify",
+          "goal": "按原始键类型精确访问含通配字符的嵌套字段",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement dpath.exact.get_exact(root,segments,default=marker). Paths are finite component iterables, never plain strings; mapping keys retain actual hashable types and punctuation, list indices are nonnegative int excluding bool. Empty path returns root identity. Missing key/index returns an explicit default or raises original error, while invalid traversal/type errors propagate. Do not interpret glob characters, coerce \"1\" to integer, trigger defaultdict creation, or mutate input; preserve old dpath.get.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_exact_dev.py and concise Chinese compatibility documentation at library/docs/development-dp-exact-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DP-EXACT-DEV-contract.md",
+            "materials/DP-EXACT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dpath/exact.py",
+            "library/development_tests/test_development_dp_exact_dev.py",
+            "library/docs/development-dp-exact-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DP-EXACT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-EXACT-DEV.native.json",
+            "public_native": "verification/DP-EXACT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DP-EXACT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DP-WALK-DEV-SCENE",
+      "title": "非递归返回类型化路径并执行祖先循环和访问预算策略",
+      "goal": "非递归返回类型化路径并执行祖先循环和访问预算策略",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DP-WALK-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-WALK-DEV",
+          "kind": "modify",
+          "goal": "非递归返回类型化路径并执行祖先循环和访问预算策略",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement dpath.walking.walk_paths(root,*,include_containers=False,cycles=\"error\",max_depth=None,max_nodes=None), yielding (tuple_path,original_value) in mapping/list source preorder. Root depth zero and node budget includes root/containers. Empty containers are leaves; optional nonempty containers are emitted too. Track active ancestors iteratively: PathCycleError.path identifies cycles or skip drops only cyclic edges, while shared acyclic objects appear under both paths. Reject invalid budgets, bound before yielding offending nodes, avoid Python recursion and preserve original path key types/input.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_walk_dev.py and concise Chinese compatibility documentation at library/docs/development-dp-walk-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DP-WALK-DEV-contract.md",
+            "materials/DP-WALK-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dpath/walking.py",
+            "library/development_tests/test_development_dp_walk_dev.py",
+            "library/docs/development-dp-walk-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DP-WALK-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-WALK-DEV.native.json",
+            "public_native": "verification/DP-WALK-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DP-WALK-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DP-TRANSFORM-DEV-SCENE",
+      "title": "按类型化路径转换原有配置叶子并隔离原对象",
+      "goal": "按类型化路径转换原有配置叶子并隔离原对象",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DP-TRANSFORM-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-TRANSFORM-DEV",
+          "kind": "modify",
+          "goal": "按类型化路径转换原有配置叶子并隔离原对象",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement dpath.transforming.transform_existing(root,transform,*,predicate=None), using completed walk_paths and get_exact rather than glob strings. Evaluate only original snapshot leaves (including empty containers), pass typed tuple path and detached value to callbacks, write replacements into a deep-copied result and never revisit newly generated content. Predicate is optional; late callback or cycle errors propagate while original objects remain unchanged, including callback mutations of supplied values. Root-leaf replacement works; preserve shared-copy alias semantics and source traversal order.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_transform_dev.py and concise Chinese compatibility documentation at library/docs/development-dp-transform-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "DP-EXACT-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "DP-WALK-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/DP-TRANSFORM-DEV-contract.md",
+            "materials/DP-TRANSFORM-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dpath/transforming.py",
+            "library/development_tests/test_development_dp_transform_dev.py",
+            "library/docs/development-dp-transform-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DP-TRANSFORM-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-TRANSFORM-DEV.native.json",
+            "public_native": "verification/DP-TRANSFORM-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DP-TRANSFORM-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DP-PATCH-DEV-SCENE",
+      "title": "把配置测试、插入、替换和删除作为一个副本事务提交",
+      "goal": "把配置测试、插入、替换和删除作为一个副本事务提交",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DP-PATCH-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-PATCH-DEV",
+          "kind": "modify",
+          "goal": "把配置测试、插入、替换和删除作为一个副本事务提交",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement dpath.patches.apply_edits(root,operations) using completed get_exact for typed literal paths. Materialize operations first and work on a deep copy. Support add/replace/remove/test; dictionary add sets a key, replace/remove require it, list add inserts at 0..len and remove compacts. Reject bool/negative list indices; test compares recursive types and values so True differs from 1. Empty path may test or replace/add root, but cannot remove root. Any later invalid operation, failed test or enumeration error leaves original unchanged; copy incoming mutable values and do not reinterpret paths as globs.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_patch_dev.py and concise Chinese compatibility documentation at library/docs/development-dp-patch-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "DP-EXACT-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/DP-PATCH-DEV-contract.md",
+            "materials/DP-PATCH-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dpath/patches.py",
+            "library/development_tests/test_development_dp_patch_dev.py",
+            "library/docs/development-dp-patch-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DP-PATCH-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-PATCH-DEV.native.json",
+            "public_native": "verification/DP-PATCH-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DP-PATCH-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DP-MERGE-KEY-DEV-SCENE",
+      "title": "按记录业务键对齐深合并并保持稳定顺序和输入隔离",
+      "goal": "按记录业务键对齐深合并并保持稳定顺序和输入隔离",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DP-MERGE-KEY-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DP-MERGE-KEY-DEV",
+          "kind": "modify",
+          "goal": "按记录业务键对齐深合并并保持稳定顺序和输入隔离",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement dpath.keymerge.merge_by_key(left,right,key). Materialize and validate both record iterables before merging: every mapping has a hashable business key and no duplicates within a side, using (type,value) identity so bool/int/string keys are not silently conflated. Preserve left order, recursively merge matching dictionary fields with right scalar/list replacement, append new records in right order, and deep-copy all retained/incoming nodes. Reject malformed/duplicate/unhashable keys without mutating either input. Do not change default dpath.merge list concatenation or original source references.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_merge_key_dev.py and concise Chinese compatibility documentation at library/docs/development-dp-merge-key-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DP-MERGE-KEY-DEV-contract.md",
+            "materials/DP-MERGE-KEY-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dpath/keymerge.py",
+            "library/development_tests/test_development_dp_merge_key_dev.py",
+            "library/docs/development-dp-merge-key-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DP-MERGE-KEY-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DP-MERGE-KEY-DEV.native.json",
+            "public_native": "verification/DP-MERGE-KEY-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DP-MERGE-KEY-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

@@ -1,0 +1,85 @@
+--- a/library/docs/development-wrapt-03-dev.md
++++ b/library/docs/development-wrapt-03-dev.md
+@@ -0,0 +1,5 @@
++# 异步LRU只缓存成功await结果并隔离loop及清理代次
++
++路线03：独立async_lru_cache缓存成功完成值，各loop独立有界LRU；异常/取消不缓存，clear撤回在飞回填，正常async descriptor/元数据保持，明确不合并并发计算。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wrapt/async_cache.py
++++ b/library/src/wrapt/async_cache.py
+@@ -0,0 +1,39 @@
++"""只缓存成功完成值的按事件循环隔离异步LRU。"""
++import asyncio
++import inspect
++from collections import OrderedDict,namedtuple
++from functools import wraps
++from weakref import WeakKeyDictionary
++CacheInfo=namedtuple('CacheInfo','hits misses maxsize currsize')
++
++def async_lru_cache(*,maxsize=128):
++    """异步结果装饰器。@param maxsize 每loop容量。@return async函数装饰器；并发相同未完成调用允许独立计算。"""
++    if type(maxsize) is not int or maxsize<0:raise ValueError('maxsize须非负整数')
++    def decorate(function):
++        if not inspect.iscoroutinefunction(function):raise TypeError('需要async函数')
++        loops=WeakKeyDictionary()
++        def state():
++            loop=asyncio.get_running_loop()
++            if loop not in loops:loops[loop]={'cache':OrderedDict(),'hits':0,'misses':0,'generation':0}
++            return loops[loop]
++        @wraps(function)
++        async def invoke(*args,**kwargs):
++            current=state();key=(args,tuple(sorted(kwargs.items())));hash(key)
++            if key in current['cache']:
++                current['hits']+=1;current['cache'].move_to_end(key);return current['cache'][key]
++            current['misses']+=1;generation=current['generation']
++            value=await function(*args,**kwargs)
++            # clear期间仍在飞的计算可返回给原调用者，但不能回填被清理的缓存代次。
++            if maxsize and generation==current['generation']:
++                current['cache'][key]=value;current['cache'].move_to_end(key)
++                while len(current['cache'])>maxsize:current['cache'].popitem(last=False)
++            return value
++        def cache_info():
++            """查看当前运行loop统计。@return CacheInfo。"""
++            value=state();return CacheInfo(value['hits'],value['misses'],maxsize,len(value['cache']))
++        def cache_clear():
++            """清理当前loop并撤销在飞回填。@return None。"""
++            value=state();value['generation']+=1;value['cache'].clear();value['hits']=value['misses']=0
++        invoke.cache_info=cache_info;invoke.cache_clear=cache_clear
++        return invoke
++    return decorate
+--- a/library/tests/test_development_wrapt_03_dev.py
++++ b/library/tests/test_development_wrapt_03_dev.py
+@@ -0,0 +1,32 @@
++"""重复await复用完成值，异常/取消与不同loop不串缓存。"""
++import asyncio
++import unittest
++from wrapt.async_cache import async_lru_cache
++
++def test_completed_values_repeat_await_and_event_loop_isolation():
++    """缓存的是结果，不是只能await一次的协程。@return None。"""
++    calls=[]
++    @async_lru_cache(maxsize=2)
++    async def value(x):calls.append(x);await asyncio.sleep(0);return x*2
++    async def run():
++        assert await value(2)==await value(2)==4
++        assert value.cache_info().hits==1 and value.cache_info().currsize==1
++    asyncio.run(run());asyncio.run(run());assert calls==[2,2]
++
++def test_failure_cancellation_and_clear_during_compute_do_not_store():
++    """取消/失败不缓存，clear后迟到成功不回填。@return None。"""
++    async def run():
++        started=asyncio.Event();release=asyncio.Event();calls=[]
++        @async_lru_cache(maxsize=2)
++        async def blocked(x):calls.append(x);started.set();await release.wait();return x
++        task=asyncio.create_task(blocked(1));await started.wait();blocked.cache_clear();release.set();assert await task==1
++        assert blocked.cache_info().currsize==0
++        @async_lru_cache()
++        async def fail():raise ValueError('bad')
++        for _ in range(2):
++            with unittest.TestCase().assertRaises(ValueError):await fail()
++        assert fail.cache_info().misses==2 and fail.cache_info().currsize==0
++        started.clear();release.clear();task=asyncio.create_task(blocked(2));await started.wait();task.cancel()
++        with unittest.TestCase().assertRaises(asyncio.CancelledError):await task
++        assert blocked.cache_info().currsize==0
++    asyncio.run(run())

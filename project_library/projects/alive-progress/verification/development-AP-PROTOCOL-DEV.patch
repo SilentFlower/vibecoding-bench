@@ -1,0 +1,58 @@
+--- a/library/alive_progress/core/progress.py
++++ b/library/alive_progress/core/progress.py
+@@ -458,6 +458,8 @@
+             self._handle(*args, **kwargs)
+ 
+ 
++_BAR_HANDLE_TYPE = __AliveBarHandle
++
+ def _noop(*_args, **_kwargs):  # pragma: no cover
+     pass
+ 
+@@ -602,6 +604,8 @@
+         # makes this adapter work as the real bar.
+         if '_bar' in self.__dict__:  # detects not yet started bar instances.
+             return getattr(self._bar, item)
++        if item not in _BAR_HANDLE_TYPE.__dict__ or item.startswith('_'):
++            raise AttributeError(item)
+         raise UserWarning('Configure this bar either via `alive_it()` or after iterating it.')
+ 
+     def __setattr__(self, key, value):
+--- a/library/development_tests/test_development_ap_protocol_dev.py
++++ b/library/development_tests/test_development_ap_protocol_dev.py
+@@ -0,0 +1,27 @@
++"""公开未启动迭代器属性协议回归。"""
++import pytest
++from alive_progress import alive_it
++
++def test_unknown_and_protocol_attribute_probes_are_normal_missing_values():
++    adapter=alive_it([1],disable=True)
++    assert not hasattr(adapter,'not_a_real_attribute') and getattr(adapter,'__await__','missing')=='missing'
++
++def test_known_progress_control_keeps_prestart_warning():
++    adapter=alive_it([1],disable=True)
++    with pytest.raises(UserWarning):
++        adapter.text
++
++def test_probing_does_not_consume_source_or_start_bar():
++    seen=[]
++    def source():
++        seen.append(1)
++        yield 'a'
++    adapter=alive_it(source(),disable=True)
++    assert getattr(adapter,'missing',None) is None and seen==[]
++    assert list(adapter)==['a'] and seen==[1]
++
++def test_started_adapter_delegates_current_and_preserves_single_use():
++    adapter=alive_it([1,2],disable=True);iterator=iter(adapter)
++    next(iterator);assert adapter.current==0
++    next(iterator);assert adapter.current==1
++    list(iterator);assert adapter.current==2 and list(adapter)==[]
+--- a/library/docs/development-ap-protocol-dev.md
++++ b/library/docs/development-ap-protocol-dev.md
+@@ -0,0 +1,5 @@
++# 让未启动进度迭代器正确响应未知属性和协议探测
++
++未启动适配器被hasattr或协议探测时，应对未知属性返回正常缺失，而不是抛配置警告。真实进度控件仍保留启动前警告，探测不能提前消费数据；启动后的属性委托继续兼容。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

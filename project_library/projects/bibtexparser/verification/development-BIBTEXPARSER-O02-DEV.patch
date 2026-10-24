@@ -1,0 +1,81 @@
+--- a/library/bibtexparser/validation.py
++++ b/library/bibtexparser/validation.py
+@@ -0,0 +1,42 @@
++"""可配置且版本明确的本地书目字段校验。"""
++RULES_V1 = {
++    'article': {'required': ('title', 'journal', 'year'), 'one_of': (('author',),)},
++    'book': {'required': ('title', 'publisher', 'year'), 'one_of': (('author', 'editor'),)},
++}
++
++
++def validate_entries(library, *, rules=None, version='bibtex-v1'):
++    """产生结构化缺字段和未知字段诊断，不更改容错解析。
++
++    :param library: 真实Library。
++    :param rules: 按条目类型配置required/one_of/allowed的映射。
++    :param version: 当前支持bibtex-v1；其他版本明确拒绝。
++    :return: 按条目与规则顺序排列的诊断tuple。
++    """
++    if version != 'bibtex-v1':
++        raise ValueError('不支持的书目规则版本')
++    rules = RULES_V1 if rules is None else rules
++    diagnostics = []
++    for entry in library.entries:
++        rule = rules.get(entry.entry_type.lower())
++        if rule is None:
++            diagnostics.append({'key': entry.key, 'field': None, 'code': 'unknown-type', 'line': entry.start_line})
++            continue
++        fields = entry.fields_dict
++        def present(name):
++            """空值不满足必需字段。@param name 字段。@return 是否有效。"""
++            if name not in fields:
++                return False
++            value = fields[name].value
++            return value is not None and (bool(value.strip()) if isinstance(value, str) else bool(value))
++        for name in rule.get('required', ()):
++            if not present(name):
++                diagnostics.append({'key': entry.key, 'field': name, 'code': 'required', 'line': entry.start_line})
++        for group in rule.get('one_of', ()):
++            if not any(present(name) for name in group):
++                diagnostics.append({'key': entry.key, 'field': tuple(group), 'code': 'one-of', 'line': entry.start_line})
++        if 'allowed' in rule:
++            for field in entry.fields:
++                if field.key not in rule['allowed']:
++                    diagnostics.append({'key': entry.key, 'field': field.key, 'code': 'unknown-field', 'line': field.start_line})
++    return tuple(diagnostics)
+--- a/library/docs/development-bibtexparser-o02-dev.md
++++ b/library/docs/development-bibtexparser-o02-dev.md
+@@ -0,0 +1,5 @@
++# 按版本化规则校验真实书目字段
++
++提供版本明确的书目校验，覆盖文章与书籍必需字段、作者编辑替代组和自定义规则。返回稳定诊断而不删除或修改字段，空值不充当必需值；未知类型、未知字段和不支持版本明确报告。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bibtexparser_o02_dev.py
++++ b/library/tests/test_development_bibtexparser_o02_dev.py
+@@ -0,0 +1,25 @@
++"""书目校验报告真实缺失字段并保留原始内容。"""
++from bibtexparser import Library
++from bibtexparser.model import Entry, Field
++
++def test_article_required_fields():
++    """文章缺期刊和作者可同时定位。@return None。"""
++    from bibtexparser.validation import validate_entries
++    source = Library([Entry('article', 'x', [Field('title', 'Paper'), Field('year', '2026')])])
++    diagnostics = validate_entries(source)
++    assert {row['code'] for row in diagnostics} == {'required', 'one-of'}
++    assert any(row['field'] == 'journal' for row in diagnostics)
++    assert source.entries[0]['title'] == 'Paper'
++
++def test_editor_alternative():
++    """书籍作者或编辑的替代组生效。@return None。"""
++    from bibtexparser.validation import validate_entries
++    source = Library([Entry('book', 'x', [Field('title', 'Book'), Field('year', '2026'), Field('publisher', 'P'), Field('editor', 'E')])])
++    assert validate_entries(source) == ()
++
++def test_custom_rules_and_empty():
++    """可配置规则区分空字段和未知字段。@return None。"""
++    from bibtexparser.validation import validate_entries
++    source = Library([Entry('custom', 'x', [Field('needed', ''), Field('extra', 'v')])])
++    diagnostics = validate_entries(source, rules={'custom': {'required': ['needed'], 'allowed': ['needed']}})
++    assert [row['code'] for row in diagnostics] == ['required', 'unknown-field']

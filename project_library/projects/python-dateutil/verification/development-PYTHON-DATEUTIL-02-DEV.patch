@@ -1,0 +1,41 @@
+--- a/library/docs/development-python-dateutil-02-dev.md
++++ b/library/docs/development-python-dateutil-02-dev.md
+@@ -0,0 +1,5 @@
++# 重复日历BYDAY的普通与序数条件按规范并集选日
++
++路线02：同一BYDAY普通/序数为并集，其他BY条件仍取交；覆盖月/年、负序数、BYSETPOS和缓存一致的真实会议日期。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/dateutil/rrule.py
++++ b/library/src/dateutil/rrule.py
+@@ -832,8 +832,10 @@
+             for i in dayset[start:end]:
+                 if ((bymonth and ii.mmask[i] not in bymonth) or
+                     (byweekno and not ii.wnomask[i]) or
+-                    (byweekday and ii.wdaymask[i] not in byweekday) or
+-                    (ii.nwdaymask and not ii.nwdaymask[i]) or
++                    # 同一BYDAY列表中的普通/序数项为并集，其他BY属性仍与之取交。
++                    ((byweekday or ii.nwdaymask) and not (
++                        (byweekday and ii.wdaymask[i] in byweekday) or
++                        (ii.nwdaymask and ii.nwdaymask[i]))) or
+                     (byeaster and not ii.eastermask[i]) or
+                     ((bymonthday or bynmonthday) and
+                      ii.mdaymask[i] not in bymonthday and
+--- a/library/tests/test_development_python_dateutil_02_dev.py
++++ b/library/tests/test_development_python_dateutil_02_dev.py
+@@ -0,0 +1,15 @@
++"""同一BYDAY列表普通与序数按并集，而不同BY属性仍交集。"""
++from datetime import datetime
++from dateutil.rrule import rrule,MONTHLY,FR,MO,YEARLY
++
++def test_duplicate_ordinary_and_ordinal_friday_is_all_fridays():
++    """FR,1FR不能缩水为每月首周五。@return None。"""
++    values=list(rrule(MONTHLY,dtstart=datetime(2024,1,1),byweekday=(FR,FR(1)),count=5))
++    assert values==[datetime(2024,1,5),datetime(2024,1,12),datetime(2024,1,19),datetime(2024,1,26),datetime(2024,2,2)]
++
++def test_mixed_days_negative_ordinal_and_other_filters():
++    """月/年频率与BYMONTH/BYSETPOS共同保持真实规则。@return None。"""
++    values=list(rrule(MONTHLY,dtstart=datetime(2024,1,1),byweekday=(MO,FR(-1)),count=6))
++    assert values==[datetime(2024,1,1),datetime(2024,1,8),datetime(2024,1,15),datetime(2024,1,22),datetime(2024,1,26),datetime(2024,1,29)]
++    values=list(rrule(YEARLY,dtstart=datetime(2024,1,1),bymonth=(1,),byweekday=(MO,FR(1)),bysetpos=-1,count=2))
++    assert values==[datetime(2024,1,29),datetime(2025,1,27)]

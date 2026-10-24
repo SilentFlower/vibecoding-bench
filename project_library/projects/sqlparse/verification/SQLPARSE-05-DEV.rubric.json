@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SQLPARSE-05-DEV",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend existing Token.match(ttype,values,regex=False,case_sensitive=None) with explicit strict bool or None policy. None preserves all legacy behavior (keyword normalized case-insensitive, names sensitive, exact token-type match). True compares original value exactly; False uses Unicode casefold for ordinary string matching. Regex uses original value with Python re.IGNORECASE only when explicitly insensitive, without casefolding regex patterns or altering their escapes; partial-match semantics stay. Support values generators, None/type mismatch, quoted tokens as explicitly chosen text and preserve token.value/normalized without mutation. Do not misreport the already-working default Keyword case matching as a bug.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

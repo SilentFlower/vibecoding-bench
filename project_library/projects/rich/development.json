@@ -1,0 +1,306 @@
+{
+  "project_key": "rich",
+  "title": "Rich终端报表工作场景",
+  "category": "终端展示与诊断",
+  "seed_digest": "eae9db9c2541512a919b70b138b2be13b712012efc6916fff34e7708eede6e74",
+  "environment": "rich-py312",
+  "source": {
+    "repository": "https://github.com/Textualize/rich",
+    "commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "schema": 3,
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
+  "scenarios": [
+    {
+      "id": "RICH-01-DEV-SCENE",
+      "title": "格宽测量与字素裁切统一且非正宽容器可靠收口",
+      "goal": "格宽测量与字素裁切统一且非正宽容器可靠收口",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "RICH-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RICH-01-DEV",
+          "kind": "modify",
+          "goal": "格宽测量与字素裁切统一且非正宽容器可靠收口",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Rich cells/Text wrapping as one complete width-boundary delivery: use the same split_graphemes widths for ZWJ/VS special paths, guard zero total grapheme width and positions beyond the end before offset estimation, and honor the selected Unicode table. set_cell_size/chop_cells/Text.wrap at <=0 width consistently return empty text/list/Lines, while split_text at <=0 returns empty-left/original-right for ASCII and Unicode. Preserve positive-width ASCII fast paths, grapheme boundaries, normal padding, replacement spaces for splitting a double-width glyph, existing Panel layout and all original tests. Never turn all Unicode characters into width two or claim full UAX grapheme conformance beyond the pinned model.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_rich_01_dev.py, and Chinese compatibility documentation at library/docs/development-rich-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/RICH-01-DEV-contract.md",
+            "materials/RICH-01-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/RICH-01-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/rich/cells.py",
+            "library/rich/text.py",
+            "library/tests/test_development_rich_01_dev.py",
+            "library/docs/development-rich-01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/RICH-01-DEV.rubric.json",
+            "native": "verification/RICH-01-DEV.native.json",
+            "public_native": "verification/RICH-01-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "RICH-02-DEV-SCENE",
+      "title": "循环与共享异常链按身份有界提取且保留各自说明",
+      "goal": "循环与共享异常链按身份有界提取且保留各自说明",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "RICH-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RICH-02-DEV",
+          "kind": "modify",
+          "goal": "循环与共享异常链按身份有界提取且保留各自说明",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Traceback.extract for the entire cause/context/ExceptionGroup graph using exception object identity IDs, not hashing or equality/text. Each exception appears at most once, self/multi-object cycles terminate, shared group members and unhashable custom exceptions work, normal chain order/is_cause/__suppress_context__ remain correct and notes belong to the actual current exception rather than being copied from the first. Propagate the same visited set through group recursion without prematurely marking unprocessed children. Preserve normal frame extraction/rendering and control test baseline cycles in a bounded subprocess so regression cannot hang indefinitely.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_rich_02_dev.py, and Chinese compatibility documentation at library/docs/development-rich-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/RICH-02-DEV-contract.md",
+            "materials/RICH-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/RICH-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/rich/traceback.py",
+            "library/tests/test_development_rich_02_dev.py",
+            "library/docs/development-rich-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/RICH-02-DEV.rubric.json",
+            "native": "verification/RICH-02-DEV.native.json",
+            "public_native": "verification/RICH-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "RICH-03-DEV-SCENE",
+      "title": "富文本字符负索引保持基础样式与交叠span",
+      "goal": "富文本字符负索引保持基础样式与交叠span",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "RICH-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RICH-03-DEV",
+          "kind": "modify",
+          "goal": "富文本字符负索引保持基础样式与交叠span",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Text integer indexing: normalize a negative offset exactly once against codepoint length, enforce normal IndexError at both bounds and transfer base style plus every overlapping span to the one-character result. Positive and corresponding negative indexes are semantically identical; preserve source Text untouched, Unicode codepoint indexing, empty behavior, end=\"\" on the selected character and existing slice rules. Do not clamp too-negative indexes to zero or turn indexing into grapheme segmentation. This is a complete styled-selection repair with real overlapping style checks.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_rich_03_dev.py, and Chinese compatibility documentation at library/docs/development-rich-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/RICH-03-DEV-contract.md",
+            "materials/RICH-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/RICH-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/rich/text.py",
+            "library/tests/test_development_rich_03_dev.py",
+            "library/docs/development-rich-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/RICH-03-DEV.rubric.json",
+            "native": "verification/RICH-03-DEV.native.json",
+            "public_native": "verification/RICH-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "RICH-04-DEV-SCENE",
+      "title": "ANSI解码规范忽略C0并阻止残留ESC伪装为正文",
+      "goal": "ANSI解码规范忽略C0并阻止残留ESC伪装为正文",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "RICH-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RICH-04-DEV",
+          "kind": "modify",
+          "goal": "ANSI解码规范忽略C0并阻止残留ESC伪装为正文",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Rich ANSI decoding by removing only the designated ignorable C0 characters already stripped from plain Text (NUL..BS, VT/FF, SO..SUB, FS..US) before recognizing escape sequences; preserve TAB/LF/CR handling. SGR sequences with such bytes after ESC or within parameters decode into actual styles. Unrecognized/truncated sequences never leave a raw ESC in emitted plain fragments; unsupported suffix text may remain literal. Preserve standard SGR/OSC8-ST links, colors and decoder style state. Document this limited parser policy rather than claim a complete arbitrary terminal-protocol sanitizer; do not reinterpret or execute terminal controls beyond existing supported sequences.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_rich_04_dev.py, and Chinese compatibility documentation at library/docs/development-rich-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/RICH-04-DEV-contract.md",
+            "materials/RICH-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/RICH-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/rich/ansi.py",
+            "library/tests/test_development_rich_04_dev.py",
+            "library/docs/development-rich-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/RICH-04-DEV.rubric.json",
+            "native": "verification/RICH-04-DEV.native.json",
+            "public_native": "verification/RICH-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "RICH-05-DEV-SCENE",
+      "title": "语法类异常的非字符串消息安全提取并可靠渲染",
+      "goal": "语法类异常的非字符串消息安全提取并可靠渲染",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "RICH-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RICH-05-DEV",
+          "kind": "modify",
+          "goal": "语法类异常的非字符串消息安全提取并可靠渲染",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Traceback SyntaxError-derived capture to normalize msg, filename and source text through the existing safe_str helper, preserving actual original object fields and stable <exception str() failed> fallback. Actual Console rendering must survive numeric/container/custom messages instead of raising a second TypeError that hides the original problem. Preserve ordinary string diagnostics and offset/line positioning. Apply across the earlier accepted cyclic/shared exception graph without losing its identity bound; this delivery depends on that graph repair and does not re-count exception traversal as a separate phase.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_rich_05_dev.py, and Chinese compatibility documentation at library/docs/development-rich-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "RICH-02-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/RICH-05-DEV-contract.md",
+            "materials/RICH-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/RICH-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/rich/traceback.py",
+            "library/tests/test_development_rich_05_dev.py",
+            "library/docs/development-rich-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/RICH-05-DEV.rubric.json",
+            "native": "verification/RICH-05-DEV.native.json",
+            "public_native": "verification/RICH-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "RICH-06-DEV-SCENE",
+      "title": "控制台打印单个富文本时保留其排版并尊重显式覆盖",
+      "goal": "控制台打印单个富文本时保留其排版并尊重显式覆盖",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "RICH-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "RICH-06-DEV",
+          "kind": "modify",
+          "goal": "控制台打印单个富文本时保留其排版并尊重显式覆盖",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Console._collect_renderables single-Text collection: retain the Text own justify/overflow/no_wrap/style/spans through a copy rather than recreating it from the separator template. Current print end replaces the copy end, explicit print justify/overflow/no_wrap still have their existing priority, and the caller Text never mutates. Preserve multiple-item separator-join policy, ordinary strings, non-text renderables/Group/Panel and style wrapping. Verify actual Console output for centered/right-aligned Unicode and ellipsis/no-wrap, not only intermediary attributes; do not change default multi-Text conflict semantics in this delivery.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_rich_06_dev.py, and Chinese compatibility documentation at library/docs/development-rich-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/RICH-06-DEV-contract.md",
+            "materials/RICH-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/RICH-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/rich/console.py",
+            "library/tests/test_development_rich_06_dev.py",
+            "library/docs/development-rich-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/RICH-06-DEV.rubric.json",
+            "native": "verification/RICH-06-DEV.native.json",
+            "public_native": "verification/RICH-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

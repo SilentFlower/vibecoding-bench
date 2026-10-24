@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-FRONTMATTER-02-DEV",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair format detection across checks/check/load/loads/parse: the same leading whitespace and CRLF normalization already accepted by parse must not lose the actual YAML/TOML handler when building a Post. Preserve explicit handler identity, body trimming, reserved business metadata and default no-frontmatter behavior. Roundtripping a leading-blank TOML document must remain TOML, not silently switch to YAML. Do not broaden this delivery to BOM guessing or arbitrary body delimiter search.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

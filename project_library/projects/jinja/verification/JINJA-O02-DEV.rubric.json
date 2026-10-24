@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JINJA-O02-DEV",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix CodeGenerator.visit_Include synchronous without-context handling so buffered macro/set/filter frames append real included events via simple_write, instead of making the macro return a generator representation. Preserve top-level streaming, actual without-context isolation, nested macros, ignore missing, autoescape and existing async parity. Do not silently switch to with context or reevaluate include arguments; demonstrate concrete rendered output through actual compilation/render/generate paths.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

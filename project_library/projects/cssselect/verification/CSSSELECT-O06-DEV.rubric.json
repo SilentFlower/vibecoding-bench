@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSSSELECT-O06-DEV",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add cssselect.editable.EditableStateTranslator supporting :read-write/:read-only as exact complements in the selected tree scope. Text-like input/textarea require no readonly/disabled and use the inherited static fieldset-disabled policy; exclude hidden/range/color/button/submit/reset/image/checkbox/radio/file inputs. Form controls never become editable merely from contenteditable ancestors. Other elements inherit the nearest valid contenteditable empty/true/plaintext-only/false declaration case-insensitively; invalid values inherit, false blocks. Support XHTML namespaced declarations, default read-only, preserve GenericTranslator rejection and document snapshot limitations (no scripts/designMode or improved fieldset approximation).",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

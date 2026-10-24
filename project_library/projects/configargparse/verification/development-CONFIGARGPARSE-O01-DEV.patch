@@ -1,0 +1,74 @@
+--- a/library/configargparse.py
++++ b/library/configargparse.py
+@@ -205,9 +205,19 @@
+         )
+         return msg
+ 
++    def __init__(self, *, duplicates='last'):
++        """配置同一输入内的重复键政策。
++
++        :param duplicates: last、warn或error；跨配置文件层级覆盖不属于重复。
++        :return: None。
++        """
++        if duplicates not in ('last', 'warn', 'error'):
++            raise ValueError('重复键政策必须为last、warn或error')
++        self.duplicates = duplicates
++
+     def parse(self, stream):
+-        # see ConfigFileParser.parse docstring
+-
++        # 记录物理行号，不把注释或空白行压缩后的位置误报给用户。
++        positions = {}
+         items = OrderedDict()
+         for i, line in enumerate(stream):
+             line = line.strip()
+@@ -236,6 +246,13 @@
+                     except Exception as e:
+                         # for backward compatibility with legacy format (eg. where config value is [a, b, c] instead of proper json ["a", "b", "c"]
+                         value = [elem.strip() for elem in value[1:-1].split(",")]
++                if key in positions and self.duplicates != 'last':
++                    diagnostic = '重复键%s：%s第%d行与第%d行' % (
++                        key, getattr(stream, 'name', 'stream'), positions[key], i + 1)
++                    if self.duplicates == 'error':
++                        raise ConfigFileParserException(diagnostic)
++                    warnings.warn(diagnostic, UserWarning, stacklevel=2)
++                positions.setdefault(key, i + 1)
+                 items[key] = value
+             else:
+                 raise ConfigFileParserException(
+--- a/library/docs/development-configargparse-o01-dev.md
++++ b/library/docs/development-configargparse-o01-dev.md
+@@ -0,0 +1,5 @@
++# 对单个配置输入实施可诊断重复键政策
++
++对应路线01：给真实默认解析器增加同文件重复键策略，使用物理行号和源标签定位，不打印值；区分大小写并保持默认最后值、跨文件正常覆盖与原语法。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_configargparse_o01_dev.py
++++ b/library/tests/test_development_configargparse_o01_dev.py
+@@ -0,0 +1,25 @@
++"""同一输入的重复键有明确政策，层间正常覆盖保持。"""
++from io import StringIO
++import pytest
++import configargparse as c
++
++def test_default_and_strict_physical_lines():
++    """默认最后值与真实物理行号。@return None。"""
++    assert c.DefaultConfigFileParser().parse(StringIO('port=1\nport=2'))['port'] == '2'
++    source = StringIO('# comment\nport=1\n\nport=2\n'); source.name = 'settings.conf'
++    with pytest.raises(c.ConfigFileParserException, match='settings.conf第2行与第4行'):
++        c.DefaultConfigFileParser(duplicates='error').parse(source)
++
++def test_warning_values_and_case():
++    """警告不泄露敏感值，区分大小写且列表仍可用。@return None。"""
++    with pytest.warns(UserWarning) as records:
++        result = c.DefaultConfigFileParser(duplicates='warn').parse(StringIO('key=secret1\nKey=x\nkey=[a,b]\n'))
++    assert result == {'key': ['a','b'], 'Key':'x'}
++    assert len(records) == 1 and 'secret1' not in str(records[0].message)
++
++def test_parser_reuse_and_layering():
++    """每个流重置重复记录，跨文件覆盖不误拒绝。@return None。"""
++    parser = c.DefaultConfigFileParser(duplicates='error')
++    assert parser.parse(StringIO('port=1'))['port'] == '1'
++    assert parser.parse(StringIO('port=2'))['port'] == '2'
++    with pytest.raises(ValueError): c.DefaultConfigFileParser(duplicates='unknown')

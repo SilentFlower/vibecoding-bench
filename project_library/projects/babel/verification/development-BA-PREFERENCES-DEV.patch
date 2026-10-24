@@ -1,0 +1,82 @@
+--- a/library/babel/core.py
++++ b/library/babel/core.py
+@@ -1240,6 +1240,48 @@
+     return None
+ 
+ 
++def negotiate_locale_preferences(header, available, *, sep='_', aliases=LOCALE_ALIASES):
++    """按权重协商应用实际可用语言。@param header 有界语言首选项文本。
++    @param available 可用区域标识。@param sep 可用标识分隔符。@param aliases 旧协商别名映射。
++    @return 原available拼写的匹配项或None；q=0明确排除优先于通配符。
++    """
++    import re
++    from decimal import Decimal
++
++    if not isinstance(header, str):
++        raise TypeError('语言首选项必须是字符串')
++    if len(header) > 8192 or header.count(',') >= 100:
++        raise ValueError('语言首选项过长')
++    choices = list(available)
++    normalized = {item.replace(sep, '-').lower(): item for item in choices if item}
++    weighted, excluded = [], []
++    for index, part in enumerate(header.split(',')):
++        if not part.strip():
++            continue
++        match = re.fullmatch(r'\s*(\*|[A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*)\s*(?:;\s*q=(0(?:\.\d{0,3})?|1(?:\.0{0,3})?))?\s*', part)
++        if match is None:
++            raise ValueError('无效语言首选项')
++        language, quality = match.groups()
++        quality = Decimal(quality or '1')
++        language = language.lower()
++        if quality == 0:
++            excluded.append(language)
++        else:
++            weighted.append((-quality, index, language))
++    def denied(candidate):
++        return any(item == '*' or candidate == item or candidate.startswith(item + '-') for item in excluded)
++    allowed = {key: value for key, value in normalized.items() if not denied(key)}
++    for quality, index, language in sorted(weighted):
++        if language == '*':
++            return next(iter(allowed.values()), None)
++        if denied(language):
++            continue
++        match = negotiate_locale([language.replace('-', sep)], allowed.values(), sep=sep, aliases=aliases)
++        if match is not None:
++            return allowed[match.replace(sep, '-').lower()]
++    return None
++
++
+ def parse_locale(
+     identifier: str,
+     sep: str = '_',
+--- a/library/development_tests/test_development_ba_preferences_dev.py
++++ b/library/development_tests/test_development_ba_preferences_dev.py
+@@ -0,0 +1,20 @@
++"""公开带权语言协商回归。"""
++import pytest
++from babel.core import negotiate_locale_preferences
++
++def test_quality_and_available_spelling_are_preserved():
++    assert negotiate_locale_preferences('en-US;q=0.5, de-DE;q=0.9', ['en_US','de_DE']) == 'de_DE'
++    assert negotiate_locale_preferences('de-de', ['de_de']) == 'de_de'
++
++def test_ties_and_iterable_available_are_stable():
++    assert negotiate_locale_preferences('fr, de', iter(['de','fr'])) == 'fr'
++
++def test_zero_quality_excludes_language_from_wildcard():
++    assert negotiate_locale_preferences('en;q=0, *;q=0.5', ['en_US','fr']) == 'fr'
++    assert negotiate_locale_preferences('*;q=0', ['fr']) is None
++
++def test_aliases_and_invalid_headers_have_explicit_behavior():
++    assert negotiate_locale_preferences('no', ['nb_NO']) == 'nb_NO'
++    for value in ('en;q=1.1', 'en;q=0.1234', 'en;bad=1', 'en,' * 100):
++        with pytest.raises(ValueError):
++            negotiate_locale_preferences(value, ['en'])
+--- a/library/docs/development-ba-preferences-dev.md
++++ b/library/docs/development-ba-preferences-dev.md
+@@ -0,0 +1,5 @@
++# 按带权语言偏好选择实际可用区域
++
++应用发布多语言后，按用户带权偏好选择实际可用包，保持同权顺序和原区域拼写。明确禁用的语言不能被通配符选回，复用原别名与语言回退，输入长度及权重语法有明确限制。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

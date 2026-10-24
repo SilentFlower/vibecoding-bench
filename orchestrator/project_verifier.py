@@ -1,6 +1,7 @@
 """在无凭据、无外网的临时容器中验证候选项目行为。"""
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import shutil
@@ -16,6 +17,54 @@ from docker.errors import NotFound
 from requests.exceptions import ReadTimeout
 
 from project_library import canonical_json, digest_json, read_document, safe_relative, write_document
+from project_scenario_content import read_native_contract
+
+
+_DUPLICATE_RUNNER_SHA256 = frozenset({
+    '0ffc9f24d34a43d5e835566246d6488af99e9e78e1ab64e499dcdae24771b3d9',
+})
+_DUPLICATE_COLLECTOR = """        state['duplicate_identities'] = duplicates
+    required = state['control']['required_nodes']
+"""
+_SCOPED_DUPLICATE_COLLECTOR = """        state['duplicate_identities'] = duplicates
+    required = state['control']['required_nodes']
+    if state['control'].get('duplicate_ids') and required:
+        # 新API的doctest不属于原合同；只比较实际保留节点的元数据，旧身份新增次数仍须拒绝。
+        required_scope = set(required)
+        selected_duplicates = [item for item in state['duplicate_identities'] if item['id'] in required_scope]
+        preserved_original_ids = {item['original_id'] for item in selected_duplicates}
+        unexpected = [item for item in state['duplicate_identities']
+            if item['original_id'] in preserved_original_ids and item['id'] not in required_scope]
+        if unexpected:
+            state['errors'].append('extra_frozen_duplicate_occurrences:' + str(len(unexpected)))
+        state['duplicate_identities'] = selected_duplicates
+"""
+
+
+class _NativeRegressionControlError(ValueError):
+    """表示冻结回归控制器不属于已确认可安全适配的版本。"""
+
+
+def _native_regression_adapter(source: bytes, contract: dict) -> tuple[bytes, dict | None]:
+    """为已知控制器收窄重复身份统计范围，不改冻结资产。
+
+    :param source: 从受控验证目录读取的原控制器字节。
+    :param contract: 原冻结回归合同。
+    :return: 实际执行字节及可公开的摘要；不需要适配时摘要为 None。
+    """
+    if not contract.get('duplicate_identities'):
+        return source, None
+    original = hashlib.sha256(source).hexdigest()
+    if original not in _DUPLICATE_RUNNER_SHA256:
+        raise _NativeRegressionControlError('重复身份控制器版本未知，拒绝推测适配')
+    anchor = _DUPLICATE_COLLECTOR.encode('utf-8')
+    if source.count(anchor) != 1:
+        raise _NativeRegressionControlError('可信控制器的重复身份收集片段不唯一或不匹配')
+    actual = source.replace(anchor, _SCOPED_DUPLICATE_COLLECTOR.encode('utf-8'), 1)
+    return actual, {'name': 'required-node-duplicate-identities-v1', 'scope': 'required_nodes',
+        'original_runner_sha256': original, 'effective_runner_sha256': hashlib.sha256(actual).hexdigest(),
+        'expected_nodes': len(contract['nodes']), 'expected_duplicate_identities': len(contract['duplicate_identities']),
+        'preserves_frozen_duplicate_counts': True}
 
 
 _EXECUTE = """import os,runpy,shutil,sys
@@ -228,7 +277,7 @@ class ProjectVerifier:
         if regression:
             frozen = specification['regression']
             contract_path=safe_relative(frozen['contract'])
-            contract=read_document(project_root/contract_path)
+            contract=read_native_contract(project_root/contract_path)
             specification={'script':frozen['runner'],'args':['--project',contract['project'],'--candidate-root','/work/project',
                 '--baseline-root','/baseline/library','--contract','/request-data/'+contract_path,
                 '--evidence-dir','/work/regression-evidence','--timeout-sec',str(max(1,profile['regression']['timeout_sec']-30))],
@@ -250,13 +299,21 @@ class ProjectVerifier:
         directory.chmod(0o755)
         container = None
         try:
-            target = directory / script
-            target.parent.mkdir(parents=True)
-            shutil.copyfile(project_root / script, target)
+            source = (project_root / script).read_bytes()
+            adapter = None
+            if regression:
+                source, adapter = _native_regression_adapter(source, contract)
+            # verification会单独只读挂载；可信副本放输入根，确保执行的是已核SHA的实际字节。
+            execution_script = 'trusted-native-regression.py' if adapter else script
+            # 外层输入挂载只读，嵌套验证目录的挂载点必须先在宿主创建。
+            (directory / 'verification').mkdir(exist_ok=True)
+            target = directory / execution_script
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source)
             target.chmod(0o644)
             (directory / 'answer.txt').write_text(answer, encoding='utf-8')
             (directory / 'answer.txt').chmod(0o644)
-            payload = {'script': script, 'args': args, 'python_paths': paths, 'requirements': requirements}
+            payload = {'script': execution_script, 'args': args, 'python_paths': paths, 'requirements': requirements}
             write_document(directory / 'native.json', payload, mode=0o644)
             with self._slots, self._native_cleanup(lambda:container):
                 if cancel and cancel.is_set():
@@ -320,10 +377,22 @@ class ProjectVerifier:
                     expected_collection=digest_json([{'id':node['id'],'kind':node['kind']} for node in contract['nodes']])
                     valid=(completed.get('StatusCode')==0 and isinstance(actual,dict) and actual.get('status')=='passed' and actual.get('collection_matches_contract') is True
                         and actual.get('collected')==len(contract['nodes']) and actual.get('collection_digest')==expected_collection)
-                    return {'status':'passed' if valid else 'error' if isinstance(actual,dict) and actual.get('status')=='error' else 'failed',
+                    duplicate_match = None
+                    if contract.get('duplicate_identities'):
+                        duplicate_match = isinstance(actual, dict) and actual.get('duplicate_identities') == contract['duplicate_identities']
+                        valid = valid and duplicate_match
+                    result = {'status':'passed' if valid else 'error' if isinstance(actual,dict) and actual.get('status')=='error' else 'failed',
                         'regression':actual,'contract_digest':digest_json(contract),'suite_digest':digest_json(specification),'image':self.image}
+                    if duplicate_match is not None:
+                        result.update(duplicate_identities_match_contract=duplicate_match,
+                            expected_duplicate_execution_count=len(contract['duplicate_identities']))
+                    if adapter is not None:
+                        result['runtime_adapter'] = adapter
+                    return result
                 return {'status': 'passed' if _same_json(actual, specification['expected']) else 'failed',
                     'actual': actual, 'suite_digest': digest_json(specification), 'image': self.image}
+        except _NativeRegressionControlError as error:
+            return {'status': 'error', 'reason': 'unsupported_native_regression_runner', 'message': str(error)}
         except Exception as error:
             return {'status': 'error', 'message': '原生隔离环境错误：' + type(error).__name__+': '+str(error)[:300]}
         finally:

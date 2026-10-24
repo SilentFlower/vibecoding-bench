@@ -1,0 +1,106 @@
+--- a/library/arrow/arrow.py
++++ b/library/arrow/arrow.py
+@@ -5,6 +5,7 @@
+ """
+ 
+ import calendar
++from decimal import Decimal, ROUND_HALF_EVEN, localcontext
+ import re
+ import sys
+ from datetime import date as dt_date
+@@ -175,6 +176,47 @@
+         self._datetime = dt_datetime(
+             year, month, day, hour, minute, second, microsecond, tzinfo, fold=fold
+         )
++
++    @classmethod
++    def from_excel(cls, serial, *, date_system, tzinfo=timezone.utc):
++        """按明确日期系统解析Excel序号。@param serial 有限int/float/Decimal。
++        @param date_system 字符串1900或1904。@param tzinfo 解释本地墙钟的时区。@return Arrow。
++        """
++        if date_system not in ('1900','1904'):
++            raise ValueError('必须明确选择1900或1904日期系统')
++        if isinstance(serial, bool) or not isinstance(serial, (int,float,Decimal)):
++            raise TypeError('Excel序号必须是有限数值')
++        value = Decimal(str(serial))
++        if not value.is_finite():
++            raise ValueError('Excel序号必须有限')
++        if date_system == '1900' and Decimal(60) <= value < Decimal(61):
++            raise ValueError('Excel的1900-02-29并非真实日期')
++        with localcontext() as context:
++            context.prec = 50
++            micros = int((value * Decimal(86400000000)).to_integral_value(rounding=ROUND_HALF_EVEN))
++        day = micros // 86400000000
++        if date_system == '1900' and day == 60:
++            raise ValueError('微秒舍入落入不存在的1900-02-29')
++        if date_system == '1900' and day > 60:
++            micros -= 86400000000
++        origin = dt_datetime(1899,12,31) if date_system == '1900' else dt_datetime(1904,1,1)
++        value = origin + timedelta(microseconds=micros)
++        return cls.fromdatetime(value, tzinfo=tzinfo)
++
++    def to_excel(self, *, date_system):
++        """以本地墙钟转换Excel序号。@param date_system 字符串1900或1904。@return Decimal序号。
++        """
++        if date_system not in ('1900','1904'):
++            raise ValueError('必须明确选择1900或1904日期系统')
++        value = self._datetime.replace(tzinfo=None)
++        origin = dt_datetime(1899,12,31) if date_system == '1900' else dt_datetime(1904,1,1)
++        delta = value - origin
++        micros = (delta.days * 86400 + delta.seconds) * 1000000 + delta.microseconds
++        if date_system == '1900' and value >= dt_datetime(1900,3,1):
++            micros += 86400000000
++        with localcontext() as context:
++            context.prec = 50
++            return Decimal(micros) / Decimal(86400000000)
+ 
+     # factories: single object, both original and from datetime.
+ 
+--- a/library/development_tests/test_development_ar_excel_dev.py
++++ b/library/development_tests/test_development_ar_excel_dev.py
+@@ -0,0 +1,37 @@
++"""公开Excel日期系统转换回归。"""
++from decimal import Decimal
++import pytest
++import arrow
++
++def test_1900_epoch_and_leap_bug_boundaries():
++    assert arrow.Arrow.from_excel(0, date_system='1900').format('YYYY-MM-DD') == '1899-12-31'
++    assert arrow.Arrow.from_excel(59, date_system='1900').day == 28
++    assert arrow.Arrow.from_excel(61, date_system='1900').format('YYYY-MM-DD') == '1900-03-01'
++    with pytest.raises(ValueError):
++        arrow.Arrow.from_excel(Decimal('60.5'), date_system='1900')
++
++def test_1904_epoch_and_half_day():
++    assert arrow.Arrow.from_excel(Decimal('0.5'), date_system='1904').format('YYYY-MM-DD HH:mm') == '1904-01-01 12:00'
++
++def test_modern_dates_roundtrip_through_both_systems():
++    value = arrow.get(2026, 3, 4, 12, 34, 56, 123456)
++    for system in ('1900','1904'):
++        assert arrow.Arrow.from_excel(value.to_excel(date_system=system), date_system=system) == value
++
++def test_timezone_applies_to_wall_clock_not_unix_instant():
++    value = arrow.Arrow.from_excel(Decimal('1.25'), date_system='1904', tzinfo='Asia/Shanghai')
++    assert value.hour == 6 and value.utcoffset().total_seconds() == 28800
++    assert value.to_excel(date_system='1904') == Decimal('1.25')
++
++def test_bad_systems_booleans_and_nonfinite_serials_are_rejected():
++    with pytest.raises(ValueError):
++        arrow.Arrow.from_excel(1, date_system='guess')
++    for value in (True, '123'):
++        with pytest.raises(TypeError):
++            arrow.Arrow.from_excel(value, date_system='1900')
++    with pytest.raises(ValueError):
++        arrow.Arrow.from_excel(float('inf'), date_system='1900')
++
++def test_negative_serials_and_existing_unix_inputs():
++    assert arrow.Arrow.from_excel(-1, date_system='1904').format('YYYY-MM-DD') == '1903-12-31'
++    assert arrow.get(25569).int_timestamp == 25569
+--- a/library/docs/development-ar-excel-dev.md
++++ b/library/docs/development-ar-excel-dev.md
+@@ -0,0 +1,5 @@
++# 为表格时间导入交付显式Excel日期系统双向转换
++
++离线表格导入必须明确Excel的1900／1904日期系统，不得改变普通数值Unix时间戳解析。新增双向转换，支持Decimal微秒和负序号，对虚构1900-02-29及舍入落入该日明确拒绝，时区解释采用墙钟规则。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

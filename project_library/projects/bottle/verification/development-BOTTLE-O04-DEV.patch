@@ -1,0 +1,78 @@
+--- a/library/bottle.py
++++ b/library/bottle.py
+@@ -1753,10 +1753,35 @@
+ 
+     @property
+     def charset(self, default='UTF-8'):
+-        """ Return the charset specified in the content-type header (default: utf8). """
+-        if 'charset=' in self.content_type:
+-            return self.content_type.split('charset=')[-1].split(';')[0].strip()
+-        return default
++        """读取大小写不敏感且可引用的charset。@param default 后备。@return 编码名称。"""
++        from email.message import Message
++        message = Message()
++        message['Content-Type'] = self.content_type
++        value = message.get_param('charset', header='Content-Type')
++        return value if isinstance(value, str) and value else default
++
++    @charset.setter
++    def charset(self, value):
++        """在输出前验证编码并只替换charset参数。
++
++        :param value: 真实编码名称。
++        :return: None；媒体类型及其他参数保留。
++        """
++        from codecs import lookup
++        from email.message import Message
++        if not isinstance(value, str) or not value:
++            raise ValueError('响应编码不可为空')
++        lookup(value)
++        message = Message()
++        message['Content-Type'] = self.content_type or 'text/html'
++        parameters = message.get_params(header='Content-Type', unquote=True) or [('text/html', '')]
++        result = Message()
++        result['Content-Type'] = parameters[0][0]
++        for name, original in parameters[1:]:
++            if name.lower() != 'charset':
++                result.set_param(name, original, header='Content-Type')
++        result.set_param('charset', value, header='Content-Type')
++        self.content_type = result['Content-Type']
+ 
+     def set_cookie(self, name, value, secret=None, digestmod=hashlib.sha256, **options):
+         """ Create a new cookie or replace an old one. If the `secret` parameter is
+--- a/library/docs/development-bottle-o04-dev.md
++++ b/library/docs/development-bottle-o04-dev.md
+@@ -0,0 +1,5 @@
++# 安全设置响应charset并影响实际字符串编码
++
++charset新增setter，先验证真实编码，再仅替换编码参数，保留媒体类型与其他带引用参数。getter正确读取大小写和引用，实际字符串输出使用所选编码；非法编码不改变Header，bytes行为不改。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bottle_o04_dev.py
++++ b/library/test/test_development_bottle_o04_dev.py
+@@ -0,0 +1,25 @@
++"""响应编码setter保留媒体类型和无关参数。"""
++import bottle
++
++def test_charset_parameters():
++    """引用和大小写旧参数被替换且其他参数保持。@return None。"""
++    value = bottle.BaseResponse(headers={'Content-Type': 'text/plain; format=flowed; CHARSET="UTF-8"'})
++    value.charset = 'latin-1'
++    assert value.charset == 'latin-1'
++    assert value.content_type.startswith('text/plain') and 'format=' in value.content_type
++    assert value.content_type.lower().count('charset=') == 1
++
++def test_real_string_output_encoding():
++    """实际Bottle字符串输出遵守新编码。@return None。"""
++    bottle.response.bind()
++    bottle.response.content_type = 'text/plain'
++    bottle.response.charset = 'latin-1'
++    assert list(bottle.Bottle()._cast('é')) == [b'\xe9']
++
++def test_invalid_codec_does_not_mutate():
++    """坏编码在修改Header前失败。@return None。"""
++    import pytest
++    value = bottle.BaseResponse(headers={'Content-Type': 'text/plain; charset=utf-8'})
++    before = value.content_type
++    with pytest.raises(LookupError): value.charset = 'not-a-real-codec'
++    assert value.content_type == before

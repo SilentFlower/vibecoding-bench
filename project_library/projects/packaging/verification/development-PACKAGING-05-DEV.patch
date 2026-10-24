@@ -1,0 +1,77 @@
+--- a/library/docs/development-packaging-05-dev.md
++++ b/library/docs/development-packaging-05-dev.md
+@@ -0,0 +1,5 @@
++# 结构化分发信息生成语义可逆wheel与sdist文件名
++
++路线12：复用现有名字/版本/Tag解析构造可逆发行文件名；压缩tag不得扩大兼容集合，build与空tag明确校验，不创建或安装归档。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/packaging/utils.py
++++ b/library/src/packaging/utils.py
+@@ -21,6 +21,8 @@
+     "is_normalized_name",
+     "parse_sdist_filename",
+     "parse_wheel_filename",
++    "build_wheel_filename",
++    "build_sdist_filename",
+ ]
+ 
+ 
+@@ -195,6 +197,35 @@
+         except InvalidVersion:
+             return str(version)
+     return str(_TrimmedRelease(version) if strip_trailing_zero else version)
++
++
++def build_wheel_filename(name,version,tags,build=()):
++    """从结构化值构造wheel名称。@param name 项目名。@param version 标准版本。@param tags 精确Tag集合。@param build 空或(非负整数,后缀)。@return 语义可逆文件名。"""
++    normalized=canonicalize_name(name,validate=True).replace("-","_")
++    parsed=version if isinstance(version,Version) else Version(version)
++    values=frozenset(tags)
++    if not values:raise InvalidWheelFilename("tags不能为空")
++    if any(not isinstance(tag,Tag) for tag in values):raise TypeError("tags必须为Tag")
++    if build:
++        if not isinstance(build,tuple) or len(build)!=2 or type(build[0]) is not int or build[0]<0 or not isinstance(build[1],str):
++            raise InvalidWheelFilename("无效build")
++        build_sql=f"-{build[0]}{build[1]}"
++    else:build_sql=""
++    components=[".".join(sorted({getattr(tag,key) for tag in values})) for key in ("interpreter","abi","platform")]
++    filename=f"{normalized}-{parsed}{build_sql}-"+"-".join(components)+".whl"
++    # 压缩标签表达笛卡尔积；非矩形集合不能通过扩大兼容面假装往返。
++    actual=parse_wheel_filename(filename,validate_order=True)
++    if actual[0]!=canonicalize_name(name) or actual[1]!=parsed or actual[2]!=build or actual[3]!=values:
++        raise InvalidWheelFilename("不能无损压缩该tag/build集合")
++    return filename
++
++
++def build_sdist_filename(name,version,extension=".tar.gz"):
++    """构造标准sdist名称。@param name 项目名。@param version 版本。@param extension tar.gz或zip。@return 可逆标准名称。"""
++    if extension not in (".tar.gz",".zip"):raise InvalidSdistFilename("无效extension")
++    normalized=canonicalize_name(name,validate=True).replace("-","_")
++    parsed=version if isinstance(version,Version) else Version(version)
++    return f"{normalized}-{parsed}{extension}"
+ 
+ 
+ def parse_wheel_filename(
+--- a/library/tests/test_development_packaging_05_dev.py
++++ b/library/tests/test_development_packaging_05_dev.py
+@@ -0,0 +1,19 @@
++"""分发文件名从结构化数据构造，不扩大兼容tag集合。"""
++import unittest
++from packaging.tags import Tag
++from packaging.version import Version
++from packaging.utils import build_wheel_filename,build_sdist_filename,parse_wheel_filename,parse_sdist_filename,InvalidWheelFilename
++
++def test_wheel_and_sdist_semantic_roundtrip_and_stable_tags():
++    """名字转义、build、版本和压缩tag均可反向解析。@return None。"""
++    tags={Tag('py3','none','any'),Tag('py2','none','any')}
++    name=build_wheel_filename('My.Pkg','01.2',tags,(3,'abc'))
++    assert name=='my_pkg-1.2-3abc-py2.py3-none-any.whl'
++    assert parse_wheel_filename(name)==('my-pkg',Version('1.2'),(3,'abc'),tags)
++    assert parse_sdist_filename(build_sdist_filename('My.Pkg','1.0+local'))==('my-pkg',Version('1.0+local'))
++
++def test_nonrectangular_tags_and_invalid_build_are_rejected():
++    """不能让两标签压缩后变成四个兼容组合。@return None。"""
++    tags={Tag('py2','none','any'),Tag('py3','abi3','any')}
++    with unittest.TestCase().assertRaises(InvalidWheelFilename):build_wheel_filename('pkg','1',tags)
++    with unittest.TestCase().assertRaises(InvalidWheelFilename):build_wheel_filename('pkg','1',{Tag('py3','none','any')},(True,'x'))

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARDET-O06-DEV",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement chardet.transcode.transcode_bytes(data, target_encoding, *, source_encoding=None). Use the explicit source codec or actual detection result, require a supported codec and strict full-payload decoding/encoding with no replacement or character loss. Return independent output bytes, canonical source/target names, original detection facts when used and validated byte count. Target codec explicitly controls BOM, empty auto-detection must request a source, unrepresentable target text and malformed source bytes fail, and input buffers remain unchanged. Do not imply autodetected semantic accuracy.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

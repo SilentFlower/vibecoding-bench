@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TB-LOAD-DEV",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement tablib.loading.load_records(records,columns,*,aliases=None,missing=\"raise\",extra=\"raise\",converters=None,errors=\"raise\",title=None) returning completed ConversionResult. Output column order is explicit; aliases map output names to unique external keys. Validate missing raise/none and extra raise/ignore, consume mapping records once and detach values. Use actual Dataset.dict loading with canonical header prototype while retaining each later mapping order, requiring completed alignment repair; remove prototype before output. Compose actual convert_columns, preserve false/zero/empty/None, support empty input, fail without partial output and never mutate incoming records.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

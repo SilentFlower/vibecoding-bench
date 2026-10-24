@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FLASK-O06-DEV",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix real App.add_url_rule endpoint conflict ordering so a conflicting different view is rejected before mutating url_map or view_functions. After catching AssertionError, the proposed new URL must remain 404 and previous rules/views/methods/defaults/matcher behavior exactly match preattempt state. Preserve identical-view aliases, view_func=None later binding, automatic methods, blueprint-qualified endpoints and existing exception text. Do not hide conflicts, delete the existing view, rebuild the entire map or alter frozen tests.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

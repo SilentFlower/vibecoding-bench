@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CATTRS-O02-DEV",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement cattrs.strategies.decimal.configure_decimal(converter, *, allow_special=False) using paired actual structure/unstructure hooks. Decimal values travel as exact strings through existing JSON/YAML converters, preserving precision, exponent and negative-zero text without float conversion. Accept explicit strings/integers/Decimal, reject bool/float/invalid text, default reject nonfinite values with an explicit opt-in policy. Configure only the supplied converter and preserve later user-hook precedence and nested records.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,53 @@
+--- a/library/development_tests/test_development_xw_sheet_names_dev.py
++++ b/library/development_tests/test_development_xw_sheet_names_dev.py
+@@ -0,0 +1,21 @@
++"""公开实际工作表命名回归。"""
++from io import BytesIO
++from xlsxwriter import Workbook
++from xlsxwriter.sheet_names import add_named_worksheet
++
++def test_forbidden_names_and_apostrophes_are_sanitized():
++    book=Workbook(BytesIO());sheet=add_named_worksheet(book," 'sales/[west]' ")
++    assert sheet.get_name()=='sales__west_' and sheet is book.worksheets()[0];book.close()
++
++def test_case_collisions_allocate_stable_suffixes():
++    book=Workbook(BytesIO());book.add_worksheet('Report')
++    assert add_named_worksheet(book,'report').get_name()=='report (2)'
++    assert add_named_worksheet(book,'REPORT').get_name()=='REPORT (3)';book.close()
++
++def test_long_unicode_names_leave_space_for_suffix():
++    book=Workbook(BytesIO());first=add_named_worksheet(book,'中'*40);second=add_named_worksheet(book,'中'*40)
++    assert len(first.get_name())==31 and len(second.get_name())==31 and second.get_name().endswith(' (2)');book.close()
++
++def test_empty_and_reserved_names_are_usable():
++    book=Workbook(BytesIO());assert add_named_worksheet(book,'  ').get_name()=='Sheet'
++    assert add_named_worksheet(book,'History').get_name()=='History_';book.close()
+--- a/library/docs/development-xw-sheet-names-dev.md
++++ b/library/docs/development-xw-sheet-names-dev.md
+@@ -0,0 +1,5 @@
++# 为业务名称分配符合Excel约束的唯一工作表
++
++业务名称先清理Excel禁用字符与边界引号，再按真实已用工作表分配唯一名称。长度限制和序号后缀协同处理，不覆盖或重命名已有工作表，处理保留名和大小写冲突。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/xlsxwriter/sheet_names.py
++++ b/library/xlsxwriter/sheet_names.py
+@@ -0,0 +1,18 @@
++"""生成可用且不覆盖已有工作表的业务名称。"""
++import re
++
++
++def add_named_worksheet(workbook,desired):
++    """清理并分配唯一工作表名。@param workbook 原工作簿。@param desired 业务名称。
++    @return 新增实际Worksheet；按大小写折叠检测已用名称。
++    """
++    if not isinstance(desired,str):
++        raise TypeError('工作表名必须为文本')
++    base=re.sub(r"[\[\]:*?/\\\x00-\x1f]",'_',desired).strip().strip("'") or 'Sheet'
++    if base.casefold()=='history':
++        base='History_'
++    used={sheet.get_name().casefold() for sheet in workbook.worksheets()}
++    candidate=base[:31];number=2
++    while candidate.casefold() in used:
++        suffix=' ('+str(number)+')';candidate=base[:31-len(suffix)]+suffix;number+=1
++    return workbook.add_worksheet(candidate)

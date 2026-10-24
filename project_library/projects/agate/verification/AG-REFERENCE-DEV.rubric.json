@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AG-REFERENCE-DEV",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add optional reference_datetime=None to Date and DateTime constructors. When supplied, it must be a naive datetime; reject dates, strings and aware datetimes with TypeError before parsing. Use this fixed wall-clock anchor for natural-language relative date parsing. Preserve explicit format and ISO handling, timezone parameter behavior, null handling and old defaults (Date uses ZERO_DT, DateTime captures today at midnight). Keep the anchor across pickle round trips and preserve old Date pickle states.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

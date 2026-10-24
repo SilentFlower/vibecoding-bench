@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML5LIB-O02-DEV",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix lint.Filter(require_matching_tags=True) to assert that the open-element stack is empty only after full source exhaustion, detecting truncated final/nested StartTag streams. Unmatched EndTag must raise the documented AssertionError rather than raw IndexError. Preserve lazy yielded prefixes, source/token identity, balanced HTML/foreign namespace/void streams and explicit require_matching_tags=False fragments. Do not auto-close, consume the source twice or change serializer/tree-parser recovery semantics.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

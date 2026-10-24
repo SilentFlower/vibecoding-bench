@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYDANTIC-SETTINGS-04-DEV",
+  "source_commit": "8dc9e05ab07d91e21dd2a37d0b9c30f6d92b1930",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Expand explicit PyprojectTomlConfigSettingsSource Path with expanduser before resolve. A local ~/pyproject.toml must read exactly the same bytes/table as its absolute Path. Preserve ordinary relative/absolute paths, missing-file empty source, custom table header and current depth/cwd discovery; no cwd mutation or new search location. Unknown user expansion errors propagate clearly. Use synthetic HOME and temporary files only.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TREELIB-01-DEV",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Tree.from_map as one complete import operation: validate exactly one root, all parent references and complete reachability including detached cycles/self-cycles before conversion callbacks or building nodes. Reject invalid input with useful involved IDs, never silently discard records. Accept valid out-of-order maps, preserve sibling insertion order, call id_func once per record and reject None/unhashable/colliding transformed IDs. Honor cls and explicitly forwarded **tree_kwargs, including custom node_class and constructor failures, without guessing required arguments or swallowing them. Data callbacks build a fresh tree; old legal behavior remains compatible.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -3,7 +3,7 @@
   "project_key": "tinydb",
   "title": "TinyDB 本地订单开发任务",
   "category": "数据存储",
-  "description": "固定真实源码上的 2 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "固定真实源码上的六项完整工程交付，覆盖查询、批量修改、分页、嵌套编辑与可靠持久化；每项持续调查、确认、实施和验收返工。",
   "seed_digest": "d478acdf6f6cf1c05645ad6ec2ceadd0a83d76755a2df6c34689e4bcae52cac7",
   "environment": "tinydb-py312",
   "source": {
@@ -108,6 +108,194 @@
             "disclosure/TD-M02-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TD-PATH-DEV-SCENE",
+      "title": "以显式字段序列构造嵌套查询并保持缓存身份",
+      "goal": "以显式字段序列构造嵌套查询并保持缓存身份",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TD-PATH-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-PATH-DEV",
+          "kind": "modify",
+          "goal": "以显式字段序列构造嵌套查询并保持缓存身份",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Query.at_path(segments), appending a nonempty finite iterable of string keys to the current query path. Treat dots, slashes, empty strings and names of Query methods as literal keys. Preserve Query subclasses, immutability of the original builder, full-path cache identity and uncacheable map paths. Reject plain string/bytes inputs and nonstring segments before returning a query; preserve missing-path false behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_td_path_dev.py and concise Chinese compatibility documentation at library/docs/development-td-path-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TD-PATH-DEV-contract.md",
+            "materials/TD-PATH-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tinydb/queries.py",
+            "library/development_tests/test_development_td_path_dev.py",
+            "library/docs/development-td-path-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TD-PATH-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-PATH-DEV.native.json",
+            "public_native": "verification/TD-PATH-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TD-PATH-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TD-PAGE-DEV-SCENE",
+      "title": "按文档ID稳定分页查询并隔离返回对象",
+      "goal": "按文档ID稳定分页查询并隔离返回对象",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TD-PAGE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-PAGE-DEV",
+          "kind": "modify",
+          "goal": "按文档ID稳定分页查询并隔离返回对象",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Table.query_page(cond=None, *, limit=100, after=None) returning (documents,next_cursor). Integer document IDs are sorted ascending, after is exclusive, condition is optional and evaluated on detached Documents. Return at most limit rows; next_cursor is the last returned matching ID only if another match exists, otherwise None. Support sparse IDs, insert/remove between pages, MemoryStorage and JSONStorage. Deep-copy returned data so caller or predicate changes cannot mutate storage. Validate limit 1..1000 and nonnegative integer cursor, excluding booleans. This is keyset pagination, without snapshot/concurrent-writer guarantees.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_td_page_dev.py and concise Chinese compatibility documentation at library/docs/development-td-page-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TD-PAGE-DEV-contract.md",
+            "materials/TD-PAGE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tinydb/table.py",
+            "library/development_tests/test_development_td_page_dev.py",
+            "library/docs/development-td-page-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TD-PAGE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-PAGE-DEV.native.json",
+            "public_native": "verification/TD-PAGE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TD-PAGE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TD-NESTED-UPDATE-DEV-SCENE",
+      "title": "安全更新和删除嵌套字段而不共享可变值",
+      "goal": "安全更新和删除嵌套字段而不共享可变值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TD-NESTED-UPDATE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-NESTED-UPDATE-DEV",
+          "kind": "modify",
+          "goal": "安全更新和删除嵌套字段而不共享可变值",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd tinydb.operations.set_path(path,value,*,create=False) and delete_path(path,*,missing_ok=False), returning ordinary Table.update callbacks. Paths are finite nonempty string-key sequences with literal punctuation. Set deep-copies the supplied value when building the operation and separately per document; optionally create missing mapping parents. Delete preserves siblings and optionally tolerates missing keys. Nonmapping parents remain errors. Validate a complete candidate document before replacing that document contents so a failed callback leaves it unchanged; do not promise a transaction across all documents or modify old operations.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_td_nested_update_dev.py and concise Chinese compatibility documentation at library/docs/development-td-nested-update-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TD-NESTED-UPDATE-DEV-contract.md",
+            "materials/TD-NESTED-UPDATE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tinydb/operations.py",
+            "library/development_tests/test_development_td_nested_update_dev.py",
+            "library/docs/development-td-nested-update-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TD-NESTED-UPDATE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-NESTED-UPDATE-DEV.native.json",
+            "public_native": "verification/TD-NESTED-UPDATE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TD-NESTED-UPDATE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TD-ATOMIC-STORAGE-DEV-SCENE",
+      "title": "提供序列化失败不损坏旧文件的原子JSON存储",
+      "goal": "提供序列化失败不损坏旧文件的原子JSON存储",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TD-ATOMIC-STORAGE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TD-ATOMIC-STORAGE-DEV",
+          "kind": "modify",
+          "goal": "提供序列化失败不损坏旧文件的原子JSON存储",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tinydb.atomic.AtomicJSONStorage(Storage) with TinyDB-compatible read/write/close and constructor (path, *, create_dirs=False, encoding=\"utf-8\", **json_options). Serialize completely before opening a same-directory temporary file, flush/fsync and atomically os.replace; preserve existing mode, use 0600 for new files, clean temporary files and retain old bytes on serialization/write/replace failure. Read current path each time, return None for absent/empty files, reject nonmapping JSON roots and symlink targets, and reject reads/writes after close. Verify reopen and shrinking data. Preserve existing JSONStorage and do not claim cross-process locking, hostile-directory race protection or parent-directory crash durability.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_td_atomic_storage_dev.py and concise Chinese compatibility documentation at library/docs/development-td-atomic-storage-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TD-ATOMIC-STORAGE-DEV-contract.md",
+            "materials/TD-ATOMIC-STORAGE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tinydb/atomic.py",
+            "library/development_tests/test_development_td_atomic_storage_dev.py",
+            "library/docs/development-td-atomic-storage-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TD-ATOMIC-STORAGE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TD-ATOMIC-STORAGE-DEV.native.json",
+            "public_native": "verification/TD-ATOMIC-STORAGE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TD-ATOMIC-STORAGE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

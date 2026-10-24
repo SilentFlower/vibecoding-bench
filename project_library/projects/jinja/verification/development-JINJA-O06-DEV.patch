@@ -1,0 +1,133 @@
+--- a/library/docs/development-jinja-o06-dev.md
++++ b/library/docs/development-jinja-o06-dev.md
+@@ -0,0 +1,5 @@
++# 从真实Traversable资源树编译渲染并有界枚举模板
++
++对应路线16：新增真实BaseLoader资源树实现，目录和ZIP Traversable同样支持编译继承与枚举；content重读或immutable明确，不伪造mtime，路径与枚举预算受控。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/jinja2/loaders.py
++++ b/library/src/jinja2/loaders.py
+@@ -149,6 +149,80 @@
+         )
+ 
+ 
++class ResourcesLoader(BaseLoader):
++    """接收应用明确提供的Traversable资源根，复用真实BaseLoader编译缓存。
++
++    :param root: 有is_dir/joinpath/iterdir协议的资源根，可为Path或ZIP资源。
++    :param encoding: 模板文本编码。
++    :param reload: content比较源码内容，immutable明确认为资源不变。
++    :param max_depth: 枚举目录深度上限。
++    :param max_templates: 枚举模板总数上限。
++    :return: 不依赖磁盘mtime的真实模板加载器。
++    """
++    def __init__(self, root, *, encoding='utf-8', reload='content', max_depth=32, max_templates=10000):
++        """验证资源根及明确重载/枚举预算。@return None。"""
++        if not callable(getattr(root, 'joinpath', None)) or not callable(getattr(root, 'is_dir', None)) or not root.is_dir():
++            raise TypeError('资源根必须为Traversable目录')
++        if reload not in ('content', 'immutable'):
++            raise ValueError('未知资源重载政策')
++        for name, value in [('max_depth', max_depth), ('max_templates', max_templates)]:
++            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
++                raise ValueError(name + '必须为非负整数')
++        self.root, self.encoding, self.reload = root, encoding, reload
++        self.max_depth, self.max_templates = max_depth, max_templates
++
++    def _resource(self, template):
++        """按标准安全组件访问，不让名称控制任意资源树根。@return 资源节点。"""
++        from pathlib import Path
++        if not isinstance(template, str) or not template or template.startswith('/') or '\\' in template or '\x00' in template:
++            raise TemplateNotFound(template)
++        parts = split_template_path(template)
++        if not parts:
++            raise TemplateNotFound(template)
++        resource = self.root.joinpath(*parts)
++        if isinstance(self.root, Path) and isinstance(resource, Path) and not resource.resolve().is_relative_to(self.root.resolve()):
++            raise TemplateNotFound(template)
++        return resource
++
++    def get_source(self, environment, template):
++        """读取实际资源文本，content政策不伪造mtime支持。@return 源码/文件名/重载回调。"""
++        from pathlib import Path
++        resource = self._resource(template)
++        if not resource.is_file():
++            raise TemplateNotFound(template)
++        source = resource.read_text(encoding=self.encoding)
++        def uptodate():
++            if self.reload == 'immutable':
++                return True
++            try:
++                current = self._resource(template)
++                return current.is_file() and current.read_text(encoding=self.encoding) == source
++            except (OSError, UnicodeError, TemplateNotFound):
++                return False
++        return source, str(resource) if isinstance(resource, Path) else None, uptodate
++
++    def list_templates(self):
++        """有界枚举并返回排序名称，预算超限明确失败而非假装完整。@return list[str]。"""
++        result, stack = [], [('', self.root, 0)]
++        while stack:
++            prefix, directory, depth = stack.pop()
++            if depth > self.max_depth:
++                raise ValueError('资源树超过枚举深度预算')
++            for child in directory.iterdir():
++                name = child.name
++                if not isinstance(name, str) or not name or name in ('.', '..') or '/' in name or '\\' in name:
++                    raise ValueError('资源树返回非法子项名称')
++                template = prefix + name
++                checked = self._resource(template)
++                if checked.is_dir():
++                    stack.append((template + '/', checked, depth + 1))
++                elif checked.is_file():
++                    result.append(template)
++                    if len(result) > self.max_templates:
++                        raise ValueError('资源模板数超过枚举预算')
++        return sorted(result)
++
++
+ class FileSystemLoader(BaseLoader):
+     """Load templates from a directory in the file system.
+ 
+--- a/library/tests/test_development_jinja_o06_dev.py
++++ b/library/tests/test_development_jinja_o06_dev.py
+@@ -0,0 +1,39 @@
++"""同一真实模板树在目录与ZIP Traversable中加载、继承和枚举。"""
++from pathlib import Path
++from zipfile import ZipFile,Path as ZipPath
++from jinja2 import Environment,TemplateNotFound
++import pytest
++
++def test_directory_zip_resources_and_template_inheritance(tmp_path):
++    """无需__fspath__的ZIP资源也进入原生编译与继承。@return None。"""
++    from jinja2.loaders import ResourcesLoader
++    files={'base.html':'A{% block body %}{% endblock %}Z','sub/page.html':'{% extends "base.html" %}{% block body %}{{name}}{% endblock %}'}
++    root=tmp_path/'root';root.mkdir()
++    archive=tmp_path/'templates.zip'
++    with ZipFile(archive,'w') as zipped:
++        for name,text in files.items():
++            path=root/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(text);zipped.writestr(name,text)
++    with ZipFile(archive) as zipped:
++        for resource in [root,ZipPath(zipped)]:
++            loader=ResourcesLoader(resource);env=Environment(loader=loader)
++            assert env.get_template('sub/page.html').render(name='中文')=='A中文Z' and loader.list_templates()==sorted(files)
++
++def test_content_reload_immutable_and_encoding(tmp_path):
++    """无mtime协议也按明确content策略重载，immutable保持缓存。@return None。"""
++    from jinja2.loaders import ResourcesLoader
++    path=tmp_path/'page';path.write_text('one');env=Environment(loader=ResourcesLoader(tmp_path));assert env.get_template('page').render()=='one'
++    path.write_text('two');assert env.get_template('page').render()=='two'
++    stable=Environment(loader=ResourcesLoader(tmp_path,reload='immutable'));assert stable.get_template('page').render()=='two';path.write_text('three');assert stable.get_template('page').render()=='two'
++    path.write_bytes(b'\xff')
++    with pytest.raises(UnicodeDecodeError):ResourcesLoader(tmp_path).get_source(env,'page')
++
++def test_traversal_symlink_and_inventory_budget(tmp_path):
++    """组件越界和Path符号链接限制明确，枚举预算不静默截断。@return None。"""
++    from jinja2.loaders import ResourcesLoader
++    root=tmp_path/'root';root.mkdir();outside=tmp_path/'outside';outside.write_text('private');(root/'link').symlink_to(outside)
++    loader=ResourcesLoader(root);env=Environment(loader=loader)
++    for name in ['../outside','/outside','a\\b','link']:
++        with pytest.raises(TemplateNotFound):env.get_template(name)
++    (root/'link').unlink();(root/'x').write_text('x')
++    with pytest.raises(ValueError):ResourcesLoader(root,max_templates=0).list_templates()
++    with pytest.raises(ValueError):ResourcesLoader(root,reload='guess')

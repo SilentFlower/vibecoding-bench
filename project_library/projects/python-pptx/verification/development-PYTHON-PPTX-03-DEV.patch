@@ -1,0 +1,68 @@
+--- a/library/docs/development-python-pptx-03-dev.md
++++ b/library/docs/development-python-pptx-03-dev.md
+@@ -0,0 +1,5 @@
++# 形状无障碍替代说明与标题可独立编辑并保存
++
++路线12：BaseShape公开alternative_text/title映射cNvPr，缺失None与空串明确，保ID/name、正文、几何、关系和未知元信息；真实文件往返，本目标范围为说明/标题。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pptx/shapes/base.py
++++ b/library/src/pptx/shapes/base.py
+@@ -57,6 +57,32 @@
+         return ActionSetting(cNvPr, self)
+ 
+     @property
++    def alternative_text(self):
++        """读取形状无障碍元信息。@return str或None缺失。"""
++        return self._element._nvXxPr.cNvPr.get('descr')
++
++    @alternative_text.setter
++    def alternative_text(self,value):
++        """仅修改当前属性。@param value str或None，空串保留。@return None。"""
++        if value is not None and not isinstance(value,str):raise TypeError("value必须为str或None")
++        element=self._element._nvXxPr.cNvPr
++        if value is None:element.attrib.pop('descr',None)
++        else:element.set('descr',value)
++
++    @property
++    def title(self):
++        """读取形状无障碍元信息。@return str或None缺失。"""
++        return self._element._nvXxPr.cNvPr.get('title')
++
++    @title.setter
++    def title(self,value):
++        """仅修改当前属性。@param value str或None，空串保留。@return None。"""
++        if value is not None and not isinstance(value,str):raise TypeError("value必须为str或None")
++        element=self._element._nvXxPr.cNvPr
++        if value is None:element.attrib.pop('title',None)
++        else:element.set('title',value)
++
++    @property
+     def element(self) -> ShapeElement:
+         """`lxml` element for this shape, e.g. a CT_Shape instance.
+ 
+--- a/library/tests/test_development_python_pptx_03_dev.py
++++ b/library/tests/test_development_python_pptx_03_dev.py
+@@ -0,0 +1,22 @@
++"""所有BaseShape派生对象的说明写真实cNvPr而非普通文字。"""
++from io import BytesIO
++from pptx import Presentation
++
++def test_textbox_and_table_accessibility_metadata_roundtrip():
++    """标题/说明不替换正文，图形ID几何和关系不变。@return None。"""
++    presentation=Presentation();slide=presentation.slides.add_slide(presentation.slide_layouts[6])
++    shapes=[slide.shapes.add_textbox(1,2,300000,400000),slide.shapes.add_table(1,1,5,6,500000,500000)]
++    before=[(shape.shape_id,shape.left,shape.width) for shape in shapes]
++    for index,shape in enumerate(shapes):shape.alternative_text='说明 & '+str(index);shape.title='Figure '+str(index)
++    output=BytesIO();presentation.save(output);output.seek(0);restored=Presentation(output).slides[0].shapes
++    assert [(shape.shape_id,shape.left,shape.width) for shape in restored]==before
++    assert [shape.alternative_text for shape in restored]==['说明 & 0','说明 & 1']
++    assert restored[1].title=='Figure 1'
++
++def test_none_vs_empty_and_other_nonvisual_properties_stay():
++    """空串是明确空说明，None才移除，不改name。@return None。"""
++    presentation=Presentation();shape=presentation.slides.add_slide(presentation.slide_layouts[6]).shapes.add_textbox(1,2,30,40)
++    name=shape.name;assert shape.alternative_text is None
++    shape.alternative_text='';shape.title='keep';assert shape.alternative_text==''
++    shape.alternative_text=None
++    assert shape.alternative_text is None and shape.title=='keep' and shape.name==name

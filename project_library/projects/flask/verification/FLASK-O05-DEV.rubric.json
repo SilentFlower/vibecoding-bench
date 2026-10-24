@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FLASK-O05-DEV",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add JSONProvider.stream(values) returning the application response class with application/x-ndjson, lazily invoking this actual provider.dumps once per consumed value in compact single physical lines plus newline. Preserve custom provider encoding, Unicode/newline escaping and request context through stream_with_context when a request is active. Do not materialize the iterable; response close/failure/normal exhaustion closes its source once, including unstarted close. Empty input works; unsupported or multiline provider output terminates with an explicit error. Document that a late failure after first bytes cannot revise HTTP status, and leave jsonify array behavior unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

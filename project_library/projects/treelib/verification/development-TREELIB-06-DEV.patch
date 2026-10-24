@@ -1,0 +1,90 @@
+--- a/library/docs/development-treelib-06-dev.md
++++ b/library/docs/development-treelib-06-dev.md
+@@ -0,0 +1,5 @@
++# 分类导航按明确路径段解析并提供双端关系路径
++
++路线10/20合并为完整分类导航交付：字面路径段不猜分隔符，重名默认拒绝或显式全量返回；双端路径及最近公共祖先按当前树身份和关系计算。方向、同节点、共享视图、缺ID与断链均独立验收。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_treelib_06_dev.py
++++ b/library/tests/test_development_treelib_06_dev.py
+@@ -0,0 +1,31 @@
++"""业务导航保留节点身份，重名不偷偷挑第一项。"""
++import unittest
++from treelib import Tree
++from treelib.navigation import resolve_path,path_between,lowest_common_ancestor
++
++
++def build():
++    """含中文、路径分隔符和同名兄弟的真实分类。@return Tree。"""
++    tree=Tree();tree.create_node('商品','r');tree.create_node('饮/品','a',parent='r');tree.create_node('茶','x',parent='a');tree.create_node('茶','y',parent='a');tree.create_node('其它','b',parent='r')
++    return tree
++
++
++def test_literal_path_and_ambiguity_policy():
++    """不猜分隔符，含糊必须报错或显式返回全量。@return None。"""
++    tree=build()
++    assert resolve_path(tree,['商品','饮/品']).identifier=='a'
++    with unittest.TestCase().assertRaises(ValueError):resolve_path(tree,['商品','饮/品','茶'])
++    assert [node.identifier for node in resolve_path(tree,['茶'],start='a',all_matches=True)]==['x','y']
++    assert resolve_path(tree,['不存在']) is None
++    with unittest.TestCase().assertRaises(ValueError):resolve_path(tree,'商品/饮品')
++
++
++def test_two_endpoint_direction_and_shared_context():
++    """路径方向、同节点及当前视图根都准确。@return None。"""
++    tree=build()
++    assert path_between(tree,'x','b')==['x','a','r','b']
++    assert path_between(tree,'b','x')==['b','r','a','x']
++    assert lowest_common_ancestor(tree,'x','y')=='a'
++    assert path_between(tree,'x','x')==['x']
++    view=tree.subtree('a')
++    assert path_between(view,'x','y')==['x','a','y']
+--- a/library/treelib/navigation.py
++++ b/library/treelib/navigation.py
+@@ -0,0 +1,45 @@
++"""分类路径解析和两节点关系导航，不将显示tag当唯一身份。"""
++from .exceptions import NodeIDAbsentError
++
++
++def _parents(tree,identity):
++    """按当前树关系得到到根路径并拒绝断链。@param tree 树。@param identity 节点。@return 节点到根列表。"""
++    if identity not in tree.nodes:raise NodeIDAbsentError(identity)
++    path=[];seen=set();current=identity
++    while current is not None:
++        if current in seen or current not in tree.nodes:raise ValueError('父链损坏')
++        seen.add(current);path.append(current);current=tree[current].predecessor(tree.identifier)
++    if not path or path[-1]!=tree.root:raise ValueError('父链未到当前根')
++    return path
++
++
++def path_between(tree,source,target):
++    """返回从源到目标的有序标识，包括两端。@param tree 树。@param source 源。@param target 目标。@return 标识列表。"""
++    left,right=_parents(tree,source),_parents(tree,target)
++    shared=set(right);ancestor=next(identity for identity in left if identity in shared)
++    return left[:left.index(ancestor)+1]+list(reversed(right[:right.index(ancestor)]))
++
++
++def lowest_common_ancestor(tree,left,right):
++    """只依据当前树返回最近公共祖先。@param tree 树。@param left 节点。@param right 节点。@return 祖先标识。"""
++    left_path=_parents(tree,left);right_path=set(_parents(tree,right))
++    return next(identity for identity in left_path if identity in right_path)
++
++
++def resolve_path(tree,segments,start=None,all_matches=False):
++    """按字面tag段解析，默认含糊拒绝。@param tree 树。@param segments 字符串段序列。@param start 相对起点或None绝对含根tag。@param all_matches 是否返回全部。@return Node或Node列表或None。"""
++    if isinstance(segments,str):raise ValueError('请传路径段序列，不能猜分隔符或转义')
++    parts=list(segments)
++    if any(not isinstance(part,str) for part in parts):raise ValueError('路径段必须是字符串')
++    if start is None:
++        if tree.root is None:return [] if all_matches else None
++        if not parts or parts[0]!=tree[tree.root].tag:return [] if all_matches else None
++        identities=[tree.root];parts=parts[1:]
++    else:
++        _parents(tree,start);identities=[start]
++    for part in parts:
++        identities=[child for identity in identities for child in tree[identity].successors(tree.identifier) if tree[child].tag==part]
++    result=[tree[identity] for identity in identities]
++    if all_matches:return result
++    if len(result)>1:raise ValueError('路径有多个同名匹配，请显式请求全部')
++    return result[0] if result else None

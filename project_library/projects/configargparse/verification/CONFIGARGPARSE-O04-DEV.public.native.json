@@ -1,0 +1,14 @@
+{
+  "script": "verification/CONFIGARGPARSE-O04-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_configargparse_o04_dev.py"
+}

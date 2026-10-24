@@ -373,7 +373,9 @@ window.ProjectsUI = (() => {
     bar.classList.toggle('hidden', !known || progress.total === 0);
     if (known && progress.total > 0) bar.value = Math.min(100, progress.completed / progress.total * 100);
     else bar.removeAttribute('value');
-    $('#projects-progress-detail').textContent = known ? `授权池内剩余 ${progress.remaining} 项工程目标 · 通过独立验收才计入完成` : '以独立验收通过的目标计数。';
+    const readiness = known && Number.isInteger(progress.ready) && Number.isInteger(progress.waiting)
+      ? ` · 可开始 ${progress.ready} 项 · 等待前置验收 ${progress.waiting} 项` : '';
+    $('#projects-progress-detail').textContent = known ? `授权池内剩余 ${progress.remaining} 项工程目标${readiness} · 通过独立验收才计入完成` : '以独立验收通过的目标计数。';
     const work = agent?.work, unfinished = work && !['passed', 'stopped'].includes(work.status);
     $('#projects-target-label').textContent = !work || unfinished ? '当前目标' : work.status === 'passed' ? '最近完成目标' : '最近停止目标';
     $('#projects-current').innerHTML = work
@@ -423,7 +425,9 @@ window.ProjectsUI = (() => {
     const usage = agent?.pi_usage;
     const native = agent?.claude_usage;
     const count = value => value === null || value === undefined ? '未采集' : value.toLocaleString();
-    $('#projects-usage').textContent = usage ? `Pi${usage.complete === false ? '（已知小计）' : ''}：输入 ${count(usage.input_tokens)} · 输出 ${count(usage.output_tokens)} · 缓存 ${count(usage.cache_read_tokens)}；Claude：输入 ${count(native?.input_tokens)} · 输出 ${count(native?.output_tokens)} · 缓存 ${count(native?.cache_read_input_tokens)}` : '尚无模型调用';
+    const piUsage = usage && `Pi${usage.complete === false ? '（已知小计）' : ''}：未缓存输入 ${count(usage.input_tokens)} · 缓存写入 ${count(usage.cache_write_tokens)} · 缓存读取 ${count(usage.cache_read_tokens)} · 输出 ${count(usage.output_tokens)}`;
+    const nativeUsage = `Claude${native?.complete === false ? '（已知小计）' : ''}：未缓存输入 ${count(native?.input_tokens)} · 缓存写入 ${count(native?.cache_creation_input_tokens)} · 缓存读取 ${count(native?.cache_read_input_tokens)} · 输出 ${count(native?.output_tokens)}`;
+    $('#projects-usage').textContent = usage ? `账号累计｜${piUsage}；${nativeUsage}` : '尚无模型调用';
     document.querySelectorAll('[data-pi-action]').forEach(button => {
       button.disabled = !agent || !!pending || (button.dataset.piAction === 'start' && agent.controller_active === true);
       button.setAttribute('aria-busy', String(!!pending));

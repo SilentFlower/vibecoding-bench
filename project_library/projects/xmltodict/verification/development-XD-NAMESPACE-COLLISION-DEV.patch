@@ -1,0 +1,90 @@
+--- a/library/development_tests/test_development_xd_namespace_collision_dev.py
++++ b/library/development_tests/test_development_xd_namespace_collision_dev.py
+@@ -0,0 +1,24 @@
++"""公开命名空间压缩冲突回归。"""
++import pytest
++import xmltodict
++
++def test_distinct_expanded_elements_cannot_silently_merge_in_error_mode():
++    text='<r xmlns:a="urn:a" xmlns:b="urn:b"><a:x>1</a:x><b:x>2</b:x></r>'
++    options={'process_namespaces':True,'namespaces':{'urn:a':None,'urn:b':None}}
++    assert xmltodict.parse(text,**options)['r']['x']==['1','2']
++    with pytest.raises(ValueError):
++        xmltodict.parse(text,namespace_collision='error',**options)
++
++def test_attribute_collision_is_rejected_before_overwriting():
++    text='<r xmlns:a="urn:a" xmlns:b="urn:b" a:x="1" b:x="2"/>'
++    with pytest.raises(ValueError):
++        xmltodict.parse(text,process_namespaces=True,namespaces={'urn:a':None,'urn:b':None},namespace_collision='error')
++
++def test_same_name_repeats_and_distinct_parents_are_valid():
++    text='<r xmlns:a="urn:a" xmlns:b="urn:b"><one><a:x>1</a:x><a:x>2</a:x></one><two><b:x>3</b:x></two></r>'
++    result=xmltodict.parse(text,process_namespaces=True,namespaces={'urn:a':None,'urn:b':None},namespace_collision='error')
++    assert result['r']['one']['x']==['1','2'] and result['r']['two']['x']=='3'
++
++def test_invalid_policy_is_rejected_before_input_use():
++    with pytest.raises(ValueError):
++        xmltodict.parse('<r/>',namespace_collision='ignore')
+--- a/library/docs/development-xd-namespace-collision-dev.md
++++ b/library/docs/development-xd-namespace-collision-dev.md
+@@ -0,0 +1,5 @@
++# 显式拒绝命名空间压缩引起的元素或属性键冲突
++
++命名空间压缩可能把不同字段合并成同一键。提供显式error策略，在同父元素及单元素属性范围检查真实展开名，相同展开名重复仍按列表处理，不改变默认合并及用户postprocessor语义。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/xmltodict.py
++++ b/library/xmltodict.py
+@@ -26,6 +26,7 @@
+         dict_constructor=dict,
+         strip_whitespace=True,
+         namespace_separator=":",
++        namespace_collision="merge",
+         namespaces=None,
+         force_list=None,
+         comment_key="#comment",
+@@ -45,6 +46,10 @@
+         self.dict_constructor = dict_constructor
+         self.strip_whitespace = strip_whitespace
+         self.namespace_separator = namespace_separator
++        if namespace_collision not in ('merge','error'):
++            raise ValueError('未知命名空间键冲突策略')
++        self._namespace_collision=namespace_collision
++        self._namespace_keys=[{}]
+         self.namespaces = namespaces
+         self.namespace_declarations = dict_constructor()
+         self.force_list = force_list
+@@ -76,6 +81,11 @@
+ 
+     def startElement(self, full_name, attrs):
+         name = self._build_name(full_name)
++        previous=self._namespace_keys[-1].get(name)
++        if self._namespace_collision=='error' and previous is not None and previous!=full_name:
++            raise ValueError('命名空间压缩导致元素键冲突')
++        self._namespace_keys[-1][name]=full_name
++        self._namespace_keys.append({})
+         attrs = self._attrs_to_dict(attrs)
+         if self.namespace_declarations:
+             if not attrs:
+@@ -87,8 +97,13 @@
+             self.stack.append((self.item, self.data))
+             if self.xml_attribs:
+                 attr_entries = []
++                attr_sources = {}
+                 for key, value in attrs.items():
++                    original_key=key
+                     key = self.attr_prefix+self._build_name(key)
++                    if self._namespace_collision=='error' and key in attr_sources and attr_sources[key]!=original_key:
++                        raise ValueError('命名空间压缩导致属性键冲突')
++                    attr_sources[key]=original_key
+                     if self.postprocessor:
+                         entry = self.postprocessor(self.path, key, value)
+                     else:
+@@ -102,6 +117,7 @@
+             self.data = []
+ 
+     def endElement(self, full_name):
++        self._namespace_keys.pop()
+         name = self._build_name(full_name)
+         # If we just closed an item at the streaming depth, emit it and drop it
+         # without attaching it back to its parent. This avoids accumulating all

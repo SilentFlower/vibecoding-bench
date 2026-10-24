@@ -1,0 +1,65 @@
+--- a/library/docs/development-html2text-o02-dev.md
++++ b/library/docs/development-html2text-o02-dev.md
+@@ -0,0 +1,5 @@
++# 让实际表格caption成为独立可读段落且不污染首行表头
++
++对应路线08：显式caption段落模式保留真实强调/链接并与首行表头分离，重复/空标题、bypass/ignore模式明确，默认及无caption表保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/html2text/__init__.py
++++ b/library/html2text/__init__.py
+@@ -54,6 +54,7 @@
+         self.split_next_td = False
+         self.td_count = 0
+         self.table_start = False
++        self.table_caption_mode = 'legacy'
+         self.unicode_snob = config.UNICODE_SNOB  # covered in cli
+         self.escape_snob = config.ESCAPE_SNOB  # covered in cli
+         self.links_each_paragraph = config.LINKS_EACH_PARAGRAPH
+@@ -661,6 +662,13 @@
+                     self.list_code_indent += "   "
+                     self.o(str(li.num) + ". ")
+                 self.start = True
++
++        if tag == 'caption':
++            if self.table_caption_mode not in ('legacy', 'paragraph'):
++                raise ValueError('未知表格标题模式')
++            if self.table_caption_mode == 'paragraph':
++                # caption的正文仍用原行内转换，只建立真实段落边界，不能黏进首个单元格。
++                self.p()
+ 
+         if tag in ["table", "tr", "td", "th"]:
+             if self.ignore_tables:
+--- a/library/test/test_development_html2text_o02_dev.py
++++ b/library/test/test_development_html2text_o02_dev.py
+@@ -0,0 +1,30 @@
++"""表格标题模式保留独立段落关系而不污染表头。"""
++from html2text import HTML2Text
++import pytest
++
++def convert(text,**options):
++    """通过真实转换设置明确选项。@return Markdown。"""
++    converter=HTML2Text(bodywidth=0)
++    for key,value in options.items():setattr(converter,key,value)
++    return converter.handle(text)
++
++def test_caption_is_real_separate_paragraph_before_actual_header():
++    """标题不再与首单元格粘连，表格分隔仍正确。@return None。"""
++    text='<table><caption>Quarter report</caption><tr><th>Name</th><th>Value</th></tr><tr><td>A</td><td>2</td></tr></table>'
++    actual=convert(text,table_caption_mode='paragraph')
++    assert 'Quarter report\n\nName| Value' in actual and '---|---' in actual and 'A| 2' in actual
++
++def test_caption_inline_formatting_multiple_and_empty_boundaries():
++    """标题仍经过真实强调/链接转换，多标题各一段，空标题不造文本。@return None。"""
++    text='<table><caption><strong>First</strong></caption><caption><a href="https://e.test">Second</a></caption><caption></caption><tr><td>Cell</td></tr></table>'
++    actual=convert(text,table_caption_mode='paragraph')
++    assert '**First**\n\n[Second](https://e.test)\n\nCell' in actual and actual.count('First')==1
++
++def test_default_bypass_ignore_modes_and_invalid_strategy_are_explicit():
++    """默认不改，bypass/ignore表仍保留独立标题，错误策略拒绝。@return None。"""
++    text='<table><caption>Title</caption><tr><td>Cell</td></tr></table>'
++    assert convert(text)==convert(text,table_caption_mode='legacy')
++    import re
++    assert re.search(r'Title[ \t]*\n[ \t]*\n',convert(text,table_caption_mode='paragraph',bypass_tables=True))
++    assert re.search(r'Title[ \t]*\n[ \t]*\nCell',convert(text,table_caption_mode='paragraph',ignore_tables=True))
++    with pytest.raises(ValueError):convert(text,table_caption_mode='guess')

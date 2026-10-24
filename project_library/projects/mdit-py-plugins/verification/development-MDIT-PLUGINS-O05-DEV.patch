@@ -1,0 +1,56 @@
+--- a/library/docs/development-mdit-plugins-o05-dev.md
++++ b/library/docs/development-mdit-plugins-o05-dev.md
+@@ -0,0 +1,5 @@
++# 让front matter点结束符正确终止且不污染元数据
++
++对应路线12：检查当前扫描行识别三点，结束符不入content且在EOF可关闭，map包含结束行、正文首行保留；原破折号及首行/未闭合策略不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/mdit_py_plugins/front_matter/index.py
++++ b/library/mdit_py_plugins/front_matter/index.py
+@@ -69,11 +69,13 @@
+             # unclosed block should be autoclosed by end of document.
+             return False
+ 
+-        if state.src[start:maximum] == "...":
+-            break
+-
+         start = state.bMarks[nextLine] + state.tShift[nextLine]
+         maximum = state.eMarks[nextLine]
++
++        # 必须检查当前扫描行；检查上一行会把结束符纳入content并漏掉EOF结束。
++        if state.src[start:maximum].rstrip(' \t') == "...":
++            auto_closed = True
++            break
+ 
+         if start < maximum and state.sCount[nextLine] < state.blkIndent:
+             # non-empty line with negative indent should stop the list:
+--- a/library/tests/test_development_mdit_plugins_o05_dev.py
++++ b/library/tests/test_development_mdit_plugins_o05_dev.py
+@@ -0,0 +1,26 @@
++"""点结束符不进入metadata且在EOF也真正关闭。"""
++from markdown_it import MarkdownIt
++from mdit_py_plugins.front_matter import front_matter_plugin
++
++def test_dot_terminator_metadata_content_and_body_map():
++    """内容仅含数据，map包括结束行而正文第一行不能被吞。@return None。"""
++    md=MarkdownIt().use(front_matter_plugin)
++    tokens=md.parse('---\na: 1\n...\n# Body')
++    assert tokens[0].type=='front_matter' and tokens[0].content=='a: 1'
++    assert tokens[0].map==[0,3] and tokens[0].hidden
++    assert md.render('---\na: 1\n...\n# Body')=='\n<h1>Body</h1>\n'
++
++def test_eof_empty_metadata_and_trailing_spaces():
++    """结束符在最后一行、空数据和允许尾空白均关闭。@return None。"""
++    md=MarkdownIt().use(front_matter_plugin)
++    for source,content in [('---\na: 1\n...','a: 1'),('---\n...',''),('---\na: 1\n...  \t','a: 1')]:
++        tokens=md.parse(source)
++        assert len(tokens)==1 and tokens[0].type=='front_matter' and tokens[0].content==content
++        assert tokens[0].map==[0,len(source.splitlines())]
++
++def test_long_dots_unclosed_noninitial_and_dash_defaults_stay_distinct():
++    """四点不是结束符，非文档首行不当metadata，原破折号保持。@return None。"""
++    md=MarkdownIt().use(front_matter_plugin)
++    assert all(token.type!='front_matter' for token in md.parse('---\na: 1\n....'))
++    assert all(token.type!='front_matter' for token in md.parse('text\n\n---\na: 1\n...'))
++    assert md.parse('---\na: 1\n---')[0].content=='a: 1'

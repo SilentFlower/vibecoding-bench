@@ -2,12 +2,75 @@
 from __future__ import annotations
 
 import json
+import math
 import threading
 from pathlib import Path
 
 from project_evaluation import (check_change_scope, load_rubric, parse_review, review_package,
     review_prompt, source_evidence)
 from project_library import digest_json, materialize_snapshot, read_document, safe_relative, snapshot_tree, write_document
+
+
+def _bounded_public_fact(value, budget: dict, depth: int = 0):
+    """限制公开事实体积，不透传任意大对象或执行其字符串转换。
+
+    :param value: 已筛选的 JSON 事实。
+    :param budget: 整份事实共享的 UTF-8 字节预算及截断标记。
+    :param depth: 当前结构层数。
+    :return: 有界 JSON 值。
+    """
+    if budget['bytes'] <= 0 or depth > 8:
+        budget['truncated'] = True
+        return None
+    if isinstance(value, str):
+        raw = value.encode('utf-8')
+        # 控制字符经JSON转义最多放大六倍，先预留最坏情况才能保证总字节界限。
+        limit = min(600, max(0, (budget['bytes'] - 4) // 6))
+        budget['truncated'] |= len(raw) > limit
+        result = raw[:limit].decode('utf-8', errors='ignore')
+        budget['bytes'] -= len(json.dumps(result, ensure_ascii=False).encode('utf-8')) + 2
+        return result
+    if value is None or type(value) in (bool, int, float):
+        if isinstance(value, float) and not math.isfinite(value):
+            budget['truncated'] = True
+            return None
+        cost = len(json.dumps(value).encode('utf-8')) + 2
+        if cost > budget['bytes']:
+            budget['truncated'] = True
+            budget['bytes'] -= 4
+            return None
+        budget['bytes'] -= cost
+        return value
+    if isinstance(value, dict):
+        result = {}
+        budget['bytes'] -= 2
+        budget['truncated'] |= len(value) > 32
+        entries = sorted(value.items(), key=lambda item: {'regression': 1, 'business': 2, 'actual': 3}.get(item[0], 0))
+        for key, item in entries[:32]:
+            if not isinstance(key, str) or budget['bytes'] <= 8:
+                budget['truncated'] = True
+                break
+            name = key[:80]
+            budget['truncated'] |= name != key
+            cost = len(json.dumps(name, ensure_ascii=False).encode('utf-8')) + 2
+            if cost + 4 > budget['bytes']:
+                budget['truncated'] = True
+                break
+            budget['bytes'] -= cost
+            result[name] = _bounded_public_fact(item, budget, depth + 1)
+        return result
+    if isinstance(value, list):
+        result = []
+        budget['bytes'] -= 2
+        budget['truncated'] |= len(value) > 16
+        for item in value[:16]:
+            if budget['bytes'] <= 4:
+                budget['truncated'] = True
+                break
+            result.append(_bounded_public_fact(item, budget, depth + 1))
+        return result
+    budget['truncated'] = True
+    return None
 
 
 class ProjectsVerification:
@@ -19,9 +82,10 @@ class ProjectsVerification:
     :param pi: Pi SDK 运行时，仅用于独立无工具的交付审查。
     :param provider: 私有模型配置回调。
     :param event: 记录审查实际用量的回调。
+    :param accepted: 返回权威已验收工作，用于保护同项目此前交付的能力。
     """
 
-    def __init__(self, catalog, terminal, native, pi, provider, event=None) -> None:
+    def __init__(self, catalog, terminal, native, pi, provider, event=None, accepted=None) -> None:
         """保存验收依赖，不触发任何模型或容器请求。
 
         :param catalog: 内容目录。
@@ -30,10 +94,12 @@ class ProjectsVerification:
         :param pi: Pi 运行时。
         :param provider: 模型配置。
         :param event: 用量事件回调。
+        :param accepted: 返回同账号、身份和固定项目已验收工作的权威回调。
         :return: None。
         """
         self.catalog, self.terminal, self.native = catalog, terminal, native
         self.pi, self.provider, self.event = pi, provider, event
+        self.accepted = accepted
 
     def __call__(self, work: dict, snapshot: dict, objects: Path, directory: Path, summary: str,
                  cancel: threading.Event | None = None) -> dict:
@@ -75,6 +141,31 @@ class ProjectsVerification:
                 regression = self.native.verify_native(candidate, project.root, specification, environment, profile, regression=True, cancel=cancel)
             checks['regression'] = regression['status']
             report = {'status': regression['status'], 'business': report, 'regression': regression}
+        if report['status'] == 'passed' and self.accepted:
+            accepted_reports = []
+            for previous in self.accepted(work):
+                old_assets = self.catalog.for_work(previous)
+                old_project, old_definition = old_assets.objective(previous['project_key'], previous['objective_id'])
+                if old_definition != json.loads(previous['definition_json']):
+                    raise ValueError('已验收目标的冻结合同不一致，不能省略历史能力检查')
+                old_library = old_assets.library
+                old_environment = old_project.manifest['environment']
+                old_specification = read_document(old_project.root / safe_relative(old_definition['evaluation']['native']))
+                prior = self.native.verify_native(candidate, old_project.root, old_specification,
+                    old_library.root / 'environments' / old_environment, old_library.environments[old_environment],
+                    cancel=cancel)
+                if prior['status'] == 'error':
+                    prior = self.native.verify_native(candidate, old_project.root, old_specification,
+                        old_library.root / 'environments' / old_environment, old_library.environments[old_environment],
+                        cancel=cancel)
+                accepted_reports.append({'objective_id': previous['objective_id'], 'report': prior})
+                if prior['status'] != 'passed':
+                    break
+            # 当前目标的上游回归不能覆盖此前新增功能；同一候选必须保住每项已验收能力。
+            status = next((item['report']['status'] for item in accepted_reports
+                if item['report']['status'] != 'passed'), 'passed')
+            checks['previous_objectives'] = status
+            report = {'status': status, 'business': report, 'previous_objectives': accepted_reports}
         write_document(directory / 'program.json', report)
         if report['status'] != 'passed':
             return {'status': report['status'], 'checks': checks,
@@ -106,11 +197,48 @@ class ProjectsVerification:
         return {'status': 'passed', 'checks': checks, 'feedback': ['独立交付验收通过']}
 
     @staticmethod
-    def _public_facts(report: dict) -> dict:
-        result = {key: report[key] for key in ('status', 'message', 'actual', 'feedback_codes') if key in report}
+    def _public_facts(report: dict, _depth: int = 0) -> dict:
+        """投影返工所需事实，保留计数与失败原因而不公开原始大数组或日志。
+
+        :param report: 程序验收的完整私有报告。
+        :param _depth: 内部嵌套层数上限。
+        :return: 共享体积预算内的结构化事实。
+        """
+        if _depth > 5:
+            return {'facts_truncated': True}
+        fields = ('status', 'message', 'reason', 'collected', 'returncode', 'elapsed_sec', 'timed_out',
+            'collection_matches_contract', 'worker_collections_consistent', 'xml_testcases',
+            'xml_failures_and_errors', 'xml_skipped', 'strict_doctest_count', 'subtest_count',
+            'subtests_match_contract', 'collection_skip_count', 'collection_skips_match_contract',
+            'duplicate_execution_count', 'expected_duplicate_execution_count', 'duplicate_identities_match_contract',
+            'supplementary_example_count', 'supplementary_match_contract')
+        result = {key: report[key] for key in fields if key in report}
+        if isinstance(report.get('counts'), dict):
+            result['counts'] = {key: report['counts'][key] for key in
+                ('passed', 'failed', 'error', 'skipped', 'xfailed', 'xpassed', 'unexecuted')
+                if type(report['counts'].get(key)) is int and report['counts'][key] >= 0}
+        if isinstance(report.get('runtime_adapter'), dict):
+            result['runtime_adapter'] = {key: report['runtime_adapter'][key] for key in
+                ('name', 'scope', 'original_runner_sha256', 'effective_runner_sha256', 'expected_nodes',
+                    'expected_duplicate_identities', 'preserves_frozen_duplicate_counts')
+                if key in report['runtime_adapter']}
+        for key in ('collection_errors', 'feedback_codes'):
+            if isinstance(report.get(key), list):
+                result[key] = report[key][:8]
         for key in ('business', 'regression'):
             if isinstance(report.get(key), dict):
-                result[key] = ProjectsVerification._public_facts(report[key])
+                result[key] = ProjectsVerification._public_facts(report[key], _depth + 1)
+        if isinstance(report.get('previous_objectives'), list):
+            result['previous_objectives'] = [{'objective_id': item['objective_id'],
+                'report': ProjectsVerification._public_facts(item['report'], _depth + 1)}
+                for item in report['previous_objectives'][:16]]
+        if 'actual' in report:
+            result['actual'] = report['actual']
+        if _depth == 0:
+            budget = {'bytes': 12 * 1024, 'truncated': False}
+            result = _bounded_public_fact(result, budget)
+            if budget['truncated']:
+                result['facts_truncated'] = True
         return result
 
     def _review(self, work: dict, directory: Path, package: dict, cancel) -> dict:

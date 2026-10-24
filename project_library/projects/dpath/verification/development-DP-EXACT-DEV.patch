@@ -1,0 +1,71 @@
+--- a/library/development_tests/test_development_dp_exact_dev.py
++++ b/library/development_tests/test_development_dp_exact_dev.py
+@@ -0,0 +1,23 @@
++"""公开保留键类型的字面路径回归。"""
++from collections import defaultdict
++import pytest
++from dpath.exact import get_exact
++
++def test_glob_characters_separators_and_typed_keys_are_literal():
++    data={'a/b':{'*':{1:'integer','1':'string'}}}
++    assert get_exact(data,['a/b','*',1])=='integer' and get_exact(data,['a/b','*','1'])=='string'
++
++def test_empty_path_and_return_identity_are_preserved():
++    value=[];data={'a':value}
++    assert get_exact(data,()) is data and get_exact(data,iter(['a'])) is value
++
++def test_missing_defaults_and_invalid_list_indices_are_distinct():
++    assert get_exact({'a':[1]},['a',2],None) is None
++    with pytest.raises(TypeError):
++        get_exact({'a':[1]},['a',True])
++    with pytest.raises(TypeError):
++        get_exact({},'a/b')
++
++def test_read_does_not_create_defaultdict_entries():
++    data=defaultdict(list)
++    assert get_exact(data,['missing'],'default')=='default' and dict(data)=={}
+--- a/library/docs/development-dp-exact-dev.md
++++ b/library/docs/development-dp-exact-dev.md
+@@ -0,0 +1,5 @@
++# 按原始键类型精确访问含通配字符的嵌套字段
++
++含斜线、星号或整数字典键的配置应通过原始类型路径精确读取，不经过通配或字符串转换。空路径返回根对象，缺失默认值显式，列表只接受非负整数，读取不能触发defaultdict创建键。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dpath/exact.py
++++ b/library/dpath/exact.py
+@@ -0,0 +1,34 @@
++"""保留键类型的字面路径访问，不解释通配符或分隔符。"""
++from collections.abc import Mapping
++
++
++_MISSING=object()
++
++
++def get_exact(root,segments,default=_MISSING):
++    """读取精确路径。@param root 根。@param segments 键／非负列表索引的可迭代对象。
++    @param default 缺失时的显式默认值。@return 原节点对象；空路径返回根。
++    """
++    if isinstance(segments,(str,bytes)):
++        raise TypeError('字面路径必须是组件序列')
++    parts=tuple(segments)
++    value=root
++    try:
++        for part in parts:
++            if isinstance(value,Mapping):
++                if part not in value:
++                    raise KeyError(part)
++                value=value[part]
++            elif isinstance(value,list):
++                if type(part) is not int:
++                    raise TypeError('列表路径需要整数索引')
++                if part<0:
++                    raise IndexError(part)
++                value=value[part]
++            else:
++                raise TypeError('路径中间值不是映射或列表')
++    except (KeyError,IndexError):
++        if default is _MISSING:
++            raise
++        return default
++    return value

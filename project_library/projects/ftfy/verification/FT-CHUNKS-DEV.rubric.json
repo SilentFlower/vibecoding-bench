@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FT-CHUNKS-DEV",
+  "source_commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement ftfy.streaming.fix_chunks(chunks,config=None,*,max_line_length=1000000). Assemble physical LF lines across arbitrary Unicode chunk boundaries (including CRLF and mojibake sequences), then use actual fix_file semantics including sticky auto-HTML policy across lines. Preserve final unterminated line, ignore empty chunks, stay lazy and buffer at most one bounded physical line. Validate positive character budget/config before consuming input, reject non-text chunks and over-budget lines before repairing them. Results must equal fix_file(StringIO(joined_input)) without materializing the full input or changing old fix_file.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

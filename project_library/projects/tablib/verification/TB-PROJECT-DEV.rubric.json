@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TB-PROJECT-DEV",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement tablib.projection.select_columns(dataset,columns,*,rename=None) plus schema/copy_rows/key_token helpers for later table operations. Require actual Dataset with nonempty unique string headers and consistent stored widths. Select/reorder nonempty unique existing names, validate rename output collisions, deep-copy stored cells/title/row tags and leave source unchanged. The result is explicitly a static data snapshot: dynamic cells keep current stored values and dynamic definitions/export formatters/separators are not copied or executed. key_token uses strict type-and-value hashable keys, so bool/int/float are distinct; fail clearly on mutable keys.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,332 @@
+{
+  "project_key": "pendulum",
+  "title": "Pendulum事件时间工作场景",
+  "category": "月份、时区与数据类型",
+  "seed_digest": "359750aaf4864d63a64c0a4be199fb4187fbd7ef3c09ee60ee4efbcfa50b201b",
+  "environment": "pendulum-py312",
+  "source": {
+    "repository": "https://github.com/python-pendulum/pendulum",
+    "commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/app/babel-2.18-LICENSE.txt",
+      "seed/app/babel-2.18-LICENSE.unicode.txt",
+      "seed/app/rust-licenses/heck-0.5.0/LICENSE-APACHE",
+      "seed/app/rust-licenses/heck-0.5.0/LICENSE-MIT",
+      "seed/app/rust-licenses/libc-0.2.190/LICENSE-APACHE",
+      "seed/app/rust-licenses/libc-0.2.190/LICENSE-MIT",
+      "seed/app/rust-licenses/once_cell-1.21.4/LICENSE-APACHE",
+      "seed/app/rust-licenses/once_cell-1.21.4/LICENSE-MIT",
+      "seed/app/rust-licenses/portable-atomic-1.15.0/LICENSE-APACHE",
+      "seed/app/rust-licenses/portable-atomic-1.15.0/LICENSE-MIT",
+      "seed/app/rust-licenses/proc-macro2-1.0.107/LICENSE-APACHE",
+      "seed/app/rust-licenses/proc-macro2-1.0.107/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-0.29.3/pyo3-runtime/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-0.29.3/pyo3-runtime/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-build-config-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-build-config-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-ffi-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-ffi-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-macros-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-macros-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/pyo3-macros-backend-0.29.3/LICENSE-APACHE",
+      "seed/app/rust-licenses/pyo3-macros-backend-0.29.3/LICENSE-MIT",
+      "seed/app/rust-licenses/quote-1.0.47/LICENSE-APACHE",
+      "seed/app/rust-licenses/quote-1.0.47/LICENSE-MIT",
+      "seed/app/rust-licenses/syn-2.0.119/LICENSE-APACHE",
+      "seed/app/rust-licenses/syn-2.0.119/LICENSE-MIT",
+      "seed/app/rust-licenses/target-lexicon-0.13.5/LICENSE",
+      "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-APACHE",
+      "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-MIT",
+      "seed/app/rust-licenses/unicode-ident-1.0.26/LICENSE-UNICODE"
+    ]
+  },
+  "schema": 3,
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
+  "scenarios": [
+    {
+      "id": "PENDULUM-01-DEV-SCENE",
+      "title": "Interval与标准时长相等时遵守缓存键哈希契约",
+      "goal": "Interval与标准时长相等时遵守缓存键哈希契约",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PENDULUM-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PENDULUM-01-DEV",
+          "kind": "modify",
+          "goal": "Interval与标准时长相等时遵守缓存键哈希契约",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Interval.__hash__ to use the same duration representative as cross-type equality, so every Interval equal to a Duration/timedelta has its hash, including negative/zero/microsecond intervals. Preserve existing endpoint+absolute equality between Intervals; different unequal intervals may legally share a duration hash. Do not redefine endpoint identity, prohibit legal keys or change range/pickle/timezone behavior. Verify actual set/dict lookup with mixed equal types.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pendulum_01_dev.py, and Chinese compatibility documentation at library/docs/development-pendulum-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PENDULUM-01-DEV-contract.md",
+            "materials/PENDULUM-01-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PENDULUM-01-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/pendulum/interval.py",
+            "library/tests/test_development_pendulum_01_dev.py",
+            "library/docs/development-pendulum-01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PENDULUM-01-DEV.rubric.json",
+            "native": "verification/PENDULUM-01-DEV.native.json",
+            "public_native": "verification/PENDULUM-01-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PENDULUM-02-DEV-SCENE",
+      "title": "DateTime减Duration保留日历分量而非统一换算秒数",
+      "goal": "DateTime减Duration保留日历分量而非统一换算秒数",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PENDULUM-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PENDULUM-02-DEV",
+          "kind": "modify",
+          "goal": "DateTime减Duration保留日历分量而非统一换算秒数",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair DateTime._subtract_timedelta for concrete Duration using its complete original _signature, matching add and corresponding subtract(**components). Preserve days/weeks/months/years and fixed hour/minute/second/microsecond distinctions across DST, negatives and month ends. Keep ordinary standard timedelta elapsed-time behavior and existing Interval subtype path. Do not equate calendar days with 24 elapsed hours or silently alter timezone/fold policies.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pendulum_02_dev.py, and Chinese compatibility documentation at library/docs/development-pendulum-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PENDULUM-02-DEV-contract.md",
+            "materials/PENDULUM-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PENDULUM-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/pendulum/datetime.py",
+            "library/tests/test_development_pendulum_02_dev.py",
+            "library/docs/development-pendulum-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PENDULUM-02-DEV.rubric.json",
+            "native": "verification/PENDULUM-02-DEV.native.json",
+            "public_native": "verification/PENDULUM-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PENDULUM-03-DEV-SCENE",
+      "title": "倒序日期窗口成员判断与实际覆盖及迭代方向一致",
+      "goal": "倒序日期窗口成员判断与实际覆盖及迭代方向一致",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PENDULUM-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PENDULUM-03-DEV",
+          "kind": "modify",
+          "goal": "倒序日期窗口成员判断与实际覆盖及迭代方向一致",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Interval.__contains__ to use unordered endpoint coverage while retaining stored start/end, invert, absolute and range direction. Include both endpoints for forward/reverse/single-point intervals, exclude outside values; preserve existing date/datetime and aware/naive comparison exceptions. No conversion between incomparable types, no silent endpoint mutation or changes to duration signs.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pendulum_03_dev.py, and Chinese compatibility documentation at library/docs/development-pendulum-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PENDULUM-03-DEV-contract.md",
+            "materials/PENDULUM-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PENDULUM-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/pendulum/interval.py",
+            "library/tests/test_development_pendulum_03_dev.py",
+            "library/docs/development-pendulum-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PENDULUM-03-DEV.rubric.json",
+            "native": "verification/PENDULUM-03-DEV.native.json",
+            "public_native": "verification/PENDULUM-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PENDULUM-04-DEV-SCENE",
+      "title": "Duration持久化与拷贝保留完整日历声明和子类行为",
+      "goal": "Duration持久化与拷贝保留完整日历声明和子类行为",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PENDULUM-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PENDULUM-04-DEV",
+          "kind": "modify",
+          "goal": "Duration持久化与拷贝保留完整日历声明和子类行为",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit Duration pickle reducers preserving original _signature (years/months/weeks/days and fixed components) and object state, reconstructing actual Duration/AbsoluteDuration class. Support all standard pickle protocols, shallow/deepcopy, negatives/zero/microseconds and identical anchor arithmetic; use normalized AbsoluteDuration definition when it has no signature and restore its state. Keep Interval own endpoint reducers and legacy timedelta-style loads untouched. Never load untrusted pickle or change year/month approximate totals.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pendulum_04_dev.py, and Chinese compatibility documentation at library/docs/development-pendulum-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PENDULUM-04-DEV-contract.md",
+            "materials/PENDULUM-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PENDULUM-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/pendulum/duration.py",
+            "library/tests/test_development_pendulum_04_dev.py",
+            "library/docs/development-pendulum-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PENDULUM-04-DEV.rubric.json",
+            "native": "verification/PENDULUM-04-DEV.native.json",
+            "public_native": "verification/PENDULUM-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PENDULUM-05-DEV-SCENE",
+      "title": "区间日程点支持显式边界和最大产出且拒绝无进度",
+      "goal": "区间日程点支持显式边界和最大产出且拒绝无进度",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PENDULUM-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PENDULUM-05-DEV",
+          "kind": "modify",
+          "goal": "区间日程点支持显式边界和最大产出且拒绝无进度",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend Interval.range with keyword-only closed=both/left/right/neither and limit=None/nonnegative integer, where left/right refer to traversal start/end. Preserve default inclusive two-end behavior, inverse direction, absolute and ANCHORED accumulated-step month-end restoration. Require positive index-protocol amount and valid units; reject zero/negative progress and invalid policies. Stop at finite emitted limit, same endpoint correctly, and avoid endpoint overflow. Limit counts yielded points; no sleeping or unbounded verification.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pendulum_05_dev.py, and Chinese compatibility documentation at library/docs/development-pendulum-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PENDULUM-05-DEV-contract.md",
+            "materials/PENDULUM-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PENDULUM-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/pendulum/interval.py",
+            "library/tests/test_development_pendulum_05_dev.py",
+            "library/docs/development-pendulum-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PENDULUM-05-DEV.rubric.json",
+            "native": "verification/PENDULUM-05-DEV.native.json",
+            "public_native": "verification/PENDULUM-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PENDULUM-06-DEV-SCENE",
+      "title": "交期计算使用不可变离线假日与自定义周末工作日历",
+      "goal": "交期计算使用不可变离线假日与自定义周末工作日历",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PENDULUM-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PENDULUM-06-DEV",
+          "kind": "modify",
+          "goal": "交期计算使用不可变离线假日与自定义周末工作日历",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pendulum.business.BusinessCalendar immutable caller-supplied date holidays and weekday weekend policy, no downloads. Provide is_business_day, signed add_business_days, next_business_day(include_current=False), and signed half-open count. Zero addition preserves identity, nonbusiness starts count following eligible days, negatives reverse, Pendulum Date/DateTime use calendar-day add preserving type/timezone/wall clock. Freeze mutable inputs, reject all-seven weekend/invalid weekdays or datetime holiday objects. Existing ordinary date add remains unchanged; finite local synthetic dates only.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pendulum_06_dev.py, and Chinese compatibility documentation at library/docs/development-pendulum-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PENDULUM-06-DEV-contract.md",
+            "materials/PENDULUM-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/PENDULUM-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/pendulum/business.py",
+            "library/tests/test_development_pendulum_06_dev.py",
+            "library/docs/development-pendulum-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PENDULUM-06-DEV.rubric.json",
+            "native": "verification/PENDULUM-06-DEV.native.json",
+            "public_native": "verification/PENDULUM-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+--- a/library/docs/development-mdit-plugins-o02-dev.md
++++ b/library/docs/development-mdit-plugins-o02-dev.md
+@@ -0,0 +1,5 @@
++# 让闭合元素的连续属性块按实际开放Token累计class
++
++对应路线06：定位opening后读取class，链接/单Token按声明拼接，span按既有规范化语义保留首次class；后写id/key覆盖，白名单及嵌套/相邻隔离保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/mdit_py_plugins/attrs/index.py
++++ b/library/mdit_py_plugins/attrs/index.py
+@@ -175,8 +175,11 @@
+     state.pos += new_pos + 1
+     if not silent:
+         attr_token = state.tokens[token_index]
+-        if "class" in attrs and "class" in token.attrs:
+-            attrs["class"] = f"{token.attrs['class']} {attrs['class']}"
++        # closing Token没有开放元素的实际属性，必须从匹配opening合并。
++        if "class" in attrs and "class" in attr_token.attrs:
++            combined = f"{attr_token.attrs['class']} {attrs['class']}"
++            # span既有连续属性语料按规范化class集合输出；链接/单Token仍保留原声明顺序。
++            attrs["class"] = " ".join(dict.fromkeys(combined.split())) if attr_token.type == "span_open" else combined
+         _add_attrs(attr_token, attrs, allowed)
+     return True
+ 
+--- a/library/tests/test_development_mdit_plugins_o02_dev.py
++++ b/library/tests/test_development_mdit_plugins_o02_dev.py
+@@ -0,0 +1,23 @@
++"""连续属性块必须合并真实目标开放Token上的class。"""
++from markdown_it import MarkdownIt
++from mdit_py_plugins.attrs import attrs_plugin
++
++def test_link_class_accumulates_but_other_attributes_overwrite():
++    """后写id/key覆盖，class保持声明顺序并不自行去重。@return None。"""
++    md=MarkdownIt().use(attrs_plugin)
++    html=md.render('[text](url){.one #old title=first}{.two #new title=last}{.one}')
++    assert 'class="one two one"' in html and 'id="new"' in html and 'title="last"' in html
++
++def test_span_code_and_image_share_actual_target_merging():
++    """span闭合与代码/图片单Token都一致，不把属性写到邻居。@return None。"""
++    md=MarkdownIt().use(attrs_plugin,spans=True)
++    html=md.render('[span]{.one}{.two} `code`{.one}{.two} ![alt](x){.one}{.two}')
++    assert html.count('class="one two"')==3
++    assert 'class="a b"' in md.render('[span]{.a}{.a .b}')
++    assert md.render('[a]{#a .a}{#b .a .b other=c}{other=d}').strip()=='<p><span id="b" class="a b" other="d">a</span></p>'
++
++def test_allowed_filter_and_neighbor_elements_do_not_get_crossed():
++    """过滤仍生效，独立相邻链接各自合并而不串属性。@return None。"""
++    md=MarkdownIt().use(attrs_plugin,allowed=['class'])
++    html=md.render('[a](a){.a}{.b onclick=no} [c](c){.c}{.d}')
++    assert 'class="a b"' in html and 'class="c d"' in html and 'onclick=' not in html

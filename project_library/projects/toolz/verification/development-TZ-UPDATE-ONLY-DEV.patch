@@ -1,0 +1,69 @@
+--- a/library/docs/development-tz-update-only-dev.md
++++ b/library/docs/development-tz-update-only-dev.md
+@@ -0,0 +1,5 @@
++# 为嵌套更新增加禁止隐式创建的明确模式
++
++update_in增加create=False，仅完整存在路径才调用更新函数。缺失任何层时不创建、不回调，返回未更改根副本；None算存在。保留工厂、一次性路径、未修改引用、默认upsert与回调异常；空仅更新路径及无效策略明确拒绝。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/toolz/dicttoolz.py
++++ b/library/toolz/dicttoolz.py
+@@ -242,7 +242,7 @@
+     return update_in(d, keys, lambda x: value, value, factory)
+ 
+ 
+-def update_in(d, keys, func, default=None, factory=dict):
++def update_in(d, keys, func, default=None, factory=dict, *, create=True):
+     """ Update value in a (potentially) nested dictionary
+ 
+     inputs:
+@@ -276,6 +276,19 @@
+     >>> update_in({1: 'foo'}, [2, 3, 4], inc, 0)
+     {1: 'foo', 2: {3: {4: 1}}}
+     """
++    if not isinstance(create, bool):
++        raise TypeError('create必须为bool')
++    if not create:
++        keys = tuple(keys)
++        if not keys:
++            raise ValueError('仅更新模式的路径不可为空')
++        current = d
++        for key in keys:
++            if key not in current:
++                result = factory()
++                result.update(d)
++                return result
++            current = current[key]
+     ks = iter(keys)
+     k = next(ks)
+ 
+--- a/library/toolz/tests/test_development_tz_update_only_dev.py
++++ b/library/toolz/tests/test_development_tz_update_only_dev.py
+@@ -0,0 +1,27 @@
++"""仅更新模式不能创建缺失路径或触发不必要回调。"""
++import pytest
++from toolz import update_in
++
++
++def test_missing_never_calls_function():
++    """缺失叶子或祖先均返回未修改副本。@return None。"""
++    original = {'a': {'b': 1}}
++    calls = []
++    for path in (['a', 'missing'], ['missing', 'b']):
++        result = update_in(original, path, lambda value: calls.append(value), create=False)
++        assert result == original and result is not original
++    assert calls == []
++
++
++def test_none_is_existing_and_curried():
++    """None是存在值，curried入口继承策略。@return None。"""
++    from toolz.curried import update_in as curried
++    assert update_in({'a': None}, ['a'], lambda value: value is None, create=False) == {'a': True}
++    assert curried({'a': 1}, ['a'])(lambda value: value + 1, create=False) == {'a': 2}
++
++
++def test_default_upsert_and_error():
++    """默认创建语义不变，空的仅更新路径拒绝。@return None。"""
++    assert update_in({}, ['a', 'b'], lambda value: value + 1, default=0) == {'a': {'b': 1}}
++    with pytest.raises(ValueError):
++        update_in({}, [], lambda value: value, create=False)

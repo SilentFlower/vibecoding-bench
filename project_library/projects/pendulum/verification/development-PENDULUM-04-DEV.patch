@@ -1,0 +1,66 @@
+--- a/library/docs/development-pendulum-04-dev.md
++++ b/library/docs/development-pendulum-04-dev.md
+@@ -0,0 +1,5 @@
++# Duration持久化与拷贝保留完整日历声明和子类行为
++
++路线05：Duration reducer保存完整日历声明及原属性，所有协议/浅深拷贝保同一锚点运算；AbsoluteDuration规范重建并保状态，Interval自身端点reducer和旧读取不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pendulum/duration.py
++++ b/library/src/pendulum/duration.py
+@@ -41,6 +41,13 @@
+         q += 1
+ 
+     return q
++
++
++def _restore_duration(cls,signature,state):
++    """重建受信时长状态。@param cls 实际时长类。@param signature 日历声明。@param state 原属性状态。@return 重建时长。"""
++    result=cls(**signature)
++    result.__dict__.update(state)
++    return result
+ 
+ 
+ class Duration(timedelta):
+@@ -125,6 +132,17 @@
+ 
+         return self
+ 
++    def __reduce__(self):
++        """持久化全部日历声明。@return 不含外部对象执行逻辑的受信重建参数。"""
++        signature=getattr(self,"_signature",None)
++        if signature is None:
++            signature={"years":self._years,"months":self._months,"seconds":self._total}
++        return (_restore_duration,(type(self),dict(signature),dict(self.__dict__)))
++
++    def __reduce_ex__(self,protocol):
++        """所有pickle协议保留声明。@param protocol 标准协议号。@return 同一重建格式。"""
++        return self.__reduce__()
++
+     def total_minutes(self) -> float:
+         return self.total_seconds() / SECONDS_PER_MINUTE
+ 
+--- a/library/tests/test_development_pendulum_04_dev.py
++++ b/library/tests/test_development_pendulum_04_dev.py
+@@ -0,0 +1,21 @@
++"""时长持久化不能把一年两月变成近似秒数。"""
++import copy
++import pickle
++import pendulum
++from pendulum.duration import Duration,AbsoluteDuration
++
++def test_calendar_components_survive_protocols_copy_and_anchor_addition():
++    """全部协议和浅深拷贝得到相同日历效果。@return None。"""
++    value=Duration(years=1,months=2,weeks=1,days=3,hours=4,microseconds=5)
++    anchor=pendulum.datetime(2024,1,31)
++    restored=[copy.copy(value),copy.deepcopy(value)]+[pickle.loads(pickle.dumps(value,protocol=n)) for n in range(pickle.HIGHEST_PROTOCOL+1)]
++    for result in restored:
++        assert result._signature==value._signature and result.years==1 and result.months==2
++        assert anchor+result==anchor+value
++
++def test_absolute_duration_and_zero_preserve_concrete_type_and_behavior():
++    """AbsoluteDuration没有普通signature时仍保规范属性及负向标志。@return None。"""
++    for value in (AbsoluteDuration(years=2,months=3,days=-2,hours=-1),Duration(),Duration(days=-1,microseconds=7)):
++        result=pickle.loads(pickle.dumps(value))
++        assert type(result) is type(value) and result==value
++        assert result.years==value.years and result.months==value.months and result.invert==value.invert

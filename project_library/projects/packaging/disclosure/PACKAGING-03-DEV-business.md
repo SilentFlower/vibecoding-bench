@@ -1,0 +1,5 @@
+# 业务确认
+
+路线05：Requirement.applies逐个规范化所选extra，完整表达式使用同一绑定，空选集按基础extra；环境复制且不混淆Requirement.extras或lock_file集合变量。
+
+请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。

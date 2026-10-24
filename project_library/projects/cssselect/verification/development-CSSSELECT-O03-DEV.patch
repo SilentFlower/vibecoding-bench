@@ -1,0 +1,105 @@
+--- a/library/cssselect/cache.py
++++ b/library/cssselect/cache.py
+@@ -0,0 +1,62 @@
++"""显式启用、带容量及统计的内置翻译器LRU。"""
++from collections import OrderedDict
++from threading import RLock
++from cssselect.xpath import GenericTranslator, HTMLTranslator
++
++
++class SelectorCache:
++    """只缓存可明确指纹的内置翻译配置，不共享任意自定义实例。
++
++    :param capacity: 正整数缓存容量。
++    :return: 独立、有界、可清空的缓存服务。
++    """
++
++    def __init__(self, capacity=128):
++        """验证容量并初始化独立状态。@return None。"""
++        if isinstance(capacity, bool) or not isinstance(capacity, int) or capacity < 1:
++            raise ValueError('容量必须是正整数')
++        self.capacity = capacity
++        self._items = OrderedDict()
++        self._hits = self._misses = self._evictions = 0
++        self._lock = RLock()
++
++    def translate(self, css, *, mode='xml', xhtml=False, prefix='descendant-or-self::'):
++        """返回与相同真实translator配置一致的XPath。
++
++        :param css: 完整CSS选择器组。
++        :param mode: xml或html，其他配置不得猜测共享。
++        :param xhtml: HTML大小写政策。
++        :param prefix: XPath前缀，属于缓存键。
++        :return: 不可变XPath文本；失败不进入缓存。
++        """
++        if mode not in ('xml', 'html') or (mode == 'xml' and xhtml):
++            raise ValueError('无效翻译模式')
++        if not isinstance(css, str) or not isinstance(prefix, str) or not isinstance(xhtml, bool):
++            raise TypeError('选择器、前缀或XHTML配置类型错误')
++        key = (css, mode, xhtml, prefix)
++        with self._lock:
++            if key in self._items:
++                self._hits += 1
++                self._items.move_to_end(key)
++                return self._items[key]
++            self._misses += 1
++            translator = HTMLTranslator(xhtml=xhtml) if mode == 'html' else GenericTranslator()
++            result = translator.css_to_xpath(css, prefix=prefix)
++            self._items[key] = result
++            if len(self._items) > self.capacity:
++                self._items.popitem(last=False)
++                self._evictions += 1
++            return result
++
++    def stats(self):
++        """返回新统计字典，调用者不能修改内部计数。@return dict。"""
++        with self._lock:
++            return {'size': len(self._items), 'capacity': self.capacity, 'hits': self._hits,
++                    'misses': self._misses, 'evictions': self._evictions}
++
++    def clear(self, *, reset_stats=False):
++        """清空缓存；只有显式选择才重置统计。@return None。"""
++        with self._lock:
++            self._items.clear()
++            if reset_stats:
++                self._hits = self._misses = self._evictions = 0
+--- a/library/docs/development-cssselect-o03-dev.md
++++ b/library/docs/development-cssselect-o03-dev.md
+@@ -0,0 +1,5 @@
++# 提供模式隔离且可观测的有界选择器翻译缓存
++
++对应路线17：独立LRU服务只接受可明确指纹的内置配置，容量、访问顺序淘汰、统计、清空和并发可观测；失败不缓存，不隐式修改旧API。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cssselect_o03_dev.py
++++ b/library/tests/test_development_cssselect_o03_dev.py
+@@ -0,0 +1,29 @@
++"""LRU命中、配置隔离和清空均通过实际翻译验证。"""
++import pytest
++import cssselect
++
++def test_lru_uses_access_order_and_capacity():
++    """重读保护热项，第三项淘汰最久未访问项。@return None。"""
++    from cssselect.cache import SelectorCache
++    c=SelectorCache(2);c.translate('a');c.translate('b');c.translate('a');c.translate('c')
++    assert c.stats()=={'size':2,'capacity':2,'hits':1,'misses':3,'evictions':1}
++    c.translate('b');assert c.stats()['misses']==4 and c.stats()['evictions']==2
++
++def test_configuration_and_failed_result_isolation():
++    """HTML/XML、XHTML和prefix各自独立，失败不缓存。@return None。"""
++    from cssselect.cache import SelectorCache
++    c=SelectorCache(9)
++    assert c.translate('DIV')!=c.translate('DIV',mode='html')
++    assert c.translate('DIV',mode='html',xhtml=True)!=c.translate('DIV',mode='html')
++    assert c.translate('p',prefix='self::')=='self::p'
++    for _ in range(2):
++        with pytest.raises(cssselect.ExpressionError):c.translate(':unknown')
++    assert c.stats()['size']==4 and c.stats()['misses']==6
++
++def test_clear_and_independent_instances():
++    """清空和统计副本不会影响其他实例。@return None。"""
++    from cssselect.cache import SelectorCache
++    c=SelectorCache(1);d=SelectorCache(1);c.translate('p');c.clear()
++    assert c.stats()['size']==0 and c.stats()['misses']==1 and d.stats()['misses']==0
++    c.stats()['misses']=999;c.clear(reset_stats=True);assert c.stats()['misses']==0
++    with pytest.raises(ValueError):SelectorCache(True)

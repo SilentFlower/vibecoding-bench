@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AR-STRICT-DEV",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add DateTimeParser.parse_strict(text, format_or_list, normalize_whitespace=False, *, exact_width=False) and arrow.get(text, format_or_list, strict=True, exact_width=False). Strict matching consumes the whole normalized input with valid calendar values; old parse/get extraction defaults remain unchanged. Optional exact width requires single digit M/D/H/h/m/s, three day-of-year digits and the declared fractional S count; literals are not tokens. Keep token/localization semantics including corrected numeric weekdays, format-list fallback and timezone parsing. Reject nonboolean switches, literal-only formats and exact_width without strict mode; factory strict mode requires explicit formats.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

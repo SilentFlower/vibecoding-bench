@@ -1,0 +1,67 @@
+--- a/library/boltons/jsonutils.py
++++ b/library/boltons/jsonutils.py
+@@ -140,7 +140,10 @@
+     .. _JSON Lines format: http://jsonlines.org/
+     """
+     def __init__(self, file_obj,
+-                 ignore_errors=False, reverse=False, rel_seek=None):
++                 ignore_errors=False, reverse=False, rel_seek=None, *, loads=None):
++        self._loads=json.loads if loads is None else loads
++        if not callable(self._loads):
++            raise TypeError('loads必须是可调用解码器或None')
+         self._reverse = bool(reverse)
+         self._file_obj = file_obj
+         self.ignore_errors = ignore_errors
+@@ -215,7 +218,7 @@
+             if not line:
+                 continue
+             try:
+-                obj = json.loads(line)
++                obj = self._loads(line)
+             except Exception:
+                 if not self.ignore_errors:
+                     raise
+--- a/library/development_tests/test_development_bo_jsonl_decoder_dev.py
++++ b/library/development_tests/test_development_bo_jsonl_decoder_dev.py
+@@ -0,0 +1,33 @@
++"""公开JSONL自定义解码器回归。"""
++from io import StringIO,BytesIO
++from decimal import Decimal
++import json
++import pytest
++from boltons.jsonutils import JSONLIterator
++
++def test_decimal_and_object_pairs_hooks_are_preserved():
++    rows=list(JSONLIterator(StringIO('{"a":1.20}\n'),loads=lambda line:json.loads(line,parse_float=Decimal)))
++    assert rows==[{'a':Decimal('1.20')}]
++    rows=list(JSONLIterator(StringIO('{"a":1,"a":2}\n'),loads=lambda line:json.loads(line,object_pairs_hook=list)))
++    assert rows==[[('a',1),('a',2)]]
++
++def test_blank_lines_skip_decoder_and_return_identity_is_preserved():
++    seen=[];result=object()
++    def decoder(line):
++        seen.append(line)
++        return result
++    iterator=JSONLIterator(StringIO('\n  \n{}\n'),loads=decoder)
++    assert next(iterator) is result and len(seen)==1
++
++def test_reverse_and_ignore_errors_keep_existing_behavior():
++    stream=BytesIO(b'1\nbad\n2\n')
++    assert list(JSONLIterator(stream,reverse=True,ignore_errors=True,loads=json.loads))==[2,1]
++
++def test_invalid_decoder_is_rejected_before_seek_or_read():
++    class Stream:
++        def read(self,*args):
++            raise AssertionError('不应读取')
++        def seek(self,*args):
++            raise AssertionError('不应定位')
++    with pytest.raises(TypeError):
++        JSONLIterator(Stream(),loads=3,reverse=True)
+--- a/library/docs/development-bo-jsonl-decoder-dev.md
++++ b/library/docs/development-bo-jsonl-decoder-dev.md
+@@ -0,0 +1,5 @@
++# 为逐行JSON读取注入本次解码器并保持反向和错误策略
++
++逐行记录读取需要选择金额精度和对象处理方式。注入本次解码器，空行不调用，返回原结果对象，继续沿用反向读取、定位及跳过错误策略，不改全局JSON模块或关闭调用者流。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

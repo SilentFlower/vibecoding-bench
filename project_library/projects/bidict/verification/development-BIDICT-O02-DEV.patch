@@ -1,0 +1,68 @@
+--- a/library/bidict/select.py
++++ b/library/bidict/select.py
+@@ -0,0 +1,29 @@
++"""按业务选择条件构造独立双向子映射。"""
++
++
++def select(mapping, *, keys=None, values=None, predicate=None, strict=False):
++    """同时应用显式选择条件，保持源关系相对顺序。
++
++    :param mapping: 真实双向映射。
++    :param keys: 可选键集合，空集合表示不选任何项。
++    :param values: 可选值集合。
++    :param predicate: 可选(key,value)业务谓词。
++    :param strict: 请求的不存在键或值是否失败。
++    :return: 不共享可变backing的同类子映射。
++    """
++    requested_keys = None if keys is None else set(keys)
++    requested_values = None if values is None else set(values)
++    if strict:
++        if requested_keys is not None and not requested_keys <= mapping.keys():
++            raise KeyError('选择键不存在')
++        if requested_values is not None and not requested_values <= mapping.inverse.keys():
++            raise KeyError('选择值不存在')
++    items = []
++    for key, value in mapping.items():
++        if requested_keys is not None and key not in requested_keys:
++            continue
++        if requested_values is not None and value not in requested_values:
++            continue
++        if predicate is None or predicate(key, value):
++            items.append((key, value))
++    return type(mapping)(items)
+--- a/library/docs/development-bidict-o02-dev.md
++++ b/library/docs/development-bidict-o02-dev.md
+@@ -0,0 +1,5 @@
++# 按键值与谓词输出保持类型的独立双向子映射
++
++组合键、值及业务谓词筛选真实关系，空选择与未指定条件区别明确。返回同类独立双向子映射并保持原相对顺序；严格缺失在回调前失败，一次性请求只读取一次，回调错误保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bidict_o02_dev.py
++++ b/library/tests/test_development_bidict_o02_dev.py
+@@ -0,0 +1,25 @@
++"""选择结果保留双向类型、原顺序并独立于源表。"""
++from bidict import bidict, OrderedBidict, frozenbidict
++
++def test_keys_values_and_order():
++    """键值条件组合，不按请求顺序打乱原表。@return None。"""
++    from bidict.select import select
++    source = OrderedBidict([('a', 1), ('b', 2), ('c', 3)])
++    result = select(source, keys=['c', 'a'], values=[1, 3])
++    assert list(result.items()) == [('a', 1), ('c', 3)] and result.inverse[3] == 'c'
++    source['d'] = 4
++    assert 'd' not in result
++
++def test_empty_none_and_predicate():
++    """空请求与None键语义明确，谓词实际生效。@return None。"""
++    from bidict.select import select
++    source = bidict({None: 0, 'a': 1})
++    assert select(source, keys=[]) == {}
++    assert select(source, predicate=lambda key, value: value == 0) == {None: 0}
++
++def test_strict_and_frozen():
++    """严格缺失与冻结结果类型。@return None。"""
++    import pytest
++    from bidict.select import select
++    with pytest.raises(KeyError): select(bidict(a=1), values=[2], strict=True)
++    assert isinstance(select(frozenbidict(a=1), keys=['a']), frozenbidict)

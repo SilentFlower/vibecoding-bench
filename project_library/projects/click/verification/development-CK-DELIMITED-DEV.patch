@@ -1,0 +1,92 @@
+--- a/library/development_tests/test_development_ck_delimited_dev.py
++++ b/library/development_tests/test_development_ck_delimited_dev.py
+@@ -0,0 +1,32 @@
++"""公开列表选项真实命令回归。"""
++import pytest
++import click
++from click.testing import CliRunner
++from click.delimited import DelimitedList
++
++def test_quoted_separator_and_empty_fields_are_preserved():
++    assert DelimitedList().convert('"a,b",,"c""d"',None,None)==('a,b','','c"d')
++
++def test_real_option_uses_underlying_type_and_preserves_multiple_values():
++    @click.command()
++    @click.option('--ids',type=DelimitedList(int),multiple=True)
++    def command(ids):
++        click.echo(repr(ids))
++    result=CliRunner().invoke(command,['--ids','1,2','--ids','3'])
++    assert result.exit_code==0 and result.output.strip()=='((1, 2), (3,))'
++
++def test_bad_item_reports_position_and_prevents_callback():
++    calls=[]
++    @click.command()
++    @click.option('--ids',type=DelimitedList(int))
++    def command(ids):
++        calls.append(ids)
++    result=CliRunner().invoke(command,['--ids','1,bad'])
++    assert result.exit_code==2 and '第2项' in result.output and calls==[]
++
++def test_bounds_typed_sequences_and_invalid_quotes_are_checked():
++    assert DelimitedList(int,min_items=1).convert([1,'2'],None,None)==(1,2)
++    with pytest.raises(click.BadParameter):
++        DelimitedList(max_items=1).convert('a,b',None,None)
++    with pytest.raises(click.BadParameter):
++        DelimitedList().convert('"unclosed',None,None)
+--- a/library/docs/development-ck-delimited-dev.md
++++ b/library/docs/development-ck-delimited-dev.md
+@@ -0,0 +1,5 @@
++# 把有引号的列表选项转换为有界业务值序列
++
++业务命令需要单个列表选项，支持带引号的分隔符和空字段，逐项使用真实Click类型转换。长度有界，错误定位到元素，命令回调只在转换完整成功后执行，保留已有参数类型行为。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/click/delimited.py
++++ b/library/src/click/delimited.py
+@@ -0,0 +1,46 @@
++"""有引号规则的单选项列表类型。"""
++import csv
++from io import StringIO
++from .exceptions import BadParameter
++from .types import ParamType, convert_type
++
++
++class DelimitedList(ParamType):
++    """将一个选项值解析为有界CSV式列表，逐项沿用原类型转换。"""
++    name='list'
++    def __init__(self,item_type=str,*,separator=',',min_items=0,max_items=None):
++        """建立列表类型。@param item_type 原Click类型。@param separator 单个非换行分隔符。
++        @param min_items 最少数量。@param max_items 上限或None。@return None。
++        """
++        if not isinstance(separator,str) or len(separator)!=1 or separator in '\r\n"':
++            raise ValueError('分隔符必须是单个非换行、非引号字符')
++        if type(min_items) is not int or min_items<0 or max_items is not None and (type(max_items) is not int or max_items<min_items):
++            raise ValueError('列表长度边界无效')
++        self.item_type=convert_type(item_type)
++        self.separator,self.min_items,self.max_items=separator,min_items,max_items
++
++    def convert(self,value,param,ctx):
++        """解析并转换列表。@param value 文本或list/tuple。@param param 参数。@param ctx 上下文。
++        @return 不可变转换结果元组；元素失败附带一基位置。
++        """
++        if isinstance(value,str):
++            try:
++                records=list(csv.reader(StringIO(value),delimiter=self.separator,strict=True))
++            except csv.Error as error:
++                self.fail('列表引号格式无效：'+str(error),param,ctx)
++            if len(records)>1:
++                self.fail('列表必须是单条记录',param,ctx)
++            items=records[0] if records else []
++        elif isinstance(value,(list,tuple)):
++            items=list(value)
++        else:
++            self.fail('需要列表文本或序列',param,ctx)
++        if len(items)<self.min_items or self.max_items is not None and len(items)>self.max_items:
++            self.fail('列表元素数量超出边界',param,ctx)
++        result=[]
++        for index,item in enumerate(items,1):
++            try:
++                result.append(self.item_type(item,param,ctx))
++            except BadParameter as error:
++                self.fail(f'第{index}项：'+error.format_message(),param,ctx)
++        return tuple(result)

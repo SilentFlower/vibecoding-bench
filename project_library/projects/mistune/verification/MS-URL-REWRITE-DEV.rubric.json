@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MS-URL-REWRITE-DEV",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add HTMLRenderer keyword-only url_rewriter=None. For actual rendered link/image tokens, call (original_url,\"link\"|\"image\") once and require a string return; then run the existing sanitize_url and attribute escaping on the rewritten URL. Preserve visible link text, image alt/title, nested emphasis, reference links and auto links. Default output and raw HTML remain unchanged; callback exceptions propagate and a rewritten javascript URL must not bypass the existing harmful-protocol policy.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

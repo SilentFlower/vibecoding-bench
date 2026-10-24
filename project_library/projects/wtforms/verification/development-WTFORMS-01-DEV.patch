@@ -1,0 +1,68 @@
+--- a/library/docs/development-wtforms-01-dev.md
++++ b/library/docs/development-wtforms-01-dev.md
+@@ -0,0 +1,5 @@
++# 附加过滤与校验规则组合保持调用方列表所有权
++
++路线20：同根所有权修复同时覆盖extra_filters与extra_validators，组合前复制实际使用的序列，不往调用方列表追加inline；extra在前、inline在后，回调身份不变，重复构造/处理/验证不累积。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wtforms/form.py
++++ b/library/src/wtforms/form.py
+@@ -115,7 +115,7 @@
+         filters = extra_filters.copy() if extra_filters is not None else {}
+ 
+         for name, field in self._fields.items():
+-            field_extra_filters = filters.get(name, [])
++            field_extra_filters = list(filters.get(name, []))
+ 
+             inline_filter = getattr(self, f"filter_{name}", None)
+             if inline_filter is not None:
+@@ -358,6 +358,6 @@
+         for name in self._fields:
+             inline = getattr(self.__class__, f"validate_{name}", None)
+             if inline is not None:
+-                extra.setdefault(name, []).append(inline)
++                extra[name] = list(extra.get(name, ())) + [inline]
+ 
+         return super().validate(extra)
+--- a/library/tests/test_development_wtforms_01_dev.py
++++ b/library/tests/test_development_wtforms_01_dev.py
+@@ -0,0 +1,38 @@
++"""组合inline规则不得追加到调用方持有的列表。"""
++from wtforms import Form,StringField
++
++
++def test_shared_filter_and_validator_lists_stay_owned_by_caller():
++    """多次构造与验证，每轮inline恰好一次且外部列表不增长。@return None。"""
++    calls=[]
++    class Product(Form):
++        """真实带inline规则的商品表单。"""
++        value=StringField()
++        def filter_value(self,value):
++            """追加本轮展示值。@param value 原值。@return 修改值。"""
++            calls.append('filter');return value+'!'
++        def validate_value(self,field):
++            """记录一次真实inline校验。@param field 字段。@return None。"""
++            calls.append('inline')
++    filters={'value':[]};validators={'value':[]}
++    for index in range(2):
++        form=Product(data={'value':'x'},extra_filters=filters)
++        assert form.value.data=='x!' and form.validate(extra_validators=validators)
++    assert filters==validators=={'value':[]} and calls==['filter','inline','filter','inline']
++
++
++def test_tuple_sequences_order_and_callable_identity():
++    """元组附加规则同样可组合，extra在inline前且不复制callable。@return None。"""
++    calls=[]
++    def extra(form,field):
++        """本轮附加规则。@param form 表单。@param field 字段。@return None。"""
++        calls.append('extra')
++    class Product(Form):
++        """有继承式inline协议的表单。"""
++        value=StringField()
++        def validate_value(self,field):
++            """inline在最后执行。@param field 字段。@return None。"""
++            calls.append('inline')
++    given={'value':(extra,)}
++    assert Product(data={'value':'x'}).validate(extra_validators=given)
++    assert given['value']==(extra,) and calls==['extra','inline']

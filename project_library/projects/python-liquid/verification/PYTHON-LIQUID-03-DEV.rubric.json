@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-LIQUID-03-DEV",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add liquid.context_schema.ContextField(path tuple[str|int],expected_type,required=True,nullable=False), ContextSchema and validate_context(data,schema). Read declared Mapping/list/tuple paths only; report all missing and wrong-type fields in declaration order without values. Support explicit list indices, optional missing and nullable None separately; bool cannot satisfy int. Do not render templates, invoke filters or arbitrary object getters, infer filter types or declare dynamic paths complete. Schema copies field declarations, rejects duplicate/invalid paths, and extra undeclared data remains allowed. Default rendering behavior stays unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

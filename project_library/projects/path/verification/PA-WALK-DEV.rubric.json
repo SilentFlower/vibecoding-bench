@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PA-WALK-DEV",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Path.walk_controlled(*,follow_symlinks=False,max_depth=None,exclude=(),stable=False,errors=\"strict\"). Yield Path descendants in depth-first preorder, root depth=0; exclude relative POSIX fnmatch patterns before yielding or descending, optionally sort names per directory. Default yields links without following directory links; opted-in following tracks directory (device,inode) identities to prevent cycles/repeated subtree traversal. Respect original error handler resolution and caller Path subclass; close scandir handles, validate policies, preserve legacy walk and do not follow links implicitly.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

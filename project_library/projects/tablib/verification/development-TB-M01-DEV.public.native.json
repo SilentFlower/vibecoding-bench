@@ -1,0 +1,14 @@
+{
+  "script": "verification/development-TB-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 8,
+    "failures": 0
+  },
+  "test_file": "app/test_dict_import.py"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AG-SCHEMA-DEV",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add exported Schema(columns) and SchemaValidationError. A columns mapping declares nullable/unique booleans, inclusive min/max and finite choices. Validate a real Table without mutation, returning deterministic zero-based row/column/code records in row then configured-column order; never include actual values. Nulls bypass other checks, nullable defaults True, unique ignores nulls, and duplicate reports start at the second equal value. validate(table, strict=False, max_errors=None) supports an exact positive integer error cap and strict errors with an errors tuple. Copy caller rules, reject unknown/invalid rules, reversed bounds, invalid strict/caps and missing table columns before scanning.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

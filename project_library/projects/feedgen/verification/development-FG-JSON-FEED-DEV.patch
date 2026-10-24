@@ -1,0 +1,140 @@
+--- a/library/development_tests/test_development_fg_json_feed_dev.py
++++ b/library/development_tests/test_development_fg_json_feed_dev.py
+@@ -0,0 +1,30 @@
++"""公开JSON Feed真实字段映射回归。"""
++import json
++import pytest
++from feedgen.feed import FeedGenerator
++from feedgen.json_feed import json_feed,json_feed_str
++
++def make():
++    feed=FeedGenerator();feed.title('订阅');feed.author(name='Editor',uri='https://example.test/editor')
++    feed.link(href='https://example.test',rel='alternate');entry=feed.add_entry();entry.id('urn:1');entry.title('One');entry.content('<p>内容</p>',type='html')
++    return feed,entry
++
++def test_required_fields_html_and_authors_map_to_real_json_bytes():
++    feed,entry=make();result=json.loads(json_feed_str(feed))
++    assert result['version']=='https://jsonfeed.org/version/1.1' and result['title']=='订阅'
++    assert result['items'][0]['content_html']=='<p>内容</p>' and result['authors'][0]['url']=='https://example.test/editor'
++
++def test_zero_size_enclosure_and_dates_are_preserved():
++    feed,entry=make();entry.link(href='https://example.test/audio',rel='enclosure',type='audio/mpeg',length=0)
++    entry.published('2026-01-01T08:00:00+08:00');result=json_feed(feed)['items'][0]
++    assert result['attachments'][0]['size_in_bytes']==0 and result['date_published']=='2026-01-01T08:00:00+08:00'
++
++def test_duplicate_ids_and_unsupported_body_fail_explicitly():
++    feed,entry=make();other=feed.add_entry();other.id('urn:1');other.content('Text')
++    with pytest.raises(ValueError): json_feed(feed)
++    feed.entry([entry],replace=True);entry.content(src='https://example.test/external')
++    with pytest.raises(ValueError): json_feed(feed)
++
++def test_export_is_detached_from_source_metadata():
++    feed,entry=make();result=json_feed(feed);result['authors'][0]['name']='Changed';result['items'][0]['title']='Changed'
++    assert feed.author()[0]['name']=='Editor' and entry.title()=='One'
+--- a/library/docs/development-fg-json-feed-dev.md
++++ b/library/docs/development-fg-json-feed-dev.md
+@@ -0,0 +1,5 @@
++# 新增映射真实订阅字段的JSON Feed 1.1导出
++
++真实订阅对象新增JSON Feed 1.1导出，明确支持标题、正文、链接、作者、日期及附件。文本与HTML分别映射，长度零不能丢失，缺少必要内容或不支持的正文类型明确拒绝，不猜测扩展。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/feedgen/json_feed.py
++++ b/library/feedgen/json_feed.py
+@@ -0,0 +1,96 @@
++"""把已定义的订阅字段映射到JSON Feed 1.1。"""
++import json
++
++
++def _authors(authors):
++    result=[]
++    for author in authors or []:
++        row={key:author[source] for key,source in [('name','name'),('url','uri')] if author.get(source)}
++        if row:
++            result.append(row)
++    return result
++
++
++def _links(target):
++    return {link.get('rel','alternate'):link['href'] for link in target.link() or []}
++
++
++def _date(value):
++    if value.utcoffset() is None:
++        raise ValueError('JSON订阅时间必须带时区')
++    return value.isoformat()
++
++
++def json_feed(feed):
++    """导出独立JSON Feed数据。@param feed 真实订阅。@return JSON兼容映射，源对象不变。
++    不推测任意扩展；不支持的外部或XHTML正文明确报错。
++    """
++    if not isinstance(feed.title(),str) or not feed.title():
++        raise ValueError('JSON订阅需要文本标题')
++    result={'version':'https://jsonfeed.org/version/1.1','title':feed.title(),'items':[]}
++    links=_links(feed)
++    for key,rel in [('home_page_url','alternate'),('feed_url','self'),('next_url','next')]:
++        if links.get(rel):
++            result[key]=links[rel]
++    for key,value in [('description',feed.subtitle()),('language',feed.language()),('icon',feed.logo()),('favicon',feed.icon())]:
++        if value:
++            result[key]=value
++    authors=_authors(feed.author())
++    if authors:
++        result['authors']=authors
++    seen=set()
++    for entry in feed.entry():
++        identity=entry.id()
++        if not isinstance(identity,str) or not identity or identity in seen:
++            raise ValueError('JSON订阅条目需要唯一文本ID')
++        seen.add(identity);item={'id':identity}
++        if entry.title():
++            item['title']=entry.title()
++        body=entry.content() or {};summary=entry.summary() or {}
++        if body.get('src') or body.get('type','text') not in ('text','html'):
++            raise ValueError('JSON订阅仅支持内联文本或HTML正文')
++        if 'content' in body:
++            item['content_html' if body.get('type')=='html' else 'content_text']=body['content']
++        elif 'summary' in summary and summary.get('type','text')=='text':
++            item['content_text']=summary['summary']
++        else:
++            raise ValueError('条目需要内联正文或纯文本摘要')
++        if summary.get('summary') and summary.get('type','text')=='text':
++            item['summary']=summary['summary']
++        if _links(entry).get('alternate'):
++            item['url']=_links(entry)['alternate']
++        for key,value in [('date_published',entry.published()),('date_modified',entry.updated())]:
++            if value is not None:
++                item[key]=_date(value)
++        authors=_authors(entry.author())
++        if authors:
++            item['authors']=authors
++        attachments=[]
++        for link in entry.link() or []:
++            if link.get('rel')=='enclosure':
++                if not link.get('type'):
++                    raise ValueError('附件需要MIME类型')
++                attachment={'url':link['href'],'mime_type':link['type']}
++                if link.get('title'):
++                    attachment['title']=link['title']
++                if link.get('length') is not None:
++                    length=link['length']
++                    if type(length) is int and length>=0:
++                        attachment['size_in_bytes']=length
++                    elif isinstance(length,str) and length.isascii() and length.isdecimal():
++                        attachment['size_in_bytes']=int(length)
++                    else:
++                        raise ValueError('附件长度必须为非负整数')
++                attachments.append(attachment)
++        if attachments:
++            item['attachments']=attachments
++        result['items'].append(item)
++    # 往返一次形成独立标准JSON数据，也拒绝原对象中不能序列化的值。
++    return json.loads(json.dumps(result,ensure_ascii=False,allow_nan=False))
++
++
++def json_feed_str(feed,*,pretty=False):
++    """生成UTF8 JSON订阅字节。@param feed 原订阅。@param pretty 是否缩进。
++    @return 无BOM的UTF8字节。
++    """
++    return json.dumps(json_feed(feed),ensure_ascii=False,allow_nan=False,indent=2 if pretty else None).encode('utf-8')

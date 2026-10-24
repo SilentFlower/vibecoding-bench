@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DOCUTILS-O03-DEV",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend CodeBlock with caption option, using the original tag_code language/highlight/number-lines path and wrapping captioned output in an actual code-figure figure whose first child is literal_block and second is inline-parsed caption. Attach name/id to the figure for real references and preserve source/line; HTML5 naturally emits figure/figcaption and code escaping. Caption-free nodes/output remain unchanged. Reject empty captions through directive option validation and preserve Unicode/multiline title text and original lexer error policy; do not replace code contents with raw HTML or a rubric.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

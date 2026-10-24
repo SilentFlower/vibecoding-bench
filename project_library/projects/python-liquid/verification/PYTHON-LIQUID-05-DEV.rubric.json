@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-LIQUID-05-DEV",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add liquid.template_bundle.make_bundle/templates explicit source Mapping plus root entries, load_bundle and immutable TemplateBundle with fresh environment(). Canonical schema1 JSON stores only raw source strings, explicit roots and SHA256 of canonical payload; reject tampering, duplicate JSON keys, unknown schema/fields, bad source types, missing/duplicate roots. Preserve all supplied dependency sources and prove real render/include in a fresh DictLoader environment. No pickle/code objects, no automatic dynamic-dependency completeness claim, no plugin/environment identity guessing; caller supplies compatible explicit options and cannot replace bundle loader. Copy sources and expose readonly snapshot.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

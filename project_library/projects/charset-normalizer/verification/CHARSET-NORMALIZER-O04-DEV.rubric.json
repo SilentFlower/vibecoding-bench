@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARSET-NORMALIZER-O04-DEV",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement charset_normalizer.compressed.from_compressed_path(path, *, format, max_bytes, read_size=65536, **options). Use actual gzip/bz2/xz readers with a required decompressed-byte budget (at most one extra sentinel to detect overflow), then delegate complete payload detection to from_bytes. Report compressed/decoded byte sizes, support empty and multistream gzip, and fail on corruption/truncation/overrun without partial-success claims or modifying source files. Never auto-guess compressed formats or add remote I/O.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

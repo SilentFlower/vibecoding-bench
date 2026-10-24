@@ -1,0 +1,142 @@
+--- a/library/box/box.py
++++ b/library/box/box.py
+@@ -152,6 +152,18 @@
+         return None, None, None
+     attr = getattr(obj_type, key)
+     return attr.fget, attr.fset, attr.fdel
++
++
++def _restore_box(cls, config):
++    """在填充pickle条目前恢复配置，避免把子类重新转换为普通Box。
++
++    :param cls: 原始映射子类。
++    :param config: 原始选项。
++    :return: 尚未填充条目的实例；不重跑业务初始化。
++    """
++    instance = dict.__new__(cls)
++    object.__setattr__(instance, '_box_config', dict(config, __unpickling=True))
++    return instance
+ 
+ 
+ class Box(dict):
+@@ -488,6 +500,14 @@
+         out._box_config["frozen_box"] = frozen
+         return out
+ 
++    def __reduce_ex__(self, protocol):
++        """在pickle条目之前重建原始类型和配置。
++
++        :param protocol: pickle协议版本。
++        :return: 标准五元素重建合同，保留实际对象图和状态。
++        """
++        return (_restore_box, (self.__class__, self._box_config), self.__dict__, None, iter(self.items()))
++
+     def __setstate__(self, state):
+         self._box_config = state["_box_config"]
+         self.__dict__.update(state)
+@@ -661,6 +681,8 @@
+         return value
+ 
+     def __setitem__(self, key, value):
++        if self._box_config.get('__unpickling', False):
++            return dict.__setitem__(self, key, value)
+         if key != "_box_config" and self._box_config["frozen_box"] and self._box_config["__created"]:
+             raise BoxError("Box is frozen")
+         if self.__process_dotted_key(key):
+--- a/library/box/box_list.py
++++ b/library/box/box_list.py
+@@ -35,6 +35,20 @@
+ _list_pos_re = re.compile(r"\[(\d+)\]")
+ 
+ 
++def _restore_box_list(cls, options):
++    """先恢复列表选项，再填入已恢复的真实元素。
++
++    :param cls: 原始列表类。
++    :param options: 原始转换选项。
++    :return: 不再次转换元素的空列表。
++    """
++    instance = list.__new__(cls)
++    instance.box_options = options
++    instance.box_org_ref = None
++    instance._box_unpickling = True
++    return instance
++
++
+ class BoxList(list):
+     """
+     Drop in replacement of list, that converts added objects to Box or BoxList
+@@ -133,7 +147,26 @@
+             p_object.box_options.update(self.box_options)
+         return p_object
+ 
++    def __reduce_ex__(self, protocol):
++        """保存列表的真实元素和选项，避免恢复阶段重新转换。
++
++        :param protocol: pickle协议版本。
++        :return: 标准重建合同。
++        """
++        return (_restore_box_list, (self.__class__, self.box_options), self.__dict__, iter(self), None)
++
++    def __setstate__(self, state):
++        """恢复用户状态并结束内部填充阶段。
++
++        :param state: 原始实例字典。
++        :return: None。
++        """
++        self.__dict__.update(state)
++        self.__dict__.pop('_box_unpickling', None)
++
+     def append(self, p_object):
++        if getattr(self, '_box_unpickling', False):
++            return list.append(self, p_object)
+         super().append(self._convert(p_object))
+ 
+     def extend(self, iterable):
+--- a/library/docs/development-bx-pickle-dev.md
++++ b/library/docs/development-bx-pickle-dev.md
+@@ -0,0 +1,5 @@
++# 在pickle恢复阶段保留配置子类和对象图
++
++可信本地pickle往返时，根、深层映射和BoxList中的子节点保留真实子类、选项、已有共享引用及用户状态。恢复配置须早于条目填充，不重跑业务初始化；冻结对象仍禁止修改。不得通过全局pickle钩子或更改普通构造、YAML/JSON语义修补。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bx_pickle_dev.py
++++ b/library/test/test_development_bx_pickle_dev.py
+@@ -0,0 +1,36 @@
++"""pickle往返后保持Box子类及嵌套列表里的真实类型。"""
++import pickle
++from box import Box
++
++
++class ConfigSubclass(Box):
++    """实际业务配置子类。"""
++
++
++def test_nested_subclasses_roundtrip():
++    """直接子节点和列表子节点都保持子类。@return None。"""
++    original = ConfigSubclass({'child': {'port': 9}, 'rows': [{'port': 10}]})
++    for protocol in range(2, pickle.HIGHEST_PROTOCOL + 1):
++        result = pickle.loads(pickle.dumps(original, protocol=protocol))
++        assert type(result) is ConfigSubclass
++        assert type(result.child) is ConfigSubclass
++        assert type(result.rows[0]) is ConfigSubclass
++        assert result == original
++
++
++def test_frozen_options_and_plain_box():
++    """冻结和默认节点选项不丢失，普通Box继续正常。@return None。"""
++    original = ConfigSubclass({'child': {'port': 9}}, frozen_box=True, default_box=True)
++    result = pickle.loads(pickle.dumps(original))
++    assert type(result.child) is ConfigSubclass
++    assert result._box_config['frozen_box'] is True
++    assert result._box_config['default_box'] is True
++    assert pickle.loads(pickle.dumps(Box({'port': 9}))).port == 9
++
++
++def test_existing_shared_nodes():
++    """已经存在的共享引用不应在恢复时被重新转换拆开。@return None。"""
++    original = ConfigSubclass({'child': {'port': 9}})
++    dict.__setitem__(original, 'alias', original.child)
++    result = pickle.loads(pickle.dumps(original))
++    assert result.alias is result.child

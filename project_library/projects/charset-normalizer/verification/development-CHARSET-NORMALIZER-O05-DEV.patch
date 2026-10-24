@@ -1,0 +1,80 @@
+--- a/library/docs/development-charset-normalizer-o05-dev.md
++++ b/library/docs/development-charset-normalizer-o05-dev.md
+@@ -0,0 +1,5 @@
++# 为原始字节和解码文字生成跨进程稳定摘要
++
++基于已冻结模型区分raw与text摘要域，固定长度hashlib摘要跨进程稳定。默认不合并Unicode形式且保留换行，归一化和文本编码须明确选择；相同文字不同编码的text摘要一致、raw摘要不同，原fingerprint不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/charset_normalizer/models.py
++++ b/library/src/charset_normalizer/models.py
+@@ -250,6 +250,35 @@
+             self._output_encoding = encoding
+ 
+         return self._output_payload  # type: ignore
++
++    def stable_digest(self, *, mode='text', algorithm='sha256', normalization=None, text_encoding='utf-8'):
++        """从不可变原始或解码文字产生跨进程稳定摘要。
++
++        :param mode: raw或text。
++        :param algorithm: hashlib支持的固定长度摘要算法。
++        :param normalization: text可显式选NFC/NFD/NFKC/NFKD，默认不归一化。
++        :param text_encoding: text摘要的明确编码，默认UTF8。
++        :return: 十六进制稳定摘要，不改变原fingerprint。
++        """
++        from hashlib import new
++        from unicodedata import normalize
++        if mode not in ('raw', 'text'):
++            raise ValueError('未知摘要域')
++        if normalization not in (None, 'NFC', 'NFD', 'NFKC', 'NFKD'):
++            raise ValueError('未知Unicode归一化')
++        if mode == 'raw':
++            if normalization is not None:
++                raise ValueError('原始摘要不接受Unicode归一化')
++            payload = bytes(self.raw)
++        else:
++            text = str(self)
++            if normalization is not None:
++                text = normalize(normalization, text)
++            payload = text.encode(text_encoding, errors='strict')
++        digest = new(algorithm, payload)
++        if digest.digest_size == 0:
++            raise ValueError('摘要算法必须有固定输出长度')
++        return digest.hexdigest()
+ 
+     @property
+     def fingerprint(self) -> int:
+--- a/library/tests/test_development_charset_normalizer_o05_dev.py
++++ b/library/tests/test_development_charset_normalizer_o05_dev.py
+@@ -0,0 +1,31 @@
++"""文本摘要稳定，不把原始编码差异或Unicode形式偷偷合并。"""
++import hashlib
++from charset_normalizer.models import CharsetMatch
++
++def test_same_text_different_raw():
++    """相同文字不同输入编码，text相同raw不同。@return None。"""
++    text = 'café'
++    one = CharsetMatch(text.encode('utf-8'), 'utf_8', 0.0, False, [])
++    two = CharsetMatch(text.encode('latin-1'), 'latin_1', 0.0, False, [])
++    assert one.stable_digest() == two.stable_digest() == hashlib.sha256(text.encode()).hexdigest()
++    assert one.stable_digest(mode='raw') != two.stable_digest(mode='raw')
++
++def test_unicode_policy_and_snapshot():
++    """Unicode归一化显式，可变源仍保持已冻结事实。@return None。"""
++    source = bytearray('é'.encode())
++    one = CharsetMatch(source, 'utf_8', 0.0, False, [])
++    two = CharsetMatch('e\u0301'.encode(), 'utf_8', 0.0, False, [])
++    source.clear()
++    assert one.stable_digest() != two.stable_digest()
++    assert one.stable_digest(normalization='NFC') == two.stable_digest(normalization='NFC')
++
++def test_process_stability_and_invalid():
++    """不同hash种子下真实方法返回同一摘要。@return None。"""
++    import os
++    import subprocess
++    import sys
++    import pytest
++    code = "from charset_normalizer.models import CharsetMatch; print(CharsetMatch(b'abc','ascii',0.0,False,[]).stable_digest())"
++    outputs = [subprocess.check_output([sys.executable, '-c', code], env=dict(os.environ, PYTHONHASHSEED=seed)) for seed in ['1', '2']]
++    assert outputs[0] == outputs[1]
++    with pytest.raises(ValueError): CharsetMatch(b'', 'ascii', 0.0, False, []).stable_digest(algorithm='unknown')

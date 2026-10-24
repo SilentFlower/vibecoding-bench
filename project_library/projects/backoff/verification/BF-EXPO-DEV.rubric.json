@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BF-EXPO-DEV",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair expo for finite positive increasing bases/factors with a finite positive max_value so an intermediate exponentiation overflow does not terminate the sequence. Compute the true capped result, including cases where base**n overflows but factor*base**n is still below the cap. Preserve exact ordinary float outputs, priming, stable saturation, zero-factor and decreasing-base behavior. Unbounded and unsupported-domain overflow must remain explicit; do not blindly turn every OverflowError into max_value.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

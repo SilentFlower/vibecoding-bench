@@ -1,0 +1,87 @@
+--- a/library/development_tests/test_development_de_temporary_dev.py
++++ b/library/development_tests/test_development_de_temporary_dev.py
+@@ -0,0 +1,37 @@
++"""公开临时进程环境回归。"""
++import os
++import pytest
++from dotenv.environment import temporary_environment
++
++def test_values_and_absence_are_restored(monkeypatch):
++    monkeypatch.setenv('DOTENV_SCOPE_A','old')
++    monkeypatch.delenv('DOTENV_SCOPE_B', raising=False)
++    with temporary_environment({'DOTENV_SCOPE_A':'new','DOTENV_SCOPE_B':'created'}, override=True) as keys:
++        assert keys == ('DOTENV_SCOPE_A','DOTENV_SCOPE_B')
++        assert os.environ['DOTENV_SCOPE_A'] == 'new'
++    assert os.environ['DOTENV_SCOPE_A']=='old' and 'DOTENV_SCOPE_B' not in os.environ
++
++def test_exception_and_nested_scope_restore_each_boundary(monkeypatch):
++    monkeypatch.setenv('DOTENV_SCOPE_A','old')
++    with pytest.raises(LookupError):
++        with temporary_environment({'DOTENV_SCOPE_A':'outer'}, override=True):
++            with temporary_environment({'DOTENV_SCOPE_A':'inner'}, override=True):
++                assert os.environ['DOTENV_SCOPE_A']=='inner'
++            assert os.environ['DOTENV_SCOPE_A']=='outer'
++            raise LookupError()
++    assert os.environ['DOTENV_SCOPE_A']=='old'
++
++def test_none_and_override_are_explicit(monkeypatch):
++    monkeypatch.setenv('DOTENV_SCOPE_A','old')
++    with temporary_environment({'DOTENV_SCOPE_A':None}):
++        assert os.environ['DOTENV_SCOPE_A']=='old'
++    with temporary_environment({'DOTENV_SCOPE_A':None}, override=True, remove_none=True):
++        assert 'DOTENV_SCOPE_A' not in os.environ
++    assert os.environ['DOTENV_SCOPE_A']=='old'
++
++def test_invalid_late_key_prevents_any_write(monkeypatch):
++    monkeypatch.delenv('DOTENV_SCOPE_B', raising=False)
++    with pytest.raises(ValueError):
++        with temporary_environment({'DOTENV_SCOPE_B':'new','BAD=NAME':'bad'}):
++            pass
++    assert 'DOTENV_SCOPE_B' not in os.environ
+--- a/library/docs/development-de-temporary-dev.md
++++ b/library/docs/development-de-temporary-dev.md
+@@ -0,0 +1,5 @@
++# 可嵌套地临时应用配置并准确恢复环境
++
++本地工具需要临时配置作用域，结束或异常时恢复被触及的键，嵌套作用域按层恢复。整份映射写入前先校验，无关环境变更保留；覆盖及临时移除无值键必须显式选择，不承诺线程隔离。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/dotenv/environment.py
++++ b/library/src/dotenv/environment.py
+@@ -0,0 +1,36 @@
++"""仅在调用区间临时应用配置并恢复触及的键。"""
++import os
++from contextlib import contextmanager
++
++
++@contextmanager
++def temporary_environment(values, *, override=False, remove_none=False):
++    """临时应用显式映射。@param values 字符串到字符串或None。
++    @param override 是否替换已有键。@param remove_none None是否暂时移除键。
++    @return 上下文内实际修改键的不可变元组；退出恢复这些键，不回滚无关键。
++    """
++    entries = list(values.items())
++    for key, value in entries:
++        if not isinstance(key, str) or not key or '=' in key or '\x00' in key:
++            raise ValueError('无效环境变量名')
++        if value is not None and (not isinstance(value, str) or '\x00' in value):
++            raise ValueError('环境变量值必须是无NUL字符串或None')
++    saved, missing = {}, object()
++    try:
++        for key, value in entries:
++            if key in os.environ and not override:
++                continue
++            if value is None and not remove_none:
++                continue
++            saved[key] = os.environ.get(key, missing)
++            if value is None:
++                os.environ.pop(key, None)
++            else:
++                os.environ[key] = value
++        yield tuple(saved)
++    finally:
++        for key, value in saved.items():
++            if value is missing:
++                os.environ.pop(key, None)
++            else:
++                os.environ[key] = value

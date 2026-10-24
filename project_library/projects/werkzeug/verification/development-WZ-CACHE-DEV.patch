@@ -1,0 +1,61 @@
+--- a/library/development_tests/test_development_wz_cache_dev.py
++++ b/library/development_tests/test_development_wz_cache_dev.py
+@@ -0,0 +1,27 @@
++"""公开条件JSON真实WSGI回归。"""
++import pytest
++from werkzeug.wrappers import Request,Response
++from werkzeug.test import Client
++from werkzeug.exceptions import PreconditionFailed,MethodNotAllowed
++from werkzeug.conditional_json import cacheable_json
++
++def app(environ,start_response):
++    return cacheable_json({'value':1},Request(environ),max_age=60)(environ,start_response)
++
++def test_real_client_etag_304_and_head_wire_body():
++    client=Client(app,Response);first=client.get('/');etag=first.headers['ETag']
++    cached=client.get('/',headers={'If-None-Match':etag})
++    assert cached.status_code==304 and cached.data==b'' and 'Accept' in cached.vary
++    head=client.head('/');assert head.status_code==200 and head.data==b'' and head.headers['ETag']==etag
++
++def test_if_match_failure_is_native_412_and_precedes_none_match():
++    request=Request.from_values(headers={'If-Match':'"different"','If-None-Match':'*'})
++    with pytest.raises(PreconditionFailed): cacheable_json({},request)
++
++def test_changed_actual_representation_changes_etag_and_preserves_cache_policy():
++    request=Request.from_values();first=cacheable_json({'v':1},request,max_age=30);second=cacheable_json({'v':2},request)
++    assert first.headers['ETag']!=second.headers['ETag'] and first.cache_control.max_age==30 and first.cache_control.public
++
++def test_invalid_age_and_nonread_methods_are_rejected():
++    with pytest.raises(ValueError): cacheable_json({},Request.from_values(),max_age=True)
++    with pytest.raises(MethodNotAllowed): cacheable_json({},Request.from_values(method='POST'))
+--- a/library/docs/development-wz-cache-dev.md
++++ b/library/docs/development-wz-cache-dev.md
+@@ -0,0 +1,5 @@
++# 将JSON内容协商接入真实ETag与条件GET和HEAD
++
++实际协商表示生成强ETag并接入原生条件请求处理，保留Vary和HEAD线上正文语义。匹配与不匹配条件遵循真实协议顺序，内容变化导致摘要变化，不能靠字符串包含比较标签。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/werkzeug/conditional_json.py
++++ b/library/src/werkzeug/conditional_json.py
+@@ -0,0 +1,20 @@
++"""依据实际协商表示字节生成ETag并应用条件请求。"""
++import hashlib
++from .exceptions import MethodNotAllowed
++from .negotiated_json import json_response
++
++
++def cacheable_json(value,request,*,offers=('application/json',),max_age=0):
++    """创建可条件获取的JSON表示。@param value JSON值。@param request GET或HEAD请求。
++    @param offers 明确协商媒体类型。@param max_age 非负缓存秒数。@return 实际条件处理后的Response。
++    """
++    if type(max_age) is not int or max_age<0:
++        raise ValueError('缓存秒数必须为非负整数')
++    if request.method not in ('GET','HEAD'):
++        raise MethodNotAllowed(valid_methods=['GET','HEAD'])
++    response=json_response(value,request,offers=offers)
++    response.etag=hashlib.sha256(response.get_data()).hexdigest()
++    response.cache_control.public=True
++    response.cache_control.max_age=max_age
++    response.apply_conditions(request)
++    return response

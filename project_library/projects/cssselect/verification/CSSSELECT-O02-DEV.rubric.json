@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSSSELECT-O02-DEV",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add cssselect.batch.translate_many(records, *, translator=None, prefix=\"descendant-or-self::\", fail_fast=False) as a lazy ordered iterator of records {id,css,ok,xpath,error}. Each input is (id, complete CSS group), including duplicate IDs; never concatenate groups or split commas. Catch only actual SelectorSyntaxError/ExpressionError into parse/translate diagnostics without value-bearing messages; continue other records, with explicit fail-fast rethrow. Forward actual translator and prefix, consume only requested inputs, propagate upstream generator and programmer errors and support empty batches.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

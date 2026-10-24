@@ -1,0 +1,86 @@
+--- a/library/docs/development-python-liquid-04-dev.md
++++ b/library/docs/development-python-liquid-04-dev.md
+@@ -0,0 +1,5 @@
++# 按业务记录身份独立渲染报告并隔离失败与上下文
++
++路线16：每记录(id,Mapping)用独立真实RenderContext，有序同步/异步拉取，Liquid失败可记录或fail-fast；取消/普通用户异常传播，提前关闭不执行后项，明确串行不冒称并发。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/liquid/record_rendering.py
++++ b/library/liquid/record_rendering.py
+@@ -0,0 +1,43 @@
++"""有序独立上下文的本地报告批次，同步/异步逐条拉取。"""
++from collections.abc import Mapping
++from dataclasses import dataclass
++from .template import BoundTemplate
++from .exceptions import LiquidError
++
++@dataclass(frozen=True)
++class RenderedRecord:
++    """批次记录结果。@param record_id 原身份。@param status rendered/failed。@param output 成功输出或None。@param error 错误类型或None。"""
++    record_id:object
++    status:str
++    output:str|None
++    error:str|None
++
++def _record(item,seen):
++    if not isinstance(item,tuple) or len(item)!=2 or not isinstance(item[1],Mapping):raise TypeError('每条需要(id,Mapping)')
++    identity,data=item
++    if identity in seen:raise ValueError('重复记录id')
++    seen.add(identity);return identity,data
++
++def render_records(template,records,*,continue_on_error=True):
++    """拉取式批次渲染。@param template 真实模板。@param records (id,Mapping)惰性序列。@param continue_on_error 是否保留Liquid错误继续。@return 有序RenderedRecord迭代器；用户普通异常传播。"""
++    if not isinstance(template,BoundTemplate):raise TypeError('需要真实BoundTemplate')
++    seen=set()
++    for item in records:
++        identity,data=_record(item,seen)
++        try:output=template.render(data)
++        except LiquidError as error:
++            if not continue_on_error:raise
++            yield RenderedRecord(identity,'failed',None,type(error).__name__)
++        else:yield RenderedRecord(identity,'rendered',output,None)
++
++async def render_records_async(template,records,*,continue_on_error=True):
++    """异步逐条拉取，不预建无界任务。@param template 模板。@param records 普通惰性序列。@param continue_on_error Liquid失败策略。@return 异步RenderedRecord迭代器，取消/提前关闭不启动后项。"""
++    if not isinstance(template,BoundTemplate):raise TypeError('需要真实BoundTemplate')
++    seen=set()
++    for item in records:
++        identity,data=_record(item,seen)
++        try:output=await template.render_async(data)
++        except LiquidError as error:
++            if not continue_on_error:raise
++            yield RenderedRecord(identity,'failed',None,type(error).__name__)
++        else:yield RenderedRecord(identity,'rendered',output,None)
+--- a/library/tests/test_development_python_liquid_04_dev.py
++++ b/library/tests/test_development_python_liquid_04_dev.py
+@@ -0,0 +1,29 @@
++"""同模板不同记录有独立上下文，错误不冒认成功。"""
++import asyncio
++import unittest
++from liquid import Environment,StrictUndefined
++from liquid.record_rendering import render_records,render_records_async
++
++def test_ordered_results_failure_and_assign_context_isolation():
++    """第一条的assign不泄漏到下一条。@return None。"""
++    template=Environment(undefined=StrictUndefined).from_string('{% if set_flag %}{% assign x = "local" %}{% endif %}{{x}}')
++    rows=[('one',{'set_flag':True}),('two',{'set_flag':False}),('three',{'set_flag':False,'x':'given'})]
++    results=list(render_records(template,rows))
++    assert [(r.record_id,r.status,r.output) for r in results]==[('one','rendered','local'),('two','failed',None),('three','rendered','given')]
++    assert results[1].error=='UndefinedError'
++
++def test_async_matches_sync_failfast_duplicate_and_early_close():
++    """惰性消费者关闭后不拉取后续数据。@return None。"""
++    template=Environment(undefined=StrictUndefined).from_string('{{value}}')
++    rows=[('a',{'value':1}),('b',{}),('c',{'value':3})]
++    async def run():
++        actual=[item async for item in render_records_async(template,rows)]
++        assert actual==list(render_records(template,rows))
++        seen=[]
++        def source():
++            for n in range(4):seen.append(n);yield (n,{'value':n})
++        iterator=render_records_async(template,source());first=await anext(iterator);await iterator.aclose()
++        assert first.output=='0' and seen==[0]
++    asyncio.run(run())
++    with unittest.TestCase().assertRaises(Exception):list(render_records(template,rows,continue_on_error=False))
++    with unittest.TestCase().assertRaises(ValueError):list(render_records(template,[('a',{'value':1}),('a',{'value':2})]))

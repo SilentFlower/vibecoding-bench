@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SJ-STABLE-DEV",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement simplejson.stable.stable_dumps(value) and stable_bytes(value): recursively require string object keys, JSON lists/scalars and finite Decimal values; reject cycles, unsupported Python containers, NaN/Infinity including Decimal variants, and lone surrogates not representable in UTF-8. Encode sorted Unicode keys, no insignificant spaces, no ASCII escaping, BOM or trailing newline. Preserve Decimal representation and standard numeric formatting; explicitly do not claim JCS normalization. Never mutate input or change legacy encoder defaults.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

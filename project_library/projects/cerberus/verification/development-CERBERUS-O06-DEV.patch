@@ -1,0 +1,97 @@
+--- a/library/cerberus/stream.py
++++ b/library/cerberus/stream.py
+@@ -0,0 +1,48 @@
++"""惰性逐条校验真实数据流，使用独立Validator和完整结果。"""
++from copy import deepcopy
++from itertools import islice
++from cerberus import DocumentError, Validator
++from cerberus.result import ValidationResult
++
++
++class ValidationStreamError(ValueError):
++    """显式raise政策的安全序号和完整本次结果。
++
++    :param index: 一起始记录序号。
++    :param result: 失败快照，不在异常消息回显输入。
++    """
++    def __init__(self, index, result):
++        """保存失败事实。参数见类说明。@return None。"""
++        self.index, self.result = index, result
++        super().__init__('第%d条记录校验失败' % index)
++
++
++def iter_validated(records, schema, *, on_error='continue', max_records=None, validator_factory=Validator, validator_options=None):
++    """按需消费记录，每条使用独立schema与验证器状态。
++
++    :param records: 一次性或可重用输入流。
++    :param schema: 实际Cerberus schema。
++    :param on_error: continue、stop或raise。
++    :param max_records: 可选非负消费上限，零不读取输入。
++    :param validator_factory: 显式自定义Validator工厂。
++    :param validator_options: 每条独立复制的构造选项。
++    :return: 包含index及ValidationResult的惰性记录迭代器。
++    """
++    if on_error not in ('continue', 'stop', 'raise'):
++        raise ValueError('未知流错误政策')
++    if max_records is not None and (not isinstance(max_records, int) or isinstance(max_records, bool) or max_records < 0):
++        raise ValueError('记录上限必须为非负整数')
++    if max_records == 0:
++        return
++    source = records if max_records is None else islice(records, max_records)
++    for index, record in enumerate(source, 1):
++        validator = validator_factory(deepcopy(schema), **deepcopy(validator_options or {}))
++        try:
++            result = validator.validate_result(record)
++        except DocumentError:
++            result = ValidationResult(False, None, {'_document': ['输入不是可校验映射']}, True)
++        if not result.valid and on_error == 'raise':
++            raise ValidationStreamError(index, result)
++        yield {'index': index, 'result': result}
++        if not result.valid and on_error == 'stop':
++            return
+--- a/library/docs/development-cerberus-o06-dev.md
++++ b/library/docs/development-cerberus-o06-dev.md
+@@ -0,0 +1,5 @@
++# 按明确错误政策惰性校验有界业务记录流
++
++基于已交付完整结果API逐条校验流，每条使用独立Validator、schema和选项。保留编号，继续/停止/抛错政策明确，非映射形成失败结果；支持工厂和准确消费上限，零不读取，不物化全流或共享可变默认状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cerberus_o06_dev.py
++++ b/library/tests/test_development_cerberus_o06_dev.py
+@@ -0,0 +1,35 @@
++"""逐条校验保留编号和错误政策，不读取超出上限的输入。"""
++from cerberus import Validator
++
++def test_lazy_continue_and_independent_results():
++    """首条提前取得，失败后继续且各条状态独立。@return None。"""
++    from cerberus.stream import iter_validated
++    seen = []
++    def records():
++        """实际一次性流。@return 迭代器。"""
++        for value in [1, 'bad', 3]:
++            seen.append(value)
++            yield {'x': value}
++    stream = iter_validated(records(), {'x': {'type': 'integer'}})
++    first = next(stream)
++    assert first['index'] == 1 and first['result'].valid and seen == [1]
++    rest = list(stream)
++    assert [row['result'].valid for row in rest] == [False, True]
++    assert first['result'].document == {'x': 1}
++
++def test_stop_raise_and_nondocument():
++    """错误政策显式，非映射记录也可继续。@return None。"""
++    import pytest
++    from cerberus.stream import iter_validated, ValidationStreamError
++    assert len(list(iter_validated([{}, 4, {}], {}, on_error='stop'))) == 2
++    with pytest.raises(ValidationStreamError) as result:
++        list(iter_validated([4], {}, on_error='raise'))
++    assert result.value.index == 1 and not result.value.result.valid
++
++def test_exact_limit_and_zero():
++    """消费上限不额外读取下一条，零不触发流。@return None。"""
++    from cerberus.stream import iter_validated
++    source = iter([{'x': 1}, {'x': 2}])
++    assert len(list(iter_validated(source, {}, max_records=1, validator_options={'allow_unknown': True}))) == 1
++    assert next(source) == {'x': 2}
++    assert list(iter_validated(iter([4]), {}, max_records=0)) == []

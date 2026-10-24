@@ -1,0 +1,108 @@
+--- a/library/docs/development-python-liquid-02-dev.md
++++ b/library/docs/development-python-liquid-02-dev.md
+@@ -0,0 +1,5 @@
++# 编辑字典模板发布完整新版本并保留旧预览快照
++
++路线02：新增显式版本化内存loader，update/delete原子发布、同内容不增版、旧模板/只读源码snapshot不变；有界LRU、真实环境身份及globals隔离，同步异步同锁内存操作，不改旧DictLoader合同。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/liquid/versioned_loader.py
++++ b/library/liquid/versioned_loader.py
+@@ -0,0 +1,63 @@
++"""本地字典模板的受支持版本编辑与并发安全缓存。"""
++from collections import OrderedDict
++from collections.abc import Mapping
++from threading import RLock
++from types import MappingProxyType
++from .loader import BaseLoader,TemplateSource
++from .exceptions import TemplateNotFoundError
++
++class VersionedDictLoader(BaseLoader):
++    """独占复制输入，显式更新，旧BoundTemplate保持快照。@param templates 初始源码映射。@param capacity 最大编译缓存条数。"""
++    def __init__(self,templates,*,capacity=128):
++        if not isinstance(templates,Mapping) or type(capacity) is not int or capacity<1:raise ValueError('需要映射及正整数容量')
++        self._templates={};self._versions={};self._cache=OrderedDict();self._lock=RLock();self.capacity=capacity
++        for name,source in templates.items():self.update(name,source)
++
++    def update(self,name,source):
++        """原子更新一个源码。@param name 名称。@param source str源码。@return 该名字单调版本，同内容不增版。"""
++        if not isinstance(name,str) or not name or not isinstance(source,str):raise TypeError('名称与源码须为非空名称/str')
++        with self._lock:
++            if self._templates.get(name)==source and name in self._templates:return self._versions[name]
++            self._templates[name]=source;self._versions[name]=self._versions.get(name,0)+1
++            self._evict(name);return self._versions[name]
++
++    def delete(self,name):
++        """删除未来可加载源码，不改旧模板。@param name 名称。@return None，缺失抛原模板缺失异常。"""
++        with self._lock:
++            if name not in self._templates:raise TemplateNotFoundError(name)
++            del self._templates[name];self._versions[name]+=1;self._evict(name)
++
++    def _evict(self,name):
++        for key in list(self._cache):
++            if key[1]==name:del self._cache[key]
++
++    def snapshot(self):
++        """取得独立只读源码快照。@return MappingProxyType，不暴露内部字典。"""
++        with self._lock:return MappingProxyType(dict(self._templates))
++
++    def get_source(self,env,template_name,*,context=None,**kwargs):
++        """读取同锁内完整版本。@return 原生TemplateSource与版本有效性回调。"""
++        with self._lock:
++            if template_name not in self._templates:raise TemplateNotFoundError(template_name)
++            source=self._templates[template_name];version=self._versions[template_name]
++        def current():
++            with self._lock:return template_name in self._templates and self._versions[template_name]==version
++        return TemplateSource(source,template_name,current)
++
++    def load(self,env,name,*,globals=None,context=None,**kwargs):
++        """加载完整旧版或新版，不混合版本。@return 真实BoundTemplate；显式globals不共享缓存对象。"""
++        with self._lock:
++            if name not in self._templates:raise TemplateNotFoundError(name)
++            key=(env,name,self._versions[name])
++            shared=globals is None or globals==env.make_globals()
++            if shared and key in self._cache:
++                self._cache.move_to_end(key);return self._cache[key]
++            template=super().load(env,name,globals=globals,context=context,**kwargs)
++            if shared:
++                self._cache[key]=template
++                while len(self._cache)>self.capacity:self._cache.popitem(last=False)
++            return template
++
++    async def load_async(self,env,name,*,globals=None,context=None,**kwargs):
++        """纯内存加载在同一同步临界区完成，无await中间版本。@return 真实BoundTemplate。"""
++        return self.load(env,name,globals=globals,context=context,**kwargs)
+--- a/library/tests/test_development_python_liquid_02_dev.py
++++ b/library/tests/test_development_python_liquid_02_dev.py
+@@ -0,0 +1,31 @@
++"""显式更新后预览新版本，旧模板仍是完整旧快照。"""
++import asyncio
++import unittest
++from liquid import Environment
++from liquid.exceptions import TemplateNotFoundError
++from liquid.versioned_loader import VersionedDictLoader
++
++def test_update_delete_and_same_content_version_policy():
++    """未变模板保缓存，同内容不无意义失效。@return None。"""
++    source={'a':'v1','b':'stable'};loader=VersionedDictLoader(source);env=Environment(loader=loader)
++    old=env.get_template('a');stable=env.get_template('b')
++    source['a']='outside';assert old.render()=='v1'
++    assert loader.update('a','v1')==1 and env.get_template('a') is old
++    assert loader.update('a','v2')==2
++    assert env.get_template('a').render()=='v2' and old.render()=='v1' and not old.is_up_to_date()
++    assert env.get_template('b') is stable
++    loader.delete('a')
++    with unittest.TestCase().assertRaises(TemplateNotFoundError):env.get_template('a')
++    assert old.render()=='v1'
++
++def test_async_environment_identity_snapshot_and_globals_isolation():
++    """环境与显式globals不能串缓存，snapshot不可写。@return None。"""
++    loader=VersionedDictLoader({'x':'{{value}}'},capacity=2);a=Environment(loader=loader,autoescape=True);b=Environment(loader=loader)
++    assert a.get_template('x') is not b.get_template('x')
++    assert a.get_template('x',globals={'value':'<b>'}).render()=='&lt;b&gt;'
++    assert a.get_template('x',globals={'value':'other'}).render()=='other'
++    with unittest.TestCase().assertRaises(TypeError):loader.snapshot()['x']='bad'
++    async def run():
++        assert await loader.load_async(a,'x') is a.get_template('x')
++        loader.update('x','new');assert (await a.get_template_async('x')).render()=='new'
++    asyncio.run(run())

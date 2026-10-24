@@ -1,0 +1,15 @@
+{
+  "script": "verification/FLASK-O04-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library/src",
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_flask_o04_dev.py"
+}

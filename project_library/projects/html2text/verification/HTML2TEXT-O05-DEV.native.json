@@ -1,0 +1,17 @@
+{
+  "script": "verification/HTML2TEXT-O05-DEV-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "business": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/HTML2TEXT-O01-DEV-regression.py",
+    "contract": "verification/native-contract.json"
+  }
+}

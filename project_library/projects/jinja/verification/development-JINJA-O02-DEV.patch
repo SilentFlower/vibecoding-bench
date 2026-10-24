@@ -1,0 +1,53 @@
+--- a/library/docs/development-jinja-o02-dev.md
++++ b/library/docs/development-jinja-o02-dev.md
+@@ -0,0 +1,5 @@
++# 让宏和捕获帧中的无上下文include真正写入当前输出
++
++对应路线06：同步without context include在宏/捕获帧必须走simple_write写buffer；顶层仍yield流式，隔离、ignore missing及异步转义语义保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/jinja2/compiler.py
++++ b/library/src/jinja2/compiler.py
+@@ -1086,7 +1086,12 @@
+             )
+             loop_body()
+         else:
+-            self.writeline("yield from template._get_default_module()._body_stream")
++            if frame.buffer is None:
++                self.writeline("yield from template._get_default_module()._body_stream")
++            else:
++                # 宏/捕获帧必须沿simple_write进入当前缓冲，不能把宏变成generator。
++                self.writeline("for event in template._get_default_module()._body_stream:")
++                loop_body()
+ 
+         if node.ignore_missing:
+             self.outdent()
+--- a/library/tests/test_development_jinja_o02_dev.py
++++ b/library/tests/test_development_jinja_o02_dev.py
+@@ -0,0 +1,26 @@
++"""无context include在宏/捕获帧输出内容，不能返回generator表示。"""
++from jinja2 import Environment,DictLoader
++import asyncio
++
++def test_macro_nested_and_capture_output_actual_content():
++    """普通/嵌套宏及set捕获块都写入自身buffer。@return None。"""
++    env=Environment(loader=DictLoader({'child':'included'}))
++    template=env.from_string('{% macro inner() %}{% include "child" without context %}{% endmacro %}{% macro outer() %}[{{inner()}}]{% endmacro %}{{outer()}}|{% set captured %}{% include "child" without context %}{% endset %}{{captured}}')
++    assert template.render()=='[included]|included'
++
++def test_without_context_stays_isolated_ignore_missing_and_streaming():
++    """without context不能悄悄带入宏局部变量，顶层仍流式。@return None。"""
++    env=Environment(loader=DictLoader({'child':'{{local|default("absent")}}'}))
++    template=env.from_string('{% macro show(local) %}{% include "missing" ignore missing without context %}{% include "child" without context %}{% endmacro %}{{show("private")}}')
++    assert template.render()=='absent'
++    assert ''.join(env.from_string('before:{% include "child" without context %}:after').generate())=='before:absent:after'
++
++def test_autoescape_filter_capture_and_async_parity():
++    """自动转义和异步既有缓冲路径保持相同文本。@return None。"""
++    text='{% macro show() %}{% filter upper %}{% include "child" without context %}{% endfilter %}{% endmacro %}{{show()}}'
++    for async_mode in [False,True]:
++        env=Environment(loader=DictLoader({'child':'<em>{{value}}</em>'}),autoescape=True,enable_async=async_mode)
++        env.globals['value']='<x>'
++        template=env.from_string(text)
++        actual=asyncio.run(template.render_async()) if async_mode else template.render()
++        assert actual=='<EM>&LT;X&GT;</EM>'

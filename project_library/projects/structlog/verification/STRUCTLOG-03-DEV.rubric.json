@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "STRUCTLOG-03-DEV",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add FieldRenamer(mapping,conflict=\"error\"/\"keep\"/\"overwrite\") processor in structlog.processors. Freeze string mapping, reject duplicate destinations, ignore absent sources, apply all moves from original snapshot so swaps/chains work. Default external destination collision raises before any mutation; keep retains conflicting source/destination and transitively prevents moves into newly retained fields; overwrite explicitly replaces destination. Return independent outer dict preserving payload identity and untouched source; existing EventRenamer unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

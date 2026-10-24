@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WEBCOLORS-05-DEV",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add webcolors.accessibility relative_luminance, contrast_ratio, meets_contrast and contrast_on. Implement the declared sRGB 0.04045 transfer breakpoint, weights .2126/.7152/.0722 and raw (Lmax+.05)/(Lmin+.05) ratio. Validate exact integer RGB channels; never silently clamp invalid measurements. Threshold 1..21 is explicit and finite; compare without rounding first. Ordinary luminance/ratio reject transparent RGBA. contrast_on accepts prior RGBA and an explicit opaque background, performs declared encoded-sRGB alpha compositing with nearest-byte half-up quantization and measures the resulting RGB; never guess a white background. Preserve legacy conversion and avoid claims that a color ratio certifies an entire UI.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

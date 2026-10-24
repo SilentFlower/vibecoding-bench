@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WZ-JSON-DEV",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement werkzeug.strict_json.read_json(request,*,max_bytes=1048576). Require actual JSON mimetype including application/*+json and UTF8 charset, enforce positive byte budget against declared and actual stream size using at most max_bytes+1 read. Respect Werkzeug WSGI stream termination rules. Decode UTF8, reject nested duplicate keys after escape decoding, nonfinite constants and float overflow; invalid syntax/encoding/empty input becomes BadRequest, unsupported media 415 and budget overflow 413. Return any valid JSON value including false/null. This consumes the stream; do not modify legacy get_json cache, globals, body limits or close caller-owned input.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

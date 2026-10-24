@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYDASH-04-DEV",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add pydash.json_pointer pointer_tokens/get_pointer/set_pointer plus top-level exports. RFC6901 empty root, empty keys, ~0/~1 single-pass decoding and dict/list-only traversal. get returns original identity; set replaces existing list indices, adds dict keys, permits final - append, returns root (empty path returns replacement). Existing parents required; invalid escapes, negative/leading-zero/out-of-range indices and scalar/attribute traversal fail before mutation. Do not reinterpret legacy get/set_ path strings.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

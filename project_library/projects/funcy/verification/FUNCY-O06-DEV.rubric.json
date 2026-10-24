@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FUNCY-O06-DEV",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add funcy.pipeline Stage, Pipeline and PipelineResult using real Funcy make_func selectors. Validate unique nonempty names, callable optional input/output adapters and explicit raise/report policy. Run stages once in order with unary function protocol; an empty pipeline is identity, optional run(report=True) returns final value plus stage-only events without retaining inputs/intermediate business values. Default PipelineStageError carries name/index/input-function-output phase and original __cause__; report policy returns fixed failure result and stops later stages, omitting value-bearing exception text. Reject async stages/awaitable results explicitly, preserve original compose/rcompose and no implicit retry.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

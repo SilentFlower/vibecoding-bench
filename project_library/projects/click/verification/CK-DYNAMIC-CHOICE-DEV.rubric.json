@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CK-DYNAMIC-CHOICE-DEV",
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement click.dynamic.DynamicChoice(provider,*,case_sensitive=True) as ParamType. Provider accepts current Context or None and returns finite choices; snapshot once per conversion/help/completion operation and delegate actual normalization/identity/error behavior to Choice. Do not cache across calls or mutate provider results. Help metavars and shell completion must use current choices; metadata inspection must not eagerly call provider without context. Preserve original choice objects and provider exceptions, and verify independent CLI invocations with different ctx.obj values.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WRAPT-05-DEV",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add independent wrapt.canonical_cache.canonical_cache(maxsize=128,typed=False,key_func=None). inspect.signature.bind/apply_defaults before key creation so equivalent positional/keyword/explicit-default calls share, varargs remain ordered and varkw keys sort deterministically. typed mode includes direct bound value types. Custom key_func receives BoundArguments after signature validation and may extract id from unhashable dict; collisions are explicit caller policy. Default unhashable values fail, never deepcopy/serialize arbitrary inputs. Bounded LRU, cache_info/clear, exception propagation and ordinary metadata/descriptor binding; synchronous RLock serializes. Existing lru_cache key behavior unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

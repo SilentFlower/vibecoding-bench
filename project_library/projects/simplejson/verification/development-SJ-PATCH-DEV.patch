@@ -1,0 +1,125 @@
+--- a/library/development_tests/test_development_sj_patch_dev.py
++++ b/library/development_tests/test_development_sj_patch_dev.py
+@@ -0,0 +1,22 @@
++"""公开原子JSON补丁回归。"""
++import pytest
++from simplejson.patch import apply_patch
++
++def test_array_insert_move_and_append_follow_sequential_semantics():
++    value={'items':['a','b','c']}
++    result=apply_patch(value,[{'op':'move','from':'/items/0','path':'/items/2'},{'op':'add','path':'/items/-','value':'d'}])
++    assert result=={'items':['b','c','a','d']} and value=={'items':['a','b','c']}
++
++def test_later_failure_never_changes_original_document():
++    value={'v':[1]}
++    with pytest.raises(KeyError): apply_patch(value,[{'op':'add','path':'/v/-','value':2},{'op':'remove','path':'/missing'}])
++    assert value=={'v':[1]}
++
++def test_test_boolean_and_move_into_child_are_rejected():
++    with pytest.raises(ValueError): apply_patch({'v':True},[{'op':'test','path':'/v','value':1}])
++    with pytest.raises(ValueError): apply_patch({'a':{'b':{}}},[{'op':'move','from':'/a','path':'/a/b/a'}])
++
++def test_copy_and_root_operations_detach_values():
++    original={'a':[1]};result=apply_patch(original,[{'op':'copy','from':'/a','path':'/b'}]);result['b'].append(2)
++    assert result['a']==[1] and original=={'a':[1]}
++    assert apply_patch(original,[{'op':'remove','path':''}]) is None
+--- a/library/docs/development-sj-patch-dev.md
++++ b/library/docs/development-sj-patch-dev.md
+@@ -0,0 +1,5 @@
++# 在独立副本上执行有序且原子的JSON Patch
++
++补丁在独立副本上依次执行，支持数组插入、移动、复制、测试及根替换；任一步失败都不污染原输入。复用严格指针接口，布尔不等同数字，拒绝父节点移入自身子级。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/simplejson/patch.py
++++ b/library/simplejson/patch.py
+@@ -0,0 +1,89 @@
++"""复制输入后按顺序执行标准JSON补丁。"""
++from copy import deepcopy
++from .pointer import tokens,index,resolve
++
++
++def _equal(left,right):
++    if isinstance(left,bool) or isinstance(right,bool):
++        return type(left) is type(right) and left==right
++    if isinstance(left,(int,float)) and isinstance(right,(int,float)):
++        return left==right
++    if type(left) is not type(right):
++        return False
++    if isinstance(left,dict):
++        return left.keys()==right.keys() and all(_equal(left[k],right[k]) for k in left)
++    if isinstance(left,list):
++        return len(left)==len(right) and all(_equal(a,b) for a,b in zip(left,right))
++    return left==right
++
++
++def _parent(document,parts):
++    value=document
++    for token in parts[:-1]:
++        value=value[token] if isinstance(value,dict) else value[index(token,len(value))] if isinstance(value,list) else _invalid()
++    return value,parts[-1]
++
++
++def _invalid():
++    raise TypeError('补丁路径不能穿越标量')
++
++
++def _change(document,parts,value=None,*,action):
++    if not parts:
++        return None if action=='remove' else deepcopy(value)
++    parent,key=_parent(document,parts)
++    if isinstance(parent,dict):
++        if action!='add' and key not in parent:
++            raise KeyError(key)
++        if action=='remove':
++            del parent[key]
++        else:
++            parent[key]=deepcopy(value)
++    elif isinstance(parent,list):
++        position=index(key,len(parent),append=action=='add')
++        if action=='add':
++            parent.insert(position,deepcopy(value))
++        elif action=='remove':
++            parent.pop(position)
++        else:
++            parent[position]=deepcopy(value)
++    else:
++        _invalid()
++    return document
++
++
++def apply_patch(document,operations):
++    """原子产生JSON补丁结果，不修改输入或补丁值。@param document JSON树。
++    @param operations RFC6902操作序列。@return 独立结果，根删除结果为None。
++    """
++    result=deepcopy(document)
++    if not isinstance(operations,(list,tuple)):
++        raise TypeError('补丁必须为操作序列')
++    for operation in operations:
++        if not isinstance(operation,dict) or 'op' not in operation or 'path' not in operation:
++            raise ValueError('补丁缺少操作或路径')
++        action=operation['op'];parts=tokens(operation['path'])
++        if action=='test':
++            if 'value' not in operation or not _equal(resolve(result,operation['path']),operation['value']):
++                raise ValueError('JSON补丁test失败')
++        elif action in ('add','replace'):
++            if 'value' not in operation:
++                raise ValueError('补丁缺少值')
++            result=_change(result,parts,operation['value'],action=action)
++        elif action=='remove':
++            result=_change(result,parts,action='remove')
++        elif action in ('copy','move'):
++            if 'from' not in operation:
++                raise ValueError('补丁缺少来源')
++            origin=tokens(operation['from'])
++            if action=='move' and len(parts)>len(origin) and parts[:len(origin)]==origin:
++                raise ValueError('不能移动至自身子级')
++            value=deepcopy(resolve(result,operation['from']))
++            if action=='move':
++                if parts==origin:
++                    continue
++                result=_change(result,origin,action='remove')
++            result=_change(result,parts,value,action='add')
++        else:
++            raise ValueError('不支持的JSON补丁操作')
++    return result

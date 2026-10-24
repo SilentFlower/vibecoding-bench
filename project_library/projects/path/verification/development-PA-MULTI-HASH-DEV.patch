@@ -1,0 +1,69 @@
+--- a/library/development_tests/test_development_pa_multi_hash_dev.py
++++ b/library/development_tests/test_development_pa_multi_hash_dev.py
+@@ -0,0 +1,28 @@
++"""公开单次读取多摘要回归。"""
++import hashlib
++import pytest
++from path import Path
++
++def test_multiple_algorithms_match_exact_binary_data(tmp_path):
++    data=bytes(range(256))*7;path=Path(tmp_path/'data');path.write_bytes(data)
++    result=path.read_hashes(['sha256','sha512','sha256'],chunk_size=17)
++    assert list(result)==['sha256','sha512'] and result=={'sha256':hashlib.sha256(data).hexdigest(),'sha512':hashlib.sha512(data).hexdigest()}
++
++def test_only_one_stream_is_opened(tmp_path,monkeypatch):
++    path=Path(tmp_path/'data');path.write_bytes(b'data');original=Path.open;calls=[]
++    def opened(self,*args,**kwargs):
++        calls.append(str(self))
++        return original(self,*args,**kwargs)
++    monkeypatch.setattr(Path,'open',opened)
++    path.read_hashes(['sha256','sha512'])
++    assert calls==[str(path)]
++
++def test_empty_file_and_binary_digest_output(tmp_path):
++    path=Path(tmp_path/'empty');path.write_bytes(b'')
++    assert path.read_hashes(['sha256'],hex=False)=={'sha256':hashlib.sha256(b'').digest()}
++
++def test_invalid_parameters_fail_before_opening_missing_file(tmp_path):
++    path=Path(tmp_path/'absent')
++    for algorithms,options in (([],{}),(['not-an-algorithm'],{}),(['shake_128'],{}),(['sha256'],{'chunk_size':True})):
++        with pytest.raises((ValueError,TypeError)):
++            path.read_hashes(algorithms,**options)
+--- a/library/docs/development-pa-multi-hash-dev.md
++++ b/library/docs/development-pa-multi-hash-dev.md
+@@ -0,0 +1,5 @@
++# 一次顺序读取计算多种固定长度文件摘要
++
++发布校验清单需要多种摘要时只顺序读文件一次，每块同时更新所有算法，保留算法顺序和可选原始字节结果。读前校验参数，空文件及读失败时资源关闭正确，不改变原摘要方法。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/path/__init__.py
++++ b/library/path/__init__.py
+@@ -987,6 +987,27 @@
+         """
+         return self._hash(hash_name).digest()
+ 
++    def read_hashes(self,algorithms,*,chunk_size=8192,hex=True):
++        """一次读取计算多个定长摘要。@param algorithms 算法名序列。@param chunk_size 正整数。
++        @param hex 返回十六进制或原始字节。@return 算法名到摘要的保序映射，重复名称只算一次。
++        """
++        if isinstance(algorithms,str) or type(chunk_size) is not int or chunk_size<1 or type(hex) is not bool:
++            raise ValueError('摘要算法序列、块大小或输出类型无效')
++        names=tuple(dict.fromkeys(algorithms))
++        if not names:
++            raise ValueError('至少需要一个摘要算法')
++        digests={name:hashlib.new(name) for name in names}
++        if any(digest.digest_size==0 for digest in digests.values()):
++            raise ValueError('可变长度摘要需要独立长度协议，不适用于此接口')
++        with self.open('rb') as stream:
++            while True:
++                chunk=stream.read(chunk_size)
++                if not chunk:
++                    break
++                for digest in digests.values():
++                    digest.update(chunk)
++        return {name:digest.hexdigest() if hex else digest.digest() for name,digest in digests.items()}
++
+     def read_hexhash(self, hash_name) -> str:
+         """Calculate given hash for this file, returning hexdigest.
+ 

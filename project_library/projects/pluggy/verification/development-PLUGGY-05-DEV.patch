@@ -1,0 +1,82 @@
+--- a/library/docs/development-pluggy-05-dev.md
++++ b/library/docs/development-pluggy-05-dev.md
+@@ -0,0 +1,5 @@
++# 临时插件集合按作用域注册并在失败后精确清理自有对象
++
++路线12：临时插件集合完整预检后顺序注册，退出/正文异常/部分历史重放失败均逆序清理仍由本作用域持有的对象。前置身份能力避免误删相等既有插件，嵌套及同名后继替换正确；不承诺撤销外部副作用或正文新协议。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pluggy/scoped.py
++++ b/library/src/pluggy/scoped.py
+@@ -0,0 +1,27 @@
++"""作用域临时插件集合，只清理本作用域真正拥有的注册。"""
++from contextlib import contextmanager
++
++
++@contextmanager
++def temporary_plugins(manager,plugins):
++    """按顺序注册(name,plugin)并在退出时逆序清理。@param manager 真实PluginManager。@param plugins 显式名字和对象。@return 作用域内manager。"""
++    entries=list(plugins)
++    names=[];identities=set()
++    for name,plugin in entries:
++        if not isinstance(name,str) or not name or name in names or plugin is None:raise ValueError('临时插件名称或对象无效')
++        if id(plugin) in identities:raise ValueError('同对象不能重复临时注册')
++        if manager.has_plugin(name) or manager.is_blocked(name) or manager.is_registered(plugin):raise ValueError('临时插件与既有注册冲突')
++        names.append(name);identities.add(id(plugin))
++    owned=[]
++    try:
++        for name,plugin in entries:
++            # 即使historic replay在register中途失败，也尝试按对象身份清理它留下的本轮注册。
++            owned.append(plugin)
++            registered=manager.register(plugin,name)
++            if registered is None:raise ValueError('临时插件被管理器拒绝')
++        yield manager
++    finally:
++        for plugin in reversed(owned):
++            actual=manager.get_name(plugin)
++            if actual is not None and manager.get_plugin(actual) is plugin:
++                manager.unregister(plugin=plugin,name=actual)
+--- a/library/tests/test_development_pluggy_05_dev.py
++++ b/library/tests/test_development_pluggy_05_dev.py
+@@ -0,0 +1,41 @@
++"""临时插件正常、异常及部分注册失败都不会遗留本轮对象。"""
++import unittest
++from pluggy import PluginManager,HookspecMarker,HookimplMarker
++from pluggy.scoped import temporary_plugins
++spec=HookspecMarker('app');impl=HookimplMarker('app')
++
++
++class EqualPlugin:
++    """同值但不同身份的真实插件。"""
++    __hash__=None
++    def __eq__(self,other):return True
++    @impl
++    def value(self):return id(self)
++
++
++def test_scope_keeps_existing_equal_plugins_and_cleans_on_error():
++    """依赖前置身份修复，不误删既有相等对象。@return None。"""
++    class Specs:
++        @spec
++        def value(self):pass
++    pm=PluginManager('app');pm.add_hookspecs(Specs);old,a,b=EqualPlugin(),EqualPlugin(),EqualPlugin();pm.register(old,'old')
++    with unittest.TestCase().assertRaises(RuntimeError):
++        with temporary_plugins(pm,[('a',a),('b',b)]):
++            assert set(pm.hook.value())=={id(old),id(a),id(b)}
++            raise RuntimeError('body failed')
++    assert pm.list_name_plugin()==[('old',old)] and pm.hook.value()==[id(old)]
++
++
++def test_preflight_and_partial_historic_failure_cleanup():
++    """冲突先拒绝；失败的本轮重放注册也清理。@return None。"""
++    class Specs:
++        @spec(historic=True)
++        def event(self):pass
++    pm=PluginManager('app');pm.add_hookspecs(Specs);pm.hook.event.call_historic()
++    class Broken:
++        @impl
++        def event(self):raise ValueError('replay failed')
++    good=object()
++    with unittest.TestCase().assertRaises(ValueError):
++        with temporary_plugins(pm,[('good',good),('bad',Broken())]):pass
++    assert not pm.has_plugin('good') and not pm.has_plugin('bad') and pm.hook.event.get_hookimpls()==[]

@@ -1,0 +1,104 @@
+--- a/library/docs/development-python-docx-05-dev.md
++++ b/library/docs/development-python-docx-05-dev.md
+@@ -0,0 +1,5 @@
++# 长报告表格公开设置重复表头与三态跨页拆行政策
++
++路线13：Row公开repeat_header/allow_split_across_pages三态，正确tblHeader/cantSplit顺序与反向语义；None才继承，保原其他格式，Word要求连续首行由调用方负责，不计算页数。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/docx/oxml/table.py
++++ b/library/src/docx/oxml/table.py
+@@ -917,6 +917,8 @@
+     gridBefore: CT_DecimalNumber | None = ZeroOrOne(  # pyright: ignore[reportAssignmentType]
+         "w:gridBefore", successors=_tag_seq[3:]
+     )
++    cantSplit = ZeroOrOne("w:cantSplit",successors=_tag_seq[7:])
++    tblHeader = ZeroOrOne("w:tblHeader",successors=_tag_seq[9:])
+     trHeight: CT_Height | None = ZeroOrOne(  # pyright: ignore[reportAssignmentType]
+         "w:trHeight", successors=_tag_seq[8:]
+     )
+--- a/library/src/docx/table.py
++++ b/library/src/docx/table.py
+@@ -10,6 +10,7 @@
+ from docx.enum.style import WD_STYLE_TYPE
+ from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
+ from docx.oxml.simpletypes import ST_Merge
++from docx.oxml.ns import qn
+ from docx.oxml.table import CT_TblGridCol
+ from docx.shared import Inches, Parented, StoryChild, lazyproperty
+ 
+@@ -391,6 +392,48 @@
+         super(_Row, self).__init__(parent)
+         self._parent = parent
+         self._tr = self._element = tr
++
++    @property
++    def repeat_header(self):
++        """读取三态行分页政策。@return bool或None继承。"""
++        properties=self._tr.trPr
++        element=getattr(properties,'tblHeader') if properties is not None else None
++        if element is None:return None
++        value=element.get(qn("w:val"),"1") not in ("0","false","off")
++        return not value if False else value
++
++    @repeat_header.setter
++    def repeat_header(self,value):
++        """写入或移除行分页属性。@param value bool或None继承。@return None。"""
++        if value is not None and type(value) is not bool:raise TypeError("value必须为bool或None")
++        if value is None:
++            if self._tr.trPr is not None:self._tr.trPr._remove_tblHeader()
++            return
++        properties=self._tr.get_or_add_trPr()
++        element=properties.get_or_add_tblHeader()
++        stored=not value if False else value
++        element.set(qn("w:val"),"1" if stored else "0")
++
++    @property
++    def allow_split_across_pages(self):
++        """读取三态行分页政策。@return bool或None继承。"""
++        properties=self._tr.trPr
++        element=getattr(properties,'cantSplit') if properties is not None else None
++        if element is None:return None
++        value=element.get(qn("w:val"),"1") not in ("0","false","off")
++        return not value if True else value
++
++    @allow_split_across_pages.setter
++    def allow_split_across_pages(self,value):
++        """写入或移除行分页属性。@param value bool或None继承。@return None。"""
++        if value is not None and type(value) is not bool:raise TypeError("value必须为bool或None")
++        if value is None:
++            if self._tr.trPr is not None:self._tr.trPr._remove_cantSplit()
++            return
++        properties=self._tr.get_or_add_trPr()
++        element=properties.get_or_add_cantSplit()
++        stored=not value if True else value
++        element.set(qn("w:val"),"1" if stored else "0")
+ 
+     @property
+     def cells(self) -> tuple[_Cell, ...]:
+--- a/library/tests/test_development_python_docx_05_dev.py
++++ b/library/tests/test_development_python_docx_05_dev.py
+@@ -0,0 +1,23 @@
++"""长报告重复表头和跨页拆行是三态直接格式，不计算页数。"""
++from io import BytesIO
++import unittest
++from docx import Document
++
++def test_two_header_rows_data_cannot_split_and_real_roundtrip():
++    """XML属性和保存重开后的公开值一致。@return None。"""
++    document=Document();table=document.add_table(rows=3,cols=2)
++    table.rows[0].repeat_header=True;table.rows[1].repeat_header=True;table.rows[2].allow_split_across_pages=False
++    output=BytesIO();document.save(output);output.seek(0);restored=Document(output).tables[0]
++    assert restored.rows[0].repeat_header is True and restored.rows[1].repeat_header is True
++    assert restored.rows[2].allow_split_across_pages is False
++    assert 'cantSplit' in restored.rows[2]._tr.xml
++
++def test_false_and_none_clear_inheritance_without_touching_height():
++    """False是显式政策，None才删属性。@return None。"""
++    row=Document().add_table(rows=1,cols=1).rows[0]
++    assert row.repeat_header is None and row.allow_split_across_pages is None
++    row.repeat_header=False;row.allow_split_across_pages=True
++    assert row.repeat_header is False and row.allow_split_across_pages is True
++    row.repeat_header=None;row.allow_split_across_pages=None
++    assert row.repeat_header is None and row.allow_split_across_pages is None
++    with unittest.TestCase().assertRaises(TypeError):row.repeat_header=1

@@ -1,0 +1,82 @@
+--- a/library/docs/development-petl-01-dev.md
++++ b/library/docs/development-petl-01-dev.md
+@@ -0,0 +1,5 @@
++# 显式按出现次序拼接重复字段且保留默认兼容政策
++
++路线02：cat显式duplicate_fields=occurrence时字段身份为名字+第n次出现，默认first按原冻结政策不改；联合头保最大重复次数及发现顺序；显式头/短行/missing按同政策，不重复拿首列值。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/petl/transform/basics.py
++++ b/library/petl/transform/basics.py
+@@ -340,12 +340,15 @@
+ 
+ class CatView(Table):
+ 
+-    def __init__(self, sources, missing=None, header=None):
++    def __init__(self, sources, missing=None, header=None, duplicate_fields="first"):
+         self.sources = sources
+         self.missing = missing
+         self._header = header
+-
+-    def __iter__(self):
++        if duplicate_fields not in ("first","occurrence"):raise ValueError("duplicate_fields政策无效")
++        self.duplicate_fields=duplicate_fields
++
++    def __iter__(self):
++        if self.duplicate_fields=="occurrence":return _itercat_occurrence(self.sources,self.missing,self._header)
+         return itercat(self.sources, self.missing, self._header)
+ 
+ 
+@@ -389,6 +392,35 @@
+                     pass
+                 outrow.append(val)
+             yield tuple(outrow)
++
++
++def _itercat_occurrence(sources, missing, header):
++    its = [iter(t) for t in sources]
++    hdrs = []
++    for it in its:
++        try:
++            hdrs.append(list(next(it)))
++        except StopIteration:
++            hdrs.append([])
++
++    if header is None:
++        outhdr=list(hdrs[0]) if hdrs else []
++        for hdr in hdrs[1:]:
++            for index,name in enumerate(hdr):
++                if hdr[:index+1].count(name)>outhdr.count(name):
++                    outhdr.append(name)
++    else:
++        outhdr=list(header)
++    yield tuple(outhdr)
++    for hdr,it in zip(hdrs,its):
++        # 字段身份包含出现次序，不能让重复字段都回查第一个索引。
++        mapping=[]
++        for position,name in enumerate(outhdr):
++            occurrence=outhdr[:position].count(name)
++            matches=[index for index,value in enumerate(hdr) if value==name]
++            mapping.append(matches[occurrence] if occurrence<len(matches) else None)
++        for row in it:
++            yield tuple(row[index] if index is not None and index<len(row) else missing for index in mapping)
+ 
+ 
+ def stack(*tables, **kwargs):
+--- a/library/tests/test_development_petl_01_dev.py
++++ b/library/tests/test_development_petl_01_dev.py
+@@ -0,0 +1,14 @@
++"""重复列按名字与第n次出现配对，不丢后续值。"""
++import petl
++
++def test_duplicate_header_single_and_multiple_sources():
++    """一个表也必须保留两个不同值，联合头保最大重复次数。@return None。"""
++    first=[['x','x'],[1,2]];second=[['x','y','x','x'],[3,4,5,6]]
++    assert list(petl.cat(first))==[('x','x'),(1,1)]
++    assert list(petl.cat(first,duplicate_fields="occurrence"))==[('x','x'),(1,2)]
++    assert list(petl.cat(first,second,duplicate_fields="occurrence"))==[('x','x','y','x'),(1,2,None,None),(3,5,4,6)]
++
++def test_explicit_header_short_row_missing_and_empty_source():
++    """显式重复输出与短行按相同出现次序映射。@return None。"""
++    table=[['b','a','a'],[7,8],[9,10,11]]
++    assert list(petl.cat([],table,duplicate_fields='occurrence',header=['a','a','b'],missing='?'))==[('a','a','b'),(8,'?',7),(10,11,9)]

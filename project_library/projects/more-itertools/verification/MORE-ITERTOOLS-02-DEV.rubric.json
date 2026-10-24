@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MORE-ITERTOOLS-02-DEV",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add sessionize(iterable,key,gap) yielding ordered lists of original events. Start a new session only when consecutive event gap is STRICTLY greater than nonnegative numeric/timedelta gap, preserving identity and source order; equality stays in session. Support one-shot/empty/duplicate/cross-day inputs, reject observed reverse timestamps and negative gap, propagate incompatible key/arithmetic errors. Use no real clock and keep only current session plus lookahead, with documented full-session memory.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

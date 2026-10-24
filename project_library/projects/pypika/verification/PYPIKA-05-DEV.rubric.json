@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYPIKA-05-DEV",
+  "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Function.get_sql/get_function_sql so caller serialization context, particularly parameter collectors, reaches each argument and nested function while preserving namespace, dialect, quote, schema and alias semantics. Normalize explicitly controlled with_alias/subquery options to prevent duplicate keyword errors. Preserve get_special_params_sql extension behavior, aggregate FILTER collection order and plain literals. Demonstrate real bound SQLite execution and ordered Qmark/Named collections; never interpolate bound user values.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,63 @@
+--- a/library/docs/development-pt-transform-dev.md
++++ b/library/docs/development-pt-transform-dev.md
+@@ -0,0 +1,5 @@
++# 为区间值表交付不可变转换与筛选
++
++区间值表新增返回同类副本的transform_values；每个存储项回调一次，可显式传入整个复合区间。只有DROP身份哨兵表示删除，None和列表均为合法值；结果沿既有归并规则重建，原表及回调异常保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/portion/dict.py
++++ b/library/portion/dict.py
+@@ -69,6 +69,22 @@
+             d._storage[key] = value
+ 
+         return d
++
++    DROP = object()
++
++    def transform_values(self, function, *, pass_interval=False):
++        """返回经业务转换与筛选的新区间表，原表不变。
++
++        :param function: 接收值，或在pass_interval时接收值和整个存储区间。
++        :param pass_interval: 是否把复合存储区间作为第二参数。
++        :return: 同类新区间表；只有返回DROP身份哨兵才删除条目。
++        """
++        items = []
++        for interval, value in self.items():
++            result = function(value, interval) if pass_interval else function(value)
++            if result is not self.DROP:
++                items.append((interval, result))
++        return self.__class__(items)
+ 
+     def clear(self):
+         """
+--- a/library/tests/test_development_pt_transform_dev.py
++++ b/library/tests/test_development_pt_transform_dev.py
+@@ -0,0 +1,27 @@
++"""区间价格表支持返回副本的转换和明确删除哨兵。"""
++import portion as P
++
++
++def test_transform_and_original():
++    """转换价格后域保持，原表数值不变。@return None。"""
++    original = P.IntervalDict([(P.closedopen(0, 2), 10), (P.closedopen(3, 5), 20)])
++    result = original.transform_values(lambda value: value * 2)
++    assert result[1] == 20 and result[4] == 40
++    assert result.domain() == original.domain()
++    assert original[1] == 10
++
++
++def test_drop_and_none():
++    """None保留为值，只有专用身份哨兵删除。@return None。"""
++    original = P.IntervalDict([(P.closedopen(0, 2), 1), (P.closedopen(3, 5), 2)])
++    result = original.transform_values(lambda value: None if value == 1 else P.IntervalDict.DROP)
++    assert result[1] is None and 4 not in result
++
++
++def test_composite_callback_and_merge():
++    """每个存储项回调一次，相同结果按原规则归并。@return None。"""
++    original = P.IntervalDict([(P.closedopen(0, 1), 1), (P.closedopen(2, 3), 1), (P.closedopen(4, 5), 2)])
++    seen = []
++    result = original.transform_values(lambda value, interval: seen.append(interval) or [0], pass_interval=True)
++    assert len(seen) == 2 and len(seen[0]) == 2
++    assert len(result) == 1 and result.domain() == original.domain()

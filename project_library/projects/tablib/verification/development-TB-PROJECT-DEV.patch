@@ -1,0 +1,92 @@
+--- a/library/development_tests/test_development_tb_project_dev.py
++++ b/library/development_tests/test_development_tb_project_dev.py
+@@ -0,0 +1,24 @@
++"""公开表格字段投影回归。"""
++import pytest
++from tablib import Dataset
++from tablib.projection import select_columns
++
++def test_reorder_aliases_title_and_row_tags_are_preserved():
++    data=Dataset(headers=['sku','qty'],title='Stock');data.append(['A',2],tags=['active'])
++    result=select_columns(data,['qty','sku'],rename={'qty':'count'})
++    assert result.headers==['count','sku'] and result[0]==(2,'A') and result.title=='Stock'
++    assert result.filter('active').height==1 and data.headers==['sku','qty']
++
++def test_nested_values_and_headers_are_detached():
++    data=Dataset([{'values':[1]},2],headers=['payload','n']);result=select_columns(data,['payload'])
++    result[0][0]['values'].append(2);assert data[0][0]=={'values':[1]}
++
++def test_duplicate_or_missing_names_and_alias_collisions_fail():
++    data=Dataset([1,2],headers=['a','b'])
++    for columns in (['a','a'],['missing']):
++        with pytest.raises(ValueError): select_columns(data,columns)
++    with pytest.raises(ValueError): select_columns(data,['a','b'],rename={'b':'a'})
++
++def test_projection_uses_raw_cells_without_running_export_formatters():
++    data=Dataset(['raw'],headers=['v']);data._formatters=[(0,lambda value:'formatted')]
++    assert select_columns(data,['v'])[0]==('raw',) and data.dict==[{'v':'formatted'}]
+--- a/library/docs/development-tb-project-dev.md
++++ b/library/docs/development-tb-project-dev.md
+@@ -0,0 +1,5 @@
++# 提供按名称重排与别名投影的独立表格快照
++
++按明确表头进行字段重排和别名投影，复制当前存储值、标题和行标签，不修改原表。输出是静态数据快照，不执行或继承导出格式器与动态定义；为后续表操作提供真实一致的表头和关联键接口。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/tablib/projection.py
++++ b/library/src/tablib/projection.py
+@@ -0,0 +1,54 @@
++"""以存储单元格构建独立表格快照，不执行导出格式器。"""
++from copy import deepcopy
++from .core import Dataset
++from .exceptions import HeadersNeeded,InvalidDimensions
++
++
++def schema(dataset):
++    """验证名称寻址合同。@param dataset 实际数据集。@return 独立有序表头列表。
++    """
++    if not isinstance(dataset,Dataset):
++        raise TypeError('需要Dataset')
++    headers=dataset.headers
++    if not headers:
++        raise HeadersNeeded('需要非空表头')
++    if any(not isinstance(value,str) or not value for value in headers) or len(set(headers))!=len(headers):
++        raise ValueError('需要非空且唯一的字符串表头')
++    if any(len(row)!=len(headers) for row in dataset._data):
++        raise InvalidDimensions('存储行宽与表头不符')
++    return list(headers)
++
++
++def copy_rows(source,rows,headers):
++    """建立静态快照并保留行标签。@param source 标题来源。@param rows 值和标签对。
++    @param headers 输出表头。@return 独立Dataset，不复制动态定义、分隔符或导出格式器。
++    """
++    result=Dataset(headers=deepcopy(list(headers)),title=deepcopy(source.title))
++    for values,tags in rows:
++        result.append(deepcopy(list(values)),tags=deepcopy(tags))
++    return result
++
++
++def select_columns(dataset,columns,*,rename=None):
++    """按名称选择并重排字段。@param dataset 原数据。@param columns 非空唯一列名序列。
++    @param rename 可选所选字段别名映射。@return 独立静态Dataset，原值和行标签保留。
++    """
++    headers=schema(dataset);columns=list(columns);rename=dict(rename or {})
++    if not columns or any(not isinstance(name,str) or name not in headers for name in columns) or len(set(columns))!=len(columns) or set(rename)-set(columns):
++        raise ValueError('所选字段必须存在且唯一')
++    output=[rename.get(name,name) for name in columns]
++    if any(not isinstance(name,str) or not name for name in output) or len(set(output))!=len(output):
++        raise ValueError('输出字段别名必须非空且唯一')
++    positions=[headers.index(name) for name in columns]
++    return copy_rows(dataset,(([row[index] for index in positions],row.tags) for row in dataset._data),output)
++
++
++def key_token(values):
++    """建立类型严格的业务关联键。@param values 标量键序列。@return 可哈希键元组。
++    """
++    result=tuple((type(value),value) for value in values)
++    try:
++        hash(result)
++    except TypeError as error:
++        raise ValueError('业务键必须为可哈希值') from error
++    return result

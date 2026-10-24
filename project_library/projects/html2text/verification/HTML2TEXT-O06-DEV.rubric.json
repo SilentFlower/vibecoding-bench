@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML2TEXT-O06-DEV",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add public immutable Options.from_mapping with declared body_width and common link/image/wrapping switches, and HTML2Text.from_options(options, *, out=None, baseurl=\"\") integrated through the actual constructor/property conversion path. Reject unknown keys, nonbool switches, bool/noninteger/negative widths, conflicting image rendering modes and single_line_break with nonzero width in this explicit strict mode. Options detach input, expose independent as_dict copies and are reusable across independent converters. Preserve ordinary construction/dynamic property assignments, default byte output, custom out and baseurl. This task covers API strict configuration; do not claim unimplemented CLI integration or globally forbid legacy combinations.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

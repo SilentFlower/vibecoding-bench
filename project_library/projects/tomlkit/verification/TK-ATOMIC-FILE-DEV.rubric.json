@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TK-ATOMIC-FILE-DEV",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement tomlkit.files.load_with_digest(path) returning (UTF8 parsed_document,raw_bytes_sha256), and atomic_save(document,path,*,expected_digest=None) returning the new digest. Validate serialized TOML before I/O, check optional original digest before temp creation and before replacement, reject stale files with StaleDocumentError, preserve mode or choose 0600 for new files, flush/fsync a same-directory temporary then os.replace and clean failures. Reject symlinks and preserve old bytes on validation, staleness or replacement failure. Do not claim cross-process compare-and-swap locking or directory-fsync crash durability; ordinary parse/dump APIs stay unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

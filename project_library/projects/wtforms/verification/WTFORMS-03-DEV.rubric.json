@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WTFORMS-03-DEV",
+  "source_commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add wtforms.jsondata.JSONFormData implementing getlist, iteration, contains, length and first-value lookup. Snapshot a top-level JSON mapping into standard hyphen form paths: objects recurse, lists use numeric FieldList indices unless the complete path is explicitly listed in multi_values for SelectMultiple. Define None as present empty string, booleans true/false, finite numbers decimal text, strings unchanged; missing keys stay absent and explicit empty multi-value list stays present. Reject hyphen-containing/empty/nonstring keys, path collisions, unsupported objects/nonfinite numbers, excessive depth/value budget and malformed roots. Preserve caller ownership and never auto-treat arbitrary dict formdata or change data/obj semantics. Validate with actual FormField/FieldList/SelectMultiple processing and nested error locations.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

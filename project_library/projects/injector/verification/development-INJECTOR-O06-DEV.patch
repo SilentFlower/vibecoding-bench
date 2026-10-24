@@ -1,0 +1,101 @@
+--- a/library/docs/development-injector-o06-dev.md
++++ b/library/docs/development-injector-o06-dev.md
+@@ -0,0 +1,5 @@
++# 无副作用交付有效绑定及多绑定来源只读快照
++
++对应路线13：只读现存绑定表，返回冻结有效绑定及父子深度、显式/隐式、多贡献类型；查看不触发get_binding自动注册、不执行Provider、不暴露业务实例。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/injector/__init__.py
++++ b/library/injector/__init__.py
+@@ -447,6 +447,26 @@
+ _InstallableModuleType = Union[Callable[['Binder'], None], 'Module', Type['Module']]
+ 
+ 
++@dataclass(frozen=True)
++class BindingInfo:
++    """有效绑定的只读元数据，不暴露可改Binding或业务实例。
++
++    :param interface: 实际绑定键。
++    :param provider_type: Provider类。
++    :param scope: 实际Scope类。
++    :param owner_depth: 当前Binder为零，父级递增。
++    :param explicit: 是否非ImplicitBinding。
++    :param contributions: 多绑定贡献的Provider/Scope类型元组。
++    :return: 不执行provider得到的冻结信息。
++    """
++    interface: object
++    provider_type: type
++    scope: type
++    owner_depth: int
++    explicit: bool
++    contributions: tuple
++
++
+ class Binder:
+     """Bind interfaces to implementations.
+ 
+@@ -725,6 +745,30 @@
+                 return binding, self
+ 
+         raise UnsatisfiedRequirement(None, interface)
++
++    def bindings_snapshot(self, *, include_parents=True):
++        """只读取得有效绑定及来源，不触发auto_bind或Provider。
++
++        :param include_parents: 是否包含尚未被当前层覆盖的父层绑定。
++        :return: BindingInfo不可变元组；后续bind不改变旧快照。
++        """
++        if not isinstance(include_parents, bool):
++            raise TypeError('include_parents必须为bool')
++        seen, records, binder, depth = set(), [], self, 0
++        with lock:
++            while binder is not None:
++                for interface, binding in list(binder._bindings.items()):
++                    if interface in seen:
++                        continue
++                    seen.add(interface)
++                    contributions = ()
++                    if isinstance(binding.provider, MultiBinder):
++                        contributions = tuple((type(item.provider), item.scope) for item in binding.provider._multi_bindings)
++                    records.append(BindingInfo(interface, type(binding.provider), binding.scope, depth,
++                        not isinstance(binding, ImplicitBinding), contributions))
++                binder = binder.parent if include_parents else None
++                depth += 1
++        return tuple(records)
+ 
+     def has_binding_for(self, interface: type) -> bool:
+         return interface in self._bindings
+--- a/library/tests/test_development_injector_o06_dev.py
++++ b/library/tests/test_development_injector_o06_dev.py
+@@ -0,0 +1,30 @@
++"""绑定快照不会执行provider/auto-bind且父子归属明确。"""
++from injector import Injector,SingletonScope
++from dataclasses import FrozenInstanceError
++from typing import List
++import pytest
++
++def test_effective_parent_override_and_no_construction():
++    """只读枚举使用已有字典，不调用可能创建隐式绑定的get_binding。@return None。"""
++    calls=[]
++    def provider():calls.append(1);return 'provided'
++    parent=Injector(lambda b:(b.bind(str,to=provider),b.bind(int,to=3)))
++    child=parent.create_child_injector(lambda b:b.bind(str,to='child'))
++    before=dict(child.binder._bindings);rows={row.interface:row for row in child.binder.bindings_snapshot()}
++    assert rows[str].owner_depth==0 and rows[int].owner_depth==1 and calls==[] and child.binder._bindings==before
++    assert all(row.owner_depth==0 for row in child.binder.bindings_snapshot(include_parents=False))
++
++def test_implicit_multibinding_and_immutable_new_snapshot():
++    """显式/隐式及多贡献完整可读，旧快照不跟着绑定变化。@return None。"""
++    container=Injector();container.get(bytes);container.binder.multibind(List[str],to=['a']);container.binder.multibind(List[str],to=['b'])
++    rows={row.interface:row for row in container.binder.bindings_snapshot()};assert not rows[bytes].explicit and len(rows[List[str]].contributions)==2
++    with pytest.raises(FrozenInstanceError):rows[bytes].owner_depth=99
++    old=container.binder.bindings_snapshot();container.binder.bind(float,to=1.5)
++    assert float not in [row.interface for row in old] and float in [row.interface for row in container.binder.bindings_snapshot()]
++
++def test_special_keys_empty_and_option_validation():
++    """特殊自动能力不被查看行为凭空创建，参数类型严格。@return None。"""
++    from injector import ProviderOf
++    container=Injector();before=dict(container.binder._bindings);container.binder.bindings_snapshot()
++    assert ProviderOf[str] not in container.binder._bindings and container.binder._bindings==before
++    with pytest.raises(TypeError):container.binder.bindings_snapshot(include_parents=1)

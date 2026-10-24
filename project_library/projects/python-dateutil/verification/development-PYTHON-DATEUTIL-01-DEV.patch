@@ -1,0 +1,50 @@
+--- a/library/docs/development-python-dateutil-01-dev.md
++++ b/library/docs/development-python-dateutil-01-dev.md
+@@ -0,0 +1,5 @@
++# 日历规则与VTIMEZONE规范接收空格和HTAB折行
++
++路线01：rrulestr与tzical均支持空格/HTAB规范折行，只去一个续行前缀；会议实例和时区offset真实验证，不任意strip业务值。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/dateutil/rrule.py
++++ b/library/src/dateutil/rrule.py
+@@ -1640,7 +1640,7 @@
+                 line = lines[i].rstrip()
+                 if not line:
+                     del lines[i]
+-                elif i > 0 and line[0] == " ":
++                elif i > 0 and line[0] in " \t":
+                     lines[i-1] += line[1:]
+                     del lines[i]
+                 else:
+--- a/library/src/dateutil/tz/tz.py
++++ b/library/src/dateutil/tz/tz.py
+@@ -800,7 +800,7 @@
+             line = lines[i].rstrip()
+             if not line:
+                 del lines[i]
+-            elif i > 0 and line[0] == " ":
++            elif i > 0 and line[0] in " \t":
+                 lines[i-1] += line[1:]
+                 del lines[i]
+             else:
+--- a/library/tests/test_development_python_dateutil_01_dev.py
++++ b/library/tests/test_development_python_dateutil_01_dev.py
+@@ -0,0 +1,17 @@
++"""空格与HTAB展开使用同一规范续行政策。"""
++from datetime import datetime,timedelta
++from io import StringIO
++from dateutil.rrule import rrulestr
++from dateutil.tz import tzical
++
++def test_rrule_tab_and_space_continuations_produce_same_meetings():
++    """只移除一个续行前缀，规则实际展开日期相同。@return None。"""
++    for prefix in (' ','\t'):
++        rule=rrulestr('DTSTART:20240101T090000\r\nRRULE:FREQ=DAILY;\r\n'+prefix+'COUNT=2',unfold=True)
++        assert list(rule)==[datetime(2024,1,1,9),datetime(2024,1,2,9)]
++
++def test_timezone_component_tab_unfold_is_applied_before_rule_parsing():
++    """时区组件也可接受规范HTAB折行，不访问TZURL。@return None。"""
++    text='BEGIN:VTIMEZONE\nTZID:Local\nBEGIN:STANDARD\nDTSTART:20200101T000000\nTZOFFSETFROM:+0200\nTZOFFSETTO:+0\n\t200\nTZNAME:Local\nEND:STANDARD\nEND:VTIMEZONE'
++    zone=tzical(StringIO(text)).get('Local')
++    assert datetime(2024,1,1,tzinfo=zone).utcoffset()==timedelta(hours=2)

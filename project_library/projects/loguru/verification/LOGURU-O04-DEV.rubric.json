@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "LOGURU-O04-DEV",
+  "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add optional serializer(record_snapshot, formatted_text) to Logger.add and real Handler emission, independently per sink and before enqueue. Require callable or None and reject simultaneous serialize=True; default boolean JSON output remains unchanged. Pass a deep detached supported record graph (traceback may be retained read-only), preserving other sinks/original nested extra/record attrs against callback mutation; unsupported deepcopy values fail under existing catch policy. Require a string result with callback-owned terminators, invoke exactly once per emitted handler record on the producer thread, and keep catch=False exception propagation and queue completion. Never route custom encoding through a replacement fake sink.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

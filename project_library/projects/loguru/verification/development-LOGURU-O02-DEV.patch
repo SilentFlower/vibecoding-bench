@@ -1,0 +1,98 @@
+--- a/library/docs/development-loguru-o02-dev.md
++++ b/library/docs/development-loguru-o02-dev.md
+@@ -0,0 +1,5 @@
++# 为真实sink提供可嵌套且异常安全的自动移除作用域
++
++对应路线03：作用域进入真实add、退出仅remove本次id，嵌套/提前移除/异常/队列按原关闭协议；调用方流保留，双失败保留业务异常并报告清理故障。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/loguru/_logger.py
++++ b/library/loguru/_logger.py
+@@ -1069,6 +1069,38 @@
+ 
+         return handler_id
+ 
++    @contextlib.contextmanager
++    def sink_context(self, sink, **options):
++        """只在作用域内拥有本次新增sink，退出按原remove协议关闭。
++
++        :param sink: 真实add支持的sink。
++        :param options: 原add配置。
++        :return: 上下文进入时返回本次handler id。
++        """
++        identifier = self.add(sink, **options)
++        failed = False
++        try:
++            yield identifier
++        except BaseException:
++            failed = True
++            raise
++        finally:
++            with self._core.lock:
++                existed = identifier in self._core.handlers
++            try:
++                if existed:
++                    self.remove(identifier)
++            except ValueError:
++                # 外部提前移除是合法的；关闭回调本身的ValueError不能误当缺失。
++                if existed:
++                    if not failed:
++                        raise
++                    warnings.warn('sink关闭失败，保留作用域原异常', RuntimeWarning)
++            except BaseException:
++                if not failed:
++                    raise
++                warnings.warn('sink关闭失败，保留作用域原异常', RuntimeWarning)
++
+     def remove(self, handler_id=None):
+         """Remove a previously added handler and stop sending logs to its sink.
+ 
+--- a/library/tests/test_development_loguru_o02_dev.py
++++ b/library/tests/test_development_loguru_o02_dev.py
+@@ -0,0 +1,46 @@
++"""临时sink拥有严格作用域，只关闭自己的资源。"""
++from copy import deepcopy
++from loguru import logger
++import pytest
++
++def clean():
++    """取得独立logger。@return Logger。"""
++    logger.remove();log=deepcopy(logger);log.remove();return log
++
++def test_scope_only_removes_owned_sink_and_nested_exits():
++    """外部sink持续收取，嵌套只关闭自己的id。@return None。"""
++    log=clean();outer=[];first=[];second=[];log.add(outer.append,format='{message}')
++    with log.sink_context(first.append,format='{message}') as identifier:
++        log.info('one')
++        with log.sink_context(second.append,format='{message}'):log.info('two')
++        log.info('three')
++    log.info('four')
++    assert ''.join(first)=='one\ntwo\nthree\n' and ''.join(second)=='two\n'
++    assert ''.join(outer)=='one\ntwo\nthree\nfour\n'
++    with pytest.raises(ValueError):log.remove(identifier)
++    log.remove()
++
++def test_exception_early_remove_and_caller_owned_stream():
++    """业务异常不丢，外部提前移除可重复退出，调用方流仍可用。@return None。"""
++    import io
++    log=clean();stream=io.StringIO();error=LookupError('body')
++    with pytest.raises(LookupError) as caught:
++        with log.sink_context(stream,format='{message}') as identifier:
++            log.info('inside');log.remove(identifier);raise error
++    assert caught.value is error and not stream.closed and stream.getvalue()=='inside\n'
++
++def test_queued_records_finish_and_cleanup_failure_does_not_mask_body():
++    """原队列关闭协议完成已有记录；stop故障不能掩盖原业务异常。@return None。"""
++    log=clean();messages=[]
++    with log.sink_context(messages.append,format='{message}',enqueue=True):
++        log.info('a');log.info('b')
++    assert ''.join(messages)=='a\nb\n'
++    class Broken:
++        """可受控失败的真实流协议。"""
++        def write(self,message):pass
++        def stop(self):raise RuntimeError('close failed')
++    error=ValueError('body')
++    with pytest.warns(RuntimeWarning):
++        with pytest.raises(ValueError) as caught:
++            with log.sink_context(Broken()):raise error
++    assert caught.value is error

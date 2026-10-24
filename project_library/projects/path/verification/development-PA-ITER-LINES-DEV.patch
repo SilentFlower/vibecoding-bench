@@ -1,0 +1,57 @@
+--- a/library/development_tests/test_development_pa_iter_lines_dev.py
++++ b/library/development_tests/test_development_pa_iter_lines_dev.py
+@@ -0,0 +1,26 @@
++"""公开流式文本行读取回归。"""
++from path import Path
++import pytest
++
++def test_universal_and_original_line_endings_are_explicit(tmp_path):
++    path=Path(tmp_path/'text');path.write_bytes(b'a\r\nb\rc\nlast')
++    assert list(path.iter_lines())==['a\n','b\n','c\n','last']
++    assert list(path.iter_lines(newline=''))==['a\r\n','b\r','c\n','last']
++
++def test_blank_lines_and_unicode_survive_without_terminators(tmp_path):
++    path=Path(tmp_path/'text');path.write_bytes('雪\r\n\r\n花'.encode())
++    assert list(path.iter_lines(encoding='utf-8',retain=False,newline=''))==['雪','','花']
++
++def test_early_close_closes_the_actual_file(tmp_path,monkeypatch):
++    path=Path(tmp_path/'text');path.write_text('a\nb\n');original=Path.open;streams=[]
++    def opened(self,*args,**kwargs):
++        stream=original(self,*args,**kwargs);streams.append(stream);return stream
++    monkeypatch.setattr(Path,'open',opened)
++    rows=path.iter_lines();assert next(rows)=='a\n';rows.close()
++    assert streams[0].closed
++
++def test_decode_errors_are_propagated_or_explicitly_replaced(tmp_path):
++    path=Path(tmp_path/'text');path.write_bytes(b'bad\xff\n')
++    with pytest.raises(UnicodeDecodeError):
++        list(path.iter_lines(encoding='utf-8'))
++    assert list(path.iter_lines(encoding='utf-8',errors='replace'))==['bad\ufffd\n']
+--- a/library/docs/development-pa-iter-lines-dev.md
++++ b/library/docs/development-pa-iter-lines-dev.md
+@@ -0,0 +1,5 @@
++# 逐行读取大文本并明确原始或归一化换行语义
++
++大文件读取按行消费，明确选择通用换行或保留原CR/LF，保留空行和无末尾换行的最后一行。提前关闭及解码失败都会关闭流，既有一次性读取API保持不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/path/__init__.py
++++ b/library/path/__init__.py
+@@ -924,6 +924,17 @@
+         text = U_NEWLINE.sub('\n', self.read_text(encoding, errors))
+         return text.splitlines(retain)
+ 
++    def iter_lines(self,encoding=None,errors='strict',*,retain=True,newline=None):
++        """逐行读取并在关闭生成器时关闭文件。@param encoding 编码。@param errors 解码策略。
++        @param retain 是否保留行结束。@param newline None通用归一化或空串保留原CR/LF。
++        @return 字符串迭代器，不先读取整份文件。
++        """
++        if type(retain) is not bool or newline not in (None,''):
++            raise ValueError('逐行读取保留或换行策略无效')
++        with self.open('r',encoding=encoding,errors=errors,newline=newline) as stream:
++            for line in stream:
++                yield line if retain else line.removesuffix('\n').removesuffix('\r')
++
+     def write_lines(
+         self,
+         lines: list[str],

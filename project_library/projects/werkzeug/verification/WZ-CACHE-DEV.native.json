@@ -1,0 +1,17 @@
+{
+  "script": "verification/WZ-CACHE-DEV-observe.py",
+  "args": [],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "candidate_import": true,
+    "business": true
+  },
+  "resource_profile": "business",
+  "regression": {
+    "runner": "verification/expansion-native-regression.py",
+    "contract": "verification/expansion-native-contract.json"
+  }
+}

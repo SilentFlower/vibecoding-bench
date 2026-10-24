@@ -1,0 +1,3 @@
+# 复合布尔表达式的NULL判定保持SQL三值逻辑与优先级
+
+路线08：NullCriterion与NotNullCriterion对真实ComplexCriterion按AST整体加括号，保留SQL三值逻辑；字段与外层组合不变，内存SQLite真值表确认。

@@ -1,0 +1,72 @@
+--- a/library/development_tests/test_development_ms_cli_ast_dev.py
++++ b/library/development_tests/test_development_ms_cli_ast_dev.py
+@@ -0,0 +1,27 @@
++"""公开CLI AST结构化交付回归。"""
++import json
++import subprocess
++import sys
++
++def run(*args,input=''):
++    return subprocess.run([sys.executable,'-m','mistune',*args],input=input,text=True,capture_output=True,timeout=8)
++
++def test_message_ast_is_actual_nested_json():
++    result=run('-r','ast','-m','# Title\n\nHello **world**')
++    tokens=json.loads(result.stdout)
++    assert result.returncode==0 and tokens[0]['type']=='heading'
++    assert any(child['type']=='strong' for token in tokens for child in token.get('children',[]))
++
++def test_empty_explicit_and_piped_input_export_empty_arrays():
++    for args in (('-r','ast','-m',''),('-r','ast')):
++        result=run(*args)
++        assert result.returncode==0 and json.loads(result.stdout)==[]
++
++def test_file_output_is_utf8_json_without_stdout(tmp_path):
++    source=tmp_path/'in.md';source.write_text('# 雪\n');target=tmp_path/'out.json'
++    result=run('-r','ast','-f',str(source),'-o',str(target))
++    assert result.returncode==0 and result.stdout=='' and json.loads(target.read_text())[0]['children'][0]['raw']=='雪'
++
++def test_html_mode_is_still_plain_html():
++    result=run('-m','**value**')
++    assert result.returncode==0 and '<strong>value</strong>' in result.stdout
+--- a/library/docs/development-ms-cli-ast-dev.md
++++ b/library/docs/development-ms-cli-ast-dev.md
+@@ -0,0 +1,5 @@
++# 通过CLI把真实Markdown AST导出为可解析JSON
++
++文档工具可直接导出真实AST的UTF8 JSON，包含嵌套属性及插件结果，消息、文件和空文档优先级沿用已修复合同。输出文件和标准输出行为明确，不能把Python repr当作JSON，也不改变原渲染模式。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/mistune/__main__.py
++++ b/library/src/mistune/__main__.py
+@@ -1,4 +1,5 @@
+ import argparse
++import json
+ import sys
+ from typing import TYPE_CHECKING, Optional
+ 
+@@ -34,6 +35,10 @@
+ 
+ 
+ def _output(text: str, args: argparse.Namespace) -> None:
++    if getattr(args,"renderer",None) == "ast":
++        if not text or all(token["type"]=="blank_line" for token in text):
++            text=[]
++        text=json.dumps(text,ensure_ascii=False,separators=(",",":"))
+     if args.output:
+         with open(args.output, "w", encoding="utf-8") as f:
+             f.write(text)
+@@ -112,12 +117,12 @@
+     if message:
+         md = _md(args)
+         text = md(message)
+-        assert isinstance(text, str)
++        assert isinstance(text, str) or args.renderer == "ast"
+         _output(text, args)
+     elif args.file:
+         md = _md(args)
+         text = md.read(args.file)[0]
+-        assert isinstance(text, str)
++        assert isinstance(text, str) or args.renderer == "ast"
+         _output(text, args)
+     else:
+         print("You must specify a message or file")

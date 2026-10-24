@@ -1,0 +1,80 @@
+--- a/library/docs/development-pyrsistent-06-dev.md
++++ b/library/docs/development-pyrsistent-06-dev.md
+@@ -0,0 +1,5 @@
++# 配置状态递归合并采用明确冲突策略并保持持久校验与原分支
++
++路线19：递归map合并按默认替换/完整路径报错/显式回调处理叶子冲突，真实evolver保留校验类型和未变分支；右侧pairs复用前置update。新普通容器冻结而已有持久类型不降级，异常不改旧状态，不默认拼接序列或宣称并发事务。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyrsistent/merge.py
++++ b/library/pyrsistent/merge.py
+@@ -0,0 +1,41 @@
++"""显式冲突政策的递归持久映射合并，不原地改业务状态。"""
++from collections.abc import Mapping
++from ._pmap import PMap,pmap
++from ._helpers import freeze
++
++
++class MergeConflict(ValueError):
++    """携带发生冲突的完整键路径。@param path 路径。"""
++    def __init__(self,path):
++        """保留真实业务键而非拼接含糊字符串。@param path 键tuple。@return None。"""
++        self.path=tuple(path);super().__init__('映射合并冲突: '+repr(self.path))
++
++
++def deep_merge(left,right,conflict='replace',max_depth=32):
++    """递归合并Map，叶子冲突显式处理。@param left PMap原状态。@param right mapping或pairs输入。@param conflict replace/raise/回调(path,old,new)。@param max_depth 最大嵌套层。@return 新持久映射。"""
++    if not isinstance(left,PMap):raise TypeError('left必须为PMap')
++    if not callable(conflict) and conflict not in ('replace','raise'):raise ValueError('未知冲突政策')
++    if type(max_depth) is not int or max_depth<1:raise ValueError('深度预算必须为正整数')
++    incoming=pmap().update(right)
++    def snapshot(value):
++        """冻结普通可变容器，已有持久类型不丢其校验类。@param value 输入。@return 持久值。"""
++        try:return freeze(value,strict=False)
++        except RecursionError as error:raise ValueError('输入容器存在循环或超过可表达深度') from error
++    def merge(current,updates,path):
++        """在本层evolver完成后提交，不修改旧分支。@param current 旧map。@param updates 新map。@param path 当前路径。@return 新map。"""
++        if len(path)>max_depth:raise ValueError('映射合并超过深度预算')
++        evolver=current.evolver()
++        for key,value in updates.items():
++            if key in current:
++                previous=current[key];location=path+(key,)
++                if isinstance(previous,Mapping) and isinstance(value,Mapping):
++                    child=previous if isinstance(previous,PMap) else snapshot(dict(previous))
++                    value=merge(child,value,location)
++                elif previous==value:value=previous
++                elif callable(conflict):value=snapshot(conflict(location,previous,value))
++                elif conflict=='raise':raise MergeConflict(location)
++                else:value=snapshot(value)
++            else:value=snapshot(value)
++            evolver.set(key,value)
++        return evolver.persistent()
++    return merge(left,incoming,())
+--- a/library/tests/test_development_pyrsistent_06_dev.py
++++ b/library/tests/test_development_pyrsistent_06_dev.py
+@@ -0,0 +1,25 @@
++"""配置资料递归合并有明确叶子政策与完整冲突路径。"""
++import unittest
++from pyrsistent import freeze,pmap,pvector
++from pyrsistent.merge import deep_merge,MergeConflict
++
++
++def test_nested_mapping_pairs_and_persistent_ownership():
++    """真正pairs前置能力复用，普通容器冻结且旧状态不改。@return None。"""
++    left=freeze({'settings':{'a':1,'b':2},'unchanged':[1]})
++    right=[('settings',{'a':3,'c':[4]}),('added',{'x':1})]
++    result=deep_merge(left,(item for item in right))
++    assert result==freeze({'settings':{'a':3,'b':2,'c':[4]},'unchanged':[1],'added':{'x':1}})
++    assert left==freeze({'settings':{'a':1,'b':2},'unchanged':[1]})
++    assert result['unchanged'] is left['unchanged']
++
++
++def test_explicit_conflict_error_callback_and_type_replacement():
++    """路径保留真实键，回调输出是新持久值。@return None。"""
++    left=freeze({'a':{'n':1}})
++    with unittest.TestCase().assertRaises(MergeConflict) as raised:deep_merge(left,{'a':{'n':2}},conflict='raise')
++    assert raised.exception.path==('a','n') and left['a']['n']==1
++    seen=[]
++    result=deep_merge(left,{'a':{'n':2}},conflict=lambda path,old,new:seen.append(path) or old+new)
++    assert result['a']['n']==3 and seen==[('a','n')]
++    assert deep_merge(left,{'a':0})==pmap({'a':0})

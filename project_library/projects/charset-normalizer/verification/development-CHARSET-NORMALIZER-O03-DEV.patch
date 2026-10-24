@@ -1,0 +1,125 @@
+--- a/library/docs/development-charset-normalizer-o03-dev.md
++++ b/library/docs/development-charset-normalizer-o03-dev.md
+@@ -0,0 +1,5 @@
++# 显式控制转码损失和BOM并复用声明头重写
++
++新转码入口默认严格不丢字，replace/ignore显式报告不可表示码点，不能把原文问号算损失。明确UTF8/16/32 BOM策略，复用既有声明头更新；旧output默认及缓存独立保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/charset_normalizer/models.py
++++ b/library/src/charset_normalizer/models.py
+@@ -222,29 +222,67 @@
+         """
+         return [self._encoding] + [m.encoding for m in self._leaves]
+ 
++    def _text_for_encoding(self, encoding):
++        """复用既有声明头更新政策。@param encoding 目标编码。@return 文本。"""
++        decoded_string = str(self)
++        if self._preemptive_declaration is not None and (
++            self._preemptive_declaration.lower() not in ["utf-8", "utf8", "utf_8"]
++            or iana_name(encoding, False) not in ["utf_8", "utf_8_sig"]
++        ):
++            patched_header = sub(
++                RE_POSSIBLE_ENCODING_INDICATION,
++                lambda m: m.string[m.span()[0] : m.span()[1]].replace(
++                    m.groups()[0],
++                    iana_name(encoding).replace("_", "-"),
++                ),
++                decoded_string[:8192],
++                count=1,
++            )
++
++            decoded_string = patched_header + decoded_string[8192:]
++        return decoded_string
++
++    def transcode(self, encoding='utf_8', *, errors='strict', bom='codec'):
++        """用显式损失及BOM政策导出，旧output缓存和默认不变。
++
++        :param encoding: 目标codec。
++        :param errors: strict、replace或ignore。
++        :param bom: codec沿codec默认，strip移除一个BOM，add为UTF目标加一个BOM。
++        :return: output及不可表示码点数量、实际编码和BOM政策。
++        """
++        import codecs
++        if errors not in ('strict', 'replace', 'ignore') or bom not in ('codec', 'strip', 'add'):
++            raise ValueError('无效转码政策')
++        canonical = codecs.lookup(encoding).name
++        prefixes = {'utf-8': codecs.BOM_UTF8, 'utf-8-sig': codecs.BOM_UTF8,
++            'utf-16': codecs.BOM_UTF16, 'utf-16-le': codecs.BOM_UTF16_LE, 'utf-16-be': codecs.BOM_UTF16_BE,
++            'utf-32': codecs.BOM_UTF32, 'utf-32-le': codecs.BOM_UTF32_LE, 'utf-32-be': codecs.BOM_UTF32_BE}
++        prefix = prefixes.get(canonical)
++        if bom == 'add' and prefix is None:
++            raise ValueError('目标codec没有支持的BOM')
++        text = self._text_for_encoding(encoding)
++        encoded = text.encode(encoding, errors)
++        losses = 0
++        if errors != 'strict':
++            for character in text:
++                try:
++                    character.encode(encoding, 'strict')
++                except UnicodeEncodeError:
++                    losses += 1
++        if bom != 'codec' and prefix is not None:
++            if encoded.startswith(prefix):
++                encoded = encoded[len(prefix):]
++            if bom == 'add':
++                encoded = prefix + encoded
++        return {'output': encoded, 'unencodable_codepoints': losses, 'encoding': canonical, 'errors': errors, 'bom': bom}
++
+     def output(self, encoding: str = "utf_8") -> bytes:
+         """
+         Method to get re-encoded bytes payload using given target encoding. Default to UTF-8.
+         Any errors will be simply ignored by the encoder NOT replaced.
+         """
+         if self._output_encoding is None or self._output_encoding != encoding:
+-            decoded_string = str(self)
+-            if self._preemptive_declaration is not None and (
+-                self._preemptive_declaration.lower() not in ["utf-8", "utf8", "utf_8"]
+-                or iana_name(encoding, False) not in ["utf_8", "utf_8_sig"]
+-            ):
+-                patched_header = sub(
+-                    RE_POSSIBLE_ENCODING_INDICATION,
+-                    lambda m: m.string[m.span()[0] : m.span()[1]].replace(
+-                        m.groups()[0],
+-                        iana_name(encoding).replace("_", "-"),
+-                    ),
+-                    decoded_string[:8192],
+-                    count=1,
+-                )
+-
+-                decoded_string = patched_header + decoded_string[8192:]
+-
++            decoded_string = self._text_for_encoding(encoding)
+             self._output_payload = decoded_string.encode(encoding, "replace")
+             self._output_encoding = encoding
+ 
+--- a/library/tests/test_development_charset_normalizer_o03_dev.py
++++ b/library/tests/test_development_charset_normalizer_o03_dev.py
+@@ -0,0 +1,27 @@
++"""新转码入口严格默认不丢字，旧output保持兼容。"""
++import codecs
++from charset_normalizer.models import CharsetMatch
++
++def test_strict_and_loss_reporting():
++    """中文转ASCII不可默默替换。@return None。"""
++    import pytest
++    match = CharsetMatch('中文?'.encode('utf-8'), 'utf_8', 0.0, False, [])
++    with pytest.raises(UnicodeEncodeError): match.transcode('ascii')
++    result = match.transcode('ascii', errors='replace')
++    assert result['output'] == b'???' and result['unencodable_codepoints'] == 2
++    assert match.transcode('ascii', errors='ignore')['output'] == b'?'
++
++def test_explicit_bom_policy():
++    """UTF8及UTF16添加和去除策略明确。@return None。"""
++    match = CharsetMatch(b'abc', 'ascii', 0.0, False, [])
++    assert match.transcode('utf-8', bom='add')['output'] == codecs.BOM_UTF8 + b'abc'
++    assert match.transcode('utf-8-sig', bom='strip')['output'] == b'abc'
++    assert not match.transcode('utf-16', bom='strip')['output'].startswith(codecs.BOM_UTF16)
++
++def test_old_cache_isolation_and_invalid():
++    """旧replace缓存不能污染新strict，坏政策拒绝。@return None。"""
++    import pytest
++    match = CharsetMatch('界'.encode(), 'utf_8', 0.0, False, [])
++    assert match.output('ascii') == b'?'
++    with pytest.raises(UnicodeEncodeError): match.transcode('ascii')
++    with pytest.raises(ValueError): match.transcode('ascii', bom='add')

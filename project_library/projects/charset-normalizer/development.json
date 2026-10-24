@@ -1,0 +1,311 @@
+{
+  "schema": 3,
+  "project_key": "charset-normalizer",
+  "title": "Charset Normalizer字节导入工作场景",
+  "category": "编码证据、转换与日志归属",
+  "description": "固定真实源码上的完整工程交付：冻结缓冲事实并支持连续memoryview生命周期；按总缓冲预算读取流并报告实际覆盖范围；显式控制转码损失和BOM并复用声明头重写；按显式格式和预算检测本地压缩文本；为原始字节和解码文字生成跨进程稳定摘要；严格检测编码完成后原子归一化本地文件。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "ad58669eb0d4c1fe2afae747173dcc9ca923ece6b0f997dd32cec0f0f4748f44",
+  "environment": "charset-normalizer-py312",
+  "source": {
+    "repository": "https://github.com/jawah/charset_normalizer",
+    "commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CHARSET-NORMALIZER-O01-DEV-SCENE",
+      "title": "冻结缓冲事实并支持连续memoryview生命周期",
+      "goal": "冻结缓冲事实并支持连续memoryview生命周期",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CHARSET-NORMALIZER-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CHARSET-NORMALIZER-O01-DEV",
+          "kind": "modify",
+          "goal": "冻结缓冲事实并支持连续memoryview生命周期",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nMake CharsetMatch retain immutable payload bytes so caller bytearray mutation cannot diverge raw bytes from cached text. Add charset_normalizer.buffers.from_buffer(buffer, **options) for continuous buffer protocol input, explicitly snapshot non-bytes, preserve caller view ownership and return matches/copied/nbytes. Reject noncontiguous/released/nonbuffer inputs clearly, support empty/read-only/writable buffers and delegate detection options to actual from_bytes. Do not promise universal zero-copy decoding or change existing immutable bytes results.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-charset-normalizer-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CHARSET-NORMALIZER-O01-DEV-contract.md",
+            "materials/CHARSET-NORMALIZER-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/charset_normalizer/models.py",
+            "library/src/charset_normalizer/buffers.py",
+            "library/tests/test_development_charset_normalizer_o01_dev.py",
+            "library/docs/development-charset-normalizer-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CHARSET-NORMALIZER-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CHARSET-NORMALIZER-O01-DEV.native.json",
+            "public_native": "verification/CHARSET-NORMALIZER-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CHARSET-NORMALIZER-O01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CHARSET-NORMALIZER-O02-DEV-SCENE",
+      "title": "按总缓冲预算读取流并报告实际覆盖范围",
+      "goal": "按总缓冲预算读取流并报告实际覆盖范围",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CHARSET-NORMALIZER-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CHARSET-NORMALIZER-O02-DEV",
+          "kind": "modify",
+          "goal": "按总缓冲预算读取流并报告实际覆盖范围",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement charset_normalizer.streams.from_stream(stream, *, max_bytes, read_size=65536, preserve_position=True, **options). Never read(-1), retain at most the explicit nonnegative budget, handle short reads and report actual read_bytes/eof/budget_exhausted with real from_bytes matches. Restore seekable caller positions even on errors and never close caller streams; nonseekable preservation/text reads/invalid bounds fail clearly. Zero budget must not read, and a limited prefix must not be represented as whole-source validation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-charset-normalizer-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CHARSET-NORMALIZER-O02-DEV-contract.md",
+            "materials/CHARSET-NORMALIZER-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/charset_normalizer/streams.py",
+            "library/tests/test_development_charset_normalizer_o02_dev.py",
+            "library/docs/development-charset-normalizer-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CHARSET-NORMALIZER-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CHARSET-NORMALIZER-O02-DEV.native.json",
+            "public_native": "verification/CHARSET-NORMALIZER-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CHARSET-NORMALIZER-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CHARSET-NORMALIZER-O03-DEV-SCENE",
+      "title": "显式控制转码损失和BOM并复用声明头重写",
+      "goal": "显式控制转码损失和BOM并复用声明头重写",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CHARSET-NORMALIZER-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CHARSET-NORMALIZER-O03-DEV",
+          "kind": "modify",
+          "goal": "显式控制转码损失和BOM并复用声明头重写",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd CharsetMatch.transcode(encoding=\"utf_8\", *, errors=\"strict\", bom=\"codec\") returning output bytes and unencodable codepoint count. Strict must fail on unrepresentable characters; replace/ignore explicitly report losses without counting literal question marks. Support codec/strip/add BOM policy for UTF8/16/32 and reject adding unsupported BOMs. Reuse current encoding-declaration rewriting, preserve empty input and keep old output default/cache behavior independent from the new strategy.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-charset-normalizer-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CHARSET-NORMALIZER-O03-DEV-contract.md",
+            "materials/CHARSET-NORMALIZER-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/charset_normalizer/models.py",
+            "library/tests/test_development_charset_normalizer_o03_dev.py",
+            "library/docs/development-charset-normalizer-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CHARSET-NORMALIZER-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CHARSET-NORMALIZER-O03-DEV.native.json",
+            "public_native": "verification/CHARSET-NORMALIZER-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CHARSET-NORMALIZER-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CHARSET-NORMALIZER-O04-DEV-SCENE",
+      "title": "按显式格式和预算检测本地压缩文本",
+      "goal": "按显式格式和预算检测本地压缩文本",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CHARSET-NORMALIZER-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CHARSET-NORMALIZER-O04-DEV",
+          "kind": "modify",
+          "goal": "按显式格式和预算检测本地压缩文本",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement charset_normalizer.compressed.from_compressed_path(path, *, format, max_bytes, read_size=65536, **options). Use actual gzip/bz2/xz readers with a required decompressed-byte budget (at most one extra sentinel to detect overflow), then delegate complete payload detection to from_bytes. Report compressed/decoded byte sizes, support empty and multistream gzip, and fail on corruption/truncation/overrun without partial-success claims or modifying source files. Never auto-guess compressed formats or add remote I/O.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-charset-normalizer-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CHARSET-NORMALIZER-O04-DEV-contract.md",
+            "materials/CHARSET-NORMALIZER-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/charset_normalizer/compressed.py",
+            "library/tests/test_development_charset_normalizer_o04_dev.py",
+            "library/docs/development-charset-normalizer-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CHARSET-NORMALIZER-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CHARSET-NORMALIZER-O04-DEV.native.json",
+            "public_native": "verification/CHARSET-NORMALIZER-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CHARSET-NORMALIZER-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CHARSET-NORMALIZER-O05-DEV-SCENE",
+      "title": "为原始字节和解码文字生成跨进程稳定摘要",
+      "goal": "为原始字节和解码文字生成跨进程稳定摘要",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CHARSET-NORMALIZER-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CHARSET-NORMALIZER-O05-DEV",
+          "kind": "modify",
+          "goal": "为原始字节和解码文字生成跨进程稳定摘要",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nOn the delivered immutable CharsetMatch model, add stable_digest(*, mode=\"text\", algorithm=\"sha256\", normalization=None, text_encoding=\"utf-8\"). Separate raw-byte and decoded-text domains, use fixed-length hashlib digests, preserve explicit encoding/newlines and default no Unicode normalization, and optionally normalize NFC/NFD/NFKC/NFKD. Same text in different source encodings must share text digests across hash-seeded processes while raw digests differ. Reject invalid modes/algorithms/raw normalization and preserve existing fingerprint.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-charset-normalizer-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "CHARSET-NORMALIZER-O01-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/CHARSET-NORMALIZER-O05-DEV-contract.md",
+            "materials/CHARSET-NORMALIZER-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/charset_normalizer/models.py",
+            "library/tests/test_development_charset_normalizer_o05_dev.py",
+            "library/docs/development-charset-normalizer-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CHARSET-NORMALIZER-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CHARSET-NORMALIZER-O05-DEV.native.json",
+            "public_native": "verification/CHARSET-NORMALIZER-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CHARSET-NORMALIZER-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CHARSET-NORMALIZER-O06-DEV-SCENE",
+      "title": "严格检测编码完成后原子归一化本地文件",
+      "goal": "严格检测编码完成后原子归一化本地文件",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CHARSET-NORMALIZER-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CHARSET-NORMALIZER-O06-DEV",
+          "kind": "modify",
+          "goal": "严格检测编码完成后原子归一化本地文件",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nBuild charset_normalizer.atomic.normalize_file_atomic on the delivered strict transcode API. Bound source reads, detect actual text, complete target encoding before touching destination and atomically publish a same-directory temporary file. Default in-place or explicit separate output, preserve existing target mode/new-file private mode, reject symlink paths and clean only owned temporary files on encoding/write/replace failures. Source and old target bytes must survive failures; report actual written bytes/loss count, keep default APIs read-only and do not claim directory crash durability.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-charset-normalizer-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "CHARSET-NORMALIZER-O03-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/CHARSET-NORMALIZER-O06-DEV-contract.md",
+            "materials/CHARSET-NORMALIZER-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/charset_normalizer/atomic.py",
+            "library/tests/test_development_charset_normalizer_o06_dev.py",
+            "library/docs/development-charset-normalizer-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CHARSET-NORMALIZER-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CHARSET-NORMALIZER-O06-DEV.native.json",
+            "public_native": "verification/CHARSET-NORMALIZER-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CHARSET-NORMALIZER-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

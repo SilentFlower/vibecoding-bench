@@ -1,0 +1,62 @@
+--- a/library/development_tests/test_development_td_path_dev.py
++++ b/library/development_tests/test_development_td_path_dev.py
+@@ -0,0 +1,28 @@
++"""公开显式嵌套查询回归。"""
++import pytest
++from tinydb import TinyDB, Query
++from tinydb.storages import MemoryStorage
++
++def test_literal_names_and_nested_paths_have_distinct_results():
++    query=Query()
++    assert (query.at_path(('a.b','test',''))==3)({'a.b':{'test':{'':3}}})
++    assert not (query.at_path(('a','b'))==3)({'a.b':3})
++
++def test_cached_queries_keep_full_path_identity():
++    with TinyDB(storage=MemoryStorage) as db:
++        db.insert_multiple([{'a':{'x':1},'b':{'x':2}},{'a':{'x':2},'b':{'x':1}}])
++        assert [d.doc_id for d in db.search(Query().at_path(('a','x'))==1)]==[1]
++        assert [d.doc_id for d in db.search(Query().at_path(('b','x'))==1)]==[2]
++
++def test_subclass_and_original_builder_are_preserved():
++    class Custom(Query):
++        pass
++    base=Custom().outer
++    result=base.at_path(iter(['inner']))
++    assert isinstance(result,Custom) and base._path==('outer',) and result._path==('outer','inner')
++
++def test_invalid_paths_and_dynamic_map_behavior():
++    for value in ('a.b',(),('a',1)):
++        with pytest.raises((TypeError,ValueError)):
++            Query().at_path(value)
++    assert not (Query().map(lambda value:value).at_path(('x',))==1).is_cacheable()
+--- a/library/docs/development-td-path-dev.md
++++ b/library/docs/development-td-path-dev.md
+@@ -0,0 +1,5 @@
++# 以显式字段序列构造嵌套查询并保持缓存身份
++
++订单字段由配置动态指定时，需要显式字段序列而非点号拆分，保留空键、方法同名键和原缓存规则。实现新查询构造能力，不修改原构造器及map动态路径行为。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tinydb/queries.py
++++ b/library/tinydb/queries.py
+@@ -214,6 +214,20 @@
+         # document's ``test`` field instead of returning a reference to the
+         # ``Query.test`` method
+         return self.__getattr__(item)
++
++    def at_path(self, segments):
++        """追加显式嵌套字段路径。@param segments 非空字符串序列，不解析点号。
++        @return 保留查询子类和缓存语义的新Query，不修改当前对象。
++        """
++        if isinstance(segments, (str, bytes)):
++            raise TypeError('路径必须是字段序列')
++        parts = tuple(segments)
++        if not parts or any(not isinstance(part, str) for part in parts):
++            raise ValueError('路径必须至少包含一个字符串字段')
++        query = type(self)()
++        query._path = self._path + parts
++        query._hash = ('path', query._path) if self.is_cacheable() else None
++        return query
+ 
+     def _generate_test(
+             self,

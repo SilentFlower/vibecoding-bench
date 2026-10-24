@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FUNCY-O05-DEV",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add funcy.relations.join_by(left,right,left_key,right_key=None,*,how=\"inner\") and frozen JoinPair(left,right,left_present,right_present). Use exact string fields or real Funcy make_func index/callable selectors, materialize right once then lazily consume left, producing every duplicate-key Cartesian pair in left/right order. Support inner/left/full and append unmatched right rows in original order. None is a legal key/record distinguished from absence by presence flags, unhashable keys and callback/input errors propagate. Never mutate/merge record fields or silently overwrite duplicates; state right-side memory cost and leave existing collection join/group_by untouched.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

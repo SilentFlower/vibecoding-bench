@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DOCUTILS-O05-DEV",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add actual json Writer and doctree_json to_data/from_data/dumps/loads schema 1 for the declared supported standard node whitelist, preserving node type/rawsource/source/line/JSON attributes/child order/Unicode and rebuilding actual id/name maps. Real published JSON must round-trip into real Docutils nodes and publish through HTML with reference ids intact. Never pickle, deserialize arbitrary classes or serialize settings/reporter objects. Reject unknown schemas/nodes/extra shapes, invalid source/line/attributes, opaque/nonfinite values, duplicate ids, shared/cyclic nodes and explicit depth/node-budget overflow. Unsupported standard/custom nodes must fail explicitly rather than silently losing information; old XML/pseudoxml remain unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

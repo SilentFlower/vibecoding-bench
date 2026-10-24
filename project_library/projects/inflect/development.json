@@ -3,7 +3,7 @@
   "project_key": "inflect",
   "title": "Inflect英语报表开发任务",
   "category": "英语文本与引擎状态",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实英语报表工程交付：模式事务、引擎作用域、业务规则、数量短语、流式连接及受限模板；独立和累计验收。",
   "seed_digest": "115ebda0c55acccbc49c9787a1263aef82c179b4aacc8126a972067ef244873d",
   "environment": "inflect-py312",
   "source": {
@@ -57,6 +57,269 @@
             "disclosure/IF-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "IF-SCOPES-DEV-SCENE",
+      "title": "实现完整引擎克隆与可嵌套临时选项作用域",
+      "goal": "实现完整引擎克隆与可嵌套临时选项作用域",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "IF-SCOPES-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-SCOPES-DEV",
+          "kind": "modify",
+          "goal": "实现完整引擎克隆与可嵌套临时选项作用域",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement inflect.scopes.clone(engine) and temporary_options(engine,*,classical=None,count=sentinel,gender=None). Clone preserves actual engine subtype, all custom definitions and options without mutable aliasing. Temporary scope uses completed atomic classical behavior, applies actual num/gender methods, yields original engine and restores all prior state values even on failed entry or body exceptions. Nested scopes restore their immediate parent; explicit count=None clears persistent count. Rule changes inside scope are rolled back. Do not promise internal-container identity or concurrency isolation.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_if_scopes_dev.py and concise Chinese compatibility documentation at library/docs/development-if-scopes-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "IF-M01-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/IF-SCOPES-DEV-contract.md",
+            "materials/IF-SCOPES-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/inflect/scopes.py",
+            "library/development_tests/test_development_if_scopes_dev.py",
+            "library/docs/development-if-scopes-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/IF-SCOPES-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-SCOPES-DEV.native.json",
+            "public_native": "verification/IF-SCOPES-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/IF-SCOPES-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "IF-RULES-DEV-SCENE",
+      "title": "以事务方式登记可迭代业务名词规则",
+      "goal": "以事务方式登记可迭代业务名词规则",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "IF-RULES-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-RULES-DEV",
+          "kind": "modify",
+          "goal": "以事务方式登记可迭代业务名词规则",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement inflect.rules.define_nouns(engine,rules) using the completed independent engine clone. Each rule mapping has singular/plural and optional case, no unknown keys. Use real defnoun validation and precedence including regex/case policies; later valid rules override as normal. Validate and apply the entire iterable on a clone before committing any state to the original. Invalid pattern, case, rule shape or generator exception leaves all original state unchanged. Return accepted count and retain unrelated custom verbs/articles/options. Do not parse or execute rule text as Python.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_if_rules_dev.py and concise Chinese compatibility documentation at library/docs/development-if-rules-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "IF-SCOPES-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/IF-RULES-DEV-contract.md",
+            "materials/IF-RULES-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/inflect/rules.py",
+            "library/development_tests/test_development_if_rules_dev.py",
+            "library/docs/development-if-rules-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/IF-RULES-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-RULES-DEV.native.json",
+            "public_native": "verification/IF-RULES-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/IF-RULES-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "IF-COUNTED-DEV-SCENE",
+      "title": "按显式业务数量生成不污染引擎状态的单位短语",
+      "goal": "按显式业务数量生成不污染引擎状态的单位短语",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "IF-COUNTED-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-COUNTED-DEV",
+          "kind": "modify",
+          "goal": "按显式业务数量生成不污染引擎状态的单位短语",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement inflect.counted.counted(engine,noun,count,*,words=False,zero=\"0\",separator=\" \"). Require nonempty noun and nonnegative integer count (bool rejected), real plural_noun with explicit count and cloned current custom rules/classical options. Support custom zero label, number_to_words and separator. Persistent count, number spelling scratch state and user rules of original engine remain unchanged on success or failure. Zero grammatical form follows actual current classical mode; do not hardcode English singular/plural suffixes.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_if_counted_dev.py and concise Chinese compatibility documentation at library/docs/development-if-counted-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "IF-SCOPES-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/IF-COUNTED-DEV-contract.md",
+            "materials/IF-COUNTED-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/inflect/counted.py",
+            "library/development_tests/test_development_if_counted_dev.py",
+            "library/docs/development-if-counted-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/IF-COUNTED-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-COUNTED-DEV.native.json",
+            "public_native": "verification/IF-COUNTED-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/IF-COUNTED-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "IF-STREAM-JOIN-DEV-SCENE",
+      "title": "提供有限前瞻的英语列表文本流并明确两项和末项分隔",
+      "goal": "提供有限前瞻的英语列表文本流并明确两项和末项分隔",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "IF-STREAM-JOIN-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-STREAM-JOIN-DEV",
+          "kind": "modify",
+          "goal": "提供有限前瞻的英语列表文本流并明确两项和末项分隔",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement inflect.streams.iter_join(words,*,sep=\", \",pair=\" and \",final=\", and \") yielding text chunks. Handle zero/one/two/many elements distinctly, consume only finite lookahead (at most three items before first output) and never materialize the whole iterable. Explicit separators avoid the existing join automatic comma scan and can disable Oxford comma. Reject bare str/bytes and non-string words, propagate generator errors, preserve empty string elements and backpressure. Existing engine.join remains unchanged; partial emitted streams are not promised transactional.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_if_stream_join_dev.py and concise Chinese compatibility documentation at library/docs/development-if-stream-join-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/IF-STREAM-JOIN-DEV-contract.md",
+            "materials/IF-STREAM-JOIN-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/inflect/streams.py",
+            "library/development_tests/test_development_if_stream_join_dev.py",
+            "library/docs/development-if-stream-join-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/IF-STREAM-JOIN-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-STREAM-JOIN-DEV.native.json",
+            "public_native": "verification/IF-STREAM-JOIN-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/IF-STREAM-JOIN-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "IF-TEMPLATE-DEV-SCENE",
+      "title": "实现受限且可复用的命名英语报表模板",
+      "goal": "实现受限且可复用的命名英语报表模板",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "IF-TEMPLATE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "IF-TEMPLATE-DEV",
+          "kind": "modify",
+          "goal": "实现受限且可复用的命名英语报表模板",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement inflect.templates.ReportTemplate(text) with compiled unique fields and render(engine,values). Allow simple named placeholders and escaped braces; reject attribute/index access, conversion flags, arbitrary format specs and nested expressions at construction. Support raw text, :words, :ordinal, :article, :join and :counted(noun), using real engine APIs and completed counted/stream join implementations. Validate all required names before formatting, preserve repeated fields/literal braces and custom noun rules. Work on an isolated clone so number formatting does not mutate original state. No eval or method dispatch from template text; content values are not reparsed as templates.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_if_template_dev.py and concise Chinese compatibility documentation at library/docs/development-if-template-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "IF-SCOPES-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "IF-COUNTED-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "IF-STREAM-JOIN-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/IF-TEMPLATE-DEV-contract.md",
+            "materials/IF-TEMPLATE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/inflect/templates.py",
+            "library/development_tests/test_development_if_template_dev.py",
+            "library/docs/development-if-template-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/IF-TEMPLATE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/IF-TEMPLATE-DEV.native.json",
+            "public_native": "verification/IF-TEMPLATE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/IF-TEMPLATE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

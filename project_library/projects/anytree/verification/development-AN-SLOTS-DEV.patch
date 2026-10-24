@@ -1,0 +1,99 @@
+--- a/library/development_tests/test_development_an_slots_dev.py
++++ b/library/development_tests/test_development_an_slots_dev.py
+@@ -0,0 +1,45 @@
++"""公开slots树导出回归。"""
++import pytest
++from anytree import LightNodeMixin, AnyNode
++from anytree.exporter import DictExporter
++from anytree.importer import DictImporter
++
++class Slim(LightNodeMixin):
++    __slots__ = ('name', 'quantity')
++    def __init__(self, name, quantity, parent=None):
++        self.name, self.quantity, self.parent = name, quantity, parent
++
++def fields(node):
++    return {'name': node.name, 'quantity': node.quantity}
++
++def test_slots_nodes_export_with_explicit_fields():
++    root = Slim('r', 1)
++    Slim('c', 2, parent=root)
++    assert DictExporter(attribute_provider=fields).export(root) == {'name':'r', 'quantity':1,
++        'children':[{'name':'c', 'quantity':2}]}
++
++def test_provider_results_still_use_attribute_filtering():
++    result = DictExporter(attribute_provider=fields, attriter=lambda pairs: [(k,v) for k,v in pairs if k == 'name']).export(Slim('r', 1))
++    assert result == {'name':'r'}
++
++def test_structural_fields_cannot_leak_or_replace_real_children():
++    root = Slim('r', 1)
++    data = DictExporter(attribute_provider=lambda node: {'name':node.name, 'parent':'private',
++        '_LightNodeMixin__children':'private', 'children':'fake'}).export(root)
++    assert data == {'name':'r'}
++
++def test_depth_and_importer_roundtrip_are_preserved():
++    root = Slim('r', 1)
++    Slim('c', 2, parent=root)
++    assert DictExporter(attribute_provider=fields, maxlevel=1).export(root) == {'name':'r', 'quantity':1}
++    restored = DictImporter().import_(DictExporter(attribute_provider=fields).export(root))
++    assert restored.children[0].quantity == 2
++
++def test_invalid_provider_and_errors_are_explicit():
++    with pytest.raises(TypeError):
++        DictExporter(attribute_provider=3)
++    with pytest.raises(ZeroDivisionError):
++        DictExporter(attribute_provider=lambda node: 1/0).export(Slim('r', 1))
++
++def test_default_dict_exporter_keeps_normal_node_behavior():
++    assert DictExporter().export(AnyNode(name='x', quantity=4)) == {'name':'x', 'quantity':4}
+--- a/library/docs/development-an-slots-dev.md
++++ b/library/docs/development-an-slots-dev.md
+@@ -0,0 +1,5 @@
++# 通过显式属性协议导出轻量槽位分类树
++
++轻量分类节点没有__dict__，需要显式声明导出字段，不能遍历所有property产生业务副作用。DictExporter增加attribute_provider，支持映射或键值序列，仍应用原过滤、深度和子级策略；结构字段永不作为业务属性输出，普通导出行为保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/anytree/exporter/dictexporter.py
++++ b/library/src/anytree/exporter/dictexporter.py
+@@ -1,3 +1,5 @@
++from collections.abc import Mapping
++
+ class DictExporter:
+     """
+     Tree to dictionary exporter.
+@@ -47,7 +49,13 @@
+                    'children': [{'a': 'sub0A', 'b': 'foo'}, {'a': 'sub0B'}]}]}
+     """
+ 
+-    def __init__(self, dictcls=dict, attriter=None, childiter=list, maxlevel=None):
++    def __init__(self, dictcls=dict, attriter=None, childiter=list, maxlevel=None, attribute_provider=None):
++        """配置显式属性读取。@param dictcls 字典工厂。@param attriter 属性后处理。@param childiter 子节点选择。
++        @param maxlevel 层数。@param attribute_provider 显式字段提供器或None。@return None。
++        """
++        if attribute_provider is not None and not callable(attribute_provider):
++            raise TypeError('属性提供器必须可调用')
++        self.attribute_provider = attribute_provider
+         self.dictcls = dictcls
+         self.attriter = attriter
+         self.childiter = childiter
+@@ -59,7 +67,18 @@
+         return self.__export(node, self.dictcls, attriter, self.childiter)
+ 
+     def __export(self, node, dictcls, attriter, childiter, level=1):
+-        attr_values = attriter(self._iter_attr_values(node))
++        if self.attribute_provider is None:
++            values = self._iter_attr_values(node)
++        else:
++            values = self.attribute_provider(node)
++            if isinstance(values, Mapping):
++                values = values.items()
++            structural = {'parent', 'children', '_NodeMixin__parent', '_NodeMixin__children',
++                '_LightNodeMixin__parent', '_LightNodeMixin__children'}
++            values = [(key, value) for key, value in values if key not in structural]
++            if any(not isinstance(key, str) for key, value in values):
++                raise TypeError('属性键必须是字符串')
++        attr_values = attriter(values)
+         data = dictcls(attr_values)
+         maxlevel = self.maxlevel
+         if maxlevel is None or level < maxlevel:

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-MARKDOWN-04-DEV",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend fenced_code with closing_fence=\"exact\" default and opt-in \"at_least\". At-least mode accepts a standalone closing fence of the same character at least as long as the opening run, keeps shorter runs inside code, rejects mixed-character/nonstandalone closers and supports backticks/tildes, language/attrs/highlight metadata and normal escaping. Scope regex/configuration per processor instance so one conversion cannot change later default output. Unknown mode rejects. Preserve all legacy exact-mode fixtures, including the intentional historical behavior, and avoid converting container/indentation semantics not included in this delivery.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

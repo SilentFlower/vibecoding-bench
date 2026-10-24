@@ -1,0 +1,60 @@
+--- a/library/development_tests/test_development_ct_peek_dev.py
++++ b/library/development_tests/test_development_ct_peek_dev.py
+@@ -0,0 +1,30 @@
++"""公开不触碰热度的缓存读取回归。"""
++import pytest
++from cachetools import Cache,LRUCache,LFUCache,TTLCache
++
++def test_peek_does_not_promote_lru_entry():
++    cache=LRUCache(2);cache['a']=1;cache['b']=2
++    assert cache.peek('a')==1
++    cache['c']=3
++    assert 'a' not in cache and 'b' in cache
++
++def test_peek_does_not_increase_lfu_frequency():
++    cache=LFUCache(2);cache['a']=1;cache['b']=2
++    assert cache['b']==2
++    for _ in range(10):
++        assert cache.peek('a')==1
++    cache['c']=3
++    assert 'a' not in cache
++
++def test_expired_entries_are_missing_without_physical_cleanup():
++    clock=[0];cache=TTLCache(2,ttl=1,timer=lambda:clock[0]);cache['a']=1;clock[0]=2
++    assert cache.peek('a',None) is None and 'a' in cache._Cache__data
++    with pytest.raises(KeyError):
++        cache.peek('a')
++
++def test_missing_override_is_not_invoked():
++    class Loading(Cache):
++        def __missing__(self,key):
++            raise AssertionError('不应加载')
++    cache=Loading(2)
++    assert cache.peek('absent','default')=='default'
+--- a/library/docs/development-ct-peek-dev.md
++++ b/library/docs/development-ct-peek-dev.md
+@@ -0,0 +1,5 @@
++# 提供不改变LRU热度或LFU频次的只读查看
++
++监控面板查看缓存不能把条目变成热点。新增只读peek，尊重时间缓存的过期可见性，不触发缺失加载或清理，不改变LRU顺序、LFU频次及容量计量。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/cachetools/__init__.py
++++ b/library/src/cachetools/__init__.py
+@@ -117,6 +117,16 @@
+     # KeyError on cache miss.  This is not the case if __missing__ is
+     # implemented for a Cache subclass, so we have to roll our own,
+     # somewhat less elegant versions.
++
++    def peek(self,key,default=__marker):
++        """不改变热度地读取活跃条目。@param key 键。@param default 缺失默认值。
++        @return 原值或默认；无默认且缺失／过期时KeyError，不触发__missing__或清理。
++        """
++        if key in self:
++            return self.__data[key]
++        if default is self.__marker:
++            raise KeyError(key)
++        return default
+ 
+     def get(self, key, default=None):
+         if key in self:

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BA-PARSE-CURRENCY-DEV",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add babel.numbers.parse_currency(string, currency, locale=None, *, strict=True, numbering_system=\"latn\") returning Decimal. Currency is mandatory and validated; support the pinned locale standard/accounting positive and negative affixes with either its actual symbol or ISO code, and its grouping/decimal/numbering symbols. Reject wrong currency, missing currency markers, trailing junk, embedded signs, unbalanced parentheses and nonfinite amounts. Strict mode requires canonical format_currency rendering at currency precision. Do not guess currencies from ambiguous symbols, silently remove interior characters or modify parse_decimal.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

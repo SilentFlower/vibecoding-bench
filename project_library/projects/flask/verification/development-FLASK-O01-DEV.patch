@@ -1,0 +1,99 @@
+--- a/library/docs/development-flask-o01-dev.md
++++ b/library/docs/development-flask-o01-dev.md
+@@ -0,0 +1,5 @@
++# 为真实路由命令提供稳定JSON清单及可组合过滤
++
++对应路线01：真实routes新增版本化JSON及endpoint/blueprint过滤，完整methods/host/subdomain/defaults/自动OPTIONS可读；未知默认值只报类型不repr，默认表格/排序保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/flask/cli.py
++++ b/library/src/flask/cli.py
+@@ -4,6 +4,7 @@
+ import collections.abc as cabc
+ import importlib.metadata
+ import inspect
++import json
+ import os
+ import platform
+ import re
+@@ -1056,10 +1057,42 @@
+     ),
+ )
+ @click.option("--all-methods", is_flag=True, help="Show HEAD and OPTIONS methods.")
++@click.option('--format', 'output_format', type=click.Choice(('table', 'json')), default='table', help='路由输出格式')
++@click.option('--endpoint', 'endpoint_filter', default=None, help='只选择完整endpoint')
++@click.option('--blueprint', 'blueprint_filter', default=None, help='选择蓝图注册名及其子蓝图')
+ @with_appcontext
+-def routes_command(sort: str, all_methods: bool) -> None:
++def routes_command(sort: str, all_methods: bool, output_format: str = 'table', endpoint_filter=None, blueprint_filter=None) -> None:
+     """Show all registered routes with endpoints and methods."""
+-    rules = list(current_app.url_map.iter_rules())
++    rules = [rule for rule in current_app.url_map.iter_rules()
++             if (endpoint_filter is None or rule.endpoint == endpoint_filter)
++             and (blueprint_filter is None or rule.endpoint.startswith(blueprint_filter + '.'))]
++    if output_format == 'json':
++        def compatible(value, depth=0):
++            """只输出原生JSON数据，不为未知业务值调用repr。@return JSON兼容值。"""
++            if value is None or type(value) in (bool, int, str):
++                return value
++            if type(value) is float:
++                import math
++                return value if math.isfinite(value) else {'$type': 'float'}
++            if depth < 8 and type(value) in (list, tuple):
++                return [compatible(item, depth + 1) for item in value]
++            if depth < 8 and type(value) is dict and all(type(key) is str for key in value):
++                return {key: compatible(item, depth + 1) for key, item in value.items()}
++            return {'$type': type(value).__name__}
++        if sort != 'match':
++            def ordering(rule):
++                """JSON清单使用相应真实字段排序。@return 可比较值。"""
++                return {'endpoint': rule.endpoint, 'rule': rule.rule,
++                        'methods': ', '.join(sorted(rule.methods or ())),
++                        'domain': (rule.host if current_app.url_map.host_matching else rule.subdomain) or ''}[sort]
++            rules.sort(key=ordering)
++        click.echo(json.dumps({'schema': 1, 'routes': [{
++            'endpoint': rule.endpoint, 'rule': rule.rule,
++            'methods': sorted(rule.methods or ()), 'host': rule.host,
++            'subdomain': rule.subdomain, 'defaults': compatible(rule.defaults),
++            'automatic_options': bool(getattr(rule, 'provide_automatic_options', False)),
++        } for rule in rules]}, ensure_ascii=False))
++        return
+ 
+     if not rules:
+         click.echo("No routes were registered.")
+--- a/library/tests/test_development_flask_o01_dev.py
++++ b/library/tests/test_development_flask_o01_dev.py
+@@ -0,0 +1,33 @@
++"""机器路由清单来自真实url_map，不解析终端对齐文本。"""
++from flask import Flask,Blueprint
++from flask.cli import cli
++import json
++
++def test_json_manifest_actual_methods_defaults_blueprint_and_unicode():
++    """JSON包含完整机器字段，默认表格仍原样可用。@return None。"""
++    app=Flask(__name__,static_folder=None);blueprint=Blueprint('shop',__name__)
++    blueprint.add_url_rule('/商品/<int:item>',endpoint='detail',view_func=lambda item:str(item),defaults={'mode':'正常'})
++    app.register_blueprint(blueprint,url_prefix='/v1')
++    result=app.test_cli_runner().invoke(cli,args=['routes','--format','json']);assert result.exit_code==0
++    document=json.loads(result.output);assert document['schema']==1
++    row=document['routes'][0];assert row['endpoint']=='shop.detail' and row['rule']=='/v1/商品/<int:item>'
++    assert row['methods']==['GET','HEAD','OPTIONS'] and row['defaults']=={'mode':'正常'} and row['automatic_options']
++    assert 'Endpoint' in app.test_cli_runner().invoke(cli,args=['routes']).output
++
++def test_filters_empty_apps_and_multiple_rules_have_valid_one_document():
++    """过滤组合按注册名，空清单也是合法JSON而不是终端提示。@return None。"""
++    app=Flask(__name__,static_folder=None)
++    assert json.loads(app.test_cli_runner().invoke(cli,args=['routes','--format','json']).output)['routes']==[]
++    app.add_url_rule('/a','shop.item',lambda:'a');app.add_url_rule('/b','shop.item',app.view_functions['shop.item']);app.add_url_rule('/c','other.item',lambda:'c')
++    result=app.test_cli_runner().invoke(cli,args=['routes','--format','json','--blueprint','shop','--endpoint','shop.item'])
++    rows=json.loads(result.output)['routes'];assert [row['rule'] for row in rows]==['/a','/b']
++
++def test_opaque_defaults_no_repr_and_invalid_format_are_explicit():
++    """无法JSON表达的默认值只报类型，不执行repr业务回调。@return None。"""
++    class Opaque:
++        """拒绝被展示调用的业务对象。"""
++        def __repr__(self):raise AssertionError('repr must not run')
++    app=Flask(__name__,static_folder=None);app.add_url_rule('/x','x',lambda **kwargs:'ok',defaults={'opaque':Opaque()})
++    row=json.loads(app.test_cli_runner().invoke(cli,args=['routes','--format','json']).output)['routes'][0]
++    assert row['defaults']=={'opaque':{'$type':'Opaque'}}
++    assert app.test_cli_runner().invoke(cli,args=['routes','--format','guess']).exit_code!=0

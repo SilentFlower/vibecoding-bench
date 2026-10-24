@@ -1,0 +1,87 @@
+--- a/library/development_tests/test_development_pa_walk_dev.py
++++ b/library/development_tests/test_development_pa_walk_dev.py
+@@ -0,0 +1,24 @@
++"""公开受控目录遍历回归。"""
++from path import Path
++import pytest
++
++def test_stable_preorder_depth_and_exclusion(tmp_path):
++    (tmp_path/'b').mkdir();(tmp_path/'a').mkdir();(tmp_path/'a'/'x').write_text('x');(tmp_path/'b'/'y').write_text('y')
++    root=Path(tmp_path)
++    assert [str(p.relpath(root)) for p in root.walk_controlled(stable=True,exclude=['b'])]==['a','a/x']
++    assert [p.basename() for p in root.walk_controlled(max_depth=1,stable=True)]==['a','b']
++
++def test_links_are_yielded_but_not_followed_by_default(tmp_path):
++    directory=tmp_path/'real';directory.mkdir();(directory/'file').write_text('x');(tmp_path/'link').symlink_to(directory,target_is_directory=True)
++    names=[str(p.relpath(tmp_path)) for p in Path(tmp_path).walk_controlled(stable=True)]
++    assert names==['link','real','real/file']
++
++def test_followed_link_cycles_terminate_and_do_not_duplicate_subtrees(tmp_path):
++    directory=tmp_path/'real';directory.mkdir();(directory/'back').symlink_to(tmp_path,target_is_directory=True)
++    result=list(Path(tmp_path).walk_controlled(follow_symlinks=True,stable=True))
++    assert [str(p.relpath(tmp_path)) for p in result]==['real','real/back']
++
++def test_invalid_and_zero_depth_are_explicit(tmp_path):
++    assert list(Path(tmp_path).walk_controlled(max_depth=0))==[]
++    with pytest.raises(ValueError):
++        list(Path(tmp_path).walk_controlled(max_depth=True))
+--- a/library/docs/development-pa-walk-dev.md
++++ b/library/docs/development-pa-walk-dev.md
+@@ -0,0 +1,5 @@
++# 为文件批处理提供有深度、排除及链接策略的稳定遍历
++
++文件批处理明确选择遍历深度、排除范围、排序及是否跟随目录链接。排除项不进入子树，跟随时按真实目录身份防环，继续返回Path子类及原错误策略，目录句柄及时关闭，旧walk保持兼容。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/path/__init__.py
++++ b/library/path/__init__.py
+@@ -602,6 +602,49 @@
+ 
+             if do_traverse:
+                 yield from child.walk(errors=error_fn, match=match)  # type: ignore[arg-type]
++
++    def walk_controlled(self,*,follow_symlinks=False,max_depth=None,exclude=(),stable=False,errors='strict'):
++        """受控深度优先遍历。@param follow_symlinks 是否进入目录链接。
++        @param max_depth 根为0的最大深度。@param exclude 相对路径fnmatch模式。
++        @param stable 是否逐目录按名字排序。@param errors 沿用原错误处理约定。@return Path迭代器。
++        """
++        if type(follow_symlinks) is not bool or type(stable) is not bool or max_depth is not None and (type(max_depth) is not int or max_depth<0):
++            raise ValueError('遍历深度或链接策略无效')
++        patterns=tuple(exclude)
++        if any(not isinstance(pattern,str) for pattern in patterns):
++            raise TypeError('排除模式必须为字符串')
++        error_fn=Handlers._resolve(errors)
++        visited=set()
++        def children(directory,depth):
++            if max_depth is not None and depth>=max_depth:
++                return
++            try:
++                identity=os.stat(directory)
++                marker=(identity.st_dev,identity.st_ino)
++                if marker in visited:
++                    return
++                visited.add(marker)
++                with os.scandir(directory) as scan:
++                    entries=list(scan)
++                if stable:
++                    entries.sort(key=lambda entry:entry.name)
++            except OSError as error:
++                error_fn(f'无法遍历{directory}: {error}')
++                return
++            for entry in entries:
++                child=self._next_class(entry.path)
++                relative=os.path.relpath(child,self).replace(os.sep,'/')
++                if any(fnmatch.fnmatchcase(relative,pattern) for pattern in patterns):
++                    continue
++                yield child
++                try:
++                    descend=entry.is_dir(follow_symlinks=follow_symlinks)
++                except OSError as error:
++                    error_fn(f'无法访问{child}: {error}')
++                    continue
++                if descend:
++                    yield from children(child,depth+1)
++        yield from children(self,0)
+ 
+     def walkdirs(self, match: _Match = None, errors: str = 'strict') -> Iterator[Self]:
+         """Iterator over subdirs, recursively."""

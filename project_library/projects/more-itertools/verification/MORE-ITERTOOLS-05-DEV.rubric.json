@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MORE-ITERTOOLS-05-DEV",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add interleave_weighted(*iterables,weights) with one positive index-protocol integer quota per input, rejecting bool/zero/negative/count mismatch. Round-robin in declaration order, at most that source quota per round, exhausted sources leave scheduling while survivors continue. Preserve source order and original identity, support empty and infinite sources via bounded prefix consumption; no random calls or whole-input copies. Propagate source errors and do not close caller-owned sources implicitly.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,124 @@
+--- a/library/docs/development-html2text-o06-dev.md
++++ b/library/docs/development-html2text-o06-dev.md
+@@ -0,0 +1,5 @@
++# 提供不可变严格配置并在实际转换前校验类型范围及组合
++
++对应路线19：新增显式不可变Options及from_options真实构造路径，拒绝拼错/类型/宽度/图片互斥/换行组合；副本及多实例隔离，原动态属性/out/baseurl保持，本项只交付严格API不冒充CLI。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/html2text/__init__.py
++++ b/library/html2text/__init__.py
+@@ -33,6 +33,55 @@
+ 
+ # TODO:
+ # Support decoded entities with UNIFIABLE.
++
++
++class Options:
++    """严格且不可变的转换配置，作为原可变属性API的显式替代入口。
++
++    :param values: 通过from_mapping提供已声明配置，不记录未知属性。
++    :return: 可复用配置；既有converter属性赋值兼容保留。
++    """
++    __slots__ = ('_values',)
++    _defaults = {'body_width': config.BODY_WIDTH, 'ignore_links': config.IGNORE_ANCHORS,
++                 'ignore_images': config.IGNORE_IMAGES, 'images_to_alt': config.IMAGES_TO_ALT,
++                 'images_as_html': config.IMAGES_AS_HTML, 'images_with_size': config.IMAGES_WITH_SIZE,
++                 'single_line_break': config.SINGLE_LINE_BREAK, 'wrap_links': config.WRAP_LINKS,
++                 'wrap_list_items': config.WRAP_LIST_ITEMS}
++
++    def __init__(self, values):
++        """验证类型/组合并固定拷贝。@param values 配置映射。@return None。"""
++        from types import MappingProxyType
++        unknown = set(values) - set(self._defaults)
++        if unknown:
++            raise ValueError('未知配置键: ' + ', '.join(sorted(unknown)))
++        merged = dict(self._defaults)
++        merged.update(values)
++        width = merged['body_width']
++        if isinstance(width, bool) or not isinstance(width, int) or width < 0:
++            raise ValueError('body_width必须为非负整数')
++        if any(not isinstance(value, bool) for key, value in merged.items() if key != 'body_width'):
++            raise TypeError('开关配置必须为bool')
++        if sum(merged[key] for key in ('images_to_alt', 'images_as_html', 'images_with_size')) > 1:
++            raise ValueError('严格配置的图片呈现模式互斥')
++        if merged['single_line_break'] and width:
++            raise ValueError('single_line_break严格模式要求body_width=0')
++        object.__setattr__(self, '_values', MappingProxyType(merged))
++
++    def __setattr__(self, name, value):
++        """配置创建后拒绝所有写入。@return 永不返回。"""
++        raise AttributeError('Options不可变')
++
++    @classmethod
++    def from_mapping(cls, values):
++        """从映射读取独立严格配置。@param values 配置映射。@return Options。"""
++        from collections.abc import Mapping
++        if not isinstance(values, Mapping):
++            raise TypeError('配置必须为映射')
++        return cls(dict(values))
++
++    def as_dict(self):
++        """返回可独立修改的普通配置副本。@return 新字典。"""
++        return dict(self._values)
+ 
+ 
+ class HTML2Text(html.parser.HTMLParser):
+@@ -139,6 +188,23 @@
+         self.current_tag = ""
+ 
+         config.UNIFIABLE["nbsp"] = "&nbsp_place_holder;"
++
++    @classmethod
++    def from_options(cls, options, *, out=None, baseurl=''):
++        """按严格Options创建真实转换器，复用原构造及属性路径。
++
++        :param options: 已验证的不可变Options。
++        :param out: 原输出回调。
++        :param baseurl: 原文档资源基址。
++        :return: 独立转换器实例。
++        """
++        if not isinstance(options, Options):
++            raise TypeError('options必须为Options')
++        values = options.as_dict()
++        converter = cls(out=out, baseurl=baseurl, bodywidth=values.pop('body_width'))
++        for name, value in values.items():
++            setattr(converter, name, value)
++        return converter
+ 
+     def feed(self, data: str) -> None:
+         data = data.replace("</' + 'script>", "</ignore>")
+--- a/library/test/test_development_html2text_o06_dev.py
++++ b/library/test/test_development_html2text_o06_dev.py
+@@ -0,0 +1,31 @@
++"""严格配置真实作用于转换器，拼写错误与冲突在转换前拒绝。"""
++from html2text import HTML2Text
++import pytest
++
++def test_mapping_is_immutable_detached_and_applies_actual_conversion():
++    """配置可复用但调用者/转换器均不能反写其值。@return None。"""
++    from html2text import Options
++    original={'body_width':0,'ignore_links':True,'images_to_alt':True};options=Options.from_mapping(original);original['ignore_links']=False
++    converter=HTML2Text.from_options(options,baseurl='https://e.test/')
++    assert converter.handle('<a href="x">link</a> <img src="pic" alt="Alt">').strip()=='link Alt'
++    converter.ignore_links=False;assert options.as_dict()['ignore_links'] is True
++    values=options.as_dict();values['ignore_links']=False;assert options.as_dict()['ignore_links'] is True
++    with pytest.raises(AttributeError):options._values={}
++
++def test_unknown_types_ranges_and_conflicting_modes_fail_before_use():
++    """不让拼写错误静默成为无效动态属性。@return None。"""
++    from html2text import Options
++    for values in [{'ignroe_links':True},{'body_width':-1},{'body_width':True},{'images_to_alt':True,'images_as_html':True},{'single_line_break':True,'body_width':20}]:
++        with pytest.raises(ValueError):Options.from_mapping(values)
++    with pytest.raises(TypeError):Options.from_mapping({'ignore_links':'yes'})
++    with pytest.raises(TypeError):HTML2Text.from_options({})
++
++def test_defaults_legacy_attributes_two_instances_and_callback_are_compatible():
++    """默认配置与原构造一致，两个实例及原out/baseurl参数各自生效。@return None。"""
++    from html2text import Options
++    text='<p>before <a href="path">link</a></p>'
++    options=Options.from_mapping({});assert HTML2Text.from_options(options).handle(text)==HTML2Text().handle(text)
++    first=HTML2Text.from_options(Options.from_mapping({'body_width':0,'single_line_break':True}));second=HTML2Text.from_options(options)
++    first.ignore_links=True;assert not second.ignore_links
++    output=[];converter=HTML2Text.from_options(Options.from_mapping({'body_width':0}),out=output.append,baseurl='https://e.test/')
++    converter.handle(text);assert 'https://e.test/path' in ''.join(output)

@@ -1,0 +1,138 @@
+--- a/library/arrow/factory.py
++++ b/library/arrow/factory.py
+@@ -190,6 +190,14 @@
+         locale = kwargs.pop("locale", DEFAULT_LOCALE)
+         tz = kwargs.get("tzinfo", None)
+         normalize_whitespace = kwargs.pop("normalize_whitespace", False)
++        strict = kwargs.pop('strict', False)
++        exact_width = kwargs.pop('exact_width', False)
++        if type(strict) is not bool or type(exact_width) is not bool:
++            raise TypeError('严格解析开关必须是布尔值')
++        if exact_width and not strict:
++            raise ValueError('精确token宽度要求启用严格解析')
++        if strict and (arg_count != 2 or not isinstance(args[0], str) or not isinstance(args[1], (str, list))):
++            raise TypeError('严格解析需要文本与显式格式')
+ 
+         # if kwargs given, send to constructor unless only tzinfo provided
+         if len(kwargs) > 1:
+@@ -282,7 +290,8 @@
+ 
+             # (str, format) -> parse @ tzinfo
+             elif isinstance(arg_1, str) and isinstance(arg_2, (str, list)):
+-                dt = parser.DateTimeParser(locale).parse(
++                reader = parser.DateTimeParser(locale)
++                dt = reader.parse_strict(args[0], args[1], normalize_whitespace, exact_width=exact_width) if strict else reader.parse(
+                     args[0], args[1], normalize_whitespace
+                 )
+                 return self.type.fromdatetime(dt, tzinfo=tz)
+--- a/library/arrow/parser.py
++++ b/library/arrow/parser.py
+@@ -438,6 +438,57 @@
+ 
+         return self._build_datetime(parts)
+ 
++    def parse_strict(self, datetime_string, fmt, normalize_whitespace=False, *, exact_width=False):
++        """显式完整格式解析。@param datetime_string 原文本。@param fmt 格式或格式列表。
++        @param normalize_whitespace 是否归一空白。@param exact_width 是否限制数值token精确位数。@return datetime。
++        """
++        if type(normalize_whitespace) is not bool or type(exact_width) is not bool:
++            raise TypeError('严格解析开关必须是布尔值')
++        formats = [fmt] if isinstance(fmt, str) else fmt
++        if not isinstance(formats, list) or not formats or any(not isinstance(item, str) for item in formats):
++            raise TypeError('格式必须是字符串或非空字符串列表')
++        text = re.sub(r"\s+", " ", datetime_string) if normalize_whitespace else datetime_string
++        for candidate in formats:
++            try:
++                tokens, pattern = self._generate_pattern_re(candidate)
++                match = pattern.fullmatch(text)
++                if match is None or not tokens:
++                    continue
++                if exact_width:
++                    widths = {'M':1, 'D':1, 'H':1, 'h':1, 'm':1, 's':1, 'DDD':3, 'DDDD':3}
++                    raw_format = self._ESCAPE_RE.sub('', candidate)
++                    valid = True
++                    for token_match in self._FORMAT_RE.finditer(raw_format):
++                        token = token_match.group(0)
++                        name = 'S' if token.startswith('S') else token
++                        width = len(token) if token.startswith('S') else widths.get(token)
++                        if width is not None and len(match.group(name)) != width:
++                            valid = False
++                    if not valid:
++                        continue
++                parts = {}
++                for token in tokens:
++                    if token == 'Do':
++                        value = match.group('value')
++                    elif token == 'W':
++                        value = (match.group('year'), match.group('week'), match.group('day'))
++                    else:
++                        value = match.group(token)
++                    self._parse_token(token, value, parts)
++                if 'day_of_year' in parts:
++                    year = parts.get('year')
++                    if year is None or not 1 <= parts['day_of_year'] <= datetime(year,12,31).timetuple().tm_yday:
++                        raise ParserMatchError('年内日数不属于所选年份')
++                if parts.get('weekdate') is not None:
++                    year, week, day = parts['weekdate']
++                    year, week, day = int(year), int(week), int(day or 1)
++                    if not 1 <= week <= datetime(year,12,28).isocalendar().week or not 1 <= day <= 7:
++                        raise ParserMatchError('ISO周不属于所选年份')
++                return self._build_datetime(parts)
++            except (ValueError, TypeError, re.error):
++                continue
++        raise ParserMatchError('完整输入不符合所声明格式或精确token宽度')
++
+     def _generate_pattern_re(self, fmt: str) -> Tuple[List[_FORMAT_TYPE], Pattern[str]]:
+         """
+         Generates a regular expression pattern from a format string.
+--- a/library/development_tests/test_development_ar_strict_dev.py
++++ b/library/development_tests/test_development_ar_strict_dev.py
+@@ -0,0 +1,40 @@
++"""公开严格时间格式回归。"""
++from datetime import datetime
++import pytest
++import arrow
++from arrow.parser import DateTimeParser, ParserError
++
++def test_strict_rejects_prefix_and_suffix_but_default_keeps_extraction():
++    text = 'prefix 2024-05-06 suffix'
++    assert arrow.get(text, 'YYYY-MM-DD').day == 6
++    with pytest.raises(ParserError):
++        arrow.get(text, 'YYYY-MM-DD', strict=True)
++
++def test_explicit_parser_and_factory_accept_complete_valid_input():
++    assert DateTimeParser().parse_strict('2024-05-06', 'YYYY-MM-DD') == datetime(2024,5,6)
++    assert arrow.get('2024-05-06', 'YYYY-MM-DD', strict=True).year == 2024
++
++def test_single_numeric_tokens_can_require_exact_width():
++    parser = DateTimeParser()
++    assert parser.parse_strict('2024-12-6', 'YYYY-M-D').month == 12
++    with pytest.raises(ParserError):
++        parser.parse_strict('2024-12-6', 'YYYY-M-D', exact_width=True)
++
++def test_fractional_width_and_literal_text_are_distinguished():
++    parser = DateTimeParser()
++    assert parser.parse_strict('at 05:06:07.123', '[at] HH:mm:ss.SSS', exact_width=True).microsecond == 123000
++    with pytest.raises(ParserError):
++        parser.parse_strict('05:06:07.12', 'HH:mm:ss.SSS', exact_width=True)
++
++def test_format_list_calendar_and_whitespace_validation():
++    assert DateTimeParser().parse_strict('2024-05-06', ['YYYY/MM/DD','YYYY-MM-DD']).day == 6
++    assert DateTimeParser().parse_strict('2024-05-06	12:30', 'YYYY-MM-DD HH:mm', True).hour == 12
++    with pytest.raises(ParserError):
++        DateTimeParser().parse_strict('2024-02-30', 'YYYY-MM-DD')
++
++def test_numeric_weekday_and_invalid_options():
++    assert arrow.get('3', 'd', strict=True).isoweekday() == 3
++    with pytest.raises(ValueError):
++        arrow.get('2024-05-06', 'YYYY-MM-DD', exact_width=True)
++    with pytest.raises(TypeError):
++        arrow.get('2024-05-06', strict=True)
+--- a/library/docs/development-ar-strict-dev.md
++++ b/library/docs/development-ar-strict-dev.md
+@@ -0,0 +1,5 @@
++# 为表单时间导入交付显式完整格式与位宽校验
++
++表单导入需要明确的整串格式校验，不能把前后杂文也作为成功。新增parse_strict及工厂strict开关，默认提取行为不变；可选精确token位宽，保留本地化、格式列表、数值星期、空白归一与日历有效性，非法模式组合明确报错。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

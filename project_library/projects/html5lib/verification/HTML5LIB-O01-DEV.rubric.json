@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML5LIB-O01-DEV",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix actual lint.Filter Doctype checks to validate publicId and systemId themselves as None or text, independently of optional name. Invalid numeric/bytes/container identifiers with a valid name must raise AssertionError; valid text identifiers with name=None must pass. Preserve token identity, lazy iteration and all existing non-Doctype validation, and verify a real parsed DOM walker stream. Do not coerce bad identifiers to text or disable lint assertions.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

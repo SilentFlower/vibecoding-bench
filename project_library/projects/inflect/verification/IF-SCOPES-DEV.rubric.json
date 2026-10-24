@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "IF-SCOPES-DEV",
+  "source_commit": "99596854bd296af1557db2015cfa98c8104ec155",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement inflect.scopes.clone(engine) and temporary_options(engine,*,classical=None,count=sentinel,gender=None). Clone preserves actual engine subtype, all custom definitions and options without mutable aliasing. Temporary scope uses completed atomic classical behavior, applies actual num/gender methods, yields original engine and restores all prior state values even on failed entry or body exceptions. Nested scopes restore their immediate parent; explicit count=None clears persistent count. Rule changes inside scope are rolled back. Do not promise internal-container identity or concurrency isolation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

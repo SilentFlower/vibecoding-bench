@@ -1,0 +1,74 @@
+--- a/library/bottle.py
++++ b/library/bottle.py
+@@ -760,6 +760,25 @@
+             return self._mount_app(prefix, app, **options)
+         else:
+             return self._mount_wsgi(prefix, app, **options)
++
++    def inspect_routes(self):
++        """按注册顺序输出不含配置值和闭包内容的稳定路由清单。
++
++        :return: 可JSON编码的规则、方法、名字、owner、过滤器和插件元数据列表。
++        """
++        result = []
++        for route in self.routes:
++            callback = route.callback
++            name = getattr(callback, '__qualname__', None)
++            name = name if isinstance(name, str) else type(callback).__name__
++            plugins = []
++            for plugin in route.plugins:
++                label = getattr(plugin, 'name', None)
++                plugins.append(label if isinstance(label, str) else type(plugin).__name__)
++            result.append({'rule': route.rule, 'method': route.method, 'name': route.name,
++                'owner': 'current' if route.app is self else 'external', 'callback': name,
++                'filters': re.findall(r'<[^>:]+:([^>:]+)(?::[^>]*)?>', route.rule), 'plugins': plugins})
++        return result
+ 
+     def merge(self, routes, prefix=None):
+         """合并真实路由，显式前缀模式克隆到当前应用。
+--- a/library/docs/development-bottle-o06-dev.md
++++ b/library/docs/development-bottle-o06-dev.md
+@@ -0,0 +1,5 @@
++# 输出不执行回调且不泄漏配置的真实路由清单
++
++在已交付前缀克隆上输出真实路由清单，明确旧合并外部owner及前缀副本当前owner。按注册顺序提供规则、方法、名字、过滤器和插件名称，不执行回调或暴露配置/闭包，不用对象地址作标识。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bottle_o06_dev.py
++++ b/library/test/test_development_bottle_o06_dev.py
+@@ -0,0 +1,35 @@
++"""路由清单是稳定可读元数据，不能泄漏秘密配置或执行回调。"""
++import json
++import bottle
++
++def test_inventory_fields_and_order():
++    """真实动态路由的方法、名字和过滤器可读。@return None。"""
++    app = bottle.Bottle()
++    app.route('/first/<number:int>', method='POST', name='number', callback=lambda number: number)
++    app.route('/second', callback=lambda: 'ok')
++    rows = app.inspect_routes()
++    assert [row['rule'] for row in rows] == ['/first/<number:int>', '/second']
++    assert rows[0]['method'] == 'POST' and rows[0]['name'] == 'number' and rows[0]['filters'] == ['int']
++    json.dumps(rows)
++
++def test_no_config_or_callback_execution():
++    """闭包不执行，配置secret不进入清单。@return None。"""
++    app = bottle.Bottle()
++    def endpoint():
++        """禁止执行。@return 不返回。"""
++        raise AssertionError('not introspection')
++    app.route('/secret', callback=endpoint, secret='never-export-value')
++    assert 'never-export-value' not in json.dumps(app.inspect_routes())
++
++def test_merged_owner_and_callable():
++    """旧合并owner可解释，无函数名对象安全降级。@return None。"""
++    class Endpoint:
++        """业务目标对象。"""
++        def __call__(self):
++            """返回结果。@return 字符串。"""
++            return 'ok'
++    child, target = bottle.Bottle(), bottle.Bottle()
++    child.route('/x', callback=Endpoint())
++    target.merge(child)
++    row = target.inspect_routes()[0]
++    assert row['owner'] == 'external' and row['callback'] == 'Endpoint'

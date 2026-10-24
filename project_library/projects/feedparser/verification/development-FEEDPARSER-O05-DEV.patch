@@ -1,0 +1,96 @@
+--- a/library/docs/development-feedparser-o05-dev.md
++++ b/library/docs/development-feedparser-o05-dev.md
+@@ -0,0 +1,5 @@
++# 合并真实订阅快照并明确报告新增修订未变及缺席保留
++
++对应路线10：复用真实身份按当前顺序合并，缺席旧条目保留并报告四类变化；完整/partial覆盖及日期倒退明确，同批重复拒绝，输入/输出嵌套隔离且无网络。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/feedparser/records.py
++++ b/library/feedparser/records.py
+@@ -35,3 +35,48 @@
+     encoded = json.dumps(normalize(chosen), sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf8')
+     return {'value': 'sha256:' + hashlib.sha256(encoded).hexdigest(), 'source': 'fields',
+             'reliable': False, 'fields': sorted(chosen)}
++
++
++def merge_feeds(previous, incoming, *, partial=False):
++    """按明确身份合并本地结果，当前缺席不等于删除。
++
++    :param previous: 旧真实解析结果。
++    :param incoming: 本轮真实解析结果，当前条目优先按原顺序。
++    :param partial: True时同ID只覆盖本轮出现字段，False用本轮完整条目。
++    :return: result及added/updated/unchanged/retained身份清单，输入全部保持。
++    """
++    from copy import deepcopy
++    from .util import FeedParserDict
++    def indexed(items):
++        """同批身份重复必须明确拒绝，不能随机保留某一条。@return 身份映射及顺序。"""
++        result = {}
++        for item in items:
++            key = entry_identity(item)['value']
++            if key in result:
++                raise ValueError('同批订阅存在重复身份')
++            result[key] = item
++        return result
++    old = indexed(dict.get(previous, 'entries', []))
++    new = indexed(dict.get(incoming, 'entries', []))
++    changes = {name: [] for name in ('added', 'updated', 'unchanged', 'retained')}
++    entries = []
++    for key, item in new.items():
++        if key not in old:
++            merged = deepcopy(item)
++            changes['added'].append(key)
++        else:
++            if partial:
++                merged = deepcopy(old[key])
++                merged.update(deepcopy(dict(item)))
++            else:
++                merged = deepcopy(item)
++            changes['unchanged' if dict(merged) == dict(old[key]) else 'updated'].append(key)
++        entries.append(merged)
++    for key, item in old.items():
++        if key not in new:
++            entries.append(deepcopy(item))
++            changes['retained'].append(key)
++    result = FeedParserDict(deepcopy(dict(previous)))
++    result.update(deepcopy({key: value for key, value in dict(incoming).items() if key != 'entries'}))
++    result['entries'] = entries
++    return {'result': result, 'changes': changes}
+--- a/library/tests/test_development_feedparser_o05_dev.py
++++ b/library/tests/test_development_feedparser_o05_dev.py
+@@ -0,0 +1,34 @@
++"""实际订阅增量合并产生真实新增修订清单，缺席条目不删除。"""
++from feedparser.util import FeedParserDict
++import copy
++import pytest
++
++def result(*items):
++    """构造与实际parse相同的真实结果容器。@return FeedParserDict。"""
++    return FeedParserDict(feed=FeedParserDict(title='T'),entries=[FeedParserDict(item) for item in items])
++
++def test_added_updated_unchanged_retained_order_and_detached_inputs():
++    """四类清单及当前优先排序均可复核，输出可独立修改。@return None。"""
++    from feedparser.records import merge_feeds
++    old=result({'id':'a','title':'old'},{'id':'b','title':'same'},{'id':'c','title':'retained'})
++    new=result({'id':'b','title':'same'},{'id':'a','title':'new'},{'id':'d','title':'added'})
++    before=copy.deepcopy((old,new));merged=merge_feeds(old,new)
++    assert merged['changes']=={'added':['d'],'updated':['a'],'unchanged':['b'],'retained':['c']}
++    assert [entry.id for entry in merged['result'].entries]==['b','a','d','c']
++    merged['result'].entries[0]['title']='changed';assert (old,new)==before
++
++def test_partial_field_policy_and_older_timestamps_are_explicit():
++    """partial保留省略字段，完整模式按本轮替换，不擅自按日期丢弃修订。@return None。"""
++    from feedparser.records import merge_feeds
++    old=result({'id':'a','title':'T','summary':'body','updated':'2026'})
++    new=result({'id':'a','title':'T','updated':'2025'})
++    assert merge_feeds(old,new,partial=True)['result'].entries[0].summary=='body'
++    assert not dict.__contains__(merge_feeds(old,new)['result'].entries[0],'summary')
++    assert merge_feeds(old,new)['changes']['updated']==['a']
++
++def test_duplicate_ids_fail_and_fallback_identity_is_used_without_false_deletion():
++    """同批冲突不静默选一条，无id内容按明确摘要策略合并。@return None。"""
++    from feedparser.records import merge_feeds
++    with pytest.raises(ValueError):merge_feeds(result({'id':'a'},{'id':'a'}),result())
++    old=result({'title':'T','link':'a'});new=result({'title':'T','link':'b'})
++    merged=merge_feeds(old,new);assert len(merged['changes']['added'])==len(merged['changes']['retained'])==1 and len(merged['result'].entries)==2

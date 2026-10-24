@@ -1,0 +1,138 @@
+--- a/library/box/box.py
++++ b/library/box/box.py
+@@ -404,6 +404,94 @@
+ 
+         return list(items)
+ 
++    @staticmethod
++    def _path_parts(path):
++        """校验有限显式路径，不把字符串或点分键猜成路径。
++
++        :param path: str/int段组成的非空可迭代路径。
++        :return: 路径tuple。
++        """
++        if isinstance(path, (str, bytes)):
++            raise TypeError('路径必须为分段序列')
++        parts = tuple(path)
++        if not parts or any(not isinstance(part, (str, int)) or isinstance(part, bool) for part in parts):
++            raise ValueError('路径须包含非空str/int段')
++        return parts
++
++    def get_path(self, path, default=NO_DEFAULT):
++        """读取字面路径而不触发默认节点或点分解析。
++
++        :param path: 显式str/int段。
++        :param default: 缺键或越界时的可选后备值。
++        :return: 原有值；缺失且无后备时抛KeyError/IndexError。
++        """
++        current = self
++        try:
++            for part in self._path_parts(path):
++                if isinstance(current, Box):
++                    current = dict.__getitem__(current, part)
++                elif isinstance(current, (list, tuple)):
++                    if not isinstance(part, int):
++                        raise TypeError('列表路径段必须为整数')
++                    current = current[part]
++                elif isinstance(current, Mapping):
++                    current = current[part]
++                else:
++                    raise TypeError('路径祖先必须为映射或序列')
++        except (KeyError, IndexError):
++            if default is not NO_DEFAULT:
++                return default
++            raise
++        return current
++
++    def set_path(self, path, value):
++        """只在已存在父结构内赋值，不隐式创建无限节点。
++
++        :param path: 显式路径，列表支持负索引。
++        :param value: 新业务值。
++        :return: None；冻结策略和既有转换规则保持。
++        """
++        parts = self._path_parts(path)
++        parent = self if len(parts) == 1 else self.get_path(parts[:-1])
++        key = parts[-1]
++        if isinstance(parent, Box):
++            if parent._box_config['frozen_box']:
++                raise BoxError('Box is frozen')
++            if parent._box_config['conversion_box'] and parent._box_config['box_duplicates'] != 'ignore' and key not in dict.keys(parent):
++                parent._conversion_checks(key)
++            parent._Box__convert_and_store(key, parent._Box__recast(key, value))
++        elif isinstance(parent, list):
++            if not isinstance(key, int):
++                raise TypeError('列表路径段必须为整数')
++            parent[key] = value
++        elif isinstance(parent, dict):
++            parent[key] = value
++        else:
++            raise TypeError('路径父结构不可赋值')
++
++    def delete_path(self, path):
++        """按字面路径删除叶子，缺失和冻结错误明确传播。
++
++        :param path: 显式路径。
++        :return: None。
++        """
++        parts = self._path_parts(path)
++        parent = self if len(parts) == 1 else self.get_path(parts[:-1])
++        key = parts[-1]
++        if isinstance(parent, Box):
++            if parent._box_config['frozen_box']:
++                raise BoxError('Box is frozen')
++            dict.__delitem__(parent, key)
++            parent._box_config['__safe_keys'] = {parent._safe_attr(item): item for item in dict.keys(parent)}
++        elif isinstance(parent, list):
++            if not isinstance(key, int):
++                raise TypeError('列表路径段必须为整数')
++            del parent[key]
++        elif isinstance(parent, dict):
++            del parent[key]
++        else:
++            raise TypeError('路径父结构不可删除')
++
+     def __contains__(self, item):
+         in_me = super().__contains__(item)
+         if not self._box_config["box_dots"] or not isinstance(item, str):
+--- a/library/docs/development-bx-path-dev.md
++++ b/library/docs/development-bx-path-dev.md
+@@ -0,0 +1,5 @@
++# 交付无歧义的分段配置路径读写删除
++
++新增get_path/set_path/delete_path，路径必须是非空str/int分段序列。字面点括号、整数键、字符串键及负列表索引均无歧义；读取不创建默认节点，写入只允许已有父结构并保留转换、recast与冻结保护。缺失可显式返回None，类型错误不能被默认值掩盖。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bx_path_dev.py
++++ b/library/test/test_development_bx_path_dev.py
+@@ -0,0 +1,30 @@
++"""显式分段路径区分字面点键、整数键和列表索引。"""
++import pytest
++from box import Box, BoxError
++
++
++def test_literal_segments():
++    """整数键和字符串键及含点键保持区别。@return None。"""
++    value = Box({'a.b': {'2': 'text', 2: 'integer'}, 'rows': [{'n': 1}]})
++    assert value.get_path(['a.b', 2]) == 'integer'
++    assert value.get_path(['a.b', '2']) == 'text'
++    assert value.get_path(['rows', -1, 'n']) == 1
++
++
++def test_assignment_and_delete():
++    """仅已存在父结构内写删，字面点不解析。@return None。"""
++    value = Box({'node': {}}, box_dots=True, default_box=True)
++    value.set_path(['node', 'a.b'], {'x': 2})
++    assert value.get_path(['node', 'a.b', 'x']) == 2
++    value.delete_path(['node', 'a.b'])
++    assert value.get_path(['node', 'a.b'], None) is None
++
++
++def test_missing_no_default_creation_and_frozen():
++    """读取不创建默认节点，冻结写入拒绝。@return None。"""
++    value = Box(default_box=True)
++    assert value.get_path(['missing'], None) is None and value.to_dict() == {}
++    with pytest.raises(ValueError):
++        value.get_path([])
++    with pytest.raises(BoxError):
++        Box({'a': 1}, frozen_box=True).set_path(['a'], 2)

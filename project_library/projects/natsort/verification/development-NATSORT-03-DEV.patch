@@ -1,0 +1,60 @@
+--- a/library/docs/development-natsort-03-dev.md
++++ b/library/docs/development-natsort-03-dev.md
+@@ -0,0 +1,5 @@
++# 单次输入的稳定自然序前K与原索引选择
++
++路线15：只保存前K候选而不物化全输入；升降序和平手次序与natsorted一致，可返回原位置，零数量完全不消费输入。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/natsort/topk.py
++++ b/library/natsort/topk.py
+@@ -0,0 +1,18 @@
++"""与全量自然排序一致的有界前K选择。"""
++from heapq import nlargest, nsmallest
++from natsort import natsort_keygen, ns
++
++
++def natural_topk(iterable, count, *, key=None, alg=ns.DEFAULT, reverse=False, indices=False):
++    """以O(K)选择存储返回稳定前K项。@param iterable 单次输入。@param count 数量。@param key 提取器。@param alg 原生算法。@param reverse 取降序。@param indices 返回原索引。@return 列表。"""
++    if type(count) is not int or count<0:
++        raise ValueError('数量必须是非负整数')
++    if count==0:
++        return []
++    natural=natsort_keygen(key=key,alg=alg)
++    decorated=enumerate(iterable)
++    if reverse:
++        selected=nlargest(count,decorated,key=lambda item:(natural(item[1]),-item[0]))
++    else:
++        selected=nsmallest(count,decorated,key=lambda item:(natural(item[1]),item[0]))
++    return [index if indices else value for index,value in selected]
+--- a/library/tests/test_development_natsort_03_dev.py
++++ b/library/tests/test_development_natsort_03_dev.py
+@@ -0,0 +1,28 @@
++"""前K结果与稳定全量自然排序前缀一致。"""
++import unittest
++from natsort import natsorted, ns
++from natsort.topk import natural_topk
++
++
++def test_forward_reverse_and_stability():
++    """同键保留输入次序，反向也不颠倒平手。@return None。"""
++    values=['x10','x2','x02','x1']
++    for reverse in (False,True):
++        assert natural_topk(iter(values),3,reverse=reverse)==natsorted(values,reverse=reverse)[:3]
++    assert natural_topk(values,3,indices=True)==[3,1,2]
++
++
++def test_zero_never_consumes_and_negative_rejects():
++    """零数量不触碰输入，非法数量明确失败。@return None。"""
++    def forbidden():
++        """证明输入没有被请求。@return 不返回。"""
++        raise AssertionError('consumed')
++        yield
++    assert natural_topk(forbidden(),0)==[]
++    with unittest.TestCase().assertRaises(ValueError):natural_topk([], -1)
++
++
++def test_key_and_original_algorithm():
++    """真实key与REAL算法继续生效。@return None。"""
++    values=[{'v':'-1.5'},{'v':'2'},{'v':'-10.2'}]
++    assert natural_topk(values,99,key=lambda x:x['v'],alg=ns.REAL)==natsorted(values,key=lambda x:x['v'],alg=ns.REAL)

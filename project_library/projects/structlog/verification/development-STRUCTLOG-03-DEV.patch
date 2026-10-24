@@ -1,0 +1,68 @@
+--- a/library/docs/development-structlog-03-dev.md
++++ b/library/docs/development-structlog-03-dev.md
+@@ -0,0 +1,5 @@
++# 事件多字段同时改名且冲突策略不丢业务数据
++
++路线03：FieldRenamer按原快照同时改名支持互换/链，不连续覆盖；error原子拒绝、keep传递保留、overwrite显式替换，来源不变及业务对象身份保留。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/structlog/_field_renamer.py
++++ b/library/src/structlog/_field_renamer.py
+@@ -0,0 +1,24 @@
++class FieldRenamer:
++    """同时字段改名处理器。@param mapping 源到目标名。@param conflict error/keep/overwrite。@return 不改源事件的处理器。"""
++    def __init__(self,mapping,*,conflict="error"):
++        """冻结配置并在使用前验证目标冲突。@param mapping 名称映射。@param conflict 策略。@return None。"""
++        self.mapping=dict(mapping)
++        if any(not isinstance(source,str) or not isinstance(target,str) for source,target in self.mapping.items()):raise TypeError("字段必须为str")
++        if len(set(self.mapping.values()))!=len(self.mapping):raise ValueError("目标名称重复")
++        if conflict not in ("error","keep","overwrite"):raise ValueError("未知conflict")
++        self.conflict=conflict
++
++    def __call__(self,logger,name,event_dict):
++        """按原事件快照同时应用，不串行覆盖。@param logger 原logger。@param name 级别。@param event_dict 来源。@return 独立新事件。"""
++        active={source:target for source,target in self.mapping.items() if source in event_dict and source!=target}
++        if self.conflict=="keep":
++            # 保留冲突源会让它不再腾空，依赖它的改名必须同样停留，直到达到稳定集合。
++            while True:
++                blocked=[source for source,target in active.items() if target in event_dict and target not in active]
++                if not blocked:break
++                for source in blocked:del active[source]
++        elif self.conflict=="error":
++            if any(target in event_dict and target not in active for target in active.values()):raise ValueError("目标字段已存在")
++        result={key:value for key,value in event_dict.items() if key not in active}
++        for source,target in active.items():result[target]=event_dict[source]
++        return result
+--- a/library/src/structlog/processors.py
++++ b/library/src/structlog/processors.py
+@@ -11,6 +11,8 @@
+ 
+ 
+ __lazy_modules__ = ["datetime", "logging", "threading"]
++
++from ._field_renamer import FieldRenamer
+ 
+ import datetime as dt
+ import enum
+--- a/library/tests/test_development_structlog_03_dev.py
++++ b/library/tests/test_development_structlog_03_dev.py
+@@ -0,0 +1,19 @@
++"""批量改名按原快照而非连续覆盖。"""
++import unittest
++from structlog.processors import FieldRenamer
++
++def test_swap_chain_and_missing_sources_preserve_values():
++    """互换与a到b到c保留各自业务值。@return None。"""
++    payload=[];source={'a':payload,'b':2,'other':3}
++    result=FieldRenamer({'a':'b','b':'c','missing':'z'})(None,'info',source)
++    assert result=={'b':payload,'c':2,'other':3} and result['b'] is payload
++    assert source=={'a':payload,'b':2,'other':3}
++    assert FieldRenamer({'a':'b','b':'a'})(None,'info',source)=={'a':2,'b':payload,'other':3}
++
++def test_error_keep_overwrite_and_dependent_keep_are_atomic():
++    """keep不能让间接冲突丢掉本应保留的源值。@return None。"""
++    source={'a':1,'b':2,'c':3}
++    with unittest.TestCase().assertRaises(ValueError):FieldRenamer({'a':'b'})(None,'info',source)
++    assert FieldRenamer({'a':'b','b':'c'},conflict='keep')(None,'info',source)==source
++    assert FieldRenamer({'a':'b'},conflict='overwrite')(None,'info',source)=={'b':1,'c':3}
++    with unittest.TestCase().assertRaises(ValueError):FieldRenamer({'a':'x','b':'x'})

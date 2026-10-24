@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PENDULUM-05-DEV",
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend Interval.range with keyword-only closed=both/left/right/neither and limit=None/nonnegative integer, where left/right refer to traversal start/end. Preserve default inclusive two-end behavior, inverse direction, absolute and ANCHORED accumulated-step month-end restoration. Require positive index-protocol amount and valid units; reject zero/negative progress and invalid policies. Stop at finite emitted limit, same endpoint correctly, and avoid endpoint overflow. Limit counts yielded points; no sleeping or unbounded verification.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

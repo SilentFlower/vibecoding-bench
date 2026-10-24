@@ -1,0 +1,66 @@
+--- a/library/docs/development-pyparsing-01-dev.md
++++ b/library/docs/development-pyparsing-01-dev.md
+@@ -0,0 +1,5 @@
++# 只读语法图检查定位确定风险且不执行解析动作
++
++路线01：只读遍历语法图，报告未定义Forward、明确Empty重复及无动作字面量遮蔽；按首次节点路径稳定定位，循环/共享安全，不执行解析动作，不把动态语法猜成确定错误。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyparsing/grammar_tools.py
++++ b/library/pyparsing/grammar_tools.py
+@@ -0,0 +1,35 @@
++"""只读语法图检查，不调用解析器或用户动作。"""
++from dataclasses import dataclass
++from .core import ParserElement,Forward,ZeroOrMore,OneOrMore,Empty,MatchFirst,Literal,_SingleCharLiteral
++
++@dataclass(frozen=True)
++class GrammarIssue:
++    """可证明的问题。@param code 类型。@param path 首次可达子索引。@param node_type 节点类。@param message 原因。"""
++    code:str
++    path:tuple[int,...]
++    node_type:str
++    message:str
++
++def lint_grammar(expression):
++    """检查已知静态风险。@param expression 真实语法。@return 按首次图遍历排序的不可变问题序列，未知自定义节点不猜测。"""
++    if not isinstance(expression,ParserElement):raise TypeError('需要ParserElement')
++    result=[];seen=set();pending=[(expression,())]
++    while pending:
++        node,path=pending.pop()
++        if id(node) in seen:continue
++        seen.add(id(node))
++        if isinstance(node,Forward) and node.expr is None:
++            result.append(GrammarIssue('undefined-forward',path,type(node).__name__,'Forward尚未赋值'))
++        if isinstance(node,(ZeroOrMore,OneOrMore)) and type(node.expr) is Empty and not node.expr.parseAction:
++            result.append(GrammarIssue('empty-repetition',path,type(node).__name__,'重复体为可证明不消费输入的Empty'))
++        if isinstance(node,MatchFirst):
++            earlier=[]
++            for index,branch in enumerate(node.exprs):
++                if type(branch) in (Literal,_SingleCharLiteral) and not branch.parseAction:
++                    if any(branch.match.startswith(value) for value in earlier):
++                        result.append(GrammarIssue('shadowed-literal',path+(index,),type(branch).__name__,'更早字面量已优先匹配此前缀'))
++                    earlier.append(branch.match)
++        # 只读取结构公开recurse；不调用can_parse_next或try_parse，避免动作副作用。
++        children=node.recurse()
++        pending.extend((child,path+(index,)) for index,child in reversed(list(enumerate(children))))
++    return tuple(result)
+--- a/library/tests/test_development_pyparsing_01_dev.py
++++ b/library/tests/test_development_pyparsing_01_dev.py
+@@ -0,0 +1,17 @@
++"""语法图静态风险可定位且不会执行业务动作。"""
++import pyparsing as pp
++from pyparsing.grammar_tools import lint_grammar
++
++def test_empty_repetition_undefined_forward_and_shadowed_literal():
++    """三类可证明问题各自有节点路径。@return None。"""
++    forward=pp.Forward();grammar=pp.MatchFirst([pp.Literal('a'),pp.Literal('ab')])+pp.ZeroOrMore(pp.Empty())+forward
++    issues=lint_grammar(grammar);codes={x.code for x in issues}
++    assert codes=={'empty-repetition','undefined-forward','shadowed-literal'}
++    assert all(isinstance(x.path,tuple) for x in issues)
++
++def test_recursive_shared_graph_and_actions_are_read_only():
++    """递归/共享节点只访问一次，不执行动作或改图。@return None。"""
++    events=[];leaf=pp.Word(pp.alphas).set_parse_action(lambda t:events.append(t))
++    recursive=pp.Forward();recursive <<= leaf+pp.Optional('('+recursive+')')
++    before=recursive.expr
++    assert lint_grammar(recursive)==() and events==[] and recursive.expr is before

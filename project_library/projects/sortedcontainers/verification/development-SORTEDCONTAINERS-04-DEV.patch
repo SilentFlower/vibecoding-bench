@@ -1,0 +1,152 @@
+--- a/library/docs/development-sortedcontainers-04-dev.md
++++ b/library/docs/development-sortedcontainers-04-dev.md
+@@ -0,0 +1,5 @@
++# 有序计划支持四种邻居查询并区分缺项与真实空值
++
++路线06：四种邻居按容器排序顺序和严格/非严格边界定义，重复key左右选择明确；映射返回item，缺项默认KeyError，显式None/False可回退。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/sortedcontainers/_neighbors.py
++++ b/library/src/sortedcontainers/_neighbors.py
+@@ -0,0 +1,14 @@
++"""四种邻居统一按容器定义的排序顺序查找。"""
++MISSING=object()
++
++
++def neighbor(container,value,kind,default=MISSING):
++    """查询相邻值或映射项。@param container 有序容器。@param value 比较值/键。@param kind floor/ceil/lower/higher。@param default 显式缺项结果。@return 值或(key,value)。"""
++    if kind=="floor":index=container.bisect_right(value)-1
++    elif kind=="lower":index=container.bisect_left(value)-1
++    elif kind=="ceil":index=container.bisect_left(value)
++    else:index=container.bisect_right(value)
++    if index<0 or index>=len(container):
++        if default is not MISSING:return default
++        raise KeyError(value)
++    return container.peekitem(index) if isinstance(container,dict) else container[index]
+--- a/library/src/sortedcontainers/sorteddict.py
++++ b/library/src/sortedcontainers/sorteddict.py
+@@ -17,6 +17,8 @@
+ """
+ 
+ import warnings
++from ._neighbors import neighbor as _neighbor, MISSING as _NEIGHBOR_MISSING
++
+ from collections.abc import ItemsView, KeysView, Mapping, Sequence, ValuesView
+ from itertools import chain
+ 
+@@ -291,6 +293,22 @@
+     def __ior__(self, other):
+         self._update(other)
+         return self
++
++    def floor(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询floor。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'floor',default)
++
++    def ceil(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询ceil。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'ceil',default)
++
++    def lower(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询lower。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'lower',default)
++
++    def higher(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询higher。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'higher',default)
+ 
+     def copy(self):
+         """Return a shallow copy of the sorted dict.
+--- a/library/src/sortedcontainers/sortedlist.py
++++ b/library/src/sortedcontainers/sortedlist.py
+@@ -17,6 +17,8 @@
+ 
+ import sys
+ import traceback
++from ._neighbors import neighbor as _neighbor, MISSING as _NEIGHBOR_MISSING
++
+ from bisect import bisect_left, bisect_right, insort
+ from collections.abc import MutableSequence, Sequence
+ from functools import reduce
+@@ -1185,6 +1187,22 @@
+         right = self._loc(pos_right, idx_right)
+         left = self._loc(pos_left, idx_left)
+         return right - left
++
++    def floor(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询floor。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'floor',default)
++
++    def ceil(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询ceil。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'ceil',default)
++
++    def lower(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询lower。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'lower',default)
++
++    def higher(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询higher。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'higher',default)
+ 
+     def copy(self):
+         """Return a shallow copy of the sorted list.
+--- a/library/src/sortedcontainers/sortedset.py
++++ b/library/src/sortedcontainers/sortedset.py
+@@ -12,6 +12,8 @@
+ * :class:`SortedSet`
+ 
+ """
++
++from ._neighbors import neighbor as _neighbor, MISSING as _NEIGHBOR_MISSING
+ 
+ from collections.abc import MutableSet, Sequence, Set
+ from itertools import chain
+@@ -347,6 +349,22 @@
+         """
+         self._set.clear()
+         self._list.clear()
++
++    def floor(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询floor。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'floor',default)
++
++    def ceil(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询ceil。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'ceil',default)
++
++    def lower(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询lower。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'lower',default)
++
++    def higher(self,value,default=_NEIGHBOR_MISSING):
++        """按排序顺序查询higher。@param value 边界值/键。@param default 缺项回退。@return 值或映射项。"""
++        return _neighbor(self,value,'higher',default)
+ 
+     def copy(self):
+         """Return a shallow copy of the sorted set.
+--- a/library/tests/test_development_sortedcontainers_04_dev.py
++++ b/library/tests/test_development_sortedcontainers_04_dev.py
+@@ -0,0 +1,22 @@
++"""最近计划查询尊重key顺序，None可为明确缺项默认。"""
++import unittest
++from operator import neg
++from sortedcontainers import SortedList,SortedSet,SortedDict
++
++def test_all_four_neighbors_and_mapping_item_identity():
++    """等值与严格邻居不能混用，映射返回业务item。@return None。"""
++    for source in (SortedList([1,3,5]),SortedSet([1,3,5])):
++        assert source.floor(4)==3 and source.ceil(4)==5 and source.lower(3)==1 and source.higher(3)==5
++        assert source.floor(3)==3 and source.ceil(3)==3
++    value=[];source=SortedDict({1:'a',3:value,5:'c'})
++    assert source.floor(4)==(3,value) and source.floor(4)[1] is value
++
++def test_duplicate_keys_reverse_order_and_explicit_default():
++    """缺项不能默认用None掩盖，方向由排序策略决定。@return None。"""
++    values=SortedList([1,3,5],key=neg)
++    assert values.floor(4)==5 and values.ceil(4)==3
++    assert values.lower(3)==5 and values.higher(3)==1
++    assert values.floor(8,None) is None
++    with unittest.TestCase().assertRaises(KeyError):SortedList().ceil(1)
++    values=SortedList([(2,'a'),(2,'b'),(4,'c')],key=lambda item:item[0])
++    assert values.floor((2,'probe'))==(2,'b') and values.ceil((2,'probe'))==(2,'a')

@@ -1,0 +1,54 @@
+--- a/library/docs/development-rich-05-dev.md
++++ b/library/docs/development-rich-05-dev.md
+@@ -0,0 +1,5 @@
++# 语法类异常的非字符串消息安全提取并可靠渲染
++
++路线07：语法类异常的msg、filename和源码文本使用现有安全字符串策略，非字符串及__str__失败均可靠展示且不修改原异常。实际Console渲染不再二次TypeError，继承前置循环/共享异常图能力。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/rich/traceback.py
++++ b/library/rich/traceback.py
+@@ -514,10 +514,10 @@
+             if isinstance(exc_value, SyntaxError):
+                 stack.syntax_error = _SyntaxError(
+                     offset=exc_value.offset or 0,
+-                    filename=exc_value.filename or "?",
++                    filename=safe_str(exc_value.filename or "?"),
+                     lineno=exc_value.lineno or 0,
+-                    line=exc_value.text or "",
+-                    msg=exc_value.msg,
++                    line=safe_str(exc_value.text or ""),
++                    msg=safe_str(exc_value.msg),
+                     notes=notes,
+                 )
+ 
+--- a/library/tests/test_development_rich_05_dev.py
++++ b/library/tests/test_development_rich_05_dev.py
+@@ -0,0 +1,27 @@
++"""原异常的非字符串消息不能被二次渲染错误掩盖。"""
++import io
++from rich.console import Console
++from rich.traceback import Traceback
++
++
++def test_non_string_syntax_message_renders_the_original_problem():
++    """实际提取并渲染，而非只检查数据类类型。@return None。"""
++    error=SyntaxError();error.msg=123;error.filename='example.py';error.text='bad source';error.lineno=1;error.offset=1
++    trace=Traceback.extract(type(error),error,None)
++    assert trace.stacks[0].syntax_error.msg=='123'
++    output=io.StringIO();Console(file=output,force_terminal=False,width=80).print(Traceback(trace))
++    assert '123' in output.getvalue() and 'SyntaxError' in output.getvalue()
++
++
++def test_message_str_failure_has_stable_fallback_without_mutation():
++    """损坏的__str__安全回退，不改原异常对象。@return None。"""
++    class Broken:
++        """字符串转换自身失败的原消息。"""
++        def __str__(self):
++            """模拟第三方异常对象。@return 不返回。"""
++            raise RuntimeError('broken str')
++    original=Broken();error=SyntaxError();error.msg=original;error.text='x';error.offset=1
++    trace=Traceback.extract(type(error),error,None)
++    assert trace.stacks[0].syntax_error.msg=='<exception str() failed>' and error.msg is original
++    output=io.StringIO();Console(file=output,force_terminal=False).print(Traceback(trace))
++    assert 'exception str() failed' in output.getvalue()

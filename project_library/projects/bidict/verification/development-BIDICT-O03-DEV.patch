@@ -1,0 +1,60 @@
+--- a/library/bidict/transform.py
++++ b/library/bidict/transform.py
+@@ -0,0 +1,22 @@
++"""对双向关系两侧执行受唯一约束保护的业务转换。"""
++
++
++def transform_items(mapping, *, key_fn=None, value_fn=None):
++    """转换全部关系后验证最终键值唯一性，不发布半成品。
++
++    :param mapping: 真实双向映射。
++    :param key_fn: 每个键调用一次的可选转换。
++    :param value_fn: 每个值调用一次的可选转换。
++    :return: 同类型新关系；重复转换结果报告来源位置。
++    """
++    items, keys, values = [], {}, {}
++    for position, (key, value) in enumerate(mapping.items(), 1):
++        new_key = key if key_fn is None else key_fn(key)
++        new_value = value if value_fn is None else value_fn(value)
++        if new_key in keys:
++            raise ValueError('转换键冲突：第%d和%d项' % (keys[new_key], position))
++        if new_value in values:
++            raise ValueError('转换值冲突：第%d和%d项' % (values[new_value], position))
++        keys[new_key], values[new_value] = position, position
++        items.append((new_key, new_value))
++    return type(mapping)(items)
+--- a/library/docs/development-bidict-o03-dev.md
++++ b/library/docs/development-bidict-o03-dev.md
+@@ -0,0 +1,5 @@
++# 对关系两侧转换并拒绝最终唯一性冲突
++
++两侧业务转换每项执行一次，最终键和值都必须唯一，冲突给出来源位置而不静默覆盖。返回同类且保持顺序的新关系，输入、冻结类型、反查与回调异常保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bidict_o03_dev.py
++++ b/library/tests/test_development_bidict_o03_dev.py
+@@ -0,0 +1,24 @@
++"""真实键值转换的最终唯一性须显式校验。"""
++from bidict import bidict, frozenbidict
++
++def test_both_sides_and_inverse():
++    """两侧转换后类型和值真实改变且可反查。@return None。"""
++    from bidict.transform import transform_items
++    source = bidict({1: 'A', 2: 'B'})
++    output = transform_items(source, key_fn=str, value_fn=str.lower)
++    assert output == {'1': 'a', '2': 'b'} and output.inverse['b'] == '2'
++    assert source == {1: 'A', 2: 'B'}
++
++def test_collision_rejected():
++    """转换后重复键或值拒绝，不能静默丢行。@return None。"""
++    import pytest
++    from bidict.transform import transform_items
++    with pytest.raises(ValueError): transform_items(bidict(a=1, A=2), key_fn=str.lower)
++    with pytest.raises(ValueError): transform_items(bidict(a=1, b=2), value_fn=lambda value: 0)
++
++def test_once_and_frozen():
++    """每个键值一次，冻结输入保持结果类型。@return None。"""
++    from bidict.transform import transform_items
++    calls = []
++    output = transform_items(frozenbidict(a=1), key_fn=lambda key: calls.append(key) or key)
++    assert calls == ['a'] and isinstance(output, frozenbidict)

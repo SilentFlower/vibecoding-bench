@@ -1,0 +1,108 @@
+--- a/library/configargparse.py
++++ b/library/configargparse.py
+@@ -895,6 +895,40 @@
+ _DEFAULTS_SOURCE_KEY = "defaults"
+ 
+ 
++class ParseResult:
++    """保存一次解析完成后的独立快照，不保留Action对象。
++
++    :param namespace: 本次解析得到的命名空间。
++    :param sources: 不含Action的来源记录。
++    :param unknown: 本次未识别命令行列表。
++    :return: 与后续解析及返回副本隔离的结果。
++    """
++
++    def __init__(self, namespace, sources, unknown):
++        """深复制本次结果。@return None。"""
++        from copy import deepcopy
++        self._namespace = deepcopy(namespace)
++        self._sources = deepcopy(sources)
++        self._unknown = tuple(unknown)
++
++    @property
++    def namespace(self):
++        """取独立命名空间副本，调用者修改不写回快照。@return Namespace。"""
++        from copy import deepcopy
++        return deepcopy(self._namespace)
++
++    @property
++    def sources(self):
++        """取不共享嵌套值的来源副本。@return dict。"""
++        from copy import deepcopy
++        return deepcopy(self._sources)
++
++    @property
++    def unknown(self):
++        """取原顺序不可变未知项。@return tuple。"""
++        return self._unknown
++
++
+ class ArgumentParser(argparse.ArgumentParser):
+     """Drop-in replacement for `argparse.ArgumentParser` that adds support for
+     environment variables and ``.ini`` or ``.yaml-style`` config files.
+@@ -1425,6 +1459,23 @@
+         # files and env vars were kept from setting one at all above.
+         self.write_config_file(namespace, output_file_paths, exit_after=True)
+         return namespace, unknown_args
++
++    def parse_result(self, args=None, namespace=None, config_file_contents=None, env_vars=os.environ, ignore_help_args=False):
++        """解析并保存独立快照，原parse_args返回协议保持。
++
++        :param args: 本次CLI参数。
++        :param namespace: 可选实际Namespace。
++        :param config_file_contents: 可选配置内容。
++        :param env_vars: 本次显式环境映射。
++        :param ignore_help_args: 是否忽略帮助选项。
++        :return: 含namespace、sources与unknown的ParseResult。
++        """
++        parsed, unknown = self.parse_known_args(args, namespace, config_file_contents, env_vars, ignore_help_args)
++        sources = OrderedDict()
++        for source, items in self.get_source_to_settings_dict().items():
++            sources[source] = OrderedDict((key, {'dest': action.dest if action is not None else None, 'value': value})
++                for key, (action, value) in items.items())
++        return ParseResult(parsed, sources, unknown)
+ 
+     def get_source_to_settings_dict(self):
+         """
+--- a/library/docs/development-configargparse-o03-dev.md
++++ b/library/docs/development-configargparse-o03-dev.md
+@@ -0,0 +1,5 @@
++# 让每次参数解析产出隔离的结果与来源快照
++
++对应路线15：真实解析后深复制结果及无Action的来源记录，访问也隔离；重复解析、可变默认、调用者修改和后续失败均不能污染先前交付结果。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_configargparse_o03_dev.py
++++ b/library/tests/test_development_configargparse_o03_dev.py
+@@ -0,0 +1,30 @@
++"""解析快照保护同parser多次调用与调用者修改。"""
++import json
++import configargparse as c
++
++def test_two_parses_do_not_replace_first():
++    """命名空间、来源与未知项按次隔离。@return None。"""
++    p=c.ArgumentParser();p.add('--tag',action='append',env_var='TAGS')
++    first=p.parse_result(['--unknown'],config_file_contents='tag=[a,b]',env_vars={})
++    p.parse_args(['--tag','next'],env_vars={})
++    assert first.namespace.tag==['a','b'] and first.unknown==('--unknown',)
++    assert 'a' in json.dumps(first.sources)
++    assert 'Action' not in json.dumps(first.sources)
++
++def test_accessors_and_caller_namespace_copied():
++    """输入和每次访问都不共享可变列表。@return None。"""
++    import argparse
++    p=c.ArgumentParser();p.add('--tag',action='append')
++    namespace=argparse.Namespace(extra=['original'])
++    result=p.parse_result(['--tag','x'],namespace=namespace,env_vars={})
++    namespace.extra.append('caller');result.namespace.tag.append('view')
++    assert result.namespace.extra==['original'] and result.namespace.tag==['x']
++    sources=result.sources;sources.clear();assert result.sources
++
++def test_failed_later_parse_keeps_snapshot():
++    """后次类型错误不会破坏前次快照。@return None。"""
++    import pytest
++    p=c.ArgumentParser();p.add('--port',type=int,env_var='PORT')
++    result=p.parse_result([],env_vars={'PORT':'9'})
++    with pytest.raises(SystemExit):p.parse_result(['--port','bad'],env_vars={})
++    assert result.namespace.port==9 and result.sources['environment_variables']['PORT']['value']=='9'

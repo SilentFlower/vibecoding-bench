@@ -3,7 +3,7 @@
   "project_key": "tablib",
   "title": "Tablib商品表开发任务",
   "category": "表格导入、导出与字段对齐",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实表格工程交付：字段对齐、投影快照、业务去重、复合关联、单元格转换与记录导入；独立和累计验收。",
   "seed_digest": "439d40837853f736e747980b1e5bbd203f4ada2b1af7a8bb5ca80f3375b5ac79",
   "environment": "tablib-py312",
   "source": {
@@ -55,6 +55,265 @@
             "disclosure/TB-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TB-PROJECT-DEV-SCENE",
+      "title": "提供按名称重排与别名投影的独立表格快照",
+      "goal": "提供按名称重排与别名投影的独立表格快照",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-PROJECT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-PROJECT-DEV",
+          "kind": "modify",
+          "goal": "提供按名称重排与别名投影的独立表格快照",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tablib.projection.select_columns(dataset,columns,*,rename=None) plus schema/copy_rows/key_token helpers for later table operations. Require actual Dataset with nonempty unique string headers and consistent stored widths. Select/reorder nonempty unique existing names, validate rename output collisions, deep-copy stored cells/title/row tags and leave source unchanged. The result is explicitly a static data snapshot: dynamic cells keep current stored values and dynamic definitions/export formatters/separators are not copied or executed. key_token uses strict type-and-value hashable keys, so bool/int/float are distinct; fail clearly on mutable keys.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_project_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-project-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TB-PROJECT-DEV-contract.md",
+            "materials/TB-PROJECT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/tablib/projection.py",
+            "library/development_tests/test_development_tb_project_dev.py",
+            "library/docs/development-tb-project-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-PROJECT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-PROJECT-DEV.native.json",
+            "public_native": "verification/TB-PROJECT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-PROJECT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TB-DEDUP-DEV-SCENE",
+      "title": "以复合业务键稳定去重并提供全部重复组删除策略",
+      "goal": "以复合业务键稳定去重并提供全部重复组删除策略",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-DEDUP-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-DEDUP-DEV",
+          "kind": "modify",
+          "goal": "以复合业务键稳定去重并提供全部重复组删除策略",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tablib.dedup.deduplicate(dataset,by,*,keep=\"first\") using completed schema/key/copy semantics. by is an existing field or nonempty unique field list; keep first/last/False. Last retains last occurrence at its actual original position, False removes all members of duplicate groups. Composite keys are strict type/value (including None), reject mutable keys, preserve selected original row order and deep-copy title/cells/tags without source mutation. Empty headed datasets are valid, missing/duplicate key columns and invalid policies fail before producing output.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_dedup_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-dedup-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "TB-PROJECT-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TB-DEDUP-DEV-contract.md",
+            "materials/TB-DEDUP-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/tablib/dedup.py",
+            "library/development_tests/test_development_tb_dedup_dev.py",
+            "library/docs/development-tb-dedup-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-DEDUP-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-DEDUP-DEV.native.json",
+            "public_native": "verification/TB-DEDUP-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-DEDUP-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TB-JOIN-DEV-SCENE",
+      "title": "支持有预算的稳定多对多表格关联和明确空键策略",
+      "goal": "支持有预算的稳定多对多表格关联和明确空键策略",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-JOIN-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-JOIN-DEV",
+          "kind": "modify",
+          "goal": "支持有预算的稳定多对多表格关联和明确空键策略",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tablib.joining.join(left,right,on,*,how=\"left\",suffixes=(\"_left\",\"_right\"),nulls=\"never\",max_rows=100000) using completed static schema/key/copy semantics. Support inner/left/full outer, composite same-name keys, strict typed keys, many-to-many in stable left then right order and unmatched right rows last. Default None keys never match; equal is explicit. Omit repeated right join keys, populate left key columns on unmatched right rows, suffix colliding nonkeys and reject resulting name collisions. Preserve copied cells/title and combined row tags; fail before return on output budget overflow or mutable key, leaving both inputs unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_join_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-join-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "TB-PROJECT-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TB-JOIN-DEV-contract.md",
+            "materials/TB-JOIN-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/tablib/joining.py",
+            "library/development_tests/test_development_tb_join_dev.py",
+            "library/docs/development-tb-join-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-JOIN-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-JOIN-DEV.native.json",
+            "public_native": "verification/TB-JOIN-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-JOIN-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TB-CONVERT-DEV-SCENE",
+      "title": "按列执行业务类型转换并保留可定位单元格错误",
+      "goal": "按列执行业务类型转换并保留可定位单元格错误",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-CONVERT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-CONVERT-DEV",
+          "kind": "modify",
+          "goal": "按列执行业务类型转换并保留可定位单元格错误",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tablib.conversion.convert_columns(dataset,converters,*,errors=\"raise\") returning frozen ConversionResult(dataset,errors) and CellError(row,column,error_type,message). Use completed schema/copy semantics and actual raw cells in deterministic row then header order. Converters receive independent cell copies so mutation or late failures cannot affect source. Raise mode wraps ValueError/TypeError/OverflowError with row/name context; collect keeps original failed cell copy and continues while successful conversions survive. Preserve title/tags, reject unknown/noncallable columns and invalid strategies, propagate unrelated programming exceptions and store no traceback.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_convert_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-convert-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "TB-PROJECT-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TB-CONVERT-DEV-contract.md",
+            "materials/TB-CONVERT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/tablib/conversion.py",
+            "library/development_tests/test_development_tb_convert_dev.py",
+            "library/docs/development-tb-convert-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-CONVERT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-CONVERT-DEV.native.json",
+            "public_native": "verification/TB-CONVERT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-CONVERT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TB-LOAD-DEV-SCENE",
+      "title": "组合外部字段合同、真实字典导入与类型转换流程",
+      "goal": "组合外部字段合同、真实字典导入与类型转换流程",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-LOAD-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-LOAD-DEV",
+          "kind": "modify",
+          "goal": "组合外部字段合同、真实字典导入与类型转换流程",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tablib.loading.load_records(records,columns,*,aliases=None,missing=\"raise\",extra=\"raise\",converters=None,errors=\"raise\",title=None) returning completed ConversionResult. Output column order is explicit; aliases map output names to unique external keys. Validate missing raise/none and extra raise/ignore, consume mapping records once and detach values. Use actual Dataset.dict loading with canonical header prototype while retaining each later mapping order, requiring completed alignment repair; remove prototype before output. Compose actual convert_columns, preserve false/zero/empty/None, support empty input, fail without partial output and never mutate incoming records.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_load_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-load-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "TB-M01-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "TB-CONVERT-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TB-LOAD-DEV-contract.md",
+            "materials/TB-LOAD-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/tablib/loading.py",
+            "library/development_tests/test_development_tb_load_dev.py",
+            "library/docs/development-tb-load-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-LOAD-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-LOAD-DEV.native.json",
+            "public_native": "verification/TB-LOAD-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-LOAD-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

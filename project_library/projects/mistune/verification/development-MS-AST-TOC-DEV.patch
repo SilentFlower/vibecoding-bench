@@ -1,0 +1,82 @@
+--- a/library/development_tests/test_development_ms_ast_toc_dev.py
++++ b/library/development_tests/test_development_ms_ast_toc_dev.py
+@@ -0,0 +1,26 @@
++"""公开AST目录及嵌套标题回归。"""
++import mistune
++from mistune.toc import add_toc_hook
++
++def test_ast_mode_has_real_toc_items_and_heading_ids():
++    md=mistune.create_markdown(renderer='ast');add_toc_hook(md)
++    tokens,state=md.parse('# Hello **world**\n')
++    assert state.env['toc_items']==[(1,'toc_1','Hello world')] and tokens[0]['attrs']['id']=='toc_1'
++
++def test_nested_selection_is_explicit_and_in_source_order():
++    source='# One\n\n> ## Two\n\n### Three\n'
++    md=mistune.create_markdown(renderer='ast');add_toc_hook(md,include_nested=True)
++    result,state=md.parse(source)
++    assert [item[2] for item in state.env['toc_items']]==['One','Two','Three']
++    plain=mistune.create_markdown(renderer='ast');add_toc_hook(plain)
++    assert [item[2] for item in plain.parse(source)[1].env['toc_items']]==['One','Three']
++
++def test_level_bounds_and_custom_ids_are_preserved():
++    md=mistune.create_markdown(renderer='ast');add_toc_hook(md,min_level=2,max_level=2,heading_id=lambda token,index:'custom')
++    result,state=md.parse('# Skip\n\n## Included\n')
++    assert state.env['toc_items']==[(2,'custom','Included')]
++
++def test_repeated_documents_do_not_inherit_previous_directory():
++    md=mistune.create_markdown(renderer='ast');add_toc_hook(md)
++    md.parse('# First')
++    assert md.parse('plain')[1].env['toc_items']==[]
+--- a/library/docs/development-ms-ast-toc-dev.md
++++ b/library/docs/development-ms-ast-toc-dev.md
+@@ -0,0 +1,5 @@
++# 在AST模式生成目录并可显式收录嵌套标题
++
++AST转换同样需要目录元数据，可显式包含引用和列表容器中的标题，顺序、层级及唯一ID沿用原分配器。利用纯文本渲染取得标题内容，提取目录不重复注册脚注等插件状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/mistune/toc.py
++++ b/library/src/mistune/toc.py
+@@ -1,4 +1,6 @@
+ import re
++from copy import deepcopy
++from .renderers.text import PlainTextRenderer
+ from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
+ 
+ from .core import BlockState
+@@ -15,6 +17,7 @@
+     min_level: int = 1,
+     max_level: int = 3,
+     heading_id: Optional[Callable[[Dict[str, Any], int], str]] = None,
++    include_nested: bool = False,
+ ) -> None:
+     """Add a hook to save toc items into ``state.env``. This is
+     usually helpful for doc generator::
+@@ -46,7 +49,11 @@
+     def toc_hook(md: "Markdown", state: "BlockState") -> None:
+         headings = []
+ 
+-        for tok in state.tokens:
++        pending=list(reversed(state.tokens))
++        while pending:
++            tok=pending.pop()
++            if include_nested:
++                pending.extend(reversed(tok.get('children',[])))
+             if tok["type"] == "heading":
+                 level = tok["attrs"]["level"]
+                 if min_level <= level <= max_level:
+@@ -93,10 +100,10 @@
+ 
+ def normalize_toc_item(md: "Markdown", token: Dict[str, Any], parent: Optional[Any] = None) -> Tuple[int, str, str]:
+     text = token["text"]
+-    tokens = md.inline(text, parent.env if parent else {})
+-    assert md.renderer is not None
+-    html = md.renderer(tokens, BlockState())
+-    text = striptags(html)
++    tokens = md.inline(text, deepcopy(parent.env) if parent else {})
++    renderer=md.renderer or PlainTextRenderer()
++    html = renderer(tokens, BlockState())
++    text = striptags(html).rstrip('\n')
+     attrs = token["attrs"]
+     return attrs["level"], attrs["id"], text
+ 

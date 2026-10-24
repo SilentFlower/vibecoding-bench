@@ -1,0 +1,133 @@
+--- a/library/docs/development-rich-01-dev.md
++++ b/library/docs/development-rich-01-dev.md
+@@ -0,0 +1,5 @@
++# 格宽测量与字素裁切统一且非正宽容器可靠收口
++
++路线01/04作为完整格宽边界修复：特殊ZWJ/VS测量与实际分段共用宽度，零总宽/超末尾先收口避免越界；非正格宽裁切/折行统一为空，split非正位置保留右侧原文。正宽ASCII快路、字素及双宽替换空格合同保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/rich/cells.py
++++ b/library/rich/cells.py
+@@ -132,30 +132,8 @@
+             get_character_cell_size(character, unicode_version) for character in text
+         )
+ 
+-    cell_table = load_cell_table(unicode_version)
+-    total_width = 0
+-    last_measured_character: str | None = None
+-
+-    SPECIAL = {"\u200d", "\ufe0f"}
+-
+-    index = 0
+-    character_count = len(text)
+-
+-    while index < character_count:
+-        character = text[index]
+-        if character in SPECIAL:
+-            if character == "\u200d":
+-                index += 1
+-            elif last_measured_character:
+-                total_width += last_measured_character in cell_table.narrow_to_wide
+-                last_measured_character = None
+-        else:
+-            if character_width := get_character_cell_size(character, unicode_version):
+-                last_measured_character = character
+-                total_width += character_width
+-        index += 1
+-
+-    return total_width
++    # 特殊字符路径统一使用同一字素分段宽度，避免测量与裁切范围互相矛盾。
++    return split_graphemes(text,unicode_version)[1]
+ 
+ 
+ def split_graphemes(
+@@ -251,6 +229,8 @@
+         return "", text
+ 
+     spans, cell_length = split_graphemes(text, unicode_version)
++    if not cell_length or cell_position >= cell_length:
++        return text, ""
+ 
+     # Guess initial offset
+     offset = int((cell_position / cell_length) * len(spans))
+@@ -291,6 +271,8 @@
+     Returns:
+         Tuple to two split strings.
+     """
++    if cell_position <= 0:
++        return "", text
+     if _is_single_cell_widths(text):
+         return text[:cell_position], text[cell_position:]
+     return _split_text(text, cell_position, unicode_version)
+@@ -307,6 +289,8 @@
+     Returns:
+         A string with cell size equal to total.
+     """
++    if total <= 0:
++        return ""
+     if _is_single_cell_widths(text):
+         size = len(text)
+         if size < total:
+@@ -314,11 +298,15 @@
+         return text[:total]
+     if total <= 0:
+         return ""
+-    cell_size = cell_len(text)
++    cell_size = cell_len(text, unicode_version)
+     if cell_size == total:
+         return text
+     if cell_size < total:
+-        return text + " " * (total - cell_size)
++        result=text + " " * (total-cell_size)
++        # 尾随ZWJ可吞掉第一个补位空格；按同一字素模型复测补齐，而非假设可加宽度。
++        measured=cell_len(result,unicode_version)
++        if measured<total:result+=" "*(total-measured)
++        return result
+     text, _ = _split_text(text, total, unicode_version)
+     return text
+ 
+@@ -334,6 +322,8 @@
+         A list of strings such that each string in the list has cell width
+         less than or equal to the available width.
+     """
++    if width <= 0:
++        return []
+     if _is_single_cell_widths(text):
+         return [text[index : index + width] for index in range(0, len(text), width)]
+     spans, _ = split_graphemes(text, unicode_version)
+--- a/library/rich/text.py
++++ b/library/rich/text.py
+@@ -1221,6 +1221,8 @@
+         Returns:
+             Lines: Number of lines.
+         """
++        if width <= 0:
++            return Lines()
+         wrap_justify = justify or self.justify or DEFAULT_JUSTIFY
+         wrap_overflow = overflow or self.overflow or DEFAULT_OVERFLOW
+ 
+--- a/library/tests/test_development_rich_01_dev.py
++++ b/library/tests/test_development_rich_01_dev.py
+@@ -0,0 +1,22 @@
++"""裁切测量与字素范围一致，零宽容器不能触发范围或除零错误。"""
++from rich.cells import split_graphemes,cell_len,_split_text,set_cell_size,chop_cells
++from rich.console import Console
++from rich.text import Text
++
++
++def test_zero_width_and_all_zero_graphemes_have_bounded_behavior():
++    """ASCII与非ASCII非正宽度统一为空，不存在零除。@return None。"""
++    for value in ('abc','中文','\u200d\u200d','e\u0301'):
++        for width in (0,-1,-10):
++            assert set_cell_size(value,width)=='' and chop_cells(value,width)==[]
++            assert list(Text(value).wrap(Console(),width))==[]
++    assert _split_text('\u200d\u200d',1)==('\u200d\u200d','')
++
++
++def test_special_measurement_and_splits_share_the_same_spans():
++    """复杂ZWJ/VS与中文按同一分段宽度测量，不越过最后span。@return None。"""
++    for value in ('👩\u200d🔧中文','❤\ufe0f\u200d❤\ufe0fX','\u200dA\ufe0f中'):
++        spans,width=split_graphemes(value)
++        assert cell_len(value)==width
++        assert _split_text(value,width+10)==(value,'')
++        for size in range(width+2):assert cell_len(set_cell_size(value,size))==size

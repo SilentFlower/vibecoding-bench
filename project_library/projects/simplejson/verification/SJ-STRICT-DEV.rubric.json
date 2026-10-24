@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SJ-STRICT-DEV",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement simplejson.strict.strict_loads(document,*,use_decimal=False) using the real decoder. Reject duplicate object keys at every depth after escape decoding, NaN/Infinity and finite-text numbers that overflow binary float. use_decimal=True preserves exact finite Decimal values and integer behavior. Accept normal UTF-8 bytes and text, preserve native JSON syntax errors and do not change existing loads defaults or globally toggle decoder engines.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

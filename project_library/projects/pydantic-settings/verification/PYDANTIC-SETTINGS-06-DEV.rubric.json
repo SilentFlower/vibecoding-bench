@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYDANTIC-SETTINGS-06-DEV",
+  "source_commit": "8dc9e05ab07d91e21dd2a37d0b9c30f6d92b1930",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair EnvSettingsSource.next_field to resolve TypeAliasType, parameterized named aliases and outer Annotated wrappers before inspecting Union/model/dataclass/dict structure. Optional named model aliases must decode nested list fields like direct models, preserving None and whole-object JSON. Follow alias layers without unbounded traversal into recursive model fields; inspect actual provided path only. Preserve field validation metadata, case policy, generic substitutions, invalid input rejection and existing plain/Union handling. Do not remove model aliases or globally force JSON parsing.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

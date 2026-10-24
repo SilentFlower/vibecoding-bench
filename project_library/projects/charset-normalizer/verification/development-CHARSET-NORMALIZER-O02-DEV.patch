@@ -1,0 +1,97 @@
+--- a/library/docs/development-charset-normalizer-o02-dev.md
++++ b/library/docs/development-charset-normalizer-o02-dev.md
+@@ -0,0 +1,5 @@
++# 按总缓冲预算读取流并报告实际覆盖范围
++
++新增明确总预算的二进制流检测，不发read(-1)，短读继续、零预算不读取。实际候选附读字节、EOF和预算耗尽事实，前缀不冒称全文；位置恢复和调用者流所有权保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/charset_normalizer/streams.py
++++ b/library/src/charset_normalizer/streams.py
+@@ -0,0 +1,45 @@
++"""以明确总缓冲预算读取二进制流并报告实际覆盖。"""
++from charset_normalizer import from_bytes
++
++
++def from_stream(stream, *, max_bytes, read_size=65536, preserve_position=True, **options):
++    """不发出read(-1)，候选仅代表已读取范围。
++
++    :param stream: 调用者拥有的二进制流。
++    :param max_bytes: 非负总读取和缓冲上限。
++    :param read_size: 正整数单次读取上限，区别于评分chunk_size。
++    :param preserve_position: 是否在成功失败后恢复可seek流的位置。
++    :param options: 实际from_bytes检测选项。
++    :return: matches/read_bytes/eof/budget_exhausted，不声称未读尾部验证。
++    """
++    if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 0:
++        raise ValueError('总字节预算必须为非负整数')
++    if not isinstance(read_size, int) or isinstance(read_size, bool) or read_size <= 0:
++        raise ValueError('读取块必须为正整数')
++    if max_bytes == 0:
++        return {'matches': from_bytes(b'', **options), 'read_bytes': 0, 'eof': False, 'budget_exhausted': True}
++    offset = None
++    if preserve_position:
++        try:
++            offset = stream.tell()
++            stream.seek(offset)
++        except (AttributeError, OSError) as error:
++            raise ValueError('保留位置需要可seek流') from error
++    buffer, eof = bytearray(), False
++    try:
++        while len(buffer) < max_bytes:
++            limit = min(read_size, max_bytes - len(buffer))
++            chunk = stream.read(limit)
++            if not isinstance(chunk, (bytes, bytearray)):
++                raise TypeError('流必须返回二进制数据')
++            if len(chunk) > limit:
++                raise ValueError('流违反读取上限协议')
++            if not chunk:
++                eof = True
++                break
++            buffer.extend(chunk)
++        return {'matches': from_bytes(bytes(buffer), **options), 'read_bytes': len(buffer),
++            'eof': eof, 'budget_exhausted': len(buffer) >= max_bytes}
++    finally:
++        if offset is not None:
++            stream.seek(offset)
+--- a/library/tests/test_development_charset_normalizer_o02_dev.py
++++ b/library/tests/test_development_charset_normalizer_o02_dev.py
+@@ -0,0 +1,38 @@
++"""真实流读取必须有界且不关闭调用者对象。"""
++import io
++
++def test_bounded_read_and_position():
++    """评分抽样设置不能代替读取预算。@return None。"""
++    from charset_normalizer.streams import from_stream
++    class Spy(io.BytesIO):
++        """记录实际read参数。"""
++        def read(self, size=-1):
++            """禁止无界读取。@param size 大小。@return 字节。"""
++            assert 0 <= size <= 3
++            return super().read(size)
++    source = Spy(b'xxplain ascii tail')
++    source.seek(2)
++    result = from_stream(source, max_bytes=5, read_size=3)
++    assert result['read_bytes'] == 5 and not result['eof'] and result['budget_exhausted']
++    assert source.tell() == 2 and not source.closed
++
++def test_short_read_and_full_candidate():
++    """短读继续到EOF，真实候选文字一致。@return None。"""
++    from charset_normalizer.streams import from_stream
++    class Short(io.BytesIO):
++        """每次最多一字节。"""
++        def read(self, size=-1):
++            """产生短读。@param size 请求。@return 字节。"""
++            return super().read(min(size, 1))
++    result = from_stream(Short(b'hello'), max_bytes=20)
++    assert result['eof'] and str(result['matches'].best()) == 'hello'
++
++def test_zero_and_text_errors():
++    """零不读取，文本流拒绝且恢复位置。@return None。"""
++    import pytest
++    from charset_normalizer.streams import from_stream
++    source = io.BytesIO(b'abc')
++    assert from_stream(source, max_bytes=0)['read_bytes'] == 0 and source.tell() == 0
++    text = io.StringIO('abc')
++    with pytest.raises(TypeError): from_stream(text, max_bytes=4)
++    assert text.tell() == 0 and not text.closed

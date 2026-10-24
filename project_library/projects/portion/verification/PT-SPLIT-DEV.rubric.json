@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PT-SPLIT-DEV",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Interval.split(points, *, ownership='right') returning an ordered tuple of same-class nonempty atomic intervals. Sort/deduplicate a finite one-shot cut iterable, ignore cuts outside the interior of each atomic part and explicitly assign internal cut points to the right or left partition. Preserve original exterior openness, gaps, empty/singleton intervals and comparable date endpoints. Returned pieces must be pairwise disjoint and their union exactly the input; do not change Interval normalization to keep partitions apart.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,84 @@
+--- a/library/docs/development-charset-normalizer-o04-dev.md
++++ b/library/docs/development-charset-normalizer-o04-dev.md
+@@ -0,0 +1,5 @@
++# 按显式格式和预算检测本地压缩文本
++
++显式选择gzip/bz2/xz，带必需解压预算读取完整载荷后真实检测，并报告压缩及解压大小。支持空内容和多成员gzip；损坏、截断或超限不返回部分成功、不改原文件，不猜格式或联网。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/charset_normalizer/compressed.py
++++ b/library/src/charset_normalizer/compressed.py
+@@ -0,0 +1,36 @@
++"""显式且有解压字节上限的本地压缩文本读取。"""
++from pathlib import Path
++from charset_normalizer import from_bytes
++
++
++def from_compressed_path(path, *, format, max_bytes, read_size=65536, **options):
++    """完整解压后调用真实检测，不自动猜压缩格式。
++
++    :param path: 本地压缩文件路径。
++    :param format: gzip、bz2或xz。
++    :param max_bytes: 非负解压结果上限；最多多读一个哨兵字节确认超限。
++    :param read_size: 正整数块大小。
++    :param options: from_bytes检测选项。
++    :return: matches及真实压缩/解压大小和格式；截断/损坏/超限不返回部分成功。
++    """
++    import bz2
++    import gzip
++    import lzma
++    if format not in ('gzip', 'bz2', 'xz'):
++        raise ValueError('压缩格式必须显式选择')
++    if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 0:
++        raise ValueError('解压上限必须为非负整数')
++    if not isinstance(read_size, int) or isinstance(read_size, bool) or read_size <= 0:
++        raise ValueError('读取块必须为正整数')
++    opener = {'gzip': gzip.open, 'bz2': bz2.open, 'xz': lzma.open}[format]
++    buffer = bytearray()
++    with opener(path, 'rb') as stream:
++        while True:
++            chunk = stream.read(min(read_size, max_bytes - len(buffer) + 1))
++            if not chunk:
++                break
++            if len(buffer) + len(chunk) > max_bytes:
++                raise ValueError('压缩文本超出解压预算')
++            buffer.extend(chunk)
++    return {'matches': from_bytes(bytes(buffer), **options), 'compressed_bytes': Path(path).stat().st_size,
++        'decoded_bytes': len(buffer), 'format': format}
+--- a/library/tests/test_development_charset_normalizer_o04_dev.py
++++ b/library/tests/test_development_charset_normalizer_o04_dev.py
+@@ -0,0 +1,34 @@
++"""三种实际压缩文本读取必须有严格解压预算。"""
++import bz2
++import gzip
++import lzma
++
++def test_three_formats_same_text(tmp_path):
++    """gzip/bz2/xz均调用真实检测得到同样文字。@param tmp_path 临时目录。@return None。"""
++    from charset_normalizer.compressed import from_compressed_path
++    payload = 'Hello compressed 中文'.encode('utf-8')
++    for format, compress in [('gzip', gzip.compress), ('bz2', bz2.compress), ('xz', lzma.compress)]:
++        path = tmp_path / format
++        path.write_bytes(compress(payload))
++        result = from_compressed_path(path, format=format, max_bytes=len(payload), cp_isolation=['utf-8'])
++        assert str(result['matches'].best()) == payload.decode('utf-8') and result['decoded_bytes'] == len(payload)
++
++def test_over_budget_and_original(tmp_path):
++    """超限拒绝且压缩原文件不改变。@param tmp_path 临时目录。@return None。"""
++    import pytest
++    from charset_normalizer.compressed import from_compressed_path
++    path = tmp_path / 'text.gz'
++    original = gzip.compress(b'x' * 100)
++    path.write_bytes(original)
++    with pytest.raises(ValueError): from_compressed_path(path, format='gzip', max_bytes=5)
++    assert path.read_bytes() == original
++
++def test_empty_and_truncated(tmp_path):
++    """空载荷可识别，损坏尾部不返回部分成功。@param tmp_path 临时目录。@return None。"""
++    import pytest
++    from charset_normalizer.compressed import from_compressed_path
++    path = tmp_path / 'empty.gz'
++    path.write_bytes(gzip.compress(b''))
++    assert from_compressed_path(path, format='gzip', max_bytes=0)['decoded_bytes'] == 0
++    path.write_bytes(gzip.compress(b'abc')[:-4])
++    with pytest.raises((EOFError, OSError)): from_compressed_path(path, format='gzip', max_bytes=10)

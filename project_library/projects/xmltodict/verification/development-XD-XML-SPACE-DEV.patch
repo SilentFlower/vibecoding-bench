@@ -1,0 +1,83 @@
+--- a/library/development_tests/test_development_xd_xml_space_dev.py
++++ b/library/development_tests/test_development_xd_xml_space_dev.py
+@@ -0,0 +1,20 @@
++"""公开xml:space局部空白回归。"""
++import xmltodict
++
++def test_preserve_inherits_and_default_restores_original_policy():
++    text='<r xml:space="preserve"><a>  one  </a><b xml:space="default">  two  </b></r>'
++    result=xmltodict.parse(text,respect_xml_space=True)['r']
++    assert result['a']=='  one  ' and result['b']['#text']=='two'
++
++def test_siblings_restore_parent_policy():
++    result=xmltodict.parse('<r><a xml:space="preserve"> x </a><b> y </b></r>',respect_xml_space=True)['r']
++    assert result['a']['#text']==' x ' and result['b']=='y'
++
++def test_default_respects_callers_disabled_strip_and_legacy_stays_same():
++    assert xmltodict.parse('<r xml:space="default"> x </r>',respect_xml_space=True,strip_whitespace=False)['r']['#text']==' x '
++    assert xmltodict.parse('<r xml:space="preserve"> x </r>')['r']['#text']=='x'
++
++def test_expanded_namespace_and_streaming_callbacks_observe_effective_policy():
++    seen=[]
++    xmltodict.parse('<r><a xml:space="preserve"> x </a><a> y </a></r>',process_namespaces=True,respect_xml_space=True,item_depth=2,item_callback=lambda path,item:not seen.append(item))
++    assert seen[0]['#text']==' x ' and seen[1]=='y'
+--- a/library/docs/development-xd-xml-space-dev.md
++++ b/library/docs/development-xd-xml-space-dev.md
+@@ -0,0 +1,5 @@
++# 按元素继承xml:space局部空白规则并恢复兄弟状态
++
++预格式化XML内容需要继承xml:space的局部空白规则，default恢复调用者原策略，子树结束后准确恢复父状态。支持命名空间及流式回调，不让一个保留空白的元素影响后面的兄弟元素。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/xmltodict.py
++++ b/library/xmltodict.py
+@@ -24,6 +24,7 @@
+         cdata_separator="",
+         postprocessor=None,
+         dict_constructor=dict,
++        respect_xml_space=False,
+         strip_whitespace=True,
+         namespace_separator=":",
+         namespaces=None,
+@@ -43,6 +44,11 @@
+         self.cdata_separator = cdata_separator
+         self.postprocessor = postprocessor
+         self.dict_constructor = dict_constructor
++        if type(respect_xml_space) is not bool:
++            raise TypeError('respect_xml_space必须为布尔值')
++        self._respect_xml_space=respect_xml_space
++        self._default_strip_whitespace=strip_whitespace
++        self._whitespace_stack=[]
+         self.strip_whitespace = strip_whitespace
+         self.namespace_separator = namespace_separator
+         self.namespaces = namespaces
+@@ -77,6 +83,13 @@
+     def startElement(self, full_name, attrs):
+         name = self._build_name(full_name)
+         attrs = self._attrs_to_dict(attrs)
++        self._whitespace_stack.append(self.strip_whitespace)
++        if self._respect_xml_space:
++            space=attrs.get('xml:space',attrs.get('http://www.w3.org/XML/1998/namespace'+self.namespace_separator+'space'))
++            if space=='preserve':
++                self.strip_whitespace=False
++            elif space=='default':
++                self.strip_whitespace=self._default_strip_whitespace
+         if self.namespace_declarations:
+             if not attrs:
+                 attrs = self.dict_constructor()
+@@ -130,6 +143,7 @@
+             else:
+                 self.item = None
+                 self.data = []
++            self.strip_whitespace=self._whitespace_stack.pop()
+             self.path.pop()
+             return
+         if self.stack:
+@@ -150,6 +164,7 @@
+         else:
+             self.item = None
+             self.data = []
++        self.strip_whitespace=self._whitespace_stack.pop()
+         self.path.pop()
+ 
+     def characters(self, data):

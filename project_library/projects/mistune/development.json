@@ -3,7 +3,7 @@
   "project_key": "mistune",
   "title": "Mistune文档处理开发任务",
   "category": "文档解析与本地转换",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实文档处理工程目标，覆盖CLI、AST、纯文本、目录、URL和脚注定位；实现、独立验收和累计原生回归。",
   "seed_digest": "69380eb6a395d926252293d0f9635ee0a671c1d7edccad33c6ecda43593b3aa5",
   "environment": "mistune-py312",
   "source": {
@@ -56,6 +56,256 @@
             "disclosure/MS-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "MS-CLI-AST-DEV-SCENE",
+      "title": "通过CLI把真实Markdown AST导出为可解析JSON",
+      "goal": "通过CLI把真实Markdown AST导出为可解析JSON",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MS-CLI-AST-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-CLI-AST-DEV",
+          "kind": "modify",
+          "goal": "通过CLI把真实Markdown AST导出为可解析JSON",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nSupport existing CLI --renderer ast by serializing the actual list of token dictionaries as UTF8 JSON on stdout or --output. Preserve input priority, explicit/piped empty documents as [], source Unicode, nested token attributes and configured plugins; do not stringify Python repr or wrap JSON in HTML. Existing html/markdown/rst/version behavior and file/stdout side effects stay compatible. Use the completed empty-document fix as prerequisite; errors still yield a nonzero process status.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ms_cli_ast_dev.py and concise Chinese compatibility documentation at library/docs/development-ms-cli-ast-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "MS-M01-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/MS-CLI-AST-DEV-contract.md",
+            "materials/MS-CLI-AST-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/mistune/__main__.py",
+            "library/development_tests/test_development_ms_cli_ast_dev.py",
+            "library/docs/development-ms-cli-ast-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MS-CLI-AST-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-CLI-AST-DEV.native.json",
+            "public_native": "verification/MS-CLI-AST-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MS-CLI-AST-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MS-PLAIN-TEXT-DEV-SCENE",
+      "title": "把真实Markdown结构渲染为保留代码和层次的纯文本",
+      "goal": "把真实Markdown结构渲染为保留代码和层次的纯文本",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MS-PLAIN-TEXT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-PLAIN-TEXT-DEV",
+          "kind": "modify",
+          "goal": "把真实Markdown结构渲染为保留代码和层次的纯文本",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement mistune.renderers.text.PlainTextRenderer(include_urls=False) as BaseRenderer with NAME=\"text\". Retain inline text/entity semantics and literal code, paragraph/heading/quote boundaries, ordered/unordered list item separation, task state, table cell boundaries and footnote references from actual tokens. Strip raw HTML tags while keeping text; optionally append link/image URLs without duplicating identical visible URLs. Handle AST plugin containers through children, empty input and repeated use without state leakage. Output must not include formatting HTML or silently use the HTML renderer and remove all structure.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ms_plain_text_dev.py and concise Chinese compatibility documentation at library/docs/development-ms-plain-text-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MS-PLAIN-TEXT-DEV-contract.md",
+            "materials/MS-PLAIN-TEXT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/mistune/renderers/text.py",
+            "library/development_tests/test_development_ms_plain_text_dev.py",
+            "library/docs/development-ms-plain-text-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MS-PLAIN-TEXT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-PLAIN-TEXT-DEV.native.json",
+            "public_native": "verification/MS-PLAIN-TEXT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MS-PLAIN-TEXT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MS-AST-TOC-DEV-SCENE",
+      "title": "在AST模式生成目录并可显式收录嵌套标题",
+      "goal": "在AST模式生成目录并可显式收录嵌套标题",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MS-AST-TOC-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-AST-TOC-DEV",
+          "kind": "modify",
+          "goal": "在AST模式生成目录并可显式收录嵌套标题",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend add_toc_hook with include_nested=False and support renderer=None AST mode. Preserve default top-level heading selection, explicit/custom IDs, allocator collision handling and level bounds. When opted in, walk block-container descendants in source preorder; normalize AST heading display text through completed PlainTextRenderer. Expose real state.env[\"toc_items\"] and assigned heading IDs without HTML renderer assertions. Inline normalization must use an isolated environment so collecting metadata does not register additional footnote references or mutate document plugin state.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ms_ast_toc_dev.py and concise Chinese compatibility documentation at library/docs/development-ms-ast-toc-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "MS-PLAIN-TEXT-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/MS-AST-TOC-DEV-contract.md",
+            "materials/MS-AST-TOC-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/mistune/toc.py",
+            "library/development_tests/test_development_ms_ast_toc_dev.py",
+            "library/docs/development-ms-ast-toc-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MS-AST-TOC-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-AST-TOC-DEV.native.json",
+            "public_native": "verification/MS-AST-TOC-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MS-AST-TOC-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MS-URL-REWRITE-DEV-SCENE",
+      "title": "在链接和图片渲染前改写URL并继续执行原协议策略",
+      "goal": "在链接和图片渲染前改写URL并继续执行原协议策略",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MS-URL-REWRITE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-URL-REWRITE-DEV",
+          "kind": "modify",
+          "goal": "在链接和图片渲染前改写URL并继续执行原协议策略",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd HTMLRenderer keyword-only url_rewriter=None. For actual rendered link/image tokens, call (original_url,\"link\"|\"image\") once and require a string return; then run the existing sanitize_url and attribute escaping on the rewritten URL. Preserve visible link text, image alt/title, nested emphasis, reference links and auto links. Default output and raw HTML remain unchanged; callback exceptions propagate and a rewritten javascript URL must not bypass the existing harmful-protocol policy.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ms_url_rewrite_dev.py and concise Chinese compatibility documentation at library/docs/development-ms-url-rewrite-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MS-URL-REWRITE-DEV-contract.md",
+            "materials/MS-URL-REWRITE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/mistune/renderers/html.py",
+            "library/development_tests/test_development_ms_url_rewrite_dev.py",
+            "library/docs/development-ms-url-rewrite-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MS-URL-REWRITE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-URL-REWRITE-DEV.native.json",
+            "public_native": "verification/MS-URL-REWRITE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MS-URL-REWRITE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MS-UNIQUE-FOOTNOTES-DEV-SCENE",
+      "title": "为重复脚注生成唯一引用锚点及全部返回链接",
+      "goal": "为重复脚注生成唯一引用锚点及全部返回链接",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MS-UNIQUE-FOOTNOTES-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MS-UNIQUE-FOOTNOTES-DEV",
+          "kind": "modify",
+          "goal": "为重复脚注生成唯一引用锚点及全部返回链接",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend footnotes(md,*,unique_refs=False) with an explicit compatibility-preserving mode. Each occurrence of one defined footnote gets a unique fnref-N, fnref-N-2,... HTML id and the footnote item links back to all occurrences. Keep one note definition/order/index and expose occurrence metadata in opted-in AST tokens; unknown references remain literal. Reset counts per parsed document, preserve escaping and legacy default HTML/AST exactly, and verify document reuse plus interaction with directory extraction.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ms_unique_footnotes_dev.py and concise Chinese compatibility documentation at library/docs/development-ms-unique-footnotes-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "MS-AST-TOC-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/MS-UNIQUE-FOOTNOTES-DEV-contract.md",
+            "materials/MS-UNIQUE-FOOTNOTES-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/mistune/plugins/footnotes.py",
+            "library/development_tests/test_development_ms_unique_footnotes_dev.py",
+            "library/docs/development-ms-unique-footnotes-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MS-UNIQUE-FOOTNOTES-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MS-UNIQUE-FOOTNOTES-DEV.native.json",
+            "public_native": "verification/MS-UNIQUE-FOOTNOTES-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MS-UNIQUE-FOOTNOTES-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

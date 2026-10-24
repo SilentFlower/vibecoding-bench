@@ -1,0 +1,57 @@
+--- a/library/docs/development-python-markdown-04-dev.md
++++ b/library/docs/development-python-markdown-04-dev.md
+@@ -0,0 +1,5 @@
++# 围栏代码块可选择同字符更长结束围栏且保持原默认
++
++路线09：围栏结束长度新增显式at_least模式，同字符不少于开围栏长度才结束，较短段保留代码，混合字符及尾随文本不误闭合；语言/属性与转义保持。默认exact及后续实例行为不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/markdown/extensions/fenced_code.py
++++ b/library/markdown/extensions/fenced_code.py
+@@ -38,6 +38,7 @@
+ class FencedCodeExtension(Extension):
+     def __init__(self, **kwargs):
+         self.config = {
++            'closing_fence': ['exact', '结束围栏模式exact或at_least，默认保持历史行为。'],
+             'lang_prefix': ['language-', 'Prefix prepended to the language. Default: "language-"']
+         }
+         """ Default configuration options. """
+@@ -77,6 +78,12 @@
+     def __init__(self, md: Markdown, config: dict[str, Any]):
+         super().__init__(md)
+         self.config = config
++        mode=config['closing_fence']
++        if mode not in ('exact','at_least'):raise ValueError('未知结束围栏模式')
++        if mode=='at_least':
++            pattern=self.FENCED_BLOCK_RE.pattern.replace('(?P<fence>^(?:~{3,}|`{3,}))','(?P<fence>^(?P<fence_char>[~`])(?P=fence_char){2,})')
++            pattern=pattern.replace('(?P=fence)[ ]*$','(?P=fence)(?P=fence_char)*[ ]*$')
++            self.FENCED_BLOCK_RE=re.compile(pattern,self.FENCED_BLOCK_RE.flags)
+         self.checked_for_deps = False
+         self.codehilite_conf: dict[str, Any] = {}
+         self.use_attr_list = False
+--- a/library/tests/test_development_python_markdown_04_dev.py
++++ b/library/tests/test_development_python_markdown_04_dev.py
+@@ -0,0 +1,23 @@
++"""结束围栏最小长度是显式兼容模式，默认exact保持。"""
++import unittest
++import markdown
++
++
++def test_longer_same_character_closer_and_default_isolation():
++    """开三闭五可选识别，语言与代码正文不丢。@return None。"""
++    text='~~~python\nprint("中文")\n~~~~~'
++    default=markdown.markdown(text,extensions=['markdown.extensions.fenced_code'])
++    output=markdown.markdown(text,extensions=['markdown.extensions.fenced_code'],extension_configs={'markdown.extensions.fenced_code':{'closing_fence':'at_least'}})
++    assert '<pre>' not in default
++    assert '<pre><code class="language-python">print(&quot;中文&quot;)\n</code></pre>' in output
++    assert '<pre>' not in markdown.markdown(text,extensions=['markdown.extensions.fenced_code'])
++
++
++def test_shorter_mixed_or_nonstandalone_closer_does_not_close():
++    """字符与长度双重约束，内部较短围栏仍为代码。@return None。"""
++    text='~~~~\na\n~~~\nb\n~~~~~'
++    output=markdown.markdown(text,extensions=['markdown.extensions.fenced_code'],extension_configs={'markdown.extensions.fenced_code':{'closing_fence':'at_least'}})
++    assert 'a\n~~~\nb\n' in output and '<pre>' in output
++    for text in ('~~~\na\n````','~~~\na\n~~~~tail'):
++        assert '<pre>' not in markdown.markdown(text,extensions=['markdown.extensions.fenced_code'],extension_configs={'markdown.extensions.fenced_code':{'closing_fence':'at_least'}})
++    with unittest.TestCase().assertRaises(ValueError):markdown.Markdown(extensions=['markdown.extensions.fenced_code'],extension_configs={'markdown.extensions.fenced_code':{'closing_fence':'wrong'}})

@@ -1,0 +1,84 @@
+--- a/library/development_tests/test_development_wz_pipeline_dev.py
++++ b/library/development_tests/test_development_wz_pipeline_dev.py
+@@ -0,0 +1,37 @@
++"""公开API中间件端到端真实WSGI回归。"""
++import pytest
++from werkzeug.wrappers import Request,Response
++from werkzeug.test import Client,EnvironBuilder
++from werkzeug.exceptions import BadRequest
++from werkzeug.request_id import RequestIdMiddleware
++from werkzeug.problem_middleware import ProblemMiddleware
++from werkzeug.strict_json import read_json
++from werkzeug.negotiated_json import json_response
++
++def app(environ,start_response):
++    request=Request(environ);value=read_json(request,max_bytes=20)
++    return json_response(value,request)(environ,start_response)
++
++def test_real_stack_converts_bad_input_and_keeps_request_identity():
++    client=Client(RequestIdMiddleware(ProblemMiddleware(app),factory=lambda:'request-1'),Response)
++    bad=client.post('/',data='{"x":1,"x":2}',content_type='application/json')
++    assert bad.status_code==400 and bad.get_json()['request_id']=='request-1' and bad.headers['X-Request-ID']=='request-1'
++    good=client.post('/',data='false',content_type='application/json');assert good.get_json() is False and good.headers['X-Request-ID']=='request-1'
++
++def test_nonhttp_programming_error_is_not_hidden():
++    def failing(environ,start_response): raise RuntimeError('bug')
++    with pytest.raises(RuntimeError): ProblemMiddleware(failing)({},lambda *args:None)
++
++def test_http_error_after_headers_started_cannot_send_second_response():
++    calls=[]
++    def failing(environ,start_response): start_response('200 OK',[]);raise BadRequest()
++    with pytest.raises(BadRequest): ProblemMiddleware(failing)({},lambda *args:calls.append(args))
++    assert len(calls)==1
++
++def test_iterable_time_http_error_propagates_without_preconsuming():
++    def app(environ,start_response):
++        start_response('200 OK',[])
++        def stream(): yield b'first';raise BadRequest()
++        return stream()
++    result=ProblemMiddleware(app)({},lambda *args:None);assert next(result)==b'first'
++    with pytest.raises(BadRequest): next(result)
+--- a/library/docs/development-wz-pipeline-dev.md
++++ b/library/docs/development-wz-pipeline-dev.md
+@@ -0,0 +1,5 @@
++# 组合真实异常响应和请求标识形成保持流语义的API中间件
++
++把调用期HTTP异常转换为真实问题响应，并与请求标识及严格输入流程组合。已发送响应头或进入流迭代后不能再伪造第二个响应，其他程序错误原样传播，成功流保持原对象。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/werkzeug/problem_middleware.py
++++ b/library/src/werkzeug/problem_middleware.py
+@@ -0,0 +1,33 @@
++"""只转换尚未开始响应的调用期HTTP异常。"""
++from .exceptions import HTTPException
++from .problems import problem_response
++
++
++class ProblemMiddleware:
++    """保留已开始响应及迭代期异常，避免二次发送状态头。"""
++    def __init__(self,app):
++        """建立中间件。@param app 原WSGI应用。@return None。
++        """
++        if not callable(app):
++            raise TypeError('需要WSGI应用')
++        self.app=app
++
++    def __call__(self,environ,start_response):
++        """运行应用并转换调用期HTTP异常。@param environ 原环境。
++        @param start_response 原响应函数。@return 原应用流或真实问题JSON响应流。
++        """
++        started=False
++        def begin(status,headers,exc_info=None):
++            nonlocal started
++            result=start_response(status,headers,exc_info) if exc_info is not None else start_response(status,headers)
++            started=True
++            return result
++        try:
++            return self.app(environ,begin)
++        except HTTPException as error:
++            if started:
++                raise
++            identity=environ.get('werkzeug.request_id')
++            extensions={'request_id':identity} if isinstance(identity,str) else None
++            response=problem_response(error,extensions=extensions)
++            return response(environ,start_response)

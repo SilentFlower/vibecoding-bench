@@ -1,0 +1,75 @@
+--- a/library/constraint/optimization.py
++++ b/library/constraint/optimization.py
+@@ -0,0 +1,35 @@
++"""显式方向的本地最优解枚举，预算停止不冒称已证最优。"""
++import math
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True)
++class OptimizationResult:
++    """本轮最好方案与证明状态。@param solution 最好方案。@param score 目标值。@param examined 已评估解数。@param complete 是否穷尽。@param reason 终止原因。"""
++    solution: object
++    score: object
++    examined: int
++    complete: bool
++    reason: str
++
++
++def optimize(problem,objective,direction='min',max_solutions=None):
++    """使用真实求解迭代器寻找最好方案。@param problem 原模型。@param objective 对赋值的有限数值函数。@param direction min/max。@param max_solutions 可选非负评估预算。@return OptimizationResult。"""
++    if direction not in ('min','max'):raise ValueError('未知优化方向')
++    if max_solutions is not None and (type(max_solutions) is not int or max_solutions<0):raise ValueError('预算必须非负整数')
++    if max_solutions==0:return OptimizationResult(None,None,0,False,'budget')
++    iterator=iter(problem.getSolutionIter())
++    best=None;best_score=None;count=0
++    try:
++        for solution in iterator:
++            # 防止目标函数修改当前求解器的赋值对象，历史保存也用独立dict。
++            score=objective(dict(solution))
++            if isinstance(score,bool) or not isinstance(score,(int,float)) or not math.isfinite(score):raise ValueError('目标值必须为有限数字')
++            count+=1
++            if best is None or (score<best_score if direction=='min' else score>best_score):
++                best=dict(solution);best_score=score
++            if max_solutions is not None and count>=max_solutions:return OptimizationResult(best,best_score,count,False,'budget')
++        return OptimizationResult(best,best_score,count,True,'optimal' if best is not None else 'unsatisfiable')
++    finally:
++        close=getattr(iterator,'close',None)
++        if close is not None:close()
+--- a/library/docs/development-python-constraint-06-dev.md
++++ b/library/docs/development-python-constraint-06-dev.md
+@@ -0,0 +1,5 @@
++# 有限可行排班按显式目标优化并清楚区分预算与最优证明
++
++路线18：真实可行解迭代优化，min/max方向明确，方案及目标值可追溯，首个并列稳定。只有穷尽才声明最优/无解，预算达到时明确未完成且无窥探；零预算不开始，异常/提前返回关闭迭代器，复用已交付的字符串生命周期与域隔离。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_python_constraint_06_dev.py
++++ b/library/tests/test_development_python_constraint_06_dev.py
+@@ -0,0 +1,26 @@
++"""最优值来自真实可行解，部分搜索绝不标已最优。"""
++import unittest
++from constraint import Problem,BacktrackingSolver
++from constraint.optimization import optimize
++
++
++def test_min_max_repeat_and_model_preservation():
++    """同一字符串排班模型多轮目标变化不累积规则或缩域。@return None。"""
++    problem=Problem(BacktrackingSolver());problem.addVariables(['x','y'],(value for value in range(4)));problem.addConstraint('x < y')
++    minimum=optimize(problem,lambda row:row['x']+row['y'])
++    maximum=optimize(problem,lambda row:row['x']+row['y'],direction='max')
++    assert minimum.score==1 and maximum.score==5 and minimum.complete and maximum.complete
++    assert minimum.reason==maximum.reason=='optimal'
++    assert not problem._constraints and list(problem._variables['x'])==list(range(4))
++
++
++def test_budget_unsatisfiable_and_invalid_objective():
++    """预算没有最优性证明，无解必须完整穷尽。@return None。"""
++    problem=Problem(BacktrackingSolver());problem.addVariables(['a','b'],range(5))
++    result=optimize(problem,lambda row:row['a'],max_solutions=2)
++    assert result.examined==2 and not result.complete and result.reason=='budget'
++    assert optimize(problem,lambda row:0,max_solutions=0).examined==0
++    impossible=Problem(BacktrackingSolver());impossible.addVariable('a',[1]);impossible.addConstraint(lambda a:False,['a'])
++    result=optimize(impossible,lambda row:0)
++    assert result.complete and result.reason=='unsatisfiable' and result.solution is None
++    with unittest.TestCase().assertRaises(ValueError):optimize(problem,lambda row:float('nan'))

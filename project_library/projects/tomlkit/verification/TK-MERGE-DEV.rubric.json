@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TK-MERGE-DEV",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement tomlkit.merging.merge_documents(base,overlay,*,arrays=\"replace\",conflicts=\"replace\"). Deep-copy base, recursively merge mapping children, and choose explicit replace/append/unique for arrays (including arrays of tables, using native value equality for uniqueness). Copy incoming mutable nodes, preserve unaffected base comments/layout and validate the final serialized TOML. conflicts=\"error\" rejects differing scalar/type conflicts without changing either input. Reject unknown policies/nonmapping overlay; preserve existing parse/dumps behavior and do not infer merges from implicit global settings.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

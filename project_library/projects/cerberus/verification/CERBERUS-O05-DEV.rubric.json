@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CERBERUS-O05-DEV",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Validator.validate_result(document, schema=None, *, update=False, normalize=True) and frozen-shell cerberus.result.ValidationResult(valid, document, errors, completed=True). Run actual validation and deep-copy normalized document plus the configured error_handler output so later calls and result-content mutations cannot overwrite validator/other results. Preserve validate/validated bool/None interfaces and normalization/update flags. Unexpected exceptions propagate without publishing a completed result; document that nested snapshot contents are editable and the validator is not made thread safe.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

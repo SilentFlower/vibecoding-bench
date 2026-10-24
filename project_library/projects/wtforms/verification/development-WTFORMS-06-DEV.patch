@@ -1,0 +1,82 @@
+--- a/library/docs/development-wtforms-06-dev.md
++++ b/library/docs/development-wtforms-06-dev.md
+@@ -0,0 +1,5 @@
++# JSON商品资料逐记录惰性验证并保存身份与嵌套错误
++
++路线11：批量导入以真实JSONFormData和Form.validate逐记录惰性处理，保存原身份、索引、处理值及嵌套错误独立快照。首next不预消费、零预算不消费，首错停止可选；超预算明确部分结果，不假称整个输入已验证。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wtforms/batch.py
++++ b/library/src/wtforms/batch.py
+@@ -0,0 +1,27 @@
++"""逐记录本地JSON表单验证，不一次物化整个导入批次。"""
++import copy
++from dataclasses import dataclass
++from .jsondata import JSONFormData
++
++
++@dataclass(frozen=True)
++class RecordResult:
++    """一条真实校验结果。@param index 输入索引。@param record_id 原身份。@param valid 是否通过。@param data 业务值快照。@param errors 嵌套错误快照。"""
++    index: int
++    record_id: object
++    valid: bool
++    data: dict
++    errors: dict
++
++
++def validate_records(form_class,records,multi_values=(),max_records=None,stop_on_error=False):
++    """惰性校验(id,payload)流。@param form_class 真实Form类。@param records 输入记录流。@param multi_values 显式多选路径。@param max_records 预算。@param stop_on_error 首错后停止。@return RecordResult迭代器。"""
++    if max_records is not None and (type(max_records) is not int or max_records<0):raise ValueError('记录预算必须非负整数')
++    if type(stop_on_error) is not bool:raise ValueError('stop_on_error必须bool')
++    if max_records==0:return
++    for index,(identity,payload) in enumerate(records):
++        if max_records is not None and index>=max_records:raise ValueError('批次超过记录预算，已输出部分结果')
++        form=form_class(JSONFormData(payload,multi_values=multi_values))
++        valid=form.validate()
++        yield RecordResult(index,identity,bool(valid),copy.deepcopy(form.data),copy.deepcopy(form.errors))
++        if stop_on_error and not valid:return
+--- a/library/tests/test_development_wtforms_06_dev.py
++++ b/library/tests/test_development_wtforms_06_dev.py
+@@ -0,0 +1,41 @@
++"""本地导入逐条执行真实嵌套表单，不把数据默认值当请求。"""
++from wtforms import Form,StringField,IntegerField,FormField,FieldList
++from wtforms.validators import InputRequired,NumberRange
++from wtforms.batch import validate_records
++
++
++class Variant(Form):
++    """实际变体数量规则。"""
++    sku=StringField(validators=[InputRequired()]);stock=IntegerField(validators=[NumberRange(min=0,max=5)])
++
++
++class Product(Form):
++    """真实嵌套批量输入。"""
++    name=StringField(validators=[InputRequired()]);variants=FieldList(FormField(Variant))
++
++
++def test_lazy_identity_nested_errors_and_result_ownership():
++    """每条身份和索引保留，错误定位嵌套数组。@return None。"""
++    consumed=[]
++    def records():
++        """惰性资料源。@return 记录迭代器。"""
++        for identity,stock in [('good',2),('bad',9)]:
++            consumed.append(identity);yield identity,{'name':'中文','variants':[{'sku':'one','stock':stock}]}
++    iterator=validate_records(Product,records());first=next(iterator)
++    assert first.valid and first.record_id=='good' and consumed==['good']
++    second=next(iterator)
++    assert not second.valid and second.index==1 and second.errors['variants'][0]['stock']
++    first.data['variants'][0]['stock']=999
++    assert second.data['variants'][0]['stock']==9
++
++
++def test_stop_on_error_and_zero_budget_do_not_consume_extra_records():
++    """首错与零预算不会无意遍历后续导入数据。@return None。"""
++    consumed=[]
++    def records():
++        """每次消费可观测。@return 记录迭代器。"""
++        for identity in range(3):
++            consumed.append(identity);yield identity,{'name':'','variants':[]}
++    result=list(validate_records(Product,records(),stop_on_error=True))
++    assert len(result)==1 and not result[0].valid and consumed==[0]
++    consumed.clear();assert list(validate_records(Product,records(),max_records=0))==[] and not consumed

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSVKIT-O04-DEV",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add real csvkit.utilities.csvslice.CSVSlice and python -m entry using CSVKitUtility reader/writer conventions. Support zero-based nonnegative --start/--stop and positive --step (exclusive stop) through lazy islice, or mutually compatible --tail N through bounded deque, with tail=0 emitting only header. Preserve complete quoted/multiline records, dialect/encoding/skip/headerless options and exactly one header. Reject negative ranges, zero step and combined tail/range modes before output, support empty/header-only inputs and never preload ordinary forward slices.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

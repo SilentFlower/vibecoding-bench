@@ -1,0 +1,65 @@
+--- a/library/docs/development-pyyaml-01-dev.md
++++ b/library/docs/development-pyyaml-01-dev.md
+@@ -0,0 +1,5 @@
++# 配置合并按真实键语义保持首源优先和本地覆盖
++
++路线01：merge序列按真实构造键去重，首源优先、本地显式覆盖；长同名键与01/1等语义相等键一致，不能依赖驻留或原文本，不可hash键带位置报错。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/lib/yaml/constructor.py
++++ b/library/lib/yaml/constructor.py
+@@ -177,9 +177,17 @@
+                     return self.construct_scalar(value_node)
+         return super().construct_scalar(node)
+ 
++    def _merge_key(self,node):
++        """取得真实合并键。@param node 键节点。@return 可哈希构造值；无效键带位置拒绝。"""
++        key=self.construct_object(node,deep=True)
++        try:hash(key)
++        except TypeError as error:
++            raise ConstructorError("while constructing a mapping",node.start_mark,"found unhashable key",node.start_mark) from error
++        return key
++
+     def flatten_mapping(self, node):
+         merge = []
+-        merge_key_ids = set()  # anchor referent node objects should have reference equality here
++        merge_key_ids = set()  # 合并优先级按构造后的YAML键语义，不能依赖字符串对象驻留。
+         index = 0
+         while index < len(node.value):
+             key_node, value_node = node.value[index]
+@@ -188,7 +196,7 @@
+                 if isinstance(value_node, MappingNode):
+                     self.flatten_mapping(value_node)
+                     for pair in value_node.value:
+-                        if (key_id := id(pair[0].value)) not in merge_key_ids:
++                        if (key_id := self._merge_key(pair[0])) not in merge_key_ids:
+                             merge_key_ids.add(key_id)
+                             merge.append(pair)
+                 elif isinstance(value_node, SequenceNode):
+@@ -200,7 +208,7 @@
+                                     % subnode.id, subnode.start_mark)
+                         self.flatten_mapping(subnode)
+                         for pair in subnode.value:
+-                            if (key_id := id(pair[0].value)) not in merge_key_ids:
++                            if (key_id := self._merge_key(pair[0])) not in merge_key_ids:
+                                 merge_key_ids.add(key_id)
+                                 merge.append(pair)
+                 else:
+--- a/library/tests/test_development_pyyaml_01_dev.py
++++ b/library/tests/test_development_pyyaml_01_dev.py
+@@ -0,0 +1,15 @@
++"""合并序列首源优先不依赖Python短字符串身份。"""
++import yaml
++
++def test_long_same_keys_first_source_and_explicit_override():
++    """独立长字符串同名键合并时保首源，本地声明仍覆盖。@return None。"""
++    key='long_field_name_that_must_not_depend_on_interning'
++    text='a: &a\n  '+key+': first\nb: &b\n  '+key+': second\nmerged:\n  <<: [*a, *b]\nlocal:\n  <<: [*a, *b]\n  '+key+': explicit\n'
++    value=yaml.safe_load(text)
++    assert value['merged'][key]=='first' and value['local'][key]=='explicit'
++
++def test_semantically_equal_numeric_keys_and_nested_merge():
++    """整数不同字面拼写归一后相同，不能只比原文本。@return None。"""
++    text='a: &a {01: first}\nb: &b {1: second}\nc: &c {<<: [*a, *b], z: third}\nmerged: {<<: *c}'
++    value=yaml.safe_load(text)
++    assert value['merged']=={1:'first','z':'third'}

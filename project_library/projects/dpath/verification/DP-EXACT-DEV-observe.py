@@ -1,0 +1,19 @@
+"""在固定候选源码上运行独立业务矩阵，不调用模型或外部服务。"""
+import json
+import os
+from pathlib import Path
+root = Path(os.environ['PROJECT_CANDIDATE_ROOT']).resolve()
+
+import dpath
+_candidate_source_root = root
+_candidate_import_bound = Path(dpath.__file__).resolve().is_relative_to(_candidate_source_root / 'library')
+business = False
+try:
+    from dpath.exact import get_exact
+    key=(1,'a');value=object();data={key:{'':[value]}}
+    business=get_exact(data,[key,'',0]) is value and get_exact(data,[key,'',1],False) is False
+
+except Exception:
+    business = False
+
+print(json.dumps({'candidate_import': _candidate_import_bound, 'business': bool(business)}))

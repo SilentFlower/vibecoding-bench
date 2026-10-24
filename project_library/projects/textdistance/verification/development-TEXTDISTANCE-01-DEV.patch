@@ -1,0 +1,50 @@
+--- a/library/docs/development-textdistance-01-dev.md
++++ b/library/docs/development-textdistance-01-dev.md
+@@ -0,0 +1,5 @@
++# 最长公共子序列在动态规划与重建中一致遵守自定义相等谓词
++
++路线01：两输入LCS动态规划和重建统一使用现有test_func，返回首输入原字符，默认结果及既有并列选择保持。大小写不敏感和非传递逐对谓词均真实验收，不通过强制小写冒充任意谓词。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_textdistance_01_dev.py
++++ b/library/tests/test_development_textdistance_01_dev.py
+@@ -0,0 +1,19 @@
++"""最长公共子序列的自定义相等谓词不能只在多序列路径生效。"""
++import textdistance
++
++
++def test_pair_and_multi_sequence_keep_first_spelling():
++    """大小写不敏感比较统一使用谓词，返回首输入原字符。@return None。"""
++    same=lambda *chars:len({char.casefold() for char in chars})==1
++    algorithm=textdistance.LCSSeq(test_func=same,external=False)
++    assert algorithm('AbC','aBc')=='AbC'
++    assert algorithm('AbC','aBc','ABC')=='AbC'
++    assert algorithm.similarity('A','a')==1
++
++
++def test_nontransitive_predicate_is_not_replaced_by_hash_key():
++    """按明确的逐对谓词求解，不能假设等价类或强制小写。@return None。"""
++    algorithm=textdistance.LCSSeq(test_func=lambda a,b:abs(ord(a)-ord(b))<=1,external=False)
++    assert algorithm('ab','bc')=='ab'
++    assert algorithm('a','c')==''
++    assert textdistance.LCSSeq(external=False)('DIXON','DICKSONX')=='DION'
+--- a/library/textdistance/algorithms/sequence_based.py
++++ b/library/textdistance/algorithms/sequence_based.py
+@@ -56,7 +56,7 @@
+         # row 0 and column 0 are initialized to 0 already
+         for i, char1 in enumerate(seq1):
+             for j, char2 in enumerate(seq2):
+-                if char1 == char2:
++                if self.test_func(char1, char2):
+                     lengths[i + 1][j + 1] = lengths[i][j] + 1
+                 else:
+                     lengths[i + 1][j + 1] = max(lengths[i + 1][j], lengths[i][j + 1])
+@@ -70,7 +70,7 @@
+             elif lengths[i][j] == lengths[i][j - 1]:
+                 j -= 1
+             else:
+-                assert seq1[i - 1] == seq2[j - 1]
++                assert self.test_func(seq1[i - 1], seq2[j - 1])
+                 result = seq1[i - 1] + result
+                 i -= 1
+                 j -= 1

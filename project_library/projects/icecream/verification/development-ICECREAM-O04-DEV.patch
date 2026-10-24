@@ -1,0 +1,84 @@
+--- a/library/docs/development-icecream-o04-dev.md
++++ b/library/docs/development-icecream-o04-dev.md
+@@ -0,0 +1,5 @@
++# 在整体生效前验证真实调试器配置并拒绝半更新
++
++对应路线07：真实构造/配置先完整验证类型才生效，内置颜色输出器切换也不能先改；保留Sentinel、空prefix及合法callable，不在验证时执行用户回调。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/icecream/icecream.py
++++ b/library/icecream/icecream.py
+@@ -313,6 +313,9 @@
+                  argToStringFunction: Union[_SingleDispatchCallable, Callable[[Any], str]]=argumentToString, includeContext: bool=False,
+                  contextAbsPath: bool=False,
+                  noColor: bool=False):
++        self._validate_configuration({'prefix': prefix, 'outputFunction': outputFunction,
++            'argToStringFunction': argToStringFunction, 'includeContext': includeContext,
++            'contextAbsPath': contextAbsPath, 'noColor': noColor})
+         self.enabled = True
+         self.prefix = prefix
+         self.includeContext = includeContext
+@@ -324,6 +327,24 @@
+             self.outputFunction = stderr_print
+         else:
+             self.outputFunction = outputFunction
++
++    @staticmethod
++    def _validate_configuration(values):
++        """只验证声明类型，不执行用户回调，错误不留下半份配置。@return None。"""
++        for name, value in values.items():
++            if value is Sentinel.absent:
++                continue
++            if name == 'prefix':
++                if not isinstance(value, str) and not callable(value):
++                    raise TypeError('prefix必须为文本或可调用对象')
++            elif name in ('outputFunction', 'argToStringFunction'):
++                if not callable(value):
++                    raise TypeError(name + '必须可调用')
++            elif name == 'lineWrapWidth':
++                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
++                    raise ValueError('lineWrapWidth必须为正整数')
++            elif not isinstance(value, bool):
++                raise TypeError(name + '必须为bool')
+ 
+     def __call__(self, *args: object) -> object:
+         if self.enabled:
+@@ -505,6 +526,9 @@
+         if noParameterProvided:
+             raise TypeError('configureOutput() missing at least one argument')
+ 
++        self._validate_configuration({'prefix': prefix, 'outputFunction': outputFunction,
++            'argToStringFunction': argToStringFunction, 'includeContext': includeContext,
++            'contextAbsPath': contextAbsPath, 'lineWrapWidth': lineWrapWidth, 'noColor': noColor})
+         if noColor is not Sentinel.absent:
+             self.noColor = noColor
+             # Auto-swap built-in output functions when no explicit
+--- a/library/tests/test_development_icecream_o04_dev.py
++++ b/library/tests/test_development_icecream_o04_dev.py
+@@ -0,0 +1,26 @@
++"""配置验证先于任何字段和内置输出器自动切换。"""
++from icecream import IceCreamDebugger
++import pytest
++
++def test_invalid_combination_leaves_all_original_fields():
++    """prefix先变而callback无效的半配置不能残留。@return None。"""
++    output=[];debug=IceCreamDebugger(prefix='old|',outputFunction=output.append);before=vars(debug).copy()
++    with pytest.raises(TypeError):debug.configureOutput(prefix='new|',outputFunction=123,noColor=True)
++    assert vars(debug)==before
++    with pytest.raises(ValueError):debug.configureOutput(prefix='new|',lineWrapWidth=True)
++    assert vars(debug)==before
++
++def test_valid_callable_not_evaluated_until_real_output():
++    """验证不执行prefix回调，合法整组配置一次生效。@return None。"""
++    called=[];output=[];debug=IceCreamDebugger()
++    def prefix():called.append(1);return 'dynamic|'
++    debug.configureOutput(prefix=prefix,outputFunction=output.append,includeContext=False,lineWrapWidth=100,noColor=True)
++    assert called==[];assert debug(7)==7 and called==[1] and output[0].startswith('dynamic|')
++
++def test_constructor_and_absent_noarg_compatibility():
++    """构造时同样验证，未传参数及未知参数仍明确拒绝。@return None。"""
++    with pytest.raises(TypeError):IceCreamDebugger(argToStringFunction=None)
++    with pytest.raises(TypeError):IceCreamDebugger(includeContext=1)
++    debug=IceCreamDebugger(prefix='')
++    with pytest.raises(TypeError):debug.configureOutput()
++    with pytest.raises(TypeError):debug.configureOutput(unknown=True)

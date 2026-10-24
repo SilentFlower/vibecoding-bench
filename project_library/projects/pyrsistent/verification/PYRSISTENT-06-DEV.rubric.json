@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYRSISTENT-06-DEV",
+  "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add pyrsistent.merge.deep_merge(left,right,conflict=\"replace\",max_depth=32) and MergeConflict.path. left is a PMap and right accepts mapping or pairs through the earlier delivered update capability. Merge mapping/mapping branches recursively, leaf conflicts replace by default, raise with full tuple path or call an explicit (path,old,new) resolver. Equal/unmodified values share existing branches; new builtin containers are frozen with strict=False to preserve already-persistent checked types. Use actual evolvers, preserve CheckedPMap validation, reject unsupported policy/depth and surface type/source/callback failures without changing left. Do not claim automatic concatenation of sequences, arbitrary object deepcopy or a concurrent transaction. Cyclic/unrepresentable new builtin containers fail explicitly.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

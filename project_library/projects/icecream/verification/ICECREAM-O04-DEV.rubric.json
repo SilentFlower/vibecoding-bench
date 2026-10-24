@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "ICECREAM-O04-DEV",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Validate real IceCreamDebugger constructor/configureOutput declarations before mutating any field or auto-swapping builtin color output. Prefix must be text/callable, formatting/output callbacks callable, flags actual bool and lineWrapWidth positive non-bool int. Preserve Sentinel.absent, empty prefixes, valid callbacks and existing builtin noColor output swap rules. Never execute a prefix/formatter during validation or pretend to know its eventual return type; callback execution failures remain runtime failures. Invalid combinations, unknown kwargs or no-arg configure must leave all previous fields identical, including prefix and outputFunction.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

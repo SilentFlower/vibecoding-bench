@@ -1,0 +1,59 @@
+--- a/library/development_tests/test_development_ct_remaining_dev.py
++++ b/library/development_tests/test_development_ct_remaining_dev.py
+@@ -0,0 +1,26 @@
++"""公开TTL剩余有效期回归。"""
++from datetime import datetime,timedelta
++import pytest
++from cachetools import TTLCache
++
++def test_remaining_decreases_and_explicit_time_does_not_change_clock():
++    clock=[1];cache=TTLCache(2,5,timer=lambda:clock[0]);cache['a']=1;clock[0]=3
++    assert cache.remaining('a')==3 and cache.remaining('a',time=5)==1 and clock[0]==3
++
++def test_boundary_and_missing_keys_raise_without_cleanup():
++    clock=[0];cache=TTLCache(2,1,timer=lambda:clock[0]);cache['a']=1;clock[0]=1
++    for key in ('a','missing'):
++        with pytest.raises(KeyError):
++            cache.remaining(key)
++    assert 'a' in cache._Cache__data
++
++def test_read_does_not_promote_lru_entry():
++    cache=TTLCache(2,10,timer=lambda:0);cache['a']=1;cache['b']=2
++    assert cache.remaining('a')==10
++    cache['c']=3
++    assert 'a' not in cache
++
++def test_datetime_clock_preserves_timedelta_result():
++    clock=[datetime(2026,1,1)];cache=TTLCache(2,timedelta(seconds=5),timer=lambda:clock[0]);cache['a']=1
++    clock[0]+=timedelta(seconds=2)
++    assert cache.remaining('a')==timedelta(seconds=3)
+--- a/library/docs/development-ct-remaining-dev.md
++++ b/library/docs/development-ct-remaining-dev.md
+@@ -0,0 +1,5 @@
++# 只读查询TTL剩余有效期并保留时间类型
++
++运行面板需要知道TTL还剩多久，同时不能续期或提升热度。只读取已存到期值，支持显式时钟及日期差值，缺失或恰好到期明确失败，不触发物理清理。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/cachetools/__init__.py
++++ b/library/src/cachetools/__init__.py
+@@ -535,6 +535,19 @@
+             link.prev = prev = root.prev
+             prev.next = root.prev = link
+         self.expire(self.timer())
++
++    def remaining(self,key,*,time=None):
++        """只读剩余有效期。@param key 活跃键。@param time 显式同类时钟值或None。
++        @return 到期值减当前时钟；缺失或恰好到期时KeyError，不触碰LRU和物理条目。
++        """
++        now=self.timer() if time is None else time
++        try:
++            link=self.__links[key]
++        except KeyError:
++            raise KeyError(key) from None
++        if not now<link.expires:
++            raise KeyError(key)
++        return link.expires-now
+ 
+     @property
+     def ttl(self):

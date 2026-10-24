@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JM-VARIADIC-DEV",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix Functions._type_check so every actual variadic argument uses the final signature rule after the fixed prefix. Preserve arity validation, array subtype checking, untyped variadic rules and custom function dispatch. Invalid later values must raise JMESPathTypeError before calling the function body, with actual function/type context; do not rely on uncontrolled Python exceptions from merge or custom functions. Fixed-arity behavior and all language semantics remain compatible.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

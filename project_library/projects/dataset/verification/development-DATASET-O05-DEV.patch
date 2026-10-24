@@ -1,0 +1,105 @@
+--- a/library/dataset/table.py
++++ b/library/dataset/table.py
+@@ -236,6 +236,59 @@
+                 self.db.executable.execute(self.table.insert(), chunk)
+                 self.db._auto_commit()
+                 chunk = []
++
++    def _write_iter(self, rows, *, keys=None, chunk_size=1000, ensure=None, types=None, atomic=False):
++        """每次最多缓冲一个批次，重用原生批量入口。@return 输入记录数。"""
++        from collections.abc import Mapping
++        from contextlib import nullcontext
++        from itertools import islice
++        if isinstance(chunk_size, bool) or not isinstance(chunk_size, int) or chunk_size < 1:
++            raise ValueError('chunk_size必须为正整数')
++        if not isinstance(atomic, bool):
++            raise TypeError('atomic必须为bool')
++        iterator, count = iter(rows), 0
++        with (self.db if atomic else nullcontext()):
++            while True:
++                chunk = list(islice(iterator, chunk_size))
++                if not chunk:
++                    break
++                if any(not isinstance(row, Mapping) for row in chunk):
++                    raise TypeError('批量输入记录必须为映射')
++                copied = [dict(row) for row in chunk]
++                if keys is None:
++                    self.insert_many(copied, chunk_size=chunk_size, ensure=ensure, types=types)
++                else:
++                    self.update_many(copied, keys, chunk_size=chunk_size, ensure=ensure, types=types)
++                count += len(chunk)
++        return count
++
++    def insert_iter(self, rows, *, chunk_size=1000, ensure=None, types=None, atomic=False):
++        """有界消费一次性插入输入。
++
++        :param rows: 只消费一次的映射记录迭代器。
++        :param chunk_size: 正整数内存批次上限。
++        :param ensure: 原自动schema政策，各新批次可发现新列。
++        :param types: 原显式列类型映射。
++        :param atomic: True时整次DML处于显式Database事务，DDL仍遵守后端限制。
++        :return: 成功消费的输入记录总数。
++        """
++        return self._write_iter(rows, chunk_size=chunk_size, ensure=ensure, types=types, atomic=atomic)
++
++    def update_iter(self, rows, keys, *, chunk_size=1000, ensure=None, types=None, atomic=False):
++        """有界消费一次性更新输入，保留已修复的省略字段政策。
++
++        :param rows: 一次性更新记录。
++        :param keys: 非空唯一匹配键。
++        :param chunk_size: 批次上限。
++        :param ensure: 自动schema政策。
++        :param types: 显式列类型。
++        :param atomic: 是否整体DML事务。
++        :return: 成功消费的输入记录数，非数据库命中数。
++        """
++        keys = ensure_strings(keys)
++        if not keys or len(set(keys)) != len(keys):
++            raise ValueError('更新迭代必须指定唯一匹配键')
++        return self._write_iter(rows, keys=keys, chunk_size=chunk_size, ensure=ensure, types=types, atomic=atomic)
+ 
+     def update(
+         self,
+--- a/library/docs/development-dataset-o05-dev.md
++++ b/library/docs/development-dataset-o05-dev.md
+@@ -0,0 +1,5 @@
++# 以有界批次消费一次性插入更新输入并明确事务边界
++
++对应路线12，更新路径依赖已修复批量更新：一次性生成器只缓冲单批并走真实批量入口，后批schema、空输入、失败和整体DML事务语义完整。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_dataset_o05_dev.py
++++ b/library/test/test_development_dataset_o05_dev.py
+@@ -0,0 +1,32 @@
++"""一次性输入分批实际写库，失败事务边界清楚。"""
++import dataset
++import pytest
++
++def test_single_pass_chunks_and_late_columns():
++    """观察每批写入发生在后续生成之前，后批新列可建。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items'];events=[]
++    def rows():
++        for n in range(5):
++            if n==2:events.append(t.count())
++            yield {'n':n,**({'later':'yes'} if n==4 else {})}
++    assert t.insert_iter(rows(),chunk_size=2)==5 and events==[2] and t.count()==5
++    assert t.find_one(n=4)['later']=='yes';db.close()
++
++def test_atomic_generator_error_rolls_back_prior_dml():
++    """已存在表的整次DML事务可回滚，非atomic保留先前批次。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items'];t.insert({'n':-1})
++    def broken():
++        yield {'n':1};yield {'n':2};raise RuntimeError('input')
++    with pytest.raises(RuntimeError):t.insert_iter(broken(),chunk_size=1,atomic=True)
++    assert t.count()==1
++    with pytest.raises(RuntimeError):t.insert_iter(broken(),chunk_size=1)
++    assert t.count()==3;db.close()
++
++def test_update_iter_scope_bounds_and_empty():
++    """更新迭代保留省略字段，边界非法不消费输入。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items'];t.insert_many([{'key':'a','x':1,'y':2},{'key':'b','x':3,'y':4}])
++    assert t.update_iter(iter([{'key':'a','x':8},{'key':'b','y':9}]),['key'],chunk_size=2)==2
++    assert t.find_one(key='a')['y']==2 and t.find_one(key='b')['x']==3
++    assert t.insert_iter(iter([]))==0
++    with pytest.raises(ValueError):t.insert_iter(iter([]),chunk_size=0)
++    db.close()

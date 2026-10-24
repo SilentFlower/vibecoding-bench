@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYRSISTENT-04-DEV",
+  "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair default CheckedPMap key/value serializers and checked sequence default serializers to pass the actual format argument into nested CheckedType.serialize(format). A record field serializer must observe the same format whether direct, in a map, in a vector/set or through multiple levels. Preserve explicit __serializer__ authority and default format=None output; do not override caller policy, mutate records or claim arbitrary serialized dictionary keys become hashable. Incompatible key serialization remains an explicit normal error. Test actual nested values and custom serializers, not only mocked forwarding.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "IF-TEMPLATE-DEV",
+  "source_commit": "99596854bd296af1557db2015cfa98c8104ec155",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement inflect.templates.ReportTemplate(text) with compiled unique fields and render(engine,values). Allow simple named placeholders and escaped braces; reject attribute/index access, conversion flags, arbitrary format specs and nested expressions at construction. Support raw text, :words, :ordinal, :article, :join and :counted(noun), using real engine APIs and completed counted/stream join implementations. Validate all required names before formatting, preserve repeated fields/literal braces and custom noun rules. Work on an isolated clone so number formatting does not mutate original state. No eval or method dispatch from template text; content values are not reparsed as templates.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

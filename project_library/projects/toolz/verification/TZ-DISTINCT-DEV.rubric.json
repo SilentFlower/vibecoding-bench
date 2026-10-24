@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TZ-DISTINCT-DEV",
+  "source_commit": "451af60dec590a6010e2babdbf391ea8f815122f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair isdistinct for reiterable data sources that implement __iter__ but no length protocol. Scan once, stop at the first duplicate and preserve hashability/error semantics. Keep the existing sized-sequence fast path, propagate errors from a genuinely implemented __len__ or iterator, and do not read a second iterator or consume unreachable tails. Preserve iterators, lists, empty input and exported namespaces.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

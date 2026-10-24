@@ -1,0 +1,80 @@
+--- a/library/docs/development-feedparser-o04-dev.md
++++ b/library/docs/development-feedparser-o04-dev.md
+@@ -0,0 +1,5 @@
++# 基于真实条目键生成明确标可靠性的稳定身份而不伪造ID
++
++对应路线09：实际id可靠优先，无id按明确真实字段/可选NFC生成稳定摘要并标推断；不写假id、不读别名、不删追踪参数，缺数据/非法配置明确拒绝。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/feedparser/records.py
++++ b/library/feedparser/records.py
+@@ -0,0 +1,37 @@
++"""基于真实FeedParserDict原始键的本地身份与增量数据操作，不抓取网络。"""
++import hashlib
++import json
++import unicodedata
++
++
++def entry_identity(entry, *, fields=('link', 'title', 'published', 'summary'), normalize_unicode=True):
++    """取得明确标注可靠性的身份，不向条目写入虚构ID。
++
++    :param entry: 已解析条目映射，使用真实id键不读兼容别名。
++    :param fields: 无id时参与稳定摘要的字段名序列。
++    :param normalize_unicode: 摘要字符串是否按NFC规范化。
++    :return: value/source/reliable及实际字段名列表。
++    """
++    identifier = dict.get(entry, 'id')
++    if identifier is not None and identifier != '':
++        if not isinstance(identifier, str):
++            raise ValueError('显式id必须为字符串')
++        return {'value': identifier, 'source': 'id', 'reliable': True, 'fields': ['id']}
++    names = list(fields)
++    if not names or any(not isinstance(name, str) or not name for name in names) or len(names) != len(set(names)):
++        raise ValueError('摘要字段必须为非空唯一名称序列')
++    chosen = {name: dict.__getitem__(entry, name) for name in names if dict.__contains__(entry, name)}
++    if not chosen or not any(value is not None and value != '' for value in chosen.values()):
++        raise ValueError('没有足够字段生成推断身份')
++    def normalize(value):
++        """只规范化JSON数据字符串，不调用任意对象repr。@return 规范数据。"""
++        if isinstance(value, str):
++            return unicodedata.normalize('NFC', value) if normalize_unicode else value
++        if isinstance(value, (list, tuple)):
++            return [normalize(item) for item in value]
++        if isinstance(value, dict):
++            return {key: normalize(item) for key, item in value.items()}
++        return value
++    encoded = json.dumps(normalize(chosen), sort_keys=True, separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode('utf8')
++    return {'value': 'sha256:' + hashlib.sha256(encoded).hexdigest(), 'source': 'fields',
++            'reliable': False, 'fields': sorted(chosen)}
+--- a/library/tests/test_development_feedparser_o04_dev.py
++++ b/library/tests/test_development_feedparser_o04_dev.py
+@@ -0,0 +1,29 @@
++"""无ID身份是明确推断，不能写入原订阅冒充原生guid。"""
++from feedparser import parse
++from feedparser.util import FeedParserDict
++import io,copy
++import pytest
++
++def test_real_rss_guid_keeps_native_identity_without_mutation():
++    """真实RSS结果走规范id而非历史别名或标题摘要。@return None。"""
++    from feedparser.records import entry_identity
++    entry=parse(io.StringIO('<rss version="2.0"><channel><title>T</title><item><guid isPermaLink="false">native-id</guid><title>Title</title></item></channel></rss>')).entries[0]
++    before=copy.deepcopy(entry);assert entry_identity(entry)=={'value':'native-id','source':'id','reliable':True,'fields':['id']} and entry==before
++
++def test_fallback_is_stable_distinguishes_links_and_records_reliability():
++    """同标题不同链接不能被自动认成同条，追踪参数不擅自删除。@return None。"""
++    from feedparser.records import entry_identity
++    one=FeedParserDict(title='Title',link='https://e.test/a?track=1');two=FeedParserDict(title='Title',link='https://e.test/b?track=1')
++    identity=entry_identity(one);assert identity==entry_identity(copy.deepcopy(one)) and not identity['reliable'] and identity['source']=='fields'
++    assert identity['value']!=entry_identity(two)['value'] and identity['value']!=entry_identity(FeedParserDict(title='Title',link='https://e.test/a'))['value']
++    assert not dict.__contains__(one,'id')
++
++def test_unicode_policy_real_keys_missing_fields_and_invalid_values():
++    """Unicode规范化可显式关闭，published不被updated fallback凭空纳入。@return None。"""
++    from feedparser.records import entry_identity
++    a=FeedParserDict(title='e\u0301');b=FeedParserDict(title='é')
++    assert entry_identity(a)['value']==entry_identity(b)['value']
++    assert entry_identity(a,normalize_unicode=False)['value']!=entry_identity(b,normalize_unicode=False)['value']
++    with pytest.raises(ValueError):entry_identity(FeedParserDict())
++    with pytest.raises(ValueError):entry_identity(a,fields=['title','title'])
++    with pytest.raises(ValueError):entry_identity(FeedParserDict(id=42))

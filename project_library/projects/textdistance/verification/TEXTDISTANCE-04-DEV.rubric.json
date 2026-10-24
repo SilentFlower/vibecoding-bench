@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TEXTDISTANCE-04-DEV",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add textdistance.weighted.WeightedLevenshtein with finite nonnegative insertion/deletion/substitution constants or token callbacks, qval and test_func using actual pinned preparation. Compute exact minimum path costs from source to target; insertion/deletion may be asymmetric, substitution may be more expensive than delete+insert, zero costs and fractional costs are legitimate. Validate bad constants at configuration and bad callback results when used; bool/negative/NaN/Inf reject. Equal units cost zero according to the predicate. Expose call/distance without claiming every asymmetric policy is a mathematical metric or inventing a normalized bound. Original Levenshtein and optional backend behavior stay unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

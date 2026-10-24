@@ -1,0 +1,80 @@
+--- a/library/docs/development-html5lib-o03-dev.md
++++ b/library/docs/development-html5lib-o03-dev.md
+@@ -0,0 +1,5 @@
++# 公开真实词法token迭代器并明确编码诊断预算及位置语义
++
++对应路线05：公开iter_tokens调用真实词法状态机，命名类型/独立字段/产出行列检查点明确；编码和错误过滤保持、预算超限显式未完成、调用方流不关闭，不冒充DOM或精确span。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/html5lib/tokenizer.py
++++ b/library/html5lib/tokenizer.py
+@@ -0,0 +1,35 @@
++"""公开稳定的真实HTML词法迭代适配，不把词法输出冒充修复后的DOM。"""
++from copy import deepcopy
++from ._tokenizer import HTMLTokenizer
++from .constants import tokenTypes
++
++
++class TokenLimitError(ValueError):
++    """公开词法token预算耗尽，此前产出明确只是部分结果。"""
++
++
++def iter_tokens(source, *, include_errors=True, max_tokens=None, **stream_options):
++    """从真实内部tokenizer惰性产出命名类型、独立字段及明确的结束检查点。
++
++    :param source: HTML文本、字节或调用方拥有的流。
++    :param include_errors: 是否产出ParseError词法诊断。
++    :param max_tokens: 非负整数输出上限，None不限，超限抛TokenLimitError。
++    :param stream_options: 原输入流编码选项，如override_encoding。
++    :return: 独立Token字典迭代器，position为token产出时的行/列检查点，不伪称精确起始span。
++    """
++    if max_tokens is not None and (isinstance(max_tokens, bool) or not isinstance(max_tokens, int) or max_tokens < 0):
++        raise ValueError('max_tokens必须为非负整数或None')
++    names = {value: name for name, value in tokenTypes.items()}
++    tokenizer = HTMLTokenizer(source, **stream_options)
++    produced = 0
++    for token in tokenizer:
++        name = names[token['type']]
++        if name == 'ParseError' and not include_errors:
++            continue
++        if max_tokens is not None and produced >= max_tokens:
++            raise TokenLimitError('词法token预算耗尽，结果未完成')
++        copied = deepcopy(token)
++        copied['type'] = name
++        copied['position'] = tuple(tokenizer.stream.position())
++        produced += 1
++        yield copied
+--- a/library/tests/test_development_html5lib_o03_dev.py
++++ b/library/tests/test_development_html5lib_o03_dev.py
+@@ -0,0 +1,31 @@
++"""公开迭代器使用真实HTML词法状态机，明确不是DOM事件。"""
++import io
++import pytest
++
++def test_named_tokens_attributes_entities_comments_and_positions_are_real():
++    """词法token保留属性及实体解码，源检查点为单调行列。@return None。"""
++    from html5lib.tokenizer import iter_tokens
++    tokens=list(iter_tokens('<!doctype html>\n<p title="a&amp;b">Hi &lt;x&gt;<!--note--></p>'))
++    assert tokens[0]['type']=='Doctype'
++    paragraph=next(token for token in tokens if token['type']=='StartTag');assert paragraph['name']=='p' and paragraph['data']['title']=='a&b'
++    assert ''.join(token['data'] for token in tokens if token['type'] in ('Characters','SpaceCharacters')).strip()=='Hi <x>'
++    assert next(token for token in tokens if token['type']=='Comment')['data']=='note'
++    assert all(len(token['position'])==2 and token['position'][0]>=1 for token in tokens)
++
++def test_bytes_encoding_error_filter_and_source_stream_ownership():
++    """bytes显式编码及词法错误过滤可复核，调用方流不被关闭。@return None。"""
++    from html5lib.tokenizer import iter_tokens
++    stream=io.BytesIO('<p>中文'.encode('utf8'));tokens=list(iter_tokens(stream,override_encoding='utf8'))
++    assert not stream.closed and any(token.get('data')=='中文' for token in tokens)
++    bad=list(iter_tokens('<p x="a" x="b">'))
++    assert any(token['type']=='ParseError' for token in bad)
++    assert all(token['type']!='ParseError' for token in iter_tokens('<p x="a" x="b">',include_errors=False))
++
++def test_budget_detached_tokens_empty_and_partial_close_have_explicit_semantics():
++    """预算超限显式失败，令牌修改不会污染后续结果，空输入预算零合法。@return None。"""
++    from html5lib.tokenizer import iter_tokens,TokenLimitError
++    iterator=iter_tokens('<p>a</p>',max_tokens=1);first=next(iterator);first['data']['changed']='value'
++    with pytest.raises(TokenLimitError):next(iterator)
++    assert list(iter_tokens('',max_tokens=0))==[]
++    with pytest.raises(ValueError):list(iter_tokens('x',max_tokens=True))
++    stream=io.StringIO('<p>a</p>');iterator=iter_tokens(stream);next(iterator);iterator.close();assert not stream.closed

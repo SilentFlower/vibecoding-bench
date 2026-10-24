@@ -3,7 +3,7 @@
   "project_key": "tabulate",
   "title": "Tabulate业务报表开发任务",
   "category": "报表表示与终端输出",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实业务报表工程交付，覆盖排版、业务索引、空段落、分页、列转换与可访问HTML；独立程序及完整上游累计回归。",
   "seed_digest": "81d150c00cf69a817d431bd984f45afcca9357492ed4ea13bad1f12c7c6ec14f",
   "environment": "tabulate-py312",
   "source": {
@@ -56,6 +56,246 @@
             "disclosure/TB-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TB-INDEX-DEV-SCENE",
+      "title": "让分隔行不消耗自定义业务行索引",
+      "goal": "让分隔行不消耗自定义业务行索引",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-INDEX-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-INDEX-DEV",
+          "kind": "modify",
+          "goal": "让分隔行不消耗自定义业务行索引",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix sized custom showindex validation to count data rows after excluding SEPARATING_LINE records, matching the actual index-consumption loop. Preserve separators at their positions, use one index per real row for list/tuple/iterator inputs, reject sized index length mismatch against real rows, and keep rendering/numeric alignment and inputs unchanged. Do not change tabulate public signature or frozen tests.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_index_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-index-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TB-INDEX-DEV-contract.md",
+            "materials/TB-INDEX-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tabulate/__init__.py",
+            "library/development_tests/test_development_tb_index_dev.py",
+            "library/docs/development-tb-index-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-INDEX-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-INDEX-DEV.native.json",
+            "public_native": "verification/TB-INDEX-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-INDEX-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TB-PARAGRAPHS-DEV-SCENE",
+      "title": "自动换行时保留单元格中的有意空段落",
+      "goal": "自动换行时保留单元格中的有意空段落",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-PARAGRAPHS-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-PARAGRAPHS-DEV",
+          "kind": "modify",
+          "goal": "自动换行时保留单元格中的有意空段落",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix _wrap_text_to_colwidths so blank physical lines between, before and after text are retained as paragraph separators instead of filtered out. Respect existing splitlines terminal-newline convention, width wrapping, whitespace wrapping and numeric bypass behavior; apply consistently to data and headers. Do not broaden blank cells into missing values or change public signatures or upstream expectations unrelated to this bug. Add meaningful render and helper regressions.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_paragraphs_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-paragraphs-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TB-PARAGRAPHS-DEV-contract.md",
+            "materials/TB-PARAGRAPHS-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tabulate/__init__.py",
+            "library/development_tests/test_development_tb_paragraphs_dev.py",
+            "library/docs/development-tb-paragraphs-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-PARAGRAPHS-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-PARAGRAPHS-DEV.native.json",
+            "public_native": "verification/TB-PARAGRAPHS-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-PARAGRAPHS-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TB-PAGES-DEV-SCENE",
+      "title": "惰性分页报表并重复表头与连续业务行号",
+      "goal": "惰性分页报表并重复表头与连续业务行号",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-PAGES-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-PAGES-DEV",
+          "kind": "modify",
+          "goal": "惰性分页报表并重复表头与连续业务行号",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tabulate.pages.iter_pages(rows,page_size,headers=(),*,showindex=False,**options). Lazily read one-shot rows, count data rows excluding separators, render each page with the pinned tabulate and repeat explicit headers or consume firstrow headers once. Automatic indices are global zero-based business indices across pages; separators retain order and boundary separators belong to the next page. Never prefetch the next data row before yielding a full page; emit no empty final page. Validate positive integer size and supported automatic-index/header options; leave arbitrary custom index streams out of this API.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_pages_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-pages-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "TB-INDEX-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TB-PAGES-DEV-contract.md",
+            "materials/TB-PAGES-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tabulate/pages.py",
+            "library/development_tests/test_development_tb_pages_dev.py",
+            "library/docs/development-tb-pages-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-PAGES-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-PAGES-DEV.native.json",
+            "public_native": "verification/TB-PAGES-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-PAGES-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TB-FORMATTERS-DEV-SCENE",
+      "title": "对归一化业务列执行显式格式化回调再渲染",
+      "goal": "对归一化业务列执行显式格式化回调再渲染",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-FORMATTERS-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-FORMATTERS-DEV",
+          "kind": "modify",
+          "goal": "对归一化业务列执行显式格式化回调再渲染",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tabulate.formatters.tabulate_with_formatters(data,headers=(),*,formatters=(),**options). Reuse pinned normalization, then apply callable(value,data_row_index,column_index) or None per column before rendering through tabulate. Do not call formatters on separator rows or absent ragged cells; row indices count business rows only. Preserve original data, propagate callback errors, validate callbacks and excess columns, support keys/firstrow headers and original options including disable_numparse. Do not add a global formatter registry or alter tabulate signature.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_formatters_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-formatters-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TB-FORMATTERS-DEV-contract.md",
+            "materials/TB-FORMATTERS-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tabulate/formatters.py",
+            "library/development_tests/test_development_tb_formatters_dev.py",
+            "library/docs/development-tb-formatters-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-FORMATTERS-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-FORMATTERS-DEV.native.json",
+            "public_native": "verification/TB-FORMATTERS-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-FORMATTERS-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TB-ACCESSIBLE-HTML-DEV-SCENE",
+      "title": "提供带标题、列与行语义的安全HTML报表输出",
+      "goal": "提供带标题、列与行语义的安全HTML报表输出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TB-ACCESSIBLE-HTML-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TB-ACCESSIBLE-HTML-DEV",
+          "kind": "modify",
+          "goal": "提供带标题、列与行语义的安全HTML报表输出",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tabulate.accessibility.accessible_html(data,headers=(),*,caption=None,table_id=None,row_headers=False,**options). Render via safe html format, add escaped caption/optional quoted id, scope=col to real column header th elements and optional scope=row to the first cell of each body row. Preserve other cells, alignment and data escaping; never convert escaped user markup into actual tags. Reject overriding tablefmt, nonboolean row_headers and invalid caption/id values before rendering. Keep old html/unsafehtml output unchanged and do not alter tabulate public signature.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_accessible_html_dev.py and concise Chinese compatibility documentation at library/docs/development-tb-accessible-html-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TB-ACCESSIBLE-HTML-DEV-contract.md",
+            "materials/TB-ACCESSIBLE-HTML-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/tabulate/accessibility.py",
+            "library/development_tests/test_development_tb_accessible_html_dev.py",
+            "library/docs/development-tb-accessible-html-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TB-ACCESSIBLE-HTML-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/TB-ACCESSIBLE-HTML-DEV.native.json",
+            "public_native": "verification/TB-ACCESSIBLE-HTML-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/TB-ACCESSIBLE-HTML-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

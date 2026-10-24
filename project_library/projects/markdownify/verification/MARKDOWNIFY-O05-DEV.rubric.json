@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWNIFY-O05-DEV",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend actual convert_hN with heading_offset (integer, default zero), heading_minimum (integer 1..6, default one), and heading_overflow clamp/bold/error (default clamp). Map depth to max(minimum, original_depth+offset) before choosing Setext or ATX style; clamp at six, render a normalized bold paragraph, or raise for overflow according to the explicit policy. Reject bool/noninteger offsets and invalid minima/policies. Preserve existing default rendering, nonstandard hN handling, empty bold overflow and existing inline table/heading contexts. This is a real document-level hierarchy conversion, not post-hoc string substitution.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-DOCX-06-DEV",
+  "source_commit": "e45454602b53e8e572b179ccf1c91093ec9f4ed7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add InlineShape.alternative_text and title backed by wp:docPr descr/title. Expose exact str or None when absent, empty str is explicit metadata, None removes only own attribute, reject nonstring before mutation. Preserve drawing ID/name, relationship, shape dimensions, image bytes and unrelated/unknown attributes. Real local PNG to saved/reopened DOCX proves independent metadata and XML escaping; no visual rendering claims, network or generated image dependency.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

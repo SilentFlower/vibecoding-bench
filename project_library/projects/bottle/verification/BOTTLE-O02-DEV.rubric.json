@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BOTTLE-O02-DEV",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend the delivered PathLike-aware template lookup: give MakoTemplate/Jinja2Template/CheetahTemplate their own engine suffixes ahead of existing legacy extensions, and allow BaseTemplate instances to append explicit extensions without mutating parent or other instances. Extend search to accept an explicit extension sequence used by initialization; preserve PathLike names/directories, direct filename search, lookup priority and legacy .tpl fallback. Validate bad path-like suffixes and prove SimpleTemplate actually renders an instance-only extension without requiring optional engines.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

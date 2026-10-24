@@ -1,0 +1,73 @@
+--- a/library/cerberus/validator.py
++++ b/library/cerberus/validator.py
+@@ -1163,6 +1163,35 @@
+         else:
+             checks(field, value, self._error)
+ 
++    def _validate_compare_to(self, condition, field, value):
++        """声明式比较归一化后的兄弟或根字段。
++
++        :param condition: 字段路径、受控操作符及缺失政策。
++        :param field: 当前字段。
++        :param value: 实际值。
++        :return: None，失败保留原生字段路径。
++
++        The rule's arguments are validated against this schema:
++        {'type': 'dict', 'schema': {
++            'field': {'type': 'string', 'required': True},
++            'operator': {'type': 'string', 'required': True, 'allowed': ['lt','le','eq','ne','ge','gt']},
++            'missing': {'type': 'string', 'allowed': ['ignore','error']}}}
++        """
++        from operator import lt, le, eq, ne, ge, gt
++        name, other = self._lookup_field(condition['field'])
++        if name is None:
++            if condition.get('missing', 'error') == 'error':
++                self._error(field, '比较目标字段缺失')
++            return
++        operation = {'lt': lt, 'le': le, 'eq': eq, 'ne': ne, 'ge': ge, 'gt': gt}[condition['operator']]
++        try:
++            valid = bool(operation(value, other))
++        except (TypeError, ValueError):
++            self._error(field, '字段值不可比较')
++            return
++        if not valid:
++            self._error(field, '字段比较约束不满足')
++
+     def _validate_contains(self, expected_values, field, value):
+         """{'empty': False }"""
+         if not isinstance(value, Iterable):
+--- a/library/docs/development-cerberus-o03-dev.md
++++ b/library/docs/development-cerberus-o03-dev.md
+@@ -0,0 +1,5 @@
++# 对归一化后的兄弟及根字段声明比较约束
++
++原生compare_to规则使用受控比较操作符，在归一化后通过既有路径协议比较兄弟或根字段。缺目标与已有None区别明确，可显式忽略缺失；失败及不可比较值进入原生错误树，不执行表达式、不改dependencies。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cerberus_o03_dev.py
++++ b/library/tests/test_development_cerberus_o03_dev.py
+@@ -0,0 +1,24 @@
++"""字段比较使用受控操作符与真实归一化文档。"""
++from cerberus import Validator
++
++def test_normalized_sibling_comparison():
++    """转换后比较起止字段。@return None。"""
++    schema = {'start': {'coerce': int, 'compare_to': {'field': 'end', 'operator': 'le'}}, 'end': {'coerce': int}}
++    validator = Validator(schema)
++    assert validator.validate({'start': '2', 'end': '3'})
++    assert not validator.validate({'start': '4', 'end': '3'})
++
++def test_root_reference_and_missing():
++    """嵌套可显式引用根，缺失政策可选。@return None。"""
++    validator = Validator({'limit': {'type': 'integer'}, 'child': {'type': 'dict', 'schema': {'value': {'compare_to': {'field': '^limit', 'operator': 'lt'}}}}})
++    assert validator.validate({'limit': 5, 'child': {'value': 4}})
++    assert not validator.validate({'limit': 5, 'child': {'value': 6}})
++    assert Validator({'x': {'compare_to': {'field': 'missing', 'operator': 'eq', 'missing': 'ignore'}}}).validate({'x': 1})
++
++def test_incomparable_and_invalid_operator():
++    """不比较类型和未知操作符不会执行表达式。@return None。"""
++    import pytest
++    from cerberus import SchemaError
++    validator = Validator({'a': {'compare_to': {'field': 'b', 'operator': 'lt'}}, 'b': {}})
++    assert not validator.validate({'a': 1, 'b': 'text'})
++    with pytest.raises(SchemaError): Validator({'a': {'compare_to': {'field': 'b', 'operator': 'eval'}}})

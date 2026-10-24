@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML5LIB-O04-DEV",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add diagnostics.parse_with_report using the actual HTMLParser and returning tree/errors/encoding/compat_mode/truncated. Collect structured real position/code/details errors, support first-error policy through original strict ParseError and ignore policy hiding reports, and cap report entries with explicit truncation without mislabeling it a parsing resource budget. Preserve namespace/backend/encoding kwargs and ordinary html5lib.parse behavior; recovered trees remain equivalent, valid documents do not gain errors and invalid options reject before parsing. Do not invent source spans or suppress strict failures as successful output.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

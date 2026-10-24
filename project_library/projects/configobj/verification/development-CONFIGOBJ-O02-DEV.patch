@@ -1,0 +1,82 @@
+--- a/library/docs/development-configobj-o02-dev.md
++++ b/library/docs/development-configobj-o02-dev.md
+@@ -0,0 +1,5 @@
++# 递归合并时保留新增节注释且解除源对象共享
++
++对应路线04，实际使用已交付原始表达式复制：递归合并保留新增节及叶注释，并将复制节重连到目标；冲突策略明确且不共享源对象。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/configobj/__init__.py
++++ b/library/src/configobj/__init__.py
+@@ -778,7 +778,7 @@
+         return newdict
+ 
+ 
+-    def merge(self, indict):
++    def merge(self, indict, *, comments="incoming"):
+         """
+         A recursive update - useful for merging config files.
+         
+@@ -797,12 +797,29 @@
+         >>> c2
+         ConfigObj({'section1': {'option1': 'False', 'subsection': {'more_options': 'False'}}})
+         """
+-        for key, val in list(indict.items()):
+-            if (key in self and isinstance(self[key], dict) and
+-                                isinstance(val, dict)):
+-                self[key].merge(val)
+-            else:   
+-                self[key] = val
++        from copy import deepcopy
++        if comments not in ('incoming', 'existing'):
++            raise ValueError('注释冲突政策必须为incoming或existing')
++        def rebind(section, parent, name):
++            section.parent, section.main = parent, self.main
++            section.depth, section.name = parent.depth + 1, name
++            section.__dict__.pop('_interpolation_engine', None)
++            for child in section.sections:
++                rebind(dict.__getitem__(section, child), section, child)
++        source_items = dict.items(indict) if isinstance(indict, Section) else indict.items()
++        for key, val in list(source_items):
++            existed = key in self
++            current = dict.__getitem__(self, key) if existed else None
++            if isinstance(current, Section) and isinstance(val, dict):
++                current.merge(val, comments=comments)
++            else:
++                copied = deepcopy(val)
++                self[key] = copied
++                if isinstance(copied, Section):
++                    rebind(copied, self, key)
++            if isinstance(indict, Section) and (not existed or comments == 'incoming'):
++                self.comments[key] = deepcopy(indict.comments.get(key, []))
++                self.inline_comments[key] = deepcopy(indict.inline_comments.get(key, ''))
+ 
+ 
+     def rename(self, oldkey, newkey):
+--- a/library/tests/test_development_configobj_o02_dev.py
++++ b/library/tests/test_development_configobj_o02_dev.py
+@@ -0,0 +1,24 @@
++"""递归合并既保留注释，也不把源Section挂进目标。"""
++from configobj import ConfigObj
++
++def test_new_subsection_metadata_and_parent_isolation():
++    """新增节和叶注释保留，复制后父树正确。@return None。"""
++    target=ConfigObj(['root=target'])
++    source=ConfigObj(['root=source','# section note','[child]','# leaf note','x=%(root)s # inline'])
++    target.merge(source)
++    assert target.comments['child']==['# section note'] and target['child'].comments['x']==['# leaf note']
++    assert target['child'].inline_comments['x']=='# inline' and target['child'].parent is target
++    target['root']='changed';assert target['child']['x']=='changed' and source['child']['x']=='source'
++
++def test_conflict_policy_and_idempotent_comments():
++    """冲突明确且重复merge不叠加注释。@return None。"""
++    left=ConfigObj(['prefix=ok','# old','x=1']);right=ConfigObj(['prefix=ok','# incoming','x=2'])
++    left.merge(right,comments='existing');assert left.comments['x']==['# old'] and left['x']=='2'
++    left.merge(right);left.merge(right);assert left.comments['x']==['# incoming']
++
++def test_plain_mapping_preserves_existing_comment():
++    """普通dict没有注释元数据，不能抹除已有注释。@return None。"""
++    import pytest
++    left=ConfigObj(['prefix=ok','# retained','x=1']);left.merge({'x':'2','child':{'y':'3'}})
++    assert left.comments['x']==['# retained'] and left['child'].parent is left
++    with pytest.raises(ValueError):left.merge({},comments='bad')

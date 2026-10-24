@@ -1,0 +1,90 @@
+--- a/library/development_tests/test_development_mm_errors_dev.py
++++ b/library/development_tests/test_development_mm_errors_dev.py
+@@ -0,0 +1,21 @@
++"""公开结构化错误响应回归。"""
++from marshmallow import ValidationError
++from marshmallow.error_paths import flatten_errors,problem
++
++def test_nested_array_and_escaped_field_names_keep_order():
++    error=ValidationError({'a/b':{0:{'~x':['bad','worse']}},'_schema':['global']})
++    rows=flatten_errors(error)
++    assert [(row.pointer,row.messages) for row in rows]==[('/a~1b/0/~0x',('bad','worse')),('/_schema',('global',))]
++
++def test_field_name_normalization_and_empty_tree():
++    assert flatten_errors(ValidationError('wrong',field_name='name'))[0].pointer=='/name'
++    assert flatten_errors({})==() and flatten_errors([])==()
++
++def test_response_is_detached_and_excludes_input_and_valid_data():
++    error=ValidationError({'field':['bad']},data={'secret':'token'},valid_data={'x':1})
++    result=problem(error);result['errors'][0]['messages'].append('later')
++    assert error.messages=={'field':['bad']} and set(result)=={'status','title','errors'}
++
++def test_message_root_and_custom_status_are_supported():
++    assert flatten_errors('root')[0].pointer==''
++    assert problem({'x':['bad']},status=400,title='输入错误')['status']==400
+--- a/library/docs/development-mm-errors-dev.md
++++ b/library/docs/development-mm-errors-dev.md
+@@ -0,0 +1,5 @@
++# 将原生嵌套校验错误转换成无输入泄露的定位响应
++
++把真实嵌套校验错误转成结构化指针，保留顺序、数组索引、所有消息及_schema。生成可用的错误响应但不包含原输入和部分成功数据，避免把定位信息与数据泄露混在一起。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/marshmallow/error_paths.py
++++ b/library/src/marshmallow/error_paths.py
+@@ -0,0 +1,55 @@
++"""保留错误层次顺序并编码成可机器定位的JSON指针。"""
++from dataclasses import dataclass
++from .exceptions import ValidationError
++
++
++@dataclass(frozen=True)
++class ErrorItem:
++    """一个终端错误位置及不可变消息列表。"""
++    pointer: str
++    messages: tuple
++
++
++def _token(value):
++    return str(value).replace('~','~0').replace('/','~1')
++
++
++def flatten_errors(error):
++    """展开真实ValidationError或消息树。@param error 原异常或原生消息树。
++    @return 保序ErrorItem元组，保留_schema键，空错误树返回空元组。
++    """
++    tree=error.normalized_messages() if isinstance(error,ValidationError) else error
++    output=[];active=set()
++    def walk(value,pointer):
++        if isinstance(value,(dict,list,tuple)):
++            identity=id(value)
++            if identity in active:
++                raise ValueError('错误消息存在循环')
++            active.add(identity)
++            try:
++                if isinstance(value,dict):
++                    for key,child in value.items():
++                        walk(child,pointer+'/'+_token(key))
++                elif all(isinstance(message,str) for message in value):
++                    if value:
++                        output.append(ErrorItem(pointer,tuple(value)))
++                else:
++                    for index,child in enumerate(value):
++                        walk(child,pointer+'/'+str(index))
++            finally:
++                active.remove(identity)
++        elif isinstance(value,str):
++            output.append(ErrorItem(pointer,(value,)))
++        else:
++            raise TypeError('错误消息必须为原生字符串树')
++    walk(tree,'')
++    return tuple(output)
++
++
++def problem(error,*,status=422,title='数据验证失败'):
++    """生成独立的错误响应数据。@param error 原异常。@param status HTTP错误状态。
++    @param title 标题。@return 仅含错误位置与消息的响应，不包含原输入或valid_data。
++    """
++    if type(status) is not int or not 400<=status<=599 or not isinstance(title,str):
++        raise ValueError('需要有效错误状态及文本标题')
++    return {'status':status,'title':title,'errors':[{'pointer':item.pointer,'messages':list(item.messages)} for item in flatten_errors(error)]}

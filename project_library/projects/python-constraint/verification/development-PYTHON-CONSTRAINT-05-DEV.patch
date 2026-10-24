@@ -1,0 +1,74 @@
+--- a/library/constraint/cardinality.py
++++ b/library/constraint/cardinality.py
+@@ -0,0 +1,39 @@
++"""多值分别限定出现次数的全局基数约束。"""
++from .constraints import Constraint
++
++
++class GlobalCardinality(Constraint):
++    """按每个值规定最小/最大出现数。@param value_bounds 值到(min,max)。@param closed 未列值是否禁止。"""
++    def __init__(self,value_bounds,closed=True):
++        """复制并检查计数范围。@param value_bounds 计数映射。@param closed 闭集政策。@return None。"""
++        if type(closed) is not bool:raise ValueError('closed必须为bool')
++        self.bounds={}
++        for value,pair in value_bounds.items():
++            minimum,maximum=pair
++            if type(minimum) is not int or type(maximum) is not int or not 0<=minimum<=maximum:raise ValueError('出现次数必须为有效非负整数范围')
++            self.bounds[value]=(minimum,maximum)
++        self.closed=closed
++
++    def _possible(self,variables,domains,assignments):
++        """仅按已赋值和仍可支持计数进行必要条件检查。@param variables 变量。@param domains 域。@param assignments 赋值。@return 是否可能。"""
++        if len(set(variables))!=len(variables):raise ValueError('基数约束不能重复列出变量')
++        assigned=[assignments[variable] for variable in variables if variable in assignments]
++        missing=[variable for variable in variables if variable not in assignments]
++        if self.closed and any(value not in self.bounds for value in assigned):return False
++        if self.closed and any(not any(value in self.bounds for value in domains[variable]) for variable in missing):return False
++        for value,(minimum,maximum) in self.bounds.items():
++            count=assigned.count(value)
++            possible=count+sum(value in domains[variable] for variable in missing)
++            if count>maximum or possible<minimum:return False
++        return True
++
++    def __call__(self,variables,domains,assignments,forwardcheck=False):
++        """安全前向删去已无计数可行性的值。@param variables 变量。@param domains 域。@param assignments 赋值。@param forwardcheck 是否删域。@return 是否仍可能。"""
++        if not self._possible(variables,domains,assignments):return False
++        if forwardcheck:
++            for variable in variables:
++                if variable not in assignments:
++                    for value in domains[variable][:]:
++                        if not self._possible(variables,domains,{**assignments,variable:value}):domains[variable].hideValue(value)
++                    if not domains[variable]:return False
++        return True
+--- a/library/docs/development-python-constraint-05-dev.md
++++ b/library/docs/development-python-constraint-05-dev.md
+@@ -0,0 +1,5 @@
++# 有限域排班按多个班次分别限制人数上下界
++
++路线16：全局基数约束同时规定每个班次人数上下界，闭集/开放未列取值政策明确；按已赋值与剩余域支持保守剪枝，不把一组SomeInSet计数换名。完整枚举核对前向检查开关结果，复用已交付的声明域隔离。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_python_constraint_05_dev.py
++++ b/library/tests/test_development_python_constraint_05_dev.py
+@@ -0,0 +1,21 @@
++"""同时约束多个班次人数，不是把SomeInSet改名。"""
++import unittest
++from constraint import Problem
++from constraint.cardinality import GlobalCardinality
++
++
++def test_per_value_bounds_and_unknown_value_policy():
++    """A恰好两人、B一至两人，未列值按显式政策。@return None。"""
++    problem=Problem();problem.addVariables(['x','y','z'],['A','B','C']);problem.addConstraint(GlobalCardinality({'A':(2,2),'B':(1,2)}),['x','y','z'])
++    result=problem.getSolutions()
++    assert len(result)==3 and all(list(item.values()).count('A')==2 and list(item.values()).count('B')==1 for item in result)
++    open_problem=Problem();open_problem.addVariable('x',['A','C']);open_problem.addConstraint(GlobalCardinality({'A':(0,0)},closed=False),['x'])
++    assert open_problem.getSolutions()==[{'x':'C'}] and list(open_problem._variables['x'])==['A','C']
++
++
++def test_impossible_bounds_and_bad_ranges():
++    """逻辑无解与声明范围错误有明确区别。@return None。"""
++    problem=Problem();problem.addVariables(['a','b'],['A','B']);problem.addConstraint(GlobalCardinality({'A':(3,3),'B':(0,2)}),['a','b'])
++    assert problem.getSolutions()==[]
++    for bounds in ({'A':(-1,2)},{'A':(2,1)},{'A':(True,2)}):
++        with unittest.TestCase().assertRaises(ValueError):GlobalCardinality(bounds)

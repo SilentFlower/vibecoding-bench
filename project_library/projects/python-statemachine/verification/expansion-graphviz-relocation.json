@@ -1,0 +1,6 @@
+{
+  "policy": "原完整回归及固定dot/插件内容保持，只复制原二进制到独占venv并还原执行位",
+  "original_dot_sha256": "419049c248ab2b4830da209e93ae98a5bdb9580e12057f547bb31c0a336153da",
+  "old_runner_edited": false,
+  "old_contract_edited": false
+}

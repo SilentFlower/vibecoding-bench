@@ -1,0 +1,95 @@
+--- a/library/docs/development-injector-o05-dev.md
++++ b/library/docs/development-injector-o05-dev.md
+@@ -0,0 +1,5 @@
++# 公开本作用域目标失效和只清当前线程的缓存协议
++
++对应路线10：真实Singleton/ThreadLocal公开目标失效和清缓存，按实际Scope归属及当前线程限制；不改绑定、不强制销毁旧引用、不级联关闭资源。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/injector/__init__.py
++++ b/library/injector/__init__.py
+@@ -872,6 +872,22 @@
+             self._context[key] = provider
+             return provider
+ 
++    def evict(self, key):
++        """只失效本Scope实例的目标缓存，不改绑定或关闭外部引用。
++
++        :param key: 绑定键，不存在时返回False。
++        :return: 是否删除已缓存Provider。
++        """
++        with lock:
++            return self._context.pop(key, None) is not None
++
++    def clear(self):
++        """清空本Scope实例缓存，返回删除数；不级联关闭业务对象。@return int。"""
++        with lock:
++            count = len(self._context)
++            self._context.clear()
++            return count
++
+     def _get_instance(self, key: Type[T], provider: Provider[T], injector: 'Injector') -> T:
+         if injector.parent and not injector.binder.has_explicit_binding_for(key):
+             try:
+@@ -903,6 +919,21 @@
+             provider = InstanceProvider(provider.get(self.injector))
+             setattr(self._locals, repr(key), provider)
+             return provider
++
++
++    def evict(self, key):
++        """只失效当前线程目标，不触碰其他线程。@return bool。"""
++        name = repr(key)
++        if not hasattr(self._locals, name):
++            return False
++        delattr(self._locals, name)
++        return True
++
++    def clear(self):
++        """只清当前线程缓存，不修改绑定或关闭持有对象。@return 删除数。"""
++        count = len(self._locals.__dict__)
++        self._locals.__dict__.clear()
++        return count
+ 
+ 
+ threadlocal = ScopeDecorator(ThreadLocalScope)
+--- a/library/tests/test_development_injector_o05_dev.py
++++ b/library/tests/test_development_injector_o05_dev.py
+@@ -0,0 +1,37 @@
++"""失效真实作用域缓存，绑定和其他缓存身份保持。"""
++from injector import Injector,SingletonScope,ThreadLocalScope
++import threading
++
++def test_single_target_invalidation_preserves_other_and_bindings():
++    """下次get重建目标，无关singleton及旧引用仍有效。@return None。"""
++    class A:
++        """首个服务。"""
++    class B:
++        """无关服务。"""
++    container=Injector(lambda b:(b.bind(A,scope=SingletonScope),b.bind(B,scope=SingletonScope)))
++    first,other=container.get(A),container.get(B);scope=container.get(SingletonScope)
++    assert scope.evict(A) is True and scope.evict(A) is False
++    assert container.get(A) is not first and container.get(B) is other
++    assert container.binder.has_explicit_binding_for(A)
++
++def test_singleton_clear_count_and_old_references_not_closed():
++    """clear只移除缓存Provider，不伪装销毁外部业务实例。@return None。"""
++    class Service:
++        """带显式close的业务对象。"""
++        def __init__(self):self.closed=False
++        def close(self):self.closed=True
++    container=Injector(lambda b:b.bind(Service,scope=SingletonScope));scope=container.get(SingletonScope);value=container.get(Service)
++    count=scope.clear();assert count>=1 and not value.closed and container.get(Service) is not value
++    scope.clear();assert scope.clear()==0
++
++def test_threadlocal_evict_clear_do_not_cross_thread():
++    """线程各自失效，另一线程对象保持原身份。@return None。"""
++    class Item:
++        """线程服务。"""
++    container=Injector(lambda b:b.bind(Item,scope=ThreadLocalScope));scope=container.get(ThreadLocalScope)
++    first=container.get(Item);ready=threading.Event();release=threading.Event();result=[]
++    def worker():
++        original=container.get(Item);ready.set();release.wait();result.append(container.get(Item) is original)
++    thread=threading.Thread(target=worker);thread.start();ready.wait()
++    assert scope.evict(Item) and container.get(Item) is not first
++    assert scope.clear()==1;release.set();thread.join();assert result==[True]

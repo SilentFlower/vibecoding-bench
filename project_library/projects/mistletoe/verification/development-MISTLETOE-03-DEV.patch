@@ -1,0 +1,64 @@
+--- a/library/docs/development-mistletoe-03-dev.md
++++ b/library/docs/development-mistletoe-03-dev.md
+@@ -0,0 +1,5 @@
++# 空文档和全部过滤时提供可渲染的空目录
++
++路线03：无标题、标题被深度或条件全部过滤时返回真正的空List并渲染为空；有效目录的层级及文本不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/mistletoe/block_token.py
++++ b/library/mistletoe/block_token.py
+@@ -492,8 +492,10 @@
+     def __init__(self, matches):
+         self.children = [ListItem(*match) for match in matches]
+         self.loose = any(item.loose for item in self.children)
++        self.start = None
++        if not self.children:
++            return
+         leader = self.children[0].leader
+-        self.start = None
+         if len(leader) != 1:
+             self.start = int(leader[:-1])
+ 
+--- a/library/mistletoe/contrib/toc_renderer.py
++++ b/library/mistletoe/contrib/toc_renderer.py
+@@ -47,7 +47,11 @@
+ 
+         lines = [build_list_item(heading) for heading in self._headings]
+         items = block_token.tokenize(lines)
+-        return items[0]
++        return items[0] if items else block_token.List([])
++
++    def render_list(self, token):
++        """空目录不生成空HTML列表。@param token 目录列表。@return HTML。"""
++        return super().render_list(token) if token.children else ''
+ 
+     def render_heading(self, token):
+         """
+--- a/library/tests/test_development_mistletoe_03_dev.py
++++ b/library/tests/test_development_mistletoe_03_dev.py
+@@ -0,0 +1,24 @@
++"""没有可见标题时仍返回可安全渲染的空目录。"""
++from mistletoe import Document
++from mistletoe.block_token import List
++from mistletoe.contrib.toc_renderer import TocRenderer
++
++
++def test_no_headings_and_empty_document():
++    """普通段落和空文档不会引发IndexError。@return None。"""
++    for text in ('','paragraph\n'):
++        with TocRenderer() as renderer:
++            renderer.render(Document(text))
++            assert isinstance(renderer.toc,List)
++            assert renderer.toc.children==[]
++            assert renderer.render(renderer.toc)==''
++
++
++def test_all_filtered_and_nonempty():
++    """过滤全部和有效目录均使用原列表语义。@return None。"""
++    with TocRenderer(depth=1) as renderer:
++        renderer.render(Document('# Title\n## Hidden\n'))
++        assert renderer.render(renderer.toc)==''
++    with TocRenderer(omit_title=False) as renderer:
++        renderer.render(Document('# Visible\n'))
++        assert 'Visible' in renderer.render(renderer.toc)

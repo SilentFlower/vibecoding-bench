@@ -1,0 +1,81 @@
+--- a/library/cerberus/result.py
++++ b/library/cerberus/result.py
+@@ -0,0 +1,18 @@
++"""校验完成状态与独立快照，不把Validator实例变成线程安全对象。"""
++from dataclasses import dataclass
++from typing import Any
++
++
++@dataclass(frozen=True)
++class ValidationResult:
++    """单次校验的不可变外壳和深复制内容。
++
++    :param valid: 本次布尔结果。
++    :param document: 本次规范化文档独立快照。
++    :param errors: 当前error_handler输出的独立快照。
++    :param completed: 是否正常完成；异常时不发布假结果。
++    """
++    valid: bool
++    document: Any
++    errors: Any
++    completed: bool = True
+--- a/library/cerberus/validator.py
++++ b/library/cerberus/validator.py
+@@ -1050,6 +1050,20 @@
+ 
+     __call__ = validate
+ 
++    def validate_result(self, document, schema=None, *, update=False, normalize=True):
++        """校验并取得不会被下次调用覆盖的完整快照。
++
++        :param document: 输入文档，沿用validate语义。
++        :param schema: 可选本次schema。
++        :param update: 是否按局部更新忽略必需字段。
++        :param normalize: 是否先执行归一化。
++        :return: 不可变外壳ValidationResult；内容深复制隔离后续校验与调用者修改。
++        """
++        from copy import deepcopy
++        from cerberus.result import ValidationResult
++        valid = self.validate(document, schema, update=update, normalize=normalize)
++        return ValidationResult(valid, deepcopy(self.document), deepcopy(self.errors), True)
++
+     def validated(self, *args, **kwargs):
+         """
+         Wrapper around :meth:`~cerberus.Validator.validate` that returns the normalized
+--- a/library/docs/development-cerberus-o05-dev.md
++++ b/library/docs/development-cerberus-o05-dev.md
+@@ -0,0 +1,5 @@
++# 交付携带规范化文档和错误的独立校验结果
++
++新增完整校验结果外壳与规范化文档、错误深复制快照，后续调用和结果内部修改互不覆盖。实际validate参数和旧布尔接口保持，异常不发布假完成；快照内容可编辑，不声称实例线程安全。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cerberus_o05_dev.py
++++ b/library/tests/test_development_cerberus_o05_dev.py
+@@ -0,0 +1,26 @@
++"""结果外壳和本次文档错误快照应独立于后续调用。"""
++from dataclasses import FrozenInstanceError
++import pytest
++from cerberus import Validator
++
++def test_result_survives_next_call():
++    """第一次失败结果不会被第二次成功覆盖。@return None。"""
++    validator = Validator({'count': {'type': 'integer'}})
++    first = validator.validate_result({'count': 'bad'})
++    second = validator.validate_result({'count': 4})
++    assert not first.valid and first.errors and second.valid and second.errors == {}
++    assert first.document == {'count': 'bad'} and first.completed
++
++def test_deep_snapshot_and_frozen_shell():
++    """嵌套内容与Validator不共享，外壳字段不可重赋。@return None。"""
++    validator = Validator({'rows': {'type': 'list'}})
++    result = validator.validate_result({'rows': [{'x': 1}]})
++    result.document['rows'][0]['x'] = 9
++    assert validator.document['rows'][0]['x'] == 1
++    with pytest.raises(FrozenInstanceError): result.valid = False
++
++def test_normalization_and_update_options():
++    """真实归一化和update参数保留。@return None。"""
++    validator = Validator({'count': {'coerce': int}, 'required': {'required': True}})
++    result = validator.validate_result({'count': '3'}, update=True)
++    assert result.valid and result.document == {'count': 3}

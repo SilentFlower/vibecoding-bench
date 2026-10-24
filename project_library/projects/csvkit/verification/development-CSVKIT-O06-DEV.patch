@@ -1,0 +1,114 @@
+--- a/library/csvkit/utilities/csvfind.py
++++ b/library/csvkit/utilities/csvfind.py
+@@ -0,0 +1,74 @@
++"""单遍定位值出现在哪些实际列，并限制样本行号数量。"""
++import json
++import re
++import agate
++from csvkit.cli import CSVKitUtility
++from csvkit.grep import FilteringCSVReader
++
++
++def find_columns(rows, names, columns, *, value=None, regex=None, sample_size=5):
++    """使用原生过滤谓词单遍统计每个指定列。
++
++    :param rows: 数据记录迭代器，不含表头。
++    :param names: 原始列名，重复名称由index区分。
++    :param columns: 零基列下标集合。
++    :param value: 精确文本值，包括空串。
++    :param regex: 可选正则，与value恰选其一。
++    :param sample_size: 每列最多逻辑数据行号样本数，零表示只计数。
++    :return: 含schema、rows和columns的JSON安全报告。
++    """
++    if (value is None) == (regex is None):
++        raise ValueError('必须且只能选择value或regex')
++    if isinstance(sample_size, bool) or not isinstance(sample_size, int) or sample_size < 0:
++        raise ValueError('样本数量必须非负')
++    indices = list(columns)
++    if len(set(indices)) != len(indices) or any(isinstance(i, bool) or not isinstance(i, int) or not 0 <= i < len(names) for i in indices):
++        raise ValueError('列下标无效或重复')
++    pattern = re.compile(regex) if regex is not None else lambda item: item == value
++    filters = [FilteringCSVReader(iter(()), patterns={i: pattern}, header=False) for i in indices]
++    result = [{'index': i, 'name': names[i], 'count': 0, 'sample_rows': []} for i in indices]
++    count = 0
++    for count, row in enumerate(rows, 1):
++        for matcher, record in zip(filters, result):
++            if matcher.test_row(row):
++                record['count'] += 1
++                if len(record['sample_rows']) < sample_size:
++                    record['sample_rows'].append(count)
++    return {'schema': 1, 'rows': count, 'columns': result}
++
++
++class CSVFind(CSVKitUtility):
++    """真实CSVKitUtility命令，JSON统计不混入输入数据。"""
++    description = '单遍报告某个值在哪些列出现及有界逻辑行样本。'
++    override_flags = ['L', 'I']
++
++    def add_arguments(self):
++        """注册列和值查询及显式输出格式。@return None。"""
++        group = self.argparser.add_mutually_exclusive_group(required=True)
++        group.add_argument('--value')
++        group.add_argument('--regex')
++        self.argparser.add_argument('-c', '--columns')
++        self.argparser.add_argument('--sample-size', type=int, default=5)
++        self.argparser.add_argument('--json', action='store_true')
++
++    def main(self):
++        """读取一次逻辑数据流并输出统计。@return None。"""
++        rows, names, columns = self.get_rows_and_column_names_and_column_ids(**self.reader_kwargs)
++        report = find_columns(rows, names, columns, value=self.args.value, regex=self.args.regex, sample_size=self.args.sample_size)
++        if self.args.json:
++            json.dump(report, self.output_file, ensure_ascii=False)
++            self.output_file.write('\n')
++        else:
++            output = agate.csv.writer(self.output_file, **self.writer_kwargs)
++            output.writerow(['index', 'name', 'count', 'sample_rows'])
++            offset = 0 if self.args.zero_based else 1
++            output.writerows([item['index'] + offset, item['name'], item['count'], ','.join(map(str, item['sample_rows']))] for item in report['columns'])
++
++
++def launch_new_instance():
++    """从模块入口执行实际查询。@return None。"""
++    CSVFind().run()
++
++
++if __name__ == '__main__':
++    launch_new_instance()
+--- a/library/docs/development-csvkit-o06-dev.md
++++ b/library/docs/development-csvkit-o06-dev.md
+@@ -0,0 +1,5 @@
++# 单遍查找业务值所在列并交付有界行样本
++
++对应路线16：真实公共utility一次扫描逻辑记录，复用原生过滤谓词，按下标区分重复列并报告精确计数和有界行样本；空值、正则和输出政策明确。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_csvkit_o06_dev.py
++++ b/library/tests/test_development_csvkit_o06_dev.py
+@@ -0,0 +1,26 @@
++"""真实单遍查找保留重复列身份与有界样本。"""
++import json
++from io import StringIO
++
++def test_single_pass_counts_bounded_samples_and_duplicates():
++    """重复列名按下标区分，迭代器只遍历一次。@return None。"""
++    from csvkit.utilities.csvfind import find_columns
++    source=iter([['x','x'],['x','no'],['x']])
++    report=find_columns(source,['same','same'],[0,1],value='x',sample_size=1)
++    assert report['rows']==3 and [r['count'] for r in report['columns']]==[3,1]
++    assert [r['sample_rows'] for r in report['columns']]==[[1],[1]] and list(source)==[]
++
++def test_real_cli_json_logical_multiline_and_empty(tmp_path):
++    """实际utility按逻辑行号报告，多行字段不拆散。@return None。"""
++    from csvkit.utilities.csvfind import CSVFind
++    path=tmp_path/'data';path.write_text('a,b\n"hello\nworld",x\nx,x\n');out=StringIO()
++    CSVFind(['--value','x','--json',str(path)],output_file=out).run()
++    report=json.loads(out.getvalue());assert report['rows']==2 and report['columns'][1]['sample_rows']==[1,2]
++
++def test_empty_cells_short_rows_regex_and_budget():
++    """精确空值与短行沿用原过滤语义，正则可显式使用。@return None。"""
++    from csvkit.utilities.csvfind import find_columns
++    import pytest
++    assert find_columns(iter([['a'],['b','']]),['a','b'],[1],value='',sample_size=0)['columns'][0]['count']==2
++    assert find_columns(iter([['Ab'],['no']]),['a'],[0],regex='(?i)^ab$')['columns'][0]['count']==1
++    with pytest.raises(ValueError):find_columns(iter([]),['x'],[0],value='x',sample_size=-1)

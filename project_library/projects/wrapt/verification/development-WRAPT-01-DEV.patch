@@ -1,0 +1,83 @@
+--- a/library/docs/development-wrapt-01-dev.md
++++ b/library/docs/development-wrapt-01-dev.md
+@@ -0,0 +1,5 @@
++# 继承类方法缓存以实际调用类为身份且保持两种装饰顺序
++
++路线01：类方法共享缓存显式加入实际cls，不捕获首次Base绑定；两种classmethod次序/继承/实例访问正确，原实例LRU与静态函数/管理API保持。类键按functools保留至淘汰/clear。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wrapt/caching.py
++++ b/library/src/wrapt/caching.py
+@@ -33,7 +33,9 @@
+ class _BoundLRUCacheFunctionWrapper(BoundFunctionWrapper):
+ 
+     def _is_instance_method(self):
+-        return self._self_binding == "function"
++        return self._self_binding == "function" and not issubclass(
++            type(self._self_instance), type
++        )
+ 
+     def __call__(self, *args, **kwargs):
+         parent = self._self_parent
+@@ -44,6 +46,16 @@
+         # is the raw classmethod/staticmethod descriptor.
+ 
+         if not self._is_instance_method():
++            # classmethod的_self_instance只反映访问方式；实际调用类来自绑定方法的__self__。
++            calling_class = getattr(self.__wrapped__, "__self__", self._self_instance)
++            if issubclass(type(calling_class), type):
++                # 缓存必须包含实际调用类；不能捕获首次访问时已绑定的Base方法。
++                if parent._self_cache is None:
++                    with synchronized(parent):
++                        if parent._self_cache is None:
++                            raw = getattr(parent.__wrapped__, "__func__", parent.__wrapped__)
++                            parent._self_cache = _functools_lru_cache(**parent._self_lru_kwargs)(raw)
++                return parent._self_cache(calling_class, *args, **kwargs)
+             if parent._self_cache is None:
+                 with synchronized(parent):
+                     if parent._self_cache is None:
+--- a/library/tests/test_development_wrapt_01_dev.py
++++ b/library/tests/test_development_wrapt_01_dev.py
+@@ -0,0 +1,42 @@
++"""继承类方法的LRU不能固定到首次调用类。"""
++import wrapt
++
++def test_both_classmethod_orders_return_real_class_and_cache_per_class_key():
++    """两种装饰次序都保持绑定，重复调用命中。@return None。"""
++    for reverse in (False,True):
++        calls=[]
++        def body(cls,x):calls.append((cls,x));return cls.__name__,x
++        decorated=classmethod(wrapt.lru_cache(body)) if reverse else wrapt.lru_cache(classmethod(body))
++        class Base:label=decorated
++        class Child(Base):pass
++        assert Base.label(1)==('Base',1) and Child.label(1)==('Child',1)
++        assert Child.label(1)==('Child',1) and Base.label(1)==('Base',1)
++        assert calls==[(Base,1),(Child,1)]
++
++def test_reverse_first_multiple_subclasses_and_shared_clear_policy():
++    """Derived先调用不污染Base，清除共享类缓存后各自重算。@return None。"""
++    calls=[]
++    class Base:
++        @wrapt.lru_cache
++        @classmethod
++        def label(cls,value):calls.append(cls);return cls.__name__+value
++    class A(Base):pass
++    class B(Base):pass
++    assert A.label('x')=='Ax' and Base.label('x')=='Basex' and B.label('x')=='Bx'
++    A.label.cache_clear()
++    assert B.label('x')=='Bx' and calls==[A,Base,B,B]
++
++def test_proxies_over_same_class_keep_real_instance_identity_and_gc():
++    """Proxy的__class__可伪装为type，不能因此改用共享类缓存。@return None。"""
++    import gc
++    import weakref
++    class Target:pass
++    class Proxy(wrapt.BaseObjectProxy):
++        def __init__(self,wrapped,factor):super().__init__(wrapped);self._self_factor=factor
++        @wrapt.lru_cache
++        def compute(self,value):return self._self_factor*value
++    first=Proxy(Target,2);second=Proxy(Target,10)
++    assert isinstance(first,type) and not issubclass(type(first),type)
++    assert first.compute(5)==10 and second.compute(5)==50 and first.compute(5)==10
++    reference=weakref.ref(first);del first;gc.collect()
++    assert reference() is None and second.compute(5)==50

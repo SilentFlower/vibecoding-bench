@@ -1,0 +1,66 @@
+--- a/library/docs/development-packaging-02-dev.md
++++ b/library/docs/development-packaging-02-dev.md
+@@ -0,0 +1,5 @@
++# 跨平台Marker可仅使用声明的完整目标环境求值
++
++路线02：strict=True从空目标环境开始，不读取宿主；保留context已有默认、extra规范化和已提供Python dev修正，缺引用变量明确报错且不改调用方。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/packaging/markers.py
++++ b/library/src/packaging/markers.py
+@@ -511,6 +511,8 @@
+         self,
+         environment: Mapping[str, str | AbstractSet[str]] | None = None,
+         context: EvaluateContext = "metadata",
++        *,
++        strict: bool = False,
+     ) -> bool:
+         """Evaluate a marker.
+ 
+@@ -535,8 +537,11 @@
+             Added the ``context`` parameter, which influences which marker names
+             are considered valid.
+         """
++        # 跨平台严格模式不得补入宿主数据；context声明的extra默认仍按原协议提供。
++        if not isinstance(strict,bool):
++            raise TypeError("strict必须为bool")
+         current_environment = cast(
+-            "dict[str, str | AbstractSet[str]]", default_environment()
++            "dict[str, str | AbstractSet[str]]", {} if strict else default_environment()
+         )
+         if context == "lock_file":
+             current_environment |= {
+@@ -556,7 +561,9 @@
+                 current_environment["extra"] = canonicalize_name(extra) if extra else ""
+ 
+         return _evaluate_markers(
+-            self._markers, _repair_python_full_version(current_environment)
++            self._markers,
++            _repair_python_full_version(current_environment)
++            if "python_full_version" in current_environment else current_environment
+         )
+ 
+ 
+--- a/library/tests/test_development_packaging_02_dev.py
++++ b/library/tests/test_development_packaging_02_dev.py
+@@ -0,0 +1,20 @@
++"""严格目标环境不从宿主补齐，默认覆盖模式仍保留。"""
++import unittest
++from unittest.mock import patch
++from packaging.markers import Marker,UndefinedEnvironmentName
++
++def test_strict_partial_environment_rejects_missing_referenced_values():
++    """即使宿主提供值，严格求值仍明确缺失。@return None。"""
++    marker=Marker('python_version >= "3.8"')
++    with patch('packaging.markers.default_environment',side_effect=AssertionError('不能访问宿主')):
++        with unittest.TestCase().assertRaises(UndefinedEnvironmentName):marker.evaluate({'os_name':'posix'},strict=True)
++        assert Marker('os_name == "posix"').evaluate({'os_name':'posix'},strict=True)
++
++def test_context_defaults_dev_version_and_mapping_ownership():
++    """context既有默认与目标dev修正不修改来源映射。@return None。"""
++    environment={'python_full_version':'3.13.0+','os_name':'target'}
++    assert Marker('python_full_version >= "3.13"').evaluate(environment,strict=True)
++    assert environment=={'python_full_version':'3.13.0+','os_name':'target'}
++    assert Marker('extra == ""').evaluate({},strict=True)
++    assert Marker('"docs" in extras').evaluate({'extras':{'docs'}},context='lock_file',strict=True)
++    with unittest.TestCase().assertRaises(UndefinedEnvironmentName):Marker('extra == ""').evaluate({},context='requirement',strict=True)

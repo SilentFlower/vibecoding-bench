@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CONFIGARGPARSE-O02-DEV",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add JSONConfigFileParser as a ConfigFileParser accepting object roots, finite JSON scalars and flat scalar lists. Normalize bool to true/false and other scalar values to strings for the existing actual ArgumentParser action pipeline. Reject null, nested objects/lists, non-object roots, invalid JSON/encoding and NaN/Infinity. duplicates defaults to error and supports last/warn explicitly; never include values in duplicate diagnostics. Serialize supported values to Unicode-preserving valid JSON with roundtrip behavior; optional YAML must not be imported.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

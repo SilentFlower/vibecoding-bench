@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "RICH-03-DEV",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Text integer indexing: normalize a negative offset exactly once against codepoint length, enforce normal IndexError at both bounds and transfer base style plus every overlapping span to the one-character result. Positive and corresponding negative indexes are semantically identical; preserve source Text untouched, Unicode codepoint indexing, empty behavior, end=\"\" on the selected character and existing slice rules. Do not clamp too-negative indexes to zero or turn indexing into grapheme segmentation. This is a complete styled-selection repair with real overlapping style checks.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

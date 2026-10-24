@@ -1,0 +1,89 @@
+--- a/library/arrow/arrow.py
++++ b/library/arrow/arrow.py
+@@ -12,7 +12,7 @@
+ from datetime import time as dt_time
+ from datetime import timedelta, timezone
+ from datetime import tzinfo as dt_tzinfo
+-from math import trunc
++from math import isfinite, trunc
+ from time import struct_time
+ from typing import (
+     Any,
+@@ -870,6 +870,29 @@
+         """
+ 
+         return self._datetime.replace(tzinfo=None)
++
++    def elapsed(self, other):
++        """沿UTC时间线求实际经过时间。@param other Arrow或带时区datetime。@return timedelta。
++        """
++        if isinstance(other, Arrow):
++            other = other._datetime
++        if not isinstance(other, dt_datetime) or other.utcoffset() is None:
++            raise TypeError('实际时差要求Arrow或带时区datetime')
++        return self._datetime.astimezone(timezone.utc) - other.astimezone(timezone.utc)
++
++    def shift_elapsed(self, **units):
++        """按固定经过时长平移。@param units weeks/days/hours/minutes/seconds/microseconds。@return 新Arrow。
++        """
++        allowed = {'weeks','days','hours','minutes','seconds','microseconds'}
++        if set(units) - allowed:
++            raise ValueError('实际时长不支持月、年或未知单位')
++        for value in units.values():
++            if isinstance(value, bool) or not isinstance(value, (int,float)):
++                raise TypeError('固定时长必须是数值而不是布尔值')
++            if isinstance(value, float) and not isfinite(value):
++                raise ValueError('固定时长必须有限')
++        value = self._datetime.astimezone(timezone.utc) + timedelta(**units)
++        return self.fromdatetime(value.astimezone(self._datetime.tzinfo))
+ 
+     def timestamp(self) -> float:
+         """Returns a timestamp representation of the :class:`Arrow <arrow.arrow.Arrow>` object, in
+--- a/library/development_tests/test_development_ar_elapsed_dev.py
++++ b/library/development_tests/test_development_ar_elapsed_dev.py
+@@ -0,0 +1,37 @@
++"""公开真实时间线运算回归。"""
++from datetime import datetime, timedelta
++from zoneinfo import ZoneInfo
++import pytest
++import arrow
++
++def test_fall_back_adjacent_instants_have_one_second_elapsed():
++    before = arrow.get(datetime(2024,11,3,1,59,59,tzinfo=ZoneInfo('America/New_York'),fold=0))
++    after = arrow.get(datetime(2024,11,3,1,0,0,tzinfo=ZoneInfo('America/New_York'),fold=1))
++    assert after.elapsed(before) == timedelta(seconds=1)
++
++def test_shift_elapsed_preserves_zone_and_correct_fold():
++    before = arrow.get(datetime(2024,11,3,1,59,59,tzinfo=ZoneInfo('America/New_York'),fold=0))
++    after = before.shift_elapsed(seconds=1)
++    assert after.hour == 1 and after.minute == 0 and after.fold == 1
++    assert after.elapsed(before) == timedelta(seconds=1)
++
++def test_spring_forward_skips_nonexistent_wall_time():
++    before = arrow.get(datetime(2024,3,10,1,30,tzinfo=ZoneInfo('America/New_York')))
++    assert before.shift_elapsed(hours=1).hour == 3
++
++def test_naive_and_calendar_units_are_rejected():
++    value = arrow.get(2024,1,1)
++    with pytest.raises(TypeError):
++        value.elapsed(datetime(2024,1,1))
++    with pytest.raises(ValueError):
++        value.shift_elapsed(months=1)
++    with pytest.raises(TypeError):
++        value.shift_elapsed(seconds=True)
++
++def test_microseconds_and_negative_shifts_are_exact():
++    value = arrow.get(2024,1,1,0,0,0,123456)
++    assert value.shift_elapsed(microseconds=-7).elapsed(value) == timedelta(microseconds=-7)
++
++def test_existing_calendar_shift_and_original_value_are_unchanged():
++    value = arrow.get(2024,1,31)
++    assert value.shift(months=1).day == 29 and value.day == 31
+--- a/library/docs/development-ar-elapsed-dev.md
++++ b/library/docs/development-ar-elapsed-dev.md
+@@ -0,0 +1,5 @@
++# 跨夏令时沿真实时间线计算时差和平移
++
++夏令时回拨附近，墙钟差与实际经过秒数不同。新增elapsed和shift_elapsed，沿UTC时间线运算后返回原时区和正确fold；只接受固定时长单位，不把月份或年份当固定秒数，保留原减法和日历shift语义。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

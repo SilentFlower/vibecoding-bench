@@ -1,0 +1,13 @@
+{
+  "script": "verification/development-TD-M02-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 2,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_tinydb.py"
+}

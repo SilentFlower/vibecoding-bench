@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MORE-ITERTOOLS-01-DEV",
+  "source_commit": "4aeb4338ae1407d8da9723e86da99efeb446f719",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add keyword-only on_error=None to map_except/filter_except, reporting zero-based input index, original item and actual caught exception once per listed conversion failure. Successful map values/filter item identities and lazy prefix consumption remain unchanged. Support falsey callable, validate non-None callbacks, propagate callback exceptions and unlisted exceptions. Restrict map exception catching to function execution, not consumer-injected errors across yield. No internal unbounded error collection.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

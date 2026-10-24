@@ -1,0 +1,151 @@
+--- a/library/docs/development-natsort-01-dev.md
++++ b/library/docs/development-natsort-01-dev.md
+@@ -0,0 +1,5 @@
++# CLI整数范围与排除筛选保留大整数精度
++
++路线01：编号过滤不再将相邻大整数折为同一float；范围、反选和排除统一使用所选数值解释，小数边界精确比较，显式float模式兼容。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/natsort/__main__.py
++++ b/library/natsort/__main__.py
+@@ -5,6 +5,7 @@
+ import argparse
+ import sys
+ import textwrap
++from decimal import Decimal, InvalidOperation
+ from collections.abc import Iterable
+ from typing import TYPE_CHECKING, Callable, Union, cast
+ 
+@@ -14,7 +15,7 @@
+ if TYPE_CHECKING:
+     from re import Pattern
+ 
+-Num = Union[float, int]
++Num = Union[float, int, Decimal]
+ NumIter = Iterable[Num]
+ NumPair = tuple[Num, Num]
+ NumPairIter = Iterable[NumPair]
+@@ -63,6 +64,14 @@
+         self.entries = entries
+ 
+ 
++def _exact_filter_number(value):
++    """保留CLI原始十进制精度。@param value 参数文本。@return 精确数值。"""
++    try:
++        return Decimal(value)
++    except InvalidOperation as error:
++        raise argparse.ArgumentTypeError('筛选参数必须是数字') from error
++
++
+ def main(*arguments: str) -> None:
+     """
+     Perform a natural sort on entries given on the command-line.
+@@ -94,7 +103,7 @@
+         "-f",
+         "--filter",
+         nargs=2,
+-        type=float,
++        type=_exact_filter_number,
+         metavar=("LOW", "HIGH"),
+         action="append",
+         help="Used for keeping only the entries that have a number "
+@@ -104,7 +113,7 @@
+         "-F",
+         "--reverse-filter",
+         nargs=2,
+-        type=float,
++        type=_exact_filter_number,
+         metavar=("LOW", "HIGH"),
+         action="append",
+         dest="reverse_filter",
+@@ -114,7 +123,7 @@
+     parser.add_argument(
+         "-e",
+         "--exclude",
+-        type=float,
++        type=_exact_filter_number,
+         action="append",
+         help="Used to exclude an entry that contains a specific number.",
+     )
+@@ -189,6 +198,17 @@
+         # Note: if nothing is given on the command line, args.entries is an empty list.
+     )
+     args = parser.parse_args(arguments or None, namespace=TypedArgs())
++
++    # 整数策略保留十进制精度；浮点策略继续使用原生float的既有比较语义。
++    if args.number_type in ('int', 'i'):
++        values = [*args.exclude, *(number for ranges in (args.filter, args.reverse_filter)
++            for pair in (ranges or []) for number in pair)]
++        if any(not value.is_finite() for value in values):
++            raise ValueError('整数筛选阈值必须是有限数')
++    else:
++        args.exclude = [float(value) for value in args.exclude]
++        args.filter = [(float(low), float(high)) for low, high in args.filter] if args.filter else None
++        args.reverse_filter = [(float(low), float(high)) for low, high in args.reverse_filter] if args.reverse_filter else None
+ 
+     # Make sure the filter range is given properly. Does nothing if no filter
+     args.filter = check_filters(args.filter)
+@@ -366,12 +386,13 @@
+             | natsort.ns.NOEXP * (not args.exp)
+         )
+         regex = regex_chooser(inp_options)
++        converter = float if is_float else int
+         if args.filter is not None:
+             lows, highs = ([f[0] for f in args.filter], [f[1] for f in args.filter])
+             entries = [
+                 entry
+                 for entry in entries
+-                if keep_entry_range(entry, lows, highs, float, regex)
++                if keep_entry_range(entry, lows, highs, converter, regex)
+             ]
+         if args.reverse_filter is not None:
+             lows, highs = (
+@@ -381,14 +402,14 @@
+             entries = [
+                 entry
+                 for entry in entries
+-                if not keep_entry_range(entry, lows, highs, float, regex)
++                if not keep_entry_range(entry, lows, highs, converter, regex)
+             ]
+         if args.exclude:
+             exclude = set(args.exclude)
+             entries = [
+                 entry
+                 for entry in entries
+-                if keep_entry_value(entry, exclude, float, regex)
++                if keep_entry_value(entry, exclude, converter, regex)
+             ]
+ 
+     # Print off the sorted results
+--- a/library/tests/test_development_natsort_01_dev.py
++++ b/library/tests/test_development_natsort_01_dev.py
+@@ -0,0 +1,29 @@
++"""CLI整数筛选不能把相邻大整数都折为同一个float。"""
++import contextlib
++import io
++from natsort.__main__ import main
++
++
++def output(*args):
++    """捕获实际CLI流水线。@param args 命令参数。@return 输出项。"""
++    stream=io.StringIO()
++    with contextlib.redirect_stdout(stream):main(*args)
++    return stream.getvalue().splitlines()
++
++
++def test_exclude_adjacent_large_integers():
++    """相邻十六位整数独立排除。@return None。"""
++    a=2**53
++    assert output('--exclude',str(a),'item'+str(a),'item'+str(a+1))==['item'+str(a+1)]
++
++
++def test_inclusive_range_preserves_exact_boundaries():
++    """上下界不提前四舍五入或截断。@return None。"""
++    a=2**53
++    assert output('--filter',str(a+1),str(a+2),*['x'+str(a+i) for i in range(3)])==['x'+str(a+1),'x'+str(a+2)]
++    assert output('--filter','1.5','2.5','x1','x2','x3')==['x2']
++
++
++def test_float_policy_stays_float():
++    """显式浮点策略保留原始筛选。@return None。"""
++    assert output('--number-type','float','--filter','1.2','2.9','x3.0','x2.5','x1.5')==['x1.5','x2.5']

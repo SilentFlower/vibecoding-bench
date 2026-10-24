@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-MARKDOWN-06-DEV",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add markdown.documents.convert_file(input,output=None,input_encoding=\"utf-8\",output_encoding=\"utf-8\",close_input=False,**options), building on the earlier real ConversionResult API. Accept string/PathLike paths, standard text/binary input streams from the current cursor and standard text/binary output streams; decode/encode once with independent explicit encodings. Keep caller streams open unless close_input is explicitly true, never close output or retry a failed write with another type. Owned path IO closes itself; return the actual structured result. Prepare encoding before touching output paths, use same-directory temporary flush/fsync+replace, preserve existing mode, reject symlink/nonregular output and clean temporary files. Read/convert/encoding/replace failures remain explicit and keep old output bytes before replacement. Existing file APIs are unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

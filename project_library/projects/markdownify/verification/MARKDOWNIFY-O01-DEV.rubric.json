@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWNIFY-O01-DEV",
+  "source_commit": "bc98c9e134ec55b2853716ab859754f061cb7054",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix actual MarkdownConverter.convert_pre to choose a backtick fence of at least three characters and strictly longer than every consecutive backtick run in the converted code body. Preserve body content, existing strip_pre modes and language callback/fallback behavior. Validate the effective language as a string with no backtick, CR or LF, refusing structural info-line injection. Simple existing pre output must remain unchanged; demonstrate entire embedded fenced samples surviving as one outer code block, not only the presence of a helper.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

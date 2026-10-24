@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DP-MERGE-KEY-DEV",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement dpath.keymerge.merge_by_key(left,right,key). Materialize and validate both record iterables before merging: every mapping has a hashable business key and no duplicates within a side, using (type,value) identity so bool/int/string keys are not silently conflated. Preserve left order, recursively merge matching dictionary fields with right scalar/list replacement, append new records in right order, and deep-copy all retained/incoming nodes. Reject malformed/duplicate/unhashable keys without mutating either input. Do not change default dpath.merge list concatenation or original source references.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

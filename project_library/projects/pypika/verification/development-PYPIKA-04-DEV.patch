@@ -1,0 +1,46 @@
+--- a/library/docs/development-pypika-04-dev.md
++++ b/library/docs/development-pypika-04-dev.md
+@@ -0,0 +1,5 @@
++# CTE驱动的DELETE保留定义并删除准确业务集合
++
++路线06：DELETE保留全部WITH定义与顺序，内存SQLite真实删除集合准确；无CTE与PG RETURNING等既有行为保持，不连接外部引擎。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pypika/queries.py
++++ b/library/pypika/queries.py
+@@ -1311,7 +1311,8 @@
+             return querystring
+ 
+         if self._delete_from:
+-            querystring = self._delete_sql(**kwargs)
++            querystring = self._with_sql(**kwargs) if self._with else ""
++            querystring += self._delete_sql(**kwargs)
+ 
+         elif not self._select_into and self._insert_table:
+             querystring = self._with_sql(**kwargs) if self._with else ""
+--- a/library/tests/test_development_pypika_04_dev.py
++++ b/library/tests/test_development_pypika_04_dev.py
+@@ -0,0 +1,23 @@
++"""WITH驱动DELETE保持定义与删除集合。"""
++import sqlite3
++from pypika import Query,PostgreSQLQuery,Table
++
++def test_cte_delete_executes_only_selected_rows():
++    """实际内存执行CTE删除，不能只查前缀。@return None。"""
++    table=Table('items');selected=Table('selected')
++    cte=Query.from_(table).select(table.id).where(table.id<3)
++    query=Query.with_(cte,'selected').from_(table).delete().where(table.id.isin(Query.from_(selected).select(selected.id)))
++    sql=query.get_sql();assert sql.startswith('WITH selected AS (SELECT')
++    with sqlite3.connect(':memory:') as connection:
++        connection.execute('CREATE TABLE items(id INTEGER)')
++        connection.executemany('INSERT INTO items VALUES(?)',[(1,),(2,),(3,)])
++        connection.execute(sql)
++        assert connection.execute('SELECT id FROM items').fetchall()==[(3,)]
++
++def test_multiple_ctes_returning_and_plain_delete():
++    """多定义保持顺序，无CTE既有行为保持。@return None。"""
++    table=Table('items')
++    query=PostgreSQLQuery.with_(Query.select(1),'first').with_(Query.select(2),'second').from_(table).delete().where(table.id==1).returning('id')
++    sql=query.get_sql()
++    assert sql=='WITH first AS (SELECT 1) ,second AS (SELECT 2) DELETE FROM "items" WHERE "id"=1 RETURNING "id"'
++    assert Query.from_(table).delete().where(table.id==2).get_sql()=='DELETE FROM "items" WHERE "id"=2'

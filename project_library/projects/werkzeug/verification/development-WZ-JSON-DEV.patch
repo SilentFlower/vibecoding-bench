@@ -1,0 +1,80 @@
+--- a/library/development_tests/test_development_wz_json_dev.py
++++ b/library/development_tests/test_development_wz_json_dev.py
+@@ -0,0 +1,23 @@
++"""公开真实请求流严格JSON回归。"""
++from io import BytesIO
++import pytest
++from werkzeug.wrappers import Request
++from werkzeug.exceptions import BadRequest,RequestEntityTooLarge,UnsupportedMediaType
++from werkzeug.strict_json import read_json
++
++def test_vendor_json_false_and_null_are_valid():
++    assert read_json(Request.from_values(data='false',content_type='application/vnd.api+json')) is False
++    assert read_json(Request.from_values(data='null',content_type='application/json')) is None
++
++def test_nested_duplicates_nonfinite_and_bad_encoding_raise_400():
++    for data in (b'{"x":{"a":1,"a":2}}',b'NaN',b'1e999',b'\xff',b''):
++        with pytest.raises(BadRequest): read_json(Request.from_values(data=data,content_type='application/json'))
++
++def test_declared_and_actual_budget_are_enforced():
++    with pytest.raises(RequestEntityTooLarge): read_json(Request.from_values(data='12345',content_type='application/json'),max_bytes=4)
++    request=Request.from_values(data='12345',content_type='application/json');request.environ.pop('CONTENT_LENGTH');request.environ['wsgi.input_terminated']=True
++    with pytest.raises(RequestEntityTooLarge): read_json(request,max_bytes=4)
++
++def test_unsupported_media_and_charset_raise_415():
++    for media in ('text/plain','application/json; charset=latin-1'):
++        with pytest.raises(UnsupportedMediaType): read_json(Request.from_values(data='1',content_type=media))
+--- a/library/docs/development-wz-json-dev.md
++++ b/library/docs/development-wz-json-dev.md
+@@ -0,0 +1,5 @@
++# 为真实请求流添加有字节预算的严格JSON读取入口
++
++真实请求流最多读取预算加一个字节，媒体类型、编码、重复键和有限数均明确校验。不同失败返回原生HTTP异常，保留false与null语义；独立入口消费流，不改变旧get_json缓存。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/werkzeug/strict_json.py
++++ b/library/src/werkzeug/strict_json.py
+@@ -0,0 +1,43 @@
++"""在明确字节预算内读取并严格解释JSON请求。"""
++import json
++from .exceptions import BadRequest,RequestEntityTooLarge,UnsupportedMediaType
++
++
++def _pairs(items):
++    result={}
++    for key,value in items:
++        if key in result:
++            raise ValueError('JSON对象键重复')
++        result[key]=value
++    return result
++
++
++def _constant(value):
++    raise ValueError('JSON不能包含非有限常量')
++
++
++def _float(value):
++    import math
++    result=float(value)
++    if not math.isfinite(result):
++        raise ValueError('JSON数字溢出')
++    return result
++
++
++def read_json(request,*,max_bytes=1048576):
++    """有限读取真实请求流。@param request 原Request。@param max_bytes 正整数字节预算。
++    @return 严格JSON值；消费请求流，不修改旧get_json的缓存或默认行为。
++    """
++    if type(max_bytes) is not int or max_bytes<1:
++        raise ValueError('需要正整数字节预算')
++    if not request.is_json or request.mimetype_params.get('charset','utf-8').lower() not in ('utf-8','utf8'):
++        raise UnsupportedMediaType('需要UTF8 JSON请求')
++    if request.content_length is not None and request.content_length>max_bytes:
++        raise RequestEntityTooLarge()
++    data=request.stream.read(max_bytes+1)
++    if len(data)>max_bytes:
++        raise RequestEntityTooLarge()
++    try:
++        return json.loads(data.decode('utf-8'),object_pairs_hook=_pairs,parse_constant=_constant,parse_float=_float)
++    except (ValueError,UnicodeError) as error:
++        raise BadRequest('无效的严格JSON请求') from error

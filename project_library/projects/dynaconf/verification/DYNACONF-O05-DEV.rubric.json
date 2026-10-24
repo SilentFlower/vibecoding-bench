@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DYNACONF-O05-DEV",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Settings.set_value_parser(parser=None,*,errors=\"raise\") selecting JSON, ast.literal_eval, a local callable or default TOML for this instance only, integrated at actual _parse_conf_data for tomlfy=True unmarked strings including env_loader. Existing explicit @str/@int/@json/@merge/lazy tokens keep priority; nonstrings/non-tomlfy values stay unchanged. Validate profile/error policies before writing config. Raise or retain original string only for declared parse ValueError/SyntaxError; propagate programming failures. Show actual JSON null/array differences versus an independent default instance and allow resetting None without modifying global converters.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "RICH-05-DEV",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Traceback SyntaxError-derived capture to normalize msg, filename and source text through the existing safe_str helper, preserving actual original object fields and stable <exception str() failed> fallback. Actual Console rendering must survive numeric/container/custom messages instead of raising a second TypeError that hides the original problem. Preserve ordinary string diagnostics and offset/line positioning. Apply across the earlier accepted cyclic/shared exception graph without losing its identity bound; this delivery depends on that graph repair and does not re-count exception traversal as a separate phase.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

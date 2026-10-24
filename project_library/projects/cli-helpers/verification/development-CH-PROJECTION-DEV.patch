@@ -1,0 +1,72 @@
+--- a/library/cli_helpers/tabular_output/projection.py
++++ b/library/cli_helpers/tabular_output/projection.py
+@@ -0,0 +1,28 @@
++"""按明确列索引或唯一列名惰性投影原始查询行。"""
++
++
++def select_columns(data,headers,selection):
++    """选择和重排列。@param data 一次性行。@param headers 有限字符串表头。
++    @param selection 零基整数或唯一列名序列。@return (惰性投影行,投影表头列表)。
++    """
++    headers=list(headers);selected=[]
++    for item in selection:
++        if type(item) is int:
++            if not 0<=item<len(headers):
++                raise IndexError('列索引越界')
++            index=item
++        elif isinstance(item,str):
++            matches=[index for index,name in enumerate(headers) if name==item]
++            if len(matches)!=1:
++                raise ValueError('列名不存在或不唯一：'+item)
++            index=matches[0]
++        else:
++            raise TypeError('列选择必须为索引或字符串')
++        selected.append(index)
++    def rows():
++        for number,row in enumerate(data,1):
++            row=list(row)
++            if len(row)!=len(headers):
++                raise ValueError('第'+str(number)+'行宽度与表头不一致')
++            yield [row[index] for index in selected]
++    return rows(),[headers[index] for index in selected]
+--- a/library/development_tests/test_development_ch_projection_dev.py
++++ b/library/development_tests/test_development_ch_projection_dev.py
+@@ -0,0 +1,30 @@
++"""公开查询列投影回归。"""
++import json
++import pytest
++from cli_helpers.tabular_output.projection import select_columns
++from cli_helpers.tabular_output import TabularOutputFormatter
++
++def test_name_and_index_selection_preserve_order_and_duplicates():
++    rows,headers=select_columns([[1,'a',3]],['id','name','n'],['name',0,'name'])
++    assert headers==['name','id','name'] and list(rows)==[['a',1,'a']]
++
++def test_projection_is_lazy_and_original_values_are_preserved():
++    consumed=[];value=object()
++    def data():
++        consumed.append(1)
++        yield [value,2]
++    rows,headers=select_columns(data(),['a','b'],[0])
++    assert consumed==[] and next(rows)[0] is value and consumed==[1]
++
++def test_ambiguous_headers_invalid_indices_and_ragged_rows_fail():
++    for selection in (['a'],[-1],[True],[2]):
++        with pytest.raises((ValueError,TypeError,IndexError)):
++            select_columns([],['a','a'],selection)
++    rows,headers=select_columns([[1]],['a','b'],[0])
++    with pytest.raises(ValueError):
++        next(rows)
++
++def test_projected_values_integrate_with_real_json_formatter():
++    rows,headers=select_columns([[1,'a']],['id','name'],['name','id'])
++    result=list(TabularOutputFormatter('jsonl').format_output(rows,headers))
++    assert json.loads(result[0])=={'name':'a','id':1}
+--- a/library/docs/development-ch-projection-dev.md
++++ b/library/docs/development-ch-projection-dev.md
+@@ -0,0 +1,5 @@
++# 按列名或索引惰性选择并重排查询结果
++
++查询导出先按唯一列名或零基索引选择、重排，原始值保持类型，之后再交给格式器推断列类型。投影惰性消费行，重复选择允许，歧义列名及行宽错误明确定位，不修改输入。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

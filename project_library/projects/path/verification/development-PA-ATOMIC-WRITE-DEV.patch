@@ -1,0 +1,77 @@
+--- a/library/development_tests/test_development_pa_atomic_write_dev.py
++++ b/library/development_tests/test_development_pa_atomic_write_dev.py
+@@ -0,0 +1,32 @@
++"""公开Path原子发布回归。"""
++import pytest
++from path import Path
++
++def test_changed_and_unchanged_outputs_have_distinct_effects(tmp_path):
++    path=Path(tmp_path/'out');assert path.atomic_write('雪')
++    before=path.stat()
++    assert path.atomic_write('雪',if_changed=True) is False
++    after=path.stat();assert (before.st_ino,before.st_mtime_ns,before.st_mode)==(after.st_ino,after.st_mtime_ns,after.st_mode)
++    assert path.atomic_write(b'new') and path.read_bytes()==b'new'
++
++def test_original_mode_and_new_private_mode_are_preserved(tmp_path):
++    path=Path(tmp_path/'out');path.atomic_write('a');assert path.stat().st_mode&0o777==0o600
++    path.chmod(0o640);path.atomic_write('b');assert path.stat().st_mode&0o777==0o640
++
++def test_replace_failure_preserves_old_file_and_cleans_temp(tmp_path,monkeypatch):
++    path=Path(tmp_path/'out');path.write_text('old')
++    def broken(*args):
++        raise OSError('synthetic')
++    monkeypatch.setattr('os.replace',broken)
++    with pytest.raises(OSError):
++        path.atomic_write('new')
++    assert path.read_text()=='old' and sorted(p.name for p in tmp_path.iterdir())==['out']
++
++def test_encoding_failure_and_symlink_rejection_do_not_modify_target(tmp_path):
++    path=Path(tmp_path/'out');path.write_text('old')
++    with pytest.raises(UnicodeEncodeError):
++        path.atomic_write('雪',encoding='ascii')
++    link=tmp_path/'link';link.symlink_to(path)
++    with pytest.raises(ValueError):
++        Path(link).atomic_write('bad')
++    assert path.read_text()=='old'
+--- a/library/docs/development-pa-atomic-write-dev.md
++++ b/library/docs/development-pa-atomic-write-dev.md
+@@ -0,0 +1,5 @@
++# 完整编码后原子发布文件并可保留相同内容的时间
++
++文件批处理最后一步完整编码成功再原子发布，保留权限并清理失败临时文件。可选相同内容不触发时间变化，拒绝链接输出，原写入API继续兼容，不承诺并发CAS或父目录同步保证。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/path/__init__.py
++++ b/library/path/__init__.py
+@@ -813,6 +813,31 @@
+         with self.open(*args, **kwargs) as f:
+             yield from iter(lambda: f.read(size) or None, None)
+ 
++    def atomic_write(self,content,*,encoding='utf-8',if_changed=False):
++        """完整编码后原子发布文件。@param content str或bytes。@param encoding 编码。
++        @param if_changed 相同内容是否保持原inode及mtime。@return 是否实际替换。
++        """
++        if not isinstance(content,(str,bytes)) or type(if_changed) is not bool:
++            raise TypeError('原子输出需要文本／bytes和布尔策略')
++        data=content.encode(encoding) if isinstance(content,str) else content
++        if os.path.islink(self):
++            raise ValueError('不接受符号链接原子输出')
++        if if_changed and self.exists() and self.read_bytes()==data:
++            return False
++        mode=os.stat(self).st_mode&0o7777 if self.exists() else 0o600
++        temporary=None
++        try:
++            with tempfile.NamedTemporaryFile(mode='wb',dir=self.parent,prefix='.'+self.basename()+'.',delete=False) as stream:
++                temporary=stream.name;stream.write(data);stream.flush()
++                os.fchmod(stream.fileno(),mode);os.fsync(stream.fileno())
++            if os.path.islink(self):
++                raise ValueError('不接受符号链接原子输出')
++            os.replace(temporary,self);temporary=None
++        finally:
++            if temporary is not None:
++                os.unlink(temporary)
++        return True
++
+     def write_bytes(self, bytes: builtins.bytes, append: bool = False) -> None:
+         """Open this file and write the given bytes to it.
+ 

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HUMANIZE-O06-DEV",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add humanize.percent.naturalpercent(value,*,input_unit=\"ratio\",precision=1,rounding=\"half_even\",group=False,space=\"\"). Require explicit ratio/percent unit, finite int/float/Decimal excluding bool/text, 0..28 non-bool precision and half_even/half_up/down. Scale/quantize with sufficiently precise local Decimal context without float conversion or global context mutation; normalize rounded negative zero. Use actual current humanize decimal/thousands separators, optional grouping and literal percent spacing, preserving existing number formatters. Prove half-value rounding, huge finite integers/Decimal, negative/zero/out-of-unit-range values, strict options and locale output.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

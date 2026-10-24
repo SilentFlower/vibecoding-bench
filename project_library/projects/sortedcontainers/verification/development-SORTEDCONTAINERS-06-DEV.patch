@@ -1,0 +1,47 @@
+--- a/library/docs/development-sortedcontainers-06-dev.md
++++ b/library/docs/development-sortedcontainers-06-dev.md
+@@ -0,0 +1,5 @@
++# 有序映射惰性读取键区间的业务项和值
++
++路线12：SortedDict的irange_items/values惰性输出当前值，边界和顺序完全沿用键irange；空值/无界/反向key明确，结构修改遵循原迭代契约而非虚构快照。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/sortedcontainers/sorteddict.py
++++ b/library/src/sortedcontainers/sorteddict.py
+@@ -291,6 +291,14 @@
+     def __ior__(self, other):
+         self._update(other)
+         return self
++
++    def irange_items(self,minimum=None,maximum=None,inclusive=(True,True),reverse=False):
++        """惰性迭代键区间items。@param minimum 下界。@param maximum 上界。@param inclusive 闭开。@param reverse 逆序。@return item迭代器。"""
++        return ((key,self[key]) for key in self.irange(minimum,maximum,inclusive,reverse))
++
++    def irange_values(self,minimum=None,maximum=None,inclusive=(True,True),reverse=False):
++        """惰性迭代键区间值。@param minimum 下界。@param maximum 上界。@param inclusive 闭开。@param reverse 逆序。@return 值迭代器。"""
++        return (self[key] for key in self.irange(minimum,maximum,inclusive,reverse))
+ 
+     def copy(self):
+         """Return a shallow copy of the sorted dict.
+--- a/library/tests/test_development_sortedcontainers_06_dev.py
++++ b/library/tests/test_development_sortedcontainers_06_dev.py
+@@ -0,0 +1,19 @@
++"""映射区间直接返回业务items/values，仍按键排序。"""
++from operator import neg
++from sortedcontainers import SortedDict
++
++def test_item_value_ranges_exactly_match_irange_bounds():
++    """边界、顺序和对象身份与已有irange一致。@return None。"""
++    payload=[];source=SortedDict({1:'a',2:payload,3:None,4:'d'})
++    assert list(source.irange_items(2,4,(True,False)))==[(2,payload),(3,None)]
++    assert list(source.irange_values(2,4,(True,False)))==[payload,None]
++    assert next(source.irange_values(2,2)) is payload
++    assert list(source.irange(2,4))==[2,3,4]
++
++def test_lazy_live_values_reverse_key_and_empty_mapping():
++    """创建后读取时取当前value，不把值排序误作键排序。@return None。"""
++    source=SortedDict(neg,{1:'b',2:'a',3:'c'});items=source.irange_items(3,1,reverse=True)
++    source[2]='updated'
++    assert list(items)==[(1,'b'),(2,'updated'),(3,'c')]
++    assert list(source.irange_values(3,2))==['c','updated']
++    assert list(SortedDict().irange_items())==[]

@@ -1,0 +1,58 @@
+--- a/library/development_tests/test_development_if_rules_dev.py
++++ b/library/development_tests/test_development_if_rules_dev.py
+@@ -0,0 +1,26 @@
++"""公开批量名词规则事务回归。"""
++import pytest
++from inflect import engine
++from inflect.rules import define_nouns
++
++def test_real_definitions_and_later_override_are_applied():
++    target=engine();assert define_nouns(target,[{'singular':'widget','plural':'widgeten'},{'singular':'widget','plural':'widgets-new'}])==2
++    assert target.plural_noun('widget')=='widgets-new'
++
++def test_late_invalid_rule_does_not_partially_mutate_engine():
++    target=engine()
++    with pytest.raises(Exception): define_nouns(target,[{'singular':'widget','plural':'widgeten'},{'singular':'[','plural':'bad'}])
++    assert target.plural_noun('widget')!='widgeten'
++
++def test_generator_failure_preserves_original_custom_rules():
++    target=engine();target.defnoun('old','olden')
++    def source():
++        yield {'singular':'new','plural':'newen'}
++        raise RuntimeError('source')
++    with pytest.raises(RuntimeError): define_nouns(target,source())
++    assert target.plural_noun('old')=='olden' and target.plural_noun('new')!='newen'
++
++def test_preserve_case_and_unrelated_engine_options_survive():
++    target=engine();target.num(2);target.defa('hourly')
++    define_nouns(target,[{'singular':'URL','plural':'URLs','case':'preserve'}])
++    assert target.plural_noun('URL')=='URLs' and target.persistent_count==2 and target.a('hourly')=='a hourly'
+--- a/library/docs/development-if-rules-dev.md
++++ b/library/docs/development-if-rules-dev.md
+@@ -0,0 +1,5 @@
++# 以事务方式登记可迭代业务名词规则
++
++业务名词规则在独立克隆上完整验证后才提交，保留原正则与大小写规则优先级。即使规则迭代器中途抛错也不部分更新引擎，其他动词、冠词和模式选项保留。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/inflect/rules.py
++++ b/library/inflect/rules.py
+@@ -0,0 +1,18 @@
++"""先在独立引擎验证整批名词规则再一次提交。"""
++from .scopes import clone
++
++
++def define_nouns(target,rules):
++    """事务登记名词规则。@param target 原引擎。@param rules 含singular/plural及可选case的映射迭代器。
++    @return 成功规则数量；失败保留全部原状态值。
++    """
++    trial=clone(target)
++    count=0
++    for rule in rules:
++        if not isinstance(rule,dict) or set(rule)-{'singular','plural','case'} or not {'singular','plural'}<=set(rule):
++            raise ValueError('规则需要singular/plural和可选case')
++        trial.defnoun(rule['singular'],rule['plural'],case=rule.get('case','normalize'))
++        count+=1
++    target.__dict__.clear()
++    target.__dict__.update(trial.__dict__)
++    return count

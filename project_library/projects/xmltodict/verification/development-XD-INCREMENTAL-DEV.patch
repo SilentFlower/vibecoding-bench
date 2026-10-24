@@ -1,0 +1,110 @@
+--- a/library/development_tests/test_development_xd_incremental_dev.py
++++ b/library/development_tests/test_development_xd_incremental_dev.py
+@@ -0,0 +1,36 @@
++"""公开增量解析生命周期回归。"""
++import pytest
++import xmltodict
++from xml.parsers.expat import ExpatError
++
++def test_every_utf8_byte_boundary_matches_parse():
++    text='<r><a>雪</a><a>花</a></r>';parser=xmltodict.IncrementalParser()
++    for value in text.encode():
++        parser.feed(bytes([value]))
++    assert parser.close()==xmltodict.parse(text) and parser.close()==xmltodict.parse(text)
++
++def test_closed_and_failed_parsers_cannot_be_reused():
++    parser=xmltodict.IncrementalParser();parser.feed('<r/>');parser.close()
++    with pytest.raises(RuntimeError):
++        parser.feed('')
++    broken=xmltodict.IncrementalParser();broken.feed('<r>')
++    with pytest.raises(ExpatError):
++        broken.close()
++    with pytest.raises(RuntimeError):
++        broken.close()
++
++def test_chunk_types_and_resource_budget_are_enforced():
++    parser=xmltodict.IncrementalParser();parser.feed('<r>')
++    with pytest.raises(TypeError):
++        parser.feed(b'</r>')
++    parser=xmltodict.IncrementalParser(max_elements=1)
++    with pytest.raises(xmltodict.XMLLimitError):
++        parser.feed('<r><a/></r>')
++
++def test_entities_are_blocked_and_streamed_items_do_not_accumulate():
++    parser=xmltodict.IncrementalParser()
++    with pytest.raises(ValueError):
++        parser.feed('<!DOCTYPE r [<!ENTITY x "secret">]><r>&x;</r>')
++    seen=[];parser=xmltodict.IncrementalParser(item_depth=2,item_callback=lambda path,item:not seen.append(item))
++    parser.feed('<r><a>one</a>');parser.feed('<a>two</a></r>')
++    assert parser.close() is None and seen==['one','two']
+--- a/library/docs/development-xd-incremental-dev.md
++++ b/library/docs/development-xd-incremental-dev.md
+@@ -0,0 +1,5 @@
++# 提供具有明确失败与完成状态的增量XML解析对象
++
++流式导入需要调用方显式feed和close，支持UTF8跨块边界，完成、失败和关闭状态不可混淆。复用原转换及资源预算，默认禁用实体，回调中断立即传播，不引入后台线程或整份输入缓存。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/xmltodict.py
++++ b/library/xmltodict.py
+@@ -376,6 +376,60 @@
+     else:
+         parser.Parse(xml_input, True)
+     return handler.item
++
++
++class IncrementalParser:
++    """显式生命周期的单文档增量解析，不启动线程或预消费后续块。"""
++    def __init__(self,encoding=None,*,process_namespaces=False,namespace_separator=':',disable_entities=True,process_comments=False,**kwargs):
++        """建立解析器。@param encoding 编码。@param kwargs 原handler选项及资源预算。
++        @param process_namespaces 是否展开命名空间。@param namespace_separator 分隔符。
++        @param disable_entities 是否禁用实体。@param process_comments 是否保留注释。@return None。
++        """
++        self._handler=_DictSAXHandler(namespace_separator=namespace_separator,**kwargs)
++        self._parser=expat.ParserCreate(encoding,namespace_separator if process_namespaces else None)
++        self._parser.ordered_attributes=True
++        self._parser.StartNamespaceDeclHandler=self._handler.startNamespaceDecl
++        self._parser.StartElementHandler=self._handler.startElement
++        self._parser.EndElementHandler=self._handler.endElement
++        self._parser.CharacterDataHandler=self._handler.characters
++        if process_comments:
++            self._parser.CommentHandler=self._handler.comments
++        self._parser.buffer_text=True
++        if disable_entities:
++            def forbidden(*args):
++                raise ValueError('entities are disabled')
++            self._parser.EntityDeclHandler=forbidden
++        self._kind=None
++        self._closed=False
++        self._failed=False
++
++    def feed(self,chunk):
++        """提交一个完整输入块。@param chunk 始终同类的bytes或str。@return None。
++        """
++        if self._closed or self._failed:
++            raise RuntimeError('解析器已结束或失败')
++        if type(chunk) not in (str,bytes) or self._kind is not None and type(chunk) is not self._kind:
++            raise TypeError('增量输入必须使用一致的bytes或str')
++        self._kind=type(chunk)
++        try:
++            self._parser.Parse(chunk,False)
++        except BaseException:
++            self._failed=True
++            raise
++
++    def close(self):
++        """完成XML文档。@return 原parse同款结果；成功后可重复读取，失败后不可复用。
++        """
++        if self._failed:
++            raise RuntimeError('失败解析器不能重新完成')
++        if not self._closed:
++            try:
++                self._parser.Parse('' if self._kind is str else b'',True)
++            except BaseException:
++                self._failed=True
++                raise
++            self._closed=True
++        return self._handler.item
+ 
+ 
+ def _convert_value_to_string(value, encoding='utf-8', bytes_errors='replace'):

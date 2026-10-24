@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TB-CONVERT-DEV",
+  "source_commit": "966876c76a6378557c1951badc1665b4d1375875",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement tablib.conversion.convert_columns(dataset,converters,*,errors=\"raise\") returning frozen ConversionResult(dataset,errors) and CellError(row,column,error_type,message). Use completed schema/copy semantics and actual raw cells in deterministic row then header order. Converters receive independent cell copies so mutation or late failures cannot affect source. Raise mode wraps ValueError/TypeError/OverflowError with row/name context; collect keeps original failed cell copy and continues while successful conversions survive. Preserve title/tags, reject unknown/noncallable columns and invalid strategies, propagate unrelated programming exceptions and store no traceback.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

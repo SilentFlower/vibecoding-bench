@@ -1,0 +1,91 @@
+--- a/library/decouple.py
++++ b/library/decouple.py
+@@ -77,21 +77,37 @@
+     def _cast_do_nothing(value):
+         return value
+ 
+-    def get(self, option, default=undefined, cast=undefined):
++    def get(self, option, default=undefined, cast=undefined, *, default_factory=undefined):
+         """
+         Return the value for option or default if defined.
+         """
+ 
++        if not isinstance(default_factory, Undefined):
++            if not isinstance(default, Undefined):
++                raise ValueError('default与default_factory不可同时指定')
++            if not callable(default_factory):
++                raise TypeError('default_factory必须可调用')
+         # We can't avoid __contains__ because value may be empty.
+         if option in os.environ:
+             value = os.environ[option]
+         elif option in self.repository:
+             value = self.repository[option]
+         else:
+-            if isinstance(default, Undefined):
++            if not isinstance(default_factory, Undefined):
++                active = getattr(self, '_default_factory_active', None)
++                if active is None:
++                    active = self._default_factory_active = set()
++                if option in active:
++                    raise ValueError('默认工厂递归读取同一配置键：%s' % option)
++                active.add(option)
++                try:
++                    value = default_factory()
++                finally:
++                    active.remove(option)
++            elif isinstance(default, Undefined):
+                 raise UndefinedValueError('{} not found. Declare it as envvar or define a default value.'.format(option))
+-
+-            value = default
++            else:
++                value = default
+ 
+         if isinstance(cast, Undefined):
+             cast = self._cast_do_nothing
+--- a/library/docs/development-dc-factory-dev.md
++++ b/library/docs/development-dc-factory-dev.md
+@@ -0,0 +1,5 @@
++# 仅在配置缺失时执行有界默认工厂
++
++Config.get增加显式default_factory，仅环境与仓库都缺键时调用一次，再按原规则转换。空值和None不算缺失；普通可调用default仍是值。双默认和非可调用工厂拒绝，同键递归有界且错误后释放守卫，工厂自身异常保持原对象。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_dc_factory_dev.py
++++ b/library/tests/test_development_dc_factory_dev.py
+@@ -0,0 +1,36 @@
++"""默认工厂只在所有来源缺失时执行一次。"""
++import pytest
++from decouple import Config, RepositoryEmpty
++
++
++def test_factory_late_cast(monkeypatch):
++    """环境存在或空值时均不执行工厂。@param monkeypatch 环境隔离。@return None。"""
++    config = Config(RepositoryEmpty())
++    calls = []
++    factory = lambda: calls.append(1) or '8'
++    monkeypatch.delenv('DEVELOPMENT_FACTORY', raising=False)
++    assert config('DEVELOPMENT_FACTORY', default_factory=factory, cast=int) == 8
++    assert calls == [1]
++    monkeypatch.setenv('DEVELOPMENT_FACTORY', '')
++    assert config('DEVELOPMENT_FACTORY', default_factory=factory) == ''
++    assert calls == [1]
++
++
++def test_factory_conflict_and_callable_default():
++    """旧可调用default仍是值，双重默认政策拒绝。@return None。"""
++    config = Config(RepositoryEmpty())
++    value = lambda: 1
++    assert config('DEVELOPMENT_MISSING', default=value) is value
++    with pytest.raises(ValueError):
++        config('DEVELOPMENT_MISSING', default=1, default_factory=value)
++
++
++def test_factory_recursion_and_none():
++    """递归不无限执行，None是合法后备值。@return None。"""
++    config = Config(RepositoryEmpty())
++    def recursive():
++        """重入相同键。@return 不返回。"""
++        return config('DEVELOPMENT_RECURSIVE', default_factory=recursive)
++    with pytest.raises(ValueError):
++        config('DEVELOPMENT_RECURSIVE', default_factory=recursive)
++    assert config('DEVELOPMENT_RECURSIVE', default_factory=lambda: None) is None

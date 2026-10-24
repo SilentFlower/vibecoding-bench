@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TQDM-06-DEV",
+  "source_commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair built-in utils.envwrap boolean inference for actual bool/Optional[bool] annotations, bool defaults and explicit types fallback. Parse case-insensitive stripped true/false/1/0/yes/no/on/off, reject unknown/empty text clearly with parameter name and preserve direct-call argument precedence. Do not turn string-typed \"False\" into bool, change int/float/union inference or evaluate symbolic annotations as code. Keep environment-name prefixes/app precedence and external optional envwrap provider delegation untouched; this delivery targets the pinned built-in provider. Validate with isolated patched synthetic env keys only, no real credential/config changes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

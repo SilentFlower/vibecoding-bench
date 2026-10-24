@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PA-ITER-LINES-DEV",
+  "source_commit": "b5ae11e41ba64a9e27fdc42d8c138d7db7699910",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Path.iter_lines(encoding=None,errors=\"strict\",*,retain=True,newline=None), a lazy text iterator owning one context-managed stream. None uses universal newline normalization; \"\" retains original CR/LF/CRLF terminators; retain=False removes exactly the physical line ending. Preserve blank lines, Unicode, missing final newline and codec error policy. Early generator.close and decode/I/O exceptions must close the stream, with no whole-file read or changes to existing lines/read_text behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

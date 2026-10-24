@@ -1,0 +1,44 @@
+--- a/library/docs/development-transitions-02-dev.md
++++ b/library/docs/development-transitions-02-dev.md
+@@ -0,0 +1,5 @@
++# 流程编辑器按State与Enum对象列表精确删除迁移
++
++路线02：remove_transition对source/dest每个元素规范化State/Enum名称，混合列表精确删边、其他路径保留；最后事件解绑与通配/空选择原行为保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_transitions_02_dev.py
++++ b/library/tests/test_development_transitions_02_dev.py
+@@ -0,0 +1,19 @@
++"""选中的State对象列表正确移除路径，不影响其他来源。"""
++from enum import Enum
++from transitions import Machine,State
++
++def test_state_object_source_and_destination_lists_remove_exact_edges():
++    """source与dest各元素规范化，列表本身没有name。@return None。"""
++    machine=Machine(states=['a','b','c'],initial='a',auto_transitions=False)
++    machine.add_transition('go','a','b');machine.add_transition('go','a','c');machine.add_transition('go','b','c')
++    machine.remove_transition('go',source=[machine.get_state('a')],dest=[machine.get_state('b')])
++    assert [(item.source,item.dest) for item in machine.get_transitions('go')]==[('a','c'),('b','c')]
++    assert machine.go() and machine.state=='c'
++
++def test_mixed_enum_name_state_and_final_binding_cleanup():
++    """混合类型按每项name处理，最后路径删除后解绑事件。@return None。"""
++    class Phase(Enum):a=1;b=2;c=3
++    machine=Machine(states=Phase,initial=Phase.a,auto_transitions=False)
++    machine.add_transition('go','a','b');machine.add_transition('go','c','b')
++    machine.remove_transition('go',source=[machine.get_state('a'),'c'],dest=[Phase.b])
++    assert 'go' not in machine.events and not hasattr(machine,'go')
+--- a/library/transitions/core.py
++++ b/library/transitions/core.py
+@@ -1138,9 +1138,9 @@
+             dest (str, Enum or State): Limits removal to transitions to a certain state.
+         """
+         if source != "*":
+-            source = [s.name if hasattr(source, 'name') else s for s in listify(source)]
++            source = [s.name if hasattr(s, 'name') else s for s in listify(source)]
+         if dest != "*":
+-            dest = [d.name if hasattr(dest, 'name') else d for d in listify(dest)]
++            dest = [d.name if hasattr(d, 'name') else d for d in listify(dest)]
+         # outer comprehension, keeps events if inner comprehension returns lists with length > 0
+         tmp = {key: value for key, value in
+                {k: [t for t in v

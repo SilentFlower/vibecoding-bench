@@ -1,0 +1,76 @@
+--- a/library/development_tests/test_development_tb_pages_dev.py
++++ b/library/development_tests/test_development_tb_pages_dev.py
+@@ -0,0 +1,31 @@
++"""公开惰性分页报表回归。"""
++import pytest
++from tabulate import tabulate,SEPARATING_LINE
++from tabulate.pages import iter_pages
++
++def test_page_consumption_is_bounded_and_headers_repeat():
++    consumed=[]
++    def rows():
++        for value in range(5):
++            consumed.append(value)
++            yield [value]
++    pages=iter_pages(rows(),2,headers=['n'],tablefmt='plain')
++    first=next(pages)
++    assert consumed==[0,1] and 'n' in first
++    rest=list(pages)
++    assert len(rest)==2 and all('n' in page for page in rest)
++
++def test_firstrow_headers_are_not_repeated_as_data():
++    pages=list(iter_pages(iter([['name'],['a'],['b']]),1,headers='firstrow',tablefmt='plain'))
++    assert len(pages)==2 and 'a' in pages[0] and 'b' in pages[1]
++
++def test_separators_do_not_consume_business_page_size_or_indices():
++    rows=[['a'],SEPARATING_LINE,['b'],['c']]
++    pages=list(iter_pages(rows,2,headers=['value'],showindex=True,tablefmt='plain'))
++    assert pages[0]==tabulate(rows[:3],headers=['value'],showindex=range(2),tablefmt='plain')
++    assert pages[1]==tabulate([['c']],headers=['value'],showindex=range(2,3),tablefmt='plain')
++
++def test_invalid_size_empty_input_and_no_empty_final_page():
++    with pytest.raises(ValueError):
++        list(iter_pages([[1]],True))
++    assert list(iter_pages([],2))==[] and len(list(iter_pages([[1],[2]],2)))==1
+--- a/library/docs/development-tb-pages-dev.md
++++ b/library/docs/development-tb-pages-dev.md
+@@ -0,0 +1,5 @@
++# 惰性分页报表并重复表头与连续业务行号
++
++大报表按业务行惰性分页，每页重复表头，自动行号跨页连续且分隔线不占行号。完整页生成后不预读下一条业务数据，最后不产生空页，渲染仍沿用原格式器。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tabulate/pages.py
++++ b/library/tabulate/pages.py
+@@ -0,0 +1,31 @@
++"""按业务行有界读取并重复表头的报表分页。"""
++from tabulate import tabulate, _is_separating_line
++
++
++def iter_pages(rows,page_size,headers=(),*,showindex=False,**options):
++    """惰性生成页文本。@param rows 一次性行序列。@param page_size 每页业务行数。
++    @param headers 显式表头或firstrow。@param showindex 布尔值或always/never。
++    @param options 原渲染选项。@return 页字符串迭代器；不预读下一页数据行。
++    """
++    if type(page_size) is not int or page_size<1:
++        raise ValueError('分页大小必须为正整数')
++    if showindex not in (True,False,'always','never'):
++        raise ValueError('分页仅支持自动全局行号或不显示行号')
++    if isinstance(headers,str) and headers!='firstrow':
++        raise ValueError('分页必须明确表头或使用firstrow')
++    iterator=iter(rows)
++    if headers=='firstrow':
++        headers=next(iterator,())
++    headers=list(headers)
++    page,count,offset=[],0,0
++    indexed=showindex is True or showindex=='always'
++    for row in iterator:
++        page.append(row)
++        if not _is_separating_line(row):
++            count+=1
++        if count==page_size:
++            yield tabulate(page,headers=headers,showindex=range(offset,offset+count) if indexed else False,**options)
++            offset+=count
++            page,count=[],0
++    if count:
++        yield tabulate(page,headers=headers,showindex=range(offset,offset+count) if indexed else False,**options)

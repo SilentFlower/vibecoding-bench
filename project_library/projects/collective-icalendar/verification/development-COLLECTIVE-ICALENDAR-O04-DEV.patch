@@ -1,0 +1,92 @@
+--- a/library/docs/development-collective-icalendar-o04-dev.md
++++ b/library/docs/development-collective-icalendar-o04-dev.md
+@@ -0,0 +1,5 @@
++# 一致转换Todo完成重开取消状态及进度
++
++对真实Todo完整维护状态、进度和完成时间，所有动作返回独立副本。完成必须明确带时区时间并转UTC；重开和取消清理旧完成字段。版本及DTSTAMP仅显式修改，不读墙钟、不发送邀请。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/icalendar/todo_transition.py
++++ b/library/src/icalendar/todo_transition.py
+@@ -0,0 +1,49 @@
++"""显式维护VTODO状态、进度与完成时间的一致性。"""
++from copy import deepcopy
++from datetime import datetime, timezone
++from icalendar.cal.todo import Todo
++
++
++def transition_todo(todo, action, *, completed_at=None, progress=0, bump_sequence=False, stamp=None):
++    """完成、重开或取消，不读取墙钟或自动发送日程邀请。
++
++    :param todo: 真实Todo。
++    :param action: complete、reopen或cancel。
++    :param completed_at: complete必需的带时区时间，统一转UTC；未来值由调用者明确决定。
++    :param progress: reopen的0..99进度，0为NEEDS-ACTION，其余IN-PROCESS。
++    :param bump_sequence: 是否明确增加一次SEQUENCE。
++    :param stamp: 可选明确DTSTAMP时间，未传则不改变。
++    :return: 同类独立Todo，错误不改变原对象。
++    """
++    if not isinstance(todo, Todo) or action not in ('complete', 'reopen', 'cancel'):
++        raise ValueError('需要Todo及明确状态动作')
++    if not isinstance(progress, int) or isinstance(progress, bool) or not 0 <= progress < 100:
++        raise ValueError('重开进度必须为0..99整数')
++    def utc(value):
++        """验证明确时间。@param value 时间。@return UTC时间。"""
++        if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
++            raise ValueError('状态时间必须带时区')
++        return value.astimezone(timezone.utc)
++    completion = utc(completed_at) if action == 'complete' else None
++    new_stamp = utc(stamp) if stamp is not None else None
++    result = deepcopy(todo)
++    for name in ('STATUS', 'PERCENT-COMPLETE', 'COMPLETED'):
++        result.pop(name, None)
++    if action == 'complete':
++        result.add('STATUS', 'COMPLETED')
++        result.add('PERCENT-COMPLETE', 100)
++        result.add('COMPLETED', completion)
++    elif action == 'reopen':
++        result.add('STATUS', 'NEEDS-ACTION' if progress == 0 else 'IN-PROCESS')
++        result.add('PERCENT-COMPLETE', progress)
++    else:
++        result.add('STATUS', 'CANCELLED')
++        result.add('PERCENT-COMPLETE', 0)
++    if bump_sequence:
++        sequence = int(result.get('SEQUENCE', 0)) + 1
++        result.pop('SEQUENCE', None)
++        result.add('SEQUENCE', sequence)
++    if new_stamp is not None:
++        result.pop('DTSTAMP', None)
++        result.add('DTSTAMP', new_stamp)
++    return result
+--- a/library/tests/test_development_collective_icalendar_o04_dev.py
++++ b/library/tests/test_development_collective_icalendar_o04_dev.py
+@@ -0,0 +1,29 @@
++"""Todo动作必须同步更新状态进度和完成时间。"""
++from datetime import datetime, timedelta, timezone
++from icalendar import Todo
++
++def test_complete_utc_and_original():
++    """完成统一UTC及100%，原Todo保持。@return None。"""
++    from icalendar.todo_transition import transition_todo
++    source = Todo()
++    moment = datetime(2026, 1, 1, 10, tzinfo=timezone(timedelta(hours=8)))
++    result = transition_todo(source, 'complete', completed_at=moment)
++    assert str(result['STATUS']) == 'COMPLETED' and int(result['PERCENT-COMPLETE']) == 100
++    assert result.decoded('COMPLETED') == moment.astimezone(timezone.utc)
++    assert 'COMPLETED' not in source
++
++def test_reopen_cancel_sequence_policy():
++    """重开清完成字段，版本变化仅显式执行。@return None。"""
++    from icalendar.todo_transition import transition_todo
++    source = transition_todo(Todo(), 'complete', completed_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
++    reopened = transition_todo(source, 'reopen', progress=25, bump_sequence=True)
++    assert str(reopened['STATUS']) == 'IN-PROCESS' and 'COMPLETED' not in reopened and int(reopened['SEQUENCE']) == 1
++    assert str(transition_todo(reopened, 'cancel')['STATUS']) == 'CANCELLED'
++
++def test_invalid_progress_and_naive():
++    """非法进度或无时区完成时间拒绝。@return None。"""
++    import pytest
++    from icalendar.todo_transition import transition_todo
++    for progress in (-1, 100, True):
++        with pytest.raises(ValueError): transition_todo(Todo(), 'reopen', progress=progress)
++    with pytest.raises(ValueError): transition_todo(Todo(), 'complete', completed_at=datetime(2026, 1, 1))

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WEBCOLORS-01-DEV",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair the pinned CSS4 registry: export CSS4 at top level, use the actual CSS4 forward mapping and make names() default match existing conversion defaults (CSS4). rebeccapurple must work through names/name_to_hex/name_to_rgb/hex_to_name and the current HTML legacy named-color branch. Explicit older specifications remain unchanged and reject that name; canonical reverse aliases remain stable, returned names lists do not expose mutable internal state. Update inaccurate conversion default documentation, preserve the strict HTML simple-color API and the remaining legacy algorithm.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

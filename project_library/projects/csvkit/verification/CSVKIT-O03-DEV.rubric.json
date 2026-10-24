@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSVKIT-O03-DEV",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add --params-json to real SQL2CSV. Accept a finite JSON object of scalar/null values, require exact agreement with named binds parsed by SQLAlchemy text(query), execute through connection.execute(statement,parameters) without string interpolation, eval or logging parameter values. Reject invalid JSON, nested values and missing/extra binds. Preserve the original exec_driver_sql path when absent, CSV headers/type output and query/file precedence. Ensure connection context and engine disposal execute on success, validation, query and output failures; all tests use only temporary SQLite, never network databases.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

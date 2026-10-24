@@ -1,0 +1,67 @@
+--- a/app/development_tests/test_development_typer_04_dev.py
++++ b/app/development_tests/test_development_typer_04_dev.py
+@@ -0,0 +1,23 @@
++"""订单履约实际扣减库存，重复SKU聚合且全体通过才发布。"""
++import json,tempfile
++from pathlib import Path
++from typer.testing import CliRunner
++import shop
++
++def test_repeated_sku_aggregate_and_complete_receipt_keep_catalog_order():
++    """订单顺序不改变原目录顺序，同sku不能只检查第一行。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'catalog';orders=base/'orders';out=base/'out'
++        source.write_text('[{"sku":"a","name":"A","quantity":8},{"sku":"b","name":"B","quantity":4}]');before=source.read_bytes()
++        orders.write_text('[{"sku":"b","quantity":1},{"sku":"a","quantity":2},{"sku":"a","quantity":3}]')
++        result=CliRunner().invoke(shop.app,['fulfill',str(source),str(orders),'--output',str(out)])
++        assert result.exit_code==0 and [x['quantity'] for x in json.loads(out.read_text())]==[3,3]
++        assert json.loads(result.stdout)['items']==[{'sku':'b','fulfilled':1,'before':4,'after':3},{'sku':'a','fulfilled':5,'before':8,'after':3}] and source.read_bytes()==before
++
++def test_insufficient_aggregate_unknown_bool_zero_and_empty_batch_policy():
++    """坏订单不写任何部分结果，空批次明确完整复制。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'catalog';orders=base/'orders';source.write_text('[{"sku":"a","name":"A","quantity":2}]');runner=CliRunner()
++        for n,raw in enumerate(([{'sku':'a','quantity':2},{'sku':'a','quantity':1}],[{'sku':'x','quantity':1}],[{'sku':'a','quantity':True}],[{'sku':'a','quantity':0}])):
++            orders.write_text(json.dumps(raw));out=base/str(n);assert runner.invoke(shop.app,['fulfill',str(source),str(orders),'--output',str(out)]).exit_code!=0 and not out.exists()
++        orders.write_text('[]');out=base/'empty';assert runner.invoke(shop.app,['fulfill',str(source),str(orders),'--output',str(out)]).exit_code==0 and json.loads(out.read_text())==json.loads(source.read_text())
+--- a/app/docs/development-typer-04-dev.md
++++ b/app/docs/development-typer-04-dev.md
+@@ -0,0 +1,5 @@
++# 本地订单履约汇总重复SKU后全单验证并交付库存与凭据
++
++完整订单履约先按首次出现顺序汇总重复sku，正整数/未知商品/合计库存全单检查；一次生成新清单并给真实前后量凭据，空批次复制，任何坏行/不足整批不交付。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/app/inventory_fulfill.py
++++ b/app/inventory_fulfill.py
+@@ -0,0 +1,30 @@
++"""订单履约先汇总重复SKU并全单检查，再交付扣减清单。"""
++import json
++from pathlib import Path
++from typing import Annotated
++import typer
++from inventory_store import load,save_catalog
++
++def register(app):
++    """注册fulfill命令。@param app 既有应用。@return None。"""
++    @app.command('fulfill')
++    def fulfill(source:Path,orders:Path,output:Annotated[Path,typer.Option('--output')]):
++        """完整履约一个本地订单批次。@param source 账面清单。@param orders sku/quantity数组。@param output 新清单。@return None，未知/不足/坏单全体拒绝。"""
++        try:
++            values=load(source);catalog={item['sku']:item for item in values};raw=json.loads(orders.read_text(encoding='utf-8'))
++            if not isinstance(raw,list):raise ValueError('订单须为数组')
++            totals={}
++            for item in raw:
++                if not isinstance(item,dict) or not isinstance(item.get('sku'),str) or type(item.get('quantity')) is not int or item['quantity']<=0:raise ValueError('订单sku/正整数quantity无效')
++                sku=item['sku']
++                if sku not in catalog:raise ValueError('订单含未知sku')
++                totals[sku]=totals.get(sku,0)+item['quantity']
++            receipt=[]
++            for sku,quantity in totals.items():
++                item=catalog[sku];before=item['quantity']
++                if quantity>before:raise ValueError('订单总量超过库存')
++                item['quantity']-=quantity;receipt.append({'sku':sku,'fulfilled':quantity,'before':before,'after':item['quantity']})
++            save_catalog(output,values,inputs=(source,orders))
++        except (OSError,UnicodeError,ValueError) as error:
++            typer.echo('履约失败：'+str(error),err=True);raise typer.Exit(1) from error
++        typer.echo(json.dumps({'orders':len(raw),'items':receipt},ensure_ascii=False))

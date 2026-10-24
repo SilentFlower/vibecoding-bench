@@ -1,0 +1,87 @@
+--- a/library/docs/development-sqlparse-02-dev.md
++++ b/library/docs/development-sqlparse-02-dev.md
+@@ -0,0 +1,5 @@
++# 格式化CLI布尔参数具备明确真值及正反开关
++
++路线02：两项布尔选项统一支持大小写真假文字、0/1、裸正开关及明确反开关，重复取最后一项，未知/空文字拒绝。真实格式化结果与Python API一致；说明可选参数后文件名应先置或用--分隔。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/sqlparse/cli.py
++++ b/library/sqlparse/cli.py
+@@ -27,6 +27,14 @@
+ 
+ # TODO: Add CLI Tests
+ # TODO: Simplify formatter by using argparse `type` arguments
++def _boolean_literal(value):
++    """兼容明确真假字面量，拒绝Python非空串真值陷阱。@param value 参数。@return bool。"""
++    normalized=value.lower()
++    if normalized in ('true','1'):return True
++    if normalized in ('false','0'):return False
++    raise argparse.ArgumentTypeError('布尔值必须是true/false/1/0')
++
++
+ def create_parser():
+     _CASE_CHOICES = ['upper', 'lower', 'capitalize']
+ 
+@@ -144,14 +152,18 @@
+         '--comma_first',
+         dest='comma_first',
+         default=False,
+-        type=bool,
++        type=_boolean_literal,
++        nargs="?",
++        const=True,
+         help='Insert linebreak before comma (default False)')
+ 
+     group.add_argument(
+         '--compact',
+         dest='compact',
+         default=False,
+-        type=bool,
++        type=_boolean_literal,
++        nargs="?",
++        const=True,
+         help='Try to produce more compact output (default False)')
+ 
+     group.add_argument(
+@@ -160,6 +172,8 @@
+         default='utf-8',
+         help='Specify the input encoding (default utf-8)')
+ 
++    group.add_argument('--no-comma-first',dest='comma_first',action='store_false',default=argparse.SUPPRESS,help='明确关闭前置逗号')
++    group.add_argument('--no-compact',dest='compact',action='store_false',default=argparse.SUPPRESS,help='明确关闭紧凑排版')
+     return parser
+ 
+ 
+--- a/library/tests/test_development_sqlparse_02_dev.py
++++ b/library/tests/test_development_sqlparse_02_dev.py
+@@ -0,0 +1,29 @@
++"""两项CLI布尔参数按明确真假解释而非bool(nonempty)。"""
++import contextlib
++import io
++import tempfile
++import unittest
++from pathlib import Path
++import sqlparse
++from sqlparse.cli import create_parser,main
++
++
++def test_literals_switches_and_last_argument_wins():
++    """正反开关及兼容True/False文字都可预测。@return None。"""
++    parser=create_parser()
++    for option,field in (('--comma_first','comma_first'),('--compact','compact')):
++        for value,expected in (('True',True),('false',False),('1',True),('0',False)):
++            assert getattr(parser.parse_args(['a.sql',option,value]),field) is expected
++        assert getattr(parser.parse_args(['a.sql',option]),field) is True
++    assert parser.parse_args(['a.sql','--compact','--no-compact']).compact is False
++    with contextlib.redirect_stderr(io.StringIO()),unittest.TestCase().assertRaises(SystemExit):parser.parse_args(['a.sql','--compact','maybe'])
++
++
++def test_actual_cli_uses_false_and_true_in_formatting():
++    """参数真正进入候选格式化流水线。@return None。"""
++    with tempfile.TemporaryDirectory() as temporary:
++        path=Path(temporary)/'query.sql';text='select a,b,c from t';path.write_text(text)
++        for value in ('False','True'):
++            output=io.StringIO()
++            with contextlib.redirect_stdout(output):assert main([str(path),'-r','--comma_first',value])==0
++            assert output.getvalue()==sqlparse.format(text,reindent=True,comma_first=value=='True')

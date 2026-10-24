@@ -1,0 +1,97 @@
+--- a/library/docs/development-sqlparse-03-dev.md
++++ b/library/docs/development-sqlparse-03-dev.md
+@@ -0,0 +1,5 @@
++# SQL编辑器以旁路映射取得原子与分组token真实源范围
++
++路线12：编辑器旁路SourceMap绑定本次真实解析对象，原子和分组返回半开字符范围及一基行列，完整保留CRLF、中文及组合码点。位置不是字节或显示字素；token编辑后明确失效，默认Token不增字段，不执行SQL。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/sqlparse/sourcemap.py
++++ b/library/sqlparse/sourcemap.py
+@@ -0,0 +1,56 @@
++"""旁路原始源码位置映射，不增加默认Token内存成本。"""
++from bisect import bisect_right
++from dataclasses import dataclass
++from . import parse
++
++
++@dataclass(frozen=True)
++class SourceSpan:
++    """半开字符范围与一基行列。@param start 开始。@param end 结束。@param line 行。@param column 列。@param end_line 结束行。@param end_column 结束列。"""
++    start: int
++    end: int
++    line: int
++    column: int
++    end_line: int
++    end_column: int
++
++
++class SourceMap:
++    """绑定一次解析的原始位置。@param text Unicode或显式编码字节。@param encoding 字节编码。"""
++    def __init__(self,text,encoding='utf-8'):
++        """只处理本地文本并完整核切片。@param text 原文。@param encoding 编码。@return None。"""
++        self.original=text.decode(encoding) if isinstance(text,bytes) else text
++        if not isinstance(self.original,str):raise TypeError('SourceMap只接受文本或字节')
++        self.statements=parse(self.original)
++        self._lines=[0]+[index+1 for index,char in enumerate(self.original) if char=='\n']
++        self._ranges={};self._leaves=[];cursor=0
++        pending=[(statement,False,0) for statement in reversed(self.statements)]
++        while pending:
++            token,leaving,start=pending.pop()
++            if leaving:self._ranges[id(token)]=(start,cursor);continue
++            if token.is_group:
++                pending.append((token,True,cursor));pending.extend((child,False,0) for child in reversed(token.tokens))
++            else:
++                end=cursor+len(token.value)
++                if self.original[cursor:end]!=token.value:raise ValueError('解析结果不能映射到原始文本')
++                self._ranges[id(token)]=(cursor,end);self._leaves.append((token,token.ttype,token.value));cursor=end
++        if cursor!=len(self.original):raise ValueError('解析没有保留完整原文')
++
++    def _validate(self):
++        """Token被编辑后拒绝继续冒充原位置。@return None。"""
++        current=[token for statement in self.statements for token in statement.flatten()]
++        if len(current)!=len(self._leaves) or any(actual is not old or actual.ttype!=kind or actual.value!=value for actual,(old,kind,value) in zip(current,self._leaves)):
++            raise ValueError('Token已修改，请为新文本重新建立SourceMap')
++
++    def span(self,token):
++        """返回本次解析token或group的原始范围。@param token 原对象。@return SourceSpan。"""
++        self._validate()
++        if id(token) not in self._ranges:raise ValueError('Token不属于本次解析')
++        start,end=self._ranges[id(token)]
++        left,right=bisect_right(self._lines,start)-1,bisect_right(self._lines,end)-1
++        return SourceSpan(start,end,left+1,start-self._lines[left]+1,right+1,end-self._lines[right]+1)
++
++    def tokens(self):
++        """返回原子token及不可变范围快照。@return tuple。"""
++        self._validate()
++        return tuple((token,self.span(token)) for token,_,_ in self._leaves)
+--- a/library/tests/test_development_sqlparse_03_dev.py
++++ b/library/tests/test_development_sqlparse_03_dev.py
+@@ -0,0 +1,27 @@
++"""中文、CRLF与分组位置都切回精确原字符，不伪称字节偏移。"""
++import unittest
++from sqlparse.sourcemap import SourceMap
++
++
++def test_atomic_and_group_half_open_character_ranges():
++    """每个叶子与Statement切片准确且偏移连续。@return None。"""
++    text=' \r\nSELECT 中文, 1;\r\nSELECT e\u0301 FROM t;  '
++    mapping=SourceMap(text)
++    entries=mapping.tokens()
++    assert ''.join(token.value for token,span in entries)==text
++    assert entries[0][1].start==0 and entries[-1][1].end==len(text)
++    for token,span in entries:
++        assert text[span.start:span.end]==token.value
++        prefix=text[:span.start]
++        assert span.line==prefix.count('\n')+1
++    for statement in mapping.statements:
++        span=mapping.span(statement);assert text[span.start:span.end]==str(statement)
++
++
++def test_bytes_empty_and_stale_tokens_reject():
++    """编码明确，编辑后映射失效不能继续报原坐标。@return None。"""
++    mapping=SourceMap('SELECT 中文;'.encode('utf-16-le'),encoding='utf-16-le')
++    assert mapping.original=='SELECT 中文;'
++    assert SourceMap('').tokens()==()
++    token=mapping.tokens()[0][0];token.value='updated'
++    with unittest.TestCase().assertRaises(ValueError):mapping.span(token)

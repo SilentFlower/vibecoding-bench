@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FEEDPARSER-O06-DEV",
+  "source_commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add feedparser.readers.entry_text(entry,*,prefer=(text/plain,text/html,application/xhtml+xml),languages=(),strip_html=True). Select existing nonempty local content with MIME priority then declared language order/source order, accepting native content lists and legacy JSON single-content dict; normalize text/html/xhtml aliases. Fall back to real summary_detail or summary only when no usable content. Return text plus original value/type/language/source/index, leaving entry unchanged. Optional limited HTML text extraction preserves block/break/entity order and excludes script/style text; do not claim sanitization. Never fetch src, invent a body from title, accept unknown types silently or generate a summary.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

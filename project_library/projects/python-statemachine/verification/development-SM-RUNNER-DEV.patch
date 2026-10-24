@@ -1,0 +1,125 @@
+--- a/library/development_tests/test_development_sm_runner_dev.py
++++ b/library/development_tests/test_development_sm_runner_dev.py
+@@ -0,0 +1,36 @@
++"""公开同步事件执行回归。"""
++import pytest
++from statemachine.runner import MachineRunner,EventCall
++from statemachine.exceptions import TransitionNotAllowed
++from statemachine import StateMachine,State
++
++class Flow(StateMachine):
++    draft=State(initial=True)
++    ready=State()
++    done=State(final=True)
++    advance=draft.to(ready)
++    finish=ready.to(done)
++    reset=ready.to(draft)
++
++def test_actual_events_record_before_after_and_native_result():
++    machine=Flow();result=MachineRunner(machine).dispatch('advance')
++    assert result.before.states==('draft',) and result.after.states==('ready',) and result.status=='passed'
++
++def test_collect_continues_after_transition_not_allowed():
++    result=list(MachineRunner(Flow()).run(['finish','advance','finish'],errors='collect'))
++    assert [row.status for row in result]==['error','passed','passed'] and result[2].after.states==('done',)
++
++def test_stream_is_lazy_and_default_error_is_original_exception():
++    machine=Flow();calls=[]
++    def source(): calls.append(1);yield 'advance'
++    stream=MachineRunner(machine).run(source());assert calls==[] and tuple(machine.configuration_values)==('draft',)
++    assert next(stream).call.event=='advance' and calls==[1]
++    with pytest.raises(TransitionNotAllowed): MachineRunner(Flow()).dispatch('finish')
++
++def test_callback_arguments_are_detached_and_control_keywords_are_rejected():
++    observed=[]
++    class WithArgs(Flow):
++        def on_advance(self,payload): payload.append('changed');observed.append(payload)
++    value=[];result=MachineRunner(WithArgs()).dispatch(EventCall('advance',kwargs={'payload':value}))
++    assert observed==[['changed']] and value==[]
++    with pytest.raises(ValueError): MachineRunner(Flow()).dispatch(EventCall('advance',kwargs={'delay':1}))
+--- a/library/docs/development-sm-runner-dev.md
++++ b/library/docs/development-sm-runner-dev.md
+@@ -0,0 +1,5 @@
++# 为真实同步状态机提供惰性事件执行与前后状态记录
++
++真实同步事件按输入顺序惰性执行，记录前后配置和回调结果。只收集原生不允许转换错误，其他回调或来源故障不能吞掉；即时批量不能暗中混入延迟调度字段。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/statemachine/runner.py
++++ b/library/statemachine/runner.py
+@@ -0,0 +1,75 @@
++"""同步逐事件调用真实状态机，保留原异常与实际前后配置。"""
++from collections.abc import Mapping
++from copy import deepcopy
++from dataclasses import dataclass
++from inspect import isawaitable,iscoroutine
++from .exceptions import TransitionNotAllowed
++from .snapshots import snapshot
++
++
++@dataclass(frozen=True)
++class EventCall:
++    """明确事件及用户回调参数；调度保留字段不能藏入kwargs。"""
++    event: str
++    args: tuple=()
++    kwargs: object=None
++
++
++@dataclass(frozen=True)
++class EventResult:
++    """一次真实事件调用的独立记录，不承诺回滚回调外部副作用。"""
++    index: int
++    call: EventCall
++    status: str
++    before: object
++    after: object
++    result: object=None
++    error: object=None
++
++
++def normalize_call(call):
++    """验证并隔离用户参数。@param call 事件文本或EventCall。@return 独立EventCall。
++    """
++    call=EventCall(call) if isinstance(call,str) else call
++    if not isinstance(call,EventCall) or not isinstance(call.event,str) or not call.event or not isinstance(call.args,tuple) or (call.kwargs is not None and not isinstance(call.kwargs,Mapping)):
++        raise ValueError('需要明确事件及参数')
++    kwargs=dict(call.kwargs or {})
++    if any(not isinstance(key,str) for key in kwargs) or set(kwargs)&{'delay','send_id','internal'}:
++        raise ValueError('批量即时执行不接受调度控制字段')
++    return EventCall(call.event,deepcopy(call.args),deepcopy(kwargs))
++
++
++class MachineRunner:
++    """对既有同步状态机执行即时外部事件。"""
++    def __init__(self,machine):
++        """绑定真实状态机。@param machine 已激活同步状态机。@return None。
++        """
++        snapshot(machine);self.machine=machine
++
++    def dispatch(self,call,*,index=0,errors='raise'):
++        """执行一条事件。@param call 事件及参数。@param index 记录序号。
++        @param errors raise或collect，仅收集TransitionNotAllowed。@return EventResult。
++        """
++        if errors not in ('raise','collect'):
++            raise ValueError('无效事件错误策略')
++        call=normalize_call(call);before=snapshot(self.machine)
++        try:
++            result=self.machine.send(call.event,*deepcopy(call.args),**deepcopy(call.kwargs))
++            if isawaitable(result):
++                if iscoroutine(result):
++                    result.close()
++                raise TypeError('异步状态机请使用AsyncMachineRunner')
++        except TransitionNotAllowed as error:
++            if errors=='raise':
++                raise
++            return EventResult(index,call,'error',before,snapshot(self.machine),error=str(error))
++        return EventResult(index,call,'passed',before,snapshot(self.machine),result=result)
++
++    def run(self,calls,*,errors='raise'):
++        """惰性顺序执行事件流。@param calls 输入事件。@param errors 错误策略。
++        @return 逐事件结果迭代器，来源错误原样传播。
++        """
++        if errors not in ('raise','collect'):
++            raise ValueError('无效事件错误策略')
++        iterator=iter(calls)
++        return (self.dispatch(call,index=index,errors=errors) for index,call in enumerate(iterator))

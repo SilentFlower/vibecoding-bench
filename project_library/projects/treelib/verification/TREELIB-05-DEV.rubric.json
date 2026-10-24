@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TREELIB-05-DEV",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add treelib.integrity.validate_structure(tree) returning deterministic diagnostic dictionaries code/id/related. Inspect the actual current tree.identifier scope for root validity, index-vs-node identity, missing parent/child, missing backlinks, duplicate successors, child-parent mismatch, cycles and unreachable nodes. Healthy empty/single/shared-view trees report no findings; foreign tree contexts are not corruption. Use iterative traversal to handle deep chains beyond Python recursion limits. Do not mutate, auto-repair or claim validation of arbitrary business data. Report multiple independent faults without hiding them behind the first exception and keep old traversal behavior unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

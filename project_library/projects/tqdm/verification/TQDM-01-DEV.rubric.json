@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TQDM-01-DEV",
+  "source_commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair tqdm.contrib.itertools.product repeat handling via operator.index before computing totals or delegating to itertools.product. Preserve Python arbitrary-precision exponent totals for numpy integer repeats and custom __index__ objects, standard zero/negative/nonintegral behavior, yielded combinations and explicit total precedence. Do not preconsume unknown-length inputs to infer total; total remains None where lengths are unavailable. Test actual product generation and wrapper-observed totals without enumerating astronomically large products. Preserve other combinator wrappers.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

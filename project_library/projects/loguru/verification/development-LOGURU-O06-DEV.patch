@@ -1,0 +1,153 @@
+--- a/library/docs/development-loguru-o06-dev.md
++++ b/library/docs/development-loguru-o06-dev.md
+@@ -0,0 +1,5 @@
++# 让逐参数惰性值只在真实占位读取时按事件计算一次
++
++对应路线19：公开LazyValue混普通参数，真实占位访问才算、同事件别名/多sink只算一次、跨事件重算；支持格式/颜色/下标，未引用extra标未求值避免JSON触发，旧lazy模式保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/loguru/__init__.py
++++ b/library/loguru/__init__.py
+@@ -10,10 +10,11 @@
+ from . import _defaults
+ from ._logger import Core as _Core
+ from ._logger import Logger as _Logger
++from ._logger import LazyValue
+ 
+ __version__ = "0.7.3"
+ 
+-__all__ = ["logger"]
++__all__ = ["logger", "LazyValue"]
+ 
+ logger = _Logger(
+     core=_Core(),
+--- a/library/loguru/_logger.py
++++ b/library/loguru/_logger.py
+@@ -149,6 +149,54 @@
+ 
+ 
+ Level = namedtuple("Level", ["name", "no", "color", "icon"])  # noqa: PYI024
++
++class LazyValue:
++    """按单条日志事件惰性计算参数，不跨事件缓存业务值。
++
++    :param function: 无参业务计算函数。
++    :return: 可与普通格式化参数混用的公开包装器。
++    """
++    def __init__(self, function):
++        """验证函数，不提前求值。@return None。"""
++        if not callable(function):
++            raise TypeError('LazyValue需要可调用函数')
++        self.function = function
++
++
++class _EventLazy:
++    """一个事件内的求值单元，重复占位与多sink共享首次结果。"""
++    def __init__(self, source):
++        self.source = source
++        self.ready = False
++        self.value = None
++
++    def _value(self):
++        """仅首次实际读取时求值。@return 业务结果。"""
++        if not self.ready:
++            self.value = self.source.function()
++            self.ready = True
++        return self.value
++
++    def __format__(self, spec):
++        """沿标准format_spec格式化实际值。@return 字符串。"""
++        return format(self._value(), spec)
++
++    def __str__(self):
++        """支持标准!s转换。@return 字符串。"""
++        return str(self._value())
++
++    def __repr__(self):
++        """支持标准!r转换。@return repr字符串。"""
++        return repr(self._value())
++
++    def __getattr__(self, name):
++        """支持格式字段的属性访问。@return 实际属性。"""
++        return getattr(self._value(), name)
++
++    def __getitem__(self, key):
++        """支持格式字段的下标访问。@return 实际子项。"""
++        return self._value()[key]
++
+ 
+ start_time = aware_now()
+ 
+@@ -2165,6 +2213,17 @@
+             args = [arg() for arg in args]
+             kwargs = {key: value() for key, value in kwargs.items()}
+ 
++        event_values = {}
++        def wrap_value(value):
++            """同一公开包装器的多个参数位置共享本次求值。@return 事件内参数。"""
++            if isinstance(value, LazyValue):
++                if id(value) not in event_values:
++                    event_values[id(value)] = _EventLazy(value)
++                return event_values[id(value)]
++            return value
++        args = tuple(wrap_value(value) for value in args)
++        kwargs = {key: wrap_value(value) for key, value in kwargs.items()}
++
+         if capture and kwargs:
+             log_record["extra"].update(kwargs)
+ 
+@@ -2189,6 +2248,12 @@
+         else:
+             colored_message = None
+ 
++        if event_values and capture:
++            # 序列化extra不能为了展示未引用参数而触发新计算；显式记录未求值状态。
++            for key, value in list(log_record['extra'].items()):
++                if isinstance(value, _EventLazy):
++                    log_record['extra'][key] = value.value if value.ready else '<unevaluated LazyValue>'
++
+         if core.patcher:
+             core.patcher(log_record)
+ 
+--- a/library/tests/test_development_loguru_o06_dev.py
++++ b/library/tests/test_development_loguru_o06_dev.py
+@@ -0,0 +1,39 @@
++"""实际占位才计算惰性参数，每事件缓存而非每sink重复计算。"""
++from copy import deepcopy
++from loguru import logger
++import pytest
++
++def clean():
++    """创建独立logger。@return Logger。"""
++    logger.remove();log=deepcopy(logger);log.remove();return log
++
++def test_mixed_values_unused_and_repeated_placeholders_evaluate_once():
++    """普通参数可混用，未引用参数不算，同一个包装器的不同位置仍一次。@return None。"""
++    from loguru import LazyValue
++    calls=[];log=clean();a=[];b=[];log.add(a.append,format='{message}');log.add(b.append,format='{message}')
++    used=LazyValue(lambda:calls.append('used') or 12.345);unused=LazyValue(lambda:calls.append('unused') or 'never')
++    log.info('{name} {v:.2f}/{v!r}/{other}',name='Ada',v=used,other=used,unused=unused)
++    assert calls==['used'] and ''.join(a)==''.join(b)=='Ada 12.35/12.345/12.345\n'
++    log.info('{v}',v=used);assert calls==['used','used'];log.remove()
++
++def test_filtered_arguments_and_serialized_extra_do_not_force_unused_values():
++    """低于全局级别直接短路，JSON明确标记未求值而不触发计算。@return None。"""
++    import json
++    from loguru import LazyValue
++    log=clean();out=[];calls=[];log.add(out.append,level='INFO',serialize=True,format='{message}')
++    value=LazyValue(lambda:calls.append('computed') or 9)
++    log.debug('{v}',v=value);log.info('plain',unused=value)
++    assert calls==[] and json.loads(out[0])['record']['extra']['unused']=='<unevaluated LazyValue>'
++    log.remove()
++
++def test_conversion_index_attributes_colors_errors_and_legacy_lazy():
++    """标准访问及颜色格式使用真实值，异常传播且旧全callable模式保留。@return None。"""
++    from loguru import LazyValue
++    log=clean();out=[];log.add(out.append,format='{message}',colorize=False,catch=False)
++    log.opt(colors=True).info('<red>{item[x]:03d}</red> {text!s}',item=LazyValue(lambda:{'x':7}),text=LazyValue(lambda:'ok'))
++    log.opt(lazy=True).info('{}',lambda:'legacy')
++    assert ''.join(out)=='007 ok\nlegacy\n'
++    def broken():raise RuntimeError('computation failed')
++    with pytest.raises(RuntimeError,match='computation failed'):log.info('{x}',x=LazyValue(broken))
++    with pytest.raises(TypeError):LazyValue(42)
++    log.remove()

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CF-TRACE-DEV",
+  "source_commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement confuse.trace.trace_sources(view,*,include_values=False,redact=True) returning immutable SourceTrace records in actual view.resolve order. Records contain filename/default/base_for_paths, kind of resolved value, zero-based priority, is_first and optional value. Missing views produce an empty tuple; first means first resolution, not sole contributor to merged dictionaries. Default mode must not expose values. Included values use the completed snapshot freeze logic and relative redactions including sequences, remain detached, and reject unsupported/cyclic structures. No file reads or source mutations.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

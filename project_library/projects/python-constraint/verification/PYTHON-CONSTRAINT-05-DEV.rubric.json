@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-CONSTRAINT-05-DEV",
+  "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add constraint.cardinality.GlobalCardinality(value_bounds,closed=True) as a real Constraint. Snapshot each value min/max nonnegative strict integer bounds; simultaneously enforce per-value counts, using assigned counts and remaining-domain support as safe necessary pruning conditions. closed=True excludes unlisted values; closed=False allows them. Do not confuse one combined SomeInSet count with independent bounds. Reject repeated variables and invalid bound shapes/ranges; impossible but structurally legal bounds produce no solutions. Forward checking must preserve every brute-force legal assignment across solver modes; unary preprocessing must preserve the earlier declared-domain isolation. Document that this is safe support pruning, not a claim of complete generalized arc consistency.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

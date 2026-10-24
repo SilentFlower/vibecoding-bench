@@ -1,0 +1,305 @@
+{
+  "project_key": "wtforms",
+  "title": "WTForms商品表单工作场景",
+  "category": "输入、验证与对象边界",
+  "seed_digest": "412d439d4afa704928603efef3c1adb7ecae4c1a2afc9292b247efb50d1341ff",
+  "environment": "wtforms-py312",
+  "source": {
+    "repository": "https://github.com/pallets-eco/wtforms",
+    "commit": "af18fd6a7595d374aa707ff97b73df0dcc462ec2",
+    "license_files": [
+      "seed/library/LICENSE.rst"
+    ]
+  },
+  "schema": 3,
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
+  "scenarios": [
+    {
+      "id": "WTFORMS-01-DEV-SCENE",
+      "title": "附加过滤与校验规则组合保持调用方列表所有权",
+      "goal": "附加过滤与校验规则组合保持调用方列表所有权",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WTFORMS-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WTFORMS-01-DEV",
+          "kind": "modify",
+          "goal": "附加过滤与校验规则组合保持调用方列表所有权",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair both BaseForm.process extra_filters and Form.validate extra_validators as one caller-ownership bug family. Before appending an inline rule, copy only that used field sequence; do not mutate caller lists, deep-copy callable objects, reorder explicit-extra before inline, or eagerly consume unrelated unused extra-field generators. Support list/tuple sequences, repeat construction/process/validate, inheritance and real error propagation. Each inline runs once per current processing/validation cycle. Preserve all original field/validator semantics and leave already-correct default behavior unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wtforms_01_dev.py, and Chinese compatibility documentation at library/docs/development-wtforms-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WTFORMS-01-DEV-contract.md",
+            "materials/WTFORMS-01-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WTFORMS-01-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wtforms/form.py",
+            "library/tests/test_development_wtforms_01_dev.py",
+            "library/docs/development-wtforms-01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WTFORMS-01-DEV.rubric.json",
+            "native": "verification/WTFORMS-01-DEV.native.json",
+            "public_native": "verification/WTFORMS-01-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "WTFORMS-02-DEV-SCENE",
+      "title": "对象数据可选字段按真实非空值继续业务校验",
+      "goal": "对象数据可选字段按真实非空值继续业务校验",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WTFORMS-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WTFORMS-02-DEV",
+          "kind": "modify",
+          "goal": "对象数据可选字段按真实非空值继续业务校验",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd wtforms.data_optional.DataOptional as opt-in Optional subclass. When raw_data is present, keep original Optional request/explicit-empty semantics, including clearing earlier processing errors for a deliberately empty request. Without submitted raw_data, use processed field.data: None/empty selected containers/empty string or configured whitespace is optional; 0 and False are real values and continue validators. Never erase an object conversion error merely because resulting data is None. Preserve old Optional untouched and use original StopValidation/field_flags/validator order. Document empty-container and whitespace policies explicitly.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wtforms_02_dev.py, and Chinese compatibility documentation at library/docs/development-wtforms-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WTFORMS-02-DEV-contract.md",
+            "materials/WTFORMS-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WTFORMS-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wtforms/data_optional.py",
+            "library/tests/test_development_wtforms_02_dev.py",
+            "library/docs/development-wtforms-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WTFORMS-02-DEV.rubric.json",
+            "native": "verification/WTFORMS-02-DEV.native.json",
+            "public_native": "verification/WTFORMS-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "WTFORMS-03-DEV-SCENE",
+      "title": "嵌套JSON显式适配为真实表单提交并保留数组与多值边界",
+      "goal": "嵌套JSON显式适配为真实表单提交并保留数组与多值边界",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WTFORMS-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WTFORMS-03-DEV",
+          "kind": "modify",
+          "goal": "嵌套JSON显式适配为真实表单提交并保留数组与多值边界",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd wtforms.jsondata.JSONFormData implementing getlist, iteration, contains, length and first-value lookup. Snapshot a top-level JSON mapping into standard hyphen form paths: objects recurse, lists use numeric FieldList indices unless the complete path is explicitly listed in multi_values for SelectMultiple. Define None as present empty string, booleans true/false, finite numbers decimal text, strings unchanged; missing keys stay absent and explicit empty multi-value list stays present. Reject hyphen-containing/empty/nonstring keys, path collisions, unsupported objects/nonfinite numbers, excessive depth/value budget and malformed roots. Preserve caller ownership and never auto-treat arbitrary dict formdata or change data/obj semantics. Validate with actual FormField/FieldList/SelectMultiple processing and nested error locations.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wtforms_03_dev.py, and Chinese compatibility documentation at library/docs/development-wtforms-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WTFORMS-03-DEV-contract.md",
+            "materials/WTFORMS-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WTFORMS-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wtforms/jsondata.py",
+            "library/tests/test_development_wtforms_03_dev.py",
+            "library/docs/development-wtforms-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WTFORMS-03-DEV.rubric.json",
+            "native": "verification/WTFORMS-03-DEV.native.json",
+            "public_native": "verification/WTFORMS-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "WTFORMS-04-DEV-SCENE",
+      "title": "局部编辑按显式嵌套字段路径验证且保留未选状态",
+      "goal": "局部编辑按显式嵌套字段路径验证且保留未选状态",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WTFORMS-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WTFORMS-04-DEV",
+          "kind": "modify",
+          "goal": "局部编辑按显式嵌套字段路径验证且保留未选状态",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd wtforms.partial.validate_fields(form,paths,extra_validators=None) and PartialResult(valid,validated,errors). paths are explicit segment tuples, supporting FormField names and strict integer FieldList indices; preflight unknown/duplicate/overlapping ancestor-descendant masks before any validation. Validate only selected targets through actual field.validate with owning form, explicit extras then original class inline validator, copying sequences without mutating caller lists. Return deep-copied path-associated errors, preserve every unselected error/state and support empty mask without claiming whole-form validity. Do not run/deem passed cross-field Form.validate overrides; document callers must perform full validation for global rules and that selected container fields invoke their normal whole-container rules.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wtforms_04_dev.py, and Chinese compatibility documentation at library/docs/development-wtforms-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WTFORMS-04-DEV-contract.md",
+            "materials/WTFORMS-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WTFORMS-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wtforms/partial.py",
+            "library/tests/test_development_wtforms_04_dev.py",
+            "library/docs/development-wtforms-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WTFORMS-04-DEV.rubric.json",
+            "native": "verification/WTFORMS-04-DEV.native.json",
+            "public_native": "verification/WTFORMS-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "WTFORMS-05-DEV-SCENE",
+      "title": "配置化编辑器独立派生表单并保留Meta与业务验证继承",
+      "goal": "配置化编辑器独立派生表单并保留Meta与业务验证继承",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WTFORMS-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WTFORMS-05-DEV",
+          "kind": "modify",
+          "goal": "配置化编辑器独立派生表单并保留Meta与业务验证继承",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd wtforms.derive.derive_form(base,name,fields,remove=(),replace=False) returning a new Form class through its actual metaclass. Preserve inherited Meta/inline validators and deterministic base-field order, append new mapping-order fields, keep overridden fields in their original slot and support explicit inherited-field removal. Reject reserved/private/invalid names, non-UnboundField values, unknown removals, simultaneous remove/readd and accidental override without replace=True. Do not mutate parent class, caches, field creation counters or existing instances; independent derived forms bind independent Field objects. This is a supported dynamic-class construction feature, not a claim existing WTForms cannot use type()/BaseForm at all.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wtforms_05_dev.py, and Chinese compatibility documentation at library/docs/development-wtforms-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WTFORMS-05-DEV-contract.md",
+            "materials/WTFORMS-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WTFORMS-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wtforms/derive.py",
+            "library/tests/test_development_wtforms_05_dev.py",
+            "library/docs/development-wtforms-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WTFORMS-05-DEV.rubric.json",
+            "native": "verification/WTFORMS-05-DEV.native.json",
+            "public_native": "verification/WTFORMS-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "WTFORMS-06-DEV-SCENE",
+      "title": "JSON商品资料逐记录惰性验证并保存身份与嵌套错误",
+      "goal": "JSON商品资料逐记录惰性验证并保存身份与嵌套错误",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WTFORMS-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WTFORMS-06-DEV",
+          "kind": "modify",
+          "goal": "JSON商品资料逐记录惰性验证并保存身份与嵌套错误",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd wtforms.batch.validate_records(form_class,records,multi_values=(),max_records=None,stop_on_error=False) yielding independent RecordResult(index,record_id,valid,data,errors). Consume (id,JSON payload) records lazily, use the earlier explicit JSONFormData adapter with actual Form.validate and nested fields, preserve duplicate/arbitrary original IDs and input order, and snapshot processed data/errors. First next must not preconsume later records; zero budget does not consume; optional first-error stops after yielding that failure. Exceeding a finite budget raises with explicit partial-results meaning (one extra record may be read to detect excess), never claim whole-stream success. Programming/source/validator exceptions propagate, and no files/network/HTTP services are accessed.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wtforms_06_dev.py, and Chinese compatibility documentation at library/docs/development-wtforms-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "WTFORMS-03-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/WTFORMS-06-DEV-contract.md",
+            "materials/WTFORMS-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WTFORMS-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wtforms/batch.py",
+            "library/tests/test_development_wtforms_06_dev.py",
+            "library/docs/development-wtforms-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WTFORMS-06-DEV.rubric.json",
+            "native": "verification/WTFORMS-06-DEV.native.json",
+            "public_native": "verification/WTFORMS-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

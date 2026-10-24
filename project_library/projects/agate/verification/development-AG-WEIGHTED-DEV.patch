@@ -1,0 +1,108 @@
+--- a/library/agate/aggregations/__init__.py
++++ b/library/agate/aggregations/__init__.py
+@@ -36,3 +36,5 @@
+ from agate.aggregations.sum import Sum
+ from agate.aggregations.summary import Summary
+ from agate.aggregations.variance import PopulationVariance, Variance
++
++from agate.aggregations.weighted import WeightedMean, WeightedVariance
+--- a/library/agate/aggregations/weighted.py
++++ b/library/agate/aggregations/weighted.py
+@@ -0,0 +1,56 @@
++"""按显式数量列计算加权统计，保持Decimal精度。"""
++from agate.aggregations.base import Aggregation
++from agate.data_types import Number
++from agate.exceptions import DataTypeError
++
++
++class WeightedMean(Aggregation):
++    """加权均值。@param column_name 数值列。@param weight_column 权重列。"""
++
++    def __init__(self, column_name, weight_column):
++        """保存显式配对列。@param column_name 数值列。@param weight_column 权重列。@return None。"""
++        self._column_name = column_name
++        self._weight_column = weight_column
++
++    def get_aggregate_data_type(self, table):
++        """返回数值结果类型。@param table 原表。@return Number。"""
++        return Number()
++
++    def validate(self, table):
++        """先核列类型及权重。@param table 原表。@return None。"""
++        for name in (self._column_name, self._weight_column):
++            if not isinstance(table.columns[name].data_type, Number):
++                raise DataTypeError('加权统计要求数值列和数值权重')
++        self._pairs(table)
++
++    def _pairs(self, table):
++        pairs = []
++        for row in table.rows:
++            value, weight = row[self._column_name], row[self._weight_column]
++            if weight is not None and (not weight.is_finite() or weight < 0):
++                raise ValueError('权重必须是非负有限数值')
++            if value is not None and not value.is_finite():
++                raise ValueError('统计值必须是有限数值')
++            # 成对删除缺失值，不能把缺少值的权重加入分母。
++            if value is not None and weight is not None:
++                pairs.append((value, weight))
++        return pairs
++
++    def run(self, table):
++        """计算加权均值。@param table 已验证表。@return Decimal或None。"""
++        pairs = self._pairs(table)
++        weight = sum(pair[1] for pair in pairs)
++        return sum(value * count for value, count in pairs) / weight if weight else None
++
++
++class WeightedVariance(WeightedMean):
++    """总体加权方差。@param column_name 数值列。@param weight_column 权重列。"""
++
++    def run(self, table):
++        """按总体权重计算方差。@param table 已验证表。@return Decimal或None。"""
++        pairs = self._pairs(table)
++        weight = sum(pair[1] for pair in pairs)
++        if not weight:
++            return None
++        mean = sum(value * count for value, count in pairs) / weight
++        return sum(count * (value - mean) ** 2 for value, count in pairs) / weight
+--- a/library/development_tests/test_development_ag_weighted_dev.py
++++ b/library/development_tests/test_development_ag_weighted_dev.py
+@@ -0,0 +1,30 @@
++"""公开销量加权分析回归。"""
++from decimal import Decimal
++import agate
++import pytest
++
++def table(rows):
++    return agate.Table(rows, ['price', 'units'], [agate.Number(), agate.Number()])
++
++def test_weighted_mean_uses_quantity_not_row_count():
++    assert table([(2, 1), (6, 3)]).aggregate(agate.WeightedMean('price', 'units')) == Decimal(5)
++
++def test_population_variance_has_the_documented_denominator():
++    assert table([(2, 1), (6, 3)]).aggregate(agate.WeightedVariance('price', 'units')) == Decimal(3)
++
++def test_null_pairs_and_zero_weights_do_not_contribute():
++    data = table([(None, 100), (99, None), (2, 1), (6, 3), (900, 0)])
++    assert data.aggregate(agate.WeightedMean('price', 'units')) == Decimal(5)
++
++def test_empty_or_zero_weight_returns_none():
++    assert table([]).aggregate(agate.WeightedMean('price', 'units')) is None
++    assert table([(1, 0)]).aggregate(agate.WeightedVariance('price', 'units')) is None
++
++def test_negative_weights_are_rejected_before_calculation():
++    with pytest.raises(ValueError):
++        table([(1, -1), (2, 3)]).aggregate(agate.WeightedMean('price', 'units'))
++
++def test_decimal_precision_and_original_mean():
++    data = table([('1000000000000000', 1), ('1000000000000001', 1)])
++    assert data.aggregate(agate.WeightedVariance('price', 'units')) == Decimal('0.25')
++    assert table([(2, 1), (6, 3)]).aggregate(agate.Mean('price')) == Decimal(4)
+--- a/library/docs/development-ag-weighted-dev.md
++++ b/library/docs/development-ag-weighted-dev.md
+@@ -0,0 +1,5 @@
++# 按数量权重交付精确的均值与总体方差
++
++订单价格需要按销量计算均值和总体方差，不能使用逐行平均或把空值权重混入分母。新增WeightedMean和WeightedVariance，保持Decimal精度，成对忽略空值；负权重或非有限数值拒绝，零总权重返回None，分组聚合与原统计保持兼容。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

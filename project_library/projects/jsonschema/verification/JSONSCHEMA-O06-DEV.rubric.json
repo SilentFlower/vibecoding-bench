@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JSONSCHEMA-O06-DEV",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add FormatChecker.compose(format, checker, *, mode=\"all\", raises=()) for an existing registered format on this instance only, returning self. Combine the captured prior checker and new callable in order with all/any short circuit, preserving declared input-exception causes in FormatError and propagating undeclared programming errors. Keep original checks decorator overwrite semantics and independent/global checker registries unchanged. Reject unknown formats, invalid mode/callable/raises before mutation. Exercise actual builtin date syntax plus business conditions through FormatChecker and a real JSON Schema format keyword; no global monkeypatch or duplicated fake validation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

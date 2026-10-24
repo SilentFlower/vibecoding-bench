@@ -1,0 +1,14 @@
+{
+  "script": "verification/PYTHON-CONSTRAINT-05-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 2,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_python_constraint_05_dev.py"
+}

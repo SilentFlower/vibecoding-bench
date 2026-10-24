@@ -1,0 +1,87 @@
+--- a/library/docs/development-webcolors-06-dev.md
++++ b/library/docs/development-webcolors-06-dev.md
+@@ -0,0 +1,5 @@
++# 品牌主题色板不可变组合内建规范并明确处理名称冲突
++
++路线12：不可变品牌色板独立持有输入副本，可组合显式内建规范，名称大小写统一，冲突默认拒绝或显式选择品牌/内建优先；别名稳定且导出副本不泄漏内部状态。自定义primary不注册全局CSS，不影响其他品牌。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/webcolors/palette.py
++++ b/library/src/webcolors/palette.py
+@@ -0,0 +1,48 @@
++"""不可变品牌色板，不向CSS全局表注册自定义颜色。"""
++from collections.abc import Mapping
++from types import MappingProxyType
++from ._conversion import hex_to_rgb, normalize_hex
++from ._definitions import CSS3, names
++from ._conversion import name_to_hex
++
++
++class Palette(Mapping):
++    """复制并冻结品牌色定义。@param colors 名称到hex。@param base_spec 可选内建规范。@param conflict error/brand/builtin。"""
++    def __init__(self, colors, base_spec=None, conflict='error'):
++        """构建独立名称表并拒绝含混冲突。@param colors 映射。@param base_spec 规范。@param conflict 冲突政策。@return None。"""
++        if conflict not in ('error','brand','builtin'):raise ValueError('未知冲突政策')
++        brand={}
++        for key,value in colors.items():
++            if not isinstance(key,str) or not key or key!=key.strip():raise ValueError('名称必须是无首尾空白的非空字符串')
++            normalized=key.lower()
++            if normalized in brand:raise ValueError('名称大小写冲突')
++            brand[normalized]=normalize_hex(value)
++        base={name:name_to_hex(name,base_spec) for name in names(base_spec)} if base_spec is not None else {}
++        if conflict=='error' and set(base)&set(brand):raise ValueError('品牌名称与内建规范冲突')
++        merged={**base,**brand} if conflict!='builtin' else {**brand,**base}
++        self._colors=MappingProxyType(merged)
++
++    def __getitem__(self, key):
++        """按不区分大小写的品牌名称查hex。@param key 名称。@return hex。"""
++        return self._colors[key.lower()]
++
++    def __iter__(self):
++        """稳定遍历名称。@return 名称迭代器。"""
++        return iter(sorted(self._colors))
++
++    def __len__(self):
++        """返回色板名称数。@return 数量。"""
++        return len(self._colors)
++
++    def rgb(self, name):
++        """查询真实RGB通道。@param name 名称。@return IntegerRGB。"""
++        return hex_to_rgb(self[name])
++
++    def aliases(self, value):
++        """返回该hex的全部独立稳定名称。@param value hex。@return 名称元组。"""
++        color=normalize_hex(value)
++        return tuple(name for name in self if self[name]==color)
++
++    def to_dict(self):
++        """返回独立可序列化副本。@return 名称映射。"""
++        return dict(self._colors)
+--- a/library/tests/test_development_webcolors_06_dev.py
++++ b/library/tests/test_development_webcolors_06_dev.py
+@@ -0,0 +1,25 @@
++"""品牌色板持有自己的数据，不修改内建名称。"""
++import unittest
++import webcolors
++from webcolors.palette import Palette
++
++
++def test_copied_case_normalized_aliases_and_roundtrip():
++    """来源及导出副本随后变化不影响色板。@return None。"""
++    source={'Primary':'#369','accent':'#336699'}
++    palette=Palette(source);source['Primary']='#000'
++    assert palette['PRIMARY']=='#336699' and palette.rgb('primary')==(51,102,153)
++    assert palette.aliases('#369')==('accent','primary')
++    exported=palette.to_dict();exported['primary']='#000'
++    assert Palette(palette.to_dict()).to_dict()==palette.to_dict()
++    assert palette['primary']=='#336699'
++    with unittest.TestCase().assertRaises(ValueError):webcolors.name_to_hex('primary')
++
++
++def test_conflict_policies_and_invalid_input():
++    """品牌和内建冲突必须选择政策，非法数据拒绝。@return None。"""
++    with unittest.TestCase().assertRaises(ValueError):Palette({'red':'#000'},base_spec=webcolors.CSS3)
++    assert Palette({'red':'#000'},base_spec=webcolors.CSS3,conflict='brand')['red']=='#000000'
++    assert Palette({'red':'#000'},base_spec=webcolors.CSS3,conflict='builtin')['red']=='#ff0000'
++    for source in ({'X':'#000','x':'#fff'},{' leading':'#fff'},{'x':'#oops'}):
++        with unittest.TestCase().assertRaises(ValueError):Palette(source)

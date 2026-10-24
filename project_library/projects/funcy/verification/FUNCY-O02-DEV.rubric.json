@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FUNCY-O02-DEV",
+  "source_commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add funcy.async_calc.amemoize/acache using real Funcy SkipMemory and positional-vs-keyword key policy. Cache completed successful values, never coroutine objects, isolate values/pending tasks per event loop, singleflight same-key concurrent calls and shield shared producer from one waiter cancellation. Failures/producer cancellation/SkipMemory never cache; canceled waiters may leave a producer running by documented policy. TTL uses injectable monotonic clock from completion, invalidation supports key_func and generation checks so a detached stale producer cannot overwrite newer cache. Provide invalidate/invalidate_all/cache_info, bounded expired cleanup on access and strict options without changing synchronous memoize/cache.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

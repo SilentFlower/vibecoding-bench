@@ -1,0 +1,77 @@
+--- a/library/docs/development-natsort-06-dev.md
++++ b/library/docs/development-natsort-06-dev.md
+@@ -0,0 +1,5 @@
++# 多列记录自然排序支持独立方向与缺失政策
++
++路线10：记录多列各自指定原生自然算法、升降序和None位置，以稳定多轮排序实现优先级；保留原记录及平手顺序，不修改调用者列表。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/natsort/records.py
++++ b/library/natsort/records.py
+@@ -0,0 +1,37 @@
++"""每列独立原生策略及方向的稳定自然排序。"""
++from dataclasses import dataclass
++from natsort import natsort_keygen, ns
++
++
++@dataclass(frozen=True)
++class FieldSortSpec:
++    """单列自然排序合同。@param key 字段提取器。@param alg 原生算法。@param reverse 降序。@param missing None放first或last，error拒绝。"""
++    key: object
++    alg: object=ns.DEFAULT
++    reverse: bool=False
++    missing: str='last'
++
++    def __post_init__(self):
++        """在排序前核对公开策略。@return None。"""
++        if not callable(self.key) or self.missing not in ('first','last','error') or type(self.reverse) is not bool:
++            raise ValueError('字段排序策略不合法')
++
++
++def multisorted(iterable, fields):
++    """按字段优先级稳定排序且不修改原输入。@param iterable 记录。@param fields 非空字段策略。@return 新记录列表。"""
++    fields=tuple(fields)
++    if not fields or any(not isinstance(field,FieldSortSpec) for field in fields):
++        raise ValueError('至少提供一个有效字段策略')
++    result=list(iterable)
++    for field in reversed(fields):
++        present=[];missing=[];natural=natsort_keygen(alg=field.alg)
++        for row in result:
++            value=field.key(row)
++            if value is None:
++                if field.missing=='error':raise ValueError('排序字段缺失')
++                missing.append(row)
++            else:present.append((natural(value),row))
++        present.sort(key=lambda item:item[0],reverse=field.reverse)
++        rows=[row for _,row in present]
++        result=missing+rows if field.missing=='first' else rows+missing
++    return result
+--- a/library/tests/test_development_natsort_06_dev.py
++++ b/library/tests/test_development_natsort_06_dev.py
+@@ -0,0 +1,26 @@
++"""真实记录多列使用各自自然算法、方向和缺失政策。"""
++import unittest
++from natsort import ns
++from natsort.records import FieldSortSpec, multisorted
++
++
++def test_independent_field_direction_and_stability():
++    """主列自然升序、次列真实数值降序。@return None。"""
++    rows=[{'a':'group10','b':'2','id':0},{'a':'group2','b':'-1','id':1},{'a':'group2','b':'3.5','id':2},{'a':'group2','b':'3.5','id':3}]
++    result=multisorted(iter(rows),[FieldSortSpec(lambda row:row['a']),FieldSortSpec(lambda row:row['b'],alg=ns.REAL,reverse=True)])
++    assert [row['id'] for row in result]==[2,3,1,0]
++    assert [row['id'] for row in rows]==[0,1,2,3]
++
++
++def test_missing_is_independent_of_direction():
++    """缺失位置不随降序意外翻转。@return None。"""
++    rows=[{'v':None},{'v':'x2'},{'v':'x10'}]
++    assert multisorted(rows,[FieldSortSpec(lambda row:row['v'],reverse=True)])==[rows[2],rows[1],rows[0]]
++    assert multisorted(rows,[FieldSortSpec(lambda row:row['v'],missing='first')])[0] is rows[0]
++    with unittest.TestCase().assertRaises(ValueError):multisorted(rows,[FieldSortSpec(lambda row:row['v'],missing='error')])
++
++
++def test_empty_policy_and_callback_errors():
++    """非法策略与真实getter错误不被吞掉。@return None。"""
++    with unittest.TestCase().assertRaises(ValueError):multisorted([],[])
++    with unittest.TestCase().assertRaises(KeyError):multisorted([{}],[FieldSortSpec(lambda row:row['absent'])])

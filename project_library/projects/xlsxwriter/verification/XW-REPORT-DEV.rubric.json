@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "XW-REPORT-DEV",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement xlsxwriter.report.export_report(destination,columns,records,*,sheet=\"Report\",max_rows=1048576,workbook_options=None) and frozen ReportSummary(sheets,row_count). Reuse completed atomic_workbook, safe sheet naming and typed write_records. Stream records once, split at explicit per-sheet row budget including repeated headers, freeze first row, create one header-only sheet for empty input and return actual names/count only after successful replacement. Preserve UTC and literal-formula semantics in constant_memory mode. Any bad later record or source exception preserves the old target without partial report files. Validate budgets/schema before iterating.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

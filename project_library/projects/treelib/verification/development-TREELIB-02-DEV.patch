@@ -1,0 +1,119 @@
+--- a/library/docs/development-treelib-02-dev.md
++++ b/library/docs/development-treelib-02-dev.md
+@@ -0,0 +1,5 @@
++# 分类节点安全改名不覆盖现有节点且失败保持原结构
++
++路线01：改名前先检查None、哈希及重复标识，成功时保持Node身份并同步索引、根与双向关系。多树共享无法安全改名时明确拒绝；属性校验或指针更新失败恢复全部结构和属性容器，不承诺撤销data外部副作用。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_treelib_02_dev.py
++++ b/library/tests/test_development_treelib_02_dev.py
+@@ -0,0 +1,29 @@
++"""节点重命名不得覆盖兄弟或先移除再遇到非法标识。"""
++import unittest
++from treelib import Tree
++from treelib.exceptions import DuplicatedNodeIdError
++
++
++def build():
++    """建立真实带子节点的分类。@return 树。"""
++    tree=Tree();tree.create_node('Root','r');tree.create_node('A','a',parent='r');tree.create_node('B','b',parent='r');tree.create_node('Leaf','leaf',parent='a')
++    return tree
++
++
++def test_collision_and_unhashable_leave_whole_structure_unchanged():
++    """冲突与不可哈希标识保留索引、对象和双向指针。@return None。"""
++    tree=build();before=tree.to_json(with_identifier=True);node=tree['a']
++    for value in ('b',[],None):
++        with unittest.TestCase().assertRaises((ValueError,DuplicatedNodeIdError)):tree.update_node('a',identifier=value,tag='changed')
++        assert tree.to_json(with_identifier=True)==before and tree['a'] is node
++
++
++def test_rename_root_children_and_shared_view_rejection():
++    """合法根/子级改名完整更新，多树共享明确拒绝。@return None。"""
++    tree=build();tree.update_node('a',identifier='new',tag='New')
++    assert tree.parent('leaf').identifier=='new' and [node.identifier for node in tree.children('r')]==['new','b']
++    tree.update_node('r',identifier='root')
++    assert tree.root=='root' and tree.parent('new').identifier=='root'
++    view=tree.subtree('new');before=tree.to_json(with_identifier=True)
++    with unittest.TestCase().assertRaises(ValueError):tree.update_node('new',identifier='other')
++    assert tree.to_json(with_identifier=True)==before and view['new'] is tree['new']
+--- a/library/treelib/tree.py
++++ b/library/treelib/tree.py
+@@ -1936,42 +1936,40 @@
+                 st[node_n].set_predecessor(None, st.identifier)
+         return st
+ 
+-    def update_node(self, nid: str, **attrs) -> None:
+-        """
+-        Update node's attributes.
+-
+-        :param nid: the identifier of modified node
+-        :param attrs: attribute pairs recognized by Node object
+-        :return: None
+-        """
+-        cn = self[nid]
+-        for attr, val in iteritems(attrs):
+-            if attr == "identifier":
+-                # Updating node id meets following contraints:
+-                # * Update node identifier property
+-                # * Update parent's followers
+-                # * Update children's parents
+-                # * Update tree registration of var _nodes
+-                # * Update tree root if necessary
+-                cn = self._nodes.pop(nid)
+-                setattr(cn, "identifier", val)
+-                self._nodes[val] = cn
+-
+-                if cn.predecessor(self._identifier) is not None:
+-                    self[cn.predecessor(self._identifier)].update_successors(
+-                        nid,
+-                        mode=self.node_class.REPLACE,
+-                        replace=val,
+-                        tree_id=self._identifier,
+-                    )
+-
+-                for fp in cn.successors(self._identifier):
+-                    self[fp].set_predecessor(val, self._identifier)
+-
+-                if self.root == nid:
+-                    self.root = val
+-            else:
+-                setattr(cn, attr, val)
++    def update_node(self, nid, **attrs):
++        """预检冲突并以可回滚结构更新节点。@param nid 当前标识。@param attrs 节点属性。@return None。"""
++        node=self[nid]
++        destination=attrs.get('identifier',nid)
++        if destination is None:raise ValueError('标识不能为None')
++        try:hash(destination)
++        except TypeError as error:raise ValueError('标识必须可哈希') from error
++        if destination!=nid:
++            if destination in self._nodes:raise DuplicatedNodeIdError('标识已经存在: '+repr(destination))
++            contexts=set(node._predecessor)|set(node._successors)
++            if contexts-{self._identifier}:raise ValueError('共享多树节点必须先独立复制，不能只更新一个视图')
++        registration=dict(self._nodes);old_root=self.root
++        # 只复制关系和属性容器，不复制或声称撤销业务data内部的外部副作用。
++        saved=[]
++        for current in self._nodes.values():
++            state=dict(current.__dict__)
++            state['_predecessor']=dict(current._predecessor)
++            state['_successors']=type(current._successors)(list,{key:list(value) for key,value in current._successors.items()})
++            saved.append((current,state))
++        try:
++            for name,value in attrs.items():
++                setattr(node,name,value)
++            if destination!=nid:
++                if node.identifier!=destination:raise ValueError('节点拒绝目标标识')
++                parent=node.predecessor(self._identifier)
++                if parent is not None:self[parent].update_successors(nid,mode=self.node_class.REPLACE,replace=destination,tree_id=self._identifier)
++                for child in node.successors(self._identifier):self[child].set_predecessor(destination,self._identifier)
++                del self._nodes[nid];self._nodes[destination]=node
++                if self.root==nid:self.root=destination
++        except Exception:
++            self._nodes.clear();self._nodes.update(registration);self.root=old_root
++            for current,state in saved:
++                current.__dict__.clear();current.__dict__.update(state)
++            raise
+ 
+     def to_dict(
+         self,

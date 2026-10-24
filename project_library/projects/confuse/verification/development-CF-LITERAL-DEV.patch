@@ -1,0 +1,73 @@
+--- a/library/confuse/literal.py
++++ b/library/confuse/literal.py
+@@ -0,0 +1,36 @@
++"""显式常量合同，不混淆Python的布尔与数字等值。"""
++from copy import deepcopy
++from .templates import Template,REQUIRED
++
++
++def _equal(left,right):
++    if type(left) is not type(right):
++        return False
++    if isinstance(left,dict):
++        return len(left)==len(right) and all(any(_equal(k,rk) and _equal(v,rv) for rk,rv in right.items()) for k,v in left.items())
++    if isinstance(left,(list,tuple)):
++        return len(left)==len(right) and all(_equal(a,b) for a,b in zip(left,right))
++    return left==right
++
++
++class Literal(Template):
++    """仅接受深层类型和值均相同的配置常量。"""
++    def __init__(self,expected,default=REQUIRED):
++        """建立独立常量。@param expected 期望值。@param default 缺失值。@return None。
++        """
++        if default is not REQUIRED and not _equal(expected,default):
++            raise ValueError('默认值必须满足常量合同')
++        self.expected=deepcopy(expected)
++        super().__init__(deepcopy(default) if default is not REQUIRED else REQUIRED)
++
++    def convert(self,value,view):
++        """验证常量。@param value 实际值。@param view 来源视图。@return 值的独立副本。
++        """
++        if not _equal(value,self.expected):
++            self.fail('值不满足严格常量合同',view)
++        return deepcopy(value)
++
++    def get_default_value(self,key_name='default'):
++        """隔离可变默认值。@param key_name 配置位置。@return 默认值副本。
++        """
++        return deepcopy(super().get_default_value(key_name))
+--- a/library/development_tests/test_development_cf_literal_dev.py
++++ b/library/development_tests/test_development_cf_literal_dev.py
+@@ -0,0 +1,23 @@
++"""公开严格常量模板回归。"""
++import pytest
++from confuse import RootView,ConfigSource,ConfigValueError,NotFoundError
++from confuse.literal import Literal
++
++def test_boolean_number_and_nested_types_are_distinct():
++    view=RootView([ConfigSource({'value':{'x':[True]}})])
++    with pytest.raises(ConfigValueError): view['value'].get(Literal({'x':[1]}))
++    assert view['value'].get(Literal({'x':[True]}))=={'x':[True]}
++
++def test_mutated_constructor_input_cannot_change_contract():
++    expected={'a':[1]};template=Literal(expected);expected['a'].append(2)
++    assert RootView([ConfigSource({'v':{'a':[1]}})])['v'].get(template)=={'a':[1]}
++
++def test_default_is_validated_and_each_result_is_detached():
++    with pytest.raises(ValueError): Literal(True,default=1)
++    view=RootView([ConfigSource({})]);template=Literal([],default=[])
++    result=view['v'].get(template);result.append(1);assert view['v'].get(template)==[]
++
++def test_required_error_and_success_copy_preserve_native_contract():
++    view=RootView([ConfigSource({'v':[1]})])
++    with pytest.raises(NotFoundError): view['missing'].get(Literal(1))
++    result=view['v'].get(Literal([1]));result.append(2);assert view['v'].get()==[1]
+--- a/library/docs/development-cf-literal-dev.md
++++ b/library/docs/development-cf-literal-dev.md
+@@ -0,0 +1,5 @@
++# 添加深层严格常量模板并隔离可变默认值
++
++新增严格常量模板，递归区分布尔、整数、浮点和序列类型。期望值、默认值和返回结果彼此隔离，失败使用原配置领域异常，保留旧模板转换行为。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "LOGURU-O03-DEV",
+  "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Logger.silence(level=\"INFO\", *, module=None) using the existing ContextVar compatibility layer. Suppress matching records whose severity is <= threshold before message formatting, with string level or nonbool nonnegative integer; module None covers all, a string covers itself/dot-separated descendants. Scope rules to the same shared Logger core (bound loggers included), combine nested scopes additively and reset on every exit. Preserve global enable/disable and normal sink filters. Async siblings/new threads stay independent while created child tasks inherit context; do not mutate global activation to emulate local silence.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

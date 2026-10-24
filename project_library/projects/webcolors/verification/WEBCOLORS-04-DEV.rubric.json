@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WEBCOLORS-04-DEV",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add webcolors.css_rgb.parse_css_rgb and serialize_css_rgb, using RGBA byte semantics from the prior goal. Support legacy rgb(r,g,b)/rgba(r,g,b,a) with all-number or all-percent channels and modern rgb()/rgba() three whitespace-separated channels with optional / alpha. Modern channels may mix numeric and percent; numeric exponent syntax is allowed if finite. Clamp RGB/alpha to their range then round to nearest byte with halves up. Reject mixed separators, partial suffixes, missing components, NaN/Inf, none, calc/var and unsupported expressions. Serializer uses stable modern syntax and roundtrips every alpha byte without loss. Keep existing name/hex/HTML parsers untouched and document the deliberately supported subset.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

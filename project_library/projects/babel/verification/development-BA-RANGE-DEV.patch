@@ -1,0 +1,69 @@
+--- a/library/babel/numbers.py
++++ b/library/babel/numbers.py
+@@ -603,6 +603,30 @@
+         group_separator=group_separator,
+         numbering_system=numbering_system,
+     )
++
++
++def format_number_range(start, end, *, currency=None, locale=None, collapse=True, **options):
++    """格式化有限有序数值区间。@param start 下界。@param end 上界。
++    @param currency 同币种代码或None。@param locale 区域。@param collapse 是否合并显示相等端点。
++    @param options 传给原数字／金额格式器的选项。@return 区域化完整端点区间。
++    """
++    left, right = decimal.Decimal(str(start)), decimal.Decimal(str(end))
++    if not left.is_finite() or not right.is_finite() or left > right:
++        raise ValueError('区间端点必须有限且有序')
++    resolved = Locale.parse(locale or LC_NUMERIC)
++    if currency is None:
++        first = format_decimal(left, locale=resolved, **options)
++        last = format_decimal(right, locale=resolved, **options)
++    else:
++        validate_currency(currency)
++        first = format_currency(left, currency, locale=resolved, **options)
++        last = format_currency(right, currency, locale=resolved, **options)
++    if collapse and first == last:
++        return first
++    pattern = resolved.interval_formats.get(None, '{0}–{1}')
++    # 一次替换防止用户自定义前后缀中的占位文字被二次解释。
++    import re
++    return re.sub(r'\{([01])\}', lambda match: (first, last)[int(match.group(1))], pattern)
+ 
+ 
+ def format_compact_decimal(
+--- a/library/development_tests/test_development_ba_range_dev.py
++++ b/library/development_tests/test_development_ba_range_dev.py
+@@ -0,0 +1,25 @@
++"""公开区域化数值区间回归。"""
++from decimal import Decimal
++import pytest
++from babel import Locale
++from babel.numbers import format_number_range, format_decimal, format_currency, UnknownCurrencyError
++
++def test_decimal_endpoints_use_locale_pattern():
++    locale = Locale.parse('de')
++    expected = locale.interval_formats[None].replace('{0}', '1,2').replace('{1}', '3,4')
++    assert format_number_range('1.2', '3.4', locale='de') == expected
++
++def test_currency_and_options_preserve_both_complete_endpoints():
++    text = format_number_range(-3, 4, currency='USD', locale='en', group_separator=False)
++    assert format_currency(-3, 'USD', locale='en') in text and format_currency(4, 'USD', locale='en') in text
++
++def test_rounded_equality_can_be_collapsed_or_shown():
++    assert format_number_range('1.001', '1.002', locale='en', format='0.0') == '1.0'
++    assert format_number_range('1.001', '1.002', locale='en', format='0.0', collapse=False).count('1.0') == 2
++
++def test_invalid_ranges_and_currency_fail():
++    for first, last in ((2, 1), ('NaN', 2), (0, 'Infinity')):
++        with pytest.raises(ValueError):
++            format_number_range(first, last, locale='en')
++    with pytest.raises(UnknownCurrencyError):
++        format_number_range(1, 2, currency='NOT', locale='en')
+--- a/library/docs/development-ba-range-dev.md
++++ b/library/docs/development-ba-range-dev.md
+@@ -0,0 +1,5 @@
++# 区域化数值与同币种金额区间展示
++
++价格和数值筛选需要完整区间展示：沿用数字／金额舍入和编号系统，通过区域间隔模板连接，不错误删除负号或币种。提供相等显示端点的可控合并，并拒绝反向、非有限端点及未知币种。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

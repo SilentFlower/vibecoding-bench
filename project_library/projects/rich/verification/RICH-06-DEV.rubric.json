@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "RICH-06-DEV",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Console._collect_renderables single-Text collection: retain the Text own justify/overflow/no_wrap/style/spans through a copy rather than recreating it from the separator template. Current print end replaces the copy end, explicit print justify/overflow/no_wrap still have their existing priority, and the caller Text never mutates. Preserve multiple-item separator-join policy, ordinary strings, non-text renderables/Group/Panel and style wrapping. Verify actual Console output for centered/right-aligned Unicode and ellipsis/no-wrap, not only intermediary attributes; do not change default multi-Text conflict semantics in this delivery.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

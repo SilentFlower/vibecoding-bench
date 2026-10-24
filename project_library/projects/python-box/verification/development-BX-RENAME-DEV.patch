@@ -1,0 +1,84 @@
+--- a/library/box/box.py
++++ b/library/box/box.py
+@@ -404,6 +404,37 @@
+ 
+         return list(items)
+ 
++    def rename_key(self, old, new):
++        """在原位置重命名字面键，失败不改变值、顺序或别名表。
++
++        :param old: 已存在原键。
++        :param new: 不与其他键或安全属性冲突的新键。
++        :return: self；现有子对象保持同一引用。
++        """
++        if self._box_config['frozen_box']:
++            raise BoxError('Box is frozen')
++        if old not in dict.keys(self):
++            raise BoxKeyError(old)
++        hash(new)
++        if old == new:
++            return self
++        if new in dict.keys(self):
++            raise BoxKeyError('目标键已存在')
++        if isinstance(new, str) and new in self._protected_keys:
++            raise BoxKeyError('目标键为保留属性')
++        safe = self._safe_attr(new)
++        if self._box_config['conversion_box']:
++            for key in dict.keys(self):
++                if key != old and self._safe_attr(key) == safe:
++                    raise BoxKeyError('目标安全属性冲突')
++        items = [(new if key == old else key, value) for key, value in dict.items(self)]
++        aliases = {self._safe_attr(key): key for key, value in items}
++        # 验证及别名计算都在发布前完成，不能通过删除再赋值移动键或重建子对象。
++        dict.clear(self)
++        dict.update(self, items)
++        self._box_config['__safe_keys'] = aliases
++        return self
++
+     def __contains__(self, item):
+         in_me = super().__contains__(item)
+         if not self._box_config["box_dots"] or not isinstance(item, str):
+--- a/library/docs/development-bx-rename-dev.md
++++ b/library/docs/development-bx-rename-dev.md
+@@ -0,0 +1,5 @@
++# 在原位置原子重命名配置键并保持子对象
++
++rename_key在原插入位置改名字面键，子Box与列表保持原引用、配置和转换结果，并更新安全属性索引。缺原键、已有目标、保留属性、别名冲突或冻结状态均在修改前拒绝；普通赋值规则不改。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bx_rename_dev.py
++++ b/library/test/test_development_bx_rename_dev.py
+@@ -0,0 +1,33 @@
++"""重命名配置键保持顺序、子对象和安全属性映射。"""
++import pytest
++from box import Box, BoxError
++
++
++def test_order_and_identity():
++    """原位置改名且不重新转换子Box。@return None。"""
++    value = Box({'before': 1, 'old name': {'port': 3}, 'after': 2})
++    child = value['old name']
++    assert value.rename_key('old name', 'new name') is value
++    assert list(value) == ['before', 'new name', 'after']
++    assert value.new_name is child
++    with pytest.raises(KeyError):
++        value['old name']
++
++
++def test_collision_atomic():
++    """冲突或保留键失败时原对象完全不动。@return None。"""
++    value = Box({'a': 1, 'b c': 2})
++    before = value.to_dict()
++    for target in ['b c', 'b-c', 'to_dict']:
++        with pytest.raises(BoxError):
++            value.rename_key('a', target)
++        assert value.to_dict() == before and list(value) == ['a', 'b c']
++
++
++def test_integer_and_frozen():
++    """整数键可改名，冻结对象拒绝。@return None。"""
++    value = Box({2: 'value'})
++    value.rename_key(2, 4)
++    assert value[4] == 'value'
++    with pytest.raises(BoxError):
++        Box({'a': 1}, frozen_box=True).rename_key('a', 'b')

@@ -1,0 +1,136 @@
+--- a/library/docs/development-collective-icalendar-o02-dev.md
++++ b/library/docs/development-collective-icalendar-o02-dev.md
+@@ -0,0 +1,5 @@
++# 提供显式严格组件边界解析并保持旧入口兼容
++
++新增继承到Calendar/LazyCalendar的from_ical_strict显式入口。先用完整展开文本栈验证BEGIN/END：孤立、错配、跨层及EOF未闭合均拒绝，错配说明实际与预期名字；校验必须先于模型解析及任何时区缓存。支持文本、字节、只读一次的Path、多顶层返回和子类解析器；共享私有边界校验后委托原cls.from_ical。仅检查组件边界，不冒充完整RFC属性校验。原from_ical签名及容错、未知组件和延迟解析保持，不硬编码损坏fixture或默认强制严格。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/icalendar/cal/component.py
++++ b/library/src/icalendar/cal/component.py
+@@ -595,6 +595,22 @@
+                 )
+             )
+         return components[0]
++
++    @classmethod
++    def from_ical_strict(
++        cls, st: str | bytes | Path, multiple: bool = False
++    ) -> Component | list[Component]:
++        """显式检查BEGIN/END闭合后沿当前类的真实解析路径构造模型。
++
++        :param st: iCalendar文本、字节或本地Path；文件只读取一次。
++        :param multiple: True返回全部顶层组件，False沿原入口要求恰好一个。
++        :return: 当前类解析器产生的组件或组件列表。
++        """
++        if isinstance(st, Path):
++            st = st.read_bytes()
++        # 先检查完整文本，避免坏尾部之前的有效时区提前污染共享缓存。
++        ComponentIcalParser._validate_component_boundaries(st)
++        return cls.from_ical(st, multiple=multiple)
+ 
+     @staticmethod
+     def _format_error(error_description, bad_input, elipsis="[...]"):
+--- a/library/src/icalendar/parser/ical/component.py
++++ b/library/src/icalendar/parser/ical/component.py
+@@ -109,6 +109,37 @@
+         if not getattr(component, "name", ""):  # undefined components
+             component.name = c_name
+         self._stack.append(component)
++
++    @staticmethod
++    def _validate_component_boundaries(data: str | bytes) -> None:
++        """在构造模型和写入时区缓存前验证整个输入的组件边界。
++
++        :param data: 实际iCalendar文本或字节；沿用原内容行展开规则。
++        :return: None；孤立、错配或未结束的组件抛出ValueError。
++        """
++        stack: list[str] = []
++        for line in Contentlines.from_ical(data):
++            if not line:
++                continue
++            try:
++                name, _params, value = line.parts()
++            except ValueError:
++                # 属性损坏仍由原解析器按组件ignore_exceptions处理。
++                continue
++            marker = name.upper()
++            if marker == "BEGIN":
++                if not value:
++                    raise ValueError("BEGIN组件名称不能为空")
++                stack.append(value.upper())
++            elif marker == "END":
++                if not stack:
++                    raise ValueError(f"END:{value}没有对应BEGIN")
++                expected = stack[-1]
++                if value.upper() != expected:
++                    raise ValueError(f"END:{value}与当前BEGIN:{expected}不匹配")
++                stack.pop()
++        if stack:
++            raise ValueError(f"BEGIN:{stack[-1]}缺少END")
+ 
+     def handle_end_component(self, vals: str) -> None:
+         """Handle the end of a component."""
+--- a/library/tests/test_development_collective_icalendar_o02_dev.py
++++ b/library/tests/test_development_collective_icalendar_o02_dev.py
+@@ -0,0 +1,60 @@
++"""显式严格入口覆盖完整文本，旧容错入口保持兼容。"""
++from icalendar import Calendar, LazyCalendar
++
++
++def test_mismatch_is_opt_in_and_legacy_unchanged():
++    """严格入口拒绝错配，旧from_ical仍按冻结行为容错。@return None。"""
++    import pytest
++    raw = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nEND:VTODO\r\nEND:VCALENDAR\r\n'
++    assert len(Calendar.from_ical(raw).walk('VEVENT')) == 1
++    for calendar_type in (Calendar, LazyCalendar):
++        with pytest.raises(ValueError, match='VEVENT'):
++            calendar_type.from_ical_strict(raw)
++
++
++def test_valid_nested_case_and_unknown_components():
++    """严格入口保持大小写、合法嵌套和真实未知组件。@return None。"""
++    raw = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT5M\r\nEND:valarm\r\nEND:vevent\r\nEND:vcalendar\r\n'
++    for calendar_type in (Calendar, LazyCalendar):
++        calendar = calendar_type.from_ical_strict(raw)
++        assert len(calendar.walk('VALARM')) == 1
++    custom = 'BEGIN:VCALENDAR\r\nBEGIN:X-CUSTOM\r\nX-VALUE:1\r\nEND:x-custom\r\nEND:VCALENDAR\r\n'
++    assert Calendar.from_ical_strict(custom).subcomponents[0].name == 'X-CUSTOM'
++
++
++def test_invalid_complete_input_precedes_parser_and_cache():
++    """尾部损坏也必须在真实解析器、组件工厂和缓存之前被拒绝。@return None。"""
++    import pytest
++    class Guard(Calendar):
++        """监测损坏结构是否错误进入模型解析。"""
++        @classmethod
++        def _get_ical_parser(cls, st):
++            """禁止损坏输入调用解析器。@param st 输入。@return 不返回。"""
++            raise AssertionError('不应先构造解析器')
++    valid = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n'
++    for raw in ('END:VCALENDAR\r\n', 'BEGIN:VCALENDAR\r\n', valid + 'END:X-OTHER\r\n',
++        'BEGIN:VCALENDAR\r\nBEGIN:X-CUSTOM\r\nEND:VCALENDAR\r\nEND:X-CUSTOM\r\n'):
++        with pytest.raises(ValueError):
++            Guard.from_ical_strict(raw)
++
++
++def test_bytes_path_multiple_and_subclass_dispatch(tmp_path):
++    """文件、字节、多组件及子类解析器均沿真实API。@return None。"""
++    import pytest
++    raw = b'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n'
++    path = tmp_path / 'strict.ics'
++    path.write_bytes(raw + raw)
++    assert len(Calendar.from_ical_strict(path, multiple=True)) == 2
++    assert len(LazyCalendar.from_ical_strict(raw + raw, multiple=True)) == 2
++    with pytest.raises(ValueError):
++        Calendar.from_ical_strict(path)
++    class Recording(Calendar):
++        """严格校验后仍必须使用真实子类解析入口。"""
++        observed = []
++        @classmethod
++        def _get_ical_parser(cls, st):
++            """记录输入并委托原解析器。@param st 文本。@return 解析器。"""
++            cls.observed.append(st)
++            return super()._get_ical_parser(st)
++    assert Recording.from_ical_strict(raw).name == 'VCALENDAR'
++    assert Recording.observed == [raw]

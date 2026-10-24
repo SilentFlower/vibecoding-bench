@@ -1,0 +1,74 @@
+--- a/library/docs/development-pydash-03-dev.md
++++ b/library/docs/development-pydash-03-dev.md
+@@ -0,0 +1,5 @@
++# 客户映射按键或金额稳定排序且保留业务对象身份
++
++路线03：新增明确的保序映射键/值排序，支持key/reverse和稳定同值；Mapping输入不改、业务对象身份保持，falsey回调不被忽略。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pydash/__init__.py
++++ b/library/src/pydash/__init__.py
+@@ -202,6 +202,8 @@
+     pick,
+     pick_by,
+     rename_keys,
++    sort_dict_by_keys,
++    sort_dict_by_values,
+     set_,
+     set_with,
+     to_boolean,
+--- a/library/src/pydash/objects.py
++++ b/library/src/pydash/objects.py
+@@ -67,6 +67,8 @@
+     "pick",
+     "pick_by",
+     "rename_keys",
++    "sort_dict_by_keys",
++    "sort_dict_by_values",
+     "set_",
+     "set_with",
+     "to_boolean",
+@@ -2665,3 +2667,19 @@
+             _customize_clone(subvalue, val, customizer, is_deep=is_deep, memo=memo, seen=seen)
+         if val is not None:
+             result[memo.get(id(key), key) if is_deep else key] = val
++
++
++def sort_dict_by_keys(mapping, *, key=None, reverse=False):
++    """按键稳定排序并返回新dict。@param mapping 只读映射。@param key 键转换。@param reverse 是否逆序。@return 保留键值对应的新dict。"""
++    from collections.abc import Mapping
++    if not isinstance(mapping,Mapping):raise TypeError('mapping必须为Mapping')
++    if key is not None and not callable(key):raise TypeError('key必须可调用或None')
++    return dict(sorted(mapping.items(),key=(lambda item:key(item[0])) if key is not None else (lambda item:item[0]),reverse=reverse))
++
++
++def sort_dict_by_values(mapping, *, key=None, reverse=False):
++    """按值稳定排序并返回新dict。@param mapping 只读映射。@param key 值转换。@param reverse 是否逆序。@return 保序新dict。"""
++    from collections.abc import Mapping
++    if not isinstance(mapping,Mapping):raise TypeError('mapping必须为Mapping')
++    if key is not None and not callable(key):raise TypeError('key必须可调用或None')
++    return dict(sorted(mapping.items(),key=(lambda item:key(item[1])) if key is not None else (lambda item:item[1]),reverse=reverse))
+--- a/library/tests/test_development_pydash_03_dev.py
++++ b/library/tests/test_development_pydash_03_dev.py
+@@ -0,0 +1,21 @@
++"""映射排序不修改来源，重复比较值保持输入顺序。"""
++from types import MappingProxyType
++import pydash
++
++def test_key_and_value_sort_preserve_mapping_and_ties():
++    """按客户键与金额排序是两种明确语义。@return None。"""
++    source={'b':2,'a':1,'c':2};snapshot=list(source.items())
++    assert list(pydash.sort_dict_by_keys(source))==['a','b','c']
++    assert list(pydash.sort_dict_by_values(source,reverse=True))==['b','c','a']
++    assert list(source.items())==snapshot
++
++def test_custom_mapping_falsey_key_and_transform():
++    """Falsey函数仍需应用，不以truthiness跳过。@return None。"""
++    class Key:
++        """按字符串长度排序。"""
++        def __bool__(self):return False
++        def __call__(self,value):return len(value)
++    source=MappingProxyType({'long':3,'x':2,'xx':1})
++    assert list(pydash.sort_dict_by_keys(source,key=Key()))==['x','xx','long']
++    assert list(pydash.sort_dict_by_values({1:'BBB',2:'a'},key=str.lower))==[2,1]
++    assert pydash.sort_dict_by_values({})=={}

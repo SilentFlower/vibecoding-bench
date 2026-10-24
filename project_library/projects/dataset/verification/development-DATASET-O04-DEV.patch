@@ -1,0 +1,109 @@
+--- a/library/dataset/util.py
++++ b/library/dataset/util.py
+@@ -129,8 +129,12 @@
+     def __next__(self) -> OutRow:
+         try:
+             return convert_row(self.row_type, next(self._iter))
+-        except StopIteration:
+-            self.close()
++        except BaseException:
++            # 转换失败或上游读取异常也必须归还专用资源，同时保留原失败。
++            try:
++                self.close()
++            except BaseException:
++                pass
+             raise
+ 
+     next = __next__
+@@ -138,12 +142,40 @@
+     def __iter__(self) -> Iterator[OutRow]:
+         return self
+ 
++    def __enter__(self):
++        """开始可提前终止的结果消费上下文。@return self。"""
++        return self
++
++    def __exit__(self, exc_type, exc_value, traceback):
++        """关闭专用游标/连接，但不覆盖业务异常。@return False。"""
++        if exc_type is None:
++            self.close()
++        else:
++            try:
++                self.close()
++            except BaseException:
++                pass
++        return False
++
+     def close(self) -> None:
+-        if self.result_proxy is not None:
+-            self.result_proxy.close()
+-        if self._conn is not None:
+-            self._conn.close()
+-            self._conn = None
++        """幂等关闭专用结果及连接，绝不关闭共享Database。@return None。"""
++        proxy, connection = self.result_proxy, self._conn
++        self.result_proxy, self._conn = None, None
++        self._iter = iter(())
++        failure = None
++        try:
++            if proxy is not None:
++                proxy.close()
++        except BaseException as error:
++            failure = error
++        try:
++            if connection is not None:
++                connection.close()
++        except BaseException as error:
++            if failure is None:
++                failure = error
++        if failure is not None:
++            raise failure
+ 
+ 
+ def ensure_strings(value: str | Iterable[str] | None) -> list[str]:
+--- a/library/docs/development-dataset-o04-dev.md
++++ b/library/docs/development-dataset-o04-dev.md
+@@ -0,0 +1,5 @@
++# 让查询结果上下文可靠释放专用游标和连接
++
++对应路线11：为真实ResultIter增加可提前退出上下文，并补读取/row_type失败清理；幂等释放专用资源，双清理失败不遮蔽业务异常，共享Database继续可用。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_dataset_o04_dev.py
++++ b/library/test/test_development_dataset_o04_dev.py
+@@ -0,0 +1,35 @@
++"""结果上下文提前退出、转换失败和资源异常均清理。"""
++import dataset
++import pytest
++
++def test_real_streamed_early_exit_leaves_database_usable():
++    """退出游标上下文不关闭共享Database。@return None。"""
++    db=dataset.connect('sqlite://');table=db['items'];table.insert_many([{'x':1},{'x':2}])
++    with table.find(_streamed=True) as result:
++        assert next(result)['x']==1;connection=result._conn;proxy=result.result_proxy
++    assert connection.closed and proxy.closed and table.count()==2
++    result.close();assert list(result)==[];db.close()
++
++def test_conversion_error_releases_actual_result():
++    """row_type抛错也释放专用连接。@return None。"""
++    db=dataset.connect('sqlite://');table=db['items'];table.insert({'x':1})
++    result=table.find(_streamed=True);connection=result._conn;proxy=result.result_proxy
++    def fail(items):raise ValueError('conversion')
++    result.row_type=fail
++    with pytest.raises(ValueError,match='conversion'):next(result)
++    assert connection.closed and proxy.closed;db.close()
++
++def test_cleanup_failure_preserves_original_and_is_idempotent():
++    """双资源均尝试关闭，原业务异常不能被清理错误遮蔽。@return None。"""
++    from dataset.util import ResultIter
++    class Proxy:
++        calls=0
++        def keys(self):return []
++        def close(self):self.calls+=1;raise OSError('close cursor')
++    class Connection:
++        calls=0
++        def close(self):self.calls+=1
++    proxy,connection=Proxy(),Connection();result=ResultIter(proxy,connection=connection)
++    with pytest.raises(RuntimeError,match='business'):
++        with result:raise RuntimeError('business')
++    result.close();assert proxy.calls==1 and connection.calls==1

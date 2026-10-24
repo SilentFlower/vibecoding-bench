@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DOCUTILS-O06-DEV",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add public fragments.extract_section(document,section_id,*,external=\"error\"|\"include_notes\") selecting one exact real section id into a new document, preserving source/line, nested structure and internal refid/name maps without modifying the old tree. Selected section becomes top level structurally; actual HTML publication must work. Default rejects references outside selection. include_notes appends only referenced external footnote/citation closure and filters backrefs to included ids; external section/unknown targets still error rather than silently including arbitrary chapters. Missing/duplicate IDs and invalid policies fail explicitly. Do not slice rendered HTML, guess titles, fake URLs or claim unimplemented CLI support.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

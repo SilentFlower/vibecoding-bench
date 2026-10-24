@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DATASET-O03-DEV",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement Table.increment(column,amount,filters,*,nulls=\"preserve\") with one SQLAlchemy UPDATE expression, never read-modify-write. Require existing numeric SQLAlchemy column, finite int/float/Decimal excluding bool, explicit filters mapping, and nulls=preserve|zero. Zero/negative increments work; unmatched/nonexistent table returns zero, no schema creation. Return reliable database rowcount, preserve existing update/transaction behavior and reject unknown/non-numeric columns or invalid policies before DML. Prove two file-backed SQLite connections accumulate changes and an explicit database transaction rolls back failed work; document backend numeric range/precision limits.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

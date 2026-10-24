@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CF-TOML-DEV",
+  "source_commit": "bf42783301ac4e9c640328ec95486952fd599ce6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement confuse.toml_source.TomlSource(filename,default=False,base_for_paths=False,optional=False) as a ConfigSource. Read standard TOML including tables, arrays and dates; keep absolute filename and metadata. load() parses fully before replacing the same source dictionary, removes deleted keys, preserves last valid state on parse/read error and raises ConfigReadError. Optional missing files become empty, other failures remain errors. Configuration.reload must reload TOML and existing YAML without replacing source identities or disturbing in-memory sources. Do not alter YAML parsing.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

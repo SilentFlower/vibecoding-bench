@@ -1,0 +1,134 @@
+--- a/library/docs/development-html2text-o01-dev.md
++++ b/library/docs/development-html2text-o01-dev.md
+@@ -0,0 +1,5 @@
++# 以显式模式让真实行内代码动态定界且保留原始正文
++
++对应路线01：显式adaptive_inline_code缓冲真实code/kbd/tt，按最长反引号及CommonMark padding产生可还原跨度；实体/嵌套文字/EOF收口，默认及pre路径保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/html2text/__init__.py
++++ b/library/html2text/__init__.py
+@@ -116,6 +116,9 @@
+         self.pre_indent = ""
+         self.list_code_indent = ""
+         self.code = False
++        self.adaptive_inline_code = False
++        self._inline_code_parts = None
++        self._inline_code_depth = 0
+         self.quote = False
+         self.br_toggle = ""
+         self.lastWasNL = False
+@@ -161,6 +164,7 @@
+ 
+     def finish(self) -> str:
+         self.close()
++        self._finish_inline_code()
+ 
+         self.pbr()
+         self.o("", force="end")
+@@ -310,6 +314,12 @@
+             if self.tag_callback(self, tag, attrs, start) is True:
+                 return
+ 
++        if self._inline_code_parts is not None and tag not in ('code', 'kbd', 'tt'):
++            # 行内代码正文按文本处理，不能给其中的强调标签再生成Markdown标记。
++            if tag == 'br' and start:
++                self._inline_code_parts.append(' ')
++            return
++
+         # first thing inside the anchor tag is another tag
+         # that produces some output
+         if (
+@@ -474,8 +484,20 @@
+                 self.handle_emphasis(start, tag_style, parent_style)
+ 
+         if tag in ["kbd", "code", "tt"] and not self.pre:
+-            self.o("`")  # TODO: `` `this` ``
+-            self.code = not self.code
++            if self.adaptive_inline_code:
++                if start:
++                    if self._inline_code_parts is None:
++                        self._inline_code_parts = []
++                        self._inline_code_depth = 0
++                    self._inline_code_depth += 1
++                    self.code = True
++                elif self._inline_code_parts is not None:
++                    self._inline_code_depth -= 1
++                    if self._inline_code_depth <= 0:
++                        self._finish_inline_code()
++            else:
++                self.o("`")  # 原兼容模式保持单反引号。
++                self.code = not self.code
+ 
+         if tag == "abbr":
+             if start:
+@@ -869,12 +891,31 @@
+             self.out(data)
+             self.outcount += 1
+ 
++    def _finish_inline_code(self):
++        """结束单个行内代码缓冲，按真实CommonMark分隔规则输出。@return None。"""
++        if self._inline_code_parts is None:
++            return
++        text = ''.join(self._inline_code_parts).replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
++        self._inline_code_parts = None
++        self._inline_code_depth = 0
++        self.code = False
++        if not text:
++            return
++        width = 1 + max((len(match.group()) for match in re.finditer(r'`+', text)), default=0)
++        delimiter = '`' * width
++        # 首尾反引号以及非全空格正文的双端空格都需padding，渲染后才不会被语法吞掉。
++        padding = text.startswith('`') or text.endswith('`') or text.startswith(' ') and text.endswith(' ') and bool(text.strip(' '))
++        self.o(delimiter + (' ' if padding else '') + text + (' ' if padding else '') + delimiter)
++
+     def handle_data(self, data: str, entity_char: bool = False) -> None:
+         if not data:
+             # Data may be empty for some HTML entities. For example,
+             # LEFT-TO-RIGHT MARK.
+             return
+ 
++        if self._inline_code_parts is not None:
++            self._inline_code_parts.append(data)
++            return
+         if self.stressed:
+             data = data.strip()
+             self.stressed = False
+--- a/library/test/test_development_html2text_o01_dev.py
++++ b/library/test/test_development_html2text_o01_dev.py
+@@ -0,0 +1,35 @@
++"""显式动态行内代码模式产生可还原的真实代码跨度。"""
++from html2text import HTML2Text
++import re
++
++def convert(text):
++    """通过真实handle入口启用自适应代码。@return Markdown。"""
++    converter=HTML2Text(bodywidth=0);converter.adaptive_inline_code=True;return converter.handle(text).strip('\n')
++
++def decode_span(text):
++    """独立按CommonMark围栏宽度及padding规则还原跨度。@return 代码正文。"""
++    match=re.match(r'^(`+)(.*)\1$',text,re.S);assert match
++    body=match.group(2)
++    if body.startswith(' ') and body.endswith(' ') and body.strip(' '):body=body[1:-1]
++    assert max((len(value) for value in re.findall(r'`+',body)),default=0)<len(match.group(1))
++    return body
++
++def test_backtick_runs_edges_entities_and_padding_roundtrip():
++    """不是只检查反引号个数，独立解码后原文完整。@return None。"""
++    for text in ['a`b','``edge`','a```b','`',' both ','   ','plain']:
++        assert decode_span(convert('<code>'+text+'</code>'))==text
++    assert decode_span(convert('<kbd>&lt;a&gt;&amp;`</kbd>'))=='<a>&`'
++
++def test_nested_markup_multiple_spans_and_unclosed_eof_do_not_leak():
++    """嵌套标签只贡献正文，连续及EOF未闭合代码各自正确收口。@return None。"""
++    assert convert('<code>a<strong>b</strong>`c</code>')=='``ab`c``'
++    assert convert('<tt>a`b</tt> next <kbd>plain</kbd>')=='``a`b`` next `plain`'
++    converter=HTML2Text(bodywidth=0);converter.adaptive_inline_code=True
++    assert converter.handle('<code>unfinished`').strip('\n')=='`` unfinished` ``'
++    assert converter.handle('<p>next</p>').strip()=='next'
++
++def test_default_and_pre_behavior_remain_existing_paths():
++    """默认简单代码和pre路径保持，空代码不伪造不可解析空跨度。@return None。"""
++    assert HTML2Text(bodywidth=0).handle('<code>plain</code>').strip()=='`plain`'
++    assert convert('<code></code>')==''
++    assert '    a`b' in convert('<pre>a`b</pre>')

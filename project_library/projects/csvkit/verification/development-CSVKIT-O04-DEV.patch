@@ -1,0 +1,87 @@
+--- a/library/csvkit/utilities/csvslice.py
++++ b/library/csvkit/utilities/csvslice.py
+@@ -0,0 +1,46 @@
++"""按CSV逻辑记录切片，保留原生读取和写出选项。"""
++from collections import deque
++from itertools import islice
++import agate
++from csvkit.cli import CSVKitUtility
++
++
++class CSVSlice(CSVKitUtility):
++    """对逻辑数据记录切片；不按物理换行拆坏带引号字段。"""
++    description = '按逻辑CSV记录选择区间或有界末尾，不改变字段内容。'
++    override_flags = ['L', 'I']
++
++    def add_arguments(self):
++        """注册切片参数，沿用原通用CSV选项。@return None。"""
++        self.argparser.add_argument('--start', type=int, default=0)
++        self.argparser.add_argument('--stop', type=int)
++        self.argparser.add_argument('--step', type=int, default=1)
++        self.argparser.add_argument('--tail', type=int)
++        self.argparser.set_defaults(columns=None)
++
++    def main(self):
++        """输出一份表头及被选中的完整逻辑记录。@return None。"""
++        if self.args.start < 0 or (self.args.stop is not None and self.args.stop < 0) or self.args.step < 1 or (self.args.tail is not None and self.args.tail < 0):
++            self.argparser.error('start/stop/tail必须非负，step必须大于零')
++        if self.args.tail is not None and (self.args.start != 0 or self.args.stop is not None or self.args.step != 1):
++            self.argparser.error('tail不能与区间参数组合')
++        rows, names, columns = self.get_rows_and_column_names_and_column_ids(**self.reader_kwargs)
++        writer = agate.csv.writer(self.output_file, **self.writer_kwargs)
++        if names:
++            writer.writerow(names)
++        if self.args.tail is None:
++            selected = islice(rows, self.args.start, self.args.stop, self.args.step)
++        elif self.args.tail == 0:
++            selected = ()
++        else:
++            selected = deque(rows, maxlen=self.args.tail)
++        writer.writerows(selected)
++
++
++def launch_new_instance():
++    """作为模块启动真实CSVKitUtility。@return None。"""
++    CSVSlice().run()
++
++
++if __name__ == '__main__':
++    launch_new_instance()
+--- a/library/docs/development-csvkit-o04-dev.md
++++ b/library/docs/development-csvkit-o04-dev.md
+@@ -0,0 +1,5 @@
++# 按CSV逻辑记录切片并以有界队列取末尾
++
++对应路线10：真实utility复用公共reader/writer，普通区间惰性islice、末尾有界deque，始终以逻辑记录处理带引号换行及表头。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_csvkit_o04_dev.py
++++ b/library/tests/test_development_csvkit_o04_dev.py
+@@ -0,0 +1,27 @@
++"""逻辑记录切片真实处理字段内换行和单份表头。"""
++from io import StringIO
++import csv
++import pytest
++
++def run(tmp_path,text,args):
++    """调用真实utility处理临时输入。@return CSV行。"""
++    from csvkit.utilities.csvslice import CSVSlice
++    path=tmp_path/'input.csv';path.write_text(text);output=StringIO();CSVSlice([*args,str(path)],output_file=output).run()
++    return list(csv.reader(StringIO(output.getvalue())))
++
++def test_logical_multiline_slice_and_step(tmp_path):
++    """含换行记录不会拆开，区间是零基数据记录。@return None。"""
++    text='id,note\n1,"a\nb"\n2,c\n3,d\n4,e\n'
++    assert run(tmp_path,text,['--start','0','--stop','3','--step','2'])==[['id','note'],['1','a\nb'],['3','d']]
++
++def test_tail_zero_header_only_and_empty(tmp_path):
++    """tail有界且表头不重复，空输入不造表头。@return None。"""
++    assert run(tmp_path,'id\n1\n2\n3\n',['--tail','2'])==[['id'],['2'],['3']]
++    assert run(tmp_path,'id\n1\n',['--tail','0'])==[['id']]
++    assert run(tmp_path,'id\n',[])==[['id']] and run(tmp_path,'',[])==[]
++
++def test_invalid_modes_and_headerless(tmp_path):
++    """非法范围在输出前拒绝，无表头采用原默认命名。@return None。"""
++    for args in [['--step','0'],['--start','-1'],['--tail','2','--stop','3']]:
++        with pytest.raises(SystemExit):run(tmp_path,'a\n1\n',args)
++    assert run(tmp_path,'1,2\n3,4\n',['-H','--stop','1'])==[['a','b'],['1','2']]

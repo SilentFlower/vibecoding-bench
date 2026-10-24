@@ -1,0 +1,73 @@
+--- a/library/docs/development-tz-distinct-dev.md
++++ b/library/docs/development-tz-distinct-dev.md
+@@ -0,0 +1,5 @@
++# 让无长度可重读流单次扫描判重
++
++无长度但可重复读取的数据源走一次流式判重，发现重复立即停止，不能多次打开查询或读取故障尾部。具有真实长度实现的源保持快速路径及原异常，不能宽泛吞掉TypeError；不可哈希数据仍明确失败。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/toolz/itertoolz.py
++++ b/library/toolz/itertoolz.py
+@@ -297,10 +297,11 @@
+     >>> isdistinct("World")
+     True
+     """
+-    if iter(seq) is seq:
++    iterator = iter(seq)
++    if iterator is seq or getattr(type(seq), '__len__', None) is None:
+         seen = set()
+         seen_add = seen.add
+-        for item in seq:
++        for item in iterator:
+             if item in seen:
+                 return False
+             seen_add(item)
+--- a/library/toolz/tests/test_development_tz_distinct_dev.py
++++ b/library/toolz/tests/test_development_tz_distinct_dev.py
+@@ -0,0 +1,46 @@
++"""无长度可重读数据源应单次扫描判重。"""
++import pytest
++from toolz import isdistinct
++
++
++class Reiterable:
++    """不提供长度的可重复业务查询。"""
++    def __init__(self, values):
++        """保存数据。@param values 数据。@return None。"""
++        self.values = values
++        self.reads = 0
++    def __iter__(self):
++        """每次只返回一个流。@return 迭代器。"""
++        self.reads += 1
++        return iter(self.values)
++
++
++def test_reiterable_unique_and_duplicate():
++    """无长度源支持唯一和重复结果且不重读。@return None。"""
++    for values, expected in [([1, 2, 3], True), ([1, 2, 1], False), ([], True)]:
++        source = Reiterable(values)
++        assert isdistinct(source) is expected
++        assert source.reads == 1
++
++
++def test_short_circuit():
++    """发现首个重复后不访问故障尾部。@return None。"""
++    class Stream:
++        """包含不可达故障尾部的数据源。"""
++        def __iter__(self):
++            """产生两个重复值。@return 迭代器。"""
++            yield 1
++            yield 1
++            raise RuntimeError('must not read')
++    assert isdistinct(Stream()) is False
++
++
++def test_real_length_error_propagates():
++    """真实长度实现错误不被当作缺少长度。@return None。"""
++    class Broken(Reiterable):
++        """具有故障长度函数的数据源。"""
++        def __len__(self):
++            """失败。@return 不返回。"""
++            raise TypeError('length body')
++    with pytest.raises(TypeError, match='length body'):
++        isdistinct(Broken([1]))

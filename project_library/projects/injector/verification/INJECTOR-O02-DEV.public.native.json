@@ -1,0 +1,14 @@
+{
+  "script": "verification/INJECTOR-O02-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_injector_o02_dev.py"
+}

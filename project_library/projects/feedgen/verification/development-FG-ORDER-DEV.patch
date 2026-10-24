@@ -1,0 +1,84 @@
+--- a/library/development_tests/test_development_fg_order_dev.py
++++ b/library/development_tests/test_development_fg_order_dev.py
+@@ -0,0 +1,30 @@
++"""公开订阅历史排序回归。"""
++from datetime import datetime,timezone,timedelta
++import pytest
++from feedgen.feed import FeedGenerator
++from feedgen.ordering import sorted_feed
++
++def make():
++    feed=FeedGenerator();feed.title('Test')
++    for identity,stamp in [('a','2026-01-01T08:00:00+08:00'),('b','2026-01-01T00:00:00+00:00'),('c','2026-01-02T00:00:00+00:00')]:
++        entry=feed.add_entry(order='append');entry.id(identity);entry.title(identity);entry.published(stamp)
++    return feed
++
++def test_actual_instants_and_stable_ties_preserve_original():
++    feed=make();result=sorted_feed(feed,by='published')
++    assert [entry.id() for entry in result.entry()]==['c','a','b'] and [entry.id() for entry in feed.entry()]==['a','b','c']
++
++def test_snapshot_content_and_metadata_are_independent():
++    feed=make();result=sorted_feed(feed);result.title('Changed');result.entry()[0].title('Changed')
++    assert feed.title()=='Test' and all(entry.title()!='Changed' for entry in feed.entry())
++
++def test_missing_dates_and_limit_zero_are_explicit():
++    feed=make();entry=feed.add_entry(order='append');entry.id('missing')
++    assert sorted_feed(feed,by='published',missing='first').entry()[0].id()=='missing'
++    assert sorted_feed(feed,limit=0).entry()==[]
++    with pytest.raises(ValueError): sorted_feed(feed,by='published',missing='error')
++
++def test_since_is_inclusive_and_rejects_naive_boundary():
++    feed=make();result=sorted_feed(feed,by='published',since=datetime(2026,1,2,tzinfo=timezone.utc))
++    assert [entry.id() for entry in result.entry()]==['c']
++    with pytest.raises(ValueError): sorted_feed(feed,since=datetime(2026,1,1))
+--- a/library/docs/development-fg-order-dev.md
++++ b/library/docs/development-fg-order-dev.md
+@@ -0,0 +1,5 @@
++# 按带时区时间稳定排序并生成独立订阅快照
++
++按真实时刻而非时间字符串排序，时刻相同保持原序。缺失时间位置、含边界过滤和数量限制明确，返回保留元数据与扩展的独立快照，原订阅和条目不受后续修改影响。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/feedgen/ordering.py
++++ b/library/feedgen/ordering.py
+@@ -0,0 +1,40 @@
++"""按真实带时区时间生成独立排序订阅快照。"""
++from copy import deepcopy
++from datetime import datetime,timezone
++from .feed import FeedGenerator
++
++
++def copy_feed(feed,entries):
++    """复制元数据与指定条目。@param feed 真实订阅。@param entries 所选条目。
++    @return 独立订阅快照，扩展沿用真实深拷贝。
++    """
++    result=deepcopy(feed);result.entry(deepcopy(list(entries)),replace=True)
++    return result
++
++
++def sorted_feed(feed,*,by='updated',reverse=True,missing='last',since=None,limit=None):
++    """排序过滤并捕获独立订阅。@param feed 真实订阅。@param by updated或published。
++    @param reverse 是否最新优先。@param missing first/last/error。@param since 含边界的带时区时间。
++    @param limit 非负记录上限。@return 保持同刻原顺序的独立FeedGenerator。
++    """
++    if not isinstance(feed,FeedGenerator) or by not in ('updated','published') or type(reverse) is not bool or missing not in ('first','last','error') or (limit is not None and (type(limit) is not int or limit<0)):
++        raise ValueError('无效订阅排序策略')
++    if since is not None and (not isinstance(since,datetime) or since.utcoffset() is None):
++        raise ValueError('过滤边界必须带时区')
++    dated=[];absent=[]
++    for item in feed.entry():
++        value=getattr(item,by)()
++        if value is None:
++            if missing=='error':
++                raise ValueError('条目缺少排序时间')
++            if since is None:
++                absent.append(item)
++        else:
++            if not isinstance(value,datetime) or value.utcoffset() is None:
++                raise ValueError('条目时间必须带时区')
++            if since is None or value>=since:
++                dated.append((value.astimezone(timezone.utc),item))
++    dated.sort(key=lambda row:row[0],reverse=reverse)
++    entries=[item for _,item in dated]
++    entries=absent+entries if missing=='first' else entries+absent
++    return copy_feed(feed,entries if limit is None else entries[:limit])

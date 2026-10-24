@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "RICH-04-DEV",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Rich ANSI decoding by removing only the designated ignorable C0 characters already stripped from plain Text (NUL..BS, VT/FF, SO..SUB, FS..US) before recognizing escape sequences; preserve TAB/LF/CR handling. SGR sequences with such bytes after ESC or within parameters decode into actual styles. Unrecognized/truncated sequences never leave a raw ESC in emitted plain fragments; unsupported suffix text may remain literal. Preserve standard SGR/OSC8-ST links, colors and decoder style state. Document this limited parser policy rather than claim a complete arbitrary terminal-protocol sanitizer; do not reinterpret or execute terminal controls beyond existing supported sequences.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

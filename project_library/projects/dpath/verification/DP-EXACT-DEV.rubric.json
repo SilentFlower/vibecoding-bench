@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DP-EXACT-DEV",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement dpath.exact.get_exact(root,segments,default=marker). Paths are finite component iterables, never plain strings; mapping keys retain actual hashable types and punctuation, list indices are nonnegative int excluding bool. Empty path returns root identity. Missing key/index returns an explicit default or raises original error, while invalid traversal/type errors propagate. Do not interpret glob characters, coerce \"1\" to integer, trigger defaultdict creation, or mutate input; preserve old dpath.get.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TQDM-02-DEV",
+  "source_commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair tqdm.cli.posix_pipe to combine retained tail with each bounded read before delimiter scanning. Handle delimiters split at every byte position, multiple/consecutive delimiters, delimiter-at-EOF, incomplete delimiter suffix and undelimited final record. Forward every original byte exactly once, preserve byte-count mode for delim=b\"\", record-count mode and full-record callback mode used by numeric --update. Reject nonpositive/noninteger buffer size and nonbytes delimiter. Keep caller stream ownership/flush behavior; incomplete records may require record-sized carry memory, not falsely constant memory. Do not decode or execute input records in the generic pipe helper.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

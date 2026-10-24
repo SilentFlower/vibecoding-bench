@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CH-FORMULA-DEV",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add spreadsheet_formula_policy(data,headers,formula_policy=\"preserve\",**kwargs) preprocessor. Treat string cells/headers whose leading-whitespace-trimmed text begins =,+,-,@ as formula-like. Preserve default; escape prefixes one apostrophe to the exact original string; error raises with only one-based data row/column (header row zero), without exposing contents. Keep numeric negatives/nonstrings unchanged, operate lazily without mutating inputs and integrate through real CSV formatter preprocessors. Per-call policy must not leak to subsequent exports. Do not claim sanitization for every spreadsheet engine or rollback lines already consumed before a later error.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

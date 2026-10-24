@@ -1,0 +1,14 @@
+{
+  "script": "verification/CK-STABLE-WRITE-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library/src",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_ck_stable_write_dev.py"
+}

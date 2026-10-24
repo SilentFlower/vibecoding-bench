@@ -1,0 +1,52 @@
+--- a/library/docs/development-python-dateutil-05-dev.md
++++ b/library/docs/development-python-dateutil-05-dev.md
+@@ -0,0 +1,5 @@
++# VTIMEZONE安全忽略X扩展且保留必需字段严格校验
++
++路线06：VTIMEZONE及子组件X扩展仅元信息忽略，参数/大小写/重复不执行；真实offset不变，必需字段、非X未知属性及组件结构仍严格。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/dateutil/tz/tz.py
++++ b/library/src/dateutil/tz/tz.py
+@@ -895,7 +895,8 @@
+                             raise ValueError(
+                                 "unsupported TZNAME parm: "+parms[0])
+                         tzname = value
+-                    elif name == "COMMENT":
++                    elif name == "COMMENT" or name.startswith("X-"):
++                        # X扩展仅作为不执行的元信息忽略，必需字段仍严格验证。
+                         pass
+                     else:
+                         raise ValueError("unsupported property: "+name)
+@@ -905,7 +906,7 @@
+                             raise ValueError(
+                                 "unsupported TZID parm: "+parms[0])
+                         tzid = value
+-                    elif name in ("TZURL", "LAST-MODIFIED", "COMMENT"):
++                    elif name in ("TZURL", "LAST-MODIFIED", "COMMENT") or name.startswith("X-"):
+                         pass
+                     else:
+                         raise ValueError("unsupported property: "+name)
+--- a/library/tests/test_development_python_dateutil_05_dev.py
++++ b/library/tests/test_development_python_dateutil_05_dev.py
+@@ -0,0 +1,20 @@
++"""VTIMEZONE允许X扩展但仍拒绝未知标准字段和缺失必需项。"""
++from datetime import datetime,timedelta
++from io import StringIO
++import unittest
++from dateutil.tz import tzical
++
++BASE='BEGIN:VTIMEZONE\nTZID:Office\n{outer}BEGIN:STANDARD\nDTSTART:20200101T000000\nTZOFFSETFROM:+0300\nTZOFFSETTO:+0300\n{inner}END:STANDARD\nEND:VTIMEZONE'
++
++def test_x_extensions_in_both_component_levels_do_not_change_offsets():
++    """扩展含参数/重复/大小写只作为元信息，不执行内容。@return None。"""
++    for outer,inner in (('',''),('X-LIC-LOCATION:Europe/Office\n','X-CUSTOM;LANG=en:a\nx-custom:b\n')):
++        zone=tzical(StringIO(BASE.format(outer=outer,inner=inner))).get('Office')
++        assert datetime(2024,6,1,tzinfo=zone).utcoffset()==timedelta(hours=3)
++
++def test_unknown_standard_and_required_field_errors_remain():
++    """不能因为忽略X扩展就忽略所有未知属性或必需值。@return None。"""
++    text=BASE.format(outer='UNKNOWN:value\n',inner='')
++    with unittest.TestCase().assertRaises(ValueError):tzical(StringIO(text))
++    text=BASE.format(outer='X-HINT:data\n',inner='').replace('TZID:Office\n','')
++    with unittest.TestCase().assertRaises(ValueError):tzical(StringIO(text))

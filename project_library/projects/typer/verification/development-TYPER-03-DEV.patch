@@ -1,0 +1,57 @@
+--- a/app/development_tests/test_development_typer_03_dev.py
++++ b/app/development_tests/test_development_typer_03_dev.py
+@@ -0,0 +1,22 @@
++"""真实调账CLI在新清单中只改变目标sku。"""
++import json,tempfile
++from pathlib import Path
++from typer.testing import CliRunner
++import shop
++
++def test_positive_negative_zero_and_non_target_record_preserved():
++    """明确delta为零也是一次合法业务请求。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'source';initial=[{'sku':'a','name':'茶','quantity':5},{'sku':'b','name':'Milk','quantity':2}];source.write_text(json.dumps(initial));before=source.read_bytes()
++        for delta in (3,-5,0):
++            out=base/str(delta);result=CliRunner().invoke(shop.app,['adjust',str(source),'--sku','a',f'--delta={delta}','--output',str(out)])
++            assert result.exit_code==0;values=json.loads(out.read_text());assert values[0]['quantity']==5+delta and values[1]==initial[1]
++            assert json.loads(result.stdout)['after']==5+delta and source.read_bytes()==before
++
++def test_insufficient_unknown_invalid_catalog_and_existing_output_refuse():
++    """任何失败不交付部分清单，已有目的文件保持。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'source';source.write_text('[{"sku":"a","name":"A","quantity":1}]');out=base/'out';runner=CliRunner()
++        for sku,delta in (('a',-2),('missing',1)):
++            assert runner.invoke(shop.app,['adjust',str(source),'--sku',sku,f'--delta={delta}','--output',str(out)]).exit_code!=0 and not out.exists()
++        out.write_text('keep');assert runner.invoke(shop.app,['adjust',str(source),'--sku','a','--delta=1','--output',str(out)]).exit_code!=0 and out.read_text()=='keep'
+--- a/app/docs/development-typer-03-dev.md
++++ b/app/docs/development-typer-03-dev.md
+@@ -0,0 +1,5 @@
++# 商品库存调账按明确SKU生成新清单并拒绝负库存或未知商品
++
++完整调账业务按已存在sku和有符号delta生成独立新清单，正负零变化/库存下限/未知商品明确；其他商品/原文件保持，成功后给前后量凭据，失败不写半成品或覆盖。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/app/inventory_adjust.py
++++ b/app/inventory_adjust.py
+@@ -0,0 +1,21 @@
++"""库存调账生成完整新清单，原账面文件只读。"""
++import json
++from pathlib import Path
++from typing import Annotated
++import typer
++from inventory_store import load,save_catalog
++
++def register(app):
++    """注册adjust命令。@param app 既有应用。@return None。"""
++    @app.command('adjust')
++    def adjust(source:Path,sku:Annotated[str,typer.Option('--sku')],delta:Annotated[int,typer.Option('--delta')],output:Annotated[Path,typer.Option('--output')]):
++        """按指定sku调账。@param source 原清单。@param sku 存在商品。@param delta 有符号整数变化。@param output 新清单。@return None，低于零/未知sku/坏清单不交付。"""
++        try:
++            values=load(source);item=next((item for item in values if item['sku']==sku),None)
++            if item is None:raise ValueError('未知sku')
++            before=item['quantity'];after=before+delta
++            if after<0:raise ValueError('库存不能小于零')
++            item['quantity']=after;save_catalog(output,values,inputs=(source,))
++        except (OSError,UnicodeError,ValueError) as error:
++            typer.echo('调账失败：'+str(error),err=True);raise typer.Exit(1) from error
++        typer.echo(json.dumps({'sku':sku,'before':before,'delta':delta,'after':after},ensure_ascii=False))

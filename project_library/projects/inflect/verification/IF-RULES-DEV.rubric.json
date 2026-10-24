@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "IF-RULES-DEV",
+  "source_commit": "99596854bd296af1557db2015cfa98c8104ec155",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement inflect.rules.define_nouns(engine,rules) using the completed independent engine clone. Each rule mapping has singular/plural and optional case, no unknown keys. Use real defnoun validation and precedence including regex/case policies; later valid rules override as normal. Validate and apply the entire iterable on a clone before committing any state to the original. Invalid pattern, case, rule shape or generator exception leaves all original state unchanged. Return accepted count and retain unrelated custom verbs/articles/options. Do not parse or execute rule text as Python.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

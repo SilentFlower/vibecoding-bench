@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-PPTX-01-DEV",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair RGBColor.from_string to accept exactly six ASCII hexadecimal characters, case-insensitive, otherwise clear ValueError including wrong type. Preserve legal channel values and six-character uppercase serialization; reject 5/7 length, whitespace, #/0x, Unicode digit lookalikes and nonhex. No CSS shorthand support or changes to RGBColor numeric constructor.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,202 @@
+--- a/library/docs/development-jsonschema-o05-dev.md
++++ b/library/docs/development-jsonschema-o05-dev.md
+@@ -0,0 +1,5 @@
++# 一次收集真实独立验证错误并对无限错误源明确截断
++
++对应路线11：生成validator及protocol新增validate_all，真实错误保留路径/身份并组成支持except*的组；最多limit+1判断截断、关闭生成器，编程/解析错误不伪装实例错误。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/jsonschema/exceptions.py
++++ b/library/jsonschema/exceptions.py
+@@ -572,3 +572,29 @@
+         ):
+             best_key, best = error_key, error
+     return best_key, best
++
++
++class ValidationErrorGroup(ExceptionGroup):
++    """一批真实实例错误及明确的收集截断标记。
++
++    :param errors: 非空ValidationError列表。
++    :param truncated: 是否至少还有一个未收入的错误。
++    :param limit: 本次配置的最大错误数。
++    :return: 支持except*派生的异常组。
++    """
++    def __new__(cls, errors, *, truncated=False, limit=100):
++        """创建真实ExceptionGroup。@return 异常组。"""
++        result = super().__new__(cls, 'JSON Schema实例验证失败', errors)
++        result.truncated = truncated
++        result.limit = limit
++        return result
++
++    def __init__(self, errors, *, truncated=False, limit=100):
++        """初始化由__new__创建的有界异常组。@return None。"""
++        super().__init__('JSON Schema实例验证失败', errors)
++
++    def derive(self, errors):
++        """except*分组保留收集元数据。@param errors 剩余错误。@return 派生组。"""
++        return type(self)(errors, truncated=self.truncated, limit=self.limit)
++
++
+--- a/library/jsonschema/protocols.py
++++ b/library/jsonschema/protocols.py
+@@ -213,6 +213,9 @@
+ 
+         """
+ 
++    def validate_all(self, instance: Any, *, max_errors: int = 100) -> None:
++        """有界收集实例错误。@param instance 实例。@param max_errors 正整数上限。@return 无错误时None，否则ValidationErrorGroup。"""
++
+     def evolve(self, **kwargs) -> Self:
+         """
+         Create a new validator like this one, but with given changes.
+--- a/library/jsonschema/validators.py
++++ b/library/jsonschema/validators.py
+@@ -383,18 +383,23 @@
+ 
+             for validator, k, v in validators:
+                 errors = validator(self, v, instance, _schema) or ()
+-                for error in errors:
+-                    # set details if not already set by the called fn
+-                    error._set(
+-                        validator=k,
+-                        validator_value=v,
+-                        instance=instance,
+-                        schema=_schema,
+-                        type_checker=self.TYPE_CHECKER,
+-                    )
+-                    if k not in {"if", "$ref"}:
+-                        error.schema_path.appendleft(k)
+-                    yield error
++                try:
++                    for error in errors:
++                        # set details if not already set by the called fn
++                        error._set(
++                            validator=k,
++                            validator_value=v,
++                            instance=instance,
++                            schema=_schema,
++                            type_checker=self.TYPE_CHECKER,
++                        )
++                        if k not in {"if", "$ref"}:
++                            error.schema_path.appendleft(k)
++                        yield error
++                finally:
++                    close = getattr(errors, 'close', None)
++                    if callable(close):
++                        close()
+ 
+         def descend(
+             self,
+@@ -433,26 +438,56 @@
+                     continue
+ 
+                 errors = validator(evolved, v, instance, schema) or ()
+-                for error in errors:
+-                    # set details if not already set by the called fn
+-                    error._set(
+-                        validator=k,
+-                        validator_value=v,
+-                        instance=instance,
+-                        schema=schema,
+-                        type_checker=evolved.TYPE_CHECKER,
+-                    )
+-                    if k not in {"if", "$ref"}:
+-                        error.schema_path.appendleft(k)
+-                    if path is not None:
+-                        error.path.appendleft(path)
+-                    if schema_path is not None:
+-                        error.schema_path.appendleft(schema_path)
+-                    yield error
++                try:
++                    for error in errors:
++                        # set details if not already set by the called fn
++                        error._set(
++                            validator=k,
++                            validator_value=v,
++                            instance=instance,
++                            schema=schema,
++                            type_checker=evolved.TYPE_CHECKER,
++                        )
++                        if k not in {"if", "$ref"}:
++                            error.schema_path.appendleft(k)
++                        if path is not None:
++                            error.path.appendleft(path)
++                        if schema_path is not None:
++                            error.schema_path.appendleft(schema_path)
++                        yield error
++                finally:
++                    close = getattr(errors, 'close', None)
++                    if callable(close):
++                        close()
+ 
+         def validate(self, *args, **kwargs):
+             for error in self.iter_errors(*args, **kwargs):
+                 raise error
++
++        def validate_all(self, instance, *, max_errors=100):
++            """有界收集真实iter_errors并一次抛出全部已收集错误。
++
++            :param instance: 待验证实例。
++            :param max_errors: 正整数上限，额外最多读取一个错误确定截断。
++            :return: 有效时None，否则抛ValidationErrorGroup，异常/取消会关闭生成器。
++            """
++            if isinstance(max_errors, bool) or not isinstance(max_errors, int) or max_errors < 1:
++                raise ValueError('max_errors必须为正整数')
++            iterator = iter(self.iter_errors(instance))
++            collected = []
++            truncated = False
++            try:
++                for error in iterator:
++                    if len(collected) == max_errors:
++                        truncated = True
++                        break
++                    collected.append(error)
++            finally:
++                close = getattr(iterator, 'close', None)
++                if callable(close):
++                    close()
++            if collected:
++                raise exceptions.ValidationErrorGroup(collected, truncated=truncated, limit=max_errors)
+ 
+         def is_type(self, instance, type):
+             try:
+--- a/library/tests/test_development_jsonschema_o05_dev.py
++++ b/library/tests/test_development_jsonschema_o05_dev.py
+@@ -0,0 +1,36 @@
++"""一次抛出全部独立错误，且对无限错误源保持真实上限。"""
++from jsonschema import Draft202012Validator,validators
++from jsonschema.exceptions import ValidationError
++import pytest
++
++def test_real_independent_field_errors_are_one_exception_group():
++    """保留每个原始ValidationError路径，正常实例返回None。@return None。"""
++    from jsonschema.exceptions import ValidationErrorGroup
++    validator=Draft202012Validator({'properties':{'a':{'type':'integer'},'b':{'type':'string'}}})
++    with pytest.raises(ValidationErrorGroup) as caught:validator.validate_all({'a':'bad','b':2})
++    group=caught.value;assert len(group.exceptions)==2 and all(isinstance(error,ValidationError) for error in group.exceptions)
++    assert {tuple(error.path) for error in group.exceptions}=={('a',),('b',)} and not group.truncated and group.limit==100
++    assert validator.validate_all({'a':1,'b':'ok'}) is None
++    derived=group.subgroup(ValidationError);assert derived.limit==100 and not derived.truncated
++
++def test_limit_reads_at_most_one_lookahead_and_closes_real_generator():
++    """自定义关键字无限流只消费limit+1，finally真实执行。@return None。"""
++    from jsonschema.exceptions import ValidationErrorGroup
++    counts={'yielded':0,'closed':False}
++    def endless(validator,value,instance,schema):
++        try:
++            while True:counts['yielded']+=1;yield ValidationError('item')
++        finally:counts['closed']=True
++    cls=validators.extend(Draft202012Validator,{'endless':endless})
++    with pytest.raises(ValidationErrorGroup) as caught:cls({'endless':True}).validate_all(1,max_errors=3)
++    assert len(caught.value.exceptions)==3 and caught.value.truncated and caught.value.limit==3
++    assert counts=={'yielded':4,'closed':True}
++
++def test_invalid_limits_and_programming_errors_are_not_instance_groups():
++    """无效预算立即拒绝，关键字自身故障不能包装成校验失败。@return None。"""
++    validator=Draft202012Validator({})
++    for limit in [0,-1,True,1.5]:
++        with pytest.raises(ValueError):validator.validate_all(1,max_errors=limit)
++    def broken(validator,value,instance,schema):raise RuntimeError('keyword failed');yield
++    cls=validators.extend(Draft202012Validator,{'broken':broken})
++    with pytest.raises(RuntimeError):cls({'broken':True}).validate_all(1)

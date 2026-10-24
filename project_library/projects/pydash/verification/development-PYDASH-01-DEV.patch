@@ -1,0 +1,56 @@
+--- a/library/docs/development-pydash-01-dev.md
++++ b/library/docs/development-pydash-01-dev.md
+@@ -0,0 +1,5 @@
++# 单界随机数以零为起点且兼容显式边界和链式调用
++
++路线01：区分省略start/stop与显式零，单界由零起，双界、反序、floating和链式语义保持。用底层精确边界而非随机概率验收。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pydash/utilities.py
++++ b/library/src/pydash/utilities.py
+@@ -957,7 +957,7 @@
+ ) -> float: ...
+ 
+ 
+-def random(start: t.Union[float, int] = 0, stop: t.Union[float, int] = 1, floating: bool = False):
++def random(start=UNSET, stop=UNSET, floating: bool = False):
+     """
+     Produces a random number between `start` and `stop` (inclusive). If only one argument is
+     provided a number between 0 and the given number will be returned. If floating is truthy or
+@@ -984,6 +984,13 @@
+ 
+     .. versionadded:: 1.0.0
+     """
++    # 省略stop与显式stop=1不同；无参数仍使用0..1。
++    if start is UNSET:
++        start = 0
++        if stop is UNSET:
++            stop = 1
++    elif stop is UNSET:
++        start, stop = 0, start
+     floating = isinstance(start, float) or isinstance(stop, float) or floating is True
+ 
+     if stop < start:
+--- a/library/tests/test_development_pydash_01_dev.py
++++ b/library/tests/test_development_pydash_01_dev.py
+@@ -0,0 +1,20 @@
++"""通过实际底层边界验证随机数入口，禁止概率性验收。"""
++from unittest.mock import patch
++import pydash
++
++def test_single_bound_positive_negative_zero_float_and_chain():
++    """单界以零为另一端，链式复用真实入口。@return None。"""
++    for bound,expected in ((5,(0,5)),(-3,(-3,0)),(0,(0,0))):
++        with patch('pydash.utilities.randint',return_value=9) as draw:
++            assert pydash.random(bound)==9;draw.assert_called_once_with(*expected)
++    with patch('pydash.utilities.uniform',return_value=0.2) as draw:
++        assert pydash.chain(0.5).random().value()==0.2;draw.assert_called_once_with(0,0.5)
++
++def test_no_argument_keyword_stop_and_explicit_reverse_bounds():
++    """无参和关键字调用不能被单界修复破坏。@return None。"""
++    with patch('pydash.utilities.randint',return_value=0) as draw:
++        pydash.random();draw.assert_called_once_with(0,1)
++    with patch('pydash.utilities.randint',return_value=0) as draw:
++        pydash.random(stop=7);draw.assert_called_once_with(0,7)
++    with patch('pydash.utilities.randint',return_value=0) as draw:
++        pydash.random(8,1);draw.assert_called_once_with(1,8)

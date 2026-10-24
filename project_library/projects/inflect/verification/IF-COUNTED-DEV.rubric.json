@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "IF-COUNTED-DEV",
+  "source_commit": "99596854bd296af1557db2015cfa98c8104ec155",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement inflect.counted.counted(engine,noun,count,*,words=False,zero=\"0\",separator=\" \"). Require nonempty noun and nonnegative integer count (bool rejected), real plural_noun with explicit count and cloned current custom rules/classical options. Support custom zero label, number_to_words and separator. Persistent count, number spelling scratch state and user rules of original engine remain unchanged on success or failure. Zero grammatical form follows actual current classical mode; do not hardcode English singular/plural suffixes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,59 @@
+--- a/library/docs/development-mistletoe-02-dev.md
++++ b/library/docs/development-mistletoe-02-dev.md
+@@ -0,0 +1,5 @@
++# 基础渲染器安全输出叶节点与真实换行
++
++路线02：基础文本渲染器不再对无子节点叶子抛TypeError；有内容叶子保留内容，换行输出换行，子类覆写和错误传播保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/mistletoe/base_renderer.py
++++ b/library/mistletoe/base_renderer.py
+@@ -107,6 +107,8 @@
+         Arguments:
+             token: a branch node who has children attribute.
+         """
++        if token.children is None:
++            return getattr(token, 'content', '')
+         return ''.join(map(self.render, token.children))
+ 
+     def __enter__(self):
+@@ -169,7 +171,7 @@
+         return self.render_inner(token)
+ 
+     def render_line_break(self, token: span_token.LineBreak) -> str:
+-        return self.render_inner(token)
++        return '\n'
+ 
+     def render_heading(self, token: block_token.Heading) -> str:
+         return self.render_inner(token)
+--- a/library/tests/test_development_mistletoe_02_dev.py
++++ b/library/tests/test_development_mistletoe_02_dev.py
+@@ -0,0 +1,28 @@
++"""基础渲染器具备可预测的叶节点文本语义。"""
++from mistletoe import Document
++from mistletoe.base_renderer import BaseRenderer
++
++
++def test_soft_and_hard_line_breaks():
++    """普通换行与硬换行保留文本分隔。@return None。"""
++    with BaseRenderer() as renderer:
++        assert renderer.render(Document('alpha\nbeta'))=='alpha\nbeta'
++        assert renderer.render(Document('alpha  \nbeta'))=='alpha\nbeta'
++
++
++def test_leaf_and_code_values():
++    """分隔线安全为空，代码内容不会因缺子节点被吞。@return None。"""
++    with BaseRenderer() as renderer:
++        assert renderer.render(Document('---\n'))==''
++        assert 'code' in renderer.render(Document('```\ncode\n```'))
++
++
++def test_subclass_override_is_respected():
++    """子类对分隔行为的决定优先。@return None。"""
++    class Renderer(BaseRenderer):
++        """为当前业务使用竖线分隔。"""
++        def render_line_break(self, token):
++            """提供业务分隔符。@param token 节点。@return 分隔符。"""
++            return '|'
++    with Renderer() as renderer:
++        assert renderer.render(Document('a\nb'))=='a|b'

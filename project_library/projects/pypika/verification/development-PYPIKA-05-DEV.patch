@@ -1,0 +1,55 @@
+--- a/library/docs/development-pypika-05-dev.md
++++ b/library/docs/development-pypika-05-dev.md
+@@ -0,0 +1,5 @@
++# 嵌套函数与聚合过滤共享真实参数绑定上下文
++
++路线07：parameter等序列化上下文进入每个函数参数，统一嵌套with_alias/subquery；聚合FILTER和WHERE保持真实遍历顺序，SQLite实际绑定执行。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pypika/terms.py
++++ b/library/pypika/terms.py
+@@ -1457,7 +1457,7 @@
+             name=self.name,
+             args=",".join(
+                 (
+-                    p.get_sql(with_alias=False, subquery=True, **kwargs)
++                    p.get_sql(**dict(kwargs, with_alias=False, subquery=True))
+                     if hasattr(p, "get_sql")
+                     else self.get_arg_sql(p, **kwargs)
+                 )
+@@ -1473,7 +1473,8 @@
+         dialect = kwargs.pop("dialect", None)
+ 
+         # FIXME escape
+-        function_sql = self.get_function_sql(with_namespace=with_namespace, quote_char=quote_char, dialect=dialect)
++        # parameter等调用级上下文进入每个嵌套参数，不能退回字面值拼接。
++        function_sql = self.get_function_sql(with_namespace=with_namespace, quote_char=quote_char, dialect=dialect, **kwargs)
+ 
+         if self.schema is not None:
+             function_sql = "{schema}.{function}".format(
+--- a/library/tests/test_development_pypika_05_dev.py
++++ b/library/tests/test_development_pypika_05_dev.py
+@@ -0,0 +1,23 @@
++"""函数共享真实参数绑定上下文，嵌套不重复关键字。"""
++import sqlite3
++from pypika import Query,Table,QmarkParameter,NamedParameter
++from pypika.terms import Function
++from pypika.functions import Coalesce,Sum
++
++def test_nested_functions_execute_with_ordered_real_bindings():
++    """真实执行参数列表，而不是只断言问号。@return None。"""
++    parameter=QmarkParameter();query=Query.select(Coalesce(Function('ABS',-8),3).as_('value'))
++    sql=query.get_sql(parameter=parameter)
++    assert sql=='SELECT COALESCE(ABS(?),?) "value"' and parameter.get_parameters()==[-8,3]
++    with sqlite3.connect(':memory:') as connection:
++        assert connection.execute(sql,parameter.get_parameters()).fetchone()==(8,)
++
++def test_aggregate_filter_where_and_named_share_context():
++    """聚合、过滤和WHERE按真实遍历顺序绑定。@return None。"""
++    table=Table('items');parameter=QmarkParameter()
++    query=Query.from_(table).select(Sum(Coalesce(table.value,5)).filter(table.kind=='live')).where(table.id>9)
++    sql=query.get_sql(parameter=parameter)
++    assert 'COALESCE("value",?)' in sql and 'FILTER(WHERE "kind"=?)' in sql
++    assert parameter.get_parameters()==[5,'live',9]
++    parameter=NamedParameter();sql=Query.select(Function('LOWER','ABC')).get_sql(parameter=parameter)
++    assert 'ABC' not in sql and list(parameter.get_parameters().values())==['ABC']

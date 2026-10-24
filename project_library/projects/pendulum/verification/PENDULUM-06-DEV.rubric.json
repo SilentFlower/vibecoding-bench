@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PENDULUM-06-DEV",
+  "source_commit": "e06dacedc4cdea90fa1286b3965d180ab94cf251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add pendulum.business.BusinessCalendar immutable caller-supplied date holidays and weekday weekend policy, no downloads. Provide is_business_day, signed add_business_days, next_business_day(include_current=False), and signed half-open count. Zero addition preserves identity, nonbusiness starts count following eligible days, negatives reverse, Pendulum Date/DateTime use calendar-day add preserving type/timezone/wall clock. Freeze mutable inputs, reject all-seven weekend/invalid weekdays or datetime holiday objects. Existing ordinary date add remains unchanged; finite local synthetic dates only.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

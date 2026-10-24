@@ -1,0 +1,76 @@
+--- a/library/docs/development-pt-coalesce-dev.md
++++ b/library/docs/development-pt-coalesce-dev.md
+@@ -0,0 +1,5 @@
++# 按业务容差合并区间并报告填补空隙
++
++coalesce按显式非负容差填补相邻片段间空隙，可传业务距离函数并报告真实新增的区间。支持数值、Decimal及日期时长、零宽缺失单点和空集；原对象及精确集合代数不变。负容差、NaN和负距离拒绝，回调错误不吞掉。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/portion/interval.py
++++ b/library/portion/interval.py
+@@ -308,6 +308,35 @@
+                 raise TypeError(f"Unsupported return type {type(value)} for {value}")
+ 
+         return self.__class__(*intervals)
++
++    def coalesce(self, max_gap, metric=None, *, report=False):
++        """按显式容差近似填补空隙，精确集合代数保持不变。
++
++        :param max_gap: 非负距离容差，支持日期时长。
++        :param metric: 可选的两端点距离函数，默认后端点减前端点。
++        :param report: 是否同时返回被填补的真实空隙。
++        :return: 同类近似区间，或(区间, 空隙tuple)。
++        """
++        zero = max_gap - max_gap
++        if not max_gap >= zero:
++            raise ValueError('合并容差必须非负且不是NaN')
++        if metric is None:
++            metric = lambda lower, upper: upper - lower
++        pieces, gaps = [], []
++        for atomic in self:
++            if pieces:
++                previous = pieces[-1]
++                distance = metric(previous.upper, atomic.lower)
++                if distance < zero:
++                    raise ValueError('距离函数不可返回负值')
++                if distance <= max_gap:
++                    combined = self.__class__.from_atomic(previous.left, previous.lower, atomic.upper, atomic.right)
++                    gaps.extend(combined - (previous | atomic))
++                    pieces[-1] = combined
++                    continue
++            pieces.append(atomic)
++        result = self.__class__(*pieces)
++        return (result, tuple(gaps)) if report else result
+ 
+     def adjacent(self, other):
+         """
+--- a/library/tests/test_development_pt_coalesce_dev.py
++++ b/library/tests/test_development_pt_coalesce_dev.py
+@@ -0,0 +1,27 @@
++"""近似合并显式报告新增集合元素。"""
++from datetime import date, timedelta
++import pytest
++import portion as P
++
++
++def test_bridge_and_gap_report():
++    """小空隙填补且返回真实开区间缺口。@return None。"""
++    source = P.closed(1, 2) | P.closed(2.1, 3)
++    result, gaps = source.coalesce(0.2, report=True)
++    assert result == P.closed(1, 3)
++    assert gaps == (P.open(2, 2.1),)
++    assert len(source) == 2
++
++
++def test_open_single_point_gap():
++    """零距离也可填补两侧都开放造成的缺失单点。@return None。"""
++    result, gaps = (P.open(0, 1) | P.open(1, 2)).coalesce(0, report=True)
++    assert result == P.open(0, 2) and gaps == (P.singleton(1),)
++
++
++def test_date_metric_and_negative():
++    """日期时长及非法容差明确。@return None。"""
++    source = P.closed(date(2026, 1, 1), date(2026, 1, 2)) | P.closed(date(2026, 1, 4), date(2026, 1, 5))
++    assert len(source.coalesce(timedelta(days=2))) == 1
++    with pytest.raises(ValueError):
++        source.coalesce(timedelta(days=-1))

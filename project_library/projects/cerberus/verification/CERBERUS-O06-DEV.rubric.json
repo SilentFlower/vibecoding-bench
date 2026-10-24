@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CERBERUS-O06-DEV",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Build cerberus.stream.iter_validated on the delivered validate_result API. Consume one record at a time with independent Validator/schema/options, yield one-based index and independent complete results, and expose continue/stop/raise policies including safe ValidationStreamError. Treat nonmapping DocumentError records as failed results, allow custom validator factories, exact max_records without lookahead, zero consumption and early close. Preserve normal custom exceptions and never materialize the entire input stream or share mutable per-record defaults.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

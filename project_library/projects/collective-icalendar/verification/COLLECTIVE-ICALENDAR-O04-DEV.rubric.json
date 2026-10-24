@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "COLLECTIVE-ICALENDAR-O04-DEV",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement icalendar.todo_transition.transition_todo for actual Todo objects with complete/reopen/cancel actions, returning an isolated same-class copy. Completion requires an explicit aware timestamp normalized to UTC and 100 percent; reopen clears COMPLETED and uses 0..99 progress/NEEDS-ACTION or IN-PROCESS; cancel clears completion and uses CANCELLED/zero. Validate progress and timestamps before publication, preserve UID/start/due and by-default SEQUENCE/DTSTAMP, offer explicit sequence bump/stamp, and never read a wall clock or send invitations.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

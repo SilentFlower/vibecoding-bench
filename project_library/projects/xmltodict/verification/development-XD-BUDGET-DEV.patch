@@ -1,0 +1,90 @@
+--- a/library/development_tests/test_development_xd_budget_dev.py
++++ b/library/development_tests/test_development_xd_budget_dev.py
+@@ -0,0 +1,28 @@
++"""公开XML读取预算回归。"""
++import pytest
++import xmltodict
++
++def test_depth_and_element_boundaries_are_exact():
++    assert xmltodict.parse('<a><b/></a>',max_depth=2,max_elements=2)=={'a':{'b':None}}
++    for options in ({'max_depth':1},{'max_elements':1}):
++        with pytest.raises(xmltodict.XMLLimitError):
++            xmltodict.parse('<a><b/></a>',**options)
++
++def test_decoded_text_counts_unicode_and_whitespace():
++    assert xmltodict.parse('<a>雪 花</a>',max_text_chars=3)=={'a':'雪 花'}
++    with pytest.raises(xmltodict.XMLLimitError):
++        xmltodict.parse('<a>雪 花</a>',max_text_chars=2)
++
++def test_streaming_mode_cannot_reset_whole_document_budget():
++    seen=[]
++    with pytest.raises(xmltodict.XMLLimitError):
++        xmltodict.parse('<r><a>1</a><a>2</a></r>',item_depth=2,item_callback=lambda path,item:not seen.append(item),max_elements=2)
++    assert seen==['1']
++
++def test_invalid_limit_does_not_consume_input():
++    def input_data():
++        raise AssertionError('不应读取')
++        yield b''
++    for value in (-1,True,1.5):
++        with pytest.raises(ValueError):
++            xmltodict.parse(input_data(),max_depth=value)
+--- a/library/docs/development-xd-budget-dev.md
++++ b/library/docs/development-xd-budget-dev.md
+@@ -0,0 +1,5 @@
++# 在XML构造期间执行深度、元素及文本预算
++
++外部订单XML在解析过程中执行资源预算，根深度计1、元素及解码文本按整份输入累计。在超限节点构建或文本追加前终止，流式模式也不能绕过；默认行为和实体禁用保持不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/xmltodict.py
++++ b/library/xmltodict.py
+@@ -10,6 +10,10 @@
+ 
+ class ParsingInterrupted(Exception):
+     pass
++
++
++class XMLLimitError(ValueError):
++    """XML解析在构造超预算节点前终止。"""
+ 
+ 
+ class _DictSAXHandler:
+@@ -29,7 +33,15 @@
+         namespaces=None,
+         force_list=None,
+         comment_key="#comment",
++        max_depth=None,
++        max_elements=None,
++        max_text_chars=None,
+     ):
++        for limit in (max_depth,max_elements,max_text_chars):
++            if limit is not None and (type(limit) is not int or limit<0):
++                raise ValueError('XML预算必须为非负整数或None')
++        self._max_depth,self._max_elements,self._max_text_chars=max_depth,max_elements,max_text_chars
++        self._elements_seen,self._text_chars_seen=0,0
+         self.path = []
+         self.stack = []
+         self.data = []
+@@ -75,6 +87,11 @@
+         self.namespace_declarations[prefix or ''] = uri
+ 
+     def startElement(self, full_name, attrs):
++        self._elements_seen+=1
++        if self._max_depth is not None and len(self.path)+1>self._max_depth:
++            raise XMLLimitError('超过XML深度预算')
++        if self._max_elements is not None and self._elements_seen>self._max_elements:
++            raise XMLLimitError('超过XML元素预算')
+         name = self._build_name(full_name)
+         attrs = self._attrs_to_dict(attrs)
+         if self.namespace_declarations:
+@@ -153,6 +170,9 @@
+         self.path.pop()
+ 
+     def characters(self, data):
++        self._text_chars_seen+=len(data)
++        if self._max_text_chars is not None and self._text_chars_seen>self._max_text_chars:
++            raise XMLLimitError('超过XML文本预算')
+         if not self.data:
+             self.data = [data]
+         else:

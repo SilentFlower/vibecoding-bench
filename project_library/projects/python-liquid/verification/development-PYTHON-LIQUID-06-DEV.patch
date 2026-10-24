@@ -1,0 +1,80 @@
+--- a/library/docs/development-python-liquid-06-dev.md
++++ b/library/docs/development-python-liquid-06-dev.md
+@@ -0,0 +1,5 @@
++# 本地模板项目命令从真实JSON生成原子报告并保留失败前结果
++
++路线20：本地python -m liquid.project_cli显式模板根/入口/JSON/输出，真实严格渲染后同目录fsync+replace原子交付；失败保旧输出、清临时、拒覆盖输入/模板根及路径逃逸，不暴露数据错误内容。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/liquid/project_cli.py
++++ b/library/liquid/project_cli.py
+@@ -0,0 +1,40 @@
++"""本地模板项目命令，实际渲染且通过同目录原子替换交付输出。"""
++import argparse
++import json
++import os
++import sys
++import tempfile
++from pathlib import Path
++from .environment import Environment
++from .builtin.loaders.file_system_loader import FileSystemLoader
++from .undefined import StrictUndefined
++
++def main(argv=None):
++    """执行本地render命令。@param argv 明确参数或None。@return 0成功/2失败，不写半成品或覆盖源模板/数据。"""
++    parser=argparse.ArgumentParser(prog='liquid-project')
++    parser.add_argument('--root',required=True,type=Path);parser.add_argument('--template',required=True)
++    parser.add_argument('--data',required=True,type=Path);parser.add_argument('--output',required=True,type=Path)
++    args=parser.parse_args(argv);temporary=None
++    try:
++        root=args.root.resolve(strict=True);data_path=args.data.resolve(strict=True);output=args.output.resolve()
++        if not root.is_dir():raise ValueError('模板根不是目录')
++        name=Path(args.template)
++        if name.is_absolute() or '..' in name.parts:raise ValueError('模板名不能逃逸根目录')
++        source=(root/name).resolve(strict=True)
++        if not source.is_relative_to(root) or not source.is_file():raise ValueError('模板来源无效')
++        if output==data_path or output.is_relative_to(root):raise ValueError('输出不能覆盖数据或模板根内文件')
++        data=json.loads(data_path.read_text(encoding='utf-8'))
++        if not isinstance(data,dict):raise ValueError('JSON数据根必须为object')
++        env=Environment(loader=FileSystemLoader(root),undefined=StrictUndefined)
++        rendered=env.get_template(args.template).render(data)
++        # 先完成全部渲染，再同目录fsync+replace；失败清理临时文件，原输出保持。
++        descriptor,temporary=tempfile.mkstemp(prefix='.liquid-',dir=output.parent)
++        with os.fdopen(descriptor,'w',encoding='utf-8',newline='') as target:
++            target.write(rendered);target.flush();os.fsync(target.fileno())
++        os.replace(temporary,output);temporary=None;return 0
++    except Exception as error:
++        print(json.dumps({'status':'failed','error':type(error).__name__}),file=sys.stderr);return 2
++    finally:
++        if temporary is not None:Path(temporary).unlink(missing_ok=True)
++
++if __name__=='__main__':raise SystemExit(main())
+--- a/library/tests/test_development_python_liquid_06_dev.py
++++ b/library/tests/test_development_python_liquid_06_dev.py
+@@ -0,0 +1,26 @@
++"""本地项目命令交付真实文件，错误不破坏旧输出或源数据。"""
++import json
++import tempfile
++from pathlib import Path
++from liquid.project_cli import main
++
++def test_render_include_unicode_and_empty_output_are_real_files():
++    """使用实际FileSystemLoader和JSON而非命令假实现。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);root=base/'templates';root.mkdir()
++        (root/'report').write_text('Hi {% render "row", name: user %}',encoding='utf-8');(root/'row').write_text('{{name}}',encoding='utf-8')
++        data=base/'data.json';data.write_text(json.dumps({'user':'茶'}));out=base/'report.txt'
++        argv=['--root',str(root),'--template','report','--data',str(data),'--output',str(out)]
++        assert main(argv)==0 and out.read_text()=='Hi 茶'
++        (root/'report').write_text('');assert main(argv)==0 and out.read_bytes()==b''
++
++def test_invalid_data_strict_missing_path_escape_and_source_collision_preserve_old():
++    """失败前后旧输出、数据、模板保持；无残留临时文件。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);root=base/'templates';root.mkdir();template=root/'report';template.write_text('{{missing}}')
++        data=base/'data.json';data.write_text('{}');out=base/'result';out.write_text('old')
++        argv=['--root',str(root),'--template','report','--data',str(data),'--output',str(out)]
++        assert main(argv)==2 and out.read_text()=='old'
++        data.write_text('[]');assert main(argv)==2 and out.read_text()=='old'
++        data.write_text('{}');assert main(argv[:-1]+[str(template)])==2 and template.read_text()=='{{missing}}'
++        assert not list(base.glob('.liquid-*'))

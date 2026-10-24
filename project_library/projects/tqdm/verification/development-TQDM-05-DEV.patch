@@ -1,0 +1,76 @@
+--- a/library/docs/development-tqdm-05-dev.md
++++ b/library/docs/development-tqdm-05-dev.md
+@@ -0,0 +1,5 @@
++# 并发进度锁上下文在异常与嵌套退出后精确恢复
++
++路线14：ensure_lock用finally覆盖创建、选择和上下文异常，恢复原锁身份及自有/继承/缺失/明确None的属性所有权，嵌套逐层恢复，真实worker异常不遗留临时锁。只修生命周期，不宣称并发类配置隔离。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_tqdm_05_dev.py
++++ b/library/tests/test_development_tqdm_05_dev.py
+@@ -0,0 +1,35 @@
++"""并发进度锁借用结束后即使失败也恢复原本作用域。"""
++import threading
++import unittest
++from tqdm import tqdm
++from tqdm.contrib.concurrent import ensure_lock,thread_map
++
++
++def test_exception_and_nested_lock_context_restore_exact_identity():
++    """异常展开和嵌套上下文逐层恢复。@return None。"""
++    class Local(tqdm):
++        """独立控制类避免影响全局测试进度。"""
++    original=threading.RLock();temporary=threading.RLock();inner=threading.RLock();Local.set_lock(original)
++    with unittest.TestCase().assertRaises(ValueError):
++        with ensure_lock(Local,lock=temporary):
++            assert Local.get_lock() is temporary
++            with ensure_lock(Local,lock=inner):assert Local.get_lock() is inner
++            assert Local.get_lock() is temporary
++            raise ValueError('worker failed')
++    assert Local.get_lock() is original
++
++
++def test_inherited_absent_and_real_worker_failure_cleanup():
++    """原无自有锁时清除临时属性，真实thread_map异常仍恢复。@return None。"""
++    class Local(tqdm):
++        """继承而非持有自己的锁。"""
++    parent=tqdm.get_lock();assert Local.get_lock() is parent
++    assert '_lock' not in Local.__dict__
++    with unittest.TestCase().assertRaises(RuntimeError):
++        with ensure_lock(Local,lock=threading.RLock()):raise RuntimeError('body')
++    assert '_lock' not in Local.__dict__ and Local.get_lock() is parent
++    def broken(value):
++        """真实线程池任务失败。@param value 输入。@return 不返回。"""
++        raise RuntimeError('worker')
++    with unittest.TestCase().assertRaises(RuntimeError):thread_map(broken,[1],max_workers=1,tqdm_class=Local,disable=True)
++    assert '_lock' not in Local.__dict__ and Local.get_lock() is parent
+--- a/library/tqdm/contrib/concurrent.py
++++ b/library/tqdm/contrib/concurrent.py
+@@ -71,16 +71,17 @@
+ @contextmanager
+ def ensure_lock(tqdm_class, lock_name="", lock=None):
+     """get (create if necessary) and then restore `tqdm_class`'s lock"""
+-    old_lock = getattr(tqdm_class, '_lock', None)  # don't create a new lock
+-    if lock is None:
+-        lock = old_lock or tqdm_class.get_lock()  # maybe create a new lock
+-    lock = getattr(lock, lock_name, lock)  # maybe subtype
+-    tqdm_class.set_lock(lock)
+-    yield lock
+-    if old_lock is None:
+-        del tqdm_class._lock
+-    else:
+-        tqdm_class.set_lock(old_lock)
++    had_own_lock='_lock' in tqdm_class.__dict__
++    old_lock=getattr(tqdm_class,'_lock',None)
++    try:
++        if lock is None:lock=old_lock or tqdm_class.get_lock()
++        lock=getattr(lock,lock_name,lock)
++        tqdm_class.set_lock(lock)
++        yield lock
++    finally:
++        # 异常和嵌套退出都恢复原本属性所有权，不能把继承锁永久写到子类。
++        if had_own_lock:tqdm_class.set_lock(old_lock)
++        elif '_lock' in tqdm_class.__dict__:del tqdm_class._lock
+ 
+ 
+ def _get_interpreter_init(tqdm_class, lock_queue_id):

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AN-EVENTS-DEV",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add exported EventIter following AbstractIter constructor conventions. Yield (event, actual_node, depth) with event enter/leave and zero-based root depth. A complete traversal pairs visible nodes exactly once, preserves child order, uses an explicit stack, and supports deep trees without changing recursion limits. filter_ hides only that node events, stop prunes the subtree, and maxlevel=1 includes only the root (nonpositive levels yield none). Evaluate visibility once per visited node. A partially consumed iterator promises only its actual prefix, not invented closing events. Preserve existing iterators.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

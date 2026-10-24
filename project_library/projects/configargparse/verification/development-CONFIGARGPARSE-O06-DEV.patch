@@ -1,0 +1,115 @@
+--- a/library/configargparse.py
++++ b/library/configargparse.py
+@@ -412,6 +412,76 @@
+         """写出可重读的扁平JSON对象，不改调用者对象。@return JSON文本。"""
+         self.parse(StringIO(json.dumps(items, allow_nan=False)))
+         return json.dumps(items, ensure_ascii=False, allow_nan=False) + '\n'
++
++
++class MappedJSONConfigFileParser(JSONConfigFileParser):
++    """把明确的JSON键路径映射为现有参数名，不隐式拆点。
++
++    :param paths: 由非空字符串元组到扁平配置键的映射。
++    :param unknown: error或ignore，控制未映射叶值。
++    :param duplicates: 沿用严格JSON重复键政策。
++    :return: 继承JSON真实解码与标量转换的解析器。
++    """
++
++    def __init__(self, paths, *, unknown='error', duplicates='error'):
++        """冻结明确映射并拒绝重复目标与前缀冲突。@return None。"""
++        super().__init__(duplicates=duplicates)
++        if unknown not in ('error', 'ignore'):
++            raise ValueError('未知叶值政策错误')
++        self.unknown = unknown
++        self.paths = dict(paths)
++        destinations = set()
++        for path, destination in self.paths.items():
++            if not isinstance(path, tuple) or not path or any(not isinstance(part, str) or not part for part in path):
++                raise ValueError('键路径必须为非空字符串元组')
++            if not isinstance(destination, str) or not destination or destination in destinations:
++                raise ValueError('目标配置键必须非空且唯一')
++            destinations.add(destination)
++        paths = list(self.paths)
++        if any(left != right and right[:len(left)] == left for left in paths for right in paths):
++            raise ValueError('映射不能同时指向对象与其子路径')
++
++    def parse(self, stream):
++        """按字面键路径提取值，标量仍交给真实Action转换。@return 有序扁平映射。"""
++        source = self._load_object(stream)
++        result = OrderedDict()
++        used = set()
++        for path, destination in self.paths.items():
++            current = source
++            for part in path:
++                if not isinstance(current, dict):
++                    raise ConfigFileParserException('映射路径中的对象被标量替代')
++                if part not in current:
++                    break
++                current = current[part]
++            else:
++                result[destination] = self.convert_value(current)
++                used.add(path)
++        def inspect(value, path):
++            if path in used:
++                return
++            if isinstance(value, dict) and value:
++                for key, child in value.items():
++                    inspect(child, path + (key,))
++            elif self.unknown == 'error' and path:
++                raise ConfigFileParserException('存在未映射JSON键路径：%s' % (path,))
++        inspect(source, ())
++        return result
++
++    def serialize(self, items):
++        """按反向映射构造嵌套对象，拒绝未知扁平键。@return JSON文本。"""
++        reverse = {destination: path for path, destination in self.paths.items()}
++        result = {}
++        for key, value in items.items():
++            if key not in reverse:
++                raise ConfigFileParserException('输出含未映射字段')
++            self.convert_value(value)
++            current = result
++            path = reverse[key]
++            for part in path[:-1]:
++                current = current.setdefault(part, {})
++            current[path[-1]] = value
++        return json.dumps(result, ensure_ascii=False, allow_nan=False) + '\n'
+ 
+ 
+ class YAMLConfigFileParser(ConfigFileParser):
+--- a/library/docs/development-configargparse-o06-dev.md
++++ b/library/docs/development-configargparse-o06-dev.md
+@@ -0,0 +1,5 @@
++# 把明确JSON层级映射为真实参数命名空间
++
++对应路线12，依赖路线06已交付JSON真实解码：用显式元组路径映射命名空间，字面点键与层级不混淆；冲突、未知值和类型受控，能反向写回嵌套JSON。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_configargparse_o06_dev.py
++++ b/library/tests/test_development_configargparse_o06_dev.py
+@@ -0,0 +1,25 @@
++"""明确键路径映射避免点键歧义并走真实参数类型。"""
++from io import StringIO
++import pytest
++import configargparse as c
++
++def test_nested_and_literal_dotted_key_real_actions():
++    """嵌套路径和字面点键是不同字段。@return None。"""
++    cls=c.MappedJSONConfigFileParser({('server','port'):'server-port',('server.port',):'literal'})
++    p=c.ArgumentParser(config_file_parser_class=cls);p.add('--server-port',type=int);p.add('--literal')
++    ns=p.parse_args([],config_file_contents='{"server":{"port":42},"server.port":"kept"}',env_vars={})
++    assert ns.server_port==42 and ns.literal=='kept'
++
++def test_unknown_and_conflicting_paths():
++    """未知、标量替代对象和映射冲突不能静默丢值。@return None。"""
++    p=c.MappedJSONConfigFileParser({('a','b'):'x'})
++    for text in ['{"a":1}','{"a":{"b":2,"c":3}}']:
++        with pytest.raises(c.ConfigFileParserException):p.parse(StringIO(text))
++    with pytest.raises(ValueError):c.MappedJSONConfigFileParser({('a',):'x',('a','b'):'y'})
++    with pytest.raises(ValueError):c.MappedJSONConfigFileParser({('a',):'x',('b',):'x'})
++
++def test_lists_roundtrip_and_explicit_ignore():
++    """平面列表可往返，忽略未知必须声明。@return None。"""
++    p=c.MappedJSONConfigFileParser({('group','tags'):'tags'},unknown='ignore')
++    assert p.parse(StringIO('{"group":{"tags":["a","b"]},"other":1}'))=={'tags':['a','b']}
++    assert p.parse(StringIO(p.serialize({'tags':['x','y']})))=={'tags':['x','y']}

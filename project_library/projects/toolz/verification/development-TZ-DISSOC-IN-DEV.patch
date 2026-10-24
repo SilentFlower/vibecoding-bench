@@ -1,0 +1,111 @@
+--- a/library/docs/development-tz-dissoc-in-dev.md
++++ b/library/docs/development-tz-dissoc-in-dev.md
+@@ -0,0 +1,5 @@
++# 交付不可变嵌套映射删除与路径策略
++
++新增dissoc_in，只复制受影响映射路径并删除叶子，未修改分支保留引用。默认保留空父节点、忽略缺失但返回根副本；strict和prune显式启用。支持一次性键路径、工厂和三个冻结环境导出入口；不修改既有顶层删除或更新语义。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/toolz/curried/__init__.py
++++ b/library/toolz/curried/__init__.py
+@@ -61,6 +61,7 @@
+ cons = toolz.curry(toolz.cons)
+ countby = toolz.curry(toolz.countby)
+ dissoc = toolz.curry(toolz.dissoc)
++dissoc_in = toolz.curry(toolz.dissoc_in)
+ do = toolz.curry(toolz.do)
+ drop = toolz.curry(toolz.drop)
+ excepts = toolz.curry(toolz.excepts)
+--- a/library/toolz/dicttoolz.py
++++ b/library/toolz/dicttoolz.py
+@@ -5,7 +5,7 @@
+ 
+ __all__ = ('merge', 'merge_with', 'valmap', 'keymap', 'itemmap',
+            'valfilter', 'keyfilter', 'itemfilter',
+-           'assoc', 'dissoc', 'assoc_in', 'update_in', 'get_in')
++           'assoc', 'dissoc', 'dissoc_in', 'assoc_in', 'update_in', 'get_in')
+ 
+ 
+ def _get_factory(f, kwargs):
+@@ -337,3 +337,45 @@
+         if no_default:
+             raise
+         return default
++
++
++def dissoc_in(d, keys, factory=dict, *, strict=False, prune=False):
++    """复制受影响路径并删除嵌套叶子，不修改业务输入。
++
++    :param d: 原映射。
++    :param keys: 一次性或可重用的非空键路径。
++    :param factory: 各受影响分支的空映射工厂。
++    :param strict: 缺失路径是否抛KeyError。
++    :param prune: 是否逐级移除删除后为空的父映射。
++    :return: 新根映射，未修改分支保持引用。
++    """
++    path = tuple(keys)
++    if not path:
++        raise ValueError('删除路径不可为空')
++    parents = []
++    current = d
++    for index, key in enumerate(path):
++        if not isinstance(current, Mapping):
++            raise TypeError('删除路径的中间值必须为映射')
++        if key not in current:
++            if strict:
++                raise KeyError(path)
++            result = factory()
++            result.update(d)
++            return result
++        if index == len(path) - 1:
++            result = factory()
++            result.update(current)
++            del result[key]
++        else:
++            parents.append((current, key))
++            current = current[key]
++    for parent, key in reversed(parents):
++        copied = factory()
++        copied.update(parent)
++        if prune and not result:
++            del copied[key]
++        else:
++            copied[key] = result
++        result = copied
++    return result
+--- a/library/toolz/tests/test_development_tz_dissoc_in_dev.py
++++ b/library/toolz/tests/test_development_tz_dissoc_in_dev.py
+@@ -0,0 +1,33 @@
++"""嵌套删除仅复制修改路径并支持严格和清理政策。"""
++from collections import OrderedDict
++import pytest
++from toolz import dissoc_in
++from toolz.curried import dissoc_in as curried
++
++
++def test_delete_and_share_untouched():
++    """叶子删除保持兄弟和未修改分支引用。@return None。"""
++    original = {'account': {'secret': 1, 'name': 'x'}, 'other': {'value': 2}}
++    result = dissoc_in(original, ['account', 'secret'])
++    assert result == {'account': {'name': 'x'}, 'other': {'value': 2}}
++    assert original['account']['secret'] == 1
++    assert result['other'] is original['other']
++    assert result['account'] is not original['account']
++
++
++def test_missing_prune_and_factory():
++    """缺失路径、父节点清理和映射工厂均显式。@return None。"""
++    assert dissoc_in({'a': {'b': 1}}, ['a', 'b']) == {'a': {}}
++    assert dissoc_in({'a': {'b': 1}}, ['a', 'b'], prune=True) == {}
++    with pytest.raises(KeyError):
++        dissoc_in({}, ['a'], strict=True)
++    assert isinstance(dissoc_in({'a': 1}, ['a'], factory=OrderedDict), OrderedDict)
++
++
++def test_curried_and_invalid_paths():
++    """导出可组合，空路径和标量祖先不静默处理。@return None。"""
++    assert curried({'a': 1})(['a']) == {}
++    with pytest.raises(ValueError):
++        dissoc_in({}, [])
++    with pytest.raises(TypeError):
++        dissoc_in({'a': 1}, ['a', 'b'])

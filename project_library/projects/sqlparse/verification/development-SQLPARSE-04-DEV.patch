@@ -1,0 +1,56 @@
+--- a/library/docs/development-sqlparse-04-dev.md
++++ b/library/docs/development-sqlparse-04-dev.md
+@@ -0,0 +1,5 @@
++# 本地报表查询按非执行型形状指纹分组且保留业务身份边界
++
++路线14：查询指纹按真实token类型清普通注释/间隔、规范关键字并替换字面量，保留标识符、占位符、操作及IN列表长度；可返回稳定摘要。字符串内注释符不误删，只用于形状统计，不宣称语义相等或生成可执行参数化SQL。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/sqlparse/fingerprint.py
++++ b/library/sqlparse/fingerprint.py
+@@ -0,0 +1,21 @@
++"""仅用于本地统计分组的查询形状指纹，不生成可执行参数化SQL。"""
++import hashlib
++from .lexer import tokenize
++from . import tokens as T
++
++
++def fingerprint(text,encoding=None,digest=False,replace_constants=True):
++    """规范关键字/间隔并替换字面量，保留身份和占位符。@param text SQL文本。@param encoding 原编码。@param digest 是否SHA256。@param replace_constants 是否替换NULL/布尔。@return 规范字符串或摘要。"""
++    if type(digest) is not bool or type(replace_constants) is not bool:raise ValueError('政策必须为bool')
++    pieces=[]
++    for kind,value in tokenize(text,encoding):
++        if kind in T.Comment or kind in T.Whitespace:continue
++        if kind in T.Literal.Number or kind in T.Literal.String.Single or kind is T.Literal:
++            pieces.append('?')
++        elif replace_constants and kind in T.Keyword and value.upper() in ('NULL','TRUE','FALSE'):
++            pieces.append('?')
++        elif kind in T.Keyword:
++            pieces.append(' '.join(value.upper().split()))
++        else:pieces.append(value)
++    normalized=' '.join(pieces)
++    return hashlib.sha256(normalized.encode('utf-8')).hexdigest() if digest else normalized
+--- a/library/tests/test_development_sqlparse_04_dev.py
++++ b/library/tests/test_development_sqlparse_04_dev.py
+@@ -0,0 +1,21 @@
++"""查询形状忽略业务字面量而保留表名、操作和真实占位符。"""
++from sqlparse.fingerprint import fingerprint
++
++
++def test_literal_comment_and_keyword_normalization():
++    """不同值与注释得到同形状，字符串内注释符不是注释。@return None。"""
++    a="select * from products where id=-1 and label='-- secret'; -- tail"
++    b="SELECT * FROM products WHERE id=99 AND label='other';"
++    assert fingerprint(a)==fingerprint(b)
++    assert 'secret' not in fingerprint(a) and '99' not in fingerprint(b)
++    assert fingerprint('select $$raw ; -- content$$')==fingerprint("select 'different'")
++
++
++def test_identity_quoted_names_placeholders_and_list_cardinality_remain():
++    """形状等同不冒称SQL语义相等，列表长度政策明确保留。@return None。"""
++    assert fingerprint('select * from a')!=fingerprint('select * from b')
++    assert fingerprint('select "Sensitive.Name" from t')!='SELECT ? FROM t'
++    assert ':value' in fingerprint('select :value from t')
++    assert fingerprint('select x from t where x in (1,2)')!=fingerprint('select x from t where x in (1)')
++    assert fingerprint('select null,true')==fingerprint('select false,null')
++    assert fingerprint('select true',replace_constants=False)=='SELECT TRUE'

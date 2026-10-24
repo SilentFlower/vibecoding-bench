@@ -1,0 +1,85 @@
+--- a/library/docs/development-mistletoe-01-dev.md
++++ b/library/docs/development-mistletoe-01-dev.md
+@@ -0,0 +1,5 @@
++# 标题节点保存独立原始内容并保持AST导出兼容
++
++路线01：将解析器临时状态与实例原内容分开；连续文档、多级标题、空标题、闭合井号和实例赋值均正确。原有AST、repr及HTML结构保持兼容。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/mistletoe/block_token.py
++++ b/library/mistletoe/block_token.py
+@@ -172,11 +172,22 @@
+     repr_attributes = BlockToken.repr_attributes + ("level",)
+     pattern = re.compile(r' {0,3}(#{1,6})(?:\n|\s+?(.*?)(\n|\s+?#+\s*?$))')
+     level = 0
+-    content = ''
++    _parse_content = ''
+ 
+     def __init__(self, match):
+         self.level, content, self.closing_sequence = match
++        self._raw_content = content
+         super().__init__(content, span_token.tokenize_inner)
++
++    @property
++    def content(self):
++        """返回本标题的原始内容，不受后续解析影响。@return 标题源内容。"""
++        return self._raw_content
++
++    @content.setter
++    def content(self, value):
++        """允许调用方更新本实例源内容。@param value 新内容。@return None。"""
++        self._raw_content = value
+ 
+     @classmethod
+     def start(cls, line):
+@@ -184,9 +195,9 @@
+         if match_obj is None:
+             return False
+         cls.level = len(match_obj.group(1))
+-        cls.content = (match_obj.group(2) or '').strip()
+-        if set(cls.content) == {'#'}:
+-            cls.content = ''
++        cls._parse_content = (match_obj.group(2) or '').strip()
++        if set(cls._parse_content) == {'#'}:
++            cls._parse_content = ''
+         cls.closing_sequence = (match_obj.group(3) or '').strip()
+         return True
+ 
+@@ -197,7 +208,7 @@
+     @classmethod
+     def read(cls, lines):
+         next(lines)
+-        return cls.level, cls.content, cls.closing_sequence
++        return cls.level, cls._parse_content, cls.closing_sequence
+ 
+ 
+ class SetextHeading(BlockToken):
+--- a/library/tests/test_development_mistletoe_01_dev.py
++++ b/library/tests/test_development_mistletoe_01_dev.py
+@@ -0,0 +1,26 @@
++"""标题内容属于自身实例，现有AST及repr结构兼容。"""
++from mistletoe import Document
++from mistletoe.ast_renderer import get_ast
++
++
++def test_multiple_and_later_documents():
++    """后续标题和文档不可回写已有节点。@return None。"""
++    first=Document('# First\n## *Second*\n### Third ###\n')
++    assert [h.content for h in first.children]==['First','*Second*','Third']
++    Document('# Later\n')
++    assert [h.content for h in first.children]==['First','*Second*','Third']
++
++
++def test_empty_and_mutable_instance():
++    """空标题与显式实例修改均不污染其它标题。@return None。"""
++    doc=Document('#\n## Content\n')
++    assert doc.children[0].content==''
++    doc.children[0].content='manual'
++    assert doc.children[1].content=='Content'
++
++
++def test_ast_and_repr_remain_compatible():
++    """修复不扩张原有Heading序列化字段。@return None。"""
++    heading=Document('# Actual\n').children[0]
++    assert 'content' not in get_ast(heading)
++    assert 'with 1 child line_number=1 level=1' in repr(heading)

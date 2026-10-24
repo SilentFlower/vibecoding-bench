@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BO-TIMESTAMP-DEV",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix timeutils.dt_to_timestamp to classify awareness by tzinfo is not None and dt.utcoffset() is not None, rather than tzinfo truthiness. Falsey tzinfo with a real offset must convert correctly; tzinfo objects returning None are naive and retain the existing implied-UTC convention. Preserve negative epochs, fractional seconds, fold-specific offsets and original offset errors; do not silently use host local timezone or alter datetime objects.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

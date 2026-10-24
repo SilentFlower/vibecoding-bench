@@ -1,0 +1,91 @@
+--- a/library/docs/development-pyparsing-04-dev.md
++++ b/library/docs/development-pyparsing-04-dev.md
+@@ -0,0 +1,5 @@
++# 真实命名解析结果映射嵌套数据类且错误定位到字段
++
++路线12：命名ParseResults按显式数据类映射，嵌套/list/可选/default_factory保类型；缺失/额外/类型错误定位路径，不隐式构造任意类型或把bool当int，原结果不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyparsing/dataclass_results.py
++++ b/library/pyparsing/dataclass_results.py
+@@ -0,0 +1,44 @@
++"""显式将命名解析结果映射到数据类，不隐式执行任意字段转换。"""
++from collections.abc import Mapping
++from dataclasses import MISSING,fields,is_dataclass
++from types import UnionType
++from typing import get_args,get_origin,get_type_hints,Union
++from .results import ParseResults
++
++class ResultMappingError(ValueError):
++    """携带字段路径的映射错误。@param path 结构路径。@param message 原因。"""
++    def __init__(self,path,message):super().__init__(f'{path}: {message}');self.path=path
++
++def to_dataclass(results,model,*,strict=True):
++    """显式构造数据类。@param results ParseResults或Mapping。@param model 数据类类型。@param strict 是否拒绝额外命名字段。@return 嵌套数据类实例，类型不符带字段路径报错。"""
++    if not isinstance(model,type) or not is_dataclass(model):raise TypeError('model必须为数据类类型')
++    def convert(value,annotation,path,depth):
++        if depth>64:raise ResultMappingError(path,'嵌套深度超过64')
++        origin=get_origin(annotation);args=get_args(annotation)
++        if origin in (Union,UnionType):
++            for item in args:
++                try:return convert(value,item,path,depth+1)
++                except ResultMappingError:pass
++            raise ResultMappingError(path,'不匹配声明的联合类型')
++        if annotation is type(None):
++            if value is None:return None
++            raise ResultMappingError(path,'需要None')
++        if origin is list:
++            if isinstance(value,ParseResults):value=value.as_list()
++            if not isinstance(value,list):raise ResultMappingError(path,'需要列表')
++            return [convert(item,args[0],f'{path}[{index}]',depth+1) for index,item in enumerate(value)]
++        if isinstance(annotation,type) and is_dataclass(annotation):
++            if isinstance(value,ParseResults):value=value.as_dict()
++            if not isinstance(value,Mapping):raise ResultMappingError(path,'需要命名字段映射')
++            declared={item.name:item for item in fields(annotation) if item.init};hints=get_type_hints(annotation)
++            extra=set(value)-set(declared)
++            if strict and extra:raise ResultMappingError(path+'.'+sorted(extra)[0],'额外字段')
++            converted={}
++            for name,item in declared.items():
++                if name in value:converted[name]=convert(value[name],hints[name],path+'.'+name,depth+1)
++                elif item.default is MISSING and item.default_factory is MISSING:raise ResultMappingError(path+'.'+name,'缺少必填字段')
++            return annotation(**converted)
++        if annotation is int and type(value) is bool:raise ResultMappingError(path,'bool不是整数字段')
++        if isinstance(annotation,type) and isinstance(value,annotation):return value
++        raise ResultMappingError(path,'类型不符或不支持的注解；请在解析动作显式转换')
++    return convert(results,model,'$',0)
+--- a/library/tests/test_development_pyparsing_04_dev.py
++++ b/library/tests/test_development_pyparsing_04_dev.py
+@@ -0,0 +1,33 @@
++"""命名结果映射真实数据类，缺失/额外/类型错误有业务路径。"""
++import unittest
++from dataclasses import dataclass,field
++import pyparsing as pp
++from pyparsing.dataclass_results import to_dataclass,ResultMappingError
++
++@dataclass(frozen=True)
++class Item:
++    """类型转换在语法动作完成。"""
++    name:str
++    quantity:int
++    tags:list[str]=field(default_factory=list)
++
++@dataclass
++class Order:
++    """嵌套命名结果。"""
++    item:Item
++    note:str|None=None
++
++def test_named_group_nested_dataclass_and_defaults_keep_types():
++    """真实parse结果不是调用方预先构造的dict。@return None。"""
++    grammar=pp.Group(pp.Word(pp.alphas)('name')+pp.common.integer('quantity'))('item')
++    result=grammar.parse_string('tea 7',parse_all=True)
++    value=to_dataclass(result,Order)
++    assert value==Order(Item('tea',7)) and value.item.tags==[] and value.note is None
++    assert result.as_dict()=={'item':{'name':'tea','quantity':7}}
++
++def test_precise_path_type_extra_missing_and_explicit_non_strict():
++    """不把字符串或bool强转int，严格模式不吞字段。@return None。"""
++    for data,path in (({'name':'tea'},'$.quantity'),({'name':'tea','quantity':'7'},'$.quantity'),({'name':'tea','quantity':True},'$.quantity'),({'name':'tea','quantity':7,'extra':1},'$.extra')):
++        with unittest.TestCase().assertRaises(ResultMappingError) as caught:to_dataclass(data,Item)
++        assert caught.exception.path==path
++    assert to_dataclass({'name':'tea','quantity':7,'extra':1},Item,strict=False)==Item('tea',7)

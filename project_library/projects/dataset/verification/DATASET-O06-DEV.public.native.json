@@ -1,0 +1,14 @@
+{
+  "script": "verification/DATASET-O06-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/test/test_development_dataset_o06_dev.py"
+}

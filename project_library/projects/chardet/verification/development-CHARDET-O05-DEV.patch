@@ -1,0 +1,82 @@
+--- a/library/chardet/validated.py
++++ b/library/chardet/validated.py
+@@ -0,0 +1,41 @@
++"""全文严格解码和业务验收后的候选选择，不把置信度当概率保证。"""
++from codecs import lookup
++from chardet import detect_all
++
++
++def detect_validated(data, *, validator=None):
++    """验证候选能解码全部字节，再执行可选业务判定。
++
++    :param data: bytes或bytearray，会在回调前快照。
++    :param validator: 可选(text, candidate)业务函数，异常原样传播。
++    :return: selected、候选状态与validated_whole，不泄漏全文到结果。
++    """
++    if not isinstance(data, (bytes, bytearray)):
++        raise TypeError('候选验证需要字节输入')
++    data = bytes(data)
++    candidates = sorted(detect_all(data, ignore_threshold=True), key=lambda item: item['confidence'], reverse=True)
++    seen, records, selected = set(), [], None
++    for candidate in candidates:
++        record = dict(candidate)
++        try:
++            codec = lookup(candidate['encoding']).name if candidate['encoding'] else None
++        except LookupError:
++            codec = None
++        if codec is None:
++            record['status'] = 'unsupported-codec'
++            records.append(record)
++            continue
++        if codec in seen:
++            continue
++        seen.add(codec)
++        try:
++            text = data.decode(codec, errors='strict')
++        except UnicodeError as error:
++            record.update(status='decode-error', error_start=getattr(error, 'start', None))
++        else:
++            accepted = bool(validator(text, dict(candidate))) if validator is not None else True
++            record['status'] = 'accepted' if accepted else 'business-rejected'
++            if accepted and selected is None:
++                selected = dict(candidate)
++        records.append(record)
++    return {'selected': selected, 'candidates': tuple(records), 'validated_whole': selected is not None}
+--- a/library/docs/development-chardet-o05-dev.md
++++ b/library/docs/development-chardet-o05-dev.md
+@@ -0,0 +1,5 @@
++# 对真实候选执行全文解码及业务验收后再选择
++
++对真实候选按置信度稳定排序，去重codec别名，先全文严格解码再执行业务回调。返回原始检测事实和各候选状态而不回显全文；全拒绝、空或不支持codec不能声称成功，缓冲快照与回调错误保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_chardet_o05_dev.py
++++ b/library/tests/test_development_chardet_o05_dev.py
+@@ -0,0 +1,27 @@
++"""实际候选须全文解码并满足明确业务校验。"""
++def test_full_decode_and_business_predicate():
++    """正常ASCII候选经过真实业务回调。@return None。"""
++    from chardet.validated import detect_validated
++    seen = []
++    result = detect_validated(b'account=42', validator=lambda text, candidate: seen.append(text) or text.startswith('account='))
++    assert result['validated_whole'] and result['selected']['encoding'] == 'ascii'
++    assert seen == ['account=42'] and result['candidates'][0]['status'] == 'accepted'
++
++def test_reject_all_and_unsupported_codec():
++    """业务全拒绝与特殊UCS4不可解码均不冒充验证成功。@return None。"""
++    from chardet.validated import detect_validated
++    assert detect_validated(b'abc', validator=lambda text, candidate: False)['selected'] is None
++    result = detect_validated(b'\xfe\xff\x00\x00payload')
++    assert not result['validated_whole'] and result['candidates'][0]['status'] == 'unsupported-codec'
++
++def test_callback_error_and_mutable_snapshot():
++    """业务异常保持，回调改变原缓冲不改变本次文本。@return None。"""
++    import pytest
++    from chardet.validated import detect_validated
++    source = bytearray(b'abc')
++    result = detect_validated(source, validator=lambda text, candidate: source.clear() or text == 'abc')
++    assert result['validated_whole'] and source == bytearray()
++    def fail(text, candidate):
++        """业务故障。@param text 文本。@param candidate 候选。@return 不返回。"""
++        raise RuntimeError('business')
++    with pytest.raises(RuntimeError): detect_validated(b'abc', validator=fail)

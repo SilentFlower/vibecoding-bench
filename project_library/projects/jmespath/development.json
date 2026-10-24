@@ -3,7 +3,7 @@
   "project_key": "jmespath",
   "title": "JMESPath业务查询开发任务",
   "category": "JSON投影与查询语言",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实JSON查询工程交付，覆盖类型比较、可变参数、常量隔离、选项绑定、命名查询与逐文档流；独立和累计验收。",
   "seed_digest": "0ae4b57756cc847d9d8471515c6304711de220bfce1b2afacfe5a867bc1ce570",
   "environment": "jmespath-py312",
   "source": {
@@ -55,6 +55,260 @@
             "disclosure/JM-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "JM-VARIADIC-DEV-SCENE",
+      "title": "为可变参数函数校验每个实参而不只检查声明前缀",
+      "goal": "为可变参数函数校验每个实参而不只检查声明前缀",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JM-VARIADIC-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-VARIADIC-DEV",
+          "kind": "modify",
+          "goal": "为可变参数函数校验每个实参而不只检查声明前缀",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix Functions._type_check so every actual variadic argument uses the final signature rule after the fixed prefix. Preserve arity validation, array subtype checking, untyped variadic rules and custom function dispatch. Invalid later values must raise JMESPathTypeError before calling the function body, with actual function/type context; do not rely on uncontrolled Python exceptions from merge or custom functions. Fixed-arity behavior and all language semantics remain compatible.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_jm_variadic_dev.py and concise Chinese compatibility documentation at library/docs/development-jm-variadic-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/JM-VARIADIC-DEV-contract.md",
+            "materials/JM-VARIADIC-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jmespath/functions.py",
+            "library/development_tests/test_development_jm_variadic_dev.py",
+            "library/docs/development-jm-variadic-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JM-VARIADIC-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-VARIADIC-DEV.native.json",
+            "public_native": "verification/JM-VARIADIC-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JM-VARIADIC-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "JM-LITERAL-DEV-SCENE",
+      "title": "隔离编译表达式的可变JSON字面量结果",
+      "goal": "隔离编译表达式的可变JSON字面量结果",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JM-LITERAL-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-LITERAL-DEV",
+          "kind": "modify",
+          "goal": "隔离编译表达式的可变JSON字面量结果",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix TreeInterpreter.visit_literal so mutable JSON literal results cannot mutate the cached parsed expression or later searches. Deeply detach object/array literal nodes on each evaluation, including literals nested in multi-select/projections and custom functions. Preserve scalar literal values, input field identity semantics, parser cache use and existing equality/type rules. Do not deepcopy every input document or purge compilation caches as a workaround.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_jm_literal_dev.py and concise Chinese compatibility documentation at library/docs/development-jm-literal-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/JM-LITERAL-DEV-contract.md",
+            "materials/JM-LITERAL-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jmespath/visitor.py",
+            "library/development_tests/test_development_jm_literal_dev.py",
+            "library/docs/development-jm-literal-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JM-LITERAL-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-LITERAL-DEV.native.json",
+            "public_native": "verification/JM-LITERAL-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JM-LITERAL-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "JM-BOUND-DEV-SCENE",
+      "title": "绑定编译查询与独立选项快照并支持显式单次覆盖",
+      "goal": "绑定编译查询与独立选项快照并支持显式单次覆盖",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JM-BOUND-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-BOUND-DEV",
+          "kind": "modify",
+          "goal": "绑定编译查询与独立选项快照并支持显式单次覆盖",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement jmespath.bound.BoundExpression(expression,options=None) with read-only expression and search(data,options=sentinel). Compile once, snapshot Options dict_cls/custom_functions references at binding so later mutation of the Options container does not change defaults, and create the normal interpreter per call. Omitted override uses binding, explicit None uses standard defaults, explicit Options affects one call. Retain custom function object identity, actual parser/errors and input field semantics; require completed literal isolation so callers cannot poison repeated template results.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_jm_bound_dev.py and concise Chinese compatibility documentation at library/docs/development-jm-bound-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "JM-LITERAL-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/JM-BOUND-DEV-contract.md",
+            "materials/JM-BOUND-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jmespath/bound.py",
+            "library/development_tests/test_development_jm_bound_dev.py",
+            "library/docs/development-jm-bound-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JM-BOUND-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-BOUND-DEV.native.json",
+            "public_native": "verification/JM-BOUND-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JM-BOUND-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "JM-QUERYSET-DEV-SCENE",
+      "title": "一次编译命名查询集并逐项返回编译或求值状态",
+      "goal": "一次编译命名查询集并逐项返回编译或求值状态",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JM-QUERYSET-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-QUERYSET-DEV",
+          "kind": "modify",
+          "goal": "一次编译命名查询集并逐项返回编译或求值状态",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement jmespath.queries.QuerySet(queries,*,options=None,errors=\"raise\") and frozen QueryResult (status,value,error_type,error,phase). Compile the ordered name->expression mapping once via BoundExpression; raise is default, collect preserves individual compile/evaluate JMESPath errors while other queries continue. search(data) returns ordered name->result with phase compile/evaluate/complete and status error/passed. Do not capture unrelated programmer exceptions or retain traceback objects. Query and result-container mutations must not change later searches; standard null remains a successful None value. Use completed variadic validation and literal/option binding for reliable repeated evaluation.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_jm_queryset_dev.py and concise Chinese compatibility documentation at library/docs/development-jm-queryset-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "JM-BOUND-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "JM-VARIADIC-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/JM-QUERYSET-DEV-contract.md",
+            "materials/JM-QUERYSET-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jmespath/queries.py",
+            "library/development_tests/test_development_jm_queryset_dev.py",
+            "library/docs/development-jm-queryset-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JM-QUERYSET-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-QUERYSET-DEV.native.json",
+            "public_native": "verification/JM-QUERYSET-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JM-QUERYSET-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "JM-ITER-DEV-SCENE",
+      "title": "一次编译后惰性查询文档流并可逐条收集标准错误",
+      "goal": "一次编译后惰性查询文档流并可逐条收集标准错误",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JM-ITER-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JM-ITER-DEV",
+          "kind": "modify",
+          "goal": "一次编译后惰性查询文档流并可逐条收集标准错误",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement jmespath.streaming.iter_search(expression,documents,*,options=None,errors=\"raise\"). Compile/bind once before consuming first document and yield one result per consumed document without prefetching. Default returns raw standard values; collect returns (zero_based_index,QueryResult) for each success or JMESPath evaluation error using the completed result schema. Syntax errors always raise before input consumption, source/programmer errors propagate, stopping/closing iteration reads no further documents, and independent literal results remain detached. Never materialize whole streams.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_jm_iter_dev.py and concise Chinese compatibility documentation at library/docs/development-jm-iter-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "JM-QUERYSET-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/JM-ITER-DEV-contract.md",
+            "materials/JM-ITER-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jmespath/streaming.py",
+            "library/development_tests/test_development_jm_iter_dev.py",
+            "library/docs/development-jm-iter-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JM-ITER-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JM-ITER-DEV.native.json",
+            "public_native": "verification/JM-ITER-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JM-ITER-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

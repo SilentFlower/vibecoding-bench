@@ -1,0 +1,61 @@
+--- a/library/docs/development-tqdm-06-dev.md
++++ b/library/docs/development-tqdm-06-dev.md
+@@ -0,0 +1,5 @@
++# 环境变量布尔覆盖使用明确真值且保留显式调用优先级
++
++路线17：内建envwrap对实际bool/Optional[bool]注解、bool默认和显式types回退采用明确真假文字，空/未知值报含参数名错误；直接调用仍优先，字符串False仍字符串，其余类型推断和可选外部provider不改。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_tqdm_06_dev.py
++++ b/library/tests/test_development_tqdm_06_dev.py
+@@ -0,0 +1,30 @@
++"""环境布尔False不是非空字符串True，显式调用仍有优先级。"""
++import os
++import unittest
++from unittest.mock import patch
++from tqdm.utils import envwrap
++
++
++def test_bool_default_annotation_and_explicit_type_fallback():
++    """三种真实类型来源都按明确字面量解析。@return None。"""
++    for raw,expected in [('False',False),('0',False),('off',False),('TRUE',True),('1',True),('yes',True)]:
++        with patch.dict(os.environ,{'BUSINESS_FLAG':raw}):
++            @envwrap('business')
++            def default(flag=True):return flag
++            @envwrap('business')
++            def annotated(flag:bool=None):return flag
++            @envwrap('business',types={'flag':bool})
++            def fallback(flag=None):return flag
++            assert default() is annotated() is fallback() is expected
++            assert default(flag=not expected) is not expected
++
++
++def test_unknown_boolean_rejects_and_other_types_keep_conversion():
++    """未知布尔不能静默开启，非布尔原推断不变。@return None。"""
++    with patch.dict(os.environ,{'BUSINESS_FLAG':'maybe'}):
++        with unittest.TestCase().assertRaises(ValueError):
++            envwrap('business')(lambda flag=False:flag)
++    with patch.dict(os.environ,{'BUSINESS_NUMBER':'42','BUSINESS_NAME':'False'}):
++        @envwrap('business')
++        def ordinary(number=1,name='text'):return number,name
++        assert ordinary()==(42,'False')
+--- a/library/tqdm/utils.py
++++ b/library/tqdm/utils.py
+@@ -57,6 +57,17 @@
+         # infer overrides' `type`s
+         for k in overrides:
+             param = params[k]
++            annotation=param.annotation
++            arguments=getattr(annotation,'__args__',())
++            boolean_annotation=annotation is bool or bool(arguments) and bool in arguments and all(value in (bool,type(None)) for value in arguments)
++            boolean_default=annotation is param.empty and type(param.default) is bool
++            boolean_fallback=annotation is param.empty and param.default is None and types.get(k) is bool
++            if boolean_annotation or boolean_default or boolean_fallback:
++                value=overrides[k].strip().lower()
++                if value in ('true','1','yes','on'):overrides[k]=True
++                elif value in ('false','0','no','off'):overrides[k]=False
++                else:raise ValueError('环境布尔参数 '+k+' 必须为true/false/1/0/yes/no/on/off')
++                continue
+             if param.annotation is not param.empty:  # typehints
+                 for typ in getattr(param.annotation, '__args__', (param.annotation,)):
+                     try:

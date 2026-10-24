@@ -1,0 +1,149 @@
+--- a/library/docs/development-webcolors-01-dev.md
++++ b/library/docs/development-webcolors-01-dev.md
+@@ -0,0 +1,5 @@
++# CSS4命名颜色在公开注册、枚举与双向转换中一致
++
++路线01：修复固定源码CSS4正向表误连CSS3与顶层常量缺失，使默认枚举、转换及现行HTML旧式命名色分支一致；显式旧规范不扩大，gray等规范别名保持。完整交付包含公开回归、兼容说明及全套冻结原生验收。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/webcolors/__init__.py
++++ b/library/src/webcolors/__init__.py
+@@ -23,7 +23,7 @@
+     rgb_to_name,
+     rgb_to_rgb_percent,
+ )
+-from ._definitions import CSS2, CSS3, CSS21, HTML4, names
++from ._definitions import CSS2, CSS3, CSS4, CSS21, HTML4, names
+ from ._html5 import (
+     html5_parse_legacy_color,
+     html5_parse_simple_color,
+@@ -41,6 +41,7 @@
+     "CSS2",
+     "CSS21",
+     "CSS3",
++    "CSS4",
+     "name_to_hex",
+     "name_to_rgb",
+     "name_to_rgb_percent",
+--- a/library/src/webcolors/_conversion.py
++++ b/library/src/webcolors/_conversion.py
+@@ -41,7 +41,7 @@
+ 
+     :param name: The color name to convert.
+     :param spec: The specification from which to draw the list of color names. Default
+-       is :data:`CSS3`.
++       is :data:`CSS4`.
+     :raises ValueError: when the given name has no definition in the given spec.
+ 
+     """
+@@ -71,7 +71,7 @@
+ 
+     :param name: The color name to convert.
+     :param spec: The specification from which to draw the list of color names. Default
+-       is :data:`CSS3.`
++       is :data:`CSS4`
+     :raises ValueError: when the given name has no definition in the given spec.
+ 
+     """
+@@ -98,7 +98,7 @@
+ 
+     :param name: The color name to convert.
+     :param spec: The specification from which to draw the list of color names. Default
+-       is :data:`CSS3`.
++       is :data:`CSS4`.
+     :raises ValueError: when the given name has no definition in the given spec.
+ 
+     """
+@@ -143,7 +143,7 @@
+ 
+     :param hex_value: The hexadecimal color value to convert.
+     :param spec: The specification from which to draw the list of color names. Default
+-       is :data:`CSS3`.
++       is :data:`CSS4`.
+     :raises ValueError: when the given color has no name in the given spec, or when the
+        supplied hex value is invalid.
+ 
+@@ -232,7 +232,7 @@
+ 
+     :param rgb_triplet: The ``rgb()`` triplet.
+     :param spec: The specification from which to draw the list of color names. Default
+-       is :data:`CSS3`.
++       is :data:`CSS4`.
+     :raises ValueError: when the given color has no name in the given spec.
+ 
+     """
+@@ -339,7 +339,7 @@
+ 
+     :param rgb_percent_triplet: The ``rgb()`` triplet.
+     :param spec: The specification from which to draw the list of color names. Default
+-        is :data:`CSS3`.
++        is :data:`CSS4`.
+     :raises ValueError: when the given color has no name in the given spec.
+ 
+     """
+--- a/library/src/webcolors/_definitions.py
++++ b/library/src/webcolors/_definitions.py
+@@ -274,7 +274,7 @@
+     CSS2: _CSS2_NAMES_TO_HEX,
+     CSS21: _CSS21_NAMES_TO_HEX,
+     CSS3: _CSS3_NAMES_TO_HEX,
+-    CSS4: _CSS3_NAMES_TO_HEX,
++    CSS4: _CSS4_NAMES_TO_HEX,
+ }
+ 
+ _hex_to_names = {
+@@ -310,7 +310,7 @@
+     return _hex_to_names[spec]
+ 
+ 
+-def names(spec: str = CSS3) -> List[str]:
++def names(spec: str = CSS4) -> List[str]:
+     """
+     Return the list of valid color names for the given specification.
+ 
+--- a/library/src/webcolors/_html5.py
++++ b/library/src/webcolors/_html5.py
+@@ -17,7 +17,7 @@
+ 
+ import string
+ 
+-from ._definitions import _CSS3_NAMES_TO_HEX
++from ._definitions import _CSS4_NAMES_TO_HEX
+ from ._types import HTML5SimpleColor, IntTuple
+ 
+ 
+@@ -159,7 +159,7 @@
+     #    return the simple color corresponding to that keyword.
+     #
+     #    Note: CSS2 System Colors are not recognized.
+-    if keyword_hex := _CSS3_NAMES_TO_HEX.get(value.lower()):
++    if keyword_hex := _CSS4_NAMES_TO_HEX.get(value.lower()):
+         return html5_parse_simple_color(keyword_hex)
+ 
+     # 6. If input's code point length is four, and the first character in input is
+--- a/library/tests/test_development_webcolors_01_dev.py
++++ b/library/tests/test_development_webcolors_01_dev.py
+@@ -0,0 +1,23 @@
++"""CSS4公开转换与枚举组成闭环，旧规范不被污染。"""
++import unittest
++import webcolors
++
++
++def test_css4_public_registry_and_legacy_keyword():
++    """固定版本新增命名色在正反转换和旧式名称中一致。@return None。"""
++    assert webcolors.CSS4=='css4'
++    assert webcolors.name_to_hex('RebeccaPurple')=='#663399'
++    assert webcolors.hex_to_name('#639')=='rebeccapurple'
++    assert webcolors.name_to_rgb('rebeccapurple',spec=webcolors.CSS4)==(102,51,153)
++    assert 'rebeccapurple' in webcolors.names()
++    assert webcolors.html5_parse_legacy_color('REBECCAPURPLE')==(102,51,153)
++
++
++def test_older_specs_and_canonical_aliases_remain_isolated():
++    """显式旧规范及规范别名保持原合同。@return None。"""
++    for spec in (webcolors.HTML4,webcolors.CSS2,webcolors.CSS21,webcolors.CSS3):
++        assert 'rebeccapurple' not in webcolors.names(spec)
++        with unittest.TestCase().assertRaises(ValueError):webcolors.name_to_hex('rebeccapurple',spec)
++    assert webcolors.hex_to_name('#808080')=='gray'
++    result=webcolors.names();result.clear()
++    assert len(webcolors.names(webcolors.CSS4))==148

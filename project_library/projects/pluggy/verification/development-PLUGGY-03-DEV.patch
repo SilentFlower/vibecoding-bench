@@ -1,0 +1,134 @@
+--- a/library/docs/development-pluggy-03-dev.md
++++ b/library/docs/development-pluggy-03-dev.md
+@@ -0,0 +1,5 @@
++# 插件注册、查询、注销与hook子集统一按对象身份判断
++
++路线05：注册/查询/注销/实现移除和子集统一is身份，不运行用户__eq__，相等但不同实例分别管理，同对象重复仍拒。子集不靠set误合并；get_plugins既有set可哈希边界保持并明确。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pluggy/_caller.py
++++ b/library/src/pluggy/_caller.py
+@@ -7,7 +7,7 @@
+ from collections.abc import Callable
+ from collections.abc import Mapping
+ from collections.abc import Sequence
+-from collections.abc import Set as AbstractSet
++from collections.abc import Iterable
+ from typing import Any
+ from typing import Final
+ from typing import final
+@@ -115,7 +115,7 @@
+ 
+     def _remove_plugin(self, plugin: _Plugin) -> None:
+         """Remove all hook implementations registered by the given plugin."""
+-        remaining = [impl for impl in self._hookimpls if impl.plugin != plugin]
++        remaining = [impl for impl in self._hookimpls if impl.plugin is not plugin]
+         if len(remaining) == len(self._hookimpls):
+             raise ValueError(f"plugin {plugin!r} not found")
+         self._hookimpls[:] = remaining
+@@ -296,9 +296,9 @@
+         "_remove_plugins",
+     )
+ 
+-    def __init__(self, orig: HookCaller, remove_plugins: AbstractSet[_Plugin]) -> None:
++    def __init__(self, orig: HookCaller, remove_plugins: Iterable[_Plugin]) -> None:
+         self._orig = orig
+-        self._remove_plugins = remove_plugins
++        self._remove_plugins = tuple(remove_plugins)
+         self.name = orig.name  # type: ignore[misc]
+         self._hookexec = orig._hookexec  # type: ignore[misc]
+ 
+@@ -307,7 +307,7 @@
+         return [
+             impl
+             for impl in self._orig._hookimpls
+-            if impl.plugin not in self._remove_plugins
++            if all(impl.plugin is not removed for removed in self._remove_plugins)
+         ]
+ 
+     @property
+--- a/library/src/pluggy/_manager.py
++++ b/library/src/pluggy/_manager.py
+@@ -209,7 +209,7 @@
+                 f"{plugin_name}={plugin}\n{self._name2plugin}"
+             )
+ 
+-        if plugin in self._name2plugin.values():
++        if any(plugin is value for value in self._name2plugin.values()):
+             raise ValueError(
+                 "Plugin already registered under a different name: "
+                 f"{plugin_name}={plugin}\n{self._name2plugin}"
+@@ -397,7 +397,7 @@
+ 
+     def is_registered(self, plugin: _Plugin) -> bool:
+         """Return whether the plugin is already registered."""
+-        return any(plugin == val for val in self._name2plugin.values())
++        return plugin is not None and any(plugin is val for val in self._name2plugin.values())
+ 
+     def get_canonical_name(self, plugin: _Plugin) -> str:
+         """Return a canonical name for a plugin object.
+@@ -422,7 +422,7 @@
+         """Return the name the plugin is registered under, or ``None`` if
+         is isn't."""
+         for name, val in self._name2plugin.items():
+-            if plugin == val:
++            if plugin is not None and plugin is val:
+                 return name
+         return None
+ 
+@@ -640,12 +640,8 @@
+         """Return a proxy :class:`~pluggy.HookCaller` for the named hook which
+         calls all registered plugins except the ones from remove_plugins."""
+         orig: HookCaller = getattr(self.hook, name)
+-        plugins_to_remove = set(remove_plugins)
+-        # Optimization: discard plugins to remove which don't actually implement
+-        # the hook, to make checks faster.
+-        plugins_to_remove.intersection_update(
+-            hookimpl.plugin for hookimpl in orig._hookimpls
+-        )
++        requested=tuple(remove_plugins)
++        plugins_to_remove=tuple(plugin for plugin in requested if any(impl.plugin is plugin for impl in orig._hookimpls))
+         # Optimization: if none of the plugins to remove actually implement the
+         # hook, avoid the subset hook caller overhead.
+         if not plugins_to_remove:
+--- a/library/tests/test_development_pluggy_03_dev.py
++++ b/library/tests/test_development_pluggy_03_dev.py
+@@ -0,0 +1,38 @@
++"""插件是对象身份，不能被用户__eq__重定义注册关系。"""
++import unittest
++from pluggy import PluginManager,HookspecMarker,HookimplMarker
++spec=HookspecMarker('app');impl=HookimplMarker('app')
++
++
++class EqualPlugin:
++    """相同业务值但独立实例。"""
++    __hash__=None
++    def __eq__(self,other):return True
++    @impl
++    def value(self):return 7
++
++
++def test_equal_instances_register_lookup_unregister_independently():
++    """两个相等且不可hash对象使用不同名字仍可管理。@return None。"""
++    class Specs:
++        @spec
++        def value(self):pass
++    pm=PluginManager('app');pm.add_hookspecs(Specs);a,b,c=EqualPlugin(),EqualPlugin(),EqualPlugin()
++    pm.register(a,'a');pm.register(b,'b')
++    assert pm.get_name(a)=='a' and pm.get_name(b)=='b' and pm.get_name(c) is None
++    assert not pm.is_registered(c) and pm.hook.value()==[7,7]
++    pm.unregister(a)
++    assert pm.get_name(b)=='b' and pm.hook.value()==[7]
++
++
++def test_identity_subset_and_throwing_equality_never_execute_eq():
++    """子集及重复同对象校验都用is，不吞用户eq异常。@return None。"""
++    class Dangerous(EqualPlugin):
++        def __eq__(self,other):raise AssertionError('不应比较插件值')
++    class Specs:
++        @spec
++        def value(self):pass
++    pm=PluginManager('app');pm.add_hookspecs(Specs);a,b=Dangerous(),Dangerous()
++    pm.register(a,'a');pm.register(b,'b')
++    assert pm.subset_hook_caller('value',[a])()==[7] and pm.hook.value()==[7,7]
++    with unittest.TestCase().assertRaises(ValueError):pm.register(a,'alias')

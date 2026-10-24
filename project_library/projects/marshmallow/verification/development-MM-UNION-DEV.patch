@@ -1,0 +1,86 @@
+--- a/library/development_tests/test_development_mm_union_dev.py
++++ b/library/development_tests/test_development_mm_union_dev.py
+@@ -0,0 +1,29 @@
++"""公开标签嵌套Schema回归。"""
++import pytest
++from marshmallow import Schema,fields,ValidationError
++from marshmallow.discriminated import DiscriminatedNested
++
++class Person(Schema): name=fields.String(required=True)
++class Number(Schema): value=fields.Integer(required=True)
++
++def test_actual_schema_selection_and_round_trip():
++    field=DiscriminatedNested('kind',{'person':Person(),'number':Number()})
++    assert field.deserialize({'kind':'number','value':'4'})=={'kind':'number','value':4}
++    assert field._serialize({'kind':'person','name':'Ada'},None,None)=={'kind':'person','name':'Ada'}
++
++def test_unknown_tag_and_nested_error_locations():
++    field=DiscriminatedNested('kind',{'person':Person()})
++    with pytest.raises(ValidationError) as caught: field.deserialize({'kind':'missing'})
++    assert 'kind' in caught.value.messages
++    with pytest.raises(ValidationError) as caught: field.deserialize({'kind':'person'})
++    assert 'name' in caught.value.messages
++
++def test_input_and_original_unknown_policy_are_preserved():
++    value={'kind':'person','name':'Ada','extra':1};field=DiscriminatedNested('kind',{'person':Person()})
++    with pytest.raises(ValidationError): field.deserialize(value)
++    assert value=={'kind':'person','name':'Ada','extra':1}
++
++def test_none_and_nested_partial_load_work():
++    field=DiscriminatedNested('kind',{'person':Person()},allow_none=True)
++    assert field.deserialize(None) is None
++    assert field.deserialize({'kind':'person'},partial=True)=={'kind':'person'}
+--- a/library/docs/development-mm-union-dev.md
++++ b/library/docs/development-mm-union-dev.md
+@@ -0,0 +1,5 @@
++# 实现外部标签分派的嵌套Schema双向转换
++
++根据外部标签选择真实Schema执行双向转换，标签不误报为子Schema未知字段。保留嵌套错误、未知字段规则和部分加载语义，拒绝未知类型或占用保留标签的输出。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/marshmallow/discriminated.py
++++ b/library/src/marshmallow/discriminated.py
+@@ -0,0 +1,43 @@
++"""按外部类型标签选择真实Schema进行嵌套转换。"""
++from collections.abc import Mapping
++from .schema import Schema
++from .fields import Field
++from .exceptions import ValidationError
++
++
++class DiscriminatedNested(Field):
++    """标签不进入被选Schema，载入和导出均保留外部标签。"""
++    def __init__(self,discriminator,schemas,**kwargs):
++        """建立标签字段。@param discriminator 非空标签键。@param schemas 标签到Schema实例。
++        @param kwargs 原字段选项。@return None。
++        """
++        if not isinstance(discriminator,str) or not discriminator or not isinstance(schemas,Mapping) or not schemas:
++            raise ValueError('需要标签名及非空Schema映射')
++        if any(not isinstance(tag,str) or not tag or not isinstance(schema,Schema) for tag,schema in schemas.items()):
++            raise TypeError('标签必须为非空字符串，值必须为Schema实例')
++        self.discriminator=discriminator;self.schemas=dict(schemas)
++        super().__init__(**kwargs)
++
++    def _select(self,value):
++        if not isinstance(value,Mapping):
++            raise ValidationError('需要带标签的映射')
++        tag=value.get(self.discriminator)
++        if not isinstance(tag,str) or tag not in self.schemas:
++            raise ValidationError({self.discriminator:['缺少或未知类型标签']})
++        return tag,self.schemas[tag],{key:item for key,item in value.items() if key!=self.discriminator}
++
++    def _deserialize(self,value,attr,data,**kwargs):
++        tag,schema,payload=self._select(value)
++        loaded=schema.load(payload,many=False,partial=kwargs.get('partial'))
++        if not isinstance(loaded,Mapping) or self.discriminator in loaded:
++            raise ValidationError('类型Schema必须返回不含外部标签的映射')
++        return {self.discriminator:tag,**loaded}
++
++    def _serialize(self,value,attr,obj,**kwargs):
++        if value is None:
++            return None
++        tag,schema,payload=self._select(value)
++        dumped=schema.dump(payload,many=False)
++        if self.discriminator in dumped:
++            raise ValidationError('类型Schema不能占用外部标签')
++        return {self.discriminator:tag,**dumped}

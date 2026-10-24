@@ -1,0 +1,78 @@
+--- a/library/cli_helpers/tabular_output/json_output_adapter.py
++++ b/library/cli_helpers/tabular_output/json_output_adapter.py
+@@ -19,8 +19,38 @@
+             return super(CustomEncoder, self).default(o)
+ 
+ 
++def _resolve_headers(headers,policy):
++    if policy not in ('last','error','suffix'):
++        raise ValueError('未知JSON重复列策略')
++    headers=list(headers)
++    if policy=='last':
++        return headers
++    if any(not isinstance(header,str) for header in headers):
++        raise TypeError('显式JSON列策略要求字符串表头')
++    if policy=='error':
++        if len(set(headers))!=len(headers):
++            raise ValueError('JSON对象列名重复')
++        return headers
++    reserved,used,result=set(headers),set(),[]
++    for header in headers:
++        candidate=header
++        index=2
++        while candidate in used:
++            candidate=header+'_'+str(index)
++            index+=1
++            if candidate in reserved:
++                continue
++        if candidate!=header:
++            while candidate in reserved or candidate in used:
++                candidate=header+'_'+str(index)
++                index+=1
++        result.append(candidate);used.add(candidate)
++    return result
++
++
+ def adapter(data, headers, table_format="jsonl", **_kwargs):
+     """Wrap the formatting inside a function for TabularOutputFormatter."""
++    headers=_resolve_headers(headers,_kwargs.get("duplicate_headers","last"))
+     if table_format == "jsonl":
+         ensure_ascii = False
+     elif table_format == "jsonl_escaped":
+--- a/library/development_tests/test_development_ch_json_headers_dev.py
++++ b/library/development_tests/test_development_ch_json_headers_dev.py
+@@ -0,0 +1,26 @@
++"""公开重复JSON对象列名回归。"""
++import json
++import pytest
++from cli_helpers.tabular_output.json_output_adapter import adapter
++
++def test_default_and_error_modes_are_explicit():
++    assert json.loads(next(adapter([[1,2]],['a','a'])))=={'a':2}
++    with pytest.raises(ValueError):
++        next(adapter([[1,2]],['a','a'],duplicate_headers='error'))
++
++def test_suffix_mode_reserves_existing_real_names():
++    value=json.loads(next(adapter([[1,2,3,4]],['a','a','a_2','a'],duplicate_headers='suffix')))
++    assert value=={'a':1,'a_3':2,'a_2':3,'a_4':4}
++
++def test_one_shot_headers_are_reused_for_every_row():
++    result=list(adapter([[1],[2]],iter(['name']),duplicate_headers='error'))
++    assert [json.loads(row) for row in result]==[{'name':1},{'name':2}]
++
++def test_rejection_does_not_consume_data_and_input_headers_are_unchanged():
++    headers=['a','a'];consumed=[]
++    def rows():
++        consumed.append(1)
++        yield [1,2]
++    with pytest.raises(ValueError):
++        next(adapter(rows(),headers,duplicate_headers='error'))
++    assert consumed==[] and headers==['a','a']
+--- a/library/docs/development-ch-json-headers-dev.md
++++ b/library/docs/development-ch-json-headers-dev.md
+@@ -0,0 +1,5 @@
++# 明确处理JSON对象导出中的重复列名
++
++查询可能含同名列，JSON对象不能悄悄丢字段。提供拒绝或稳定补后缀策略，预留真实已有列名避免二次冲突，默认继续旧末值行为，表头只消费一次，行宽及Unicode输出不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

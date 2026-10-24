@@ -1,0 +1,97 @@
+--- a/library/development_tests/test_development_sg_bind_dev.py
++++ b/library/development_tests/test_development_sg_bind_dev.py
+@@ -0,0 +1,26 @@
++"""公开命名参数真实SQL执行回归。"""
++import sqlite3
++from decimal import Decimal
++import pytest
++from sqlglot import parse_one,exp
++from sqlglot.report_binding import bind_parameters,parameter_names
++
++def test_strings_are_literals_even_when_they_look_like_sql():
++    value="x'); DROP TABLE data; --";query=bind_parameters('SELECT :value AS result',{'value':value})
++    assert sqlite3.connect(':memory:').execute(query.sql(dialect='sqlite')).fetchone()==(value,)
++
++def test_repeated_parameters_and_false_null_numbers_are_real_values():
++    result=bind_parameters('SELECT :n+:n, :flag, :empty',{'n':2,'flag':False,'empty':None})
++    assert sqlite3.connect(':memory:').execute(result.sql(dialect='sqlite')).fetchone()==(4,0,None)
++    nodes=list(bind_parameters('SELECT :n, :n',{'n':Decimal('1.25')}).find_all(exp.Literal))
++    assert len(nodes)==2 and nodes[0] is not nodes[1]
++
++def test_missing_extra_positional_and_unsafe_values_fail():
++    for values in ({},{'x':1,'extra':2},{'x':float('inf')},{'x':parse_one('SELECT 1')}):
++        with pytest.raises((ValueError,TypeError)): bind_parameters('SELECT :x',values)
++    with pytest.raises(ValueError): bind_parameters('SELECT ?',{})
++
++def test_input_ast_and_colon_strings_are_preserved():
++    original=parse_one("SELECT :x, ':x' AS text");before=original.dump()
++    result=bind_parameters(original,{'x':1,'ignored':object()},strict=False)
++    assert original.dump()==before and parameter_names(result)==() and "':x'" in result.sql()
+--- a/library/docs/development-sg-bind-dev.md
++++ b/library/docs/development-sg-bind-dev.md
+@@ -0,0 +1,5 @@
++# 基于真实AST绑定命名参数并拒绝SQL表达式注入
++
++只替换真实命名占位符，参数值转成SQL字面量而非重新解析成语句。支持明确标量和数组，拒绝非有限数、循环和表达式对象；重复参数节点独立，缺失及多余参数规则明确。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/sqlglot/report_binding.py
++++ b/library/sqlglot/report_binding.py
+@@ -0,0 +1,57 @@
++"""以真实SQL字面量替换命名参数，不把值解析为SQL。"""
++import math
++from datetime import date,datetime,time
++from decimal import Decimal
++from collections.abc import Mapping
++from . import exp
++from .report_inspection import query_copy
++
++
++def parameter_names(query):
++    """读取命名占位符。@param query 已解析Query。@return 首次出现顺序的唯一名称元组。
++    """
++    names=[]
++    for node in query.find_all(exp.Placeholder):
++        if not isinstance(node.this,str) or not node.this or node.this=='?':
++            raise ValueError('仅支持命名占位符，不接受位置参数')
++        if node.this not in names:
++            names.append(node.this)
++    return tuple(names)
++
++
++def _literal(value,active=None):
++    if value is None or type(value) in (str,bool,int,bytes) or isinstance(value,(date,datetime,time)):
++        return exp.convert(value)
++    if type(value) is float:
++        if not math.isfinite(value):
++            raise ValueError('SQL参数不能为非有限数')
++        return exp.convert(value)
++    if isinstance(value,Decimal):
++        if not value.is_finite():
++            raise ValueError('SQL参数不能为非有限Decimal')
++        return exp.Literal.number(str(value))
++    if isinstance(value,list):
++        active=set() if active is None else active
++        if id(value) in active:
++            raise ValueError('SQL参数数组存在循环')
++        active.add(id(value))
++        try:
++            return exp.Array(expressions=[_literal(item,active) for item in value])
++        finally:
++            active.remove(id(value))
++    raise TypeError('参数只接受明确标量或列表，不接受SQL表达式')
++
++
++def bind_parameters(query,values,*,strict=True,dialect=None):
++    """绑定命名参数。@param query SQL文本或Query。@param values 名称到普通值映射。
++    @param strict 是否拒绝多余参数。@param dialect 输入方言。@return 独立已绑定Query。
++    """
++    if not isinstance(values,Mapping) or any(not isinstance(name,str) or not name for name in values) or type(strict) is not bool:
++        raise TypeError('需要命名参数映射和布尔严格策略')
++    tree=query_copy(query,dialect);names=parameter_names(tree)
++    if set(names)-set(values):
++        raise ValueError('缺少命名参数')
++    if strict and set(values)-set(names):
++        raise ValueError('存在多余命名参数')
++    bindings={name:_literal(values[name]) for name in names}
++    return tree.transform(lambda node:bindings[node.this].copy() if isinstance(node,exp.Placeholder) else node,copy=False)

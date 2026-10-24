@@ -1,0 +1,89 @@
+--- a/library/development_tests/test_development_ft_atomic_file_dev.py
++++ b/library/development_tests/test_development_ft_atomic_file_dev.py
+@@ -0,0 +1,24 @@
++"""公开原子文本文件实际回归。"""
++import pytest
++from ftfy.atomic import fix_file_atomic
++
++def test_in_place_repair_preserves_permissions_and_counts(tmp_path):
++    path=tmp_path/'text.txt';source='cafÃ©\r\nﬁ';path.write_text(source);path.chmod(0o640)
++    result=fix_file_atomic(path)
++    assert path.read_bytes()=='café\nfi'.encode() and result.changed and result.input_chars==len(source)
++    assert result.output_chars==len('café\nfi') and path.stat().st_mode&0o777==0o640
++
++def test_explicit_legacy_encoding_writes_utf8_without_claiming_text_change(tmp_path):
++    source=tmp_path/'latin.txt';source.write_bytes('café'.encode('latin-1'));target=tmp_path/'utf8.txt'
++    result=fix_file_atomic(source,target,encoding='latin-1')
++    assert target.read_bytes()=='café'.encode() and not result.changed
++
++def test_decode_failure_preserves_existing_target_and_removes_temp(tmp_path):
++    source=tmp_path/'bad';source.write_bytes(b'\xff');target=tmp_path/'target';target.write_bytes(b'old')
++    with pytest.raises(UnicodeDecodeError): fix_file_atomic(source,target)
++    assert target.read_bytes()==b'old' and len(list(tmp_path.iterdir()))==2
++
++def test_late_line_budget_failure_keeps_original_file(tmp_path):
++    path=tmp_path/'text';path.write_text('ok\n'+'x'*50)
++    with pytest.raises(ValueError): fix_file_atomic(path,max_line_length=10)
++    assert path.read_text()=='ok\n'+'x'*50 and len(list(tmp_path.iterdir()))==1
+--- a/library/docs/development-ft-atomic-file-dev.md
++++ b/library/docs/development-ft-atomic-file-dev.md
+@@ -0,0 +1,5 @@
++# 以明确输入编码和有界文本流原子修复本地文件
++
++明确输入编码后使用有界分块修复，UTF8输出完整写入才原子替换。支持原位修复并保留权限，解码、行预算或写入失败不截断旧文件；变化标记比较文本而非源编码字节。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/ftfy/atomic.py
++++ b/library/ftfy/atomic.py
+@@ -0,0 +1,51 @@
++"""明确输入编码并以同目录原子替换输出修复文件。"""
++import hashlib
++import os
++import stat
++import tempfile
++from dataclasses import dataclass
++from pathlib import Path
++from .streaming import fix_chunks
++
++
++@dataclass(frozen=True)
++class FileRepairResult:
++    """成功写入后的文本长度与变化摘要。"""
++    input_chars: int
++    output_chars: int
++    changed: bool
++
++
++def fix_file_atomic(source,destination=None,*,encoding='utf-8',config=None,max_line_length=1000000):
++    """修复本地文件并输出UTF8。@param source 输入文件。@param destination 缺省原位替换。
++    @param encoding 明确输入编码。@param config 原修复政策。@param max_line_length 物理行预算。
++    @return 成功替换后的FileRepairResult；解码或修复失败保留原目标。
++    """
++    source=Path(source);destination=source if destination is None else Path(destination)
++    if source.is_symlink() or destination.is_symlink() or not source.is_file() or (destination.exists() and not destination.is_file()):
++        raise ValueError('输入和输出必须为普通文件路径')
++    mode=stat.S_IMODE(destination.stat().st_mode) if destination.exists() else None
++    state={'input':0,'output':0};before=hashlib.sha256();after=hashlib.sha256()
++    descriptor,name=tempfile.mkstemp(prefix='.'+destination.name+'.',dir=destination.parent)
++    try:
++        with open(source,'r',encoding=encoding,errors='strict',newline='') as incoming,os.fdopen(descriptor,'w',encoding='utf-8',newline='') as outgoing:
++            descriptor=None
++            def chunks():
++                while True:
++                    text=incoming.read(65536)
++                    if not text:
++                        return
++                    state['input']+=len(text);before.update(text.encode('utf-8','surrogatepass'))
++                    yield text
++            for text in fix_chunks(chunks(),config,max_line_length=max_line_length):
++                state['output']+=len(text);after.update(text.encode('utf-8','surrogatepass'));outgoing.write(text)
++            outgoing.flush();os.fsync(outgoing.fileno())
++        if mode is not None:
++            os.chmod(name,mode)
++        os.replace(name,destination)
++        return FileRepairResult(state['input'],state['output'],before.digest()!=after.digest())
++    finally:
++        if descriptor is not None:
++            os.close(descriptor)
++        if os.path.exists(name):
++            os.unlink(name)

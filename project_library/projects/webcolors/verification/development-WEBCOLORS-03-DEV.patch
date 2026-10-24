@@ -1,0 +1,88 @@
+--- a/library/docs/development-webcolors-03-dev.md
++++ b/library/docs/development-webcolors-03-dev.md
+@@ -0,0 +1,5 @@
++# 主题资产通过显式RGBA模型无损保存透明度
++
++路线05：新增独立RGBA模块，四通道明确为0..255整数字节，四/八位hex无损往返，透明像素隐藏RGB保留。旧RGB及HTML simple合同不扩展；转RGB仅允许不透明，不暗选背景。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/webcolors/rgba.py
++++ b/library/src/webcolors/rgba.py
+@@ -0,0 +1,51 @@
++"""显式保存8位alpha的RGBA模型，不改变旧RGB函数。"""
++import re
++from dataclasses import dataclass
++from ._types import IntegerRGB
++
++
++@dataclass(frozen=True)
++class RGBA:
++    """四个0..255整数字节。@param red 红。@param green 绿。@param blue 蓝。@param alpha 透明度字节。"""
++    red: int
++    green: int
++    blue: int
++    alpha: int = 255
++
++    def __post_init__(self):
++        """拒绝bool、浮点与越界值，避免静默丢透明度。@return None。"""
++        for value in (self.red,self.green,self.blue,self.alpha):
++            if type(value) is not int or not 0 <= value <= 255:
++                raise ValueError('RGBA分量必须是0..255整数')
++
++    def __iter__(self):
++        """按RGBA顺序提供分量。@return 分量迭代器。"""
++        return iter((self.red,self.green,self.blue,self.alpha))
++
++
++def hex_to_rgba(value):
++    """解析精确四位或八位hex。@param value 字面量。@return RGBA。"""
++    if not isinstance(value,str) or re.fullmatch(r'#[0-9a-fA-F]{4}(?:[0-9a-fA-F]{4})?',value) is None:
++        raise ValueError('RGBA十六进制必须是四位或八位')
++    digits=value[1:]
++    if len(digits)==4:digits=''.join(char*2 for char in digits)
++    return RGBA(*(int(digits[index:index+2],16) for index in range(0,8,2)))
++
++
++def rgba_to_hex(value):
++    """无损输出八位小写hex。@param value RGBA或四元组。@return hex。"""
++    color=value if isinstance(value,RGBA) else RGBA(*value)
++    return '#'+''.join(format(channel,'02x') for channel in color)
++
++
++def rgb_to_rgba(value, alpha=255):
++    """显式为RGB添加alpha。@param value 三通道。@param alpha 8位alpha。@return RGBA。"""
++    red,green,blue=value
++    return RGBA(red,green,blue,alpha)
++
++
++def rgba_to_rgb(value):
++    """仅将完全不透明RGBA转RGB。@param value 四通道。@return IntegerRGB。"""
++    color=value if isinstance(value,RGBA) else RGBA(*value)
++    if color.alpha != 255:raise ValueError('透明色需要显式背景，不允许静默丢alpha')
++    return IntegerRGB(color.red,color.green,color.blue)
+--- a/library/tests/test_development_webcolors_03_dev.py
++++ b/library/tests/test_development_webcolors_03_dev.py
+@@ -0,0 +1,23 @@
++"""RGBA新增合同不能让既有RGB函数静默丢弃alpha。"""
++import unittest
++import webcolors
++from webcolors.rgba import RGBA, hex_to_rgba, rgba_to_hex, rgba_to_rgb, rgb_to_rgba
++
++
++def test_short_and_long_roundtrip_preserves_hidden_rgb():
++    """所有分量及透明像素中的RGB无损保留。@return None。"""
++    assert hex_to_rgba('#3698')==RGBA(51,102,153,136)
++    assert rgba_to_hex(hex_to_rgba('#AbCd'))=='#aabbccdd'
++    assert rgba_to_hex(hex_to_rgba('#ff000000'))=='#ff000000'
++    assert rgba_to_rgb(rgb_to_rgba((1,2,3)))==(1,2,3)
++
++
++def test_old_rgb_contract_and_invalid_rgba():
++    """透明转换必须显式，坏分量与尾换行拒绝。@return None。"""
++    for value in ('#3698','#33669980'):
++        with unittest.TestCase().assertRaises(ValueError):webcolors.hex_to_rgb(value)
++    for value in ('#abc','#abcdef','#abcd\n','abcd','#abcdefff!'):
++        with unittest.TestCase().assertRaises(ValueError):hex_to_rgba(value)
++    for values in ((True,0,0,255),(1,2,3,-1),(1.0,2,3,4)):
++        with unittest.TestCase().assertRaises(ValueError):RGBA(*values)
++    with unittest.TestCase().assertRaises(ValueError):rgba_to_rgb(RGBA(255,0,0,0))

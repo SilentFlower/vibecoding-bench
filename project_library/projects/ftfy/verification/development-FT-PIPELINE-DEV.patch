@@ -1,0 +1,104 @@
+--- a/library/development_tests/test_development_ft_pipeline_dev.py
++++ b/library/development_tests/test_development_ft_pipeline_dev.py
+@@ -0,0 +1,25 @@
++"""公开结构化文本导入端到端回归。"""
++import pytest
++from ftfy import TextFixerConfig,apply_plan
++from ftfy.pipeline import TextRepairPipeline
++
++def test_real_changes_include_replayable_audit_and_preserve_input():
++    original={'name':'cafÃ©','raw':'cafÃ©'};result=TextRepairPipeline([('name',)]).process(original)
++    assert result.value=={'name':'café','raw':'cafÃ©'} and original['name']=='cafÃ©'
++    path,audit=result.changes[0];assert path==('name',) and apply_plan(original['name'],list(audit.explanation))=='café'
++
++def test_collect_continues_and_keeps_input_indices():
++    result=list(TextRepairPipeline([('name',)]).run([{'name':'ﬁ'},{'name':4},{'name':'ok'}],errors='collect'))
++    assert [(row.index,row.status) for row in result]==[(0,'passed'),(1,'error'),(2,'passed')]
++    assert result[1].error[0]=='TypeError' and result[2].changes==()
++
++def test_pipeline_is_lazy_and_reusable_without_record_state():
++    calls=[]
++    def source(): calls.append(1);yield {'name':'ﬁ'}
++    pipeline=TextRepairPipeline([('name',)]);stream=pipeline.run(source());assert calls==[]
++    assert next(stream).value['name']=='fi' and pipeline.process({'name':'ok'}).changes==()
++
++def test_disabled_explanation_policy_and_missing_skip_are_retained():
++    pipeline=TextRepairPipeline([('name',)],TextFixerConfig(explain=False,fix_latin_ligatures=False),missing='skip')
++    assert pipeline.process({'name':'ﬁ'}).changes==() and pipeline.process({}).value=={}
++    with pytest.raises(ValueError): pipeline.run([],errors='skip')
+--- a/library/docs/development-ft-pipeline-dev.md
++++ b/library/docs/development-ft-pipeline-dev.md
+@@ -0,0 +1,5 @@
++# 实现可复用结构化文本导入流程和逐记录修复审计
++
++固定路径与修复政策的导入流程复用字段修复和真实审计，记录实际变化的字段及可重放结果。逐条输出并支持错误收集，不保存异常对象，不吞掉来源迭代器故障，多次运行不能共享记录状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/ftfy/pipeline.py
++++ b/library/ftfy/pipeline.py
+@@ -0,0 +1,65 @@
++"""重用结构化路径与真实审计，逐记录输出独立修复结果。"""
++from dataclasses import dataclass
++from . import TextFixerConfig
++from .structured import normalize_paths,read_path,fix_fields
++from .audit import repair
++
++
++@dataclass(frozen=True)
++class RecordResult:
++    """一条记录的转换值或错误摘要，不保留异常对象。"""
++    index: int
++    status: str
++    value: object=None
++    changes: tuple=()
++    error: object=None
++
++
++class TextRepairPipeline:
++    """固定字段路径和不可变修复政策，可在多个输入流重用。"""
++    def __init__(self,paths,config=None,*,missing='raise'):
++        """建立导入流程。@param paths 明确字段路径。@param config 修复配置。
++        @param missing 缺失策略。@return None。
++        """
++        if config is not None and not isinstance(config,TextFixerConfig):
++            raise TypeError('需要TextFixerConfig')
++        if missing not in ('raise','skip'):
++            raise ValueError('无效缺失策略')
++        self.paths=normalize_paths(paths);self.config=config or TextFixerConfig();self.missing=missing
++
++    def process(self,record,*,index=0):
++        """转换并审计一条记录。@param record 原记录。@param index 原序号。
++        @return 成功RecordResult，changes仅含实际变化路径与RepairResult。
++        """
++        value=fix_fields(record,self.paths,self.config,missing=self.missing)
++        changes=[]
++        for path in self.paths:
++            try:
++                original=read_path(record,path)
++            except (KeyError,IndexError):
++                if self.missing=='skip':
++                    continue
++                raise
++            if original is None:
++                continue
++            audit=repair(original,self.config)
++            if audit.changed:
++                changes.append((path,audit))
++        return RecordResult(index,'passed',value,tuple(changes))
++
++    def run(self,records,*,errors='raise'):
++        """惰性处理记录流。@param records 输入迭代器。@param errors raise或collect。
++        @return 每条记录一个RecordResult；源迭代异常仍原样传播。
++        """
++        if errors not in ('raise','collect'):
++            raise ValueError('无效错误策略')
++        iterator=iter(records)
++        def produce():
++            for index,record in enumerate(iterator):
++                try:
++                    yield self.process(record,index=index)
++                except (ValueError,TypeError,KeyError,IndexError) as error:
++                    if errors=='raise':
++                        raise
++                    yield RecordResult(index,'error',error=(type(error).__name__,str(error)))
++        return produce()

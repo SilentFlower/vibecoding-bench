@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FG-UPSERT-DEV",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement feedgen.upsert.upsert_entries(feed,entries) and frozen UpsertResult(added,updated). Use actual FeedGenerator/FeedEntry APIs. Validate all existing/incoming entries have unique nonempty string IDs before mutation; invalid late input or generator failure preserves original entries. Replace matching IDs at their original position with supplied entry objects, append new IDs in incoming order, retain unrelated exact entry objects and metadata/extensions. Do not merge entries by title or destructively edit old entry fields. Empty input is valid; duplicate old IDs are explicit errors.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

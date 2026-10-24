@@ -1,0 +1,82 @@
+--- a/library/docs/development-webcolors-05-dev.md
++++ b/library/docs/development-webcolors-05-dev.md
+@@ -0,0 +1,5 @@
++# 主题检查计算真实相对亮度与显式背景对比度
++
++路线14：主题检查新增真实sRGB相对亮度、对称原始比值及显式阈值判断；不先四舍五入再比较。透明RGBA必须给出实际不透明背景，编码sRGB合成及量化规则明确，不默认白色，也不将单个比值宣称为整体可访问性认证。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/webcolors/accessibility.py
++++ b/library/src/webcolors/accessibility.py
+@@ -0,0 +1,43 @@
++"""不透明sRGB的相对亮度和实际背景上的透明色对比度。"""
++import math
++from .rgba import RGBA
++
++
++def _rgb(value):
++    """只接受三个有限整数通道或已不透明RGBA。@param value 颜色。@return 三元组。"""
++    if isinstance(value,RGBA):
++        if value.alpha!=255:raise ValueError('透明输入必须先明确合成背景')
++        return value.red,value.green,value.blue
++    values=tuple(value)
++    if len(values)!=3 or any(type(channel) is not int or not 0<=channel<=255 for channel in values):raise ValueError('RGB必须为三个0..255整数')
++    return values
++
++
++def relative_luminance(value):
++    """按sRGB分段传递函数计算亮度。@param value 不透明颜色。@return 0..1亮度。"""
++    def linear(channel):
++        """线性化单通道。@param channel 字节。@return 线性强度。"""
++        encoded=channel/255
++        return encoded/12.92 if encoded<=0.04045 else ((encoded+0.055)/1.055)**2.4
++    return sum(weight*linear(channel) for weight,channel in zip((0.2126,0.7152,0.0722),_rgb(value)))
++
++
++def contrast_ratio(foreground, background):
++    """计算对称原始对比度比值，不先舍入。@param foreground 前景。@param background 背景。@return 1..21比值。"""
++    left,right=relative_luminance(foreground),relative_luminance(background)
++    return (max(left,right)+0.05)/(min(left,right)+0.05)
++
++
++def meets_contrast(foreground, background, minimum=4.5):
++    """显式阈值比较不预先舍入。@param foreground 前景。@param background 背景。@param minimum 有限1..21阈值。@return 是否达标。"""
++    if isinstance(minimum,bool) or not isinstance(minimum,(int,float)) or not math.isfinite(minimum) or not 1<=minimum<=21:raise ValueError('阈值必须为1..21有限数字')
++    return contrast_ratio(foreground,background)>=minimum
++
++
++def contrast_on(foreground, background):
++    """按编码sRGB在显式不透明背景合成后计算对比度。@param foreground RGBA。@param background 不透明RGB。@return 原始比值。"""
++    if not isinstance(foreground,RGBA):raise ValueError('前景必须是RGBA')
++    base=_rgb(background)
++    alpha=foreground.alpha/255
++    mixed=tuple(int(math.floor(front*alpha+back*(1-alpha)+0.5)) for front,back in zip((foreground.red,foreground.green,foreground.blue),base))
++    return contrast_ratio(mixed,base)
+--- a/library/tests/test_development_webcolors_05_dev.py
++++ b/library/tests/test_development_webcolors_05_dev.py
+@@ -0,0 +1,25 @@
++"""主题对比度使用真实sRGB公式和明确背景，不暗选白色。"""
++import math
++import unittest
++from webcolors.rgba import RGBA
++from webcolors.accessibility import relative_luminance,contrast_ratio,meets_contrast,contrast_on
++
++
++def test_luminance_ratio_and_unrounded_threshold():
++    """黑白21比1、对称及严格阈值比较。@return None。"""
++    black,white=(0,0,0),(255,255,255)
++    assert relative_luminance(black)==0 and relative_luminance(white)==1
++    assert contrast_ratio(black,white)==contrast_ratio(white,black)==21
++    assert contrast_ratio(black,black)==1 and meets_contrast(black,white,7)
++    value=contrast_ratio((118,118,118),white)
++    assert meets_contrast((118,118,118),white,value)
++    assert not meets_contrast((118,118,118),white,math.nextafter(value,math.inf))
++
++
++def test_transparency_and_invalid_data_are_explicit():
++    """透明色只有指定背景后才能参与比值。@return None。"""
++    assert contrast_on(RGBA(255,0,0,0),(1,2,3))==1
++    assert contrast_on(RGBA(0,0,0,255),(255,255,255))==21
++    with unittest.TestCase().assertRaises(ValueError):relative_luminance(RGBA(0,0,0,128))
++    for bad in ((True,0,0),(256,0,0),(1,2),(0.5,0,0)):
++        with unittest.TestCase().assertRaises(ValueError):relative_luminance(bad)

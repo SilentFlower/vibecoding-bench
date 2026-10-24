@@ -1,0 +1,67 @@
+--- a/library/configargparse.py
++++ b/library/configargparse.py
+@@ -1859,6 +1859,25 @@
+                 keys += [arg[2:], arg]  # eg. for '--bla' return ['bla', '--bla']
+ 
+         return keys
++
++    def discover_config_files(self):
++        """只发现默认源，不打开文件、不调用provider、不运行参数动作。
++
++        :return: 保留声明和匹配顺序的字典列表；路径含exists，provider只标记索引。
++        """
++        discovered = []
++        for index, entry in enumerate(self._default_config_files):
++            if isinstance(entry, (str, bytes, os.PathLike)):
++                pattern = os.path.expanduser(os.fsdecode(os.fspath(entry)))
++                matches = glob.glob(pattern)
++                for path in matches:
++                    discovered.append({'kind': 'path', 'index': index, 'path': path, 'exists': True})
++                if not matches:
++                    discovered.append({'kind': 'path', 'index': index, 'path': pattern, 'exists': False})
++            else:
++                # 不调用repr或任意provider属性，防止预览触发业务副作用或泄露秘密。
++                discovered.append({'kind': 'provider', 'index': index, 'executed': False})
++        return discovered
+ 
+     def _open_config_files(self, command_line_args):
+         """Tries to parse config file path(s) from within command_line_args.
+--- a/library/docs/development-configargparse-o04-dev.md
++++ b/library/docs/development-configargparse-o04-dev.md
+@@ -0,0 +1,5 @@
++# 无业务副作用地发现本次默认配置来源
++
++对应路线16：提供默认源的无打开预览，保留真实glob和重复顺序，明确缺路径和未执行provider；不调用repr、不执行Action、不改变上次解析状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_configargparse_o04_dev.py
++++ b/library/tests/test_development_configargparse_o04_dev.py
+@@ -0,0 +1,28 @@
++"""配置源预览不会执行提供器、打开文件或改解析状态。"""
++from pathlib import Path
++import configargparse as c
++
++def test_preview_order_and_real_open_matches(tmp_path):
++    """匹配路径和重复来源按真实glob顺序出现。@return None。"""
++    a=tmp_path/'a.ini';b=tmp_path/'b.ini';a.write_text('x=1');b.write_text('x=2')
++    p=c.ArgumentParser(default_config_files=[tmp_path/'*.ini',a])
++    rows=p.discover_config_files();streams=p._open_config_files([])
++    try: assert [r['path'] for r in rows if r.get('exists')]==[label for stream,label in streams]
++    finally:
++        for stream,label in streams:stream.close()
++    assert rows[-1]['path']==str(a) and rows[-1]['index']==1
++
++def test_provider_not_called_and_missing_explicit(tmp_path):
++    """缺路径有记录，提供器绝不执行。@return None。"""
++    def forbidden():raise AssertionError('provider executed')
++    p=c.ArgumentParser(default_config_files=[tmp_path/'missing',forbidden])
++    assert p.discover_config_files()==[{'kind':'path','index':0,'path':str(tmp_path/'missing'),'exists':False},{'kind':'provider','index':1,'executed':False}]
++
++def test_open_function_and_pathlike_precedence(tmp_path):
++    """同时callable和PathLike的声明按路径处理且不打开。@return None。"""
++    class Both:
++        def __fspath__(self):return str(tmp_path/'x')
++        def __call__(self):raise AssertionError('called')
++    def forbidden(*args):raise AssertionError('opened')
++    p=c.ArgumentParser(default_config_files=[Both()],config_file_open_func=forbidden)
++    assert p.discover_config_files()[0]['kind']=='path'

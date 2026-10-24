@@ -1,0 +1,14 @@
+{
+  "script": "verification/development-FG-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "app/test_atom_link.py"
+}

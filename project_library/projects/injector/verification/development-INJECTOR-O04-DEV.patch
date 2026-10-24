@@ -1,0 +1,127 @@
+--- a/library/docs/development-injector-o04-dev.md
++++ b/library/docs/development-injector-o04-dev.md
+@@ -0,0 +1,5 @@
++# 以显式任务上下文作用域隔离真实注入实例
++
++对应路线09：真实Scope协议接入ContextVar，必须本线程/任务显式进入，嵌套恢复及异步交错隔离，继承缓存不视为子任务所有；构造失败不缓存。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/injector/__init__.py
++++ b/library/injector/__init__.py
+@@ -890,6 +890,58 @@
+ singleton = ScopeDecorator(SingletonScope)
+ 
+ 
++class ContextScope(Scope):
++    """必须显式进入、按线程/异步任务归属隔离的作用域。
++
++    :param injector: 实际容器，沿用Scope协议。
++    :return: 在enter上下文内复用实际实例的Scope。
++    """
++
++    def configure(self):
++        """创建本Scope实例专属ContextVar，不共享全局缓存。@return None。"""
++        from contextvars import ContextVar
++        self._current = ContextVar('injector_context_scope', default=None)
++
++    def _owner(self):
++        """防止子任务把继承的可变缓存当成自己所有。@return 线程/任务身份。"""
++        import asyncio
++        try:
++            task = asyncio.current_task()
++        except RuntimeError:
++            task = None
++        return threading.get_ident(), id(task) if task is not None else None
++
++    def enter(self):
++        """创建一次显式可嵌套作用域，不隐式关闭业务资源。@return contextmanager。"""
++        from contextlib import contextmanager
++        @contextmanager
++        def active():
++            token = self._current.set((self._owner(), {}))
++            try:
++                yield self
++            finally:
++                self._current.reset(token)
++        return active()
++
++    def get(self, key, provider):
++        """在本任务拥有的活动域内缓存成功构造，失败不登记。
++
++        :param key: 真实绑定键。
++        :param provider: 原生Provider。
++        :return: InstanceProvider；未进入或继承其他任务状态时明确失败。
++        """
++        selected = self._current.get()
++        if selected is None or selected[0] != self._owner():
++            raise RuntimeError('ContextScope需要本任务显式进入')
++        memory = selected[1]
++        if key not in memory:
++            memory[key] = InstanceProvider(provider.get(self.injector))
++        return memory[key]
++
++
++contextscope = ScopeDecorator(ContextScope)
++
++
+ class ThreadLocalScope(Scope):
+     """A :class:`Scope` that returns a per-thread instance for a key."""
+ 
+--- a/library/tests/test_development_injector_o04_dev.py
++++ b/library/tests/test_development_injector_o04_dev.py
+@@ -0,0 +1,55 @@
++"""ContextScope真实解析对象，在任务、嵌套和异常边界隔离。"""
++import asyncio
++from injector import Injector
++import pytest
++
++def test_explicit_reuse_nested_restore_and_fresh_next():
++    """每域内复用、嵌套独立、退出恢复外层。@return None。"""
++    from injector import ContextScope
++    class Item:
++        """真实创建的作用域对象。"""
++    container=Injector(lambda b:b.bind(Item,scope=ContextScope));scope=container.get(ContextScope)
++    with pytest.raises(RuntimeError):container.get(Item)
++    with scope.enter():
++        first=container.get(Item);assert container.get(Item) is first
++        with scope.enter():assert container.get(Item) is not first
++        assert container.get(Item) is first
++    with scope.enter():assert container.get(Item) is not first
++
++def test_event_coordinated_async_tasks_and_inherited_state_rejected():
++    """交错任务各自缓存，未进入的子任务不能误用父缓存。@return None。"""
++    from injector import ContextScope
++    class Item:
++        """独立任务对象。"""
++    container=Injector(lambda b:b.bind(Item,scope=ContextScope));scope=container.get(ContextScope)
++    async def run():
++        ready,release=asyncio.Event(),asyncio.Event()
++        async def a():
++            with scope.enter():
++                value=container.get(Item);ready.set();await release.wait();assert container.get(Item) is value;return value
++        async def b():
++            await ready.wait()
++            with scope.enter():
++                value=container.get(Item);release.set();await asyncio.sleep(0);return value
++        left,right=await asyncio.gather(a(),b());assert left is not right
++        with scope.enter():
++            async def child():
++                with pytest.raises(RuntimeError):container.get(Item)
++            await asyncio.create_task(child())
++    asyncio.run(run())
++
++def test_exception_cleanup_and_provider_failure_not_cached():
++    """失败构造可重试，域异常退出不留下活动缓存。@return None。"""
++    from injector import ContextScope
++    calls=[]
++    def provide():
++        calls.append(1)
++        if len(calls)==1:raise ValueError('first')
++        return 9
++    container=Injector(lambda b:b.bind(int,to=provide,scope=ContextScope));scope=container.get(ContextScope)
++    with pytest.raises(LookupError):
++        with scope.enter():
++            with pytest.raises(ValueError):container.get(int)
++            assert container.get(int)==9 and len(calls)==2
++            raise LookupError('app')
++    with pytest.raises(RuntimeError):container.get(int)

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-CONSTRAINT-03-DEV",
+  "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair actual domain ingestion: addVariable checks/materializes the domain, not the variable identity, so tuple/hashable IDs and one-shot iterables work. addVariables materializes a shared iterable once, preflights duplicate/existing IDs, prepares all independent domains before commit and leaves no partial variables on empty/domain-source/copy failure. Preserve Domain subclass deepcopy semantics and never share hidden-value state. Allocate fresh Domain copies for each _getArgs solve so preprocessing does not permanently shrink declared model domains. Preserve original list/set/range and ordinary solver results; arbitrary user constraint external side effects are outside this isolation guarantee.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

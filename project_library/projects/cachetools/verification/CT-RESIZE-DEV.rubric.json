@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CT-RESIZE-DEV",
+  "source_commit": "6f23e2a7b75a42d30cb9d890ab3ca4059ee01bfd",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Cache.resize(maxsize) for built-in policies. Validate a nonnegative real int/float excluding bool/NaN; allow positive infinity. Perform normal expiry cleanup for timed caches, then evict through their original popitem policy until currsize fits, update maxsize and return a tuple of capacity-evicted pairs (not expired pairs). Preserve weighted sizing, growth/no-op behavior, subsequent insertion semantics and zero capacity. Validation must happen before any cleanup or mutation; do not rebuild caches or reset policy history.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

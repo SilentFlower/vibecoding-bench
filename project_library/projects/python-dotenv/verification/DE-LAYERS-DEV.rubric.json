@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DE-LAYERS-DEV",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement dotenv.layers.load_layers(sources, *, environment=None, override=True, interpolate=True), accepting a finite iterable of uniquely named (name,text) layers. Strictly parse all layers before returning, merge in order using last definition per layer, resolve variables against explicit environment and previously resolved keys with pinned override precedence. Return immutable LayeredValues(values, origins); each origin is (layer_name, original_line). Do not read or mutate ambient os.environ or input mappings; unknown variables and defaults follow pinned parse_variables semantics. Preserve valueless keys and raw values when disabled.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

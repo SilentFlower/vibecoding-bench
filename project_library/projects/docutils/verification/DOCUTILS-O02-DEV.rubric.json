@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DOCUTILS-O02-DEV",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add registered segmented-list RST directive with required pipe-CSV columns option, optional inline-formatted title, class/name and pipe-CSV content rows. Parse through real Directive/state.inline_text into table/tgroup/colspec/thead/tbody/row/entry nodes and actual HTML writer output. Preserve quoted pipes, empty cells, Unicode/inline markup and ordinary non-directive colon paragraphs. Reject absent/empty headings, malformed CSV or inconsistent row widths with real directive diagnostics and no half table. Do not implement as raw HTML/text substitution or change existing table/list-table syntax.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

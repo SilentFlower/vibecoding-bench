@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JM-QUERYSET-DEV",
+  "source_commit": "2812594e69d43098ef60f81f4efc404c071b0418",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement jmespath.queries.QuerySet(queries,*,options=None,errors=\"raise\") and frozen QueryResult (status,value,error_type,error,phase). Compile the ordered name->expression mapping once via BoundExpression; raise is default, collect preserves individual compile/evaluate JMESPath errors while other queries continue. search(data) returns ordered name->result with phase compile/evaluate/complete and status error/passed. Do not capture unrelated programmer exceptions or retain traceback objects. Query and result-container mutations must not change later searches; standard null remains a successful None value. Use completed variadic validation and literal/option binding for reliable repeated evaluation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

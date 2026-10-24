@@ -1,0 +1,110 @@
+--- a/library/bottle.py
++++ b/library/bottle.py
+@@ -3959,7 +3959,7 @@
+                  source=None,
+                  name=None,
+                  lookup=None,
+-                 encoding='utf8', **settings):
++                 encoding='utf8', extensions=None, **settings):
+         """ Create a new template.
+         If the source parameter (str or buffer) is missing, the name argument
+         is used to guess a template filename. Subclasses can assume that
+@@ -3970,6 +3970,9 @@
+         The encoding parameter should be used to decode byte strings or files.
+         The settings parameter contains a dict for engine-specific settings.
+         """
++        self.extensions = tuple(type(self).extensions) + tuple(extensions or ())
++        if any(not isinstance(ext, str) or not ext or '/' in ext or '\\' in ext for ext in self.extensions):
++            raise ValueError('模板扩展名无效')
+         self.name = os.fsdecode(os.fspath(name)) if name is not None else None
+         if isinstance(lookup, (str, bytes, os.PathLike)):
+             lookup = [lookup]
+@@ -3980,7 +3983,7 @@
+         self.settings = self.settings.copy()  # Copy from class variable
+         self.settings.update(settings)  # Apply
+         if not self.source and self.name:
+-            self.filename = self.search(self.name, self.lookup)
++            self.filename = self.search(self.name, self.lookup, extensions=self.extensions)
+             if not self.filename:
+                 raise TemplateError('Template %s not found.' % repr(name))
+         if not self.source and not self.filename:
+@@ -3988,7 +3991,7 @@
+         self.prepare(**self.settings)
+ 
+     @classmethod
+-    def search(cls, name, lookup=None):
++    def search(cls, name, lookup=None, extensions=None):
+         """ Search name in all directories specified in lookup.
+         First without, then with common extensions. Return first hit. """
+         if not lookup:
+@@ -4003,7 +4006,7 @@
+             fname = os.path.abspath(os.path.join(spath, name))
+             if not fname.startswith(spath): continue
+             if os.path.isfile(fname): return fname
+-            for ext in cls.extensions:
++            for ext in (cls.extensions if extensions is None else extensions):
+                 if os.path.isfile('%s.%s' % (fname, ext)):
+                     return '%s.%s' % (fname, ext)
+ 
+@@ -4034,6 +4037,7 @@
+ 
+ 
+ class MakoTemplate(BaseTemplate):
++    extensions = ['mako'] + BaseTemplate.extensions
+     def prepare(self, **options):
+         from mako.template import Template
+         from mako.lookup import TemplateLookup
+@@ -4056,6 +4060,7 @@
+ 
+ 
+ class CheetahTemplate(BaseTemplate):
++    extensions = ['tmpl'] + BaseTemplate.extensions
+     def prepare(self, **options):
+         from Cheetah.Template import Template
+         self.context = threading.local()
+@@ -4077,6 +4082,7 @@
+ 
+ 
+ class Jinja2Template(BaseTemplate):
++    extensions = ['jinja2', 'j2'] + BaseTemplate.extensions
+     def prepare(self, filters=None, tests=None, globals={}, **kwargs):
+         from jinja2 import Environment, FunctionLoader
+         self.env = Environment(loader=FunctionLoader(self.loader), **kwargs)
+--- a/library/docs/development-bottle-o02-dev.md
++++ b/library/docs/development-bottle-o02-dev.md
+@@ -0,0 +1,5 @@
++# 隔离模板引擎和实例的默认扩展名搜索
++
++在已交付PathLike模板读取边界上扩展引擎搜索。每种引擎优先自己的扩展并保留tpl后备；实例追加不污染父类或其他实例，实际渲染保留PathLike名字和目录、搜索优先及既有行为。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bottle_o02_dev.py
++++ b/library/test/test_development_bottle_o02_dev.py
+@@ -0,0 +1,27 @@
++"""模板引擎扩展名不能污染父类或其他实例。"""
++import bottle
++from pathlib import Path
++
++def test_engine_local_search(tmp_path):
++    """每个适配器优先匹配自己的扩展名。@param tmp_path 临时目录。@return None。"""
++    for extension in ('tpl', 'mako', 'jinja2', 'tmpl'):
++        (tmp_path / ('view.' + extension)).write_text(extension)
++    assert bottle.MakoTemplate.search('view', [str(tmp_path)]).endswith('.mako')
++    assert bottle.Jinja2Template.search('view', [str(tmp_path)]).endswith('.jinja2')
++    assert bottle.CheetahTemplate.search('view', [str(tmp_path)]).endswith('.tmpl')
++    assert bottle.BaseTemplate.search('view', [str(tmp_path)]).endswith('.tpl')
++
++def test_instance_extension_isolation(tmp_path):
++    """实例追加扩展仅对该实例生效且真实渲染。@param tmp_path 临时目录。@return None。"""
++    (tmp_path / 'view.business').write_text('Hello {{value}}')
++    before = list(bottle.SimpleTemplate.extensions)
++    instance = bottle.SimpleTemplate(name=Path('view'), lookup=tmp_path, extensions=['business'])
++    assert instance.render(value='x') == 'Hello x'
++    assert list(bottle.SimpleTemplate.extensions) == before
++
++def test_default_fallback_and_invalid(tmp_path):
++    """已有tpl后备保持，坏扩展明确拒绝。@param tmp_path 临时目录。@return None。"""
++    import pytest
++    (tmp_path / 'legacy.tpl').write_text('legacy')
++    assert bottle.MakoTemplate.search('legacy', [str(tmp_path)]).endswith('.tpl')
++    with pytest.raises(ValueError): bottle.SimpleTemplate(source='x', extensions=['../bad'])

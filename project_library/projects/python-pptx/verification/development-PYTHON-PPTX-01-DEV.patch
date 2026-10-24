@@ -1,0 +1,36 @@
+--- a/library/docs/development-python-pptx-01-dev.md
++++ b/library/docs/development-python-pptx-01-dev.md
+@@ -0,0 +1,5 @@
++# 演示主题RGB颜色严格校验六位ASCII输入而不静默误色
++
++路线01：RGBColor.from_string仅收六位ASCII十六进制，大小写合法、输出六位大写；长度/空白/前缀/Unicode类数字/类型错误明确ValueError，数值构造不动。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pptx/dml/color.py
++++ b/library/src/pptx/dml/color.py
+@@ -295,6 +295,8 @@
+         """
+         Return a new instance from an RGB color hex string like ``'3C2F80'``.
+         """
++        if not isinstance(rgb_hex_str,str) or len(rgb_hex_str)!=6 or any(character not in "0123456789abcdefABCDEF" for character in rgb_hex_str):
++            raise ValueError("RGB字符串必须为恰好六位ASCII十六进制")
+         r = int(rgb_hex_str[:2], 16)
+         g = int(rgb_hex_str[2:4], 16)
+         b = int(rgb_hex_str[4:], 16)
+--- a/library/tests/test_development_python_pptx_01_dev.py
++++ b/library/tests/test_development_python_pptx_01_dev.py
+@@ -0,0 +1,14 @@
++"""RGB输入严格六位ASCII十六进制，不把CSS语法当现有合同。"""
++import unittest
++from pptx.dml.color import RGBColor
++
++def test_exact_hex_case_channels_and_serialization():
++    """合法大小写等值，输出固定六位大写。@return None。"""
++    assert RGBColor.from_string('abcdef')==RGBColor(171,205,239)
++    assert str(RGBColor.from_string('00aF01'))=='00AF01'
++    assert RGBColor.from_string('112233')==RGBColor(17,34,51)
++
++def test_invalid_length_whitespace_unicode_prefix_type_are_clear_errors():
++    """五/七位不能静默成为其他颜色。@return None。"""
++    for value in ('11223','1122000','','#112233',' 112233','１12233','gg2233',None,b'112233',123456):
++        with unittest.TestCase().assertRaises(ValueError):RGBColor.from_string(value)

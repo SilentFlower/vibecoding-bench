@@ -59,6 +59,246 @@
           "development_cycle": "feature"
         }
       ]
+    },
+    {
+      "id": "DC-CSV-DEV-SCENE",
+      "title": "增加显式CSV字面解析并保持默认兼容",
+      "goal": "增加显式CSV字面解析并保持默认兼容",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DC-CSV-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-CSV-DEV",
+          "kind": "modify",
+          "goal": "增加显式CSV字面解析并保持默认兼容",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Csv with a keyword-only mode='legacy_shell' default and opt-in mode='csv'. The CSV mode parses one strict CSV record, preserving backslashes, # characters, empty/trailing fields, quoted delimiters and doubled double quotes; reject malformed quoting, multiple records and non-single-character CSV delimiters with ValueError. Retain existing cast/strip/post_process semantics, None and legacy shell behavior; do not change Config precedence or repository reading.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dc_csv_dev.py and concise Chinese compatibility documentation at library/docs/development-dc-csv-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DC-CSV-DEV-contract.md",
+            "materials/DC-CSV-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/decouple.py",
+            "library/tests/test_development_dc_csv_dev.py",
+            "library/docs/development-dc-csv-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DC-CSV-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-CSV-DEV.native.json",
+            "public_native": "verification/DC-CSV-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DC-CSV-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DC-MAPPING-DEV-SCENE",
+      "title": "为配置值提供显式键值和JSON映射转换",
+      "goal": "为配置值提供显式键值和JSON映射转换",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DC-MAPPING-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-MAPPING-DEV",
+          "kind": "modify",
+          "goal": "为配置值提供显式键值和JSON映射转换",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd MappingCast(key_cast=str, value_cast=undefined, *, format='pairs', delimiter=',', duplicate='error'). Parse strict one-record CSV key=value pairs by splitting only the first equals sign, or explicitly selected JSON objects with native nested values. Convert each key/value once, detect duplicate keys after key conversion and support explicit duplicate='last'. Preserve empty values and # characters; reject empty keys, missing separators, multiple records and non-object JSON without leaking entire values. None yields an empty mapping. Do not change Csv or guess formats automatically.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dc_mapping_dev.py and concise Chinese compatibility documentation at library/docs/development-dc-mapping-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DC-MAPPING-DEV-contract.md",
+            "materials/DC-MAPPING-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/decouple.py",
+            "library/tests/test_development_dc_mapping_dev.py",
+            "library/docs/development-dc-mapping-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DC-MAPPING-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-MAPPING-DEV.native.json",
+            "public_native": "verification/DC-MAPPING-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DC-MAPPING-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DC-STRICT-ENV-DEV-SCENE",
+      "title": "为ENV文件提供不泄漏值的严格解析诊断",
+      "goal": "为ENV文件提供不泄漏值的严格解析诊断",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DC-STRICT-ENV-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-STRICT-ENV-DEV",
+          "kind": "modify",
+          "goal": "为ENV文件提供不泄漏值的严格解析诊断",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend the already delivered BOM-aware RepositoryEnv with keyword-only strict=False. Strict mode rejects non-comment/nonblank lines without equals, empty trimmed keys and duplicate trimmed keys, with source path and physical one-based line number but no raw line or values in the diagnostic. Preserve UTF-8 BOM handling and embedded U+FEFF, empty values, splitting at the first equals, existing quotation handling, encoding errors and OS errors. Default tolerant skipping/last-value behavior remains unchanged; do not read unrelated files or execute shell syntax.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dc_strict_env_dev.py and concise Chinese compatibility documentation at library/docs/development-dc-strict-env-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "DC-BOM-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/DC-STRICT-ENV-DEV-contract.md",
+            "materials/DC-STRICT-ENV-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/decouple.py",
+            "library/tests/test_development_dc_strict_env_dev.py",
+            "library/docs/development-dc-strict-env-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DC-STRICT-ENV-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-STRICT-ENV-DEV.native.json",
+            "public_native": "verification/DC-STRICT-ENV-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DC-STRICT-ENV-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DC-INI-OPTIONS-DEV-SCENE",
+      "title": "让INI节和字面百分号读取策略显式可选",
+      "goal": "让INI节和字面百分号读取策略显式可选",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DC-INI-OPTIONS-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-INI-OPTIONS-DEV",
+          "kind": "modify",
+          "goal": "让INI节和字面百分号读取策略显式可选",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend RepositoryIni with keyword-only section='settings' and interpolation=True. Each instance selects its own nonempty section; interpolation=False reads literal % sequences such as URL percent escapes, while True preserves existing ConfigParser interpolation. Preserve DEFAULT inheritance, case-insensitive option lookup, encoding, Config environment precedence and default behavior. Validate option types; do not globally escape percent signs or mutate the class SECTION for other instances.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dc_ini_options_dev.py and concise Chinese compatibility documentation at library/docs/development-dc-ini-options-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DC-INI-OPTIONS-DEV-contract.md",
+            "materials/DC-INI-OPTIONS-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/decouple.py",
+            "library/tests/test_development_dc_ini_options_dev.py",
+            "library/docs/development-dc-ini-options-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DC-INI-OPTIONS-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-INI-OPTIONS-DEV.native.json",
+            "public_native": "verification/DC-INI-OPTIONS-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DC-INI-OPTIONS-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DC-FACTORY-DEV-SCENE",
+      "title": "仅在配置缺失时执行有界默认工厂",
+      "goal": "仅在配置缺失时执行有界默认工厂",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DC-FACTORY-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DC-FACTORY-DEV",
+          "kind": "modify",
+          "goal": "仅在配置缺失时执行有界默认工厂",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd explicit keyword-only default_factory=undefined to Config.get and its call shortcut. Invoke a callable factory exactly once only when neither environment nor repository contains the key, then apply the normal cast/bool rules. Empty and None source values are present, not missing. Reject simultaneous default/default_factory and noncallable factories, bound recursive lookup of the same missing key with a safe ValueError, clear the recursion guard even after errors, and preserve the identity of factory exceptions. Existing callable default values must remain ordinary values.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dc_factory_dev.py and concise Chinese compatibility documentation at library/docs/development-dc-factory-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DC-FACTORY-DEV-contract.md",
+            "materials/DC-FACTORY-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/decouple.py",
+            "library/tests/test_development_dc_factory_dev.py",
+            "library/docs/development-dc-factory-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DC-FACTORY-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DC-FACTORY-DEV.native.json",
+            "public_native": "verification/DC-FACTORY-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DC-FACTORY-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
     }
   ]
 }

@@ -1,0 +1,71 @@
+--- a/library/docs/development-pydantic-settings-05-dev.md
++++ b/library/docs/development-pydantic-settings-05-dev.md
+@@ -0,0 +1,5 @@
++# CLI未知参数序列化保持父子命令归属并可多层往返
++
++路线05：每层unknown放本层已知参数之后/子命令之前，不汇总搬尾；真实三层往返、重复未知项、叶子--、原位置参数规则保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pydantic_settings/sources/providers/cli.py
++++ b/library/pydantic_settings/sources/providers/cli.py
+@@ -1839,11 +1839,9 @@
+                 if not positionals_first
+                 else serialized_args['positional'] + serialized_args['optional']
+             )
++            # 当前命令的未知参数必须位于它自己的已知参数之后、子命令之前；否则回读会误归子层。
++            + serialized_args['unknown']
+             + serialized_args['subcommand']
+-            # Unknown args are emitted last, regardless of positionals_first. They are replayed verbatim and may
+-            # contain an end-of-options marker ('--') or an unknown option, either of which would capture known args
+-            # that follow it.
+-            + serialized_args['unknown']
+         )
+ 
+     def _serialized_args(
+@@ -1880,10 +1878,6 @@
+                     positionals_first=positionals_first,
+                     _is_submodel=True,
+                 )
+-                # Hoist the subcommand's unknown args into this model's trailing segment so that all unknown args,
+-                # at any depth, stay at the very end of the serialized output.
+-                unknown_args += sub_args['unknown']
+-                sub_args['unknown'] = []
+                 subcommand_args += self._flatten_serialized_args(sub_args, positionals_first)
+                 continue
+             if is_model_class(type(model_default)) or is_pydantic_dataclass(type(model_default)):
+--- a/library/tests/test_development_pydantic_settings_05_dev.py
++++ b/library/tests/test_development_pydantic_settings_05_dev.py
+@@ -0,0 +1,33 @@
++"""未知CLI参数按原父子层级保留，不能都搬到末尾。"""
++from pydantic_settings import BaseSettings,CliApp,CliSubCommand,CliUnknownArgs
++
++def test_parent_and_child_unknowns_keep_ownership_after_roundtrip():
++    """真实解析先建立归属，序列化后再解析核每层。@return None。"""
++    class Child(BaseSettings):
++        value:int=1
++        unknown:CliUnknownArgs
++    class Root(BaseSettings):
++        name:str='old'
++        unknown:CliUnknownArgs
++        sub:CliSubCommand[Child]
++    value=CliApp.run(Root,cli_args=['--name','now','--parent-extra=7','sub','--value','3','--child-extra=8'])
++    assert value.unknown==['--parent-extra=7'] and value.sub.unknown==['--child-extra=8']
++    for positionals_first in (False,True):
++        copy=CliApp.run(Root,cli_args=CliApp.serialize(value,positionals_first=positionals_first))
++        assert copy==value
++
++def test_three_levels_and_child_end_marker_preserve_known_fields():
++    """多层unknown各留原层，叶子--仍在已知参数之后。@return None。"""
++    class Leaf(BaseSettings):
++        value:int=0
++        unknown:CliUnknownArgs
++    class Middle(BaseSettings):
++        unknown:CliUnknownArgs
++        leaf:CliSubCommand[Leaf]
++    class Root(BaseSettings):
++        unknown:CliUnknownArgs
++        mid:CliSubCommand[Middle]
++    value=CliApp.run(Root,cli_args=['--root=x','mid','--middle=y','leaf','--value','9','--','--literal=z'])
++    copy=CliApp.run(Root,cli_args=CliApp.serialize(value))
++    assert copy==value and copy.mid.leaf.value==9
++    assert copy.unknown==['--root=x'] and copy.mid.unknown==['--middle=y'] and copy.mid.leaf.unknown==['--','--literal=z']

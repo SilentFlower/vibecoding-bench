@@ -1,0 +1,116 @@
+--- a/library/development_tests/test_development_tn_random_source_dev.py
++++ b/library/development_tests/test_development_tn_random_source_dev.py
+@@ -0,0 +1,33 @@
++"""公开显式随机源等待回归。"""
++import random
++import pytest
++from types import SimpleNamespace
++from tenacity.wait import wait_random,wait_random_exponential,wait_exponential_jitter,wait_fixed
++
++def test_independent_seeded_sources_are_reproducible():
++    first=wait_random(2,5,random_source=random.Random(17))
++    second=wait_random(2,5,random_source=random.Random(17))
++    assert [first(None) for _ in range(4)]==[second(None) for _ in range(4)]
++
++def test_global_random_state_is_not_consumed():
++    before=random.getstate()
++    wait_random(random_source=random.Random(5))(None)
++    wait_random_exponential(random_source=random.Random(5))(SimpleNamespace(attempt_number=3))
++    wait_exponential_jitter(random_source=random.Random(5))(SimpleNamespace(attempt_number=3))
++    assert random.getstate()==before
++
++def test_bounds_and_composition_keep_original_formulas():
++    class Source:
++        def random(self):
++            return 0.25
++        def uniform(self,low,high):
++            return low+(high-low)*0.25
++    source=Source();state=SimpleNamespace(attempt_number=3)
++    assert (wait_random(2,6,random_source=source)+wait_fixed(1))(state)==4
++    assert wait_random_exponential(multiplier=2,max=10,min=2,random_source=source)(state)==3.5
++    assert wait_exponential_jitter(multiplier=2,jitter=4,random_source=source)(state)==9
++
++def test_invalid_sources_fail_at_configuration():
++    for cls in (wait_random,wait_random_exponential,wait_exponential_jitter):
++        with pytest.raises(TypeError):
++            cls(random_source=object())
+--- a/library/docs/development-tn-random-source-dev.md
++++ b/library/docs/development-tn-random-source-dev.md
+@@ -0,0 +1,5 @@
++# 为随机等待策略注入独立随机源并保持旧默认行为
++
++重试压测需要可复现而互不干扰的随机等待。三个随机策略接受显式随机源，默认继续使用原模块，保留边界和溢出处理，不重置或消耗全局随机状态，组合策略仍兼容。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tenacity/wait.py
++++ b/library/tenacity/wait.py
+@@ -80,15 +80,18 @@
+     """Wait strategy that waits a random amount of time between min/max."""
+ 
+     def __init__(
+-        self, min: _utils.time_unit_type = 0, max: _utils.time_unit_type = 1
++        self, min: _utils.time_unit_type = 0, max: _utils.time_unit_type = 1, *, random_source=None
+     ) -> None:
++        self._random_source = random if random_source is None else random_source
++        if not callable(getattr(self._random_source, 'random', None)):
++            raise TypeError('随机源必须提供random方法')
+         self.wait_random_min = _utils.to_seconds(min)
+         self.wait_random_max = _utils.to_seconds(max)
+ 
+     @override
+     def __call__(self, retry_state: "RetryCallState") -> float:
+         return self.wait_random_min + (
+-            random.random() * (self.wait_random_max - self.wait_random_min)
++            self._random_source.random() * (self.wait_random_max - self.wait_random_min)
+         )
+ 
+ 
+@@ -270,10 +273,19 @@
+ 
+     """
+ 
++    def __init__(self,*args,random_source=None,**kwargs):
++        """创建指数随机等待。@param random_source 独立uniform随机源。
++        @param args 原指数参数。@param kwargs 原指数参数。@return None。
++        """
++        super().__init__(*args,**kwargs)
++        self._random_source=random if random_source is None else random_source
++        if not callable(getattr(self._random_source,'uniform',None)):
++            raise TypeError('随机源必须提供uniform方法')
++
+     @override
+     def __call__(self, retry_state: "RetryCallState") -> float:
+         high = super().__call__(retry_state=retry_state)
+-        return random.uniform(self.min, high)
++        return self._random_source.uniform(self.min, high)
+ 
+ 
+ class wait_exponential_jitter(wait_base):
+@@ -296,6 +308,8 @@
+         jitter: _utils.time_unit_type = 1,
+         min: _utils.time_unit_type = 0,
+         multiplier: float = 1,
++        *,
++        random_source=None,
+     ) -> None:
+         if initial != 1 and multiplier != 1:
+             raise ValueError(
+@@ -310,6 +324,9 @@
+             )
+             multiplier = initial
+ 
++        self._random_source=random if random_source is None else random_source
++        if not callable(getattr(self._random_source,'uniform',None)):
++            raise TypeError('随机源必须提供uniform方法')
+         self.multiplier = multiplier
+         self.max = _utils.to_seconds(max)
+         self.exp_base = exp_base
+@@ -318,7 +335,7 @@
+ 
+     @override
+     def __call__(self, retry_state: "RetryCallState") -> float:
+-        jitter = random.uniform(0, self.jitter)
++        jitter = self._random_source.uniform(0, self.jitter)
+         try:
+             exp = self.exp_base ** (retry_state.attempt_number - 1)
+             result = self.multiplier * exp + jitter

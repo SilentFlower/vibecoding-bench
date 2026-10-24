@@ -3,7 +3,7 @@
   "project_key": "confuse",
   "title": "Confuse分层配置开发任务",
   "category": "YAML配置与源归属",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项完整配置工程交付：重载修复、TOML来源、严格常量、不可变快照、临时覆盖与来源追踪；独立和累计验收。",
   "seed_digest": "c04ba316aeae924e01b78c32d9b26c573804551f9ea771a6096b309522fca69b",
   "environment": "confuse-py312",
   "source": {
@@ -55,6 +55,248 @@
             "disclosure/CF-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "CF-TOML-DEV-SCENE",
+      "title": "接入标准TOML文件来源并保持重载事务与来源身份",
+      "goal": "接入标准TOML文件来源并保持重载事务与来源身份",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CF-TOML-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-TOML-DEV",
+          "kind": "modify",
+          "goal": "接入标准TOML文件来源并保持重载事务与来源身份",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement confuse.toml_source.TomlSource(filename,default=False,base_for_paths=False,optional=False) as a ConfigSource. Read standard TOML including tables, arrays and dates; keep absolute filename and metadata. load() parses fully before replacing the same source dictionary, removes deleted keys, preserves last valid state on parse/read error and raises ConfigReadError. Optional missing files become empty, other failures remain errors. Configuration.reload must reload TOML and existing YAML without replacing source identities or disturbing in-memory sources. Do not alter YAML parsing.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_cf_toml_dev.py and concise Chinese compatibility documentation at library/docs/development-cf-toml-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CF-TOML-DEV-contract.md",
+            "materials/CF-TOML-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/confuse/toml_source.py",
+            "library/confuse/core.py",
+            "library/development_tests/test_development_cf_toml_dev.py",
+            "library/docs/development-cf-toml-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CF-TOML-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-TOML-DEV.native.json",
+            "public_native": "verification/CF-TOML-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CF-TOML-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CF-LITERAL-DEV-SCENE",
+      "title": "添加深层严格常量模板并隔离可变默认值",
+      "goal": "添加深层严格常量模板并隔离可变默认值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CF-LITERAL-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-LITERAL-DEV",
+          "kind": "modify",
+          "goal": "添加深层严格常量模板并隔离可变默认值",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement confuse.literal.Literal(expected,default=REQUIRED) as a real Template. Require recursive type-and-value equality for scalars, dict keys/values and sequences: True,1,1.0 differ and list differs from tuple. Constructor detaches expected and validates explicit default against it. Conversion raises normal ConfigValueError with view path on mismatch, missing required values retain NotFoundError. Returned mutable values and defaults must be independent copies, without changing legacy Choice or coercive templates.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_cf_literal_dev.py and concise Chinese compatibility documentation at library/docs/development-cf-literal-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CF-LITERAL-DEV-contract.md",
+            "materials/CF-LITERAL-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/confuse/literal.py",
+            "library/development_tests/test_development_cf_literal_dev.py",
+            "library/docs/development-cf-literal-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CF-LITERAL-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-LITERAL-DEV.native.json",
+            "public_native": "verification/CF-LITERAL-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CF-LITERAL-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CF-SNAPSHOT-DEV-SCENE",
+      "title": "按实际分层语义生成可验证且脱敏的不可变快照",
+      "goal": "按实际分层语义生成可验证且脱敏的不可变快照",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CF-SNAPSHOT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-SNAPSHOT-DEV",
+          "kind": "modify",
+          "goal": "按实际分层语义生成可验证且脱敏的不可变快照",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ConfigView.snapshot(template=REQUIRED,*,redact=False) and confuse.snapshots.snapshot(view,...). Without template resolve nested mappings across sources and list subviews using existing view precedence; explicit templates use view.get(template). Deep-freeze dictionaries as read-only mappings and lists/tuples as tuples, retain standard immutable configuration scalar/date/Decimal/Path values, reject cycles and unsupported mutable objects. Snapshot detaches all future source changes. Redact relative marked paths including list elements and whole views as REDACTED. Do not silently serialize values or alter flatten/get.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_cf_snapshot_dev.py and concise Chinese compatibility documentation at library/docs/development-cf-snapshot-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CF-SNAPSHOT-DEV-contract.md",
+            "materials/CF-SNAPSHOT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/confuse/snapshots.py",
+            "library/confuse/core.py",
+            "library/development_tests/test_development_cf_snapshot_dev.py",
+            "library/docs/development-cf-snapshot-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CF-SNAPSHOT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-SNAPSHOT-DEV.native.json",
+            "public_native": "verification/CF-SNAPSHOT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CF-SNAPSHOT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CF-OVERRIDE-DEV-SCENE",
+      "title": "提供嵌套安全且精确撤销的临时配置覆盖",
+      "goal": "提供嵌套安全且精确撤销的临时配置覆盖",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CF-OVERRIDE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-OVERRIDE-DEV",
+          "kind": "modify",
+          "goal": "提供嵌套安全且精确撤销的临时配置覆盖",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement confuse.scopes.temporary_override(root,value), a synchronous context manager for RootView and mapping dict inputs. Deep-copy input, insert one independent ConfigSource at highest priority and yield it. On normal or exceptional exit remove only that exact source identity, preserving preexisting source identities/order, unrelated additions/removals and nested scopes even when dictionaries compare equal. Do not reset the whole source list or redactions and do not claim concurrent isolation.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_cf_override_dev.py and concise Chinese compatibility documentation at library/docs/development-cf-override-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CF-OVERRIDE-DEV-contract.md",
+            "materials/CF-OVERRIDE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/confuse/scopes.py",
+            "library/development_tests/test_development_cf_override_dev.py",
+            "library/docs/development-cf-override-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CF-OVERRIDE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-OVERRIDE-DEV.native.json",
+            "public_native": "verification/CF-OVERRIDE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CF-OVERRIDE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CF-TRACE-DEV-SCENE",
+      "title": "实现默认隐藏值的真实来源追踪与可选脱敏快照",
+      "goal": "实现默认隐藏值的真实来源追踪与可选脱敏快照",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CF-TRACE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CF-TRACE-DEV",
+          "kind": "modify",
+          "goal": "实现默认隐藏值的真实来源追踪与可选脱敏快照",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement confuse.trace.trace_sources(view,*,include_values=False,redact=True) returning immutable SourceTrace records in actual view.resolve order. Records contain filename/default/base_for_paths, kind of resolved value, zero-based priority, is_first and optional value. Missing views produce an empty tuple; first means first resolution, not sole contributor to merged dictionaries. Default mode must not expose values. Included values use the completed snapshot freeze logic and relative redactions including sequences, remain detached, and reject unsupported/cyclic structures. No file reads or source mutations.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_cf_trace_dev.py and concise Chinese compatibility documentation at library/docs/development-cf-trace-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "CF-SNAPSHOT-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/CF-TRACE-DEV-contract.md",
+            "materials/CF-TRACE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/confuse/trace.py",
+            "library/development_tests/test_development_cf_trace_dev.py",
+            "library/docs/development-cf-trace-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CF-TRACE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CF-TRACE-DEV.native.json",
+            "public_native": "verification/CF-TRACE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CF-TRACE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

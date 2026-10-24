@@ -1,0 +1,305 @@
+{
+  "project_key": "wrapt",
+  "title": "Wrapt可观察性集成工作场景",
+  "category": "装饰、代理与包装生命周期",
+  "seed_digest": "2815cecc43105b3fc818818aa0e0ed28bb6089dc431fa595474fd445412c55b4",
+  "environment": "wrapt-py312",
+  "source": {
+    "repository": "https://github.com/GrahamDumpleton/wrapt",
+    "commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "schema": 3,
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
+  "scenarios": [
+    {
+      "id": "WRAPT-01-DEV-SCENE",
+      "title": "继承类方法缓存以实际调用类为身份且保持两种装饰顺序",
+      "goal": "继承类方法缓存以实际调用类为身份且保持两种装饰顺序",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WRAPT-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WRAPT-01-DEV",
+          "kind": "modify",
+          "goal": "继承类方法缓存以实际调用类为身份且保持两种装饰顺序",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair wrapt.lru_cache classmethod handling so actual calling class participates in shared cache keys rather than capturing first bound method. Both @lru_cache/@classmethod orders, Base/Derived calls in either order and instance access must return actual cls. Keep ordinary per-instance cache isolation/GC, static/plain functions, cache_info/cache_parameters and shared class cache_clear behavior. Class-key references follow normal functools retention until eviction/clear; do not claim weak class storage.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wrapt_01_dev.py, and Chinese compatibility documentation at library/docs/development-wrapt-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WRAPT-01-DEV-contract.md",
+            "materials/WRAPT-01-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WRAPT-01-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wrapt/caching.py",
+            "library/tests/test_development_wrapt_01_dev.py",
+            "library/docs/development-wrapt-01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WRAPT-01-DEV.rubric.json",
+            "native": "verification/WRAPT-01-DEV.native.json",
+            "public_native": "verification/WRAPT-01-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "WRAPT-02-DEV-SCENE",
+      "title": "无字典轻量实例以弱引用身份维护独立方法缓存",
+      "goal": "无字典轻量实例以弱引用身份维护独立方法缓存",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WRAPT-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WRAPT-02-DEV",
+          "kind": "modify",
+          "goal": "无字典轻量实例以弱引用身份维护独立方法缓存",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit wrapt.weak_cache.weak_method_cache(maxsize=128,typed=False) using real wrapt descriptor/decorator binding and WeakFunctionProxy. Maintain id+weakref-verified per-instance caches without requiring instance hash/equality or __dict__; weak callbacks remove exact matching entry, bound methods must not strongly retain instance. Expose cache_count() and cache_clear(instance=None). Reject nonweakrefable/class/plain usage clearly, preserve method results/exceptions and functools argument/typed semantics. Thread-safe cache creation, no singleflight promise. Cached result or arguments that themselves retain self follow normal retention and are excluded from weak-lifetime guarantee. Existing lru_cache unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wrapt_02_dev.py, and Chinese compatibility documentation at library/docs/development-wrapt-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WRAPT-02-DEV-contract.md",
+            "materials/WRAPT-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WRAPT-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wrapt/weak_cache.py",
+            "library/tests/test_development_wrapt_02_dev.py",
+            "library/docs/development-wrapt-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WRAPT-02-DEV.rubric.json",
+            "native": "verification/WRAPT-02-DEV.native.json",
+            "public_native": "verification/WRAPT-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "WRAPT-03-DEV-SCENE",
+      "title": "异步LRU只缓存成功await结果并隔离loop及清理代次",
+      "goal": "异步LRU只缓存成功await结果并隔离loop及清理代次",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WRAPT-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WRAPT-03-DEV",
+          "kind": "modify",
+          "goal": "异步LRU只缓存成功await结果并隔离loop及清理代次",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit wrapt.async_cache.async_lru_cache(maxsize=128) for coroutine functions, storing only successful completed values in per-running-loop bounded LRU. Repeat await same call works, exceptions and cancellation never cache; clear during in-flight compute advances generation so its later success returns only to caller without repopulating cleared cache. Expose current-loop cache_info/cache_clear, preserve metadata and descriptor binding through normal async function. Concurrent same-key misses explicitly may compute separately, no singleflight. Keys are hashable args+sorted kwargs including method self, normal result/argument retention until eviction/clear. Default synchronous lru_cache unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wrapt_03_dev.py, and Chinese compatibility documentation at library/docs/development-wrapt-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WRAPT-03-DEV-contract.md",
+            "materials/WRAPT-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WRAPT-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wrapt/async_cache.py",
+            "library/tests/test_development_wrapt_03_dev.py",
+            "library/docs/development-wrapt-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WRAPT-03-DEV.rubric.json",
+            "native": "verification/WRAPT-03-DEV.native.json",
+            "public_native": "verification/WRAPT-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "WRAPT-04-DEV-SCENE",
+      "title": "本地派生结果按单调时间与容量双重失效并保持准确边界",
+      "goal": "本地派生结果按单调时间与容量双重失效并保持准确边界",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WRAPT-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WRAPT-04-DEV",
+          "kind": "modify",
+          "goal": "本地派生结果按单调时间与容量双重失效并保持准确边界",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd separate wrapt.ttl_cache.ttl_cache(ttl,maxsize=128,clock=monotonic). Use finite explicit nonnegative TTL from successful computation COMPLETION, maxsize bounded LRU and global expired-entry purge on call/info; zero TTL/maxsize disables storing. Injectable clock for exact deterministic tests, reject nonfinite/backward clock or invalid budget. Exceptions never cached, results maintain identity, cache_info/cache_clear defined. Thread RLock serializes computation/clear; no cross-key concurrency promise. Hashable args/sorted kwargs keys include method self with normal cache retention; preserve existing lru_cache unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wrapt_04_dev.py, and Chinese compatibility documentation at library/docs/development-wrapt-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WRAPT-04-DEV-contract.md",
+            "materials/WRAPT-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WRAPT-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wrapt/ttl_cache.py",
+            "library/tests/test_development_wrapt_04_dev.py",
+            "library/docs/development-wrapt-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WRAPT-04-DEV.rubric.json",
+            "native": "verification/WRAPT-04-DEV.native.json",
+            "public_native": "verification/WRAPT-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "WRAPT-05-DEV-SCENE",
+      "title": "缓存键按真实参数默认值规范化并允许明确业务ID策略",
+      "goal": "缓存键按真实参数默认值规范化并允许明确业务ID策略",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WRAPT-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WRAPT-05-DEV",
+          "kind": "modify",
+          "goal": "缓存键按真实参数默认值规范化并允许明确业务ID策略",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd independent wrapt.canonical_cache.canonical_cache(maxsize=128,typed=False,key_func=None). inspect.signature.bind/apply_defaults before key creation so equivalent positional/keyword/explicit-default calls share, varargs remain ordered and varkw keys sort deterministically. typed mode includes direct bound value types. Custom key_func receives BoundArguments after signature validation and may extract id from unhashable dict; collisions are explicit caller policy. Default unhashable values fail, never deepcopy/serialize arbitrary inputs. Bounded LRU, cache_info/clear, exception propagation and ordinary metadata/descriptor binding; synchronous RLock serializes. Existing lru_cache key behavior unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wrapt_05_dev.py, and Chinese compatibility documentation at library/docs/development-wrapt-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/WRAPT-05-DEV-contract.md",
+            "materials/WRAPT-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WRAPT-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wrapt/canonical_cache.py",
+            "library/tests/test_development_wrapt_05_dev.py",
+            "library/docs/development-wrapt-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WRAPT-05-DEV.rubric.json",
+            "native": "verification/WRAPT-05-DEV.native.json",
+            "public_native": "verification/WRAPT-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "WRAPT-06-DEV-SCENE",
+      "title": "按同一业务参数身份只失效指定缓存交付并保留其他热数据",
+      "goal": "按同一业务参数身份只失效指定缓存交付并保留其他热数据",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "WRAPT-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "WRAPT-06-DEV",
+          "kind": "modify",
+          "goal": "按同一业务参数身份只失效指定缓存交付并保留其他热数据",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend delivered canonical_cache with cache_invalidate(*args,**kwargs) using the SAME make_key/signature/default/custom-key path as reads. Return True only when existing entry deleted; missing returns False, invalid call/key errors propagate. Preserve all unrelated entries and hit/miss statistics, per-method-self identity and custom business IDs. Run invalidation under same computation RLock so a completed call cannot later silently refill invalidated value; explicitly no cancellation of already-running user code. Do not call cache_clear internally or reset all stats. Keep existing default/cache_clear behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_wrapt_06_dev.py, and Chinese compatibility documentation at library/docs/development-wrapt-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "WRAPT-05-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/WRAPT-06-DEV-contract.md",
+            "materials/WRAPT-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/WRAPT-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/wrapt/canonical_cache.py",
+            "library/tests/test_development_wrapt_06_dev.py",
+            "library/docs/development-wrapt-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/WRAPT-06-DEV.rubric.json",
+            "native": "verification/WRAPT-06-DEV.native.json",
+            "public_native": "verification/WRAPT-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

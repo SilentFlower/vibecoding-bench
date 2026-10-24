@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "RICH-01-DEV",
+  "source_commit": "9d8f9a372cc5916fd4781fec207ced7ddac2f08f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Rich cells/Text wrapping as one complete width-boundary delivery: use the same split_graphemes widths for ZWJ/VS special paths, guard zero total grapheme width and positions beyond the end before offset estimation, and honor the selected Unicode table. set_cell_size/chop_cells/Text.wrap at <=0 width consistently return empty text/list/Lines, while split_text at <=0 returns empty-left/original-right for ASCII and Unicode. Preserve positive-width ASCII fast paths, grapheme boundaries, normal padding, replacement spaces for splitting a double-width glyph, existing Panel layout and all original tests. Never turn all Unicode characters into width two or claim full UAX grapheme conformance beyond the pinned model.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,306 @@
+{
+  "project_key": "structlog",
+  "title": "Structlog结构化日志工作场景",
+  "category": "上下文、序列化与出站政策",
+  "seed_digest": "273f7c539952331608373d361fbc8c0adfcccb9adad2ad730fdef24587c2512d",
+  "environment": "structlog-py312",
+  "source": {
+    "repository": "https://github.com/hynek/structlog",
+    "commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+    "license_files": [
+      "seed/library/LICENSE-MIT",
+      "seed/library/LICENSE-APACHE",
+      "seed/library/NOTICE",
+      "seed/library/COPYRIGHT"
+    ]
+  },
+  "schema": 3,
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
+  "scenarios": [
+    {
+      "id": "STRUCTLOG-01-DEV-SCENE",
+      "title": "有序日志渲染仅丢缺字段而保留显式空值",
+      "goal": "有序日志渲染仅丢缺字段而保留显式空值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "STRUCTLOG-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "STRUCTLOG-01-DEV",
+          "kind": "modify",
+          "goal": "有序日志渲染仅丢缺字段而保留显式空值",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair shared _items_sorter missing detection with a private sentinel, preserving explicit None for KeyValueRenderer and LogfmtRenderer when drop_missing=True. Cover both ordered+sort paths, false/zero/empty values and duplicate key_order behavior. Keep default absent-field None rendering, ordering, extras sorting and original event-dictionary consumption semantics; do not turn None into an absent field or change serializer rules.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_structlog_01_dev.py, and Chinese compatibility documentation at library/docs/development-structlog-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/STRUCTLOG-01-DEV-contract.md",
+            "materials/STRUCTLOG-01-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/STRUCTLOG-01-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/structlog/processors.py",
+            "library/tests/test_development_structlog_01_dev.py",
+            "library/docs/development-structlog-01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/STRUCTLOG-01-DEV.rubric.json",
+            "native": "verification/STRUCTLOG-01-DEV.native.json",
+            "public_native": "verification/STRUCTLOG-01-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "STRUCTLOG-02-DEV-SCENE",
+      "title": "嵌套事件字节值可显式递归解码且不污染调用方容器",
+      "goal": "嵌套事件字节值可显式递归解码且不污染调用方容器",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "STRUCTLOG-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "STRUCTLOG-02-DEV",
+          "kind": "modify",
+          "goal": "嵌套事件字节值可显式递归解码且不污染调用方容器",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend UnicodeDecoder with opt-in recursive=False/max_depth=32. Recursive mode builds new built-in dict/list/tuple containers, decodes bytes values using configured encoding/errors, leaves keys and opaque objects untouched. Preserve container types, reject active-path cycles with path diagnostics (shared DAG is legal), enforce finite depth. Default shallow in-place behavior stays unchanged. No arbitrary object getter/deepcopy or claim to preserve alias identity of copied shared subtrees.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_structlog_02_dev.py, and Chinese compatibility documentation at library/docs/development-structlog-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/STRUCTLOG-02-DEV-contract.md",
+            "materials/STRUCTLOG-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/STRUCTLOG-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/structlog/processors.py",
+            "library/tests/test_development_structlog_02_dev.py",
+            "library/docs/development-structlog-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/STRUCTLOG-02-DEV.rubric.json",
+            "native": "verification/STRUCTLOG-02-DEV.native.json",
+            "public_native": "verification/STRUCTLOG-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "STRUCTLOG-03-DEV-SCENE",
+      "title": "事件多字段同时改名且冲突策略不丢业务数据",
+      "goal": "事件多字段同时改名且冲突策略不丢业务数据",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "STRUCTLOG-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "STRUCTLOG-03-DEV",
+          "kind": "modify",
+          "goal": "事件多字段同时改名且冲突策略不丢业务数据",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd FieldRenamer(mapping,conflict=\"error\"/\"keep\"/\"overwrite\") processor in structlog.processors. Freeze string mapping, reject duplicate destinations, ignore absent sources, apply all moves from original snapshot so swaps/chains work. Default external destination collision raises before any mutation; keep retains conflicting source/destination and transitively prevents moves into newly retained fields; overwrite explicitly replaces destination. Return independent outer dict preserving payload identity and untouched source; existing EventRenamer unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_structlog_03_dev.py, and Chinese compatibility documentation at library/docs/development-structlog-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/STRUCTLOG-03-DEV-contract.md",
+            "materials/STRUCTLOG-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/STRUCTLOG-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/structlog/processors.py",
+            "library/src/structlog/_field_renamer.py",
+            "library/tests/test_development_structlog_03_dev.py",
+            "library/docs/development-structlog-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/STRUCTLOG-03-DEV.rubric.json",
+            "native": "verification/STRUCTLOG-03-DEV.native.json",
+            "public_native": "verification/STRUCTLOG-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "STRUCTLOG-04-DEV-SCENE",
+      "title": "嵌套事件按明确业务路径投影并区分空值与缺项",
+      "goal": "嵌套事件按明确业务路径投影并区分空值与缺项",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "STRUCTLOG-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "STRUCTLOG-04-DEV",
+          "kind": "modify",
+          "goal": "嵌套事件按明确业务路径投影并区分空值与缺项",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd EventProjector(fields,keep=(),missing=\"error\"/\"omit\"/\"default\",default=None). Explicit output-alias to tuple/list path segments, str dict keys and nonnegative int list indexes, no implicit dotted-path interpretation or Python attribute access. Only retain requested top-level fields plus projections; reject alias/keep collision and invalid paths before processing. Actual None is present, missing paths follow explicit policy. Return new outer event preserving payload identity and source; do not infer entire schema or expand object tree.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_structlog_04_dev.py, and Chinese compatibility documentation at library/docs/development-structlog-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/STRUCTLOG-04-DEV-contract.md",
+            "materials/STRUCTLOG-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/STRUCTLOG-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/structlog/processors.py",
+            "library/src/structlog/_event_projector.py",
+            "library/tests/test_development_structlog_04_dev.py",
+            "library/docs/development-structlog-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/STRUCTLOG-04-DEV.rubric.json",
+            "native": "verification/STRUCTLOG-04-DEV.native.json",
+            "public_native": "verification/STRUCTLOG-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "STRUCTLOG-05-DEV-SCENE",
+      "title": "日志捕获器按明确容量留存并公开总量丢弃和快照",
+      "goal": "日志捕获器按明确容量留存并公开总量丢弃和快照",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "STRUCTLOG-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "STRUCTLOG-05-DEV",
+          "kind": "modify",
+          "goal": "日志捕获器按明确容量留存并公开总量丢弃和快照",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend CapturingLogger/Factory optional capacity=None with overflow drop_oldest/reject_new. Preserve default unlimited calls list and repr, all dynamic methods and one cached logger per factory. Nonnegative strict integer capacity, zero records nothing, total counts every call and dropped counts each unretained/evicted call. Snapshot returns tuple with copied kwargs containers but shared nested business objects. No concurrent producer guarantees or silently changing stats when caller manually edits calls.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_structlog_05_dev.py, and Chinese compatibility documentation at library/docs/development-structlog-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/STRUCTLOG-05-DEV-contract.md",
+            "materials/STRUCTLOG-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/STRUCTLOG-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/structlog/testing.py",
+            "library/tests/test_development_structlog_05_dev.py",
+            "library/docs/development-structlog-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/STRUCTLOG-05-DEV.rubric.json",
+            "native": "verification/STRUCTLOG-05-DEV.native.json",
+            "public_native": "verification/STRUCTLOG-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "STRUCTLOG-06-DEV-SCENE",
+      "title": "业务日志时间戳显式指定时区和ISO精度且拒绝无时区时钟",
+      "goal": "业务日志时间戳显式指定时区和ISO精度且拒绝无时区时钟",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "STRUCTLOG-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "STRUCTLOG-06-DEV",
+          "kind": "modify",
+          "goal": "业务日志时间戳显式指定时区和ISO精度且拒绝无时区时钟",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd ZonedTimeStamper(zone,*,timespec=\"microseconds\",key=\"timestamp\",clock=None) processor in structlog.processors. Accept tzinfo or standard ZoneInfo name, convert an actual aware datetime instant with astimezone, output ISO offset with selected supported precision, mutate/return same event. Default clock UTC now, injectable aware clock for deterministic proof, reject naive/wrong clock and unsupported precision. Existing TimeStamper utc/local/UNIX outputs/pickle stay unchanged. No timezone guessing, changing OS TZ or online data.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_structlog_06_dev.py, and Chinese compatibility documentation at library/docs/development-structlog-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/STRUCTLOG-06-DEV-contract.md",
+            "materials/STRUCTLOG-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/STRUCTLOG-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/src/structlog/processors.py",
+            "library/src/structlog/_zoned_timestamp.py",
+            "library/tests/test_development_structlog_06_dev.py",
+            "library/docs/development-structlog-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/STRUCTLOG-06-DEV.rubric.json",
+            "native": "verification/STRUCTLOG-06-DEV.native.json",
+            "public_native": "verification/STRUCTLOG-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

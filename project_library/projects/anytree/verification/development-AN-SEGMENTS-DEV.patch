@@ -1,0 +1,85 @@
+--- a/library/development_tests/test_development_an_segments_dev.py
++++ b/library/development_tests/test_development_an_segments_dev.py
+@@ -0,0 +1,43 @@
++"""公开字面路径段回归。"""
++import pytest
++from anytree import Node, Resolver, ChildResolverError, ResolverError
++
++def test_slash_and_navigation_text_are_literal_names():
++    root = Node('root')
++    slash = Node('a/b', parent=root)
++    dot = Node('..', parent=slash)
++    assert Resolver().get_by_segments(root, ['a/b', '..']) is dot
++
++def test_empty_and_wildcard_names_are_literal():
++    root = Node('root')
++    empty = Node('', parent=root)
++    wildcard = Node('*', parent=empty)
++    assert Resolver().get_by_segments(root, ['', '*']) is wildcard
++    assert Resolver().get_by_segments(root, []) is root
++
++def test_case_and_custom_attribute_modes_are_preserved():
++    root = Node('root', key='ROOT')
++    child = Node('child', key='A/B', parent=root)
++    assert Resolver('key', ignorecase=True).get_by_segments(root, ['a/b']) is child
++
++def test_relax_stops_at_the_first_missing_segment():
++    root = Node('root')
++    assert Resolver(relax=True).get_by_segments(root, ['missing', 'next']) is None
++    with pytest.raises(ChildResolverError):
++        Resolver().get_by_segments(root, ['missing'])
++
++def test_absolute_mode_matches_an_explicit_root_segment():
++    root = Node('root')
++    child = Node('child', parent=root)
++    assert Resolver().get_by_segments(child, ['root', 'child'], absolute=True) is child
++    with pytest.raises(ResolverError):
++        Resolver().get_by_segments(child, ['other'], absolute=True)
++
++def test_string_and_nonstring_segments_are_rejected_and_old_get_keeps_navigation():
++    root = Node('root')
++    child = Node('child', parent=root)
++    with pytest.raises(TypeError):
++        Resolver().get_by_segments(root, 'child')
++    with pytest.raises(TypeError):
++        Resolver().get_by_segments(root, [3])
++    assert Resolver().get(child, '..') is root
+--- a/library/docs/development-an-segments-dev.md
++++ b/library/docs/development-an-segments-dev.md
+@@ -0,0 +1,5 @@
++# 按字面路径段可靠定位分类节点
++
++分类业务键可能包含斜杠、星号、空串和“..”，需要真正按字面段寻址。新增get_by_segments，保留大小写、pathattr、relax及首匹配规则；显式absolute模式要求首段根名，旧字符串get/glob导航保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/anytree/resolver.py
++++ b/library/src/anytree/resolver.py
+@@ -117,6 +117,28 @@
+                 pass
+             else:
+                 node = self.__get(node, part)
++        return node
++
++    def get_by_segments(self, node, segments, *, absolute=False):
++        """按字面段定位。@param node 起点。@param segments 有限字符串序列。
++        @param absolute 是否从根开始且首段明确匹配根名。@return 实际节点或relax下的None。
++        """
++        if isinstance(segments, (str, bytes)) or type(absolute) is not bool:
++            raise TypeError('必须提供独立路径段和布尔绝对模式')
++        parts = tuple(segments)
++        if any(not isinstance(part, str) for part in parts):
++            raise TypeError('路径段必须是字符串')
++        if absolute:
++            node = node.root
++            if not parts or not self.__cmp(_getattr(node, self.pathattr), parts[0]):
++                if self.relax:
++                    return None
++                raise ResolverError(node, parts[0] if parts else None, '绝对路径首段必须匹配根节点')
++            parts = parts[1:]
++        for part in parts:
++            node = self.__get(node, part)
++            if node is None:
++                return None
+         return node
+ 
+     def __get(self, node, name):

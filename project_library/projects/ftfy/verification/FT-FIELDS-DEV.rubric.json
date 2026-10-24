@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FT-FIELDS-DEV",
+  "source_commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement ftfy.structured.fix_fields(value,paths,config=None,*,missing=\"raise\"), read_path and normalize_paths. Paths are explicit tuples/lists of string dict keys and nonnegative integer list indices, never dotted-string guesses; support empty root path and stable deduplication. Repair only selected text through actual fix_text, retain None and all nonselected data/keys. Return deep-copied result and leave original unchanged on any late failure. Missing keys/indices may raise or skip, type mismatches/nontext leaves always fail. Preserve caller config and original container structures.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

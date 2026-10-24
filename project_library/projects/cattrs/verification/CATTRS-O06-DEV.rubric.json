@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CATTRS-O06-DEV",
+  "source_commit": "57333a234a19903a94e5b181bc0aee6b187ee05c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement cattrs.strategies.sequence_union.configure_sequence_union(converter, union) as opt-in actual union-hook registration for exactly one list/tuple/Sequence branch and one attrs/dataclass/dict record branch. Mapping input selects the record, non-text Sequence selects the sequence, then delegate every nested conversion to current converter hooks. Support empty/tuple input and nested custom hooks, reject text/bytes/generators and ambiguous branch sets explicitly, and leave other union/default behavior unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SORTEDCONTAINERS-03-DEV",
+  "source_commit": "3ac358631f58c1347f1d6d2d92784117db0f38ed",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add sorted_copy(key=None) to SortedList/SortedKeyList, SortedSet and SortedDict. Build a fully independent container of the same logical family using the selected key, preserving members/value identities and natural ordering for None. Original content/order/strategy never change, including when new key raises. Rebind all cached bisect/irange proxies to the new index; retain empty/copy/pickle behavior. SortedList factory may return keyed/unkeyed concrete list type; no subclass constructor guarantee or implicit in-place rekey.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

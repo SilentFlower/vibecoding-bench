@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "XD-XML-SPACE-DEV",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add respect_xml_space=False parse handler option. When enabled, xml:space=\"preserve\" disables stripping for that element, inherited descendants and comments; xml:space=\"default\" restores the caller original strip_whitespace policy in that subtree. Restore parent policy when an element closes, including item_depth callback paths, so siblings do not leak state. Recognize raw xml:space and expanded XML namespace attributes with configured separator; unknown values inherit. Preserve exposed attribute values, legacy default behavior and concatenation semantics, without promising ordered mixed-content fidelity.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

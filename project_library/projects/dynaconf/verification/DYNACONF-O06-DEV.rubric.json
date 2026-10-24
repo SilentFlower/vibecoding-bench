@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DYNACONF-O06-DEV",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend actual dynaconf list CLI with repeatable --match glob patterns over top-level canonical key names, case-insensitive union without duplicates. Apply after existing env/loader selection on a detached dictionary and consistently to text/JSON/output-file views; empty matches return valid empty data, not a fake missing-key failure. Reject combining --match with old --key explicitly while preserving legacy no-pattern/single-key behavior. Use fnmatch semantics, never arbitrary eval/regex rewriting, and do not mutate settings or loader history during filtering.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

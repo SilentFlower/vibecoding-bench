@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BF-TYPEERROR-DEV",
+  "source_commit": "d82b23c42d7a7e2402903e71e7a7f03014a00076",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair dynamic retry configuration and jitter adaptation so TypeError raised inside a valid callable propagates as the same exception and is never swallowed or retried with another signature. Use binding/introspection to preserve wait-generator runtime value callbacks requiring an argument, legal dynamic max_tries/max_time and truly nullary deprecated jitter with its warning. Resolve configuration before target execution and preserve synchronous/asynchronous behavior. Do not catch all TypeError around user execution as a signature probe.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

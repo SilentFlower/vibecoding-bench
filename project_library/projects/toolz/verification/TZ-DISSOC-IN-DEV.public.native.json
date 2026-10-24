@@ -1,0 +1,14 @@
+{
+  "script": "verification/TZ-DISSOC-IN-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/toolz/tests/test_development_tz_dissoc_in_dev.py"
+}

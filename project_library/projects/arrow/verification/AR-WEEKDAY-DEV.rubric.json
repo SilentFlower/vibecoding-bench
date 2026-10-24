@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AR-WEEKDAY-DEV",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement the d parsing token as ISO weekday 1 through 7, converting to the same zero-based day_of_week used by ddd/dddd. Preserve existing first matching weekday in the epoch, selected year/month and complete-date precedence rules. Reject zero/eight and unsupported extra width rather than silently returning Monday. Keep named weekdays, formatting, locale behavior and all other tokens unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

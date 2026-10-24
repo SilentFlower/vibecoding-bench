@@ -1,0 +1,94 @@
+--- a/library/docs/development-transitions-05-dev.md
++++ b/library/docs/development-transitions-05-dev.md
+@@ -0,0 +1,5 @@
++# 多模型同步分发返回各订单真实成功拒绝和错误
++
++路线09：dispatch_report逐模型执行真实事件，按顺序返回模型身份/前后态/成功拒绝错误；collect继续或首错止，queued/异步提前拒绝，不冒充事务或最终排队结果。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_transitions_05_dev.py
++++ b/library/tests/test_development_transitions_05_dev.py
+@@ -0,0 +1,31 @@
++"""多订单事件分别记录实际结果，不把AND汇总当明细。"""
++import unittest
++from transitions import Machine
++
++class Order:
++    """受控同步业务模型。"""
++    def __init__(self,allowed,error=False):self.allowed=allowed;self.error=error
++    def guard(self,*args,**kwargs):
++        """按模型决定成功、拒绝或程序错误。@return bool。"""
++        if self.error:raise ValueError('private business message')
++        return self.allowed
++
++def test_success_rejected_and_exception_rows_keep_input_order():
++    """继续收集错误后仍处理下一订单，无跨模型事务承诺。@return None。"""
++    models=[Order(True),Order(False),Order(False,True),Order(True)]
++    machine=Machine(model=models,states=['draft','packed'],initial='draft',auto_transitions=False)
++    machine.add_transition('pack','draft','packed',conditions='guard')
++    rows=machine.dispatch_report('pack',7,reason='manual')
++    assert [row['status'] for row in rows]==['succeeded','rejected','failed','succeeded']
++    assert [row['model'] for row in rows]==models and [model.state for model in models]==['packed','draft','draft','packed']
++    assert rows[2]['error_type']=='ValueError' and 'private' not in repr(rows[2])
++
++def test_failfast_and_queue_rejection_before_any_execution():
++    """只处理到失败项，queued明确拒绝最终凭据语义。@return None。"""
++    models=[Order(False,True),Order(True)];machine=Machine(model=models,states=['a','b'],initial='a',auto_transitions=False)
++    machine.add_transition('go','a','b',conditions='guard')
++    rows=machine.dispatch_report('go',collect_errors=False)
++    assert len(rows)==1 and models[1].state=='a'
++    queued=Machine(states=['a','b'],initial='a',auto_transitions=False,queued=True);queued.add_transition('go','a','b')
++    with unittest.TestCase().assertRaises(ValueError):queued.dispatch_report('go')
++    assert queued.state=='a'
+--- a/library/transitions/core.py
++++ b/library/transitions/core.py
+@@ -1159,6 +1159,49 @@
+                 delattr(model, trigger)
+             del self.events[trigger]
+ 
++    def dispatch_report(self, trigger, *args, collect_errors=True, **kwargs):
++        """同步多模型逐项分发。@param trigger 事件。@param args 事件位置参数。@param collect_errors 是否错误后继续。@param kwargs 事件命名参数。@return 按模型顺序的结果tuple。"""
++        import inspect
++
++        if self.has_queue:
++            raise ValueError("queued接收不能冒充最终结果")
++        models = tuple(self.models)
++        methods = [getattr(model, trigger) for model in models]
++        if any(inspect.iscoroutinefunction(method) for method in methods):
++            raise ValueError("异步事件须使用异步入口")
++        results = []
++        for index, (model, method) in enumerate(zip(models, methods)):
++            before = getattr(model, self.model_attribute)
++            try:
++                value = method(*args, **kwargs)
++            except Exception as error:
++                results.append(
++                    {
++                        "index": index,
++                        "model": model,
++                        "source": before,
++                        "dest": getattr(model, self.model_attribute),
++                        "status": "failed",
++                        "result": None,
++                        "error_type": type(error).__name__,
++                    }
++                )
++                if not collect_errors:
++                    break
++            else:
++                results.append(
++                    {
++                        "index": index,
++                        "model": model,
++                        "source": before,
++                        "dest": getattr(model, self.model_attribute),
++                        "status": "succeeded" if value else "rejected",
++                        "result": value,
++                        "error_type": None,
++                    }
++                )
++        return tuple(results)
++
+     def dispatch(self, trigger, *args, **kwargs):
+         """Trigger an event on all models assigned to the machine.
+         Args:

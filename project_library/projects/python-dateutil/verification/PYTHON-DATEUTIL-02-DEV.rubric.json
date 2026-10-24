@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-DATEUTIL-02-DEV",
+  "source_commit": "68994217fbe253835989e7c1e3eeef5c653088d1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair rrule day filtering so ordinary and ordinal weekdays in the SAME BYDAY list form a union before intersecting with BYMONTH/BYMONTHDAY/BYYEARDAY etc. Preserve pure ordinary/pure ordinal rules, negative ordinals, MONTHLY/YEARLY with BYMONTH, COUNT/UNTIL/BYSETPOS and cached/noncached results. Use actual meeting sequences across months/years, not merely an internal mask. No hardcoded dates or change to other BY attribute conjunction.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

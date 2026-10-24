@@ -1,0 +1,64 @@
+--- a/library/development_tests/test_development_tk_string_style_dev.py
++++ b/library/development_tests/test_development_tk_string_style_dev.py
+@@ -0,0 +1,28 @@
++"""公开字符串保留风格回归。"""
++import pytest
++import tomlkit
++from tomlkit.exceptions import InvalidStringError
++
++def test_quote_type_and_comment_are_preserved():
++    document=tomlkit.parse("a = 'old' # keep\n")
++    old=document.item('a');new=old.replace_value('new')
++    document['a']=new
++    assert document.as_string()=="a = 'new' # keep\n" and str(old)=='old'
++
++def test_unrepresentable_literal_requires_explicit_fallback():
++    old=tomlkit.string('old',literal=True)
++    with pytest.raises(InvalidStringError):
++        old.replace_value("can't")
++    new=old.replace_value("can't",fallback=True)
++    assert new.type.is_basic() and tomlkit.parse('a='+new.as_string())['a']=="can't"
++
++def test_multiline_leading_newline_roundtrips():
++    old=tomlkit.string('old',multiline=True)
++    new=old.replace_value('\nnew\nvalue')
++    assert new.type==old.type and tomlkit.parse('a='+new.as_string())['a']=='\nnew\nvalue'
++
++def test_trivia_is_independent_and_plain_str_replace_is_unchanged():
++    old=tomlkit.string('old');old.comment('original')
++    new=old.replace_value('new');new.comment('new comment')
++    assert 'original' in old.trivia.comment and 'new comment' in new.trivia.comment
++    assert old.replace('o','b')=='bld'
+--- a/library/docs/development-tk-string-style-dev.md
++++ b/library/docs/development-tk-string-style-dev.md
+@@ -0,0 +1,5 @@
++# 替换字符串语义值并保留可表达的引号及注释风格
++
++配置表单改字符串值时应保留原引号和注释风格，通过原编码器正确处理换行与转义。字面字符串无法表达新值时默认拒绝，明确fallback才改为基本引号；新节点不共享注释对象。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tomlkit/items.py
++++ b/library/tomlkit/items.py
+@@ -2278,6 +2278,22 @@
+     def type(self) -> StringType:
+         return self._t
+ 
++    def replace_value(self, value, *, fallback=False):
++        """保留引号类型替换语义值。@param value 新字符串。@param fallback 不可表示时改用基本字符串。
++        @return 独立String与独立Trivia，不改变原节点。
++        """
++        if not isinstance(value,str) or type(fallback) is not bool:
++            raise TypeError('字符串值和fallback类型无效')
++        try:
++            result=type(self).from_raw(value,self.type)
++        except InvalidStringError:
++            if not fallback:
++                raise
++            target=StringType.MLB if self.type.is_multiline() else StringType.SLB
++            result=type(self).from_raw(value,target)
++        result._trivia=self.trivia.copy()
++        return result
++
+     def __add__(self, other: str) -> String:
+         result = super().__add__(other)
+         if isinstance(other, String):

@@ -1,0 +1,13 @@
+{
+  "script": "verification/DE-TEMPORARY-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_de_temporary_dev.py"
+}

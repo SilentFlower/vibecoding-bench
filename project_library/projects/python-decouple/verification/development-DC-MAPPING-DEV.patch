@@ -1,0 +1,107 @@
+--- a/library/decouple.py
++++ b/library/decouple.py
+@@ -314,3 +314,67 @@
+                 ).format(value, self._valid_values))
+         else:
+             return transform
++
++
++class MappingCast(object):
++    """显式解析键值配置或JSON对象，不改变Csv与Config行为。
++
++    :param key_cast: 每个键的转换函数。
++    :param value_cast: 每个值的可选转换函数，默认保留解析值。
++    :param format: pairs或json。
++    :param delimiter: pairs模式的单字符分隔符。
++    :param duplicate: 转换后重复键采用error或last。
++    """
++    def __init__(self, key_cast=text_type, value_cast=undefined, *, format='pairs', delimiter=',', duplicate='error'):
++        """保存显式解析政策。参数见类说明。@return None。"""
++        if format not in ('pairs', 'json') or duplicate not in ('error', 'last'):
++            raise ValueError('未知映射解析政策')
++        if not isinstance(delimiter, str) or len(delimiter) != 1:
++            raise ValueError('键值分隔符必须为单个字符')
++        self.key_cast, self.value_cast = key_cast, value_cast
++        self.format, self.delimiter, self.duplicate = format, delimiter, duplicate
++
++    def __call__(self, value):
++        """先独立解析，再按转换后的键检测冲突。
++
++        :param value: 配置字符串或None。
++        :return: 新字典；格式和重复键错误明确失败。
++        """
++        import json
++        from csv import reader
++        from io import StringIO
++        if value is None:
++            return {}
++        if self.format == 'json':
++            class Pairs(list):
++                """区分JSON对象与数组，保留重复键。"""
++            pairs = json.loads(value, object_pairs_hook=Pairs)
++            if not isinstance(pairs, Pairs):
++                raise ValueError('配置必须是JSON对象')
++            def native(item):
++                """恢复嵌套JSON对象。@param item 值。@return 原生值。"""
++                if isinstance(item, Pairs):
++                    return {k: native(v) for k, v in item}
++                if isinstance(item, list):
++                    return [native(v) for v in item]
++                return item
++            pairs = [(k, native(v)) for k, v in pairs]
++        else:
++            rows = list(reader(StringIO(value), delimiter=self.delimiter, strict=True))
++            if len(rows) > 1:
++                raise ValueError('配置只接受一条键值记录')
++            pairs = []
++            for index, item in enumerate(rows[0] if rows else []):
++                if '=' not in item:
++                    raise ValueError('配置项缺少等号：第%d项' % (index + 1))
++                key, item = item.split('=', 1)
++                pairs.append((key.strip(), item.strip()))
++        result = {}
++        for key, item in pairs:
++            if key == '':
++                raise ValueError('配置键不可为空')
++            key = self.key_cast(key)
++            if key in result and self.duplicate == 'error':
++                raise ValueError('配置存在重复键')
++            result[key] = item if isinstance(self.value_cast, Undefined) else self.value_cast(item)
++        return result
+--- a/library/docs/development-dc-mapping-dev.md
++++ b/library/docs/development-dc-mapping-dev.md
+@@ -0,0 +1,5 @@
++# 为配置值提供显式键值和JSON映射转换
++
++新增独立MappingCast，显式选择键值记录或JSON对象；首个等号之后的URL保持完整，引用逗号、空值和井号保留。键转换后判重复，支持明确末项获胜；JSON嵌套保持原生类型。坏项、不合法顶层或空键报错，不自动猜测格式、不改Csv。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_dc_mapping_dev.py
++++ b/library/tests/test_development_dc_mapping_dev.py
+@@ -0,0 +1,26 @@
++"""键值配置映射保留URL中的等号并检查重复键。"""
++import pytest
++from decouple import MappingCast
++
++
++def test_pairs_preserve_values():
++    """只分割首个等号，引号内部逗号不拆项。@return None。"""
++    assert MappingCast()('SQLite3=sqlite://:memory:,"URL=https://x/?a=b,c"') == {'SQLite3': 'sqlite://:memory:', 'URL': 'https://x/?a=b,c'}
++
++
++def test_casts_and_duplicate_policy():
++    """在键转换后检查重复，支持显式末项获胜。@return None。"""
++    assert MappingCast(key_cast=int, value_cast=int)('1=2,3=4') == {1: 2, 3: 4}
++    with pytest.raises(ValueError):
++        MappingCast(key_cast=int)('1=a,01=b')
++    assert MappingCast(duplicate='last')('a=1,a=2') == {'a': '2'}
++
++
++def test_json_and_errors():
++    """JSON必须为对象，空键或无等号明确失败。@return None。"""
++    assert MappingCast(format='json')('{"x": 2, "nested": {"a": true}}') == {'x': 2, 'nested': {'a': True}}
++    for value in ['=x', 'missing']:
++        with pytest.raises(ValueError):
++            MappingCast()(value)
++    with pytest.raises(ValueError):
++        MappingCast(format='json')('[1,2]')

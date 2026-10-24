@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WZ-PIPELINE-DEV",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement werkzeug.problem_middleware.ProblemMiddleware(app) composing completed problem_response and optional validated werkzeug.request_id context. Convert only HTTPException raised during app call before successful start_response into actual problem JSON, retaining original status/protocol headers and request_id extension. Other Python exceptions, HTTPException after headers started and all iterable-time errors must propagate without sending a second response. Return success iterable unchanged. Verify the real stack RequestIdMiddleware(ProblemMiddleware(app)) with bounded strict JSON input: errors and successful negotiated responses share exact request ID and native close behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WEBCOLORS-03-DEV",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add webcolors.rgba with immutable validated RGBA(red,green,blue,alpha=255), exact 4/8-digit hex_to_rgba, lossless 8-digit rgba_to_hex, rgb_to_rgba and opaque-only rgba_to_rgb. All channels are integer bytes 0..255 (bool/float rejected); zero-alpha hidden RGB is retained. Do not alter legacy RGB or HTML simple-color functions to accept/drop alpha. Reject malformed lengths, suffixes and whitespace; do not clamp silently or use a white background implicitly. Provide complete source implementation, public roundtrip/error tests and Chinese compatibility documentation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

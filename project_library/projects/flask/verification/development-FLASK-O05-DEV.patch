@@ -1,0 +1,102 @@
+--- a/library/docs/development-flask-o05-dev.md
++++ b/library/docs/development-flask-o05-dev.md
+@@ -0,0 +1,5 @@
++# 通过当前JSON provider惰性生成NDJSON响应并管理源生命周期
++
++对应路线11：当前app.json真实provider逐项生成单行NDJSON，非物化、保留request上下文及定制编码；正常/异常/提前或未启动关闭源一次，已发首行后错误终止而不伪改状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/flask/json/provider.py
++++ b/library/src/flask/json/provider.py
+@@ -71,6 +71,40 @@
+         :param kwargs: May be passed to the underlying JSON library.
+         """
+         return self.loads(fp.read(), **kwargs)
++
++    def stream(self, values):
++        """通过当前provider惰性生成NDJSON真实响应，并在关闭时收口源迭代器。
++
++        :param values: 每项为一个JSON文档的Iterable。
++        :return: application/x-ndjson响应；已发出后序列化失败会终止流，不能改HTTP状态。
++        """
++        from ..helpers import stream_with_context
++        from ..ctx import has_request_context
++        iterator = iter(values)
++        closed = False
++        def close_source():
++            """提前关闭和生成器finally可重复调用，但只关闭业务源一次。@return None。"""
++            nonlocal closed
++            if not closed:
++                closed = True
++                close = getattr(iterator, 'close', None)
++                if callable(close):
++                    close()
++        def generate():
++            """每次只消费一项并强制每文档一物理行。@return 字符串迭代器。"""
++            try:
++                for value in iterator:
++                    text = self.dumps(value, separators=(',', ':'), indent=None)
++                    if not isinstance(text, str) or '\n' in text or '\r' in text:
++                        raise ValueError('NDJSON provider必须返回单行字符串')
++                    yield text + '\n'
++            finally:
++                close_source()
++        generated = generate()
++        body = stream_with_context(generated) if has_request_context() else generated
++        response = self._app.response_class(body, mimetype='application/x-ndjson')
++        response.call_on_close(close_source)
++        return response
+ 
+     def _prepare_response_obj(
+         self, args: tuple[t.Any, ...], kwargs: dict[str, t.Any]
+--- a/library/tests/test_development_flask_o05_dev.py
++++ b/library/tests/test_development_flask_o05_dev.py
+@@ -0,0 +1,48 @@
++"""NDJSON真实响应逐项委托当前应用provider且正确关闭源。"""
++from flask import Flask,request
++from flask.json.provider import DefaultJSONProvider
++import json
++import pytest
++
++def test_actual_response_is_lazy_one_json_per_line_and_current_provider():
++    """首chunk之前不物化整个数组，定制编码真实进入每项响应。@return None。"""
++    app=Flask(__name__);calls=[]
++    class Provider(DefaultJSONProvider):
++        """真实应用JSONProvider扩展。"""
++        def dumps(self,obj,**kwargs):calls.append(obj);return super().dumps({'wrapped':obj},**kwargs)
++    app.json=Provider(app);consumed=[]
++    def values():
++        for index in range(1000):consumed.append(index);yield {'index':index,'text':'中文\nline'}
++    response=app.json.stream(values());assert not consumed and response.mimetype=='application/x-ndjson'
++    iterator=iter(response.response);first=next(iterator);assert len(consumed)==len(calls)==1
++    assert json.loads(first)=={'wrapped':{'index':0,'text':'中文\nline'}} and first.count('\n')==1
++    iterator.close();response.close()
++
++def test_request_context_and_early_close_run_source_finally_once():
++    """视图返回后真实stream_with_context保留request，提前关闭执行finally。@return None。"""
++    app=Flask(__name__);events=[]
++    @app.get('/items/<value>')
++    def view(value):
++        def values():
++            try:
++                yield {'value':request.view_args['value']};yield {'later':True}
++            finally:events.append('closed')
++        return app.json.stream(values())
++    response=app.test_client().get('/items/actual',buffered=False)
++    assert json.loads(next(iter(response.response)))=={'value':'actual'}
++    response.close();assert events==['closed']
++
++def test_empty_unstarted_close_and_late_encoding_failure_have_explicit_lifetime():
++    """空流正确，未启动可关闭源，后续编码失败不会假称成功文档。@return None。"""
++    app=Flask(__name__);assert app.json.stream([]).get_data()==b''
++    class Source:
++        """能够记录未消费关闭的真实Iterator。"""
++        def __init__(self):self.closed=0
++        def __iter__(self):return self
++        def __next__(self):return 1
++        def close(self):self.closed+=1
++    source=Source();response=app.json.stream(source);response.close();assert source.closed==1
++    def values():yield 1;yield object()
++    response=app.json.stream(values());iterator=iter(response.response);assert next(iterator)=='1\n'
++    with pytest.raises(TypeError):next(iterator)
++    response.close()

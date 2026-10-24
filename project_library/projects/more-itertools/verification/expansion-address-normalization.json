@@ -1,0 +1,6 @@
+{
+  "policy": "仅context.kwargs内以 at 0x...> 结尾的repr非确定地址双侧规范，其他身份/顺序/结果完全保留",
+  "replacements": 31,
+  "nodes": 765,
+  "subtests": 21194
+}

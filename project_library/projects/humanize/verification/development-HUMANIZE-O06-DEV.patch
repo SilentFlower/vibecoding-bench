@@ -1,0 +1,81 @@
+--- a/library/docs/development-humanize-o06-dev.md
++++ b/library/docs/development-humanize-o06-dev.md
+@@ -0,0 +1,5 @@
++# 显式区分比率百分数并交付精确区域百分比格式
++
++对应路线18：显式ratio/percent量纲，以足够精度局部Decimal缩放舍入，不经float、不改全局context；真实区域分隔、分组及百分号间距由选项明确。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/humanize/percent.py
++++ b/library/src/humanize/percent.py
+@@ -0,0 +1,38 @@
++"""显式区分比率与百分数输入，并以Decimal实施受控舍入。"""
++from decimal import Decimal, ROUND_HALF_EVEN, ROUND_HALF_UP, ROUND_DOWN, localcontext
++from math import isfinite
++from humanize.i18n import decimal_separator, thousands_separator
++
++
++def naturalpercent(value, *, input_unit='ratio', precision=1, rounding='half_even', group=False, space=''):
++    """不猜输入量纲，保留Decimal精度后按区域分隔符显示。
++
++    :param value: 有限int/float/Decimal，不接受bool或隐式文本。
++    :param input_unit: ratio乘一百，percent已是百分数。
++    :param precision: 固定小数位0至28。
++    :param rounding: half_even、half_up或down。
++    :param group: 是否显式千位分组。
++    :param space: 百分号前的显式字面间隔。
++    :return: 数值和百分号字符串，不修改全局Decimal上下文。
++    """
++    choices = {'half_even': ROUND_HALF_EVEN, 'half_up': ROUND_HALF_UP, 'down': ROUND_DOWN}
++    if input_unit not in ('ratio', 'percent') or rounding not in choices:
++        raise ValueError('量纲或舍入模式无效')
++    if isinstance(precision, bool) or not isinstance(precision, int) or not 0 <= precision <= 28:
++        raise ValueError('precision必须为0至28整数')
++    if not isinstance(group, bool) or not isinstance(space, str):
++        raise TypeError('分组开关或百分号间隔类型无效')
++    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
++        raise TypeError('百分数输入必须为数值')
++    if (isinstance(value, float) and not isfinite(value)) or (isinstance(value, Decimal) and not value.is_finite()):
++        raise ValueError('百分数输入必须有限')
++    raw = value if isinstance(value, Decimal) else Decimal(str(value))
++    with localcontext() as context:
++        context.prec = max(32, len(raw.as_tuple().digits) + abs(raw.adjusted()) + precision + 8)
++        scaled = raw * 100 if input_unit == 'ratio' else raw
++        rounded = scaled.quantize(Decimal(1).scaleb(-precision), rounding=choices[rounding])
++        if rounded == 0:
++            rounded = abs(rounded)
++        text = format(rounded, (',' if group else '') + '.' + str(precision) + 'f')
++    text = text.translate({ord(','): thousands_separator(), ord('.'): decimal_separator()})
++    return text + space + '%'
+--- a/library/tests/test_development_humanize_o06_dev.py
++++ b/library/tests/test_development_humanize_o06_dev.py
+@@ -0,0 +1,29 @@
++"""输入量纲、精度和区域分隔均明确，Decimal不先转float。"""
++from decimal import Decimal,getcontext
++from humanize import i18n
++import pytest
++
++def test_ratio_percent_and_rounding_half_values():
++    """同量纲结果一致，半值舍入策略可证伪。@return None。"""
++    from humanize.percent import naturalpercent
++    assert naturalpercent(Decimal('0.125'))=='12.5%' and naturalpercent(Decimal('12.5'),input_unit='percent')=='12.5%'
++    assert naturalpercent(Decimal('0.1245'),rounding='half_even')=='12.4%'
++    assert naturalpercent(Decimal('0.1245'),rounding='half_up')=='12.5%'
++    assert naturalpercent(Decimal('-0.0001'),precision=1)=='0.0%'
++
++def test_decimal_extremes_group_and_locale_separators(monkeypatch):
++    """大有限Decimal不溢出，区域只影响数值部分。@return None。"""
++    from humanize.percent import naturalpercent
++    monkeypatch.setattr(i18n._CURRENT,'locale','fr_FR',raising=False)
++    assert naturalpercent(Decimal('12.345'),group=True,space='\u00a0')=='1 234,5\u00a0%'
++    before=getcontext().prec
++    assert naturalpercent(Decimal('1e400'),precision=0).endswith('%') and 'Inf' not in naturalpercent(10**400,precision=0)
++    assert getcontext().prec==before
++
++def test_finite_type_policy_and_old_formatter_unchanged():
++    """不接受模糊字符串、bool和非有限值，错误量纲拒绝。@return None。"""
++    from humanize.percent import naturalpercent
++    for value,error in [(True,TypeError),('0.5',TypeError),(float('nan'),ValueError),(Decimal('Infinity'),ValueError)]:
++        with pytest.raises(error):naturalpercent(value)
++    with pytest.raises(ValueError):naturalpercent(1,input_unit='guess')
++    with pytest.raises(ValueError):naturalpercent(1,precision=-1)

@@ -1,0 +1,3 @@
+# 流程Markup导出后置回调并保持配置往返业务顺序
+
+路线01：Markup全局after_state_change取真实after列表，顺序/表示/空值保持；导出重建后真实pack仅执行一次before与after。

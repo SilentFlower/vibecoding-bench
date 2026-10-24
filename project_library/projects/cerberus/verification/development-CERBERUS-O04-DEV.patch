@@ -1,0 +1,71 @@
+--- a/library/cerberus/validator.py
++++ b/library/cerberus/validator.py
+@@ -1440,6 +1440,20 @@
+ 
+     _validate_require_all = dummy_for_rule_validation(""" {'type': 'boolean'} """)
+ 
++    def _validate_required_if(self, condition, field, value):
++        """为缺失字段声明条件必需政策，实际检查集中在required阶段。
++
++        :param condition: 兄弟或根字段路径及预期值。
++        :param field: 当前字段。
++        :param value: 当前值。
++        :return: None；存在值仍按nullable/type等原规则校验。
++
++        The rule's arguments are validated against this schema:
++        {'type': 'dict', 'schema': {'field': {'type': 'string', 'required': True},
++            'equals': {'required': True, 'nullable': True}}}
++        """
++        return
++
+     def __validate_required_fields(self, document):
+         """
+         Validates that required fields are not missing.
+@@ -1458,6 +1472,13 @@
+                 raise _SchemaRuleTypeError
+             else:
+                 raise
++        for field, definition in self.schema.items():
++            condition = self._resolve_rules_set(definition).get('required_if')
++            if condition is None:
++                continue
++            name, actual = self._lookup_field(condition['field'])
++            if name is not None and actual == condition['equals']:
++                required.add(field)
+         required -= self._unrequired_by_excludes
+         missing = required - set(
+             field
+--- a/library/docs/development-cerberus-o04-dev.md
++++ b/library/docs/development-cerberus-o04-dev.md
+@@ -0,0 +1,5 @@
++# 让缺失字段按归一化后的条件参与必需校验
++
++required_if在归一化后的真实required阶段检查，即使目标字段缺失也生效。支持兄弟和根条件、False/None与默认判别字段；存在性复用required、nullable和ignore_none_values政策，update及排除规则保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cerberus_o04_dev.py
++++ b/library/tests/test_development_cerberus_o04_dev.py
+@@ -0,0 +1,23 @@
++"""条件必需字段在缺失时也必须检查。"""
++from cerberus import Validator
++
++def test_missing_condition_true_and_false():
++    """kind决定缺失value是否必需，不反转dependencies。@return None。"""
++    validator = Validator({'kind': {}, 'value': {'required_if': {'field': 'kind', 'equals': 'choice'}}})
++    assert not validator.validate({'kind': 'choice'})
++    assert validator.validate({'kind': 'free'})
++    assert validator.validate({'kind': 'choice', 'value': 0})
++
++def test_defaults_and_update():
++    """默认值先归一化，update模式保持原必需政策。@return None。"""
++    schema = {'kind': {'default': 'choice'}, 'value': {'required_if': {'field': 'kind', 'equals': 'choice'}}}
++    assert not Validator(schema).validate({})
++    assert Validator(schema).validate({}, update=True)
++    schema['value']['default'] = 7
++    assert Validator(schema).validate({})
++
++def test_root_false_and_nullable():
++    """False条件和根字段引用不被误作缺失。@return None。"""
++    validator = Validator({'enabled': {}, 'child': {'type': 'dict', 'schema': {'value': {'nullable': True, 'required_if': {'field': '^enabled', 'equals': False}}}}})
++    assert not validator.validate({'enabled': False, 'child': {}})
++    assert validator.validate({'enabled': False, 'child': {'value': None}})

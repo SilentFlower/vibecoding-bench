@@ -1,0 +1,54 @@
+--- a/library/docs/development-mistletoe-05-dev.md
++++ b/library/docs/development-mistletoe-05-dev.md
+@@ -0,0 +1,5 @@
++# 命令行显式stdin文件模式可用于真实UTF8管道
++
++路线18：新增显式-文件标识消费一份标准输入，UTF8、空输入及与普通文件组合都可批处理；不改变零文件参数的交互REPL，重复-在读取前明确拒绝。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/mistletoe/cli.py
++++ b/library/mistletoe/cli.py
+@@ -15,6 +15,8 @@
+ 
+ 
+ def convert(filenames, renderer):
++    if filenames.count('-') > 1:
++        raise ValueError('标准输入只能指定一次')
+     for filename in filenames:
+         convert_file(filename, renderer)
+ 
+@@ -23,6 +25,10 @@
+     """
+     Parse a Markdown file and dump the output to stdout.
+     """
++    if filename == '-':
++        rendered = mistletoe.markdown(sys.stdin, renderer)
++        sys.stdout.buffer.write(rendered.encode('utf-8'))
++        return
+     try:
+         with open(filename, 'r', encoding='utf-8') as fin:
+             rendered = mistletoe.markdown(fin, renderer)
+--- a/library/tests/test_development_mistletoe_05_dev.py
++++ b/library/tests/test_development_mistletoe_05_dev.py
+@@ -0,0 +1,21 @@
++"""显式破折号将stdin作为一份文档消费并正常退出。"""
++import os
++import subprocess
++import sys
++import unittest
++from mistletoe import cli, HtmlRenderer
++
++
++def test_utf8_pipe_converts_once():
++    """批处理输出只有HTML，无REPL提示。@return None。"""
++    result=subprocess.run([sys.executable,'-m','mistletoe','-'],input='# 中文标题\n',text=True,capture_output=True,timeout=3)
++    assert result.returncode==0 and result.stdout=='<h1>中文标题</h1>\n'
++    assert '>>>' not in result.stdout
++
++
++def test_empty_input_and_duplicate_guard():
++    """空stdin正常结束，重复stdin标识在消费前被拒绝。@return None。"""
++    result=subprocess.run([sys.executable,'-m','mistletoe','-'],input='',text=True,capture_output=True,timeout=3)
++    assert result.returncode==0 and result.stdout==''
++    with unittest.TestCase().assertRaises(ValueError):
++        cli.convert(['-','-'],HtmlRenderer)

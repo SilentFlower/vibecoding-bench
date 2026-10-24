@@ -1,0 +1,3 @@
+# 显式用户目录pyproject配置可正确加载且保留搜索边界
+
+路线04：显式pyproject路径先expanduser再resolve，用户目录与绝对路径读取同一TOML；自定义表头、缺文件和原自动搜索保持，仅本地临时HOME。

@@ -1,0 +1,14 @@
+{
+  "script": "verification/DC-STRICT-ENV-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_dc_strict_env_dev.py"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AR-EXCEL-DEV",
+  "source_commit": "2224255c4acc594d734cef0bbc83360452a67983",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Arrow.from_excel(serial, *, date_system, tzinfo=UTC) and Arrow.to_excel(*, date_system). Require string date_system 1900 or 1904 explicitly. Accept finite int/float/Decimal serials excluding booleans, preserve microsecond fractions with Decimal half-even rounding, and return Decimal serials. 1900 serial 0=1899-12-31, 59=1900-02-28, 61=1900-03-01; reject the fictitious [60,61) day and rounding into it. 1904 serial 0=1904-01-01. Negative serials map before the chosen epoch. Interpret values as wall-clock dates in the requested zone, preserve real datetime bounds and existing Unix timestamp get behavior; never guess the date system.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

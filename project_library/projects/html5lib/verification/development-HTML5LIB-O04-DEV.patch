@@ -1,0 +1,72 @@
+--- a/library/docs/development-html5lib-o04-dev.md
++++ b/library/docs/development-html5lib-o04-dev.md
+@@ -0,0 +1,5 @@
++# 以明确政策返回真实解析恢复诊断编码及兼容模式
++
++对应路线06及12结果边界：真实HTMLParser返回树/诊断/编码/compat，collect/error/ignore明确；max_errors仅报告截断，后端/命名空间/默认parse不改，不伪造位置或吞严格失败。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/html5lib/diagnostics.py
++++ b/library/html5lib/diagnostics.py
+@@ -0,0 +1,29 @@
++"""明确的解析诊断策略及树/编码/兼容模式结果，不修改默认parse。"""
++from collections import namedtuple
++from copy import deepcopy
++from .html5parser import HTMLParser
++
++ParseReport = namedtuple('ParseReport', 'tree errors encoding compat_mode truncated')
++
++
++def parse_with_report(source, *, treebuilder='etree', namespaceHTMLElements=True, policy='collect', max_errors=100, **stream_options):
++    """解析真实HTML树并按明确策略暴露恢复诊断。
++
++    :param source: 原HTML输入。
++    :param treebuilder: 原支持的后端名称或类。
++    :param namespaceHTMLElements: 原HTML命名空间开关。
++    :param policy: collect返回诊断、error首个错误抛原ParseError、ignore隐藏诊断。
++    :param max_errors: 报告条目上限，不冒充解析工作预算。
++    :param stream_options: 原parse输入流编码参数。
++    :return: tree/errors/encoding/compat_mode/truncated结果，诊断details与parser内部脱离。
++    """
++    if policy not in ('collect', 'error', 'ignore'):
++        raise ValueError('未知解析诊断政策')
++    if isinstance(max_errors, bool) or not isinstance(max_errors, int) or max_errors < 0:
++        raise ValueError('max_errors必须为非负整数')
++    parser = HTMLParser(tree=treebuilder, strict=policy == 'error', namespaceHTMLElements=namespaceHTMLElements)
++    tree = parser.parse(source, **stream_options)
++    recorded = [] if policy == 'ignore' else [{'position': tuple(position), 'code': code, 'details': deepcopy(details)}
++                 for position, code, details in parser.errors[:max_errors]]
++    return ParseReport(tree, recorded, parser.documentEncoding, parser.compatMode,
++                       policy != 'ignore' and len(parser.errors) > max_errors)
+--- a/library/tests/test_development_html5lib_o04_dev.py
++++ b/library/tests/test_development_html5lib_o04_dev.py
+@@ -0,0 +1,29 @@
++"""恢复诊断与真实树/编码/兼容模式分开交付，严格模式不伪成功。"""
++import html5lib
++import pytest
++
++def test_recovering_report_contains_real_tree_errors_encoding_and_quirks():
++    """宽容恢复仍保留可用树及每条真实诊断来源。@return None。"""
++    from html5lib.diagnostics import parse_with_report
++    result=parse_with_report('<p>broken</div>')
++    assert result.errors and all(set(error)=={'position','code','details'} for error in result.errors)
++    assert result.encoding=='utf-8' and result.compat_mode=='quirks'
++    assert 'broken' in ''.join(result.tree.itertext())
++    assert html5lib.serialize(result.tree)==html5lib.serialize(html5lib.parse('<p>broken</div>'))
++
++def test_strict_ignore_and_budget_do_not_change_default_parse_contract():
++    """error抛原异常、ignore只隐藏报告；上限只截报告不丢真实树。@return None。"""
++    from html5lib.diagnostics import parse_with_report
++    from html5lib.html5parser import ParseError
++    with pytest.raises(ParseError):parse_with_report('<p>x',policy='error')
++    ignored=parse_with_report('<p>x',policy='ignore');assert ignored.errors==[] and not ignored.truncated
++    limited=parse_with_report('<p>x',max_errors=0);assert limited.errors==[] and limited.truncated and 'x' in ''.join(limited.tree.itertext())
++
++def test_backend_namespaces_valid_documents_and_invalid_policies():
++    """DOM后端及无命名空间选项真实生效，合法文档无伪诊断。@return None。"""
++    from html5lib.diagnostics import parse_with_report
++    result=parse_with_report(b'<!doctype html><html><head><title>T</title></head><body><p>x</p></body></html>',treebuilder='dom',override_encoding='utf8')
++    assert result.tree.documentElement.tagName=='html' and result.compat_mode=='no quirks' and result.errors==[]
++    bare=parse_with_report('<!doctype html><p>x',namespaceHTMLElements=False);assert bare.tree.tag=='html'
++    with pytest.raises(ValueError):parse_with_report('',policy='guess')
++    with pytest.raises(ValueError):parse_with_report('',max_errors=True)

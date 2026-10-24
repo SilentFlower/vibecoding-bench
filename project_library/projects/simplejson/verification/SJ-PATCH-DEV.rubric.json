@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SJ-PATCH-DEV",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement simplejson.patch.apply_patch(document,operations) supporting RFC6902 add/remove/replace/move/copy/test on the completed pointer semantics. Work on a deep copy; inputs and operation values must remain unchanged on success or any later error. Array add inserts and dash appends; move resolves destination after removal and rejects moving a parent into its child. Test uses JSON equality with booleans distinct from numbers. Root replacement/add is supported and root remove returns None by explicit API convention. Missing members, invalid operations and paths fail clearly.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

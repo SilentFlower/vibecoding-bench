@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SM-REPLAY-DEV",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement statemachine.replay.replay(factory,document,*,verify=True,max_records=10000) returning frozen ReplayResult(machine,results). Fully validate completed JSON journal before calling factory; never import a class name from data. Run each EventCall through completed MachineRunner on the new factory instance and preserve native callback execution. Verify before/after states and values plus passed/error status per index, reject divergence before next event; verify=False returns actual results explicitly. Handle empty journals and expected disallowed events. Do not mutate journal data or claim external callback side effects are rolled back.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

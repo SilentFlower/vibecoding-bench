@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FT-AUDIT-DEV",
+  "source_commit": "74dd0452b48286a3770013b3a02755313bd5575e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement ftfy.audit.repair(text,config=None) returning frozen RepairResult(source_sha256,input_length,text,changed,explanation). Call actual fix_and_explain, retain explanation=None when disabled without changing any fixer policy (requires completed explanation-config repair); otherwise freeze steps and verify actual apply_plan replays to the returned result. Hash original Unicode using UTF8 surrogatepass, do not retain original plaintext in result, preserve input/config, distinguish unchanged text from an absent explanation, and do not fabricate generic repair reasons.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

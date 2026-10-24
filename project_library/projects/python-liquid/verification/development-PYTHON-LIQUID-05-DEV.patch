@@ -1,0 +1,81 @@
+--- a/library/docs/development-python-liquid-05-dev.md
++++ b/library/docs/development-python-liquid-05-dev.md
+@@ -0,0 +1,5 @@
++# 报告模板源码包可离线移交并校验入口依赖与内容完整性
++
++路线11：模板源码/显式入口/依赖全集作为规范JSON移交，SHA256核完整性、拒重复键/未知schema/缺入口；新DictLoader环境真实渲染，不pickle、不猜动态依赖完整性，源码快照只读。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/liquid/template_bundle.py
++++ b/library/liquid/template_bundle.py
+@@ -0,0 +1,45 @@
++"""离线模板源码包，只存JSON源码及可核验摘要，不反序列化Python对象。"""
++import hashlib
++import json
++from collections.abc import Mapping
++from dataclasses import dataclass
++from types import MappingProxyType
++from .environment import Environment
++from .builtin.loaders.dict_loader import DictLoader
++
++def _canonical(value):return json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8')
++
++@dataclass(frozen=True)
++class TemplateBundle:
++    """验证后的独立源码快照。@param templates 只读源码。@param entries 根入口元组。@param digest 完整源码/入口摘要。"""
++    templates:object
++    entries:tuple
++    digest:str
++    def environment(self,**options):
++        """在新环境加载完整包。@param options 调用方显式语言/插件选项，不接受替换loader。@return Environment。"""
++        if 'loader' in options:raise ValueError('bundle环境不能替换loader')
++        return Environment(loader=DictLoader(dict(self.templates)),**options)
++
++def make_bundle(templates,entries):
++    """生成规范JSON。@param templates 显式全部根/依赖源码Mapping。@param entries 根名称序列。@return str，动态依赖须调用方补齐，不声称自动闭包。"""
++    if not isinstance(templates,Mapping):raise TypeError('需要源码映射')
++    sources=dict(templates);roots=list(entries)
++    if any(not isinstance(name,str) or not name or not isinstance(source,str) for name,source in sources.items()):raise TypeError('名称/源码必须为str')
++    if not roots or any(not isinstance(name,str) or name not in sources for name in roots) or len(set(roots))!=len(roots):raise ValueError('入口不存在或重复')
++    payload={'schema':1,'templates':sources,'entries':roots}
++    return _canonical({**payload,'digest':hashlib.sha256(_canonical(payload)).hexdigest()}).decode('utf-8')
++
++def load_bundle(text):
++    """校验完整包合同与每字节内容摘要。@param text str规范JSON。@return TemplateBundle，不执行模板或插件。"""
++    def unique(pairs):
++        result={}
++        for key,value in pairs:
++            if key in result:raise ValueError('包中重复JSON键')
++            result[key]=value
++        return result
++    value=json.loads(text,object_pairs_hook=unique)
++    if not isinstance(value,dict) or set(value)!={'schema','templates','entries','digest'} or type(value['schema']) is not int or value['schema']!=1:raise ValueError('包schema无效')
++    if not isinstance(value['entries'],list):raise ValueError('入口须为JSON数组')
++    expected=json.loads(make_bundle(value['templates'],value['entries']))
++    if value['digest']!=expected['digest']:raise ValueError('源码包摘要不符')
++    return TemplateBundle(MappingProxyType(dict(value['templates'])),tuple(value['entries']),value['digest'])
+--- a/library/tests/test_development_python_liquid_05_dev.py
++++ b/library/tests/test_development_python_liquid_05_dev.py
+@@ -0,0 +1,22 @@
++"""离线源码包在新环境加载根和依赖，损坏包不运行。"""
++import json
++import unittest
++from liquid.template_bundle import make_bundle,load_bundle
++
++def test_canonical_snapshot_and_real_include_render():
++    """包是源码快照，创建后调用方修改不改变它。@return None。"""
++    sources={'report':'Report:{% render "row", value: item %}','row':'[{{value}}]'}
++    text=make_bundle(sources,['report']);sources['row']='changed';bundle=load_bundle(text)
++    assert bundle.environment().get_template('report').render(item='茶')=='Report:[茶]'
++    assert text==make_bundle({'row':'[{{value}}]','report':sources['report']},['report'])
++    assert bundle.entries==('report',)
++    with unittest.TestCase().assertRaises(TypeError):bundle.templates['row']='bad'
++
++def test_tampered_unknown_duplicate_missing_and_loader_override_reject():
++    """摘要只证明内容完整，不允许未知对象/重复JSON键。@return None。"""
++    value=json.loads(make_bundle({'x':'good'},['x']));value['templates']['x']='bad'
++    with unittest.TestCase().assertRaises(ValueError):load_bundle(json.dumps(value))
++    with unittest.TestCase().assertRaises(ValueError):load_bundle('{"schema":1,"schema":1}')
++    with unittest.TestCase().assertRaises(ValueError):make_bundle({'x':'x'},['missing'])
++    bundle=load_bundle(make_bundle({'x':'x'},['x']))
++    with unittest.TestCase().assertRaises(ValueError):bundle.environment(loader=None)

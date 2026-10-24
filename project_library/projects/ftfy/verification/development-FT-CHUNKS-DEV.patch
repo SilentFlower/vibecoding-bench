@@ -1,0 +1,74 @@
+--- a/library/development_tests/test_development_ft_chunks_dev.py
++++ b/library/development_tests/test_development_ft_chunks_dev.py
+@@ -0,0 +1,27 @@
++"""公开分块文本修复回归。"""
++from io import StringIO
++import pytest
++from ftfy import fix_file,TextFixerConfig
++from ftfy.streaming import fix_chunks
++
++def test_every_split_matches_actual_file_semantics():
++    text='cafÃ©\r\nnext ﬁ\nlast'
++    expected=list(fix_file(StringIO(text)))
++    for index in range(len(text)+1): assert list(fix_chunks([text[:index],text[index:]]))==expected
++
++def test_auto_html_policy_is_retained_across_lines():
++    text='<tag>&amp;</tag>\n&amp;\n'
++    assert list(fix_chunks(['<tag>','&amp;</tag>\n&','amp;\n']))==list(fix_file(StringIO(text)))
++
++def test_stream_is_lazy_and_final_unterminated_line_survives():
++    calls=[]
++    def source():
++        calls.append(1);yield 'a\n'
++        calls.append(2);yield 'cafÃ©'
++    stream=fix_chunks(source());assert calls==[] and next(stream)=='a\n' and calls==[1]
++    assert list(stream)==['café']
++
++def test_budget_and_invalid_chunks_fail_explicitly():
++    with pytest.raises(ValueError): fix_chunks([],max_line_length=0)
++    with pytest.raises(ValueError): list(fix_chunks(['abc','de'],max_line_length=4))
++    with pytest.raises(TypeError): list(fix_chunks([b'bad']))
+--- a/library/docs/development-ft-chunks-dev.md
++++ b/library/docs/development-ft-chunks-dev.md
+@@ -0,0 +1,5 @@
++# 为任意Unicode分块实现保留原文件语义的流式修复
++
++任意文本块先按物理行重组，再调用真实文件修复流程，跨块乱码、CRLF与自动HTML政策都保持一致。惰性消费并限制单行缓存，不靠把整份输入拼起来处理。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/ftfy/streaming.py
++++ b/library/ftfy/streaming.py
+@@ -0,0 +1,33 @@
++"""把任意文本分块拼成物理行，再交给真实修复文件流程。"""
++from . import TextFixerConfig,fix_file
++
++
++def fix_chunks(chunks,config=None,*,max_line_length=1000000):
++    """惰性修复任意分块文本。@param chunks Unicode块迭代器。@param config 原修复配置。
++    @param max_line_length 物理行字符上限，含换行。@return 逐物理行修复结果迭代器。
++    """
++    if type(max_line_length) is not int or max_line_length<1:
++        raise ValueError('行字符预算必须为正整数')
++    if config is not None and not isinstance(config,TextFixerConfig):
++        raise TypeError('需要TextFixerConfig')
++    iterator=iter(chunks)
++    def lines():
++        fragments=[];size=0
++        for chunk in iterator:
++            if not isinstance(chunk,str):
++                raise TypeError('分块必须为Unicode文本')
++            start=0
++            while start<len(chunk):
++                end=chunk.find('\n',start)
++                stop=len(chunk) if end<0 else end+1
++                piece=chunk[start:stop]
++                if size+len(piece)>max_line_length:
++                    raise ValueError('物理行超过字符预算')
++                fragments.append(piece);size+=len(piece)
++                if end>=0:
++                    yield ''.join(fragments)
++                    fragments=[];size=0
++                start=stop
++        if fragments:
++            yield ''.join(fragments)
++    return fix_file(lines(),config=config)

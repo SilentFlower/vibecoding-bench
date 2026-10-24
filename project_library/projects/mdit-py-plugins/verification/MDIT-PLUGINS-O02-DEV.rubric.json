@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MDIT-PLUGINS-O02-DEV",
+  "source_commit": "519953da0a394a92534bc27580f4e7415462df44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix _attr_inline_rule class accumulation after link_close/span_close by resolving the matching opening Token before reading existing class. Link/image/code class blocks concatenate in declaration order without deduplication; spans preserve existing canonical repeated-attribute behavior by retaining each class word at its first position. Later id and other keys override normally. Keep single-token handling, nested inline content, neighbor isolation and allowed filtering. Do not globally concatenate nonclass attributes or mutate the closing Token instead of the rendered target.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

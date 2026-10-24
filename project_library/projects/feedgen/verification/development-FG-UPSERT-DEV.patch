@@ -1,0 +1,83 @@
+--- a/library/development_tests/test_development_fg_upsert_dev.py
++++ b/library/development_tests/test_development_fg_upsert_dev.py
+@@ -0,0 +1,31 @@
++"""公开真实订阅条目更新回归。"""
++import pytest
++from feedgen.feed import FeedGenerator
++from feedgen.entry import FeedEntry
++from feedgen.upsert import upsert_entries
++
++def item(identity,title):
++    value=FeedEntry();value.id(identity);value.title(title);return value
++
++def test_updates_stay_in_position_and_new_entries_append():
++    feed=FeedGenerator();first=item('a','old');other=item('b','B');feed.entry([first,other])
++    updated=item('a','new');new=item('c','C');result=upsert_entries(feed,[new,updated])
++    assert result.added==1 and result.updated==1 and feed.entry()==[updated,other,new]
++    assert feed.entry()[1] is other and first.title()=='old'
++
++def test_late_invalid_entry_leaves_existing_list_unchanged():
++    feed=FeedGenerator();original=item('a','old');feed.entry(original)
++    with pytest.raises(ValueError): upsert_entries(feed,[item('a','new'),FeedEntry()])
++    assert feed.entry()==[original] and feed.entry()[0] is original
++
++def test_duplicate_existing_or_incoming_ids_are_rejected():
++    feed=FeedGenerator();feed.entry([item('a','a'),item('a','b')])
++    with pytest.raises(ValueError): upsert_entries(feed,[])
++    feed.entry([],replace=True)
++    with pytest.raises(ValueError): upsert_entries(feed,[item('x','x'),item('x','other')])
++
++def test_generator_failure_never_partially_adds_entries():
++    feed=FeedGenerator()
++    def source(): yield item('a','a');raise RuntimeError('source')
++    with pytest.raises(RuntimeError): upsert_entries(feed,source())
++    assert feed.entry()==[]
+--- a/library/docs/development-fg-upsert-dev.md
++++ b/library/docs/development-fg-upsert-dev.md
+@@ -0,0 +1,5 @@
++# 按永久ID批量更新订阅条目并保持已有位置
++
++按永久ID维护订阅，已有条目在原位置替换，新条目按输入顺序追加。完整验证后才提交，保留无关条目对象和订阅元数据，不凭标题猜测同一内容。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/feedgen/upsert.py
++++ b/library/feedgen/upsert.py
+@@ -0,0 +1,38 @@
++"""以永久条目ID维护已有订阅，不打乱更新位置。"""
++from dataclasses import dataclass
++from .entry import FeedEntry
++from .feed import FeedGenerator
++
++
++@dataclass(frozen=True)
++class UpsertResult:
++    """成功替换及新增的条目数量。"""
++    added: int
++    updated: int
++
++
++def upsert_entries(feed,entries):
++    """批量按ID更新。@param feed 真实FeedGenerator。@param entries FeedEntry迭代器。
++    @return UpsertResult；输入验证失败不修改原条目列表或原条目。
++    """
++    if not isinstance(feed,FeedGenerator):
++        raise TypeError('需要FeedGenerator')
++    existing=list(feed.entry());incoming=list(entries)
++    def identities(items):
++        result=[]
++        for item in items:
++            if not isinstance(item,FeedEntry) or not isinstance(item.id(),str) or not item.id():
++                raise ValueError('每个条目必须有非空文本ID')
++            if item.id() in result:
++                raise ValueError('同一批条目ID重复')
++            result.append(item.id())
++        return result
++    old_ids=identities(existing);identities(incoming)
++    positions={identity:index for index,identity in enumerate(old_ids)};added=0;updated=0
++    for item in incoming:
++        if item.id() in positions:
++            existing[positions[item.id()]]=item;updated+=1
++        else:
++            positions[item.id()]=len(existing);existing.append(item);added+=1
++    feed.entry(existing,replace=True)
++    return UpsertResult(added,updated)

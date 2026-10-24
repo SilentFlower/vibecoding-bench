@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BX-PATH-DEV",
+  "source_commit": "a4c10e977b574114613431394b30412b50aaacce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Box.get_path(path, default=NO_DEFAULT), set_path(path, value) and delete_path(path) for explicit nonempty str/int segment iterables. Distinguish integer and string keys, literal dots/brackets and list indices including negatives. Reads must not invoke box_dots parsing or create default nodes; writes require existing parents, preserve Box value conversion/recast and frozen guards, and do not create arbitrary intermediate containers. Support explicit default=None only for missing keys/indexes, propagate scalar/type errors and keep existing dotted APIs unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

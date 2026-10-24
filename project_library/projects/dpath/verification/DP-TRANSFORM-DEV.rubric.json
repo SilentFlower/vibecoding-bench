@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DP-TRANSFORM-DEV",
+  "source_commit": "15759d96a006fef5278de731cd263b4d839094c3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement dpath.transforming.transform_existing(root,transform,*,predicate=None), using completed walk_paths and get_exact rather than glob strings. Evaluate only original snapshot leaves (including empty containers), pass typed tuple path and detached value to callbacks, write replacements into a deep-copied result and never revisit newly generated content. Predicate is optional; late callback or cycle errors propagate while original objects remain unchanged, including callback mutations of supplied values. Root-leaf replacement works; preserve shared-copy alias semantics and source traversal order.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

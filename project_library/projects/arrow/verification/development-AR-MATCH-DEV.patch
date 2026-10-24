@@ -1,0 +1,125 @@
+--- a/library/arrow/parser.py
++++ b/library/arrow/parser.py
+@@ -1,6 +1,7 @@
+ """Provides the :class:`Arrow <arrow.parser.DateTimeParser>` class, a better way to parse datetime strings."""
+ 
+ import re
++from dataclasses import dataclass
+ from datetime import datetime, timedelta, timezone
+ from datetime import tzinfo as dt_tzinfo
+ from functools import lru_cache
+@@ -139,6 +140,20 @@
+     weekdate: Tuple[_WEEKDATE_ELEMENT, _WEEKDATE_ELEMENT, Optional[_WEEKDATE_ELEMENT]]
+ 
+ 
++@dataclass(frozen=True)
++class ParsedDateTimeMatch:
++    """原文解析报告。@param value 日期。@param format 选中格式。@param span 原文字符区间。
++    @param matched 原文片段。@param prefix 前文。@param suffix 后文。@param normalized_span 归一文本区间。
++    """
++    value: datetime
++    format: str
++    span: Tuple[int, int]
++    matched: str
++    prefix: str
++    suffix: str
++    normalized_span: Tuple[int, int]
++
++
+ class DateTimeParser:
+     """A :class:`DateTimeParser <arrow.arrow.parser>` object
+ 
+@@ -827,6 +842,44 @@
+             + increment
+         )
+ 
++    def parse_match(self, datetime_string, fmt, normalize_whitespace=False):
++        """提取最早有效日期并保留原文位置。@param datetime_string 原文本。@param fmt 格式或格式列表。
++        @param normalize_whitespace 是否归一空白。@return 不可变ParsedDateTimeMatch。
++        """
++        if not isinstance(datetime_string, str) or type(normalize_whitespace) is not bool:
++            raise TypeError('原文和归一开关类型不合法')
++        formats = [fmt] if isinstance(fmt, str) else fmt
++        if not isinstance(formats, list) or not formats or any(not isinstance(item, str) for item in formats):
++            raise TypeError('格式必须是非空格式或格式列表')
++        text, starts, ends = datetime_string, list(range(len(datetime_string))), list(range(1, len(datetime_string)+1))
++        if normalize_whitespace:
++            parts, starts, ends = [], [], []
++            for item in re.finditer(r"\s+|\S", datetime_string):
++                parts.append(' ' if item.group(0).isspace() else item.group(0))
++                starts.append(item.start())
++                ends.append(item.end())
++            text = ''.join(parts)
++        candidates = []
++        for index, selected in enumerate(formats):
++            tokens, pattern = self._generate_pattern_re(selected)
++            if not tokens:
++                continue
++            for match in pattern.finditer(text):
++                if match.start() == match.end():
++                    continue
++                try:
++                    value = self.parse_strict(match.group(0), selected)
++                except (ValueError, TypeError):
++                    continue
++                first, last = starts[match.start()], ends[match.end()-1]
++                record = ParsedDateTimeMatch(value, selected, (first,last), datetime_string[first:last],
++                    datetime_string[:first], datetime_string[last:], match.span())
++                candidates.append((first,index,record))
++                break
++        if not candidates:
++            raise ParserMatchError('原文中没有有效日期匹配')
++        return min(candidates, key=lambda item: (item[0],item[1]))[2]
++
+     def _parse_multiformat(self, string: str, formats: Iterable[str]) -> datetime:
+         """
+         Parse a date and time string using multiple formats.
+--- a/library/development_tests/test_development_ar_match_dev.py
++++ b/library/development_tests/test_development_ar_match_dev.py
+@@ -0,0 +1,38 @@
++"""公开带原文位置的解析报告回归。"""
++from dataclasses import FrozenInstanceError
++from datetime import datetime
++import pytest
++from arrow.parser import DateTimeParser, ParserError
++
++def test_report_preserves_original_fragment_and_surrounding_text():
++    text = 'prefix 2026-01-02 suffix'
++    report = DateTimeParser().parse_match(text, 'YYYY-MM-DD')
++    assert report.value == datetime(2026,1,2) and report.span == (7,17)
++    assert report.matched == '2026-01-02' and report.prefix + report.matched + report.suffix == text
++
++def test_unicode_prefix_uses_character_offsets_not_byte_offsets():
++    text = '记录： 2026-01-02 完成'
++    report = DateTimeParser().parse_match(text, 'YYYY-MM-DD')
++    assert text[slice(*report.span)] == report.matched and report.span[0] == 4
++
++def test_normalized_whitespace_maps_back_to_exact_raw_text():
++    text = 'log 2026-01-02		 03:04 done'
++    report = DateTimeParser().parse_match(text, 'YYYY-MM-DD HH:mm', True)
++    assert report.matched == '2026-01-02		 03:04'
++    assert report.span[1] - report.span[0] > report.normalized_span[1] - report.normalized_span[0]
++
++def test_earliest_valid_match_wins_across_format_order():
++    report = DateTimeParser().parse_match('2026/03/04 then 2026-05-06', ['YYYY-MM-DD','YYYY/MM/DD'])
++    assert report.format == 'YYYY/MM/DD' and report.value.month == 3
++
++def test_invalid_calendar_matches_are_skipped_and_no_match_is_explicit():
++    assert DateTimeParser().parse_match('2026-02-30 then 2026-03-02', 'YYYY-MM-DD').value.month == 3
++    with pytest.raises(ParserError):
++        DateTimeParser().parse_match('no dates here', 'YYYY-MM-DD')
++
++def test_report_is_immutable_and_original_parse_stays_datetime():
++    parser = DateTimeParser()
++    report = parser.parse_match('2026-01-02', 'YYYY-MM-DD')
++    with pytest.raises(FrozenInstanceError):
++        report.span = (0,1)
++    assert isinstance(parser.parse('2026-01-02', 'YYYY-MM-DD'), datetime)
+--- a/library/docs/development-ar-match-dev.md
++++ b/library/docs/development-ar-match-dev.md
+@@ -0,0 +1,5 @@
++# 为离线日志导入交付原文位置完整的时间解析报告
++
++离线日志编辑器需要知道日期来自原文哪一段，并保留其余文字。新增不可变解析报告，跨格式取最早有效日期；空白归一时仍返回准确原文范围，同时单列归一索引，不把错误日期或纯字面格式当作日期。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

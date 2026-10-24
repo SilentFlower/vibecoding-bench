@@ -58,6 +58,245 @@
           "development_cycle": "bug"
         }
       ]
+    },
+    {
+      "id": "AN-SEGMENTS-DEV-SCENE",
+      "title": "按字面路径段可靠定位分类节点",
+      "goal": "按字面路径段可靠定位分类节点",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "AN-SEGMENTS-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-SEGMENTS-DEV",
+          "kind": "modify",
+          "goal": "按字面路径段可靠定位分类节点",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Resolver.get_by_segments(node, segments, *, absolute=False). Segments are a finite iterable of strings, never a single string/bytes. Treat slash, empty strings, dots, dot-dot and wildcard text as literal child attribute values, preserving pathattr, ignorecase, relax and existing first-match rules. Relative empty segments return the start node. Absolute mode starts at node.root and requires an explicit root-name first segment. Preserve get/glob and their navigation rules.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_an_segments_dev.py and concise Chinese compatibility documentation at library/docs/development-an-segments-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/AN-SEGMENTS-DEV-contract.md",
+            "materials/AN-SEGMENTS-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/anytree/resolver.py",
+            "library/development_tests/test_development_an_segments_dev.py",
+            "library/docs/development-an-segments-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/AN-SEGMENTS-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-SEGMENTS-DEV.native.json",
+            "public_native": "verification/AN-SEGMENTS-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/AN-SEGMENTS-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "AN-CLONE-DEV-SCENE",
+      "title": "以明确属性复制策略生成可独立编辑的分类子树",
+      "goal": "以明确属性复制策略生成可独立编辑的分类子树",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "AN-CLONE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-CLONE-DEV",
+          "kind": "modify",
+          "goal": "以明确属性复制策略生成可独立编辑的分类子树",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd anytree.util.clone_subtree(node, *, factory=None, copy_attributes=None). Traverse children iteratively and clone __dict__-backed nodes into new AnyNode instances by default, preserving order and all nonstructural attributes. Default attribute payload copying is shallow; an explicit callable can choose deep copy or filtering and must return a mapping without structural fields. An optional kwargs factory can preserve a desired node class but must return distinct detached empty NodeMixin/LightNodeMixin nodes, never original nodes. Validate every result before attaching copies. Do not clone external parents or traverse symbolic targets. Reject repeated/cyclic structure and unsupported slots-only source nodes explicitly; preserve the source tree.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_an_clone_dev.py and concise Chinese compatibility documentation at library/docs/development-an-clone-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/AN-CLONE-DEV-contract.md",
+            "materials/AN-CLONE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/anytree/util/clone.py",
+            "library/src/anytree/util/__init__.py",
+            "library/development_tests/test_development_an_clone_dev.py",
+            "library/docs/development-an-clone-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/AN-CLONE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-CLONE-DEV.native.json",
+            "public_native": "verification/AN-CLONE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/AN-CLONE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "AN-FOLD-DEV-SCENE",
+      "title": "为每个分类节点交付可追溯的子树聚合结果",
+      "goal": "为每个分类节点交付可追溯的子树聚合结果",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "AN-FOLD-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-FOLD-DEV",
+          "kind": "modify",
+          "goal": "为每个分类节点交付可追溯的子树聚合结果",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd anytree.util.fold_subtree(node, reducer) and NodeResultMap. Use iterative postorder, call reducer once per node with (actual_node, tuple_of_ordered_child_results), and return a read-only mapping keyed by node identity, including unhashable or equal-but-distinct NodeMixin subclasses. Retain references, preserve child order and original nodes, follow children only (not SymlinkNode targets), propagate reducer exceptions and reject structural cycles/repeated identities. Deep trees must not depend on Python recursion limits. Do not attach result attributes or caches to nodes.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_an_fold_dev.py and concise Chinese compatibility documentation at library/docs/development-an-fold-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/AN-FOLD-DEV-contract.md",
+            "materials/AN-FOLD-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/anytree/util/fold.py",
+            "library/src/anytree/util/__init__.py",
+            "library/development_tests/test_development_an_fold_dev.py",
+            "library/docs/development-an-fold-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/AN-FOLD-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-FOLD-DEV.native.json",
+            "public_native": "verification/AN-FOLD-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/AN-FOLD-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "AN-EVENTS-DEV-SCENE",
+      "title": "单遍交付分类树进入退出事件流",
+      "goal": "单遍交付分类树进入退出事件流",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "AN-EVENTS-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-EVENTS-DEV",
+          "kind": "modify",
+          "goal": "单遍交付分类树进入退出事件流",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd exported EventIter following AbstractIter constructor conventions. Yield (event, actual_node, depth) with event enter/leave and zero-based root depth. A complete traversal pairs visible nodes exactly once, preserves child order, uses an explicit stack, and supports deep trees without changing recursion limits. filter_ hides only that node events, stop prunes the subtree, and maxlevel=1 includes only the root (nonpositive levels yield none). Evaluate visibility once per visited node. A partially consumed iterator promises only its actual prefix, not invented closing events. Preserve existing iterators.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_an_events_dev.py and concise Chinese compatibility documentation at library/docs/development-an-events-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/AN-EVENTS-DEV-contract.md",
+            "materials/AN-EVENTS-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/anytree/iterators/eventiter.py",
+            "library/src/anytree/iterators/__init__.py",
+            "library/src/anytree/__init__.py",
+            "library/development_tests/test_development_an_events_dev.py",
+            "library/docs/development-an-events-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/AN-EVENTS-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-EVENTS-DEV.native.json",
+            "public_native": "verification/AN-EVENTS-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/AN-EVENTS-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "AN-SLOTS-DEV-SCENE",
+      "title": "通过显式属性协议导出轻量槽位分类树",
+      "goal": "通过显式属性协议导出轻量槽位分类树",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "AN-SLOTS-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "AN-SLOTS-DEV",
+          "kind": "modify",
+          "goal": "通过显式属性协议导出轻量槽位分类树",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd optional attribute_provider=None to DictExporter. A callable receives each visited node and returns a mapping or finite key/value iterable. Use only explicitly supplied fields, then apply existing attriter/dictcls; never enumerate arbitrary slots or properties. Exclude parent/children and NodeMixin/LightNodeMixin structural private fields from provider results. Require string attribute keys, propagate provider errors, preserve maxlevel/childiter and ordinary __dict__ export. Support LightNodeMixin-only slots nodes and normal DictImporter round trips without hidden structure leakage.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_an_slots_dev.py and concise Chinese compatibility documentation at library/docs/development-an-slots-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/AN-SLOTS-DEV-contract.md",
+            "materials/AN-SLOTS-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/src/anytree/exporter/dictexporter.py",
+            "library/development_tests/test_development_an_slots_dev.py",
+            "library/docs/development-an-slots-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/AN-SLOTS-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/AN-SLOTS-DEV.native.json",
+            "public_native": "verification/AN-SLOTS-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/AN-SLOTS-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
     }
   ]
 }

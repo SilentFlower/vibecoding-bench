@@ -1,0 +1,91 @@
+--- a/library/constraint/tables.py
++++ b/library/constraint/tables.py
+@@ -0,0 +1,55 @@
++"""业务允许/禁止元组表约束，显式列顺序与候选域支持。"""
++import copy
++from .constraints import Constraint
++
++
++class AllowedTuples(Constraint):
++    """只允许表中组合。@param rows 组合行迭代器。@param max_rows 表预算。"""
++    def __init__(self,rows,max_rows=10000):
++        """复制表且限制规模。@param rows 原表。@param max_rows 正整数。@return None。"""
++        if type(max_rows) is not int or max_rows<1:raise ValueError('表预算必须为正整数')
++        self.rows=[]
++        for index,row in enumerate(rows):
++            if index>=max_rows:raise ValueError('元组表超过预算')
++            current=tuple(copy.deepcopy(tuple(row)))
++            if self.rows and len(current)!=len(self.rows[0]):raise ValueError('元组表列数不一致')
++            if current not in self.rows:self.rows.append(current)
++
++    def _shape(self,variables):
++        """校验显式列顺序。@param variables 变量序列。@return None。"""
++        if len(set(variables))!=len(variables):raise ValueError('元组表不允许重复变量')
++        if self.rows and len(self.rows[0])!=len(variables):raise ValueError('变量数量与表列不符')
++
++    def preProcess(self,variables,domains,constraints,vconstraints):
++        """沿用原生单变量预处理协议。@param variables 列。@param domains 域。@param constraints 本轮约束。@param vconstraints 索引。@return None。"""
++        self._shape(variables)
++        super().preProcess(variables,domains,constraints,vconstraints)
++
++    def __call__(self,variables,domains,assignments,forwardcheck=False):
++        """保守筛选仍有全行支持的候选值。@param variables 列。@param domains 当前域。@param assignments 已赋值。@param forwardcheck 是否删域。@return 是否仍有支持。"""
++        self._shape(variables)
++        supported=[row for row in self.rows if all((row[index]==assignments[variable]) if variable in assignments else row[index] in domains[variable] for index,variable in enumerate(variables))]
++        if not supported:return False
++        if forwardcheck:
++            for index,variable in enumerate(variables):
++                if variable not in assignments:
++                    for value in domains[variable][:]:
++                        if not any(row[index]==value for row in supported):domains[variable].hideValue(value)
++                    if not domains[variable]:return False
++        return True
++
++
++class ForbiddenTuples(AllowedTuples):
++    """禁止明确完整组合，未列组合保持合法。@param rows 禁止行。@param max_rows 表预算。"""
++    def __call__(self,variables,domains,assignments,forwardcheck=False):
++        """完整匹配才拒绝，单个剩余变量可安全前向检查。@param variables 列。@param domains 域。@param assignments 已赋值。@param forwardcheck 是否删域。@return 是否仍可满足。"""
++        self._shape(variables)
++        missing=[variable for variable in variables if variable not in assignments]
++        if not missing:return tuple(assignments[variable] for variable in variables) not in self.rows
++        if forwardcheck and len(missing)==1:
++            variable=missing[0]
++            for value in domains[variable][:]:
++                trial={**assignments,variable:value}
++                if tuple(trial[item] for item in variables) in self.rows:domains[variable].hideValue(value)
++            return bool(domains[variable])
++        return True
+--- a/library/docs/development-python-constraint-04-dev.md
++++ b/library/docs/development-python-constraint-04-dev.md
+@@ -0,0 +1,5 @@
++# 课程与教室业务表通过允许及禁止元组约束完整求解
++
++路线15：业务允许/禁止元组表真实接入Constraint协议，列按显式variables，表持有独立快照及规模预算；允许表根据当前域支持安全剪枝，禁止表不误拒绝未完成赋值。单变量预处理复用前置独立域能力，原模型不永久缩小。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_python_constraint_04_dev.py
++++ b/library/tests/test_development_python_constraint_04_dev.py
+@@ -0,0 +1,22 @@
++"""课程/教室合法组合用真实Constraint协议执行。"""
++import unittest
++from constraint import Problem
++from constraint.tables import AllowedTuples,ForbiddenTuples
++
++
++def test_allowed_table_snapshot_and_forbidden_complement():
++    """输入表随后变化不污染规则，前向检查不漏合法组合。@return None。"""
++    rows=[('A',1),('B',2)]
++    allowed=AllowedTuples(rows);rows.append(('A',2))
++    problem=Problem();problem.addVariable('course',['A','B']);problem.addVariable('room',[1,2]);problem.addConstraint(allowed,['course','room'])
++    assert {(row['course'],row['room']) for row in problem.getSolutions()}=={('A',1),('B',2)}
++    other=Problem();other.addVariable('course',['A','B']);other.addVariable('room',[1,2]);other.addConstraint(ForbiddenTuples([('A',1)]),['course','room'])
++    assert {(row['course'],row['room']) for row in other.getSolutions()}=={('A',2),('B',1),('B',2)}
++
++
++def test_unary_preprocessing_and_bad_shape_do_not_mutate_model():
++    """前置独立域能力确保多次查询后声明域保持。@return None。"""
++    problem=Problem();problem.addVariable('x',[1,2,3]);problem.addConstraint(AllowedTuples([(2,)]),['x'])
++    assert problem.getSolutions()==[{'x':2}] and list(problem._variables['x'])==[1,2,3]
++    with unittest.TestCase().assertRaises(ValueError):AllowedTuples([(1,2),(3,)])
++    with unittest.TestCase().assertRaises(ValueError):AllowedTuples([(1,),(2,)],max_rows=1)

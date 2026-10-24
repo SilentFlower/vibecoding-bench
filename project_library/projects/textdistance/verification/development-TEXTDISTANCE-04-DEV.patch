@@ -1,0 +1,74 @@
+--- a/library/docs/development-textdistance-04-dev.md
++++ b/library/docs/development-textdistance-04-dev.md
+@@ -0,0 +1,5 @@
++# OCR编辑距离支持方向明确的非均匀插删改成本
++
++路线04：OCR距离新增非负有限的插入/删除/替换常数或单元回调，动态规划计算真实最小路径，支持方向成本、零成本与分数成本。相等谓词与词/qgram准备复用原库，不将非对称成本宣称为metric。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_textdistance_04_dev.py
++++ b/library/tests/test_development_textdistance_04_dev.py
+@@ -0,0 +1,23 @@
++"""真实加权最短路径，不能用单位距离乘统一系数。"""
++import unittest
++import textdistance
++from textdistance.weighted import WeightedLevenshtein
++
++
++def test_asymmetric_zero_and_callable_costs():
++    """插入删除有方向，贵替换可被删插路径取代。@return None。"""
++    algorithm=WeightedLevenshtein(insertion=2,deletion=5,substitution=9)
++    assert algorithm('','ab')==4 and algorithm('ab','')==10
++    assert algorithm('a','b')==7
++    assert WeightedLevenshtein(substitution=0)('a','b')==0
++    custom=WeightedLevenshtein(substitution=lambda a,b:0.25 if {a,b}=={'0','O'} else 2)
++    assert custom('O1','01')==0.25
++
++
++def test_units_predicate_and_invalid_costs():
++    """复用真实qval准备，坏回调成本明确拒绝。@return None。"""
++    assert WeightedLevenshtein(qval=None)('one two','one three')==1
++    assert WeightedLevenshtein(test_func=lambda a,b:a.casefold()==b.casefold())('A','a')==0
++    for cost in (-1,float('nan'),float('inf'),True):
++        with unittest.TestCase().assertRaises(ValueError):WeightedLevenshtein(insertion=cost)
++    with unittest.TestCase().assertRaises(ValueError):WeightedLevenshtein(substitution=lambda a,b:-1)('a','b')
+--- a/library/textdistance/weighted.py
++++ b/library/textdistance/weighted.py
+@@ -0,0 +1,37 @@
++"""带权编辑距离，方向成本明确且不改变原单位成本算法。"""
++import math
++from .algorithms.edit_based import Levenshtein
++
++
++class WeightedLevenshtein:
++    """插入、删除、替换可用非负有限常数或回调。@param insertion 插入成本。@param deletion 删除成本。@param substitution 替换成本。@param qval 原生单位。@param test_func 相等谓词。"""
++    def __init__(self,insertion=1,deletion=1,substitution=1,qval=1,test_func=None):
++        """保存独立成本政策。@param insertion 插入。@param deletion 删除。@param substitution 替换。@param qval 单位。@param test_func 谓词。@return None。"""
++        self.insertion,self.deletion,self.substitution=insertion,deletion,substitution
++        self.preparer=Levenshtein(qval=qval,test_func=test_func,external=False)
++        for cost in (insertion,deletion,substitution):
++            if not callable(cost):self._cost(cost)
++
++    @staticmethod
++    def _cost(policy,*tokens):
++        """每次真实使用成本时检查，避免负权破坏DP。@param policy 常数或回调。@param tokens 单元。@return 非负成本。"""
++        value=policy(*tokens) if callable(policy) else policy
++        if isinstance(value,bool) or not isinstance(value,(int,float)) or not math.isfinite(value) or value<0:raise ValueError('成本必须非负且有限')
++        return value
++
++    def __call__(self,left,right):
++        """计算从left到right的最小总编辑成本。@param left 源。@param right 目标。@return 最小成本。"""
++        left,right=self.preparer._get_sequences(left,right)
++        previous=[0]
++        for token in right:previous.append(previous[-1]+self._cost(self.insertion,token))
++        for source in left:
++            current=[previous[0]+self._cost(self.deletion,source)]
++            for index,target in enumerate(right,1):
++                replace=0 if self.preparer.test_func(source,target) else self._cost(self.substitution,source,target)
++                current.append(min(previous[index]+self._cost(self.deletion,source),current[-1]+self._cost(self.insertion,target),previous[index-1]+replace))
++            previous=current
++        return previous[-1]
++
++    def distance(self,left,right):
++        """明确方向的距离别名。@param left 源。@param right 目标。@return 成本。"""
++        return self(left,right)

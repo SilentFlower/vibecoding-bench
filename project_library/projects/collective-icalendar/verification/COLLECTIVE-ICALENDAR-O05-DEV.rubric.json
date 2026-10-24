@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "COLLECTIVE-ICALENDAR-O05-DEV",
+  "source_commit": "3ecf079acba0e592ea6a40c456514984c8657852",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement icalendar.schedule_shift.shift_schedule(calendar, delta, *, mode=\"wall\", ambiguous=\"error\", shift_absolute_alarms=False). Return a deep copy shifting VEVENT/VTODO DTSTART/DTEND/DUE/RECURRENCE-ID, RDATE/EXDATE periods and RRULE UNTIL consistently across masters/overrides, preserving UID/text/duration and leaving timezone definitions/metadata unchanged. Explicit wall-vs-UTC semantics must handle DST gaps/ambiguity, floating times and integral-day DATE precision. Relative alarms stay relative; absolute triggers move only on opt-in. Invalid inputs must not alter original objects.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

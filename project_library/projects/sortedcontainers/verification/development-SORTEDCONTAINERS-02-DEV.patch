@@ -1,0 +1,54 @@
+--- a/library/docs/development-sortedcontainers-02-dev.md
++++ b/library/docs/development-sortedcontainers-02-dev.md
+@@ -0,0 +1,5 @@
++# 可变优先级业务对象按既有位置显式刷新排序索引
++
++路线04：已变排序键必须按旧索引refresh_at，独立索引成功后才提交，返回原对象；失败保原缓存，不承诺回滚调用方已改对象或有副作用key。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/sortedcontainers/sortedlist.py
++++ b/library/src/sortedcontainers/sortedlist.py
+@@ -1660,6 +1660,19 @@
+     def key(self):
+         "Function used to extract comparison key from values."
+         return self._key
++
++    def refresh_at(self,index):
++        """显式重建已变排序键的一项。@param index 既有位置，支持负索引。@return 原业务对象。"""
++        import operator
++        index=operator.index(index)
++        value=self[index]
++        values=list(self)
++        del values[index]
++        # 在独立索引完成全部比较后提交，失败时保留原缓存和顺序。
++        candidate=type(self)(values,key=self._key)
++        candidate.add(value)
++        self.__dict__.update(candidate.__dict__)
++        return value
+ 
+     def clear(self):
+         """Remove all values from sorted-key list.
+--- a/library/tests/test_development_sortedcontainers_02_dev.py
++++ b/library/tests/test_development_sortedcontainers_02_dev.py
+@@ -0,0 +1,21 @@
++"""已变业务rank通过显式刷新恢复索引，不用新键寻找旧位置。"""
++import unittest
++from sortedcontainers import SortedKeyList
++
++def test_refresh_by_old_position_preserves_objects_and_new_order():
++    """按旧索引移除后重插，未变对象不被复制。@return None。"""
++    a={'rank':1};b={'rank':2};c={'rank':3}
++    values=SortedKeyList([a,b,c],key=lambda item:item['rank']);a['rank']=4
++    assert values.refresh_at(0) is a and list(values)==[b,c,a]
++    assert values[-1] is a;values._check()
++    c['rank']=0;values.refresh_at(-2);assert list(values)==[c,b,a];values._check()
++
++def test_invalid_or_comparison_failure_keeps_existing_cached_index():
++    """错误不提交半成品，也不掩盖调用方已改业务对象。@return None。"""
++    a={'rank':1};b={'rank':2};values=SortedKeyList([a,b],key=lambda item:item['rank'])
++    before_keys=[list(block) for block in values._keys]
++    a['rank']='bad'
++    with unittest.TestCase().assertRaises(TypeError):values.refresh_at(0)
++    assert list(values)==[a,b] and values._keys==before_keys
++    a['rank']=1;values._check()
++    with unittest.TestCase().assertRaises(IndexError):values.refresh_at(20)

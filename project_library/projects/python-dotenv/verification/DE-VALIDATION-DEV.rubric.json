@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DE-VALIDATION-DEV",
+  "source_commit": "0b2880591780a426b0551436f47a17e7a76d954f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement dotenv.validation.parse_config(text, *, required=(), duplicates=\"error\") returning immutable ParsedConfig(values, lines), using the pinned parser and its actual original line numbers. Collect syntax, duplicate and missing/value-less required-key issues into ConfigValidationError.issues tuples (code,key,line), in source order then required order; errors must not include secret values. Empty assigned values satisfy required. duplicates=\"last\" preserves last definition and its line. Do not interpolate, touch os.environ, print secret content, or change permissive dotenv_values behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

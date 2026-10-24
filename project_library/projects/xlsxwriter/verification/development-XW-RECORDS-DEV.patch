@@ -1,0 +1,128 @@
+--- a/library/development_tests/test_development_xw_records_dev.py
++++ b/library/development_tests/test_development_xw_records_dev.py
+@@ -0,0 +1,33 @@
++"""公开类型记录实际XLSX回归。"""
++from io import BytesIO
++from zipfile import ZipFile
++import xml.etree.ElementTree as ET
++import pytest
++from xlsxwriter import Workbook
++from xlsxwriter.records import Column,write_records
++
++NS='{http://schemas.openxmlformats.org/spreadsheetml/2006/main}'
++
++def test_text_is_literal_and_only_explicit_formula_creates_formula_cell():
++    output=BytesIO();book=Workbook(output);sheet=book.add_worksheet()
++    columns=[Column('text','Text'),Column('formula','Formula','formula')]
++    assert write_records(sheet,0,columns,[{'text':'=1+1','formula':'=1+1'}])==1;book.close()
++    with ZipFile(output) as archive: root=ET.fromstring(archive.read('xl/worksheets/sheet1.xml'))
++    cells={node.attrib['r']:node for node in root.iter(NS+'c')}
++    assert cells['A2'].find(NS+'f') is None and cells['B2'].find(NS+'f').text=='1+1'
++
++def test_bad_late_cell_is_rejected_before_any_cell_in_that_row():
++    book=Workbook(BytesIO());sheet=book.add_worksheet();columns=[Column('a','A','text'),Column('n','N','number')]
++    with pytest.raises(ValueError): write_records(sheet,5,columns,[{'a':'ok','n':True}],headers=False)
++    assert 5 not in sheet.table;book.close()
++
++def test_missing_values_and_bool_number_separation_are_explicit():
++    book=Workbook(BytesIO());sheet=book.add_worksheet()
++    with pytest.raises(KeyError): write_records(sheet,0,[Column('v','V')],[{}],headers=False,missing='raise')
++    assert write_records(sheet,0,[Column('v','V')],[{}, {'v':False}],headers=False)==2;book.close()
++
++def test_duplicate_columns_and_oversize_strings_fail():
++    book=Workbook(BytesIO());sheet=book.add_worksheet()
++    with pytest.raises(ValueError): write_records(sheet,0,[Column('x','A'),Column('x','B')],[])
++    with pytest.raises(ValueError): write_records(sheet,0,[Column('x','X')],[{'x':'x'*32768}],headers=False)
++    book.close()
+--- a/library/docs/development-xw-records-dev.md
++++ b/library/docs/development-xw-records-dev.md
+@@ -0,0 +1,5 @@
++# 实现类型列驱动的流式记录写入与文本公式边界
++
++按列合同写入真实类型单元格，普通文本不因看似公式或URL而执行转换，只有显式公式列例外。逐行预验证并使用UTC接口，支持别名、缺失策略、原格式和单次迭代，写入失败不能静默忽略。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/xlsxwriter/records.py
++++ b/library/xlsxwriter/records.py
+@@ -0,0 +1,81 @@
++"""逐记录验证并写入明确类型列，不隐式执行文本公式。"""
++import math
++from collections.abc import Mapping
++from dataclasses import dataclass
++from datetime import datetime
++from .utc import as_utc
++
++
++@dataclass(frozen=True)
++class Column:
++    """一列外部键、显示标题、明确类型与原生单元格格式。"""
++    key: str
++    header: str
++    kind: str='auto'
++    cell_format: object=None
++
++
++def _columns(columns):
++    columns=tuple(columns)
++    if not columns or any(not isinstance(column,Column) or not isinstance(column.key,str) or not column.key or not isinstance(column.header,str) or column.kind not in ('auto','text','number','boolean','datetime_utc','formula') for column in columns):
++        raise ValueError('需要有效的非空类型列')
++    if len({column.key for column in columns})!=len(columns):
++        raise ValueError('列键不能重复')
++    if any(len(column.header)>32767 for column in columns):
++        raise ValueError('标题超过Excel文本限制')
++    return columns
++
++
++def _prepare(value,kind):
++    if value is None:
++        return 'blank',None
++    if kind=='auto':
++        kind='boolean' if type(value) is bool else 'number' if type(value) in (int,float) else 'datetime_utc' if isinstance(value,datetime) else 'text' if isinstance(value,str) else 'invalid'
++    if kind in ('text','formula'):
++        if not isinstance(value,str) or len(value)>32767 or (kind=='formula' and not value.startswith(('=','{='))):
++            raise ValueError('需要有效文本或显式公式')
++    elif kind=='number':
++        if type(value) not in (int,float) or not math.isfinite(value):
++            raise ValueError('需要有限数字，布尔不是数字列')
++    elif kind=='boolean':
++        if type(value) is not bool:
++            raise ValueError('需要布尔值')
++    elif kind=='datetime_utc':
++        value=as_utc(value)
++    else:
++        raise TypeError('不支持的单元格类型')
++    return kind,value
++
++
++def write_records(worksheet,start_row,columns,records,*,start_col=0,headers=True,missing='blank'):
++    """逐记录写入真实类型单元格。@param worksheet 原工作表。@param start_row 起始行。
++    @param columns Column序列。@param records 映射迭代器。@param start_col 起始列。
++    @param headers 是否写标题。@param missing blank或raise。@return 写入业务记录数，不含标题。
++    """
++    columns=_columns(columns)
++    if type(start_row) is not int or type(start_col) is not int or start_row<0 or start_col<0 or start_col+len(columns)>16384 or type(headers) is not bool or missing not in ('blank','raise'):
++        raise ValueError('无效的起始位置或缺失值策略')
++    row=start_row
++    def put(kind,value,col,format):
++        writer=getattr(worksheet,'write_'+('datetime' if kind=='datetime_utc' else 'string' if kind=='text' else kind))
++        result=writer(row,col,value,format)
++        if result!=0:
++            raise ValueError('工作表写入失败：'+str(result))
++    if headers:
++        for offset,column in enumerate(columns):
++            put('text',column.header,start_col+offset,column.cell_format)
++        row+=1
++    count=0
++    for record in records:
++        if row>=1048576 or not isinstance(record,Mapping):
++            raise ValueError('记录必须为映射且不能超过Excel行界限')
++        prepared=[]
++        for column in columns:
++            if missing=='raise' and column.key not in record:
++                raise KeyError(column.key)
++            prepared.append(_prepare(record.get(column.key),column.kind))
++        # 先验证完整业务行，避免类型错误在该行前几个单元格已写入之后才出现。
++        for offset,(column,(kind,value)) in enumerate(zip(columns,prepared)):
++            put(kind,value,start_col+offset,column.cell_format)
++        row+=1;count+=1
++    return count

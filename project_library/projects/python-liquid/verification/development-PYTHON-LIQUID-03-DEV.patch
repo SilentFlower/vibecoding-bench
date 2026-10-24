@@ -1,0 +1,80 @@
+--- a/library/docs/development-python-liquid-03-dev.md
++++ b/library/docs/development-python-liquid-03-dev.md
+@@ -0,0 +1,5 @@
++# 本地报告数据合同预检聚合缺字段与类型问题
++
++路线04：调用方明确ContextSchema字段路径/类型/必填/可空，渲染前聚合缺失与类型问题；支持明确数组位置，不运行模板/过滤器/getter、不泄漏值、不猜动态路径，默认宽容渲染保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/liquid/context_schema.py
++++ b/library/liquid/context_schema.py
+@@ -0,0 +1,45 @@
++"""声明式上下文预检，只读JSON式值，不渲染或调用属性getter。"""
++from collections.abc import Mapping
++from dataclasses import dataclass
++
++@dataclass(frozen=True)
++class ContextField:
++    """明确字段合同。@param path str/int路径。@param expected_type 一个真实类型。@param required 是否必填。@param nullable 是否可None。"""
++    path:tuple
++    expected_type:type
++    required:bool=True
++    nullable:bool=False
++
++@dataclass(frozen=True)
++class ContextProblem:
++    """上下文问题。@param path 原声明路径。@param code missing/type。@param message 说明，不输出业务值。"""
++    path:tuple
++    code:str
++    message:str
++
++class ContextSchema:
++    """调用方明确类型合同，不猜动态路径/过滤器类型。@param fields 不重复路径的ContextField序列。"""
++    def __init__(self,fields):
++        self.fields=tuple(fields);seen=set()
++        for field in self.fields:
++            if not isinstance(field,ContextField) or not field.path or not isinstance(field.path,tuple) or any(type(part) not in (str,int) or isinstance(part,int) and part<0 for part in field.path) or not isinstance(field.expected_type,type):raise TypeError('字段合同无效')
++            if field.path in seen:raise ValueError('重复字段路径')
++            seen.add(field.path)
++
++def validate_context(data,schema):
++    """聚合声明字段的缺失和类型错误。@param data 只读Mapping。@param schema ContextSchema。@return 按合同顺序的不可变ContextProblem序列；额外字段不猜为错误。"""
++    if not isinstance(data,Mapping) or not isinstance(schema,ContextSchema):raise TypeError('需要映射与ContextSchema')
++    problems=[]
++    for field in schema.fields:
++        value=data;missing=False
++        for part in field.path:
++            if type(part) is str and isinstance(value,Mapping) and part in value:value=value[part]
++            elif type(part) is int and isinstance(value,(list,tuple)) and part<len(value):value=value[part]
++            else:missing=True;break
++        if missing:
++            if field.required:problems.append(ContextProblem(field.path,'missing','缺少声明字段'))
++            continue
++        if value is None and field.nullable:continue
++        if not isinstance(value,field.expected_type) or field.expected_type is int and type(value) is bool:
++            problems.append(ContextProblem(field.path,'type','字段类型不符'))
++    return tuple(problems)
+--- a/library/tests/test_development_python_liquid_03_dev.py
++++ b/library/tests/test_development_python_liquid_03_dev.py
+@@ -0,0 +1,21 @@
++"""渲染之前一次列出声明数据合同的问题，不运行模板过滤器。"""
++import unittest
++from liquid.context_schema import ContextField,ContextSchema,validate_context
++
++def test_aggregate_missing_types_optional_nullable_and_list_positions():
++    """明确数组位置与可选/空值独立，不强迫条件分支字段。@return None。"""
++    schema=ContextSchema([ContextField(('user','name'),str),ContextField(('items',0,'amount'),int),ContextField(('note',),str,False),ContextField(('label',),str,True,True)])
++    value={'user':{},'items':[{'amount':'bad'}],'label':None}
++    problems=validate_context(value,schema)
++    assert [(p.path,p.code) for p in problems]==[(('user','name'),'missing'),(('items',0,'amount'),'type')]
++    assert validate_context({'user':{'name':'茶'},'items':[{'amount':3}],'label':None},schema)==()
++
++def test_no_property_access_no_value_leak_bool_int_and_schema_errors():
++    """仅Mapping/list路径，不读取任意对象属性或把bool当int。@return None。"""
++    class Object:
++        @property
++        def secret(self):raise AssertionError('getter')
++    schema=ContextSchema([ContextField(('obj','secret'),str),ContextField(('n',),int)])
++    problems=validate_context({'obj':Object(),'n':True},schema)
++    assert [x.code for x in problems]==['missing','type'] and all('True' not in x.message for x in problems)
++    with unittest.TestCase().assertRaises(ValueError):ContextSchema([ContextField(('n',),int),ContextField(('n',),str)])

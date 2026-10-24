@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TREELIB-04-DEV",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add treelib.csvio.read_csv(stream,tree_class=Tree,**tree_kwargs)/write_csv(tree,stream) for an explicit id,parent,tag,data header (exact unique columns/order). IDs and parents are separate from display tags, empty parent denotes root, data is strict JSON text, standard CSV quoting preserves commas/newlines/Unicode. Read valid out-of-order rows through the delivered complete Tree.from_map validation; reject duplicate/empty IDs, wrong field counts/headers, invalid JSON, missing parents and detached cycles instead of losing rows. Write full descendants in current sibling order regardless of expanded, without closing or rewinding caller streams. Tags may be empty without becoming root markers. Preserve original file APIs and document that expanded is a snapshot capability, not a CSV field.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

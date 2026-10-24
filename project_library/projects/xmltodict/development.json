@@ -3,7 +3,7 @@
   "project_key": "xmltodict",
   "title": "XML订单交换开发任务",
   "category": "结构化数据与流式导入",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项XML交换完整工程目标：分块、预算、增量生命周期、命名空间冲突、局部空白与稳定导出；实现后逐项及累计验收。",
   "seed_digest": "ef3fbb39effc4a84d89f2a7410f56b66c9b03725279d8ecf442a4936b0a1f59b",
   "environment": "xmltodict-py312",
   "source": {
@@ -54,6 +54,246 @@
           "branches": [],
           "owner_materials": [
             "disclosure/XD-M01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XD-BUDGET-DEV-SCENE",
+      "title": "在XML构造期间执行深度、元素及文本预算",
+      "goal": "在XML构造期间执行深度、元素及文本预算",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XD-BUDGET-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-BUDGET-DEV",
+          "kind": "modify",
+          "goal": "在XML构造期间执行深度、元素及文本预算",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd optional parse kwargs max_depth/max_elements/max_text_chars (None or nonnegative nonboolean integer), validated before consuming input. Count depth including root=1, all element starts and cumulative decoded character-data lengths including whitespace (not attributes/comments). Raise XMLLimitError(ValueError) before constructing the offending element or appending excess text. Bound whole input even in item_depth streaming, namespace and chunked modes. Preserve unlimited defaults, entity blocking and callback stop semantics; do not claim rollback of callbacks emitted before a later limit failure.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xd_budget_dev.py and concise Chinese compatibility documentation at library/docs/development-xd-budget-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/XD-BUDGET-DEV-contract.md",
+            "materials/XD-BUDGET-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xmltodict.py",
+            "library/development_tests/test_development_xd_budget_dev.py",
+            "library/docs/development-xd-budget-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XD-BUDGET-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-BUDGET-DEV.native.json",
+            "public_native": "verification/XD-BUDGET-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XD-BUDGET-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XD-INCREMENTAL-DEV-SCENE",
+      "title": "提供具有明确失败与完成状态的增量XML解析对象",
+      "goal": "提供具有明确失败与完成状态的增量XML解析对象",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XD-INCREMENTAL-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-INCREMENTAL-DEV",
+          "kind": "modify",
+          "goal": "提供具有明确失败与完成状态的增量XML解析对象",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd IncrementalParser(encoding=None,*,process_namespaces=False,namespace_separator=\":\",disable_entities=True,process_comments=False,**handler_options) with feed(chunk) and close(). Reuse pinned SAX handler, including completed resource budgets, item callbacks and postprocessor. Support UTF8 byte boundaries and text chunks, require consistent bytes/str chunk types, finalize incomplete XML with original ExpatError, make successful close idempotent and prohibit feed after close or any parse failure. Entity declarations remain disabled by default and callback interruption propagates immediately. No threads, buffering an entire input document, or restarting after failure.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xd_incremental_dev.py and concise Chinese compatibility documentation at library/docs/development-xd-incremental-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "XD-BUDGET-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/XD-INCREMENTAL-DEV-contract.md",
+            "materials/XD-INCREMENTAL-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xmltodict.py",
+            "library/development_tests/test_development_xd_incremental_dev.py",
+            "library/docs/development-xd-incremental-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XD-INCREMENTAL-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-INCREMENTAL-DEV.native.json",
+            "public_native": "verification/XD-INCREMENTAL-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XD-INCREMENTAL-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XD-NAMESPACE-COLLISION-DEV-SCENE",
+      "title": "显式拒绝命名空间压缩引起的元素或属性键冲突",
+      "goal": "显式拒绝命名空间压缩引起的元素或属性键冲突",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XD-NAMESPACE-COLLISION-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-NAMESPACE-COLLISION-DEV",
+          "kind": "modify",
+          "goal": "显式拒绝命名空间压缩引起的元素或属性键冲突",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd parse handler option namespace_collision=\"merge\"|\"error\". Preserve existing merge default; error rejects when different expanded element names under the same parent or distinct expanded attributes on one element collapse to one mapped dictionary key through namespaces. Repeated identical expanded names remain valid lists, and equal local keys under separate parents are independent. Check before postprocessor transformations; do not classify ordinary repeats or user postprocessor collisions as namespace collisions. Support item_depth streaming, inherited maps and prefix remapping without global state.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xd_namespace_collision_dev.py and concise Chinese compatibility documentation at library/docs/development-xd-namespace-collision-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/XD-NAMESPACE-COLLISION-DEV-contract.md",
+            "materials/XD-NAMESPACE-COLLISION-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xmltodict.py",
+            "library/development_tests/test_development_xd_namespace_collision_dev.py",
+            "library/docs/development-xd-namespace-collision-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XD-NAMESPACE-COLLISION-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-NAMESPACE-COLLISION-DEV.native.json",
+            "public_native": "verification/XD-NAMESPACE-COLLISION-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XD-NAMESPACE-COLLISION-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XD-XML-SPACE-DEV-SCENE",
+      "title": "按元素继承xml:space局部空白规则并恢复兄弟状态",
+      "goal": "按元素继承xml:space局部空白规则并恢复兄弟状态",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XD-XML-SPACE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-XML-SPACE-DEV",
+          "kind": "modify",
+          "goal": "按元素继承xml:space局部空白规则并恢复兄弟状态",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd respect_xml_space=False parse handler option. When enabled, xml:space=\"preserve\" disables stripping for that element, inherited descendants and comments; xml:space=\"default\" restores the caller original strip_whitespace policy in that subtree. Restore parent policy when an element closes, including item_depth callback paths, so siblings do not leak state. Recognize raw xml:space and expanded XML namespace attributes with configured separator; unknown values inherit. Preserve exposed attribute values, legacy default behavior and concatenation semantics, without promising ordered mixed-content fidelity.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xd_xml_space_dev.py and concise Chinese compatibility documentation at library/docs/development-xd-xml-space-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/XD-XML-SPACE-DEV-contract.md",
+            "materials/XD-XML-SPACE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xmltodict.py",
+            "library/development_tests/test_development_xd_xml_space_dev.py",
+            "library/docs/development-xd-xml-space-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XD-XML-SPACE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-XML-SPACE-DEV.native.json",
+            "public_native": "verification/XD-XML-SPACE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XD-XML-SPACE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "XD-ATTR-SORT-DEV-SCENE",
+      "title": "显式稳定排序XML属性并保持元素及文本顺序",
+      "goal": "显式稳定排序XML属性并保持元素及文本顺序",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "XD-ATTR-SORT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "XD-ATTR-SORT-DEV",
+          "kind": "modify",
+          "goal": "显式稳定排序XML属性并保持元素及文本顺序",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd unparse(...,sort_attributes=False) with boolean validation before writing. When enabled, sort emitted attribute names lexicographically at every element after namespace rewriting, including namespace declarations; preserve child-element order, text, comments, escaping, pretty/short-empty settings and input mapping order. Default serialization must remain byte-identical. Support output streams and roundtrip parse, but do not describe this limited attribute-order option as XML canonicalization.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_xd_attr_sort_dev.py and concise Chinese compatibility documentation at library/docs/development-xd-attr-sort-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/XD-ATTR-SORT-DEV-contract.md",
+            "materials/XD-ATTR-SORT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/xmltodict.py",
+            "library/development_tests/test_development_xd_attr_sort_dev.py",
+            "library/docs/development-xd-attr-sort-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/XD-ATTR-SORT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/XD-ATTR-SORT-DEV.native.json",
+            "public_native": "verification/XD-ATTR-SORT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/XD-ATTR-SORT-DEV-business.md"
           ],
           "development_cycle": "feature"
         }

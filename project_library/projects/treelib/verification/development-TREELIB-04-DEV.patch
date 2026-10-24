@@ -1,0 +1,71 @@
+--- a/library/docs/development-treelib-04-dev.md
++++ b/library/docs/development-treelib-04-dev.md
+@@ -0,0 +1,5 @@
++# 办公CSV分类表全量交换业务标识、父关系和复杂文本
++
++路线09：办公CSV读写明确id/parent/tag/data四列，根标记与空业务文本分离，标准CSV引号保留中文、逗号和换行。读入复用前置完整映射预检，孤儿/离线环/重复ID拒绝，写出不被折叠剪枝；不关闭调用方流。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_treelib_04_dev.py
++++ b/library/tests/test_development_treelib_04_dev.py
+@@ -0,0 +1,20 @@
++"""办公表格保持业务标识、Unicode及完整父关系。"""
++import io
++import unittest
++from treelib.csvio import read_csv,write_csv
++
++
++def test_out_of_order_unicode_quoted_data_roundtrip():
++    """引号、逗号、换行及空tag不被当根或列分隔。@return None。"""
++    raw='id,parent,tag,data\nchild,root,"含,逗号","{""n"":0}"\nroot,,根,null\nempty,root,,false\n'
++    tree=read_csv(io.StringIO(raw));tree['root'].expanded=False
++    stream=io.StringIO();write_csv(tree,stream);again=read_csv(io.StringIO(stream.getvalue()))
++    assert len(again)==3 and again['child'].tag=='含,逗号' and again['child'].data=={'n':0}
++    assert again['empty'].tag=='' and again['empty'].data is False
++    assert [node.identifier for node in again.children('root')]==['child','empty']
++
++
++def test_invalid_columns_and_unreachable_records_reject():
++    """不能仅输出可达根并悄悄丢掉坏记录。@return None。"""
++    for raw in ('id,parent,tag,data\nr,,Root,null\nx,missing,X,null\n','id,parent,tag,data\nr,,R,null\na,b,A,null\nb,a,B,null\n','id,parent,tag,tag\nr,,a,b\n','id,parent,tag,data\nx,,X,null\nx,x,X,null\n'):
++        with unittest.TestCase().assertRaises(ValueError):read_csv(io.StringIO(raw))
+--- a/library/treelib/csvio.py
++++ b/library/treelib/csvio.py
+@@ -0,0 +1,37 @@
++"""办公CSV节点交换，使用已验全量映射导入而非静默丢弃记录。"""
++import csv
++import io
++import json
++from .tree import Tree
++
++
++def read_csv(stream,tree_class=Tree,**tree_kwargs):
++    """读取id,parent,tag,data节点表。@param stream 文本流。@param tree_class 显式树类。@param tree_kwargs 构造参数。@return 完整新树。"""
++    reader=csv.DictReader(stream)
++    if reader.fieldnames!=['id','parent','tag','data']:raise ValueError('CSV列必须是id,parent,tag,data且顺序唯一')
++    rows={}
++    for row in reader:
++        if set(row)!={'id','parent','tag','data'} or any(value is None for value in row.values()):raise ValueError('CSV列数不匹配')
++        identity=row['id']
++        if not identity or identity in rows:raise ValueError('CSV标识为空或重复')
++        rows[identity]=row
++    # 复用前置完整图预检，乱序、离线环及孤儿不会被静默遗漏。
++    mapping={identity:(row['parent'] or None) for identity,row in rows.items()}
++    data={identity:json.loads(row['data']) for identity,row in rows.items()}
++    tree=tree_class.from_map(mapping,data_func=lambda identity:data[identity],**tree_kwargs)
++    for identity,row in rows.items():tree[identity].tag=row['tag']
++    return tree
++
++
++def write_csv(tree,stream):
++    """按原兄弟顺序输出全部节点，包括折叠后代。@param tree 完整树。@param stream 文本流。@return None。"""
++    writer=csv.writer(stream,lineterminator='\n');writer.writerow(['id','parent','tag','data'])
++    pending=[tree.root] if tree.root is not None else []
++    seen=set()
++    while pending:
++        identity=pending.pop()
++        if identity in seen:raise ValueError('树含重复关系或环')
++        seen.add(identity);node=tree[identity]
++        writer.writerow([identity,node.predecessor(tree.identifier) or '',node.tag,json.dumps(node.data,ensure_ascii=False,allow_nan=False)])
++        pending.extend(reversed(node.successors(tree.identifier)))
++    if len(seen)!=len(tree):raise ValueError('树含不可达节点')

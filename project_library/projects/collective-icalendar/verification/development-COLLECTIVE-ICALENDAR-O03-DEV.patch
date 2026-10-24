@@ -1,0 +1,111 @@
+--- a/library/docs/development-collective-icalendar-o03-dev.md
++++ b/library/docs/development-collective-icalendar-o03-dev.md
+@@ -0,0 +1,5 @@
++# 按CAL-ADDRESS部分更新参会者并保留参数
++
++按CAL-ADDRESS匹配并返回独立同类组件，只折叠URI scheme大小写。增量更新指定参数或删除None参数，保留姓名、角色、RSVP、委派列表及其他参会者；重复与无匹配政策明确，源组件不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/icalendar/attendee_update.py
++++ b/library/src/icalendar/attendee_update.py
+@@ -0,0 +1,66 @@
++"""按明确CAL-ADDRESS键更新参会者，保留未改参数。"""
++from copy import deepcopy
++from icalendar.prop.cal_address import vCalAddress
++
++
++def _key(address):
++    """仅URI scheme大小写不敏感，其余部分保持。@param address 地址。@return 匹配键。"""
++    address = str(vCalAddress(address))
++    scheme, separator, rest = address.partition(':')
++    if not separator or not scheme:
++        raise ValueError('参会者需要显式URI')
++    return scheme.lower() + ':' + rest
++
++
++def upsert_attendee(component, address, *, parameters=None, duplicates='error'):
++    """返回同类独立副本，只更新指定参数或新增地址。
++
++    :param component: 真实Event/Todo等组件。
++    :param address: 显式CAL-ADDRESS；只折叠scheme大小写。
++    :param parameters: 参数增量，None值表示删除该参数。
++    :param duplicates: error拒绝多匹配，all更新全部匹配。
++    :return: 同类组件，其他参会者及未指定参数保持。
++    """
++    if duplicates not in ('error', 'all'):
++        raise ValueError('未知重复参会者政策')
++    target = _key(address)
++    result = deepcopy(component)
++    raw = result.get('ATTENDEE')
++    attendees = [] if raw is None else list(raw) if isinstance(raw, list) else [raw]
++    selected = [item for item in attendees if _key(item) == target]
++    if len(selected) > 1 and duplicates == 'error':
++        raise ValueError('匹配到多个参会者')
++    if not selected:
++        selected = [vCalAddress(address)]
++        attendees.extend(selected)
++    for item in selected:
++        for name, value in (parameters or {}).items():
++            if value is None:
++                item.params.pop(name, None)
++            else:
++                item.params[name] = deepcopy(value)
++    result.attendees = attendees
++    return result
++
++
++def remove_attendee(component, address, *, strict=False, duplicates='error'):
++    """移除明确匹配地址，不删除其他URI或委派关系。
++
++    :param component: 原组件。
++    :param address: CAL-ADDRESS。
++    :param strict: 无匹配时是否失败。
++    :param duplicates: error拒绝重复或all全部删除。
++    :return: 同类副本。
++    """
++    if duplicates not in ('error', 'all'):
++        raise ValueError('未知重复参会者政策')
++    target = _key(address)
++    result = deepcopy(component)
++    raw = result.get('ATTENDEE')
++    attendees = [] if raw is None else list(raw) if isinstance(raw, list) else [raw]
++    count = sum(_key(item) == target for item in attendees)
++    if (not count and strict) or (count > 1 and duplicates == 'error'):
++        raise ValueError('参会者匹配数量不满足政策')
++    if count:
++        result.attendees = [item for item in attendees if _key(item) != target]
++    return result
+--- a/library/tests/test_development_collective_icalendar_o03_dev.py
++++ b/library/tests/test_development_collective_icalendar_o03_dev.py
+@@ -0,0 +1,31 @@
++"""更新参与状态时不能丢CN、ROLE、RSVP与委派参数。"""
++from icalendar import Event
++from icalendar.prop.cal_address import vCalAddress
++
++def test_partial_update_preserves_parameters():
++    """只改PARTSTAT，原组件及其他参数保持。@return None。"""
++    from icalendar.attendee_update import upsert_attendee
++    event = Event()
++    attendee = vCalAddress('mailto:user@example.test', params={'CN': 'User', 'ROLE': 'REQ-PARTICIPANT', 'RSVP': 'TRUE'})
++    event.attendees = [attendee]
++    result = upsert_attendee(event, 'MAILTO:user@example.test', parameters={'PARTSTAT': 'ACCEPTED'})
++    assert result.attendees[0].params['CN'] == 'User' and result.attendees[0].params['ROLE'] == 'REQ-PARTICIPANT'
++    assert result.attendees[0].params['PARTSTAT'] == 'ACCEPTED' and 'PARTSTAT' not in event.attendees[0].params
++
++def test_add_remove_and_case_policy():
++    """URI scheme匹配但本地地址部分不擅自折叠。@return None。"""
++    from icalendar.attendee_update import upsert_attendee, remove_attendee
++    event = upsert_attendee(Event(), 'mailto:User@example.test', parameters={'CN': 'U'})
++    result = upsert_attendee(event, 'mailto:user@example.test')
++    assert len(result.attendees) == 2
++    assert len(remove_attendee(result, 'MAILTO:user@example.test').attendees) == 1
++
++def test_duplicate_policy_and_parameter_delete():
++    """重复必须显式all，参数None可单独删除。@return None。"""
++    import pytest
++    from icalendar.attendee_update import upsert_attendee
++    event = Event()
++    event.attendees = [vCalAddress('mailto:a@x', params={'CN': 'A'}), vCalAddress('mailto:a@x', params={'CN': 'B'})]
++    with pytest.raises(ValueError): upsert_attendee(event, 'mailto:a@x')
++    result = upsert_attendee(event, 'mailto:a@x', parameters={'CN': None, 'PARTSTAT': 'TENTATIVE'}, duplicates='all')
++    assert all('CN' not in item.params and item.params['PARTSTAT'] == 'TENTATIVE' for item in result.attendees)

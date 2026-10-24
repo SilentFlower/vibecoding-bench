@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DYNACONF-O02-DEV",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix Validator.validate when-environment inheritance as call-local evaluation context, never persisting an inferred env list onto shared self.when. Respect explicit child envs, nested when/and/or and only_current_env while retaining normal validation behavior. A descriptor first used by disabled dev must still reject negative PORT when enabled prod is checked, exactly as a fresh descriptor would. Concurrent/nested instances must not leak environments or require deepcopy of arbitrary user predicates; reset context on every failure/return.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,84 @@
+--- a/library/development_tests/test_development_ck_stable_write_dev.py
++++ b/library/development_tests/test_development_ck_stable_write_dev.py
+@@ -0,0 +1,34 @@
++"""公开内容稳定的原子输出回归。"""
++import pytest
++import click
++from click.testing import CliRunner
++from click.writing import write_if_changed
++
++def test_equal_bytes_keep_inode_mtime_and_mode(tmp_path):
++    path=tmp_path/'out';path.write_bytes(b'same');path.chmod(0o640);before=path.stat()
++    assert write_if_changed(path,'same') is False
++    after=path.stat()
++    assert (after.st_ino,after.st_mtime_ns,after.st_mode)==(before.st_ino,before.st_mtime_ns,before.st_mode)
++
++def test_changed_content_and_encoding_roundtrip(tmp_path):
++    path=tmp_path/'out'
++    assert write_if_changed(path,'雪',encoding='utf-16') and path.read_bytes()=='雪'.encode('utf-16')
++    assert path.stat().st_mode&0o777==0o600
++
++def test_replace_failure_preserves_old_bytes_and_cleans_temp(tmp_path,monkeypatch):
++    path=tmp_path/'out';path.write_text('old')
++    def broken(*args):
++        raise OSError('synthetic')
++    monkeypatch.setattr('os.replace',broken)
++    with pytest.raises(OSError):
++        write_if_changed(path,'new')
++    assert path.read_text()=='old' and list(tmp_path.iterdir())==[path]
++
++def test_real_command_reports_whether_generation_changed(tmp_path):
++    path=tmp_path/'out'
++    @click.command()
++    def command():
++        click.echo('changed' if write_if_changed(path,'content') else 'unchanged')
++    runner=CliRunner()
++    assert runner.invoke(command).output.strip()=='changed'
++    assert runner.invoke(command).output.strip()=='unchanged'
+--- a/library/docs/development-ck-stable-write-dev.md
++++ b/library/docs/development-ck-stable-write-dev.md
+@@ -0,0 +1,5 @@
++# 命令重复生成相同内容时保留目标文件并原子提交变化
++
++命令反复生成配置时，相同字节不应触发文件监听或重载。先完成编码比较，不变保持inode和时间；有变化才同目录原子替换，保留模式，失败清理，不改变原open_file默认行为。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/click/writing.py
++++ b/library/src/click/writing.py
+@@ -0,0 +1,36 @@
++"""相同内容不触碰目标文件的受控原子输出。"""
++import os
++import stat
++import tempfile
++from pathlib import Path
++
++
++def write_if_changed(path,content,*,encoding='utf-8'):
++    """内容变化时才替换文件。@param path 普通文件。@param content str或bytes。
++    @param encoding 文本编码。@return 是否实际写入；不变时保持inode、mtime与模式。
++    """
++    path=Path(path)
++    if not isinstance(content,(str,bytes)):
++        raise TypeError('输出必须是文本或bytes')
++    data=content.encode(encoding) if isinstance(content,str) else content
++    if path.is_symlink():
++        raise ValueError('不接受符号链接输出')
++    try:
++        previous=path.read_bytes()
++    except FileNotFoundError:
++        previous=None
++    if previous==data:
++        return False
++    mode=stat.S_IMODE(path.stat().st_mode) if previous is not None else 0o600
++    temporary=None
++    try:
++        with tempfile.NamedTemporaryFile(mode='wb',dir=path.parent,prefix='.'+path.name+'.',delete=False) as stream:
++            temporary=Path(stream.name);stream.write(data);stream.flush()
++            os.fchmod(stream.fileno(),mode);os.fsync(stream.fileno())
++        if path.is_symlink():
++            raise ValueError('不接受符号链接输出')
++        os.replace(temporary,path);temporary=None
++    finally:
++        if temporary is not None:
++            temporary.unlink(missing_ok=True)
++    return True

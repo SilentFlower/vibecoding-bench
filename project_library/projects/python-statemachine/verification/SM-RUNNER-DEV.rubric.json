@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SM-RUNNER-DEV",
+  "source_commit": "ec5d8173f740b37941818df13727db9d64ef498d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement statemachine.runner.EventCall, EventResult, normalize_call and MachineRunner(machine) with dispatch(call,*,index=0,errors=\"raise\") and run(calls,*,errors=\"raise\"). Invoke actual send with detached positional/keyword callback arguments; reject empty calls and delay/send_id/internal controls in immediate batches. Reuse completed snapshots before/after actual execution, retain real callback result, collect only TransitionNotAllowed as error records and continue when requested. Programming/callback/source exceptions propagate. Stay lazy and sequential, preserve original native transition semantics and do not claim rollback of external callback side effects; async uses separate runner.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

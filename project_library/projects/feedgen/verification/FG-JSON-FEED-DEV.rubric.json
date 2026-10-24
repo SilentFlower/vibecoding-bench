@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FG-JSON-FEED-DEV",
+  "source_commit": "97260abb1793eb164c458c10b493690beb413f6d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement feedgen.json_feed.json_feed(feed) and json_feed_str(feed,*,pretty=False), following https://www.jsonfeed.org/version/1.1/ for supported fields: version/title/items, alternate/self/next links, description/language/icons/authors; item unique ID/title, inline text or HTML content, plain summary fallback, URL, aware published/modified dates, authors and enclosure attachments with MIME type/optional nonnegative byte size including zero. Require valid title/content/IDs and reject unsupported external/XHTML bodies rather than silently losing them. Return independent JSON data and UTF8 bytes, do not mutate source or invent extension mappings.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

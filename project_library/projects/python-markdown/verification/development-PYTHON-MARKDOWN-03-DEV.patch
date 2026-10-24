@@ -1,0 +1,77 @@
+--- a/library/docs/development-python-markdown-03-dev.md
++++ b/library/docs/development-python-markdown-03-dev.md
+@@ -0,0 +1,5 @@
++# 知识文档显式允许SSH与URN等URI自动链接策略
++
++路线05：新增显式启用的URI自动链接扩展，按实例白名单支持SSH/URN等完整URI，属性交由真实serializer转义，显示文本不二次行内解析。危险协议配置拒绝、代码内不展开、普通HTML及原链接兼容；不是整文HTML清洗器。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/markdown/extensions/uri_autolink.py
++++ b/library/markdown/extensions/uri_autolink.py
+@@ -0,0 +1,43 @@
++"""显式scheme白名单的URI自动链接扩展，不替代HTML清洗器。"""
++import re
++import xml.etree.ElementTree as etree
++from . import Extension
++from ..inlinepatterns import InlineProcessor
++from ..util import AtomicString
++
++
++class UriInlineProcessor(InlineProcessor):
++    """只将允许的URI文本构成真实链接。@param pattern 模式。@param md Markdown。@param schemes 白名单。"""
++    def __init__(self,pattern,md,schemes):
++        """保存本实例独立政策。@param pattern 模式。@param md 转换器。@param schemes 白名单。@return None。"""
++        super().__init__(pattern,md);self.schemes=schemes
++
++    def handleMatch(self,match,data):
++        """建立由serializer转义的属性和字面显示文本。@param match 命中。@param data 行内文本。@return 元素与匹配范围。"""
++        value=match.group(1);scheme=value.split(':',1)[0].lower()
++        if scheme not in self.schemes:return None,None,None
++        element=etree.Element('a');element.set('href',value);element.text=AtomicString(value)
++        return element,match.start(0),match.end(0)
++
++
++class UriAutolinkExtension(Extension):
++    """可选URI自动链接。@param schemes 允许的scheme序列。"""
++    def __init__(self,**kwargs):
++        """验证白名单不允许主动脚本协议。@param kwargs 配置。@return None。"""
++        self.config={'schemes':[('http','https','ssh','urn'),'明确允许的scheme序列']}
++        super().__init__(**kwargs)
++        values=self.getConfig('schemes')
++        if isinstance(values,str):raise ValueError('schemes必须是序列')
++        normalized=frozenset(value.lower() for value in values)
++        if any(re.fullmatch(r'[a-z][a-z0-9+.-]*',value) is None for value in normalized) or normalized&{'javascript','vbscript','data'}:raise ValueError('URI scheme白名单不合法')
++        self.schemes=normalized
++
++    def extendMarkdown(self,md):
++        """注册在原始HTML前且代码片段后。@param md Markdown实例。@return None。"""
++        processor=UriInlineProcessor(r'<([a-zA-Z][a-zA-Z0-9+.-]*:[^<>\s]+)>',md,self.schemes)
++        md.inlinePatterns.register(processor,'markdown.extensions.uri_autolink',125)
++
++
++def makeExtension(**kwargs):
++    """创建独立扩展实例。@param kwargs 配置。@return UriAutolinkExtension。"""
++    return UriAutolinkExtension(**kwargs)
+--- a/library/tests/test_development_python_markdown_03_dev.py
++++ b/library/tests/test_development_python_markdown_03_dev.py
+@@ -0,0 +1,20 @@
++"""URI链接范围可选且属性安全转义，不能把任意标签当链接。"""
++import unittest
++import markdown
++
++
++def test_opt_in_ssh_urn_and_attribute_escaping():
++    """ssh/urn通过本实例策略，URL中的&不会破坏属性。@return None。"""
++    text='<ssh://example.com/repo?x=1&y=2> <urn:example:one>'
++    assert '<a href="ssh:' not in markdown.markdown(text)
++    output=markdown.markdown(text,extensions=['markdown.extensions.uri_autolink'])
++    assert 'href="ssh://example.com/repo?x=1&amp;y=2"' in output
++    assert 'href="urn:example:one"' in output
++    assert '<em>keep</em>' in markdown.markdown('<em>keep</em>',extensions=['markdown.extensions.uri_autolink'])
++
++
++def test_code_and_dangerous_policy_remain_separate():
++    """代码中不展开，危险白名单直接拒绝。@return None。"""
++    output=markdown.markdown('`<ssh://example.com>` <javascript:alert(1)>',extensions=['markdown.extensions.uri_autolink'])
++    assert '<code>&lt;ssh://example.com&gt;</code>' in output and '<a href="javascript:' not in output
++    with unittest.TestCase().assertRaises(ValueError):markdown.Markdown(extensions=['markdown.extensions.uri_autolink'],extension_configs={'markdown.extensions.uri_autolink':{'schemes':['javascript']}})

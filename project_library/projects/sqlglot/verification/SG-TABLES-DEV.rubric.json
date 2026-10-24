@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SG-TABLES-DEV",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement sqlglot.report_inspection.query_copy, physical_nodes and inspect_tables(query,*,dialect=None) returning frozen TableReference(catalog,database,name,alias,quoted,scope) occurrences. Parse exactly one Query or copy supplied Query; reject empty/multiple/nonquery input. Use actual traverse_scope to exclude CTE references (including shadowing), retain physical tables inside CTE bodies, nested subqueries, self joins and SEMI/ANTI RHS. Preserve exact identifier case and catalog/db/name quote flags, scope traversal order and input AST/parent links. Ignore table functions/dynamic names rather than labeling them physical tables. Do not use regex table extraction or schema guesses.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

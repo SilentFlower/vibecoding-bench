@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WZ-PROBLEM-DEV",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement werkzeug.problems.problem_response(error,*,type=\"about:blank\",instance=None,extensions=None) for real HTTPException. Create a NEW Response with actual error status, type/title/status/detail and optional instance/extensions, UTF8 finite JSON, application/problem+json and exact content length. Retain original protocol headers including duplicate Set-Cookie, Allow, WWW-Authenticate and Retry-After; replace only representation headers appropriately. Do not mutate a response supplied inside the exception. Reject reserved extension collisions/non-string keys and non-error status. Do not turn unrelated Python exceptions into successful HTTP responses.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

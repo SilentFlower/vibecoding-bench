@@ -1,0 +1,110 @@
+--- a/library/docs/development-tqdm-02-dev.md
++++ b/library/docs/development-tqdm-02-dev.md
+@@ -0,0 +1,5 @@
++# 流式管道跨缓冲边界正确识别多字节分隔符并透传原字节
++
++路线03：读取块先与残留合并再查完整分隔符，支持UTF8等多字节边界、连续分隔及末尾半分隔；原字节只透传一次，计数/数字记录回调正确。读取有界，长未结束记录仍需相应残留内存，不伪称常量内存。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_tqdm_02_dev.py
++++ b/library/tests/test_development_tqdm_02_dev.py
+@@ -0,0 +1,25 @@
++"""管道分隔符跨块时仍精确透传、计数与逐记录回调。"""
++import io
++from tqdm.cli import posix_pipe
++
++
++def test_multibyte_delimiter_at_every_chunk_boundary():
++    """UTF8分隔符不能被拆成两段普通记录内容。@return None。"""
++    raw='1é2é3'.encode();delimiter='é'.encode()
++    for size in range(1,len(raw)+1):
++        output=io.BytesIO();counts=[]
++        posix_pipe(io.BytesIO(raw),output,delim=delimiter,buf_size=size,callback=counts.append)
++        assert output.getvalue()==raw and sum(counts)==3
++
++
++def test_numeric_callbacks_consecutive_tail_and_byte_mode():
++    """数字更新收到完整记录，连续与末尾分隔计数政策保持。@return None。"""
++    raw='1é2é3'.encode();output=io.BytesIO();values=[]
++    posix_pipe(io.BytesIO(raw),output,delim='é'.encode(),buf_size=2,callback=lambda item:values.append(int(item)),callback_len=False)
++    assert sum(values)==6 and output.getvalue()==raw
++    output=io.BytesIO();records=[]
++    posix_pipe(io.BytesIO(b'a||b|'),output,delim=b'|',buf_size=1,callback=records.append,callback_len=False)
++    assert records==[b'a',b'',b'b'] and output.getvalue()==b'a||b|'
++    output=io.BytesIO();counts=[]
++    posix_pipe(io.BytesIO(raw),output,delim=b'',buf_size=2,callback=counts.append)
++    assert sum(counts)==len(raw) and output.getvalue()==raw
+--- a/library/tqdm/cli.py
++++ b/library/tqdm/cli.py
+@@ -63,50 +63,31 @@
+     callback_len  : If (default: True) do `callback(len(buffer))`.
+       Otherwise, do `callback(data) for data in buffer.split(delim)`.
+     """
+-    fp_write = fout.write
+-
++    if type(buf_size) is not int or buf_size<=0:raise ValueError('buf_size必须是正整数')
++    if delim=='':delim=b''  # 保留原CLI字节计数模式的空str哨兵。
++    if not isinstance(delim,bytes):raise TypeError('delim必须是bytes')
++    fp_write=fout.write
+     if not delim:
+         while True:
+-            tmp = fin.read(buf_size)
+-
+-            # flush at EOF
+-            if not tmp:
+-                getattr(fout, 'flush', lambda: None)()
+-                return
+-
+-            fp_write(tmp)
+-            callback(len(tmp))
+-        # return
+-
+-    buf = b''
+-    len_delim = len(delim)
+-    # n = 0
++            chunk=fin.read(buf_size)
++            if not chunk:
++                getattr(fout,'flush',lambda:None)();return
++            fp_write(chunk);callback(len(chunk))
++    pending=b''
+     while True:
+-        tmp = fin.read(buf_size)
+-
+-        # flush at EOF
+-        if not tmp:
+-            if buf:
+-                fp_write(buf)
+-                if callback_len:
+-                    # n += 1 + buf.count(delim)
+-                    callback(1 + buf.count(delim))
+-                else:
+-                    for i in buf.split(delim):
+-                        callback(i)
+-            getattr(fout, 'flush', lambda: None)()
+-            return  # n
+-
++        chunk=fin.read(buf_size)
++        if not chunk:
++            if pending:
++                fp_write(pending);callback(1 if callback_len else pending)
++            getattr(fout,'flush',lambda:None)();return
++        # 先合并上次残留再找分隔符，分隔符本身可横跨任意读取边界。
++        data=pending+chunk;pending=b''
+         while True:
+-            i = tmp.find(delim)
+-            if i < 0:
+-                buf += tmp
+-                break
+-            fp_write(buf + tmp[:i + len(delim)])
+-            # n += 1
+-            callback(1 if callback_len else (buf + tmp[:i]))
+-            buf = b''
+-            tmp = tmp[i + len_delim:]
++            offset=data.find(delim)
++            if offset<0:pending=data;break
++            end=offset+len(delim);fp_write(data[:end])
++            callback(1 if callback_len else data[:offset])
++            data=data[end:]
+ 
+ 
+ # ((opt, type), ... )

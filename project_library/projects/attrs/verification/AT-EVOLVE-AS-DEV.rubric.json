@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AT-EVOLVE-AS-DEV",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add evolve_as(instance, target_class, **changes) in attr.evolution and attrs.evolution. Copy common init=True fields by their real attribute names into the target initialization aliases, with explicit target-alias changes winning. Use the target standard constructor so its converters, defaults/factories, validators and post-init execute normally. Do not copy init=False hidden state, mutate the source or deep-copy existing payloads. Reject unknown target aliases, alias conflicts, non-attrs types and unrelated targets with no common init fields; leave missing required arguments and target validation errors explicit. Preserve ordinary attrs.evolve.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

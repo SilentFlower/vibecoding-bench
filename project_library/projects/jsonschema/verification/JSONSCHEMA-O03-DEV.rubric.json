@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JSONSCHEMA-O03-DEV",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix _Error.__init__ to materialize context exactly once and assign parent on the retained children rather than re-iterating the source. Generator/list/tuple and deliberately one-shot iterable inputs must preserve child identities and equal absolute instance/schema paths through multiple ancestors. Apply to both ValidationError and SchemaError/create_from, keep empty contexts and existing list behavior, and introduce no copied child objects or fabricated paths.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

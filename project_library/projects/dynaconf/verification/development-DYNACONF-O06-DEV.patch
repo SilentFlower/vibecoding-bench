@@ -1,0 +1,78 @@
+--- a/library/docs/development-dynaconf-o06-dev.md
++++ b/library/docs/development-dynaconf-o06-dev.md
+@@ -0,0 +1,5 @@
++# 为真实配置CLI提供可重复大小写无关glob筛选且保持存储不变
++
++对应路线20：真实list新增可重复--match，按顶层规范键大小写无关glob并集，env/loader后独立筛选并一致用于JSON/文本/文件；空集合法、与key冲突明确且不改存储。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dynaconf/cli.py
++++ b/library/dynaconf/cli.py
+@@ -518,6 +518,7 @@
+     "--env", "-e", default=None, help="Filters the env to get the values"
+ )
+ @click.option("--key", "-k", default=None, help="Filters a single key")
++@click.option('--match', 'patterns', multiple=True, help='按顶层配置键glob筛选，可重复，大小写不敏感')
+ @click.option(
+     "--more",
+     "-m",
+@@ -570,6 +571,7 @@
+     output=None,
+     flat=False,
+     _json=False,
++    patterns=(),
+ ):
+     """
+     Lists user defined settings or all (including internal configs).
+@@ -577,6 +579,8 @@
+     By default, shows only user defined. If `--all` is passed it also shows
+     dynaconf internal variables aswell.
+     """
++    if patterns and key:
++        raise click.UsageError('--match与--key不能同时使用')
+     if env:
+         env = env.strip()
+     if key:
+@@ -609,6 +613,12 @@
+         data = settings._loaded_by_loaders.get(identifier, {})
+         data = data or settings._loaded_by_loaders.get(loader, {})
+ 
++    # 列表筛选必须在独立字典上完成，不能修改loader历史或内部配置。
++    data = dict(data)
++    if patterns:
++        from fnmatch import fnmatchcase
++        data = {name: value for name, value in data.items()
++                if any(fnmatchcase(name.upper(), pattern.upper()) for pattern in patterns)}
+     # remove to avoid displaying twice
+     data.pop("SETTINGS_MODULE", None)
+ 
+--- a/library/tests/test_development_dynaconf_o06_dev.py
++++ b/library/tests/test_development_dynaconf_o06_dev.py
+@@ -0,0 +1,27 @@
++"""CLI按多个明确glob筛选真实配置键，输出与原单键模式区分。"""
++from dynaconf import Dynaconf
++from dynaconf.vendor.click.testing import CliRunner
++import dynaconf.cli as cli
++import json
++
++def test_multiple_case_insensitive_patterns_select_union_without_duplicates(monkeypatch):
++    """真实list --json输出只含匹配配置，重复匹配不重复数据。@return None。"""
++    settings=Dynaconf(environments=False,DATABASE_URL='db',DATABASE_PORT=3,CACHE_SIZE=4,OTHER=5);monkeypatch.setattr(cli,'settings',settings,raising=False)
++    result=CliRunner().invoke(cli._list,['--json','--match','database_*','--match','*SIZE','--match','*URL'])
++    assert result.exit_code==0 and json.loads(result.output)=={'DATABASE_URL':'db','DATABASE_PORT':3,'CACHE_SIZE':4}
++
++def test_empty_matches_exact_key_conflict_and_output_file_use_same_selection(tmp_path,monkeypatch):
++    """无匹配为合法空集合，--key冲突明确，文件输出不混入未选键。@return None。"""
++    settings=Dynaconf(environments=False,ONE=1,TWO=2);monkeypatch.setattr(cli,'settings',settings,raising=False);runner=CliRunner()
++    result=runner.invoke(cli._list,['--json','--match','missing*']);assert result.exit_code==0 and json.loads(result.output)=={}
++    assert runner.invoke(cli._list,['--json','--match','*','--key','ONE']).exit_code!=0
++    output=tmp_path/'selected.json';result=runner.invoke(cli._list,['--json','--match','ONE','--output',str(output)])
++    assert result.exit_code==0 and json.loads(output.read_text())=={'ONE':1}
++
++def test_literal_metacharacters_and_legacy_single_key_keep_original_data(monkeypatch):
++    """glob不是正则执行，原key模式与settings存储保持。@return None。"""
++    settings=Dynaconf(environments=False,ABC=1,ABD=2,OTHER=3);before=settings.as_dict();monkeypatch.setattr(cli,'settings',settings,raising=False)
++    result=CliRunner().invoke(cli._list,['--json','--match','AB[CD]'])
++    assert result.exit_code==0 and json.loads(result.output)=={'ABC':1,'ABD':2}
++    legacy=CliRunner().invoke(cli._list,['--json','--key','OTHER']);assert json.loads(legacy.output)=={'OTHER':3}
++    assert settings.as_dict()==before

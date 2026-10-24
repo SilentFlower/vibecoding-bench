@@ -1,0 +1,103 @@
+--- a/library/box/box_list.py
++++ b/library/box/box_list.py
+@@ -196,6 +196,50 @@
+                 new_list.append(x)
+         return new_list
+ 
++    @staticmethod
++    def iter_jsonl_records(records, **json_kwargs):
++        """逐记录编码任意有限或有界消费的数据流，不整体物化。
++
++        :param records: 可迭代业务记录。
++        :param json_kwargs: 标准json.dumps选项，不允许多行缩进。
++        :return: 每条包含末尾换行的惰性JSON文本迭代器。
++        """
++        from json import dumps
++        if json_kwargs.get('indent') is not None:
++            raise ValueError('JSONL不支持多行缩进')
++        for number, record in enumerate(records, 1):
++            try:
++                encoded = dumps(record, **json_kwargs)
++                if '\n' in encoded or '\r' in encoded:
++                    raise ValueError('JSONL记录必须单行')
++            except (TypeError, ValueError) as error:
++                raise ValueError('JSONL第%d条记录编码失败' % number) from error
++            yield encoded + '\n'
++
++    def iter_jsonl(self, **json_kwargs):
++        """惰性编码当前列表。@param json_kwargs 编码选项。@return 文本迭代器。"""
++        return self.iter_jsonl_records(self, **json_kwargs)
++
++    def write_jsonl(self, destination, *, encoding='utf-8', **json_kwargs):
++        """逐条写入JSONL，调用者持有的流不会被关闭。
++
++        :param destination: 文件路径或可写文本流。
++        :param encoding: 路径模式文件编码。
++        :param json_kwargs: JSON编码选项。
++        :return: 成功写入的记录数；失败可能保留已写前缀，不声称整文件原子性。
++        """
++        owned = not hasattr(destination, 'write')
++        stream = open(destination, 'w', encoding=encoding, newline='') if owned else destination
++        count = 0
++        try:
++            for line in self.iter_jsonl(**json_kwargs):
++                stream.write(line)
++                count += 1
++        finally:
++            if owned:
++                stream.close()
++        return count
++
+     def to_json(
+         self,
+         filename: str | PathLike | None = None,
+--- a/library/docs/development-bx-jsonl-dev.md
++++ b/library/docs/development-bx-jsonl-dev.md
+@@ -0,0 +1,5 @@
++# 逐条惰性编码和写入真实JSONL业务记录
++
++新增JSONL惰性编码与逐条写入，首条输出只读取一条记录，支持任意有界消费迭代器、Unicode和嵌套Box。每条准确一个末尾换行，坏记录给安全编号，拒绝多行缩进。路径由库关闭，调用者文本流保持打开；写入失败可留下已写前缀，不冒称整文件原子。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bx_jsonl_dev.py
++++ b/library/test/test_development_bx_jsonl_dev.py
+@@ -0,0 +1,39 @@
++"""JSONL逐记录编码和写入，不能先物化整条输入。"""
++import io
++import json
++import pytest
++from box import BoxList
++
++
++def test_bounded_first_record():
++    """首条编码只读取首条输入，提前关闭不消费尾部。@return None。"""
++    seen = []
++    def records():
++        """大流的可证伪模拟。@return 记录迭代器。"""
++        for number in range(100000):
++            seen.append(number)
++            yield {'id': number}
++    lines = BoxList.iter_jsonl_records(records())
++    assert json.loads(next(lines)) == {'id': 0}
++    lines.close()
++    assert seen == [0]
++
++
++def test_write_file_and_owned_stream(tmp_path):
++    """逐行原生读取一致，外部流继续可用。@param tmp_path 临时目录。@return None。"""
++    rows = BoxList([{'name': '中文\n行'}, {'value': None}])
++    stream = io.StringIO()
++    assert rows.write_jsonl(stream, ensure_ascii=False) == 2 and not stream.closed
++    assert [json.loads(line) for line in stream.getvalue().splitlines()] == rows.to_list()
++    path = tmp_path / 'rows.jsonl'
++    assert rows.write_jsonl(path) == 2
++    assert [json.loads(line) for line in path.read_text().splitlines()] == rows.to_list()
++
++
++def test_safe_error_line_and_empty():
++    """坏记录指明行号，空表输出为空。@return None。"""
++    lines = BoxList.iter_jsonl_records([{'x': 1}, {'bad': object()}])
++    next(lines)
++    with pytest.raises(ValueError, match='2'):
++        next(lines)
++    assert list(BoxList().iter_jsonl()) == []

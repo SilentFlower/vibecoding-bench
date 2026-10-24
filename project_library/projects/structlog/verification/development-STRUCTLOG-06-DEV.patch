@@ -1,0 +1,62 @@
+--- a/library/docs/development-structlog-06-dev.md
++++ b/library/docs/development-structlog-06-dev.md
+@@ -0,0 +1,5 @@
++# 业务日志时间戳显式指定时区和ISO精度且拒绝无时区时钟
++
++路线09：独立ZonedTimeStamper明确tzinfo/ZoneInfo、ISO精度与注入aware时钟，真实瞬间转换并输出offset；拒绝naive/无效精度，原TimeStamper不动。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/structlog/_zoned_timestamp.py
++++ b/library/src/structlog/_zoned_timestamp.py
+@@ -0,0 +1,19 @@
++import datetime as dt
++class ZonedTimeStamper:
++    """显式业务时区与精度的ISO处理器。@param zone tzinfo或ZoneInfo名称。@param timespec ISO精度。@param key 目标键。@param clock 注入aware时钟。@return 处理器。"""
++    def __init__(self,zone,*,timespec="microseconds",key="timestamp",clock=None):
++        """验证时间策略，不改变TimeStamper默认。@param zone 目标时区。@param timespec 秒/毫秒等。@param key 字段。@param clock 可调用或None。@return None。"""
++        if isinstance(zone,str):
++            from zoneinfo import ZoneInfo
++            zone=ZoneInfo(zone)
++        if not isinstance(zone,dt.tzinfo):raise TypeError("zone必须为tzinfo或时区名")
++        if timespec not in ("auto","hours","minutes","seconds","milliseconds","microseconds"):raise ValueError("未知timespec")
++        if clock is not None and not callable(clock):raise TypeError("clock必须可调用")
++        self.zone=zone;self.timespec=timespec;self.key=key;self.clock=clock
++
++    def __call__(self,logger,name,event_dict):
++        """只转换aware瞬间。@param logger 原logger。@param name 级别。@param event_dict 事件。@return 同一事件含ISO offset。"""
++        value=self.clock() if self.clock is not None else dt.datetime.now(dt.timezone.utc)
++        if not isinstance(value,dt.datetime) or value.tzinfo is None or value.utcoffset() is None:raise ValueError("clock必须返回aware datetime")
++        event_dict[self.key]=value.astimezone(self.zone).isoformat(timespec=self.timespec)
++        return event_dict
+--- a/library/src/structlog/processors.py
++++ b/library/src/structlog/processors.py
+@@ -42,6 +42,7 @@
+ from ._utils import get_processname
+ from .contextvars import _ASYNC_CALLING_THREAD
+ from .tracebacks import ExceptionDictTransformer
++from ._zoned_timestamp import ZonedTimeStamper
+ from .typing import (
+     EventDict,
+     ExceptionTransformer,
+--- a/library/tests/test_development_structlog_06_dev.py
++++ b/library/tests/test_development_structlog_06_dev.py
+@@ -0,0 +1,19 @@
++"""业务时区输出有明确offset和小数精度，可注入固定时钟。"""
++from datetime import datetime,timezone,timedelta
++import unittest
++from structlog.processors import ZonedTimeStamper
++
++def test_fixed_zone_precision_conversion_and_event_identity():
++    """真实瞬间转换而非简单改tzinfo标签。@return None。"""
++    now=datetime(2024,1,1,23,59,59,123456,tzinfo=timezone.utc)
++    stamp=ZonedTimeStamper(timezone(timedelta(hours=5,minutes=30)),timespec='milliseconds',key='at',clock=lambda:now)
++    event={'event':'order'}
++    assert stamp(None,'info',event) is event and event['at']=='2024-01-02T05:29:59.123+05:30'
++    assert now.hour==23
++
++def test_utc_name_invalid_clock_and_invalid_policy():
++    """明确命名UTC可用，naive时钟拒绝而非猜本地。@return None。"""
++    stamp=ZonedTimeStamper('UTC',timespec='seconds',clock=lambda:datetime(2024,1,1,tzinfo=timezone.utc))
++    assert stamp(None,'info',{})['timestamp']=='2024-01-01T00:00:00+00:00'
++    with unittest.TestCase().assertRaises(ValueError):ZonedTimeStamper(timezone.utc,clock=lambda:datetime(2024,1,1))(None,'info',{})
++    with unittest.TestCase().assertRaises(ValueError):ZonedTimeStamper(timezone.utc,timespec='nanoseconds')

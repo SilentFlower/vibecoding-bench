@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AG-SHIFT-DEV",
+  "source_commit": "202796ada63357c275a2a5f8685a983e37bad9bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add exported Lag and Lead Computation classes with (column_name, offset=1, default=None, partition_by=None). Use existing row order, including interleaved partitions, without sorting or mutating the table. Offset must be a nonnegative non-bool integer; zero copies the original column. partition_by accepts a column name or finite unique list/tuple of column names. Validate names and cast the boundary default with the original DataType; return a column of that same type and original length. Nulls remain positional values and oversized offsets fill the default. Preserve existing Change and other computations.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

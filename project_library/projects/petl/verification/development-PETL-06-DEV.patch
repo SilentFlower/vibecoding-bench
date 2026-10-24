@@ -1,0 +1,90 @@
+--- a/library/docs/development-petl-06-dev.md
++++ b/library/docs/development-petl-06-dev.md
+@@ -0,0 +1,5 @@
++# XML报表内置样式正确转义数据属性与表头
++
++路线01：内置tag/name/attribute按文本/属性转义，独立XML解析器真实读回；表头文本与format字段定位分离，非法名称/控制符拒绝。自定义raw模板与前后片段不二次转义，流写错误不宣称原子。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/petl/io/xml.py
++++ b/library/petl/io/xml.py
+@@ -261,6 +261,30 @@
+         else:
+             return missing
+     return _get
++
++
++def _xml_text(value,attribute=False):
++    """转义数据而非raw模板。@param value 原字段。@param attribute 是否属性上下文。@return XML安全文本。"""
++    from xml.sax.saxutils import escape
++    value=text_type(value)
++    if any(not (character in "\t\n\r" or 0x20<=ord(character)<=0xd7ff or 0xe000<=ord(character)<=0xfffd or 0x10000<=ord(character)<=0x10ffff) for character in value):
++        raise ValueError("XML不允许该字符")
++    return escape(value,{'"':"&quot;","'":"&apos;"} if attribute else {})
++
++
++def _xml_name(value):
++    """验证无命名空间元素/属性名。@param value 名称。@return 原名称。"""
++    import re
++    if not re.fullmatch(r"(?:[^\W\d]|_)[\w.-]*",text_type(value)):
++        raise ValueError("无效XML名称")
++    return value
++
++
++def _xml_rows(table,attribute):
++    """保原头用于format定位，仅转义数据值。@param table 来源。@param attribute 属性策略。@return 行迭代器。"""
++    source=iter(table)
++    yield next(source)
++    for row in source:yield tuple(_xml_text(value,attribute) for value in row)
+ 
+ 
+ def toxml(table, target=None,
+@@ -364,6 +388,13 @@
+ 
+     sample, table2 = iterpeek(table, 2)
+     props = fieldnames(sample)
++    if style in ("tag","name","attribute"):
++        for path in (root,head,rows):
++            if path:
++                for name in path.split("/"):_xml_name(name)
++        if style in ("name","attribute"):
++            for name in props:_xml_name(name)
++        table2=_xml_rows(table2,style=="attribute")
+ 
+     top = _build_xml_header(style, props, root, head, rows, prologue, encoding)
+     template = _build_cols(style, props, rows, True)
+@@ -378,7 +409,8 @@
+     nested = -1 if style in ('attribute', 'name') else -2
+     if head:
+         th1 = _build_nesting(head, False, nested)
+-        col = _build_cols(style, props, head, False)
++        labels=[_xml_text(value) for value in props] if style in ("tag","name","attribute") else props
++        col = _build_cols(style, labels, head, False)
+         th2 = _build_nesting(head, True, nested)
+         thd = '{0}\n{1}{2}'.format(th1, col, th2)
+     else:
+--- a/library/tests/test_development_petl_06_dev.py
++++ b/library/tests/test_development_petl_06_dev.py
+@@ -0,0 +1,22 @@
++"""内置XML样式可由独立解析器读回原文，raw自定义模板不二次转义。"""
++from petl import MemorySource
++from xml.etree import ElementTree
++import unittest
++import petl
++
++def test_builtin_tag_name_attribute_preserve_text_and_quotes():
++    """文本与属性都保留&、角括号及单双引号。@return None。"""
++    value='A&B <tag> "quote" \'single\' 中文'
++    for style in ('tag','name','attribute'):
++        output=MemorySource();petl.toxml([['value'],[value]],output,root='root',rows='rows/row/col' if style=='tag' else 'rows/row',style=style)
++        root=ElementTree.fromstring(output.getvalue())
++        assert (root.find('.//row').attrib['value'] if style=='attribute' else root.find('.//value').text if style=='name' else root.find('.//col').text)==value
++
++def test_header_escape_invalid_names_controls_and_raw_template():
++    """字段名只在tag头作为文本转义，非法内置标签拒绝。@return None。"""
++    output=MemorySource();petl.toxml([['A&B'],['x']],output)
++    assert ElementTree.fromstring(output.getvalue()).find('.//th').text=='A&B'
++    with unittest.TestCase().assertRaises(ValueError):petl.toxml([['bad name'],['x']],MemorySource(),rows='rows/row',style='name')
++    with unittest.TestCase().assertRaises(ValueError):petl.toxml([['value'],['bad\x01']],MemorySource())
++    output=MemorySource();petl.toxml([['value'],['<ok/>']],output,root='root',rows='rows/row',style='<item>{value}</item>')
++    assert b'<item><ok/></item>' in output.getvalue()

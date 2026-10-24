@@ -1,0 +1,305 @@
+{
+  "schema": 3,
+  "project_key": "dataset",
+  "title": "Dataset订单数据工作场景",
+  "category": "本地数据导入与查询",
+  "description": "固定真实源码上的完整工程交付：让批量更新真正同步新列并保护省略字段；让查询和单行查询在数据库侧完成明确字段投影；用数据库原子表达式完成受控数值增减；让查询结果上下文可靠释放专用游标和连接；以有界批次消费一次性插入更新输入并明确事务边界；为Chunked异常退出提供明确待提交丢弃政策。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "11668d0b0b335e1a3c6f7109f4f3296ce70dff3e85f857c5153a07984fe7b7da",
+  "environment": "dataset-py312",
+  "source": {
+    "repository": "https://github.com/pudo/dataset",
+    "commit": "db592cc041014762bba55fd544e982170831f227",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "DATASET-O01-DEV-SCENE",
+      "title": "让批量更新真正同步新列并保护省略字段",
+      "goal": "让批量更新真正同步新列并保护省略字段",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DATASET-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DATASET-O01-DEV",
+          "kind": "modify",
+          "goal": "让批量更新真正同步新列并保护省略字段",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual Table.update_many ensure/types handling before compiling SQL. Validate every input match key and positive non-bool chunk_size before any schema/DML change, synchronize the union with explicit type overrides, retain ensure=False column-dropping semantics and make empty input a no-op. Group rows by present update fields rather than padding absent fields to NULL; safe generated key binds cannot collide with real column names. Preserve existing literals, chunk commits and row inputs; empty/duplicate matching keys fail. Demonstrate real SQLite schema/type and row state, including a late missing key causing no earlier DML/DDL.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_dataset_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-dataset-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DATASET-O01-DEV-contract.md",
+            "materials/DATASET-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dataset/table.py",
+            "library/test/test_development_dataset_o01_dev.py",
+            "library/docs/development-dataset-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DATASET-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DATASET-O01-DEV.native.json",
+            "public_native": "verification/DATASET-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DATASET-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "DATASET-O02-DEV-SCENE",
+      "title": "让查询和单行查询在数据库侧完成明确字段投影",
+      "goal": "让查询和单行查询在数据库侧完成明确字段投影",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DATASET-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DATASET-O02-DEV",
+          "kind": "modify",
+          "goal": "让查询和单行查询在数据库侧完成明确字段投影",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Table.find _columns=None|string|sequence and forward through real find_one. Build an actual SQLAlchemy select of requested columns in order, preserving filters, hidden sort keys, offset/limit, streaming and configured row_type. Default full rows remain identical. Normalize through existing column naming, reject empty/duplicate/unknown projections, safely quote spaces and never interpolate SQL. No-match and nonexistent-table behavior remains empty/None without creating a table. Prove omitted fields are absent from both streamed and find_one results.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_dataset_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-dataset-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DATASET-O02-DEV-contract.md",
+            "materials/DATASET-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dataset/table.py",
+            "library/test/test_development_dataset_o02_dev.py",
+            "library/docs/development-dataset-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DATASET-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DATASET-O02-DEV.native.json",
+            "public_native": "verification/DATASET-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DATASET-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DATASET-O03-DEV-SCENE",
+      "title": "用数据库原子表达式完成受控数值增减",
+      "goal": "用数据库原子表达式完成受控数值增减",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DATASET-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DATASET-O03-DEV",
+          "kind": "modify",
+          "goal": "用数据库原子表达式完成受控数值增减",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement Table.increment(column,amount,filters,*,nulls=\"preserve\") with one SQLAlchemy UPDATE expression, never read-modify-write. Require existing numeric SQLAlchemy column, finite int/float/Decimal excluding bool, explicit filters mapping, and nulls=preserve|zero. Zero/negative increments work; unmatched/nonexistent table returns zero, no schema creation. Return reliable database rowcount, preserve existing update/transaction behavior and reject unknown/non-numeric columns or invalid policies before DML. Prove two file-backed SQLite connections accumulate changes and an explicit database transaction rolls back failed work; document backend numeric range/precision limits.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_dataset_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-dataset-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DATASET-O03-DEV-contract.md",
+            "materials/DATASET-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dataset/table.py",
+            "library/test/test_development_dataset_o03_dev.py",
+            "library/docs/development-dataset-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DATASET-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DATASET-O03-DEV.native.json",
+            "public_native": "verification/DATASET-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DATASET-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DATASET-O04-DEV-SCENE",
+      "title": "让查询结果上下文可靠释放专用游标和连接",
+      "goal": "让查询结果上下文可靠释放专用游标和连接",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DATASET-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DATASET-O04-DEV",
+          "kind": "modify",
+          "goal": "让查询结果上下文可靠释放专用游标和连接",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual ResultIter with context management and robust idempotent close. Early break, exhaustion, upstream fetch or row_type conversion failure must release result and dedicated streamed connection without closing shared Database. Detach owned resources before cleanup, attempt both even if cursor close fails, retain the first cleanup error for direct close, and preserve an existing business/conversion exception during cleanup. A closed iterator yields nothing; repeated close is safe. Test real SQLite streamed resources plus synthetic cleanup failures and existing empty/nonstreamed iteration behavior.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_dataset_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-dataset-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DATASET-O04-DEV-contract.md",
+            "materials/DATASET-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dataset/util.py",
+            "library/test/test_development_dataset_o04_dev.py",
+            "library/docs/development-dataset-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DATASET-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DATASET-O04-DEV.native.json",
+            "public_native": "verification/DATASET-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DATASET-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DATASET-O05-DEV-SCENE",
+      "title": "以有界批次消费一次性插入更新输入并明确事务边界",
+      "goal": "以有界批次消费一次性插入更新输入并明确事务边界",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DATASET-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DATASET-O05-DEV",
+          "kind": "modify",
+          "goal": "以有界批次消费一次性插入更新输入并明确事务边界",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Table.insert_iter and update_iter for one-shot iterable mapping records, with positive non-bool chunk_size, ensure/types and explicit atomic:boolean. Buffer/copy at most one chunk and call real insert_many/update_many exactly once per chunk, allowing late new columns per original schema policy and preserving the accepted absent-field update behavior. Return consumed record count, not affected rows. Empty input creates no table, invalid options do not consume input, source/generator errors propagate. atomic=True wraps the entire DML in the existing Database transaction; default keeps committed chunks on later failure. Document backend DDL rollback limitations; original Sequence APIs stay unchanged.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_dataset_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-dataset-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "DATASET-O01-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/DATASET-O05-DEV-contract.md",
+            "materials/DATASET-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dataset/table.py",
+            "library/test/test_development_dataset_o05_dev.py",
+            "library/docs/development-dataset-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DATASET-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DATASET-O05-DEV.native.json",
+            "public_native": "verification/DATASET-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DATASET-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "DATASET-O06-DEV-SCENE",
+      "title": "为Chunked异常退出提供明确待提交丢弃政策",
+      "goal": "为Chunked异常退出提供明确待提交丢弃政策",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "DATASET-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "DATASET-O06-DEV",
+          "kind": "modify",
+          "goal": "为Chunked异常退出提供明确待提交丢弃政策",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd keyword-only on_error=\"flush\"|\"discard\" to actual ChunkedInsert/ChunkedUpdate and validate positive non-bool chunksize. Default flush preserves existing behavior. In discard mode normal exit still flushes, while an application exception clears only the pending queue (and pending insert field set), invokes no callback/write and preserves the original exception; already committed chunks remain. Empty flush is an idempotent no-op. Preserve callback/write failures as failures and explicit outer Database transaction rollback behavior. Demonstrate real SQLite insert/update, pending state reuse and full-chunk vs tail distinction; never claim discard undoes committed chunks.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_dataset_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-dataset-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/DATASET-O06-DEV-contract.md",
+            "materials/DATASET-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/dataset/chunked.py",
+            "library/test/test_development_dataset_o06_dev.py",
+            "library/docs/development-dataset-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/DATASET-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/DATASET-O06-DEV.native.json",
+            "public_native": "verification/DATASET-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/DATASET-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

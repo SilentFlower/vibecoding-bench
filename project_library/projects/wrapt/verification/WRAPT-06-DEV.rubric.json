@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WRAPT-06-DEV",
+  "source_commit": "6b4e844950213118b19e613248d2bc9469eb731e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend delivered canonical_cache with cache_invalidate(*args,**kwargs) using the SAME make_key/signature/default/custom-key path as reads. Return True only when existing entry deleted; missing returns False, invalid call/key errors propagate. Preserve all unrelated entries and hit/miss statistics, per-method-self identity and custom business IDs. Run invalidation under same computation RLock so a completed call cannot later silently refill invalidated value; explicitly no cancellation of already-running user code. Do not call cache_clear internally or reset all stats. Keep existing default/cache_clear behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

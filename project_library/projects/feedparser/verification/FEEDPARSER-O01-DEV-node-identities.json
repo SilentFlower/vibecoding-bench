@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "node_prefix": "tests/test_parse_parameters.py::test_optimistic_encoding_detection",
+  "source_test": "tests/test_parse_parameters.py",
+  "source_test_sha256": "673acd59d16d0a5dcaf5a7b4b917d461f12d29cfde13cd33a028bdcc0bb76270",
+  "original_runner_sha256": "4142098c7cd0e2c9f184a12de1d6209ce9ac61c318ef469e21c6fe362556b479",
+  "original_contract_sha256": "f23189f397f757037fb6f8bdba757b4a04eab50fb7996d4a732b9bb6e7faed78",
+  "nodes": [
+    {
+      "get_content_position": 0,
+      "kwargs_position": 0,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9620>-kwargs0]"
+    },
+    {
+      "get_content_position": 0,
+      "kwargs_position": 1,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9620>-kwargs1]"
+    },
+    {
+      "get_content_position": 0,
+      "kwargs_position": 2,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9620>-kwargs2]"
+    },
+    {
+      "get_content_position": 1,
+      "kwargs_position": 0,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9b20>-kwargs0]"
+    },
+    {
+      "get_content_position": 1,
+      "kwargs_position": 1,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9b20>-kwargs1]"
+    },
+    {
+      "get_content_position": 1,
+      "kwargs_position": 2,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9b20>-kwargs2]"
+    },
+    {
+      "get_content_position": 2,
+      "kwargs_position": 0,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9c60>-kwargs0]"
+    },
+    {
+      "get_content_position": 2,
+      "kwargs_position": 1,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9c60>-kwargs1]"
+    },
+    {
+      "get_content_position": 2,
+      "kwargs_position": 2,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9c60>-kwargs2]"
+    },
+    {
+      "get_content_position": 3,
+      "kwargs_position": 0,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9d00>-kwargs0]"
+    },
+    {
+      "get_content_position": 3,
+      "kwargs_position": 1,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9d00>-kwargs1]"
+    },
+    {
+      "get_content_position": 3,
+      "kwargs_position": 2,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9d00>-kwargs2]"
+    },
+    {
+      "get_content_position": 4,
+      "kwargs_position": 0,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9da0>-kwargs0]"
+    },
+    {
+      "get_content_position": 4,
+      "kwargs_position": 1,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9da0>-kwargs1]"
+    },
+    {
+      "get_content_position": 4,
+      "kwargs_position": 2,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9da0>-kwargs2]"
+    },
+    {
+      "get_content_position": 5,
+      "kwargs_position": 0,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9e40>-kwargs0]"
+    },
+    {
+      "get_content_position": 5,
+      "kwargs_position": 1,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9e40>-kwargs1]"
+    },
+    {
+      "get_content_position": 5,
+      "kwargs_position": 2,
+      "frozen_id": "tests/test_parse_parameters.py::test_optimistic_encoding_detection[<function <lambda> at 0x76290b1f9e40>-kwargs2]"
+    }
+  ],
+  "explanation": "原十八个lambda地址仅是不透明标签；完整6×3参数及lambda代码在运行时逐项验证，所有实际节点仍须通过原4305节点及原outcome比较。"
+}

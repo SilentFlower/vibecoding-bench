@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CH-PROJECTION-DEV",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement cli_helpers.tabular_output.projection.select_columns(data,headers,selection) returning (lazy_rows,projected_headers). Materialize finite headers once and validate ordered integer indices or unique string column names before row consumption. Preserve duplicate selected positions and exact raw values; reject ambiguous/missing names, bool/negative/out-of-range indices and malformed row widths with one-based row number. Do not mutate or stringify inputs. Project before the existing formatter so its type inference applies to the selected/reordered columns; verify JSON and delimited pipeline integration.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

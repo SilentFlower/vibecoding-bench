@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWN-IT-O01-DEV",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix actual MarkdownIt.reset_rules to restore the entering active-rule sets across core, block, inline and inline2 in a finally block, on normal return, exceptions and BaseException cancellation. Nested contexts restore their own entering state, including initially disabled rules, and original exceptions propagate unchanged. Verify actual rendering after failure. Do not promise rollback of newly registered/replaced rule functions, replace parser objects or suppress consumer failures.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

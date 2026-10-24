@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-PPTX-04-DEV",
+  "source_commit": "278b47b1dedd5b46ee84c286e77cdfb0bf4594be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add _Paragraph.bullet read and set_bullet(kind,character=\"•\",scheme=\"arabicPeriod\",start=1). kind character/number/none or None inheritance; single character, number scheme from pinned ST_TextAutonumberScheme and strict 1..32767 start. Validate before mutation; replace mutually exclusive buNone/buChar/buAutoNum/buBlip only, insert before tabLst/defRPr/extLst per XSD. Preserve text, level, font and other paragraph properties, read unsupported image bullet as unsupported without implicit mutation. Real saved/reopened OOXML, never prefix fake numbering text.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

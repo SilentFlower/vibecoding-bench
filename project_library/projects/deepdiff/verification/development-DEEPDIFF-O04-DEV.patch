@@ -1,0 +1,125 @@
+--- a/library/deepdiff/merge.py
++++ b/library/deepdiff/merge.py
+@@ -0,0 +1,82 @@
++"""显式策略的JSON树深合并，不改变可执行Delta语义。"""
++from copy import deepcopy
++from math import isfinite
++from deepdiff import DeepDiff
++
++
++class MergeConflict(ValueError):
++    """携带结构位置，不在错误消息打印来源值。
++
++    :param path: 从根开始的字符串键/数组下标元组。
++    :return: 可检查path的冲突异常。
++    """
++    def __init__(self, path):
++        """保存稳定位置。@return None。"""
++        self.path = tuple(path)
++        super().__init__('JSON合并冲突：%s' % (self.path,))
++
++
++def validate_json_tree(value):
++    """限制为有限JSON树，拒绝循环但允许无循环共享引用。
++
++    :param value: dict/list及JSON标量组成的树。
++    :return: None；不支持类型或循环抛异常。
++    """
++    def visit(item, parents):
++        if item is None or type(item) in (str, bool, int):
++            return
++        if type(item) is float:
++            if not isfinite(item):
++                raise ValueError('JSON树不允许非有限数')
++            return
++        if type(item) not in (dict, list):
++            raise TypeError('只支持JSON树，不合并任意对象')
++        if id(item) in parents:
++            raise ValueError('JSON树不允许循环')
++        parents = parents | {id(item)}
++        if isinstance(item, dict):
++            if any(type(key) is not str for key in item):
++                raise TypeError('JSON对象键必须为文本')
++            children = item.values()
++        else:
++            children = item
++        for child in children:
++            visit(child, parents)
++    visit(value, set())
++
++
++def json_equal(left, right):
++    """用真实DeepDiff保留布尔/数值类型差别。@return bool。"""
++    return not DeepDiff(left, right, threshold_to_diff_deeper=0)
++
++
++def deep_merge(left, right, *, lists='replace', conflicts='right'):
++    """构造独立组合结果，词典递归、列表及叶冲突各有政策。
++
++    :param left: 左JSON树。
++    :param right: 右JSON树。
++    :param lists: replace用右列表，append连接并保留重复项。
++    :param conflicts: 不同叶值或类型冲突的right、left、error策略。
++    :return: 不与输入共享容器的合并树。
++    """
++    if lists not in ('replace', 'append') or conflicts not in ('right', 'left', 'error'):
++        raise ValueError('未知合并策略')
++    validate_json_tree(left)
++    validate_json_tree(right)
++    def combine(a, b, path):
++        if isinstance(a, dict) and isinstance(b, dict):
++            result = {}
++            for key in dict.fromkeys([*a, *b]):
++                if key in a and key in b:
++                    result[key] = combine(a[key], b[key], path + (key,))
++                else:
++                    result[key] = deepcopy(a[key] if key in a else b[key])
++            return result
++        if isinstance(a, list) and isinstance(b, list):
++            return deepcopy(a + b if lists == 'append' else b)
++        if json_equal(a, b):
++            return deepcopy(a)
++        if conflicts == 'error':
++            raise MergeConflict(path)
++        return deepcopy(a if conflicts == 'left' else b)
++    return combine(left, right, ())
+--- a/library/docs/development-deepdiff-o04-dev.md
++++ b/library/docs/development-deepdiff-o04-dev.md
+@@ -0,0 +1,5 @@
++# 交付显式策略的独立JSON树组合深合并
++
++对应路线09：独立JSON树组合合并，词典递归、列表替换/追加及叶冲突明确；真实DeepDiff判等，保留来源并拒绝循环/非JSON边界，不改变Delta。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_deepdiff_o04_dev.py
++++ b/library/tests/test_development_deepdiff_o04_dev.py
+@@ -0,0 +1,29 @@
++"""组合深合并保留两侧独有数据且不改变Delta。"""
++from deepdiff import DeepDiff,Delta
++import pytest
++
++def test_nested_union_policies_and_input_isolation():
++    """字典递归、列表策略、叶值冲突分别受控。@return None。"""
++    from deepdiff.merge import deep_merge
++    left={'a':{'x':1},'tags':['a'],'value':1};right={'a':{'y':2},'tags':['a','b'],'value':2}
++    result=deep_merge(left,right,lists='append',conflicts='left')
++    assert result=={'a':{'x':1,'y':2},'tags':['a','a','b'],'value':1}
++    result['a']['x']=9;assert left['a']['x']==1 and right['a']=={'y':2}
++    assert deep_merge(left,right)['tags']==['a','b']
++
++def test_type_conflict_path_null_bool_and_cycle():
++    """精确冲突路径与JSON类型边界，bool不被当int相等。@return None。"""
++    from deepdiff.merge import deep_merge,MergeConflict
++    with pytest.raises(MergeConflict) as error:deep_merge({'x':True},{'x':1},conflicts='error')
++    assert error.value.path==('x',)
++    assert deep_merge({'x':None},{'x':3})=={'x':3}
++    cyclic=[];cyclic.append(cyclic)
++    with pytest.raises(ValueError):deep_merge({},cyclic)
++    with pytest.raises(TypeError):deep_merge({},set())
++
++def test_existing_delta_still_replaces_not_union():
++    """新组合入口不重写原Delta变换语义。@return None。"""
++    from deepdiff.merge import deep_merge
++    base={'a':1};target={'b':2}
++    assert base+Delta(DeepDiff(base,target))==target
++    assert deep_merge(base,target)=={'a':1,'b':2}

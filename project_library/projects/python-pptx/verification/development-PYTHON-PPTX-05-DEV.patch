@@ -1,0 +1,55 @@
+--- a/library/docs/development-python-pptx-05-dev.md
++++ b/library/docs/development-python-pptx-05-dev.md
+@@ -0,0 +1,5 @@
++# 文本框公开配置真实文字流向并保留格式继承
++
++路线16：TextFrame.text_direction严格采用固定XSD全部方向，映射bodyPr@vert；None移除继承、非法值原子拒绝，形状旋转/正文/边距等不动，真实文件往返不冒认渲染。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pptx/text/text.py
++++ b/library/src/pptx/text/text.py
+@@ -102,6 +102,18 @@
+         self._apply_fit(font_family, font_size, bold, italic)
+ 
+     @property
++    def text_direction(self):
++        """读取直接文字方向。@return XSD字符串或None继承。"""
++        return self._bodyPr.get("vert")
++
++    @text_direction.setter
++    def text_direction(self,value):
++        """配置文字流向，非形状几何旋转。@param value 固定XSD方向或None继承。@return None。"""
++        if value is not None and value not in ('horz', 'vert', 'vert270', 'wordArtVert', 'eaVert', 'mongolianVert', 'wordArtVertRtl'):raise ValueError("未知文字方向")
++        if value is None:self._bodyPr.attrib.pop("vert",None)
++        else:self._bodyPr.set("vert",value)
++
++    @property
+     def margin_bottom(self) -> Length:
+         """|Length| value representing the inset of text from the bottom text frame border.
+ 
+--- a/library/tests/test_development_python_pptx_05_dev.py
++++ b/library/tests/test_development_python_pptx_05_dev.py
+@@ -0,0 +1,23 @@
++"""文字流向是bodyPr方向，不能用旋转文本框冒充竖排。"""
++from io import BytesIO
++import unittest
++from pptx import Presentation
++
++def test_vertical_east_asian_and_270_roundtrip_leave_shape_rotation():
++    """正文/内边距/形状旋转保持，只更改文字流向。@return None。"""
++    presentation=Presentation();slide=presentation.slides.add_slide(presentation.slide_layouts[6])
++    for index,value in enumerate(('vert','eaVert','vert270')):
++        shape=slide.shapes.add_textbox(index*400000,0,300000,400000);shape.text='中文 direction'
++        shape.text_frame.text_direction=value
++    output=BytesIO();presentation.save(output);output.seek(0);shapes=Presentation(output).slides[0].shapes
++    assert [shape.text_frame.text_direction for shape in shapes]==['vert','eaVert','vert270']
++    assert all(shape.rotation==0 and shape.text=='中文 direction' for shape in shapes)
++
++def test_none_inheritance_horizontal_and_invalid_atomic():
++    """None移除直接属性，不覆盖其他bodyPr。@return None。"""
++    presentation=Presentation();frame=presentation.slides.add_slide(presentation.slide_layouts[6]).shapes.add_textbox(0,0,300000,300000).text_frame
++    margin=frame.margin_left;assert frame.text_direction is None
++    frame.text_direction='horz';before=frame._bodyPr.xml
++    with unittest.TestCase().assertRaises(ValueError):frame.text_direction='rotated'
++    assert frame._bodyPr.xml==before
++    frame.text_direction=None;assert frame.text_direction is None and frame.margin_left==margin

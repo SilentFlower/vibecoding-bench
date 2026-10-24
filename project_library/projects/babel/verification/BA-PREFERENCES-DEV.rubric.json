@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BA-PREFERENCES-DEV",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add babel.core.negotiate_locale_preferences(header, available, *, sep=\"_\", aliases=LOCALE_ALIASES). Parse bounded comma-separated language ranges and optional q values 0..1 with at most three decimals. Select descending quality, stable header order; reuse pinned negotiate_locale matching/aliases for each nonwildcard candidate and return spelling from available. Explicit q=0 language/prefix exclusions must apply before wildcard selection; wildcard picks first nonexcluded available. Reject malformed parameters, quality, headers over 8192 characters or 100 ranges. Materialize available once and preserve the old negotiator.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

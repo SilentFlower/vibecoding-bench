@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BA-LIST-PARTS-DEV",
+  "source_commit": "e2a17919f0eb988bfea2883b00793ca4d5d37c4f",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add babel.lists.format_list_to_parts(lst, style=\"standard\", locale=None). Return ordered dictionaries with type element/literal, exact value, and original input index or None. Concatenation must equal format_list for all supported CLDR styles, fallback styles and locales, including repeated/empty strings, braces and Unicode. Do not locate elements by searching formatted text or use collision-prone sentinels. Preserve input and format_list.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

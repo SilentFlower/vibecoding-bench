@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SG-REMAP-DEV",
+  "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement sqlglot.report_remap.remap_tables(query,mapping,*,dialect=None,require_all=False). Reuse completed physical scope inspection; keys/values are exact (catalog,database,name) string tuples with optional empty prefixes. Quote replacement identifiers as data, never parse them as SQL. Rewrite physical named tables only, leaving CTE aliases and bodies/comments/literals otherwise compatible. Preserve existing aliases; for unaliased tables add original name as alias and repair matching scoped db/catalog-qualified columns to it. Keep table hints/other attributes. Reject malformed names and optional unused keys, return independent AST and retain source links. Do not string-replace SQL.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

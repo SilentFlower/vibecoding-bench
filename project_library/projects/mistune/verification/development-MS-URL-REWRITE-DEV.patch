@@ -1,0 +1,85 @@
+--- a/library/development_tests/test_development_ms_url_rewrite_dev.py
++++ b/library/development_tests/test_development_ms_url_rewrite_dev.py
+@@ -0,0 +1,29 @@
++"""公开链接图片URL改写回归。"""
++import pytest
++import mistune
++
++def test_link_image_and_reference_links_use_explicit_kinds():
++    calls=[]
++    def rewrite(url,kind):
++        calls.append((url,kind))
++        return '/published/'+url
++    md=mistune.create_markdown(renderer=mistune.HTMLRenderer(url_rewriter=rewrite))
++    result=md('[text](page) ![alt](img.png) [ref][x]\n\n[x]: target')
++    assert calls==[('page','link'),('img.png','image'),('target','link')]
++    assert 'href="/published/page"' in result and 'alt="alt"' in result
++
++def test_dangerous_rewritten_url_still_uses_original_protocol_policy():
++    md=mistune.create_markdown(renderer=mistune.HTMLRenderer(url_rewriter=lambda url,kind:'javascript:alert(1)'))
++    assert 'href="#harmful-link"' in md('[safe](page)')
++
++def test_attribute_escaping_and_visible_markup_are_preserved():
++    md=mistune.create_markdown(renderer=mistune.HTMLRenderer(url_rewriter=lambda url,kind:'a?x="&y=2'))
++    result=md('[**bold**](page)')
++    assert '<strong>bold</strong>' in result and '&quot;' in result and '&amp;' in result
++
++def test_invalid_return_and_callback_errors_propagate():
++    md=mistune.create_markdown(renderer=mistune.HTMLRenderer(url_rewriter=lambda url,kind:None))
++    with pytest.raises(TypeError):
++        md('[x](page)')
++    with pytest.raises(TypeError):
++        mistune.HTMLRenderer(url_rewriter=3)
+--- a/library/docs/development-ms-url-rewrite-dev.md
++++ b/library/docs/development-ms-url-rewrite-dev.md
+@@ -0,0 +1,5 @@
++# 在链接和图片渲染前改写URL并继续执行原协议策略
++
++文档发布需统一链接和图片地址，按实际令牌提供改写回调，之后仍运行原协议检查及属性转义。原文字、图片alt和标题保留，默认输出不变，回调错误不吞掉，危险改写不能绕过既有策略。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/mistune/renderers/html.py
++++ b/library/src/mistune/renderers/html.py
+@@ -35,7 +35,12 @@
+         self,
+         escape: bool = True,
+         allow_harmful_protocols: Optional[Union[bool, Iterable[str]]] = None,
++        *,
++        url_rewriter=None,
+     ) -> None:
++        if url_rewriter is not None and not callable(url_rewriter):
++            raise TypeError("url_rewriter必须可调用或None")
++        self._url_rewriter=url_rewriter
+         super(HTMLRenderer, self).__init__()
+         self._allow_harmful_protocols = allow_harmful_protocols
+         self._escape = escape
+@@ -106,6 +111,14 @@
+         else:
+             return func(text)
+ 
++    def _rewrite_url(self,url,kind):
++        if self._url_rewriter is None:
++            return url
++        result=self._url_rewriter(url,kind)
++        if not isinstance(result,str):
++            raise TypeError('URL改写必须返回字符串')
++        return result
++
+     def safe_url(self, url: str) -> str:
+         """Ensure the given URL is safe. This method is used for rendering
+         links, images, and etc.
+@@ -124,12 +137,14 @@
+         return "<strong>" + text + "</strong>"
+ 
+     def link(self, text: str, url: str, title: Optional[str] = None) -> str:
++        url=self._rewrite_url(url,"link")
+         attrs: Dict[str, object] = {"href": self.sanitize_url(url)}
+         if title:
+             attrs["title"] = title
+         return "<a" + self.render_attrs(attrs) + ">" + text + "</a>"
+ 
+     def image(self, text: str, url: str, title: Optional[str] = None) -> str:
++        url=self._rewrite_url(url,"image")
+         alt = striptags(text)
+         attrs: Dict[str, object] = {"src": self.sanitize_url(url), "alt": alt}
+         if title:

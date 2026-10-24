@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "XW-UTC-DEV",
+  "source_commit": "5d4606d89a955226d2d0825a0f44309043ae7251",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement xlsxwriter.utc.as_utc(datetime,*,naive=\"raise\") and write_utc(worksheet,row,col,value,cell_format=None,*,naive=\"raise\"). Convert aware values by instant to naive UTC before actual write_datetime, preserving fractional seconds and input identity. Default rejects naive datetimes; explicit naive=\"utc\" accepts them. Use utcoffset semantics and DST fold correctly, keep workbook 1900/1904 date modes and native return codes/formats, never globally enable remove_timezone or silently discard offsets. Existing write_datetime behavior stays compatible.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

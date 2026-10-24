@@ -1,0 +1,87 @@
+--- a/library/bidict/relation_patch.py
++++ b/library/bidict/relation_patch.py
+@@ -0,0 +1,44 @@
++"""带完整前置条件和顺序的双向关系补丁。"""
++
++
++def relation_diff(before, after):
++    """冻结有序前后关系及显式操作，不执行输入字符串。
++
++    :param before: 修改前双向映射。
++    :param after: 修改后双向映射。
++    :return: schema1的关系补丁，可逆应用。
++    """
++    left, right = tuple(before.items()), tuple(after.items())
++    ldict, rdict = dict(left), dict(right)
++    operations = []
++    for key, value in left:
++        if key not in rdict:
++            operations.append(('remove', key, value))
++        elif value != rdict[key]:
++            operations.append(('reassign', key, value, rdict[key]))
++    operations.extend(('add', key, value) for key, value in right if key not in ldict)
++    return {'schema': 1, 'before': left, 'after': right, 'operations': tuple(operations)}
++
++
++def apply_relation_patch(mapping, patch, *, reverse=False):
++    """验证完整前置关系后一次构造最终唯一状态。
++
++    :param mapping: 当前双向映射，不原地修改。
++    :param patch: relation_diff返回的真实对象补丁。
++    :param reverse: 是否反向恢复原顺序和关系。
++    :return: 同类完整结果，任意失败不改输入。
++    """
++    if not isinstance(patch, dict) or set(patch) != {'schema', 'before', 'after', 'operations'} or patch['schema'] != 1:
++        raise ValueError('不支持的关系补丁')
++    expected = patch['after'] if reverse else patch['before']
++    target = patch['before'] if reverse else patch['after']
++    if tuple(mapping.items()) != tuple(expected):
++        raise ValueError('关系补丁前置条件不匹配')
++    keys, values = set(), set()
++    for key, value in target:
++        if key in keys or value in values:
++            raise ValueError('补丁目标关系不唯一')
++        keys.add(key)
++        values.add(value)
++    # 完整目标验证允许循环换值，不误用逐条putall的即时冲突策略。
++    return type(mapping)(target)
+--- a/library/docs/development-bidict-o04-dev.md
++++ b/library/docs/development-bidict-o04-dev.md
+@@ -0,0 +1,5 @@
++# 生成并应用有前置关系和顺序的可逆补丁
++
++生成带完整前后关系、顺序和操作事实的版本化补丁。应用前校验当前关系及顺序，最终状态唯一后返回同类副本，支持循环换值、增删及反向恢复。过期或非法补丁不改变输入，不执行操作字符串。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bidict_o04_dev.py
++++ b/library/tests/test_development_bidict_o04_dev.py
+@@ -0,0 +1,29 @@
++"""关系补丁必须保留前置条件、循环换值和顺序。"""
++from bidict import bidict, OrderedBidict
++
++def test_diff_apply_reverse_order():
++    """新增删除与顺序可逆。@return None。"""
++    from bidict.relation_patch import relation_diff, apply_relation_patch
++    before = OrderedBidict([('a', 1), ('b', 2)])
++    after = OrderedBidict([('c', 3), ('a', 4)])
++    patch = relation_diff(before, after)
++    output = apply_relation_patch(before, patch)
++    assert list(output.items()) == list(after.items())
++    assert list(apply_relation_patch(output, patch, reverse=True).items()) == list(before.items())
++
++def test_cycle_reassignment():
++    """最终唯一的循环交换不可丢掉任一键。@return None。"""
++    from bidict.relation_patch import relation_diff, apply_relation_patch
++    before, after = bidict(a=1, b=2), bidict(a=2, b=1)
++    assert apply_relation_patch(before, relation_diff(before, after)) == after
++    assert before == {'a': 1, 'b': 2}
++
++def test_stale_precondition_rejected():
++    """源关系已变时拒绝应用且原表不变。@return None。"""
++    import pytest
++    from bidict.relation_patch import relation_diff, apply_relation_patch
++    source = bidict(a=1)
++    patch = relation_diff(source, bidict(a=2))
++    source['a'] = 3
++    with pytest.raises(ValueError): apply_relation_patch(source, patch)
++    assert source['a'] == 3

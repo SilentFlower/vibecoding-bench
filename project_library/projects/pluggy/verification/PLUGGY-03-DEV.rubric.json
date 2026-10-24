@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PLUGGY-03-DEV",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair registry ownership using object is identity across register/get_name/is_registered/HookCaller removal and subset filtering. Independent eq-equal/unhashable instances may register under distinct names; the exact same object still cannot register twice. User __eq__ must not run, raise, return arrays or decide None/block markers during these operations. Preserve subset input snapshot and remove only explicitly identical plugin instances, without set-based equality collapsing. Keep get_plugins() existing set/hashability API unchanged and document that separate boundary rather than overpromise it supports unhashable objects.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

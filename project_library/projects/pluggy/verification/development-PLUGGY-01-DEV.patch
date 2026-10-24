@@ -1,0 +1,60 @@
+--- a/library/docs/development-pluggy-01-dev.md
++++ b/library/docs/development-pluggy-01-dev.md
+@@ -0,0 +1,5 @@
++# 历史hook记录调用时参数映射浅快照且不复制业务对象
++
++路线01：历史调用应用spec默认后保存kwargs浅快照，调用方后来替换/清空映射不改变重放事件；嵌套可变对象仍明确共享身份，回调与顺序不变，不深拷贝业务值。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pluggy/_caller.py
++++ b/library/src/pluggy/_caller.py
+@@ -213,7 +213,7 @@
+         """
+         assert self._call_history is not None
+         kwargs = kwargs or {}
+-        kwargs = self._apply_defaults(kwargs)
++        kwargs = dict(self._apply_defaults(kwargs))
+         self._verify_all_args_are_provided(kwargs)
+         self._call_history.append((kwargs, result_callback))
+         # Historizing hooks don't return results.
+--- a/library/tests/test_development_pluggy_01_dev.py
++++ b/library/tests/test_development_pluggy_01_dev.py
+@@ -0,0 +1,38 @@
++"""历史事件持有调用时映射浅快照，不把后来键替换当原事件。"""
++from types import MappingProxyType
++from pluggy import PluginManager,HookspecMarker,HookimplMarker
++spec=HookspecMarker('app');impl=HookimplMarker('app')
++
++
++def test_historic_kwargs_mapping_is_frozen_at_call_time():
++    """修改调用方映射不影响稍后注册的真实插件。@return None。"""
++    class Specs:
++        """真实historic协议。"""
++        @spec(historic=True)
++        def event(self,value):pass
++    pm=PluginManager('app');pm.add_hookspecs(Specs)
++    given={'value':'at-call-time'};pm.hook.event.call_historic(kwargs=given);given['value']='mutated'
++    seen=[]
++    class Plugin:
++        """稍后安装的插件。"""
++        @impl
++        def event(self,value):seen.append(value)
++    pm.register(Plugin())
++    assert seen==['at-call-time']
++
++
++def test_defaults_custom_mapping_and_nested_values_remain_shallow():
++    """只复制键容器，嵌套业务对象身份明确共享。@return None。"""
++    class Specs:
++        """含默认值的历史协议。"""
++        @spec(historic=True)
++        def event(self,value='default'):pass
++    pm=PluginManager('app');pm.add_hookspecs(Specs);nested=[]
++    pm.hook.event.call_historic(kwargs=MappingProxyType({'value':nested}));nested.append(1)
++    seen=[]
++    class Plugin:
++        """真实接收嵌套原对象。"""
++        @impl
++        def event(self,value):seen.append(value)
++    pm.register(Plugin())
++    assert seen[0] is nested and seen==[[1]]

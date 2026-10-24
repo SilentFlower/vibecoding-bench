@@ -1,0 +1,102 @@
+--- a/library/docs/development-docutils-o06-dev.md
++++ b/library/docs/development-docutils-o06-dev.md
+@@ -0,0 +1,5 @@
++# 按实际章节ID复制真实文档片段并显式处理外部脚注引用闭包
++
++对应路线15：按真实section ID复制新document并保source/line/内层结构/内部引用，可再发布；外部默认拒绝、include_notes只追加脚注/引文闭包并清理backrefs，未知/重复/其他章明确失败且原树不改。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/docutils/docutils/fragments.py
++++ b/library/docutils/docutils/fragments.py
+@@ -0,0 +1,49 @@
++"""按明确section ID提取真实doctree，引用闭包与来源策略显式可验。"""
++from copy import copy
++from docutils import nodes
++from docutils.utils import new_document
++
++
++def extract_section(document, section_id, *, external='error'):
++    """复制所选section为新的文档，不修改旧树或伪造外部链接。
++
++    :param document: 已解析/变换的真实document。
++    :param section_id: 精确实际section ID，不猜标题或HTML片段。
++    :param external: error拒绝未包含refid，include_notes仅追加被引用footnote/citation闭包。
++    :return: 新document，source/line/内层层级及ID保持，所选section成为一级节。
++    """
++    if not isinstance(document,nodes.document):raise TypeError('document必须为真实doctree')
++    if external not in ('error','include_notes'):raise ValueError('未知外部引用政策')
++    selected=[node for node in document.findall(nodes.section) if section_id in node.get('ids',[])]
++    if not selected:raise KeyError(section_id)
++    if len(selected)!=1:raise ValueError('section ID不唯一')
++    original_ids={}
++    for node in document.findall(nodes.Element):
++        for identifier in node.get('ids',[]):
++            if identifier in original_ids:raise ValueError('原树含重复ID')
++            original_ids[identifier]=node
++    result=new_document(document.get('source') or '<section>',settings=copy(document.settings))
++    result+=selected[0].deepcopy()
++    while True:
++        included={identifier for node in result.findall(nodes.Element) for identifier in node.get('ids',[])}
++        missing=[]
++        for node in result.findall(nodes.Element):
++            if 'refid' in node and node['refid'] not in included and node['refid'] not in missing:missing.append(node['refid'])
++        if not missing:break
++        if external=='error':raise ValueError('片段含外部refid: '+', '.join(missing))
++        for identifier in missing:
++            target=original_ids.get(identifier)
++            if not isinstance(target,(nodes.footnote,nodes.citation)):
++                raise ValueError('外部引用不是可包含的脚注/引文: '+identifier)
++            result+=target.deepcopy()
++    result.ids.clear();result.nameids.clear()
++    included={identifier for node in result.findall(nodes.Element) for identifier in node.get('ids',[])}
++    for node in result.findall(nodes.Element):
++        node._document=result
++        if 'backrefs' in node:node['backrefs']=[identifier for identifier in node['backrefs'] if identifier in included]
++        for identifier in node.get('ids',[]):
++            if identifier in result.ids:raise ValueError('提取后ID重复')
++            result.ids[identifier]=node
++        for name in node.get('names',[]):
++            if node.get('ids'):result.nameids[name]=node['ids'][0]
++    return result
+--- a/library/tests/test_development_docutils_o06_dev.py
++++ b/library/tests/test_development_docutils_o06_dev.py
+@@ -0,0 +1,39 @@
++"""具名章节提取真实树并处理脚注闭包，不切HTML字符串。"""
++from docutils.core import publish_doctree,publish_from_doctree
++from docutils import nodes
++import io
++import pytest
++
++def build(source):
++    """保留章节结构与来源的真实解析。@return document。"""
++    return publish_doctree(source,source_path='source.rst',settings_overrides={'warning_stream':io.StringIO(),'halt_level':6,'report_level':5,'doctitle_xform':False})
++
++def test_selected_second_section_internal_refs_source_and_old_tree_are_preserved():
++    """第二节提取后没有首节正文，内部引用仍有效且源行保持。@return None。"""
++    from docutils.fragments import extract_section
++    document=build('First\n=====\n\nFirst body.\n\nSecond\n======\n\n.. _local:\n\nSecond **body** and local_.\n');before=document.pformat()
++    original=[node for node in document.findall(nodes.section) if 'second' in node['ids']][0]
++    extracted=extract_section(document,'second');section=next(extracted.findall(nodes.section))
++    assert section.source==original.source and section.line==original.line and 'First body' not in extracted.astext() and 'Second body' in extracted.astext()
++    assert document.pformat()==before and next(extracted.findall(nodes.reference))['refid'] in extracted.ids
++    html=publish_from_doctree(extracted,writer='html5').decode('utf8');assert 'Second' in html and 'First body' not in html
++
++def test_external_footnote_is_rejected_or_included_with_closed_backrefs():
++    """外部脚注必须明确选政策，包含后每条refid及backref都能在新树找到。@return None。"""
++    from docutils.fragments import extract_section
++    document=build('.. [1] Shared note.\n\nSection\n=======\n\nUse [1]_.\n')
++    with pytest.raises(ValueError):extract_section(document,'section')
++    extracted=extract_section(document,'section',external='include_notes')
++    assert 'Shared note.' in extracted.astext() and len(list(extracted.findall(nodes.footnote)))==1
++    for node in extracted.findall(nodes.Element):
++        if 'refid' in node:assert node['refid'] in extracted.ids
++        assert all(identifier in extracted.ids for identifier in node.get('backrefs',[]))
++
++def test_missing_duplicate_id_external_section_and_invalid_policy_do_not_mutate():
++    """不猜未知目标，不默默把整章外部依赖并入，失败原树保持。@return None。"""
++    from docutils.fragments import extract_section
++    document=build('First\n=====\n\nFirst body.\n\nSecond\n======\n\nSee First_.\n');before=document.pformat()
++    with pytest.raises(KeyError):extract_section(document,'missing')
++    with pytest.raises(ValueError):extract_section(document,'second',external='include_notes')
++    with pytest.raises(ValueError):extract_section(document,'first',external='guess')
++    assert document.pformat()==before

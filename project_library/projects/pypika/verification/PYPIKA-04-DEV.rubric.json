@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYPIKA-04-DEV",
+  "source_commit": "465fb9ae12f7727d28785d087b64e6226da5714e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair DELETE serialization to include accumulated ordered WITH definitions before DELETE as SELECT/INSERT/UPDATE do. Preserve subquery rendering, WHERE, PostgreSQL USING/RETURNING and unchanged no-CTE queries. Verify real selected-row deletion on in-memory SQLite and SQL text for PG; never connect external databases or claim server-specific engine/lock integration.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

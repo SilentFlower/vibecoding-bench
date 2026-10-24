@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML2TEXT-O03-DEV",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add figure_mode=\"legacy\"|\"group\" to actual figure/figcaption/image processing. Group mode creates readable paragraph boundaries around the group, each image and each caption, preserving source order, original alt text, inline caption formatting, multiple/nested figures, caption-only/empty cases and neighboring body text. Existing ignore_images/images_to_alt/images-as-HTML behavior remains authoritative; never replace alt with caption or drop captions when images are disabled. Reset grouping depth at finish including unclosed EOF, retain default compatibility and reject unknown figure strategies.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

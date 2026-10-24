@@ -1,0 +1,57 @@
+--- a/library/development_tests/test_development_tb_dedup_dev.py
++++ b/library/development_tests/test_development_tb_dedup_dev.py
+@@ -0,0 +1,23 @@
++"""公开表格业务去重回归。"""
++import pytest
++from tablib import Dataset
++from tablib.dedup import deduplicate
++
++def test_first_last_and_remove_all_groups_preserve_original_order():
++    data=Dataset(['a',1],['b',2],['a',3],['c',4],headers=['id','v'])
++    assert list(deduplicate(data,'id'))==[('a',1),('b',2),('c',4)]
++    assert list(deduplicate(data,'id',keep='last'))==[('b',2),('a',3),('c',4)]
++    assert list(deduplicate(data,'id',keep=False))==[('b',2),('c',4)]
++
++def test_composite_keys_and_type_strictness():
++    data=Dataset([True,'x'],[1,'x'],[True,'y'],[True,'x'],headers=['a','b'])
++    assert deduplicate(data,['a','b']).height==3
++
++def test_row_tags_and_source_values_remain_independent():
++    data=Dataset(headers=['id','value']);data.append(['a',[1]],tags=['active'])
++    result=deduplicate(data,'id');result[0][1].append(2)
++    assert data[0][1]==[1] and result.filter('active').height==1
++
++def test_empty_headed_data_and_mutable_key_rejection():
++    assert deduplicate(Dataset(headers=['id']),'id').height==0
++    with pytest.raises(ValueError): deduplicate(Dataset([[1]],headers=['id']),'id')
+--- a/library/docs/development-tb-dedup-dev.md
++++ b/library/docs/development-tb-dedup-dev.md
+@@ -0,0 +1,5 @@
++# 以复合业务键稳定去重并提供全部重复组删除策略
++
++按复合业务键稳定去重，可保留第一条、最后一条或删除整个重复组。保留所选行实际原序和标签，键的类型参与比较，空表和错误键合同明确。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/tablib/dedup.py
++++ b/library/src/tablib/dedup.py
+@@ -0,0 +1,20 @@
++"""以明确业务键去重并保留原行顺序和标签。"""
++from .projection import schema,key_token,copy_rows
++
++
++def deduplicate(dataset,by,*,keep='first'):
++    """按复合键去重。@param dataset 实际Dataset。@param by 字段名或非空字段序列。
++    @param keep first/last/False，False删除所有重复组。@return 独立静态Dataset。
++    """
++    headers=schema(dataset);names=[by] if isinstance(by,str) else list(by)
++    if not names or any(name not in headers for name in names) or len(set(names))!=len(names) or (keep is not False and keep not in ('first','last')):
++        raise ValueError('无效的去重键或保留策略')
++    positions=[headers.index(name) for name in names];keys=[];counts={};first={};last={}
++    for index,row in enumerate(dataset._data):
++        key=key_token([row[position] for position in positions]);keys.append(key)
++        counts[key]=counts.get(key,0)+1;first.setdefault(key,index);last[key]=index
++    chosen=[]
++    for index,(row,key) in enumerate(zip(dataset._data,keys)):
++        if (keep=='first' and first[key]==index) or (keep=='last' and last[key]==index) or (keep is False and counts[key]==1):
++            chosen.append((row,row.tags))
++    return copy_rows(dataset,chosen,headers)

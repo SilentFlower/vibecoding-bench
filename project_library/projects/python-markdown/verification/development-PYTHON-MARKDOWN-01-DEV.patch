@@ -1,0 +1,97 @@
+--- a/library/docs/development-python-markdown-01-dev.md
++++ b/library/docs/development-python-markdown-01-dev.md
+@@ -0,0 +1,5 @@
++# 扩展配置实例隔离且嵌套容器不污染类默认与调用方
++
++路线04：类级/继承config在实例初始化时复制，嵌套内建容器与传入可变值独立，实例内别名保持；回调和不透明对象保留身份，不盲目deepcopy。bool/None转换与未知键兼容，循环配置明确拒绝。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/markdown/extensions/__init__.py
++++ b/library/markdown/extensions/__init__.py
+@@ -34,6 +34,26 @@
+     from markdown import Markdown
+ 
+ 
++def _copy_configuration(value,active=None,memo=None):
++    """仅复制配置内建容器并保留回调身份。@param value 值。@param active 活动容器。@param memo 已复制别名。@return 独立配置容器。"""
++    active=set() if active is None else active
++    memo={} if memo is None else memo
++    if type(value) not in (dict,list,tuple,set,frozenset):return value
++    identity=id(value)
++    if identity in active:raise ValueError('配置容器不能含循环引用')
++    if identity in memo:return memo[identity]
++    active.add(identity)
++    try:
++        if type(value) is dict:result={key:_copy_configuration(item,active,memo) for key,item in value.items()}
++        elif type(value) is list:result=[_copy_configuration(item,active,memo) for item in value]
++        elif type(value) is tuple:result=tuple(_copy_configuration(item,active,memo) for item in value)
++        elif type(value) is set:result={_copy_configuration(item,active,memo) for item in value}
++        else:result=frozenset(_copy_configuration(item,active,memo) for item in value)
++        memo[identity]=result
++        return result
++    finally:active.remove(identity)
++
++
+ class Extension:
+     """ Base class for extensions to subclass. """
+ 
+@@ -55,6 +75,7 @@
+ 
+     def __init__(self, **kwargs):
+         """ Initiate Extension and set up configs. """
++        self.config = _copy_configuration(dict(self.config))
+         self.setConfigs(kwargs)
+ 
+     def getConfig(self, key: str, default: Any = '') -> Any:
+@@ -110,7 +131,7 @@
+             value = parseBoolValue(value)
+         if self.config[key][0] is None:
+             value = parseBoolValue(value, preserve_none=True)
+-        self.config[key][0] = value
++        self.config[key][0] = _copy_configuration(value)
+ 
+     def setConfigs(self, items: Mapping[str, Any] | Iterable[tuple[str, Any]]) -> None:
+         """
+--- a/library/tests/test_development_python_markdown_01_dev.py
++++ b/library/tests/test_development_python_markdown_01_dev.py
+@@ -0,0 +1,40 @@
++"""扩展类级配置是默认模板，实例不得相互污染。"""
++import unittest
++from markdown.extensions import Extension
++
++
++class Configured(Extension):
++    """模拟官方允许的类级配置模式。"""
++    config={'label':['default','说明'],'nested':[{'items':[1]},'嵌套'],'enabled':[False,'开关']}
++
++
++def test_instances_subclass_and_explicit_mutable_values():
++    """首实例赋值、嵌套修改及调用方容器均隔离。@return None。"""
++    first=Configured(label='first');second=Configured()
++    assert second.getConfig('label')==Configured.config['label'][0]=='default'
++    first.getConfig('nested')['items'].append(2)
++    assert second.getConfig('nested')=={'items':[1]}
++    given={'items':[9]};third=Configured(nested=given);given['items'].append(10)
++    assert third.getConfig('nested')=={'items':[9]}
++    class Child(Configured):
++        """继承默认模板仍须独立。"""
++    assert Child().getConfig('label')=='default'
++
++
++def test_callbacks_boolean_conversion_and_unknown_keys():
++    """不盲目deepcopy回调，原bool/未知键合同保持。@return None。"""
++    class Callback:
++        """不允许复制的可调用配置对象。"""
++        def __call__(self,value):
++            """原样回传。@param value 值。@return 原值。"""
++            return value
++        def __deepcopy__(self,memo):
++            """确保实现没有复制任意业务对象。@param memo 缓存。@return 不返回。"""
++            raise AssertionError('不应复制回调')
++    callback=Callback()
++    class Custom(Extension):
++        """带自定义回调的扩展。"""
++        config={'callback':[callback,'回调']}
++    assert Custom().getConfig('callback') is callback
++    assert Configured(enabled='true').getConfig('enabled') is True
++    with unittest.TestCase().assertRaises(KeyError):Configured(unknown=1)

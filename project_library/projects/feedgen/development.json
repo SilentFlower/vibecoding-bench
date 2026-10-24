@@ -3,7 +3,7 @@
   "project_key": "feedgen",
   "title": "Feedgen文档订阅开发任务",
   "category": "RSS/Atom语义与序列化",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实订阅工程交付：Atom链接、条目更新、时间排序、独立分页、JSON Feed和原子发布；独立和累计验收。",
   "seed_digest": "95adae5e21c66cd84c7ed9cc536bbbaed9a15957361830d6b249c57560a6dddd",
   "environment": "feedgen-py312",
   "source": {
@@ -57,6 +57,255 @@
             "disclosure/FG-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "FG-UPSERT-DEV-SCENE",
+      "title": "按永久ID批量更新订阅条目并保持已有位置",
+      "goal": "按永久ID批量更新订阅条目并保持已有位置",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FG-UPSERT-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-UPSERT-DEV",
+          "kind": "modify",
+          "goal": "按永久ID批量更新订阅条目并保持已有位置",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement feedgen.upsert.upsert_entries(feed,entries) and frozen UpsertResult(added,updated). Use actual FeedGenerator/FeedEntry APIs. Validate all existing/incoming entries have unique nonempty string IDs before mutation; invalid late input or generator failure preserves original entries. Replace matching IDs at their original position with supplied entry objects, append new IDs in incoming order, retain unrelated exact entry objects and metadata/extensions. Do not merge entries by title or destructively edit old entry fields. Empty input is valid; duplicate old IDs are explicit errors.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_upsert_dev.py and concise Chinese compatibility documentation at library/docs/development-fg-upsert-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FG-UPSERT-DEV-contract.md",
+            "materials/FG-UPSERT-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedgen/upsert.py",
+            "library/development_tests/test_development_fg_upsert_dev.py",
+            "library/docs/development-fg-upsert-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FG-UPSERT-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-UPSERT-DEV.native.json",
+            "public_native": "verification/FG-UPSERT-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FG-UPSERT-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FG-ORDER-DEV-SCENE",
+      "title": "按带时区时间稳定排序并生成独立订阅快照",
+      "goal": "按带时区时间稳定排序并生成独立订阅快照",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FG-ORDER-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-ORDER-DEV",
+          "kind": "modify",
+          "goal": "按带时区时间稳定排序并生成独立订阅快照",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement feedgen.ordering.sorted_feed(feed,*,by=\"updated\",reverse=True,missing=\"last\",since=None,limit=None) and reusable copy_feed(feed,entries). Compare actual updated/published instants across offsets, retain original order on ties, explicitly place or reject missing dates independent of reverse. Inclusive aware since excludes undated entries, nonnegative limit supports zero. Return deeply independent FeedGenerator preserving metadata/extensions/entry content; never reorder or mutate original feed. Reject naive boundaries and invalid modes before changing anything.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_order_dev.py and concise Chinese compatibility documentation at library/docs/development-fg-order-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FG-ORDER-DEV-contract.md",
+            "materials/FG-ORDER-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedgen/ordering.py",
+            "library/development_tests/test_development_fg_order_dev.py",
+            "library/docs/development-fg-order-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FG-ORDER-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-ORDER-DEV.native.json",
+            "public_native": "verification/FG-ORDER-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FG-ORDER-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FG-PAGES-DEV-SCENE",
+      "title": "生成独立分页订阅并维护准确的导航链接",
+      "goal": "生成独立分页订阅并维护准确的导航链接",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FG-PAGES-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-PAGES-DEV",
+          "kind": "modify",
+          "goal": "生成独立分页订阅并维护准确的导航链接",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement feedgen.pagination.paginate(feed,page,page_size,base_url,*,order_by=None,reverse=True) returning frozen FeedPage(feed,number,total_pages,total_entries). Reuse completed deep copy and optional stable date ordering. Positive pages/sizes, one empty page for empty feed and explicit out-of-range errors. Preserve root feed ID/metadata/other link relations, replace only self/first/last/prev/next with correct HTTP(S) page URLs; replace duplicate page query parameters while preserving unrelated query pairs and fragments. Source entries/links stay unchanged and result must serialize through actual Atom.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_pages_dev.py and concise Chinese compatibility documentation at library/docs/development-fg-pages-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "FG-ORDER-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/FG-PAGES-DEV-contract.md",
+            "materials/FG-PAGES-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedgen/pagination.py",
+            "library/development_tests/test_development_fg_pages_dev.py",
+            "library/docs/development-fg-pages-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FG-PAGES-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-PAGES-DEV.native.json",
+            "public_native": "verification/FG-PAGES-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FG-PAGES-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FG-JSON-FEED-DEV-SCENE",
+      "title": "新增映射真实订阅字段的JSON Feed 1.1导出",
+      "goal": "新增映射真实订阅字段的JSON Feed 1.1导出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FG-JSON-FEED-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-JSON-FEED-DEV",
+          "kind": "modify",
+          "goal": "新增映射真实订阅字段的JSON Feed 1.1导出",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement feedgen.json_feed.json_feed(feed) and json_feed_str(feed,*,pretty=False), following https://www.jsonfeed.org/version/1.1/ for supported fields: version/title/items, alternate/self/next links, description/language/icons/authors; item unique ID/title, inline text or HTML content, plain summary fallback, URL, aware published/modified dates, authors and enclosure attachments with MIME type/optional nonnegative byte size including zero. Require valid title/content/IDs and reject unsupported external/XHTML bodies rather than silently losing them. Return independent JSON data and UTF8 bytes, do not mutate source or invent extension mappings.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_json_feed_dev.py and concise Chinese compatibility documentation at library/docs/development-fg-json-feed-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FG-JSON-FEED-DEV-contract.md",
+            "materials/FG-JSON-FEED-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedgen/json_feed.py",
+            "library/development_tests/test_development_fg_json_feed_dev.py",
+            "library/docs/development-fg-json-feed-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FG-JSON-FEED-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-JSON-FEED-DEV.native.json",
+            "public_native": "verification/FG-JSON-FEED-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FG-JSON-FEED-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FG-PUBLISH-DEV-SCENE",
+      "title": "原子发布真实Atom、RSS和JSON订阅并返回内容摘要",
+      "goal": "原子发布真实Atom、RSS和JSON订阅并返回内容摘要",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FG-PUBLISH-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FG-PUBLISH-DEV",
+          "kind": "modify",
+          "goal": "原子发布真实Atom、RSS和JSON订阅并返回内容摘要",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement feedgen.publish.write_feed(feed,destination,*,format=\"atom\",pretty=False) and frozen FeedArtifact(format,size,sha256). Serialize entire actual Atom/RSS or completed JSON Feed to UTF8 before touching target, preserve completed Atom link metadata including zero-length string values. Write same-dir temp, flush/fsync and atomic replace; retain existing regular file permissions. Invalid feed, serialization/write/replace failure must retain old file and remove temp. Reject unknown formats and symlink/nonfile output, return exact final byte count/hash only on success. Do not reimplement XML or drop registered extensions, and do not claim multiple feed files publish as one transaction.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_publish_dev.py and concise Chinese compatibility documentation at library/docs/development-fg-publish-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "FG-M01-DEV",
+              "artifact": "code"
+            },
+            {
+              "task_id": "FG-JSON-FEED-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/FG-PUBLISH-DEV-contract.md",
+            "materials/FG-PUBLISH-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedgen/publish.py",
+            "library/development_tests/test_development_fg_publish_dev.py",
+            "library/docs/development-fg-publish-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FG-PUBLISH-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FG-PUBLISH-DEV.native.json",
+            "public_native": "verification/FG-PUBLISH-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FG-PUBLISH-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

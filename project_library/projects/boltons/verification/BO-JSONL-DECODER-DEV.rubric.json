@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BO-JSONL-DECODER-DEV",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add keyword-only loads=None to JSONLIterator, selecting json.loads by default or a validated explicit callable. Call it once per nonblank candidate line, preserve exact returned object, reverse/rel_seek behavior and existing ignore_errors handling for decoder exceptions. Do not mutate global json.loads, preload the file, or close caller-owned streams. Validate decoder before reading or seeking; support Decimal parse_float and object_pairs_hook through caller-provided decoder functions.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

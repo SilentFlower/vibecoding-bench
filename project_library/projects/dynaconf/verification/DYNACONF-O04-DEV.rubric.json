@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DYNACONF-O04-DEV",
+  "source_commit": "32f38478350a80020e7aab60a3cbd29dd7f8d9ea",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend validated Settings.load_file with format=None|json|toml|yaml and thread it into settings_loader. Explicit mode overrides suffix discovery and skips Python-module guessing, using whitelisted existing readers through real BaseLoader with actual file paths/source metadata, environment/key filtering, merge/validation/hooks contracts. Reject unknown or disabled core loaders; syntax errors stay visible under existing semantics. Default extension discovery remains unchanged; do not copy files to fake suffixes, import arbitrary format strings or treat a filename as serialized config text.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

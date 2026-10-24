@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HUMANIZE-O03-DEV",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend actual natural_list(items,*,conjunction=None,serial_comma=False,localized=False) preserving byte-for-byte default English output. Consume/stringify a one-shot iterable once, correctly handle 0/1/2/many items. localized=True uses the existing real translated \"%s and %s\" catalog pattern; custom literal nonempty conjunction overrides it without percent-string interpretation. serial_comma is explicit for 3+ items only, with strict boolean options and Unicode/empty-string item preservation. Do not split translations/commas/connection words into separate objectives or change current activated language automatically.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

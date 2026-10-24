@@ -1,0 +1,54 @@
+--- a/library/docs/development-markdownify-o02-dev.md
++++ b/library/docs/development-markdownify-o02-dev.md
+@@ -0,0 +1,5 @@
++# 把HTML直接任务勾选框转换为真实GFM任务列表
++
++对应路线06：显式task_lists开关，只认li首个直接checkbox；按checked属性存在取值，空任务、嵌套及有序列表保留，默认不变且不误认后续/后代输入。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/markdownify/__init__.py
++++ b/library/markdownify/__init__.py
+@@ -626,8 +626,17 @@
+     convert_ol = convert_list
+ 
+     def convert_li(self, el, text, parent_tags):
+-        # handle some early-exit scenarios
++        # 只把li自身首个非空白、非注释节点的checkbox视为任务标记，不能借子列表推断父项。
++        task = None
++        if self.options.get('task_lists', False):
++            first = next((node for node in el.contents
++                          if not isinstance(node, (Comment, Doctype))
++                          and (not isinstance(node, NavigableString) or node.strip())), None)
++            if isinstance(first, Tag) and first.name == 'input' and str(first.get('type', '')).lower() == 'checkbox':
++                task = '[x]' if first.has_attr('checked') else '[ ]'
+         text = (text or '').strip()
++        if task is not None:
++            text = task + (' ' + text if text else '')
+         if not text:
+             return "\n"
+ 
+--- a/library/tests/test_development_markdownify_o02_dev.py
++++ b/library/tests/test_development_markdownify_o02_dev.py
+@@ -0,0 +1,22 @@
++"""任务列表只解释明确的直接checkbox并保留既有列表缩进。"""
++from markdownify import markdownify
++
++def test_opt_in_checked_presence_and_empty_tasks():
++    """checked按HTML属性存在判断，空任务也保留可勾选标记。@return None。"""
++    html='<ul><li><input type="checkbox">todo</li><li><input type="checkbox" checked="false">done</li><li><input type="checkbox"></li></ul>'
++    assert markdownify(html,task_lists=True)=='* [ ] todo\n* [x] done\n* [ ]'
++    assert markdownify(html)=='* todo\n* done'
++
++def test_nested_lists_ordered_lists_and_multiline_content():
++    """嵌套任务有各自直接输入，原有bullet宽度负责后续行缩进。@return None。"""
++    html='<ol start="3"><li> <!--note--><input TYPE="CHECKBOX" checked>one<ul><li><input type="checkbox">child</li></ul></li></ol>'
++    actual=markdownify(html,task_lists=True)
++    assert actual.startswith('3. [x] one')
++    assert '\n   * [ ] child' in actual
++
++def test_later_nested_and_noncheckbox_inputs_never_mark_parent():
++    """不是第一个内容节点、不是直接子项或不是checkbox都不猜测任务。@return None。"""
++    html='<ul><li>before<input type="checkbox" checked>after</li><li><label><input type="checkbox" checked>label</label></li><li><input type="text">text</li></ul>'
++    actual=markdownify(html,task_lists=True)
++    assert '[x]' not in actual and '[ ]' not in actual
++    assert 'beforeafter' in actual and 'label' in actual and 'text' in actual

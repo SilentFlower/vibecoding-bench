@@ -1,0 +1,83 @@
+--- a/library/cli_helpers/tabular_output/output_formatter.py
++++ b/library/cli_helpers/tabular_output/output_formatter.py
+@@ -169,6 +169,27 @@
+             data, headers = f(data, headers, column_types=column_types, **fkwargs)
+         return formatter(list(data), headers, column_types=column_types, **fkwargs)
+ 
++    def stream_output(self,data,headers,format_name=None,preprocessors=(),column_types=None,**kwargs):
++        """逐行输出无需完整列推断的导出格式。@param data 惰性行流。@param headers 有限表头。
++        @param format_name 原CSV/TSV/JSONL导出名。@param preprocessors 额外预处理器。
++        @param column_types 必须显式提供的列类型。@param kwargs 本次格式选项。@return 惰性字符串迭代器。
++        """
++        name=format_name or self._format_name
++        streaming=set(delimited_output_adapter.supported_formats+tsv_output_adapter.supported_formats+json_output_adapter.supported_formats)
++        if name not in streaming:
++            raise ValueError('该格式需要完整表格布局，不能逐行导出')
++        headers=tuple(headers)
++        if column_types is None:
++            raise ValueError('逐行导出必须明确列类型，避免隐式缓存整份数据')
++        column_types=tuple(column_types)
++        if len(column_types)!=len(headers):
++            raise ValueError('列类型与表头数量不一致')
++        _,registered,handler,defaults=self._output_formats[name]
++        options=dict(defaults);options.update(kwargs)
++        for processor in unique_items(tuple(preprocessors)+registered):
++            data,headers=processor(data,headers,column_types=column_types,**options)
++        return handler(data,headers,column_types=column_types,**options)
++
+     def _get_column_types(self, data):
+         """Get a list of the data types for each column in *data*."""
+         columns = list(zip_longest(*data))
+--- a/library/development_tests/test_development_ch_stream_dev.py
++++ b/library/development_tests/test_development_ch_stream_dev.py
+@@ -0,0 +1,42 @@
++"""公开惰性流式查询导出回归。"""
++import json
++import pytest
++from cli_helpers.tabular_output import TabularOutputFormatter
++
++def test_json_lines_do_not_prefetch_next_rows():
++    seen=[]
++    def rows():
++        for value in range(3):
++            seen.append(value)
++            yield [value]
++    output=TabularOutputFormatter('jsonl').stream_output(rows(),['n'],column_types=[int])
++    assert seen==[] and json.loads(next(output))=={'n':0} and seen==[0]
++    output.close()
++    assert seen==[0]
++
++def test_csv_header_does_not_consume_a_data_row():
++    seen=[]
++    def rows():
++        seen.append(1)
++        yield ['a,b']
++    output=TabularOutputFormatter('csv').stream_output(rows(),['name'],column_types=[str])
++    assert next(output)=='name' and seen==[]
++    assert next(output)=='"a,b"' and seen==[1]
++
++def test_explicit_column_types_and_supported_format_are_required():
++    formatter=TabularOutputFormatter('jsonl')
++    with pytest.raises(ValueError):
++        formatter.stream_output([],['n'])
++    with pytest.raises(ValueError):
++        formatter.stream_output([],['n'],column_types=[])
++    with pytest.raises(ValueError):
++        formatter.stream_output([],['n'],format_name='simple',column_types=[int])
++
++def test_late_row_error_propagates_after_already_yielded_rows():
++    def rows():
++        yield [1]
++        raise LookupError('synthetic')
++    output=TabularOutputFormatter('jsonl').stream_output(rows(),['n'],column_types=[int])
++    assert json.loads(next(output))=={'n':1}
++    with pytest.raises(LookupError):
++        next(output)
+--- a/library/docs/development-ch-stream-dev.md
++++ b/library/docs/development-ch-stream-dev.md
+@@ -0,0 +1,5 @@
++# 直接逐行导出查询结果而不缓存全部数据
++
++大查询结果直接逐行导出，明确列类型后复用原预处理器及适配器，不再推断并缓存全部数据。仅开放CSV、TSV和JSONL，格式默认值按调用复制，调用方停止消费后不读取后续行。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

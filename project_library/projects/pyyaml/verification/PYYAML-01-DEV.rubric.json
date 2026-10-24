@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYYAML-01-DEV",
+  "source_commit": "f5e4504a92f169f65350a1047dccb23bc97028be",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair SafeConstructor.flatten_mapping merge deduplication using constructed hashable YAML key semantics, not id(key_node.value) or raw spelling. Earlier sources in merge sequence win, local explicit keys still override, nested/single/multiple merge and semantically equal scalar keys (01/1, bool/int under existing Python mapping semantics) consistent. Invalid unhashable keys must raise marked ConstructorError. Preserve default YAML1.1 typing and original merge-node behavior; no arbitrary object equality policy change.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

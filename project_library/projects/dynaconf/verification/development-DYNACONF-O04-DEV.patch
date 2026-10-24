@@ -1,0 +1,109 @@
+--- a/library/docs/development-dynaconf-o04-dev.md
++++ b/library/docs/development-dynaconf-o04-dev.md
+@@ -0,0 +1,5 @@
++# 让无扩展名配置显式选择已启用的真实JSONTOMLYAML加载器
++
++对应路线08：load_file显式json/toml/yaml跳过Python猜测并优先后缀，复用真实BaseLoader读取/环境/单键/历史元数据；未知/未启用loader拒绝，不伪造扩展名。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dynaconf/base.py
++++ b/library/dynaconf/base.py
+@@ -1305,6 +1305,7 @@
+         key=None,
+         validate=empty,
+         run_hooks=True,
++        format=None,
+     ):
+         """Programmatically load files from ``path``.
+ 
+@@ -1320,6 +1321,8 @@
+         :param validate: Should trigger validation?
+         :param run_hooks: Should run collected hooks?
+         """
++        if format is not None and format not in ('json', 'toml', 'yaml'):
++            raise ValueError('显式格式只支持json/toml/yaml')
+         # 先整体规范化再产生任何加载副作用，silent不能吞程序参数类型错误。
+         if path is None:
+             files = []
+@@ -1361,7 +1364,7 @@
+                     identifier=_filename,
+                     env=env,
+                 )
+-                if py_loader.try_to_load_from_py_module_name(
++                if format is None and py_loader.try_to_load_from_py_module_name(
+                     obj=self,
+                     name=_filename,
+                     silent=True,
+@@ -1405,6 +1408,7 @@
+                         filename=path,
+                         validate=validate,
+                         identifier=source_metadata,
++                        format=format,
+                     )
+                     already_loaded.add(path)
+ 
+--- a/library/dynaconf/loaders/__init__.py
++++ b/library/dynaconf/loaders/__init__.py
+@@ -251,6 +251,7 @@
+     filename=None,
+     validate=False,
+     identifier="settings_loader",
++    format=None,
+ ):
+     """Loads from defined settings module
+ 
+@@ -263,6 +264,25 @@
+     :param validate: Validate the loaded data
+     :param identifier: Loader identifier
+     """
++    if format is not None:
++        from .base import BaseLoader
++        import json
++        from dynaconf.vendor import tomllib
++        from dynaconf.vendor.ruamel import yaml
++        readers = {'json': (json.load, json.loads, {'mode': 'r', 'encoding': obj.get('ENCODING_FOR_DYNACONF', 'utf8')}),
++                   'toml': (tomllib.load, tomllib.loads, {'mode': 'rb'}),
++                   'yaml': (yaml.safe_load, yaml.safe_load, {'mode': 'r', 'encoding': obj.get('ENCODING_FOR_DYNACONF', 'utf8')})}
++        if format not in readers:
++            raise ValueError('显式格式只支持json/toml/yaml')
++        enabled = {name.upper() for name in obj.get('CORE_LOADERS_FOR_DYNACONF') or ()}
++        if format.upper() not in enabled:
++            raise ValueError('指定的核心loader未启用')
++        file_reader, string_reader, opener = readers[format]
++        loader = BaseLoader(obj, env, 'explicit_' + format, ('',), file_reader, string_reader,
++                            opener_params=opener, validate=validate)
++        # 空后缀让BaseLoader明确把当前匹配项作为文件打开，不把路径误当配置正文解析。
++        loader.load(filename=ensure_a_list(filename), key=key, silent=silent)
++        return
+     if filename is None:
+         settings_module = settings_module or obj.settings_module
+         if not settings_module:  # pragma: no cover
+--- a/library/tests/test_development_dynaconf_o04_dev.py
++++ b/library/tests/test_development_dynaconf_o04_dev.py
+@@ -0,0 +1,26 @@
++"""无扩展名文件通过明确登记格式进入原BaseLoader及历史来源路径。"""
++from dynaconf import Dynaconf
++import pytest
++
++def test_extensionless_json_toml_yaml_load_real_content(tmp_path):
++    """三种固定内建读取器真实读取文件，不导入任意用户模块。@return None。"""
++    for format,text in [('json','{"VALUE":1}'),('toml','VALUE = 2'),('yaml','VALUE: 3')]:
++        path=tmp_path/('config-'+format);path.write_text(text)
++        settings=Dynaconf(environments=False);settings.load_file(path,format=format,silent=False)
++        assert settings.VALUE=={'json':1,'toml':2,'yaml':3}[format] and str(path) in settings._loaded_files
++
++def test_environment_sections_key_filter_extension_override_and_source_metadata(tmp_path):
++    """显式格式优先文件后缀，环境/单键选择仍沿BaseLoader规则。@return None。"""
++    path=tmp_path/'looks-like.yaml';path.write_text('{"default":{"VALUE":1,"OTHER":2},"production":{"VALUE":9}}')
++    settings=Dynaconf(environments=True,env='production');settings.load_file(path,format='json',key='VALUE')
++    assert settings.VALUE==9 and settings.get('OTHER') is None
++    assert any(getattr(metadata,'identifier',None)==str(path) for metadata in settings._loaded_by_loaders)
++
++def test_unknown_disabled_loader_and_bad_syntax_are_explicit(tmp_path):
++    """未登记或关闭的loader不能任意import，坏内容不伪成功。@return None。"""
++    path=tmp_path/'plain';path.write_text('bad-json')
++    settings=Dynaconf(environments=False)
++    with pytest.raises(ValueError):settings.load_file(path,format='python.module')
++    with pytest.raises(ValueError):settings.load_file(path,format='json',silent=False)
++    disabled=Dynaconf(environments=False,core_loaders=['TOML'])
++    with pytest.raises(ValueError):disabled.load_file(path,format='json')

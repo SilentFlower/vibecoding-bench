@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TEXTDISTANCE-06-DEV",
+  "source_commit": "d6a68d61088a40eef5c88191ccf79323dbf34850",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add textdistance.retrieval Match and extract(query, choices, scorer, k=5, direction=\"distance\", threshold=None, max_candidates=None). Stream (id,value) records through the actual scorer; maintain O(k) scored result storage with explicit lower-is-better distance or higher-is-better similarity, inclusive threshold and input-order stable ties. Return original id/value/score/index without comparing IDs or merging duplicates. k=0 must not consume choices. Bad score/nonfinite/bool values or insufficient candidate budget raise rather than return an apparently complete partial ranking. Keep scoring primitives unchanged and support ordinary callables and real built-in algorithms.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

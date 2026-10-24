@@ -187,6 +187,21 @@ class ProjectsAgentTests(unittest.TestCase):
             agent['available_objectives'])
         self.assertEqual('example', agent['passed'][0]['project_key'])
 
+    def test_six_hundred_objectives_keep_a_complete_model_index_without_duplicate_payload(self):
+        """600项保持完整可启动索引，未完成总数不再携带重复正文。:return: None。"""
+        self.activate()
+        objectives = [{'id': f'goal-{index}', 'goal': f'独立完整工程交付{index}'} for index in range(600)]
+        self.catalog.project = lambda key, detail=False: {'project_key': key, 'ready': True,
+            'objectives': objectives}
+        full = self.service.state(1)['agents'][0]
+        model = self.tool('account_state')['agents'][0]
+        self.assertEqual(600, model['remaining_objective_count'])
+        self.assertEqual({item['id'] for item in objectives},
+            {item['objective_id'] for item in model['available_objectives']})
+        self.assertEqual([], model['waiting_objectives'])
+        self.assertNotIn('remaining_objectives', model)
+        self.assertLess(len(json.dumps(model, ensure_ascii=False)), len(json.dumps(full, ensure_ascii=False)) * 0.6)
+
     def test_two_accounts_are_isolated_and_pool_cannot_be_extended_by_model(self):
         """同目标的两账号使用不同工作目录、会话与工具归属。:return: None。"""
         self.activate(1); self.activate(2)

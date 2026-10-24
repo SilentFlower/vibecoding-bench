@@ -1,0 +1,46 @@
+--- a/library/docs/development-python-frontmatter-02-dev.md
++++ b/library/docs/development-python-frontmatter-02-dev.md
+@@ -0,0 +1,5 @@
++# 带前导空白的文档保持真实格式及业务元数据
++
++路线02：导入器收到前导空行或空白时，格式识别与既有parse一致；check、load和loads保持TOML/YAML真实处理器，保留正文及已交付的content/handler业务元数据。显式handler不替换，不搜索正文中间的分隔符。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/frontmatter/__init__.py
++++ b/library/frontmatter/__init__.py
+@@ -38,6 +38,7 @@
+     ``handlers`` is a dictionary where keys are opening delimiters
+     and values are handler instances.
+     """
++    text = text.strip()
+     for handler in handlers:
+         if handler.detect(text):
+             return handler
+--- a/library/tests/test_development_python_frontmatter_02_dev.py
++++ b/library/tests/test_development_python_frontmatter_02_dev.py
+@@ -0,0 +1,25 @@
++"""前导空白文档的识别、读取及导出格式一致。"""
++import io
++import frontmatter
++from frontmatter.default_handlers import TOMLHandler, YAMLHandler
++
++
++def test_leading_toml_preserves_handler_and_business_keys():
++    """前导空行不得导致TOML被默认YAML导出。@return None。"""
++    text=' \r\n\t\n+++\ncontent="摘要"\nhandler="业务处理"\ntitle="中文"\n+++\n正文'
++    assert frontmatter.checks(text)
++    post=frontmatter.loads(text)
++    assert isinstance(post.handler,TOMLHandler)
++    assert post.metadata['content']=='摘要' and post.content=='正文'
++    restored=frontmatter.loads(frontmatter.dumps(post))
++    assert isinstance(restored.handler,TOMLHandler) and restored.metadata==post.metadata
++
++
++def test_check_load_and_explicit_handler_agree():
++    """文本流及显式处理器继续可用。@return None。"""
++    text='\n  \n---\nname: value\n---\nBody'
++    assert frontmatter.check(io.StringIO(text))
++    assert isinstance(frontmatter.load(io.StringIO(text)).handler,YAMLHandler)
++    handler=YAMLHandler()
++    assert frontmatter.loads(text,handler=handler).handler is handler
++    assert not frontmatter.checks(' \njust body \n')

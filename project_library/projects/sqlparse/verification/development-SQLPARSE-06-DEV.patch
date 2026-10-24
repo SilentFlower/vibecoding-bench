@@ -1,0 +1,83 @@
+--- a/library/docs/development-sqlparse-06-dev.md
++++ b/library/docs/development-sqlparse-06-dev.md
+@@ -0,0 +1,5 @@
++# 格式化工具可选择严格选项校验并定位真实拼写错误
++
++路线20：可选严格校验公开真实支持键的不可变集合，未知键包括None均定位并提示相近真实选项；已知值和组合仍按原验证。默认宽容、CLI元参数保持兼容，strict必须bool，不凭空注册未实现过滤器。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/sqlparse/__init__.py
++++ b/library/sqlparse/__init__.py
+@@ -54,7 +54,8 @@
+     :returns: The formatted SQL statement as string.
+     """
+     stack = engine.FilterStack()
+-    options = formatter.validate_options(options)
++    strict = options.pop('strict_options', False)
++    options = formatter.validate_options(options, strict=strict)
+     stack = formatter.build_filter_stack(stack, options)
+     stack.postprocess.append(filters.SerializerUnicode())
+     return "".join(stack.run(sql, encoding))
+--- a/library/sqlparse/formatter.py
++++ b/library/sqlparse/formatter.py
+@@ -7,12 +7,27 @@
+ 
+ """SQL formatter"""
+ 
++from difflib import get_close_matches
++
+ from sqlparse import filters
+ from sqlparse.exceptions import SQLParseError
+ 
+ 
+-def validate_options(options):
+-    """Validates options."""
++SUPPORTED_OPTIONS=frozenset(['keyword_case', 'identifier_case', 'output_format', 'strip_comments', 'use_space_around_operators', 'strip_whitespace', 'truncate_strings', 'truncate_char', 'indent_columns', 'reindent', 'reindent_aligned', 'indent_after_first', 'indent_tabs', 'indent_width', 'wrap_after', 'comma_first', 'compact', 'right_margin'])
++
++
++def validate_options(options,strict=False):
++    """校验真实格式选项，可选择拒绝未知键。@param options 选项字典。@param strict 严格未知键检查。@return 已规范选项。"""
++    if type(strict) is not bool:raise SQLParseError('strict必须为bool')
++    if strict:
++        unknown=sorted(set(options)-SUPPORTED_OPTIONS)
++        if unknown:
++            details=[]
++            for key in unknown:
++                suggestion=get_close_matches(key,SUPPORTED_OPTIONS,n=1)
++                details.append(key+(' -> '+suggestion[0] if suggestion else ''))
++            raise SQLParseError('未知格式选项: '+', '.join(details))
++
+     kwcase = options.get('keyword_case')
+     if kwcase not in [None, 'upper', 'lower', 'capitalize']:
+         raise SQLParseError('Invalid value for keyword_case: '
+--- a/library/tests/test_development_sqlparse_06_dev.py
++++ b/library/tests/test_development_sqlparse_06_dev.py
+@@ -0,0 +1,28 @@
++"""严格选项可定位拼写错误，默认宽容及CLI元参数兼容。"""
++import contextlib
++import io
++import tempfile
++import unittest
++from pathlib import Path
++import sqlparse
++from sqlparse.exceptions import SQLParseError
++
++
++def test_strict_unknown_key_suggestion_and_supported_manifest():
++    """包括值None的未知键也拒绝，提示真实近似键。@return None。"""
++    with unittest.TestCase().assertRaises(SQLParseError) as raised:sqlparse.format('select 1',strict_options=True,keyword_cases='upper')
++    assert 'keyword_cases' in str(raised.exception) and 'keyword_case' in str(raised.exception)
++    with unittest.TestCase().assertRaises(SQLParseError):sqlparse.format('select 1',strict_options=True,typo=None)
++    assert sqlparse.format('select 1',strict_options=True,keyword_case='upper')=='SELECT 1'
++    assert isinstance(sqlparse.formatter.SUPPORTED_OPTIONS,frozenset)
++
++
++def test_default_compatibility_and_cli_metadata():
++    """旧宽容调用保持；CLI自己的filename/outfile不误判为formatter错误。@return None。"""
++    assert sqlparse.format('select 1',keyword_cases='upper')=='select 1'
++    with tempfile.TemporaryDirectory() as temporary:
++        path=Path(temporary)/'query.sql';path.write_text('select 1')
++        output=io.StringIO()
++        with contextlib.redirect_stdout(output):assert sqlparse.cli.main([str(path),'-k','upper'])==0
++        assert output.getvalue()=='SELECT 1'
++    with unittest.TestCase().assertRaises(SQLParseError):sqlparse.format('select 1',strict_options='yes')

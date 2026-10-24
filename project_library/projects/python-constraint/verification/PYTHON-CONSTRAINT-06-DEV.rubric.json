@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-CONSTRAINT-06-DEV",
+  "source_commit": "d91ba03d1fd6acc30d64fd9d513dc0523f697b5b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add constraint.optimization.optimize(problem,objective,direction=\"min\",max_solutions=None) and immutable OptimizationResult(solution,score,examined,complete,reason). Enumerate actual feasible solutions through the selected solver iterator, preserve input-order first tie, snapshot assignments before objective/history and validate finite non-bool numeric scores. Full exhaustion proves optimal/unsatisfiable; reaching a strict nonnegative evaluation budget reports incomplete budget even when total may equal that boundary, without lookahead or false optimality. max_solutions=0 does not start iteration. Always close supported iterators on return/error; unsupported solver iteration remains an explicit capability error, never secretly materialize all solutions. Reuse earlier repeat-string and independent declared-domain behavior so running different objectives never mutates the model.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,304 @@
+{
+  "schema": 3,
+  "project_key": "funcy",
+  "title": "Funcy本地数据管道工作场景",
+  "category": "惰性、去重与副作用",
+  "description": "固定真实源码上的完整工程交付：按实际描述符名缓存属性并保护原始方法；缓存协程成功结果并管理同键并发取消失效和TTL；让资源工厂覆盖普通生成器和异步真实执行生命周期；迭代遍历真实嵌套树并交付带路径成对事件；按真实业务键稳定关联两份记录且保留全部重复组合；交付命名同步阶段及保留原始cause的业务流水线。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "b9943ce14cdc2a224cc36feefb14e2a48f42afcf6bb243c4089dd3068a76d2f7",
+  "environment": "funcy-py312",
+  "source": {
+    "repository": "https://github.com/Suor/funcy",
+    "commit": "e8febffd57f80db8ca3a55fb1edd0feee2290d61",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/docs/_static/nhpup_1.1.js",
+      "seed/app/Django-1.4-LICENSE.txt",
+      "seed/app/CC-BY-SA-3.0.html",
+      "seed/app/THIRD_PARTY_NOTICES.txt"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FUNCY-O01-DEV-SCENE",
+      "title": "按实际描述符名缓存属性并保护原始方法",
+      "goal": "按实际描述符名缓存属性并保护原始方法",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FUNCY-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FUNCY-O01-DEV",
+          "kind": "modify",
+          "goal": "按实际描述符名缓存属性并保护原始方法",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual cached_property/cached_readonly with __set_name__ and a shared real cache-key policy, so value=cached_property(calculate) caches under value and never shadows calculate. Preserve ordinary decorator behavior, inherited descriptors, class access, independent instances and cached_property manual set/delete while readonly remains protected. Reject the same descriptor bound under different names explicitly, retain legacy function-name fallback for manually unbound descriptors and fail clearly on no-__dict__ objects. Demonstrate evaluation count and method identity, not only metadata.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-funcy-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FUNCY-O01-DEV-contract.md",
+            "materials/FUNCY-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/funcy/objects.py",
+            "library/tests/test_development_funcy_o01_dev.py",
+            "library/docs/development-funcy-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FUNCY-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FUNCY-O01-DEV.native.json",
+            "public_native": "verification/FUNCY-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FUNCY-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "FUNCY-O02-DEV-SCENE",
+      "title": "缓存协程成功结果并管理同键并发取消失效和TTL",
+      "goal": "缓存协程成功结果并管理同键并发取消失效和TTL",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FUNCY-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FUNCY-O02-DEV",
+          "kind": "modify",
+          "goal": "缓存协程成功结果并管理同键并发取消失效和TTL",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd funcy.async_calc.amemoize/acache using real Funcy SkipMemory and positional-vs-keyword key policy. Cache completed successful values, never coroutine objects, isolate values/pending tasks per event loop, singleflight same-key concurrent calls and shield shared producer from one waiter cancellation. Failures/producer cancellation/SkipMemory never cache; canceled waiters may leave a producer running by documented policy. TTL uses injectable monotonic clock from completion, invalidation supports key_func and generation checks so a detached stale producer cannot overwrite newer cache. Provide invalidate/invalidate_all/cache_info, bounded expired cleanup on access and strict options without changing synchronous memoize/cache.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-funcy-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FUNCY-O02-DEV-contract.md",
+            "materials/FUNCY-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/funcy/async_calc.py",
+            "library/tests/test_development_funcy_o02_dev.py",
+            "library/docs/development-funcy-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FUNCY-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FUNCY-O02-DEV.native.json",
+            "public_native": "verification/FUNCY-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FUNCY-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FUNCY-O03-DEV-SCENE",
+      "title": "让资源工厂覆盖普通生成器和异步真实执行生命周期",
+      "goal": "让资源工厂覆盖普通生成器和异步真实执行生命周期",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FUNCY-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FUNCY-O03-DEV",
+          "kind": "modify",
+          "goal": "让资源工厂覆盖普通生成器和异步真实执行生命周期",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd funcy.scoped.wrap_with_factory(factory) without changing wrap_with(ctx). Create fresh no-arg managers per execution; normal sync calls use sync context, generators enter on first consumption and retain resource through yield/throw/close, coroutine and async-generator wrappers accept sync or async managers. Async generator aclose must close the wrapped generator before leaving the manager. Preserve original enter/exit failures, manager suppression policy, function metadata, original exception and cancellation cleanup. Prove repeated calls never reuse one-shot managers and resources remain open only during actual execution.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-funcy-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FUNCY-O03-DEV-contract.md",
+            "materials/FUNCY-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/funcy/scoped.py",
+            "library/tests/test_development_funcy_o03_dev.py",
+            "library/docs/development-funcy-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FUNCY-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FUNCY-O03-DEV.native.json",
+            "public_native": "verification/FUNCY-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FUNCY-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FUNCY-O04-DEV-SCENE",
+      "title": "迭代遍历真实嵌套树并交付带路径成对事件",
+      "goal": "迭代遍历真实嵌套树并交付带路径成对事件",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FUNCY-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FUNCY-O04-DEV",
+          "kind": "modify",
+          "goal": "迭代遍历真实嵌套树并交付带路径成对事件",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd funcy.walktree.tree_walk(root,*,children=None,follow=None,prune=None,max_depth=None), frozen WalkEvent(event,path,depth,node,pruned) and TreeCycleError(path). Default mapping keys/sequence indexes use real Funcy is_seqcont, keeping text/bytes leaves; explicit children yields labeled edges. Generate stable lazy pre/post events with an iterative stack, prune before children access and support nonnegative depth cap. Detect ancestor cycles by identity while allowing shared acyclic nodes under separate paths, propagate callbacks/source errors and leave inputs unchanged. Prove deep 1500-level trees, exact event order and balanced pruned nodes without changing old tree_nodes/leaves.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-funcy-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FUNCY-O04-DEV-contract.md",
+            "materials/FUNCY-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/funcy/walktree.py",
+            "library/tests/test_development_funcy_o04_dev.py",
+            "library/docs/development-funcy-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FUNCY-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FUNCY-O04-DEV.native.json",
+            "public_native": "verification/FUNCY-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FUNCY-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FUNCY-O05-DEV-SCENE",
+      "title": "按真实业务键稳定关联两份记录且保留全部重复组合",
+      "goal": "按真实业务键稳定关联两份记录且保留全部重复组合",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FUNCY-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FUNCY-O05-DEV",
+          "kind": "modify",
+          "goal": "按真实业务键稳定关联两份记录且保留全部重复组合",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd funcy.relations.join_by(left,right,left_key,right_key=None,*,how=\"inner\") and frozen JoinPair(left,right,left_present,right_present). Use exact string fields or real Funcy make_func index/callable selectors, materialize right once then lazily consume left, producing every duplicate-key Cartesian pair in left/right order. Support inner/left/full and append unmatched right rows in original order. None is a legal key/record distinguished from absence by presence flags, unhashable keys and callback/input errors propagate. Never mutate/merge record fields or silently overwrite duplicates; state right-side memory cost and leave existing collection join/group_by untouched.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-funcy-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FUNCY-O05-DEV-contract.md",
+            "materials/FUNCY-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/funcy/relations.py",
+            "library/tests/test_development_funcy_o05_dev.py",
+            "library/docs/development-funcy-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FUNCY-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FUNCY-O05-DEV.native.json",
+            "public_native": "verification/FUNCY-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FUNCY-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FUNCY-O06-DEV-SCENE",
+      "title": "交付命名同步阶段及保留原始cause的业务流水线",
+      "goal": "交付命名同步阶段及保留原始cause的业务流水线",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FUNCY-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FUNCY-O06-DEV",
+          "kind": "modify",
+          "goal": "交付命名同步阶段及保留原始cause的业务流水线",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd funcy.pipeline Stage, Pipeline and PipelineResult using real Funcy make_func selectors. Validate unique nonempty names, callable optional input/output adapters and explicit raise/report policy. Run stages once in order with unary function protocol; an empty pipeline is identity, optional run(report=True) returns final value plus stage-only events without retaining inputs/intermediate business values. Default PipelineStageError carries name/index/input-function-output phase and original __cause__; report policy returns fixed failure result and stops later stages, omitting value-bearing exception text. Reject async stages/awaitable results explicitly, preserve original compose/rcompose and no implicit retry.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-funcy-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FUNCY-O06-DEV-contract.md",
+            "materials/FUNCY-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/funcy/pipeline.py",
+            "library/tests/test_development_funcy_o06_dev.py",
+            "library/docs/development-funcy-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FUNCY-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FUNCY-O06-DEV.native.json",
+            "public_native": "verification/FUNCY-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FUNCY-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

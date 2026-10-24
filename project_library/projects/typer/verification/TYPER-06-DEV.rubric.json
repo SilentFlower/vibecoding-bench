@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TYPER-06-DEV",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add real shop.py low-stock CATALOG --threshold NONNEGATIVE_INT --output NEW_CSV. Validate catalog first, include quantity zero and exact threshold, stable ascending quantity order with original-order ties. CSV header sku/name/quantity always present including empty selection; Unicode, commas, quotes and multiline names preserve csv roundtrip. Publish new report with exclusive atomic output helper, preserve input bytes and existing reports, reject negative threshold/bad catalog. Print selected count/total selected quantity/threshold only after success. Keep all prior inventory/product/export commands and fixed Typer unchanged; report is a real generated application artifact, not advice or documentation.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

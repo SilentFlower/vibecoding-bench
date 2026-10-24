@@ -1,0 +1,67 @@
+--- a/library/chardet/batch.py
++++ b/library/chardet/batch.py
+@@ -0,0 +1,31 @@
++"""保留记录标识和局部错误的惰性批量检测。"""
++from chardet import detect
++
++
++def detect_many(records, *, on_error='continue', should_rename_legacy=False):
++    """逐条创建真实检测会话，不跨记录残留状态。
++
++    :param records: (id, bytes/bytearray)记录的可迭代输入。
++    :param on_error: continue、stop或raise。
++    :param should_rename_legacy: 沿用实际detect选项。
++    :return: index/id/result/error记录迭代器；局部失败不记为成功。
++    """
++    if isinstance(records, (str, bytes, bytearray)):
++        raise TypeError('批输入必须为记录序列')
++    if on_error not in ('continue', 'stop', 'raise'):
++        raise ValueError('未知批处理错误政策')
++    for index, record in enumerate(records, 1):
++        identifier = None
++        try:
++            if not isinstance(record, (tuple, list)) or len(record) != 2:
++                raise TypeError('记录须为id和字节pair')
++            identifier, payload = record
++            result = dict(detect(payload, should_rename_legacy=should_rename_legacy))
++        except (TypeError, ValueError) as error:
++            if on_error == 'raise':
++                raise
++            yield {'index': index, 'id': identifier, 'result': None, 'error': type(error).__name__}
++            if on_error == 'stop':
++                return
++        else:
++            yield {'index': index, 'id': identifier, 'result': result, 'error': None}
+--- a/library/docs/development-chardet-o04-dev.md
++++ b/library/docs/development-chardet-o04-dev.md
+@@ -0,0 +1,5 @@
++# 逐条检测带标识记录并隔离局部失败
++
++惰性处理带id字节pair，每条调用独立真实detect并保留编号、顺序及重复id。局部错误无成功结果，继续/停止/抛错政策明确，停止和close不读尾部，整bytes不可误当批次。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_chardet_o04_dev.py
++++ b/library/tests/test_development_chardet_o04_dev.py
+@@ -0,0 +1,22 @@
++"""批检测保留标识和顺序，坏记录后可恢复。"""
++def test_ids_local_errors_and_duplicate_ids():
++    """重复id不丢记录，非法载荷只是局部失败。@return None。"""
++    from chardet.batch import detect_many
++    rows = list(detect_many([('same', b'abc'), ('bad', 'text'), ('same', b'def')]))
++    assert [row['id'] for row in rows] == ['same', 'bad', 'same']
++    assert rows[0]['result']['encoding'] == 'ascii' and rows[1]['result'] is None and rows[2]['error'] is None
++
++def test_lazy_and_stop():
++    """首条只消费首条，stop不执行尾部。@return None。"""
++    from chardet.batch import detect_many
++    source = iter([('one', b'abc'), ('bad', 3), ('tail', b'x')])
++    rows = detect_many(source, on_error='stop')
++    assert next(rows)['id'] == 'one'
++    assert len(list(rows)) == 1 and next(source)[0] == 'tail'
++
++def test_raise_and_input_shape():
++    """fail-fast和整bytes误用明确失败。@return None。"""
++    import pytest
++    from chardet.batch import detect_many
++    with pytest.raises(TypeError): list(detect_many([('x', 3)], on_error='raise'))
++    with pytest.raises(TypeError): list(detect_many(b'not records'))

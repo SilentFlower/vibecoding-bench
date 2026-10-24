@@ -1,0 +1,70 @@
+--- a/library/docs/development-pyyaml-05-dev.md
++++ b/library/docs/development-pyyaml-05-dev.md
+@@ -0,0 +1,5 @@
++# 安全配置加载显式限制文本节点深度和别名预算
++
++路线06：显式str入口限制字符/非别名节点/根为1深度/别名引用，组合前带位置拒绝；空文档零预算合法、安全图身份和清理保持，不冒充流/字节预算。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/lib/yaml/limits.py
++++ b/library/lib/yaml/limits.py
+@@ -0,0 +1,39 @@
++"""显式文本输入的安全加载预算，在组合阶段及时拒绝超限。"""
++from yaml.loader import SafeLoader
++from yaml.events import AliasEvent
++from yaml.composer import ComposerError
++from yaml.error import YAMLError
++
++
++class LimitedSafeLoader(SafeLoader):
++    """只处理已解码文本，限制字符、唯一节点、路径深度和别名引用。"""
++    def __init__(self,stream,*,max_chars=None,max_nodes=None,max_depth=None,max_aliases=None):
++        """验证预算并初始化。@param stream str文本。@param max_chars 字符上限。@param max_nodes 非别名节点。@param max_depth 根为1。@param max_aliases 别名引用。@return None。"""
++        if not isinstance(stream,str):raise TypeError("有限加载入口要求str文本")
++        for value in (max_chars,max_nodes,max_depth,max_aliases):
++            if value is not None and (type(value) is not int or value<0):raise ValueError("预算须非负整数或None")
++        if max_chars is not None and len(stream)>max_chars:raise YAMLError("超过文本字符预算")
++        self._max_nodes=max_nodes;self._max_depth=max_depth;self._max_aliases=max_aliases
++        self._nodes_seen=0;self._aliases_seen=0;self._depth_seen=0
++        super().__init__(stream)
++
++    def compose_node(self,parent,index):
++        """每个真实节点/别名入口先校验，finally释放路径深度。"""
++        alias=self.check_event(AliasEvent)
++        if alias:self._aliases_seen+=1
++        else:self._nodes_seen+=1
++        depth=self._depth_seen+1
++        if ((self._max_nodes is not None and self._nodes_seen>self._max_nodes)
++            or (self._max_aliases is not None and self._aliases_seen>self._max_aliases)
++            or (self._max_depth is not None and depth>self._max_depth)):
++            raise ComposerError(None,None,"超过加载预算",self.peek_event().start_mark)
++        self._depth_seen=depth
++        try:return super().compose_node(parent,index)
++        finally:self._depth_seen-=1
++
++
++def load_limited(text,**limits):
++    """按显式预算加载单文档。@param text 已解码YAML。@param limits LimitedSafeLoader预算。@return 安全构造结果。"""
++    loader=LimitedSafeLoader(text,**limits)
++    try:return loader.get_single_data()
++    finally:loader.dispose()
+--- a/library/tests/test_development_pyyaml_05_dev.py
++++ b/library/tests/test_development_pyyaml_05_dev.py
+@@ -0,0 +1,17 @@
++"""小型合成输入证明节点/深度/别名预算，不制造资源攻击。"""
++import unittest
++from yaml.limits import load_limited
++from yaml import YAMLError
++
++def test_under_limits_and_exact_counts_preserve_values():
++    """根序列+两标量共3唯一节点，根深度1。@return None。"""
++    assert load_limited('[a,b]',max_nodes=3,max_depth=2,max_chars=5)==['a','b']
++    assert load_limited('a: &a [1]\nb: *a',max_aliases=1)['a']==[1]
++    assert load_limited('',max_nodes=0,max_depth=0) is None
++
++def test_each_budget_rejects_with_mark_where_available():
++    """0别名/不足节点/过深和字符超限均明确YAMLError。@return None。"""
++    for text,limits in (('[a,b]',{'max_nodes':2}),('[[a]]',{'max_depth':2}),('a: &a [1]\nb: *a',{'max_aliases':0}),('hello',{'max_chars':4})):
++        with unittest.TestCase().assertRaises(YAMLError):load_limited(text,**limits)
++    with unittest.TestCase().assertRaises(TypeError):load_limited(b'hello')
++    with unittest.TestCase().assertRaises(ValueError):load_limited('hello',max_nodes=True)

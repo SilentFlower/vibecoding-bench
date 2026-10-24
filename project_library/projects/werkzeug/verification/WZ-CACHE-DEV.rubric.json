@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WZ-CACHE-DEV",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement werkzeug.conditional_json.cacheable_json(value,request,*,offers=(\"application/json\",),max_age=0) using completed negotiated_json.json_response. Permit GET/HEAD only, compute strong ETag from actual selected UTF8 representation bytes, set public/max-age and reuse real Response.apply_conditions for If-None-Match/If-Match ordering and native 304/412 behavior. Retain Vary Accept and normal HEAD wire semantics. Changed representation must change ETag, matching GET/HEAD response has no wire body. Validate nonnegative integer age, preserve request and avoid reimplementing ETag comparison with substrings.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

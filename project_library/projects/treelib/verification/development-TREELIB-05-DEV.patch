@@ -1,0 +1,75 @@
+--- a/library/docs/development-treelib-05-dev.md
++++ b/library/docs/development-treelib-05-dev.md
+@@ -0,0 +1,5 @@
++# 树存档迁移前只读报告索引、父子、环和不可达结构问题
++
++路线15：迁移审查新增只读结构诊断，定位索引、根、双向父子、重复指针、环及不可达项，明确当前tree_id作用域。迭代处理深树，多问题同时报告，不自动修复或误称业务data已验证。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_treelib_05_dev.py
++++ b/library/tests/test_development_treelib_05_dev.py
+@@ -0,0 +1,22 @@
++"""公开可变节点映射损坏后给出真实证据，不静默改关系。"""
++from treelib import Tree
++from treelib.integrity import validate_structure
++
++
++def test_healthy_empty_and_shared_view_have_no_findings():
++    """别的tree_id的合法关系不误报。@return None。"""
++    assert validate_structure(Tree())==[]
++    tree=Tree();tree.create_node('R','r');tree.create_node('C','c',parent='r')
++    view=tree.subtree('c')
++    assert validate_structure(tree)==validate_structure(view)==[]
++
++
++def test_corruption_is_localized_and_not_repaired():
++    """重复/缺子与缺反向父引用均报告且保持原状。@return None。"""
++    tree=Tree();tree.create_node('R','r');tree.create_node('C','c',parent='r')
++    tree['r'].set_successors(['c','c','lost'],tree.identifier)
++    tree['c'].set_predecessor('missing',tree.identifier)
++    before=list(tree['r'].successors(tree.identifier))
++    result=validate_structure(tree);codes={item['code'] for item in result}
++    assert {'duplicate_child','missing_child','missing_parent','child_parent_mismatch'}<=codes
++    assert tree['r'].successors(tree.identifier)==before
+--- a/library/treelib/integrity.py
++++ b/library/treelib/integrity.py
+@@ -0,0 +1,39 @@
++"""只读诊断当前tree_id下的真实结构，不自动修复业务存档。"""
++
++
++def validate_structure(tree):
++    """返回可定位的结构问题。@param tree 真实Tree。@return 稳定诊断字典列表。"""
++    findings=[]
++    def add(code,identity,related=None):
++        """记录结构证据。@param code 原因。@param identity 节点。@param related 相关标识。@return None。"""
++        findings.append({'code':code,'id':identity,'related':related})
++    if not tree.nodes:
++        if tree.root is not None:add('empty_root',tree.root)
++        return findings
++    if tree.root not in tree.nodes:add('missing_root',tree.root)
++    for identity,node in tree.nodes.items():
++        if identity!=node.identifier:add('index_identity',identity,node.identifier)
++        parent=node.predecessor(tree.identifier)
++        if identity==tree.root and parent is not None:add('root_parent',identity,parent)
++        elif identity!=tree.root:
++            if parent not in tree.nodes:add('missing_parent',identity,parent)
++            elif identity not in tree[parent].successors(tree.identifier):add('missing_backlink',identity,parent)
++        seen=set()
++        for child in node.successors(tree.identifier):
++            if child in seen:add('duplicate_child',identity,child)
++            seen.add(child)
++            if child not in tree.nodes:add('missing_child',identity,child)
++            elif tree[child].predecessor(tree.identifier)!=identity:add('child_parent_mismatch',identity,child)
++    visited=set();active=set()
++    # 显式入/出栈避免深树递归上限，同时能区分路径内环和普通已访问关系。
++    pending=[(tree.root,False)] if tree.root in tree.nodes else []
++    while pending:
++        identity,leaving=pending.pop()
++        if leaving:active.discard(identity);continue
++        if identity in active:add('cycle',identity);continue
++        if identity in visited or identity not in tree.nodes:continue
++        visited.add(identity);active.add(identity);pending.append((identity,True))
++        pending.extend((child,False) for child in reversed(tree[identity].successors(tree.identifier)))
++    for identity in tree.nodes:
++        if identity not in visited:add('unreachable',identity)
++    return findings

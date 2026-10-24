@@ -1,0 +1,13 @@
+{
+  "script": "verification/AG-WEIGHTED-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 6,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_ag_weighted_dev.py"
+}

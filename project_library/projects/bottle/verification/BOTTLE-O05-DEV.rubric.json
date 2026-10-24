@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BOTTLE-O05-DEV",
+  "source_commit": "8ec5fe29420d14998c0d86885083983eaea8b839",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add FileUpload.save_atomic(destination, *, overwrite=False, chunk_size=65536) for real path/directory targets. Complete copying in a private same-directory temporary file before publication; overwrite=True atomically replaces, False uses exclusive publication that cannot overwrite a competitor. Restore original input cursor on success and read/write/replace failures, preserve existing destination bytes on failures, clean only owned temporary files and validate positive chunk sizes. Leave existing save/stream behavior unchanged and do not claim crash durability.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

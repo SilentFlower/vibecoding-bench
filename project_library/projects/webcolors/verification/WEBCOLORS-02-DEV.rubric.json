@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WEBCOLORS-02-DEV",
+  "source_commit": "6c8da6832eb4ae2591a1883a0d1371263d6cd4db",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix html5_parse_legacy_color to strip only ASCII space, TAB, LF, FF and CR, leaving NBSP, vertical tab and other Unicode whitespace for the existing legacy replacement/padding algorithm. Preserve named colors, short hex, BMP/non-BMP handling, 128-character truncation, transparent rejection and the separate strict HTML simple-color contract. NBSP-red-NBSP must produce (0,237,0), not silently become red. Whitespace-only input follows the existing legacy padding path. This is a real parser repair, not a generic trim helper.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

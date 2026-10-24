@@ -1,0 +1,94 @@
+--- a/library/docs/development-flask-o03-dev.md
++++ b/library/docs/development-flask-o03-dev.md
+@@ -0,0 +1,5 @@
++# 在实际配置对象聚合必填类型枚举范围与嵌套路径诊断
++
++对应路线03：Config显式聚合required/type/nullable/choices/范围/properties，缺失和None区分、bool不冒充int、嵌套路径明确；不转换/修改/泄漏值，原字典加载保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/flask/config.py
++++ b/library/src/flask/config.py
+@@ -98,6 +98,57 @@
+     ) -> None:
+         super().__init__(defaults or {})
+         self.root_path = root_path
++
++    def validate(self, constraints):
++        """聚合配置必填、类型、枚举、范围及嵌套约束，不输出业务值。
++
++        :param constraints: 键到required/type/nullable/choices/minimum/maximum/properties规则的映射。
++        :return: 含path和code的错误列表；不隐式转换或修改配置。
++        """
++        errors = []
++        def inspect_rules(values, rules, prefix):
++            """按明确路径遍历规则，每项事实独立报告。@return None。"""
++            for key, rule in rules.items():
++                if not isinstance(key, str) or not isinstance(rule, dict):
++                    raise TypeError('约束必须为字符串键和规则映射')
++                unknown = set(rule) - {'required', 'type', 'nullable', 'choices', 'minimum', 'maximum', 'properties'}
++                if unknown:
++                    raise ValueError('未知配置约束')
++                path = prefix + [key]
++                if key not in values:
++                    if rule.get('required', False):
++                        errors.append({'path': path, 'code': 'required'})
++                    continue
++                value = values[key]
++                if value is None:
++                    if not rule.get('nullable', False):
++                        errors.append({'path': path, 'code': 'null'})
++                    continue
++                expected = rule.get('type')
++                if expected is not None:
++                    types = expected if isinstance(expected, tuple) else (expected,)
++                    if not types or not all(isinstance(item, type) for item in types):
++                        raise TypeError('type约束必须为类型或非空类型tuple')
++                    if not isinstance(value, types) or isinstance(value, bool) and bool not in types and any(item in (int, float) for item in types):
++                        errors.append({'path': path, 'code': 'type'})
++                        continue
++                if 'choices' in rule and value not in rule['choices']:
++                    errors.append({'path': path, 'code': 'choices'})
++                for name, comparison in [('minimum', lambda left, right: left < right), ('maximum', lambda left, right: left > right)]:
++                    if name in rule:
++                        try:
++                            invalid = comparison(value, rule[name])
++                        except TypeError:
++                            invalid = True
++                        if invalid:
++                            errors.append({'path': path, 'code': name})
++                if 'properties' in rule:
++                    if not isinstance(value, dict):
++                        errors.append({'path': path, 'code': 'object'})
++                    else:
++                        inspect_rules(value, rule['properties'], path)
++        inspect_rules(self, constraints, [])
++        return errors
+ 
+     def from_envvar(self, variable_name: str, silent: bool = False) -> bool:
+         """Loads a configuration from an environment variable pointing to
+--- a/library/tests/test_development_flask_o03_dev.py
++++ b/library/tests/test_development_flask_o03_dev.py
+@@ -0,0 +1,23 @@
++"""工厂阶段聚合配置约束，只报告字段位置和约束不泄漏值。"""
++from flask import Flask
++import json
++
++def test_required_types_enum_ranges_and_nested_errors_aggregate():
++    """多个真实配置错误一次报告，并区分bool与int。@return None。"""
++    app=Flask(__name__);app.config.update(LIMIT=True,MODE='invalid-secret',STORE={'PORT':70000},TOKEN=None)
++    rules={'LIMIT':{'type':int,'minimum':1,'maximum':100},'MODE':{'choices':['safe']},'MISSING':{'required':True},'STORE':{'properties':{'PORT':{'type':int,'maximum':65535}}},'TOKEN':{'nullable':False}}
++    rows=app.config.validate(rules)
++    assert {(tuple(row['path']),row['code']) for row in rows}=={(('LIMIT',),'type'),(('MODE',),'choices'),(('MISSING',),'required'),(('STORE','PORT'),'maximum'),(('TOKEN',),'null')}
++    assert 'invalid-secret' not in json.dumps(rows) and app.config['LIMIT'] is True
++
++def test_valid_values_missing_optional_nullable_and_explicit_bool():
++    """合法值不转换，缺省可选与明确nullable各自有效。@return None。"""
++    app=Flask(__name__);app.config.update(LIMIT=20,MODE='safe',TOKEN=None,FLAG=True)
++    assert app.config.validate({'LIMIT':{'type':int,'minimum':1,'maximum':100},'MODE':{'choices':['safe']},'TOKEN':{'nullable':True},'ABSENT':{'type':str},'FLAG':{'type':bool}})==[]
++    assert type(app.config['LIMIT']) is int
++
++def test_literal_dotted_keys_nested_missing_and_nonobject_are_distinct():
++    """点号键按原字典键，嵌套用properties明确表示，类型错误不写配置。@return None。"""
++    app=Flask(__name__);app.config.update({'LITERAL.KEY':'ok','STORE':{},'NOT_OBJECT':3})
++    rows=app.config.validate({'LITERAL.KEY':{'type':str},'STORE':{'properties':{'VALUE':{'required':True}}},'NOT_OBJECT':{'properties':{'VALUE':{'required':True}}}})
++    assert rows==[{'path':['STORE','VALUE'],'code':'required'},{'path':['NOT_OBJECT'],'code':'object'}]

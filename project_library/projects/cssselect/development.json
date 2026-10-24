@@ -1,0 +1,301 @@
+{
+  "schema": 3,
+  "project_key": "cssselect",
+  "title": "CSS选择器查询工作场景",
+  "category": "HTML/XML本地查询",
+  "description": "固定真实源码上的完整工程交付：一次编译并复用不可变选择器组事实；保留业务标识并隔离批量选择器局部失败；提供模式隔离且可观测的有界选择器翻译缓存；为真实翻译器注册实例隔离的受控伪类插件；按真实HTML资格完整区分必填与可选控件；按静态HTML编辑继承和表单状态生成互补选择器。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "1175124842cac78ebeadc0a97112754cb386f78d06dad744b7f691443d25ef2e",
+  "environment": "cssselect-py312",
+  "source": {
+    "repository": "https://github.com/scrapy/cssselect",
+    "commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/AUTHORS"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CSSSELECT-O01-DEV-SCENE",
+      "title": "一次编译并复用不可变选择器组事实",
+      "goal": "一次编译并复用不可变选择器组事实",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSSSELECT-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSSSELECT-O01-DEV",
+          "kind": "modify",
+          "goal": "一次编译并复用不可变选择器组事实",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.compiled.compile_selector(css, *, mode=\"xml\", xhtml=False, prefix=\"descendant-or-self::\") returning frozen CompiledSelector with canonical tuple, per-branch specificity tuple, XPath, mode, xhtml and prefix. Parse the complete real selector group once, never split literal commas, use actual selector_to_xpath with pseudo-element rejection and retain original exceptions. Support XML/HTML/XHTML casing and explicit prefixes, reject invalid mode/type combinations. Store no mutable parse tree or bound document and add no lxml runtime dependency; callers can evaluate the same XPath against multiple actual trees.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSSSELECT-O01-DEV-contract.md",
+            "materials/CSSSELECT-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/cssselect/compiled.py",
+            "library/tests/test_development_cssselect_o01_dev.py",
+            "library/docs/development-cssselect-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSSSELECT-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSSSELECT-O01-DEV.native.json",
+            "public_native": "verification/CSSSELECT-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSSSELECT-O01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSSSELECT-O02-DEV-SCENE",
+      "title": "保留业务标识并隔离批量选择器局部失败",
+      "goal": "保留业务标识并隔离批量选择器局部失败",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSSSELECT-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSSSELECT-O02-DEV",
+          "kind": "modify",
+          "goal": "保留业务标识并隔离批量选择器局部失败",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.batch.translate_many(records, *, translator=None, prefix=\"descendant-or-self::\", fail_fast=False) as a lazy ordered iterator of records {id,css,ok,xpath,error}. Each input is (id, complete CSS group), including duplicate IDs; never concatenate groups or split commas. Catch only actual SelectorSyntaxError/ExpressionError into parse/translate diagnostics without value-bearing messages; continue other records, with explicit fail-fast rethrow. Forward actual translator and prefix, consume only requested inputs, propagate upstream generator and programmer errors and support empty batches.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSSSELECT-O02-DEV-contract.md",
+            "materials/CSSSELECT-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/cssselect/batch.py",
+            "library/tests/test_development_cssselect_o02_dev.py",
+            "library/docs/development-cssselect-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSSSELECT-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSSSELECT-O02-DEV.native.json",
+            "public_native": "verification/CSSSELECT-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSSSELECT-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSSSELECT-O03-DEV-SCENE",
+      "title": "提供模式隔离且可观测的有界选择器翻译缓存",
+      "goal": "提供模式隔离且可观测的有界选择器翻译缓存",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSSSELECT-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSSSELECT-O03-DEV",
+          "kind": "modify",
+          "goal": "提供模式隔离且可观测的有界选择器翻译缓存",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.cache.SelectorCache(capacity=128) with translate(css, *, mode=\"xml\", xhtml=False, prefix=...), stats(), clear(reset_stats=False). Cache actual builtin XML/HTML translation by complete CSS and every supported mode/XHTML/prefix field; no arbitrary custom translator sharing without fingerprint. Enforce positive non-bool capacity, true access-order LRU, isolated instances, fresh stats and lock-protected consistent concurrent access. Count failures as misses but never cache them. Preserve native parse/translation exceptions, old uncached APIs, and explicit clear/stat-reset semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSSSELECT-O03-DEV-contract.md",
+            "materials/CSSSELECT-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/cssselect/cache.py",
+            "library/tests/test_development_cssselect_o03_dev.py",
+            "library/docs/development-cssselect-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSSSELECT-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSSSELECT-O03-DEV.native.json",
+            "public_native": "verification/CSSSELECT-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSSSELECT-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSSSELECT-O04-DEV-SCENE",
+      "title": "为真实翻译器注册实例隔离的受控伪类插件",
+      "goal": "为真实翻译器注册实例隔离的受控伪类插件",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSSSELECT-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSSSELECT-O04-DEV",
+          "kind": "modify",
+          "goal": "为真实翻译器注册实例隔离的受控伪类插件",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.extensions.PluginTranslator and HTMLPluginTranslator using an instance-local registry without replacing existing subclass mechanisms. register_pseudo(name, callback, *, functional=False,min_args=0,max_args=None,version=\"1\") validates literal names, arity, callable/version, refuses duplicates or builtin static/function names, and returns self. Static callbacks receive actual XPathExpr; functions additionally receive the real Function/Token node. Validate invocation form, arity and XPathExpr return type. Preserve normal XML/HTML/XHTML behavior and native callbacks/errors; expose deterministic extension_fingerprint capability/version declarations and ensure registry isolation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSSSELECT-O04-DEV-contract.md",
+            "materials/CSSSELECT-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/cssselect/extensions.py",
+            "library/tests/test_development_cssselect_o04_dev.py",
+            "library/docs/development-cssselect-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSSSELECT-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSSSELECT-O04-DEV.native.json",
+            "public_native": "verification/CSSSELECT-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSSSELECT-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSSSELECT-O05-DEV-SCENE",
+      "title": "按真实HTML资格完整区分必填与可选控件",
+      "goal": "按真实HTML资格完整区分必填与可选控件",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSSSELECT-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSSSELECT-O05-DEV",
+          "kind": "modify",
+          "goal": "按真实HTML资格完整区分必填与可选控件",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.formstates.FormStateTranslator(HTMLTranslator) supporting static :required and :optional. Eligible controls are select, textarea and input except hidden/range/color/button/submit/reset/image, with missing/unknown input type behaving as text and ASCII-insensitive type values. State is based on required attribute presence; disabled does not change this declaration state. The two states partition only eligible controls, not arbitrary nodes. Support unnamespaced HTML and XHTML namespace, excluding foreign same-name elements, and preserve all inherited translator APIs and GenericTranslator unsupported behavior.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSSSELECT-O05-DEV-contract.md",
+            "materials/CSSSELECT-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/cssselect/formstates.py",
+            "library/tests/test_development_cssselect_o05_dev.py",
+            "library/docs/development-cssselect-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSSSELECT-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSSSELECT-O05-DEV.native.json",
+            "public_native": "verification/CSSSELECT-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSSSELECT-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSSSELECT-O06-DEV-SCENE",
+      "title": "按静态HTML编辑继承和表单状态生成互补选择器",
+      "goal": "按静态HTML编辑继承和表单状态生成互补选择器",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSSSELECT-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSSSELECT-O06-DEV",
+          "kind": "modify",
+          "goal": "按静态HTML编辑继承和表单状态生成互补选择器",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.editable.EditableStateTranslator supporting :read-write/:read-only as exact complements in the selected tree scope. Text-like input/textarea require no readonly/disabled and use the inherited static fieldset-disabled policy; exclude hidden/range/color/button/submit/reset/image/checkbox/radio/file inputs. Form controls never become editable merely from contenteditable ancestors. Other elements inherit the nearest valid contenteditable empty/true/plaintext-only/false declaration case-insensitively; invalid values inherit, false blocks. Support XHTML namespaced declarations, default read-only, preserve GenericTranslator rejection and document snapshot limitations (no scripts/designMode or improved fieldset approximation).\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSSSELECT-O06-DEV-contract.md",
+            "materials/CSSSELECT-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/cssselect/editable.py",
+            "library/tests/test_development_cssselect_o06_dev.py",
+            "library/docs/development-cssselect-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSSSELECT-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSSSELECT-O06-DEV.native.json",
+            "public_native": "verification/CSSSELECT-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSSSELECT-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

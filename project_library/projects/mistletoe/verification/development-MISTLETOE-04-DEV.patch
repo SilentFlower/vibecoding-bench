@@ -1,0 +1,60 @@
+--- a/library/docs/development-mistletoe-04-dev.md
++++ b/library/docs/development-mistletoe-04-dev.md
+@@ -0,0 +1,5 @@
++# 目录过滤配置按实例快照并支持一次性迭代器
++
++路线04：修复默认共享列表及外部可变列表泄漏，每个目录渲染器快照自己的过滤条件；支持tuple与一次性generator，不吞回调异常。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/mistletoe/contrib/toc_renderer.py
++++ b/library/mistletoe/contrib/toc_renderer.py
+@@ -13,7 +13,7 @@
+     """
+     Extends HtmlRenderer class for table of contents support.
+     """
+-    def __init__(self, *extras, depth=5, omit_title=True, filter_conds=[], **kwargs):
++    def __init__(self, *extras, depth=5, omit_title=True, filter_conds=None, **kwargs):
+         """
+         Args:
+             extras (list): allows subclasses to add even more custom tokens.
+@@ -28,7 +28,7 @@
+         self._headings = []
+         self.depth = depth
+         self.omit_title = omit_title
+-        self.filter_conds = filter_conds
++        self.filter_conds = list(filter_conds) if filter_conds is not None else []
+ 
+     @property
+     def toc(self):
+--- a/library/tests/test_development_mistletoe_04_dev.py
++++ b/library/tests/test_development_mistletoe_04_dev.py
+@@ -0,0 +1,29 @@
++"""目录过滤器由每个实例持有独立快照。"""
++from mistletoe import Document
++from mistletoe.contrib.toc_renderer import TocRenderer
++
++
++def test_default_instances_are_isolated():
++    """修改一个实例不会污染另一个文档。@return None。"""
++    with TocRenderer() as first, TocRenderer() as second:
++        first.filter_conds.append(lambda value:True)
++        assert second.filter_conds==[]
++        second.render(Document('## shown\n'))
++        assert second._headings==[(2,'shown')]
++
++
++def test_external_iterables_snapshot_and_order():
++    """列表、元组及生成器均按顺序快照且不修改调用者。@return None。"""
++    seen=[]
++    def condition(value):
++        """记录调用次序。@param value 标题。@return 不过滤。"""
++        seen.append(value)
++        return False
++    supplied=[condition]
++    with TocRenderer(filter_conds=supplied) as renderer:
++        supplied.clear()
++        renderer.render(Document('## kept\n'))
++        assert seen==['kept'] and renderer._headings==[(2,'kept')]
++    with TocRenderer(filter_conds=(fn for fn in [condition])) as renderer:
++        renderer.render(Document('## another\n'))
++        assert renderer._headings==[(2,'another')]

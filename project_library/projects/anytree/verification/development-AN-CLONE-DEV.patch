@@ -1,0 +1,110 @@
+--- a/library/development_tests/test_development_an_clone_dev.py
++++ b/library/development_tests/test_development_an_clone_dev.py
+@@ -0,0 +1,41 @@
++"""公开可编辑子树克隆回归。"""
++from copy import deepcopy
++import pytest
++from anytree import Node, AnyNode
++from anytree.util import clone_subtree
++
++def test_clone_has_independent_nodes_and_preserves_child_order():
++    root = Node('r', children=[Node('b'), Node('a')])
++    clone = clone_subtree(root)
++    assert isinstance(clone, AnyNode) and clone is not root and clone.parent is None
++    assert [node.name for node in clone.children] == ['b','a']
++    assert clone.children[0] is not root.children[0]
++
++def test_source_parent_chain_is_not_copied_or_moved():
++    parent = Node('outside')
++    root = Node('r', parent=parent)
++    clone = clone_subtree(root)
++    assert clone.parent is None and root.parent is parent and parent.children == (root,)
++
++def test_default_payload_copy_is_shallow_and_explicit_deepcopy_is_supported():
++    root = Node('r', data=[1])
++    shallow = clone_subtree(root)
++    deep = clone_subtree(root, copy_attributes=deepcopy)
++    assert shallow.data is root.data and deep.data == [1] and deep.data is not root.data
++
++def test_kwargs_factory_can_preserve_node_class():
++    root = Node('r', children=[Node('c')])
++    clone = clone_subtree(root, factory=Node)
++    assert isinstance(clone, Node) and clone.children[0].parent is clone
++
++def test_factory_cannot_reparent_an_original_node():
++    root = Node('r')
++    with pytest.raises(ValueError):
++        clone_subtree(root, factory=lambda **attrs: root)
++    assert root.parent is None and root.children == ()
++
++def test_copy_strategy_cannot_inject_structural_parent():
++    root = Node('r')
++    with pytest.raises(ValueError):
++        clone_subtree(root, copy_attributes=lambda attrs: dict(attrs, parent=root))
++    assert root.children == ()
+--- a/library/docs/development-an-clone-dev.md
++++ b/library/docs/development-an-clone-dev.md
+@@ -0,0 +1,5 @@
++# 以明确属性复制策略生成可独立编辑的分类子树
++
++分类分支需要生成独立编辑副本，再决定是否采用。新增clone_subtree，默认AnyNode和浅属性复制，显式工厂或深复制策略可调整；父链与结构字段不复制，不跟随target，所有新节点先验证再组装，工厂绝不能把源节点搬走。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/anytree/util/__init__.py
++++ b/library/src/anytree/util/__init__.py
+@@ -1,4 +1,6 @@
+ """Utilities."""
++
++from .clone import clone_subtree
+ 
+ 
+ def commonancestors(*nodes):
+--- a/library/src/anytree/util/clone.py
++++ b/library/src/anytree/util/clone.py
+@@ -0,0 +1,46 @@
++"""按显式属性复制策略构造独立子树，不复制父链或跟随链接目标。"""
++from collections.abc import Mapping
++
++
++def clone_subtree(node, *, factory=None, copy_attributes=None):
++    """复制节点及其children。@param node 原子树。@param factory kwargs节点工厂，默认AnyNode。
++    @param copy_attributes 属性映射复制回调，默认浅复制。@return 独立且无父节点的副本根。
++    """
++    from anytree.node import AnyNode, LightNodeMixin, NodeMixin
++
++    if factory is None:
++        factory = AnyNode
++    if copy_attributes is None:
++        copy_attributes = dict
++    if not callable(factory) or not callable(copy_attributes):
++        raise TypeError('节点工厂和属性复制策略必须可调用')
++    structural = {'parent', 'children', '_NodeMixin__parent', '_NodeMixin__children',
++        '_LightNodeMixin__parent', '_LightNodeMixin__children'}
++    sources, source_ids, stack = [], set(), [(node, None)]
++    while stack:
++        current, parent = stack.pop()
++        if id(current) in source_ids:
++            raise ValueError('子树包含环或重复节点身份')
++        if not hasattr(current, '__dict__'):
++            raise TypeError('克隆需要显式字典属性节点')
++        source_ids.add(id(current))
++        index = len(sources)
++        attributes = {key: value for key, value in current.__dict__.items() if key not in structural}
++        sources.append((current, parent, attributes))
++        stack.extend((child, index) for child in reversed(current.children))
++    copies, copy_ids = [], set()
++    for current, parent, attributes in sources:
++        attributes = copy_attributes(dict(attributes))
++        if not isinstance(attributes, Mapping) or set(attributes) & structural:
++            raise ValueError('复制策略必须返回不含结构字段的属性映射')
++        copied = factory(**dict(attributes))
++        if (not isinstance(copied, (NodeMixin, LightNodeMixin)) or id(copied) in source_ids
++                or id(copied) in copy_ids or copied.parent is not None or copied.children):
++            raise ValueError('节点工厂必须返回独立的空子级节点')
++        copies.append(copied)
++        copy_ids.add(id(copied))
++    # 所有工厂结果先验证再组装，不能因为返回原节点而移动用户正在编辑的源树。
++    for copied, (_, parent, _) in zip(copies, sources):
++        if parent is not None:
++            copied.parent = copies[parent]
++    return copies[0]

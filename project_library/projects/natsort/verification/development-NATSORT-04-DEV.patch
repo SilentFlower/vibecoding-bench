@@ -1,0 +1,70 @@
+--- a/library/docs/development-natsort-04-dev.md
++++ b/library/docs/development-natsort-04-dev.md
+@@ -0,0 +1,5 @@
++# 按原生自然策略稳定惰性归并有序记录流
++
++路线16：使用同一原生键惰性归并多份已排序流，支持降序、空流、记录key及严格乱序拒绝；不重排整个输入或吞异常，提前终止不再读取。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/natsort/merge.py
++++ b/library/natsort/merge.py
+@@ -0,0 +1,23 @@
++"""按同一自然键惰性归并已有序流。"""
++from heapq import merge
++from natsort import natsort_keygen, ns
++
++
++def merge_sorted(*iterables, key=None, alg=ns.DEFAULT, reverse=False, strict=True):
++    """稳定惰性归并并可验证各流顺序。@param iterables 已有序输入。@param key 提取器。@param alg 算法。@param reverse 降序。@param strict 拒绝乱序。@return 惰性结果。"""
++    natural=natsort_keygen(key=key,alg=alg)
++    def decorated(stream):
++        """每条流独立保存最后一键。@param stream 输入。@return 带键记录。"""
++        first=True;previous=None
++        for item in stream:
++            value=natural(item)
++            if strict and not first and (value>previous if reverse else value<previous):
++                raise ValueError('输入流不符合所选自然顺序')
++            first=False;previous=value
++            yield value,item
++    streams=[decorated(stream) for stream in iterables]
++    try:
++        for _,item in merge(*streams,key=lambda item:item[0],reverse=reverse):
++            yield item
++    finally:
++        for stream in streams:stream.close()
+--- a/library/tests/test_development_natsort_04_dev.py
++++ b/library/tests/test_development_natsort_04_dev.py
+@@ -0,0 +1,33 @@
++"""归并不全量排序输入，乱序可以被发现。"""
++import itertools
++import unittest
++from natsort.merge import merge_sorted
++
++
++def test_merge_and_equal_key_stream_order():
++    """相等自然键按流次序稳定保留。@return None。"""
++    assert list(merge_sorted(['x1','x10'],['x2','x20']))==['x1','x2','x10','x20']
++    assert list(merge_sorted(['x2'],['x02']))==['x2','x02']
++    assert list(merge_sorted(['x10','x2'],['x9','x1'],reverse=True))==['x10','x9','x2','x1']
++
++
++def test_strict_and_lazy_input():
++    """默认拒绝乱序，有限前缀不会读取无限流。@return None。"""
++    with unittest.TestCase().assertRaises(ValueError):list(merge_sorted(['x2','x1']))
++    seen=[]
++    def numbers():
++        """记录惰性读取。@return 自然有序流。"""
++        for i in itertools.count():
++            seen.append(i)
++            yield 'n'+str(i)
++    result=merge_sorted(numbers())
++    assert list(itertools.islice(result,3))==['n0','n1','n2']
++    result.close()
++    assert len(seen)<=4
++
++
++def test_records_and_empty_streams():
++    """记录不丢字段，空流安全。@return None。"""
++    a=[{'name':'a2','id':1}];b=[{'name':'a10','id':2}]
++    assert list(merge_sorted([],a,b,key=lambda row:row['name']))==a+b
++    assert list(merge_sorted())==[]

@@ -1,0 +1,310 @@
+{
+  "schema": 3,
+  "project_key": "mdit-py-plugins",
+  "title": "Markdown插件组合工作场景",
+  "category": "元数据、锚点与发布政策",
+  "description": "固定真实源码上的完整工程交付：让文本span真正执行调用方属性白名单；让任务后置label保留真实行内解析结果及HTML禁用语义；让front matter点结束符正确终止且不污染元数据；在最终标题锚点分配后提供可用于导航的真实记录；让闭合元素的连续属性块按实际开放Token累计class；提供兼容默认输出的显式GFM任务空白与真实checkbox模式。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "99e5c2f7a33919f46efab752bd04d151add7c3b84e69836b014852cc93c85362",
+  "environment": "mdit-py-plugins-py312",
+  "source": {
+    "repository": "https://github.com/executablebooks/mdit-py-plugins",
+    "commit": "519953da0a394a92534bc27580f4e7415462df44",
+    "license_files": [
+      "seed/library/LICENSE",
+      "seed/library/mdit_py_plugins/front_matter/LICENSE",
+      "seed/library/mdit_py_plugins/footnote/LICENSE",
+      "seed/library/mdit_py_plugins/admon/LICENSE",
+      "seed/library/mdit_py_plugins/container/LICENSE",
+      "seed/library/mdit_py_plugins/deflist/LICENSE",
+      "seed/library/mdit_py_plugins/texmath/LICENSE",
+      "seed/library/mdit_py_plugins/tasklists/__init__.py",
+      "seed/app/DJOT-MIT.txt",
+      "seed/app/CC-BY-SA-4.0.txt",
+      "seed/app/GFM-ATTRIBUTION.md"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "MDIT-PLUGINS-O01-DEV-SCENE",
+      "title": "让文本span真正执行调用方属性白名单",
+      "goal": "让文本span真正执行调用方属性白名单",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MDIT-PLUGINS-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MDIT-PLUGINS-O01-DEV",
+          "kind": "modify",
+          "goal": "让文本span真正执行调用方属性白名单",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix attrs_plugin(spans=True, allowed=...) so _span_rule receives and applies the same _add_attrs filtering policy as supported links/images/code. Keep only allowed attributes on the real opening Token and rendered HTML while preserving rejected attributes in insecure_attrs metadata. None remains unrestricted and an empty sequence forbids all. Preserve nested spans, quoted attributes, parsing fallback and existing non-span filtering; do not disable spans or discard all attributes to pass the examples.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-mdit-plugins-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MDIT-PLUGINS-O01-DEV-contract.md",
+            "materials/MDIT-PLUGINS-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/mdit_py_plugins/attrs/index.py",
+            "library/tests/test_development_mdit_plugins_o01_dev.py",
+            "library/docs/development-mdit-plugins-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MDIT-PLUGINS-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MDIT-PLUGINS-O01-DEV.native.json",
+            "public_native": "verification/MDIT-PLUGINS-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MDIT-PLUGINS-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "MDIT-PLUGINS-O03-DEV-SCENE",
+      "title": "让任务后置label保留真实行内解析结果及HTML禁用语义",
+      "goal": "让任务后置label保留真实行内解析结果及HTML禁用语义",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MDIT-PLUGINS-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MDIT-PLUGINS-O03-DEV",
+          "kind": "modify",
+          "goal": "让任务后置label保留真实行内解析结果及HTML禁用语义",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix tasklists_plugin(label=True, label_after=True) to wrap existing parsed inline children with a paired label after the checkbox, never popping a content/closing token or reinserting raw Markdown as HTML. Preserve rich emphasis/link/image/multiline content exactly once, HTML-disabled escaping, matching generated id/for, nested list structure and enabled/disabled checkbox behavior. Default no-label and ordinary wrapping-label modes remain unchanged. Do not flatten parsed children to unescaped text or merely hide duplicated output.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-mdit-plugins-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MDIT-PLUGINS-O03-DEV-contract.md",
+            "materials/MDIT-PLUGINS-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/mdit_py_plugins/tasklists/__init__.py",
+            "library/tests/test_development_mdit_plugins_o03_dev.py",
+            "library/docs/development-mdit-plugins-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MDIT-PLUGINS-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MDIT-PLUGINS-O03-DEV.native.json",
+            "public_native": "verification/MDIT-PLUGINS-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MDIT-PLUGINS-O03-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "MDIT-PLUGINS-O05-DEV-SCENE",
+      "title": "让front matter点结束符正确终止且不污染元数据",
+      "goal": "让front matter点结束符正确终止且不污染元数据",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MDIT-PLUGINS-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MDIT-PLUGINS-O05-DEV",
+          "kind": "modify",
+          "goal": "让front matter点结束符正确终止且不污染元数据",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix _front_matter_rule to check the current scanned line for the existing triple-dot terminator, consuming it exactly once while excluding it from token.content and including it in the half-open token.map. Closing at EOF, empty metadata and trailing horizontal whitespace must work and preserve the first body line. Keep existing dash delimiters, initial-document-only recognition, insufficient/open-without-close fallback and hidden/block/markup behavior. Four dots or noninitial blocks must not be silently accepted as metadata.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-mdit-plugins-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MDIT-PLUGINS-O05-DEV-contract.md",
+            "materials/MDIT-PLUGINS-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/mdit_py_plugins/front_matter/index.py",
+            "library/tests/test_development_mdit_plugins_o05_dev.py",
+            "library/docs/development-mdit-plugins-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MDIT-PLUGINS-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MDIT-PLUGINS-O05-DEV.native.json",
+            "public_native": "verification/MDIT-PLUGINS-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MDIT-PLUGINS-O05-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "MDIT-PLUGINS-O06-DEV-SCENE",
+      "title": "在最终标题锚点分配后提供可用于导航的真实记录",
+      "goal": "在最终标题锚点分配后提供可用于导航的真实记录",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MDIT-PLUGINS-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MDIT-PLUGINS-O06-DEV",
+          "kind": "modify",
+          "goal": "在最终标题锚点分配后提供可用于导航的真实记录",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd optional callback(record) to anchors_plugin and the actual core anchor assignment path. Invoke once per selected heading after final unique slug assignment, supplying title before permalink injection, final slug, integer level and an independent map list or None. Callback records must match real rendered ids for duplicate titles/custom slug functions; changing a record/map must not mutate Token state. Keep default behavior, selected-level filtering and per-document uniqueness, do not repeat callback when rendering already parsed tokens, and propagate consumer exceptions explicitly. Do not simulate navigation by reparsing rendered HTML.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-mdit-plugins-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MDIT-PLUGINS-O06-DEV-contract.md",
+            "materials/MDIT-PLUGINS-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/mdit_py_plugins/anchors/index.py",
+            "library/tests/test_development_mdit_plugins_o06_dev.py",
+            "library/docs/development-mdit-plugins-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MDIT-PLUGINS-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MDIT-PLUGINS-O06-DEV.native.json",
+            "public_native": "verification/MDIT-PLUGINS-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MDIT-PLUGINS-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "MDIT-PLUGINS-O02-DEV-SCENE",
+      "title": "让闭合元素的连续属性块按实际开放Token累计class",
+      "goal": "让闭合元素的连续属性块按实际开放Token累计class",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MDIT-PLUGINS-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MDIT-PLUGINS-O02-DEV",
+          "kind": "modify",
+          "goal": "让闭合元素的连续属性块按实际开放Token累计class",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix _attr_inline_rule class accumulation after link_close/span_close by resolving the matching opening Token before reading existing class. Link/image/code class blocks concatenate in declaration order without deduplication; spans preserve existing canonical repeated-attribute behavior by retaining each class word at its first position. Later id and other keys override normally. Keep single-token handling, nested inline content, neighbor isolation and allowed filtering. Do not globally concatenate nonclass attributes or mutate the closing Token instead of the rendered target.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-mdit-plugins-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MDIT-PLUGINS-O02-DEV-contract.md",
+            "materials/MDIT-PLUGINS-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/mdit_py_plugins/attrs/index.py",
+            "library/tests/test_development_mdit_plugins_o02_dev.py",
+            "library/docs/development-mdit-plugins-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MDIT-PLUGINS-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MDIT-PLUGINS-O02-DEV.native.json",
+            "public_native": "verification/MDIT-PLUGINS-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MDIT-PLUGINS-O02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "MDIT-PLUGINS-O04-DEV-SCENE",
+      "title": "提供兼容默认输出的显式GFM任务空白与真实checkbox模式",
+      "goal": "提供兼容默认输出的显式GFM任务空白与真实checkbox模式",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "MDIT-PLUGINS-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "MDIT-PLUGINS-O04-DEV",
+          "kind": "modify",
+          "goal": "提供兼容默认输出的显式GFM任务空白与真实checkbox模式",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd tasklists_plugin(gfm_whitespace=False) as a strict boolean compatibility option. Default False must preserve the complete existing ordinary-space/tab/formfeed rendering bytes. When True, make_checkbox recognizes the same existing GFM whitespace set as starts_with_todo_markdown, including tab/vertical-tab/formfeed and repeated separators, and derives checked state from the matched space/x/X marker. Every recognized task gets exactly one actual input with matching state and original marker removal; preserve enabled/disabled and label modes. Do not broaden recognition to no-separator [x]text or non-GFM Unicode spaces, and do not merely add task CSS classes without a checkbox.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-mdit-plugins-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/MDIT-PLUGINS-O04-DEV-contract.md",
+            "materials/MDIT-PLUGINS-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/mdit_py_plugins/tasklists/__init__.py",
+            "library/tests/test_development_mdit_plugins_o04_dev.py",
+            "library/docs/development-mdit-plugins-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/MDIT-PLUGINS-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/MDIT-PLUGINS-O04-DEV.native.json",
+            "public_native": "verification/MDIT-PLUGINS-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/MDIT-PLUGINS-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

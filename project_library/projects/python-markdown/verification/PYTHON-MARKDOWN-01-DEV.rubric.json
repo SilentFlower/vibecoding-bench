@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-MARKDOWN-01-DEV",
+  "source_commit": "b41e0aaf1181f1a8cb200cf5a815aad7c0020d23",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Extension configuration ownership: class-level or inherited config is a template, clone built-in dict/list/tuple/set/frozenset containers per instance before kwargs, and clone mutable values accepted by setConfig. Keep within-instance alias relationships, callback/opaque business-object identity, descriptions, existing bool/None parsing and unknown-key errors. Do not blindly deepcopy arbitrary callable objects; explicitly reject cyclic built-in configuration containers rather than recurse forever. Instance-level self.config built by existing extensions remains supported and ordinary Markdown output is unchanged. This is a complete extension lifecycle repair with real inherited/custom-extension checks.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML5LIB-O03-DEV",
+  "source_commit": "fd4f032bc090d44fb11a84b352dad7cbee0a4745",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add public html5lib.tokenizer.iter_tokens wrapping the actual internal HTMLTokenizer, yielding detached dictionaries with named token types and real production-time (line,column) checkpoints. Preserve data/attributes/entities/comments/Doctype and optional ParseError inclusion, stream encoding kwargs and caller stream ownership. A nonnegative max_tokens output budget raises TokenLimitError on overflow rather than pretending partial output is complete; bool/invalid budgets reject, empty input works and early close is safe. Do not label lexer events as repaired DOM nodes or fabricate exact start spans from end checkpoints.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

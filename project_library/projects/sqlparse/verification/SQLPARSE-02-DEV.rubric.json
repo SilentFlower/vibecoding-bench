@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SQLPARSE-02-DEV",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair both comma_first and compact CLI options as one boolean parsing family. Preserve explicit True/False compatibility with case-insensitive true/false/1/0 only, support bare option as true and --no-comma-first/--no-compact as false, define repeated options as last-wins and reject empty/unknown literals with argparse usage error. Defaults remain false and Python formatter API semantics unchanged. Verify actual formatted output, not only argparse fields, and document that a filename should precede an optional-value boolean or follow -- to avoid optional argument ambiguity.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

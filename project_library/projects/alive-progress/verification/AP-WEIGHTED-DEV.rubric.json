@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AP-WEIGHTED-DEV",
+  "source_commit": "69d9bf0aba6276e2434a3a595cceca55040d64d7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement alive_progress.weighted.alive_weighted_it(source,weight,*,total=None,finalize=None,**bar_options). Use real alive_bar and snapshots; evaluate weight exactly once per consumed item before yielding, require nonnegative nonboolean integer (zero allowed), and acknowledge that weight only when iteration resumes. Keep item identity/order and explicit total-work units, without inspecting or summing the whole source. Falsey weight/finalizer callables work; only normal exhaustion finalizes once, not early close or source/weight failure. Reject manual mode and preserve original alive_it.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

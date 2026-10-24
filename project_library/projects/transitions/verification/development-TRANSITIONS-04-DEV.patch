@@ -1,0 +1,92 @@
+--- a/library/docs/development-transitions-04-dev.md
++++ b/library/docs/development-transitions-04-dev.md
+@@ -0,0 +1,5 @@
++# 流程按钮只读预览候选结构且不调用准备与规则
++
++路线05：平面Machine.preview_event仅读候选路径/规则描述，完全不resolve或执行prepare/guard；可运行性明确unknown，None/internal和reflexive保真，不虚构层级异步支持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_transitions_04_dev.py
++++ b/library/tests/test_development_transitions_04_dev.py
+@@ -0,0 +1,23 @@
++"""结构预览不能为了按钮状态执行prepare或guard。"""
++from transitions import Machine
++
++def test_preview_metadata_has_no_callback_or_property_side_effect():
++    """路径可读但runnable未知，状态和计数完全不动。@return None。"""
++    class Order:
++        """所有实际执行都会留下计数。"""
++        def __init__(self):self.calls=[]
++        def prepare(self):self.calls.append('prepare')
++        def guard(self):self.calls.append('guard');return True
++    model=Order();machine=Machine(model=model,states=['draft','packed'],initial='draft',auto_transitions=False,prepare_event='prepare')
++    machine.add_transition('pack','draft','packed',conditions='guard',prepare='prepare')
++    report=machine.preview_event(model,'pack')
++    assert report['runnable']=='unknown' and report['candidates'][0]['dest']=='packed'
++    assert report['candidates'][0]['conditions']==[{'index':0,'callback':'guard','target':True}]
++    assert model.calls==[] and model.state=='draft'
++
++def test_internal_reflexive_multiple_and_unknown_trigger():
++    """已解析通配事件按当前状态展示，内部目标None保持。@return None。"""
++    machine=Machine(states=['a','b'],initial='a',auto_transitions=False)
++    machine.add_transition('check','a',None);machine.add_transition('check','a','=')
++    assert [item['dest'] for item in machine.preview_event(machine,'check')['candidates']]==[None,'a']
++    assert machine.preview_event(machine,'absent')['candidates']==[] and machine.state=='a'
+--- a/library/transitions/core.py
++++ b/library/transitions/core.py
+@@ -1159,6 +1159,55 @@
+                 delattr(model, trigger)
+             del self.events[trigger]
+ 
++    def preview_event(self, model, trigger):
++        """只读预览同步平面流程结构。@param model 已绑定模型。@param trigger 事件名。@return 候选路径与unknown可运行性，不执行任何规则。"""
++        if not any(item is model for item in self.models):
++            raise ValueError("模型未绑定")
++        state = self.get_model_state(model)
++        event = self.events.get(trigger)
++        if event is None:
++            return {
++                "trigger": trigger,
++                "state": state.name,
++                "candidates": [],
++                "runnable": "unknown",
++            }
++
++        def label(callback):
++            return (
++                callback
++                if isinstance(callback, string_types)
++                else "<callable:" + type(callback).__name__ + ">"
++            )
++
++        candidates = []
++        for ordinal, transition in enumerate(event.transitions.get(state.name, ())):
++            candidates.append(
++                {
++                    "ordinal": ordinal,
++                    "source": transition.source,
++                    "dest": transition.dest,
++                    "conditions": [
++                        {
++                            "index": index,
++                            "callback": label(condition.func),
++                            "target": condition.target,
++                        }
++                        for index, condition in enumerate(transition.conditions)
++                    ],
++                    "prepare": [label(callback) for callback in transition.prepare],
++                    "before": [label(callback) for callback in transition.before],
++                    "after": [label(callback) for callback in transition.after],
++                    "runnable": "unknown",
++                }
++            )
++        return {
++            "trigger": trigger,
++            "state": state.name,
++            "candidates": candidates,
++            "runnable": "unknown",
++        }
++
+     def dispatch(self, trigger, *args, **kwargs):
+         """Trigger an event on all models assigned to the machine.
+         Args:

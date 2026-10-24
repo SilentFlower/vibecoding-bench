@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CONFIGOBJ-O03-DEV",
+  "source_commit": "b7707c94c0317b8f89b704a01525a68eb6c72521",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add ConfigObj.write_atomic(filename=None), preserving ordinary write/outfile behavior. Serialize a raw-preserving clone through the real ConfigObj writer before opening any temporary file; use a unique same-directory temporary, preserve existing permission bits or use 0600 for a new file, close before os.replace and clean only the operation temp on failure. Default to self.filename, support PathLike, reject missing destination and symlink targets, return the absolute destination. Serialization/encoding/replace errors must preserve old bytes and original in-memory metadata. Do not promise power-loss durability or cross-file atomicity.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

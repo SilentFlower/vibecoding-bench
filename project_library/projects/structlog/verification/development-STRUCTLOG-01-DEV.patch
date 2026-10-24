@@ -1,0 +1,64 @@
+--- a/library/docs/development-structlog-01-dev.md
++++ b/library/docs/development-structlog-01-dev.md
+@@ -0,0 +1,5 @@
++# 有序日志渲染仅丢缺字段而保留显式空值
++
++路线01：共享排序器用独立缺失哨兵，drop_missing只丢缺字段，显式None/False/0/空串保留；默认缺项渲染与字典消费策略保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/structlog/processors.py
++++ b/library/src/structlog/processors.py
+@@ -209,15 +209,17 @@
+ 
+     See `KeyValueRenderer` for an explanation of the parameters.
+     """
++    # 缺失与显式None不同；哨兵只用于内部查找，默认缺项仍按旧None渲染。
++    missing=object()
+     # Use an optimized version for each case.
+     if key_order and sort_keys:
+ 
+         def ordered_items(event_dict: EventDict) -> list[tuple[str, Any]]:
+             items = []
+             for key in key_order:
+-                value = event_dict.pop(key, None)
+-                if value is not None or not drop_missing:
+-                    items.append((key, value))
++                value = event_dict.pop(key, missing)
++                if value is not missing or not drop_missing:
++                    items.append((key, None if value is missing else value))
+ 
+             items += sorted(event_dict.items())
+ 
+@@ -228,9 +230,9 @@
+         def ordered_items(event_dict: EventDict) -> list[tuple[str, Any]]:
+             items = []
+             for key in key_order:
+-                value = event_dict.pop(key, None)
+-                if value is not None or not drop_missing:
+-                    items.append((key, value))
++                value = event_dict.pop(key, missing)
++                if value is not missing or not drop_missing:
++                    items.append((key, None if value is missing else value))
+ 
+             items += event_dict.items()
+ 
+--- a/library/tests/test_development_structlog_01_dev.py
++++ b/library/tests/test_development_structlog_01_dev.py
+@@ -0,0 +1,17 @@
++"""缺字段与真实None不能被drop_missing混淆。"""
++from structlog.processors import KeyValueRenderer,LogfmtRenderer
++
++def test_both_renderers_keep_explicit_none_drop_only_absent():
++    """无序/排序两条共享路径都保空值。@return None。"""
++    for sorted_keys in (False,True):
++        values={'present':None,'false':False,'zero':0,'empty':''}
++        text=KeyValueRenderer(key_order=['missing','present','false','zero','empty'],sort_keys=sorted_keys,drop_missing=True)(None,'info',dict(values))
++        assert 'present=None' in text and 'missing=' not in text and 'false=False' in text and 'zero=0' in text
++        text=LogfmtRenderer(key_order=['missing','present'],sort_keys=sorted_keys,drop_missing=True)(None,'info',dict(values))
++        assert 'present=' in text and 'missing=' not in text
++
++def test_default_missing_and_ordered_consumption_remain_compatible():
++    """默认缺项仍渲染None，原有字典消费方式保持。@return None。"""
++    values={'a':None,'b':2}
++    result=KeyValueRenderer(key_order=['a','absent'],drop_missing=False)(None,'info',values)
++    assert result=='a=None absent=None b=2' and values=={'b':2}

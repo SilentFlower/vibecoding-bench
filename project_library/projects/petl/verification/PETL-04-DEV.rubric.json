@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PETL-04-DEV",
+  "source_commit": "cd5ed9dd3ec1c95eb4c2285bcc71d945f7acb86b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add crossjoin prefixes sequence for all N sources, frozen at view creation. Each str is exact prefix, None means no prefix, field names converted as existing numbered mode. Length/type mismatch, simultaneous truthy prefix and prefixes or output-header collision must raise clearly before data emission. Preserve old prefix boolean, Cartesian source/row ordering, missing short-row filling and header-only empty-source behavior. Do not silently ignore prefixes or change ordinary unprefixed duplicate-header compatibility.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

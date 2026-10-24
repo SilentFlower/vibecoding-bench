@@ -1,0 +1,74 @@
+--- a/library/docs/development-python-pptx-04-dev.md
++++ b/library/docs/development-python-pptx-04-dev.md
+@@ -0,0 +1,5 @@
++# 演示段落公开配置项目符号与真实自动编号方案
++
++路线15：Paragraph.bullet/set_bullet写互斥a:bu*，字符/完整固定XSD编号方案及1..32767起点，None继承、none显式取消；验证后按schema顺序提交，正文/层级/字体不动。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pptx/text/text.py
++++ b/library/src/pptx/text/text.py
+@@ -481,6 +481,36 @@
+         return _Run(r, self)
+ 
+     @property
++    def bullet(self):
++        """读取当前直接项目符号配置。@return kind字典或None继承。"""
++        from pptx.oxml.ns import qn
++        properties=self._p.pPr
++        if properties is None:return None
++        for element in properties:
++            if element.tag==qn("a:buNone"):return {"kind":"none"}
++            if element.tag==qn("a:buChar"):return {"kind":"character","character":element.get("char")}
++            if element.tag==qn("a:buAutoNum"):return {"kind":"number","scheme":element.get("type"),"start":int(element.get("startAt","1"))}
++            if element.tag==qn("a:buBlip"):return {"kind":"unsupported"}
++        return None
++
++    def set_bullet(self,kind,*,character="•",scheme="arabicPeriod",start=1):
++        """写直接项目符号或编号。@param kind character/number/none或None继承。@param character 一个字符。@param scheme 固定XSD编号方案。@param start 1..32767。@return None。"""
++        from pptx.oxml.ns import qn
++        from pptx.oxml.xmlchemy import OxmlElement
++        if kind not in (None,"none","character","number"):raise ValueError("未知kind")
++        if kind=="character" and (not isinstance(character,str) or len(character)!=1):raise ValueError("character须单字符")
++        if kind=="number" and (scheme not in ('alphaLcParenBoth', 'alphaUcParenBoth', 'alphaLcParenR', 'alphaUcParenR', 'alphaLcPeriod', 'alphaUcPeriod', 'arabicParenBoth', 'arabicParenR', 'arabicPeriod', 'arabicPlain', 'romanLcParenBoth', 'romanUcParenBoth', 'romanLcParenR', 'romanUcParenR', 'romanLcPeriod', 'romanUcPeriod', 'circleNumDbPlain', 'circleNumWdBlackPlain', 'circleNumWdWhitePlain', 'arabicDbPeriod', 'arabicDbPlain', 'ea1ChsPeriod', 'ea1ChsPlain', 'ea1ChtPeriod', 'ea1ChtPlain', 'ea1JpnChsDbPeriod', 'ea1JpnKorPlain', 'ea1JpnKorPeriod', 'arabic1Minus', 'arabic2Minus', 'hebrew2Minus', 'thaiAlphaPeriod', 'thaiAlphaParenR', 'thaiAlphaParenBoth', 'thaiNumPeriod', 'thaiNumParenR', 'thaiNumParenBoth', 'hindiAlphaPeriod', 'hindiNumPeriod', 'hindiNumParenR', 'hindiAlpha1Period') or type(start) is not int or not 1<=start<=32767):raise ValueError("无效编号方案/起始值")
++        node=None
++        if kind is not None:
++            node=OxmlElement("a:"+{"none":"buNone","character":"buChar","number":"buAutoNum"}[kind])
++            if kind=="character":node.set("char",character)
++            if kind=="number":node.set("type",scheme);node.set("startAt",str(start))
++        properties=self._p.get_or_add_pPr()
++        for element in list(properties):
++            if element.tag in tuple(qn("a:"+name) for name in ("buNone","buChar","buAutoNum","buBlip")):properties.remove(element)
++        if node is not None:properties.insert_element_before(node,"a:tabLst","a:defRPr","a:extLst")
++
++    @property
+     def alignment(self) -> PP_PARAGRAPH_ALIGNMENT | None:
+         """Horizontal alignment of this paragraph.
+ 
+--- a/library/tests/test_development_python_pptx_04_dev.py
++++ b/library/tests/test_development_python_pptx_04_dev.py
+@@ -0,0 +1,24 @@
++"""段落符号/编号由a:bu*单一选择表达，不能给正文加假编号。"""
++from io import BytesIO
++import unittest
++from pptx import Presentation
++
++def test_character_number_and_none_inheritance_roundtrip():
++    """字符与有起点编号真实保存，默认继承不额外创造可见符号。@return None。"""
++    presentation=Presentation();frame=presentation.slides.add_slide(presentation.slide_layouts[6]).shapes.add_textbox(0,0,400000,300000).text_frame
++    first=frame.paragraphs[0];first.text='first';first.set_bullet('character',character='✓')
++    second=frame.add_paragraph();second.text='second';second.set_bullet('number',scheme='romanUcPeriod',start=4)
++    output=BytesIO();presentation.save(output);output.seek(0);paragraphs=Presentation(output).slides[0].shapes[0].text_frame.paragraphs
++    assert paragraphs[0].bullet=={'kind':'character','character':'✓'}
++    assert paragraphs[1].bullet=={'kind':'number','scheme':'romanUcPeriod','start':4} and paragraphs[1].text=='second'
++
++def test_choice_replacement_clear_and_invalid_do_not_change_other_format():
++    """切换只保一种符号，None去直接属性，字体/正文不改。@return None。"""
++    paragraph=Presentation().slides.add_slide(Presentation().slide_layouts[6]) if False else None
++    presentation=Presentation();paragraph=presentation.slides.add_slide(presentation.slide_layouts[6]).shapes.add_textbox(0,0,300000,300000).text_frame.paragraphs[0]
++    paragraph.text='item';paragraph.level=2;paragraph.set_bullet('number')
++    before=paragraph._p.xml
++    with unittest.TestCase().assertRaises(ValueError):paragraph.set_bullet('number',start=0)
++    assert paragraph._p.xml==before
++    paragraph.set_bullet('none');assert paragraph.bullet=={'kind':'none'}
++    paragraph.set_bullet(None);assert paragraph.bullet is None and paragraph.level==2 and paragraph.text=='item'

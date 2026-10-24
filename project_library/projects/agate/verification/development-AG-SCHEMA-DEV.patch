@@ -1,0 +1,152 @@
+--- a/library/agate/__init__.py
++++ b/library/agate/__init__.py
+@@ -14,3 +14,5 @@
+ from agate.type_tester import TypeTester
+ from agate.utils import *
+ from agate.warns import DuplicateColumnWarning, NullCalculationWarning, warn_duplicate_column, warn_null_calculation
++
++from agate.schema import Schema, SchemaValidationError
+--- a/library/agate/schema.py
++++ b/library/agate/schema.py
+@@ -0,0 +1,85 @@
++"""显式表级数据约束验证，不重写导入或隐式修改业务数据。"""
++from collections.abc import Mapping
++
++from agate.table import Table
++
++
++class SchemaValidationError(ValueError):
++    """严格校验错误。@param errors 不包含业务值的结构化错误列表。"""
++
++    def __init__(self, errors):
++        """保存独立错误副本。@param errors 错误列表。@return None。"""
++        self.errors = tuple(dict(error) for error in errors)
++        super().__init__('表格数据不符合显式约束')
++
++
++class Schema:
++    """表级显式约束。@param columns 列名到nullable/unique/min/max/choices的映射。"""
++
++    def __init__(self, columns):
++        """校验并复制配置。@param columns 有限约束映射。@return None。"""
++        if not isinstance(columns, Mapping):
++            raise TypeError('schema必须是列约束映射')
++        self._columns = {}
++        for name, rules in columns.items():
++            if not isinstance(name, str) or not isinstance(rules, Mapping):
++                raise TypeError('列名和约束类型不合法')
++            if set(rules) - {'nullable', 'unique', 'min', 'max', 'choices'}:
++                raise ValueError('包含未知约束')
++            copy = dict(rules)
++            for field in ('nullable', 'unique'):
++                if field in copy and type(copy[field]) is not bool:
++                    raise TypeError('开关约束必须是布尔值')
++            if 'choices' in copy:
++                if not isinstance(copy['choices'], (list, tuple, set, frozenset)):
++                    raise TypeError('枚举约束必须是有限集合或序列')
++                copy['choices'] = tuple(copy['choices'])
++            if any(field in copy and copy[field] is None for field in ('min', 'max')):
++                raise TypeError('边界不能是None')
++            if 'min' in copy and 'max' in copy and copy['min'] > copy['max']:
++                raise ValueError('最小边界不能大于最大边界')
++            self._columns[name] = copy
++
++    def validate(self, table, *, strict=False, max_errors=None):
++        """只读校验实际表。@param table Table。@param strict 是否抛结构化异常。
++        @param max_errors 正整数错误上限或None。@return 不含实际值的row/column/code列表。
++        """
++        if not isinstance(table, Table) or type(strict) is not bool:
++            raise TypeError('表和严格模式类型不合法')
++        if max_errors is not None and (type(max_errors) is not int or max_errors < 1):
++            raise ValueError('错误上限必须是正整数')
++        for name in self._columns:
++            if name not in table.column_names:
++                raise KeyError(name)
++        errors, seen = [], {name: [] for name in self._columns}
++        stop = False
++        for index, row in enumerate(table.rows):
++            for name, rules in self._columns.items():
++                value = row[name]
++                codes = []
++                if value is None:
++                    if not rules.get('nullable', True):
++                        codes.append('null')
++                else:
++                    if rules.get('unique'):
++                        if any(value == previous for previous in seen[name]):
++                            codes.append('unique')
++                        seen[name].append(value)
++                    if 'min' in rules and value < rules['min']:
++                        codes.append('min')
++                    if 'max' in rules and value > rules['max']:
++                        codes.append('max')
++                    if 'choices' in rules and value not in rules['choices']:
++                        codes.append('choice')
++                for code in codes:
++                    errors.append({'row': index, 'column': name, 'code': code})
++                    if max_errors is not None and len(errors) >= max_errors:
++                        stop = True
++                        break
++                if stop:
++                    break
++            if stop:
++                break
++        if strict and errors:
++            raise SchemaValidationError(errors)
++        return errors
+--- a/library/development_tests/test_development_ag_schema_dev.py
++++ b/library/development_tests/test_development_ag_schema_dev.py
+@@ -0,0 +1,45 @@
++"""公开表级数据质量回归。"""
++import agate
++import pytest
++
++def table():
++    return agate.Table([('A', 2, 'USD'), ('A', -1, 'XXX'), (None, 5, 'USD')],
++        ['id', 'amount', 'currency'], [agate.Text(), agate.Number(), agate.Text()])
++
++def test_rules_return_deterministic_structured_positions():
++    schema = agate.Schema({'id': {'nullable': False, 'unique': True}, 'amount': {'min': 0}, 'currency': {'choices': ['USD', 'EUR']}})
++    assert schema.validate(table()) == [{'row': 1, 'column': 'id', 'code': 'unique'}, {'row': 1, 'column': 'amount', 'code': 'min'},
++        {'row': 1, 'column': 'currency', 'code': 'choice'}, {'row': 2, 'column': 'id', 'code': 'null'}]
++
++def test_strict_mode_keeps_structured_errors():
++    with pytest.raises(agate.SchemaValidationError) as error:
++        agate.Schema({'amount': {'min': 0}}).validate(table(), strict=True)
++    assert error.value.errors == ({'row': 1, 'column': 'amount', 'code': 'min'},)
++
++def test_error_limit_is_exact_and_invalid_limits_are_rejected():
++    schema = agate.Schema({'id': {'nullable': False, 'unique': True}})
++    assert len(schema.validate(table(), max_errors=1)) == 1
++    for limit in (0, -1, True, 1.5):
++        with pytest.raises(ValueError):
++            schema.validate(table(), max_errors=limit)
++
++def test_caller_configuration_and_original_table_are_not_modified():
++    rules = {'currency': {'choices': ['USD']}}
++    schema = agate.Schema(rules)
++    rules['currency']['choices'].append('XXX')
++    source = table()
++    assert schema.validate(source) == [{'row': 1, 'column': 'currency', 'code': 'choice'}]
++    assert source.rows[1]['currency'] == 'XXX'
++
++def test_missing_columns_and_bad_rules_fail_explicitly():
++    with pytest.raises(KeyError):
++        agate.Schema({'missing': {}}).validate(table())
++    for rules in ({'amount': {'unknown': 1}}, {'amount': {'min': 5, 'max': 1}}):
++        with pytest.raises(ValueError):
++            agate.Schema(rules)
++
++def test_empty_tables_and_nullable_unique_values():
++    empty = agate.Table([], ['id'], [agate.Text()])
++    assert agate.Schema({'id': {'unique': True}}).validate(empty) == []
++    source = agate.Table([(None,), (None,)], ['id'], [agate.Text()])
++    assert agate.Schema({'id': {'unique': True}}).validate(source) == []
+--- a/library/docs/development-ag-schema-dev.md
++++ b/library/docs/development-ag-schema-dev.md
+@@ -0,0 +1,5 @@
++# 为订单导入交付只读结构化数据约束校验
++
++订单导入后需要显式校验必填、唯一、范围和币种枚举，输出不带业务值的位置与错误码。新增Schema及严格异常，不改变原导入或数据；配置复制、空值规则、稳定顺序、缺列、上限和无效约束必须清楚，全部作为一个数据质量能力交付。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

@@ -1,0 +1,97 @@
+--- a/library/bibtexparser/identifiers.py
++++ b/library/bibtexparser/identifiers.py
+@@ -0,0 +1,54 @@
++"""离线规范化DOI和ISBN，未知或校验失败值可追溯保留。"""
++import re
++from bibtexparser.middlewares.middleware import BlockMiddleware
++
++
++def _isbn(value):
++    """验证并去掉ISBN空白连字符。@param value 输入。@return 合法标准文本或None。"""
++    compact = re.sub(r'[\s-]', '', value).upper()
++    if re.fullmatch(r'\d{9}[\dX]', compact):
++        return compact if sum((10 - index) * (10 if digit == 'X' else int(digit)) for index, digit in enumerate(compact)) % 11 == 0 else None
++    if re.fullmatch(r'\d{13}', compact):
++        return compact if sum(int(digit) * (1 if index % 2 == 0 else 3) for index, digit in enumerate(compact)) % 10 == 0 else None
++    return None
++
++
++class NormalizeIdentifiers(BlockMiddleware):
++    """按显式字段集合本地规范化标识符。
++
++    :param fields: doi/isbn中的显式选择。
++    :param strict: 无效标识符是否失败，否则保留并报告。
++    """
++    def __init__(self, *, fields=('doi', 'isbn'), strict=False):
++        """保存政策，不执行任何网络查询。参数见类说明。@return None。"""
++        super().__init__(allow_inplace_modification=False)
++        self.fields = tuple(fields)
++        if any(field not in ('doi', 'isbn') for field in self.fields):
++            raise ValueError('不支持的标识符字段')
++        self.strict = strict
++
++    def transform_entry(self, entry, library):
++        """规范真实Field并记录原文。@param entry 条目。@param library 书目库。@return 条目。"""
++        report = {}
++        for name in self.fields:
++            field = entry.get(name)
++            if field is None:
++                continue
++            original = field.value
++            normalized = None
++            if isinstance(original, str):
++                if name == 'isbn':
++                    normalized = _isbn(original)
++                else:
++                    candidate = re.sub(r'^(?:https?://(?:dx\.)?doi\.org/|doi:\s*)', '', original.strip(), flags=re.IGNORECASE)
++                    if re.fullmatch(r'10\.\d{4,9}/[^\s]+', candidate):
++                        normalized = candidate.lower()
++            if normalized is None:
++                if self.strict:
++                    raise ValueError('无效书目标识符：' + name)
++                report[name] = {'status': 'invalid', 'original': original}
++            else:
++                field.value = normalized
++                report[name] = {'status': 'valid', 'original': original}
++        entry.set_parser_metadata('identifiers', report)
++        return entry
+--- a/library/docs/development-bibtexparser-o05-dev.md
++++ b/library/docs/development-bibtexparser-o05-dev.md
+@@ -0,0 +1,5 @@
++# 本地规范书目标识符并保留无效原值证据
++
++可选中间件离线规范DOI前缀和大小写、ISBN空白横线与10/13位校验。合法标点不猜测删除，无效值默认原样保留并记录状态，strict才失败；只改显式字段，不联网、不改默认栈。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bibtexparser_o05_dev.py
++++ b/library/tests/test_development_bibtexparser_o05_dev.py
+@@ -0,0 +1,29 @@
++"""标识符只做可证伪的本地语法和校验位检查。"""
++from bibtexparser import Library
++from bibtexparser.model import Entry, Field
++
++def test_doi_and_isbn():
++    """DOI URL与合法ISBN规范化且原值可追溯。@return None。"""
++    from bibtexparser.identifiers import NormalizeIdentifiers
++    source = Library([Entry('book', 'x', [Field('doi', ' HTTPS://doi.org/10.1234/ABC '), Field('isbn', '978-0-306-40615-7')])])
++    result = NormalizeIdentifiers().transform(source)
++    assert result.entries[0]['doi'] == '10.1234/abc'
++    assert result.entries[0]['isbn'] == '9780306406157'
++    assert source.entries[0]['isbn'] == '978-0-306-40615-7'
++
++def test_invalid_preserved_and_strict():
++    """无效校验位保留报告或显式失败。@return None。"""
++    import pytest
++    from bibtexparser.identifiers import NormalizeIdentifiers
++    source = Library([Entry('book', 'x', [Field('isbn', '9780306406158')])])
++    result = NormalizeIdentifiers().transform(source)
++    assert result.entries[0]['isbn'] == '9780306406158'
++    assert result.entries[0].parser_metadata['identifiers']['isbn']['status'] == 'invalid'
++    with pytest.raises(ValueError): NormalizeIdentifiers(strict=True).transform(source)
++
++def test_selected_fields_and_isbn10():
++    """字段白名单及ISBN10大写X边界。@return None。"""
++    from bibtexparser.identifiers import NormalizeIdentifiers
++    source = Library([Entry('book', 'x', [Field('isbn', '0-8044-2957-x'), Field('doi', 'doi:10.1234/KEEP')])])
++    result = NormalizeIdentifiers(fields=('isbn',)).transform(source)
++    assert result.entries[0]['isbn'] == '080442957X' and result.entries[0]['doi'] == 'doi:10.1234/KEEP'

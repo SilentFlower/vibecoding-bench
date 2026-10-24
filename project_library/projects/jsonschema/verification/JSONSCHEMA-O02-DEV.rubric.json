@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JSONSCHEMA-O02-DEV",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix _Error.json_path dot-safe identification with full-string matching and correct single-quoted bracket escaping for quote/backslash and every C0 control character. A key x followed by LF must never render as $.x plus a raw LF or resolve to the separate key x. Preserve ordinary ASCII identifier dot notation, Unicode/empty bracket keys, array indexes, original path values and absolute parent-path composition. Demonstrate independent decoding/selection round trips rather than only comparing a hard-coded diagnostic string.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

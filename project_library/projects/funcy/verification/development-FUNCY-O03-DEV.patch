@@ -1,0 +1,121 @@
+--- a/library/docs/development-funcy-o03-dev.md
++++ b/library/docs/development-funcy-o03-dev.md
+@@ -0,0 +1,5 @@
++# 让资源工厂覆盖普通生成器和异步真实执行生命周期
++
++对应路线11：新资源工厂作用域覆盖真实同步/生成器/协程/异步生成器执行期，提前close/aclose与抑制策略保持，每次独立资源，原wrap_with不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/funcy/scoped.py
++++ b/library/funcy/scoped.py
+@@ -0,0 +1,51 @@
++"""把资源工厂作用域绑定到同步、生成器和异步真实执行期。"""
++import inspect
++from contextlib import asynccontextmanager
++from functools import wraps
++
++
++def wrap_with_factory(factory):
++    """每次调用创建新manager，惰性函数在消费期保持资源。
++
++    :param factory: 无参资源工厂；同步函数要求同步manager，异步允许两种manager。
++    :return: 不改变原wrap_with的独立装饰器。
++    """
++    if not callable(factory):
++        raise TypeError('资源工厂必须可调用')
++    @asynccontextmanager
++    async def async_scope():
++        manager = factory()
++        if hasattr(manager, '__aenter__'):
++            async with manager:
++                yield
++        else:
++            with manager:
++                yield
++    def decorate(function):
++        if inspect.isasyncgenfunction(function):
++            @wraps(function)
++            async def wrapped(*args, **kwargs):
++                async with async_scope():
++                    source = function(*args, **kwargs)
++                    try:
++                        async for value in source:
++                            yield value
++                    finally:
++                        await source.aclose()
++        elif inspect.iscoroutinefunction(function):
++            @wraps(function)
++            async def wrapped(*args, **kwargs):
++                async with async_scope():
++                    return await function(*args, **kwargs)
++        elif inspect.isgeneratorfunction(function):
++            @wraps(function)
++            def wrapped(*args, **kwargs):
++                with factory():
++                    yield from function(*args, **kwargs)
++        else:
++            @wraps(function)
++            def wrapped(*args, **kwargs):
++                with factory():
++                    return function(*args, **kwargs)
++        return wrapped
++    return decorate
+--- a/library/tests/test_development_funcy_o03_dev.py
++++ b/library/tests/test_development_funcy_o03_dev.py
+@@ -0,0 +1,56 @@
++"""资源作用域覆盖实际生成、异常和提前关闭。"""
++from contextlib import contextmanager,asynccontextmanager
++import asyncio
++import pytest
++
++def test_fresh_resources_and_lazy_generator_close():
++    """创建生成器不提前进入，close立即退出。@return None。"""
++    from funcy.scoped import wrap_with_factory
++    events=[]
++    @contextmanager
++    def scope():
++        events.append('enter')
++        try:yield
++        finally:events.append('exit')
++    @wrap_with_factory(scope)
++    def values():
++        events.append('body');yield 1;yield 2
++    source=values();assert events==[];assert next(source)==1 and events==['enter','body']
++    source.close();assert events==['enter','body','exit']
++    assert list(values())==[1,2] and events.count('enter')==2
++
++def test_manager_suppression_and_enter_failure():
++    """保留原manager抑制语义，enter失败不执行业务。@return None。"""
++    from funcy.scoped import wrap_with_factory
++    @contextmanager
++    def suppress():
++        try:yield
++        except ValueError:pass
++    @wrap_with_factory(suppress)
++    def fail():raise ValueError('business')
++    assert fail() is None
++    def invalid():raise RuntimeError('enter')
++    @wrap_with_factory(invalid)
++    def never():raise AssertionError('body')
++    with pytest.raises(RuntimeError,match='enter'):never()
++
++def test_async_generator_close_and_coroutine_scope():
++    """异步生成器提前aclose先关闭业务体再退出manager。@return None。"""
++    from funcy.scoped import wrap_with_factory
++    async def run():
++        events=[]
++        @asynccontextmanager
++        async def scope():
++            events.append('enter')
++            try:yield
++            finally:events.append('exit')
++        @wrap_with_factory(scope)
++        async def values():
++            try:yield 1;yield 2
++            finally:events.append('body-close')
++        source=values();assert events==[];assert await anext(source)==1;await source.aclose()
++        assert events==['enter','body-close','exit']
++        @wrap_with_factory(scope)
++        async def value():return 9
++        assert await value()==9
++    asyncio.run(run())

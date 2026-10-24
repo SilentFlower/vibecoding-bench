@@ -1,0 +1,51 @@
+--- a/library/constraint/problem.py
++++ b/library/constraint/problem.py
+@@ -51,6 +51,7 @@
+             >>>
+         """
+         del self._constraints[:]
++        del self._str_constraints[:]
+         self._variables.clear()
+ 
+     def setSolver(self, solver):
+@@ -276,7 +277,7 @@
+             for constraint in self._str_constraints:
+                 parsed = compile_to_constraints([constraint], domains, picklable=picklable)
+                 for c, v, _ in parsed:
+-                    self.addConstraint(c, v)
++                    constraints.append((c, v))
+ 
+         # add regular constraints
+         for constraint, variables in self._constraints:
+--- a/library/docs/development-python-constraint-01-dev.md
++++ b/library/docs/development-python-constraint-01-dev.md
+@@ -0,0 +1,5 @@
++# 重复排班求解不累积字符串编译约束且重置完整清空规则
++
++路线02：字符串编译结果只进入本轮求解列表，不反复追加永久约束；用户显式重复规则不去重。reset清空字符串及普通规则，混合约束、多次求解、切换solver和新增变量保持真实解集合与模型状态。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_python_constraint_01_dev.py
++++ b/library/tests/test_development_python_constraint_01_dev.py
+@@ -0,0 +1,21 @@
++"""字符串编译结果属于本次求解，不累积污染模型。"""
++from constraint import Problem,BacktrackingSolver,OptimizedBacktrackingSolver
++
++
++def test_repeated_mixed_constraints_do_not_accumulate():
++    """真实求解十次，显式用户约束仍保留而编译列表不长。@return None。"""
++    problem=Problem();problem.addVariables(['x','y'],[0,1,2]);problem.addConstraint('x != y')
++    problem.addConstraint(lambda x,y:x+y>=2,['x','y'])
++    expected={tuple(sorted(item.items())) for item in problem.getSolutions()}
++    for index in range(10):
++        problem.setSolver(BacktrackingSolver() if index%2 else OptimizedBacktrackingSolver())
++        assert {tuple(sorted(item.items())) for item in problem.getSolutions()}==expected
++        assert len(problem._constraints)==1 and len(problem._str_constraints)==1
++
++
++def test_reset_clears_textual_rules_and_model_can_change():
++    """reset后旧字符串不能误作用到新变量。@return None。"""
++    problem=Problem();problem.addVariables(['a','b'],[1,2]);problem.addConstraint('a < b')
++    assert problem.getSolutions()==[{'a':1,'b':2}]
++    problem.reset();problem.addVariable('new',[7])
++    assert problem.getSolution()=={'new':7} and not problem._str_constraints

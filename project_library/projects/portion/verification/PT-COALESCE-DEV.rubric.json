@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PT-COALESCE-DEV",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Interval.coalesce(max_gap, metric=None, *, report=False). Bridge consecutive normalized atomic pieces when their endpoint distance is at most a nonnegative explicit tolerance, using subtraction by default or a caller metric(lower_endpoint, upper_endpoint). Preserve external bounds and class, never mutate the source, and optionally return the exact added gap intervals. Support numeric/Decimal and timedelta distances, zero-width missing points, empty input, and propagate metric errors; reject negative/NaN tolerance and negative metric results. This is explicitly approximate and must not change exact union/overlap semantics.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

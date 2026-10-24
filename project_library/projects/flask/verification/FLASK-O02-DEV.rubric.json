@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FLASK-O02-DEV",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add App.validate_routes() returning structured overlap/missing_view/view_signature diagnostics using actual url_map/view_functions without invoking views. Report identical rule/host/subdomain overlaps in non-HEAD/OPTIONS methods, missing runtime views and inspect.signature(...).bind mismatches for actual route/default arguments. Ignore build_only, preserve wrapped signatures, optional args/**kwargs/MethodView and skip uninspectable callables or signature claims when url-value preprocessors may alter arguments. Do not speculate about intersection of different converter patterns or change default route registration/dispatch; this is explicit API inspection, not an unimplemented CLI.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

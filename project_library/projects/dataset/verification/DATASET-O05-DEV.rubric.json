@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DATASET-O05-DEV",
+  "source_commit": "db592cc041014762bba55fd544e982170831f227",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Table.insert_iter and update_iter for one-shot iterable mapping records, with positive non-bool chunk_size, ensure/types and explicit atomic:boolean. Buffer/copy at most one chunk and call real insert_many/update_many exactly once per chunk, allowing late new columns per original schema policy and preserving the accepted absent-field update behavior. Return consumed record count, not affected rows. Empty input creates no table, invalid options do not consume input, source/generator errors propagate. atomic=True wraps the entire DML in the existing Database transaction; default keeps committed chunks on later failure. Document backend DDL rollback limitations; original Sequence APIs stay unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,127 @@
+--- a/app/development_tests/test_development_typer_02_dev.py
++++ b/app/development_tests/test_development_typer_02_dev.py
+@@ -0,0 +1,29 @@
++"""真实商品CLI导入供应商CSV并保留原product/export。"""
++import csv,json,tempfile
++from pathlib import Path
++from typer.testing import CliRunner
++import shop
++
++def test_import_csv_unicode_quoted_fields_order_empty_and_existing_commands():
++    """含逗号/换行名称按CSV规则读取，不手工split。@return None。"""
++    runner=CliRunner()
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'in.csv';out=base/'out.json'
++        source.write_text('sku,name,quantity\na,"茶,雪\n第二行",2\nb,Milk,0\n',encoding='utf-8-sig')
++        before=source.read_bytes();result=runner.invoke(shop.app,['import-csv',str(source),'--output',str(out)])
++        assert result.exit_code==0 and json.loads(out.read_text())==[{'sku':'a','name':'茶,雪\n第二行','quantity':2},{'sku':'b','name':'Milk','quantity':0}]
++        assert source.read_bytes()==before and b'\xe8\x8c\xb6' in out.read_bytes()
++        assert runner.invoke(shop.app,['product','茶','--quantity','3']).stdout.strip()=='茶:3'
++        exported=base/'exported.json';assert runner.invoke(shop.app,['export',str(out),'--output',str(exported)]).exit_code==0
++        source.write_text('sku,name,quantity\n');empty=base/'empty';assert runner.invoke(shop.app,['import-csv',str(source),'--output',str(empty)]).exit_code==0 and json.loads(empty.read_text())==[]
++
++def test_invalid_headers_quantities_duplicates_and_overwrite_leave_no_partial():
++    """校验全部行再发布，已有输出不覆盖。@return None。"""
++    runner=CliRunner()
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'in.csv';out=base/'out'
++        for text in ('sku,name,quantity\na,A,-1\n','sku,name,quantity\na,A,1\na,B,2\n','sku,name,quantity\na,A,true\n','sku,name,quantity,extra\na,A,1,x\n'):
++            source.write_text(text);assert runner.invoke(shop.app,['import-csv',str(source),'--output',str(out)]).exit_code!=0 and not out.exists()
++        source.write_text('sku,name,quantity\na,A,1\n');out.write_text('keep')
++        assert runner.invoke(shop.app,['import-csv',str(source),'--output',str(out)]).exit_code!=0 and out.read_text()=='keep'
++        assert not list(base.glob('.inventory-*'))
+--- a/app/docs/development-typer-02-dev.md
++++ b/app/docs/development-typer-02-dev.md
+@@ -0,0 +1,5 @@
++# 商品应用导入供应商CSV并原子交付规范清单且保留原导出
++
++在已交付product/export商品应用上新增完整供应商CSV导入，三列可换序、BOM/引用多行中文、严格数量/唯一sku；全部验证后独占原子发布新JSON，不改输入/不覆盖输出。共享业务存储只服务后续完整库存工作流，不改Typer库。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/app/inventory_import.py
++++ b/app/inventory_import.py
+@@ -0,0 +1,27 @@
++"""把供应商CSV清单导入既有商品工具的规范JSON。"""
++import csv
++import json
++import re
++from pathlib import Path
++from typing import Annotated
++import typer
++from inventory_store import records,save_catalog
++
++def register(app):
++    """注册真实import-csv命令。@param app 既有Typer应用。@return None。"""
++    @app.command('import-csv')
++    def import_csv(source:Path,output:Annotated[Path,typer.Option('--output')]):
++        """供应商CSV转规范清单。@param source UTF8/带BOM CSV。@param output 不存在的新JSON。@return None，失败非零且无部分输出。"""
++        try:
++            with source.open(encoding='utf-8-sig',newline='') as stream:
++                reader=csv.DictReader(stream)
++                if reader.fieldnames is None or len(reader.fieldnames)!=3 or set(reader.fieldnames)!={'sku','name','quantity'}:raise ValueError('CSV须且仅须sku/name/quantity三列')
++                values=[]
++                for item in reader:
++                    if set(item)!={'sku','name','quantity'} or any(value is None for value in item.values()) or not re.fullmatch('[0-9]+',item['quantity']):raise ValueError('CSV字段数或quantity无效')
++                    values.append({'sku':item['sku'],'name':item['name'],'quantity':int(item['quantity'])})
++                values=records(values)
++            save_catalog(output,values,inputs=(source,))
++        except (OSError,UnicodeError,ValueError,csv.Error) as error:
++            typer.echo('导入失败：'+str(error),err=True);raise typer.Exit(1) from error
++        typer.echo(json.dumps({'imported':len(values)},ensure_ascii=False))
+--- a/app/inventory_store.py
++++ b/app/inventory_store.py
+@@ -0,0 +1,37 @@
++"""商品工作流共享校验与独占原子输出，不改任何输入文件。"""
++import json
++import os
++import tempfile
++from pathlib import Path
++
++def records(value):
++    """校验并复制完整清单。@param value JSON值。@return 按输入顺序的sku/name/quantity字典列表。"""
++    if not isinstance(value,list):raise ValueError('清单必须为对象数组')
++    result=[];seen=set()
++    for item in value:
++        if not isinstance(item,dict):raise ValueError('清单记录必须为对象')
++        if any(not isinstance(item.get(key),str) or not item[key] for key in ('sku','name')):raise ValueError('sku/name须非空字符串')
++        if type(item.get('quantity')) is not int or item['quantity']<0:raise ValueError('quantity须非负整数')
++        if item['sku'] in seen:raise ValueError('sku重复')
++        seen.add(item['sku']);result.append({key:item[key] for key in ('sku','name','quantity')})
++    return result
++
++def load(path):
++    """读取用户JSON，不修改来源。@param path 文件。@return 已校验清单。"""
++    return records(json.loads(Path(path).read_text(encoding='utf-8')))
++
++def save_new(path,text,*,inputs=()):
++    """以同目录临时文件+独占link发布完整输出。@param path 新输出。@param text 完整UTF8内容。@param inputs 所有输入路径。@return None，已有输出/来源同路径/链接拒绝。"""
++    destination=Path(path)
++    if destination.is_symlink() or destination.exists() or any(destination.resolve()==Path(source).resolve() for source in inputs):raise ValueError('拒绝覆盖已有输出或输入')
++    descriptor,temporary=tempfile.mkstemp(prefix='.inventory-',dir=destination.parent)
++    try:
++        with os.fdopen(descriptor,'w',encoding='utf-8',newline='') as target:
++            target.write(text);target.flush();os.fsync(target.fileno())
++        # link不会覆盖检查后由另一个调用方创建的同名文件；发布时已是完整字节。
++        os.link(temporary,destination)
++    finally:Path(temporary).unlink(missing_ok=True)
++
++def save_catalog(path,value,*,inputs=()):
++    """校验全部记录后一次发布新JSON。@param path 输出。@param value 清单。@param inputs 来源。@return None。"""
++    save_new(path,json.dumps(records(value),ensure_ascii=False,indent=2)+'\n',inputs=inputs)
+--- a/app/shop.py
++++ b/app/shop.py
+@@ -7,6 +7,14 @@
+ 
+ 
+ app = typer.Typer(add_completion=False)
++
++# 新命令位于独立业务模块；后续目标只增加对应模块，保留已交付export/product和原Typer。
++from importlib import import_module
++from pathlib import Path as _CommandPath
++for _command_name in ('inventory_import','inventory_adjust','inventory_fulfill','inventory_reconcile','inventory_report'):
++    if (_CommandPath(__file__).parent/(_command_name+'.py')).is_file():
++        import_module(_command_name).register(app)
++
+ 
+ 
+ @app.callback()

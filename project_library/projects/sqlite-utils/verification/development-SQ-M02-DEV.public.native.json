@@ -1,0 +1,14 @@
+{
+  "script": "verification/development-SQ-M02-DEV.public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 1,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_convert.py"
+}

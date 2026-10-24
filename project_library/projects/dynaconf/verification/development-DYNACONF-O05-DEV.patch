@@ -1,0 +1,90 @@
+--- a/library/docs/development-dynaconf-o05-dev.md
++++ b/library/docs/development-dynaconf-o05-dev.md
+@@ -0,0 +1,5 @@
++# 把JSONliteral或本地值解析器限制到当前实例的真实加载路径
++
++对应路线09：实例set_value_parser接入真实tomlfy/env加载，支持json/literal/本地callable/None；显式token优先、非字符串不改，解析失败raise或保原文、编程异常传播且全局不污染。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dynaconf/base.py
++++ b/library/dynaconf/base.py
+@@ -583,6 +583,20 @@
+         :return: The value if found, default or None
+         """
+         return self.get(key, default=default, cast=cast, fresh=True)
++
++    def set_value_parser(self, parser=None, *, errors='raise'):
++        """选择仅作用于当前实例未显式带token的tomlfy字符串解析策略。
++
++        :param parser: None沿用TOML，json/literal或本地可调用解析器。
++        :param errors: raise传播解析错误，string保留原字符串；编程异常不吞。
++        :return: None，显式@token仍优先，其他实例不受影响。
++        """
++        if parser is not None and parser not in ('json', 'literal') and not callable(parser):
++            raise ValueError('未知值解析器')
++        if errors not in ('raise', 'string'):
++            raise ValueError('未知值解析失败政策')
++        self.set('VALUE_PARSER_FOR_DYNACONF', parser, validate=False)
++        self.set('VALUE_PARSER_ERRORS_FOR_DYNACONF', errors, validate=False)
+ 
+     def get_environ(self, key, default=None, cast=None):
+         """Get value from environment variable using os.environ.get
+--- a/library/dynaconf/utils/parse_conf.py
++++ b/library/dynaconf/utils/parse_conf.py
+@@ -567,7 +567,21 @@
+         for converter_key in converter_key_list[::-1]:
+             value = apply_converter(converter_key, value, box_settings)
+     else:
+-        value = parse_with_toml(data) if tomlfy else data
++        profile = box_settings.get('VALUE_PARSER_FOR_DYNACONF') if tomlfy and isinstance(data, str) else None
++        if profile is not None:
++            import ast
++            import json
++            function = {'json': json.loads, 'literal': ast.literal_eval}.get(profile) if isinstance(profile, str) else profile
++            if not callable(function):
++                raise ValueError('未知实例值解析器')
++            try:
++                value = function(data)
++            except (ValueError, SyntaxError):
++                if box_settings.get('VALUE_PARSER_ERRORS_FOR_DYNACONF', 'raise') != 'string':
++                    raise
++                value = data
++        else:
++            value = parse_with_toml(data) if tomlfy else data
+ 
+     if isinstance(value, dict) and box_settings.get("DYNABOXIFY", True):
+         value = DynaBox(value, box_settings=box_settings)
+--- a/library/tests/test_development_dynaconf_o05_dev.py
++++ b/library/tests/test_development_dynaconf_o05_dev.py
+@@ -0,0 +1,31 @@
++"""实例解析配置实际作用于set/env读取，而不修改全局TOML或显式token。"""
++from dynaconf import Dynaconf
++import pytest
++
++def test_json_profile_parses_null_and_arrays_while_default_instance_stays_toml():
++    """JSON null与原TOML字符串有可复现差异，两个实例互不污染。@return None。"""
++    custom=Dynaconf(environments=False);original=Dynaconf(environments=False);custom.set_value_parser('json')
++    custom.set('VALUE','null',tomlfy=True);original.set('VALUE','null',tomlfy=True)
++    assert custom.VALUE is None and original.VALUE=='null'
++    custom.set('ITEMS','[true, null, 2]',tomlfy=True);assert custom.ITEMS==[True,None,2]
++
++def test_explicit_tokens_and_real_environment_loader_keep_priority(monkeypatch):
++    """@str/@int/@merge不被新profile抢走，真实env_loader使用实例策略。@return None。"""
++    from dynaconf.loaders import env_loader
++    settings=Dynaconf(environments=False,envvar_prefix='PROBE');settings.set_value_parser('json')
++    settings.set('TEXT','@str null',tomlfy=True);settings.set('NUMBER','@int 3',tomlfy=True)
++    assert settings.TEXT=='null' and settings.NUMBER==3
++    monkeypatch.setenv('PROBE_VALUE','null');env_loader.load(settings)
++    assert settings.VALUE is None
++
++def test_literal_callable_error_policies_none_and_programming_errors_are_explicit():
++    """literal不执行表达式，坏输入可保原文但编程错误继续传播。@return None。"""
++    settings=Dynaconf(environments=False);settings.set_value_parser('literal');settings.set('VALUE',"('a', 1)",tomlfy=True)
++    assert settings.VALUE==('a',1) or settings.VALUE==['a',1]
++    settings.set_value_parser('json',errors='string');settings.set('VALUE','plain',tomlfy=True);assert settings.VALUE=='plain'
++    settings.set_value_parser('json')
++    with pytest.raises(ValueError):settings.set('VALUE','plain',tomlfy=True)
++    def broken(value):raise RuntimeError('programming error')
++    settings.set_value_parser(broken,errors='string')
++    with pytest.raises(RuntimeError):settings.set('VALUE','x',tomlfy=True)
++    settings.set_value_parser(None);settings.set('VALUE','true',tomlfy=True);assert settings.VALUE is True

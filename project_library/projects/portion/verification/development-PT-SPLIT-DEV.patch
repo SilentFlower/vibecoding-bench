@@ -1,0 +1,69 @@
+--- a/library/docs/development-pt-split-dev.md
++++ b/library/docs/development-pt-split-dev.md
+@@ -0,0 +1,5 @@
++# 按业务切点输出不会重新归并的区间分区
++
++新增split，返回同类原子区间元组，明确切点归左或右。一次性切点排序去重并忽略域外点，保留外边界开闭、空隙、空集、单点和日期端点。分区两两不交且并集等于原集，不修改原有区间自动归并。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/portion/interval.py
++++ b/library/portion/interval.py
+@@ -308,6 +308,31 @@
+                 raise TypeError(f"Unsupported return type {type(value)} for {value}")
+ 
+         return self.__class__(*intervals)
++
++    def split(self, points, *, ownership='right'):
++        """按切点返回不会重新归并的有序区间分区。
++
++        :param points: 有限可迭代切点，重复和域外点忽略。
++        :param ownership: 切点归right或left分区。
++        :return: 同类原子区间组成的tuple；并集恰好等于原集。
++        """
++        if ownership not in ('right', 'left'):
++            raise ValueError('切点归属必须为right或left')
++        ordered = []
++        for point in sorted(points):
++            if not ordered or point != ordered[-1]:
++                ordered.append(point)
++        result = []
++        for atomic in self:
++            lower, left = atomic.lower, atomic.left
++            for point in ordered:
++                if atomic.lower < point < atomic.upper:
++                    right = Bound.OPEN if ownership == 'right' else Bound.CLOSED
++                    result.append(self.__class__.from_atomic(left, lower, point, right))
++                    lower = point
++                    left = Bound.CLOSED if ownership == 'right' else Bound.OPEN
++            result.append(self.__class__.from_atomic(left, lower, atomic.upper, atomic.right))
++        return tuple(part for part in result if not part.empty)
+ 
+     def adjacent(self, other):
+         """
+--- a/library/tests/test_development_pt_split_dev.py
++++ b/library/tests/test_development_pt_split_dev.py
+@@ -0,0 +1,24 @@
++"""切点分区不自动归并，端点所有权明确。"""
++import portion as P
++
++
++def test_right_owned_partition():
++    """会议窗口按两个切点拆成三个不交叠分区。@return None。"""
++    original = P.closedopen(9, 13)
++    parts = original.split([12, 10, 10])
++    assert parts == (P.closedopen(9, 10), P.closedopen(10, 12), P.closedopen(12, 13))
++    assert P.Interval(*parts) == original
++    assert all((one & two).empty for index, one in enumerate(parts) for two in parts[index + 1:])
++
++
++def test_left_ownership_and_open_bounds():
++    """左归属不丢掉开边界。@return None。"""
++    assert P.open(0, 3).split([1], ownership='left') == (P.openclosed(0, 1), P.open(1, 3))
++
++
++def test_disjoint_empty_and_singleton():
++    """域外切点忽略，空集与单点保持。@return None。"""
++    original = P.closed(0, 1) | P.closed(3, 4)
++    assert original.split([-1, 2, 5]) == (P.closed(0, 1), P.closed(3, 4))
++    assert P.empty().split([0]) == ()
++    assert P.singleton(2).split([2]) == (P.singleton(2),)

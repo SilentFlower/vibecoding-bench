@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYDASH-03-DEV",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add public sort_dict_by_keys and sort_dict_by_values in pydash.objects and top-level exports. Accept Mapping, return a new insertion-ordered dict, support optional key and reverse, stable ties, exact key/value pairing and original value identity. Source order/content never mutate; falsey callable keys still execute, invalid input/key and comparison errors propagate clearly. Existing sort_by/objects API unchanged; do not promise chain methods without implementing their static interface.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

@@ -1,0 +1,83 @@
+--- a/library/bottle.py
++++ b/library/bottle.py
+@@ -761,14 +761,33 @@
+         else:
+             return self._mount_wsgi(prefix, app, **options)
+ 
+-    def merge(self, routes):
+-        """ Merge the routes of another :class:`Bottle` application or a list of
+-            :class:`Route` objects into this application. The routes keep their
+-            'owner', meaning that the :data:`Route.app` attribute is not
+-            changed. """
++    def merge(self, routes, prefix=None):
++        """合并真实路由，显式前缀模式克隆到当前应用。
++
++        :param routes: Bottle或Route可迭代集合。
++        :param prefix: None保持旧owner；显式绝对前缀创建当前owner副本。
++        :return: None；不修改来源规则、插件或配置。
++        """
+         if isinstance(routes, Bottle):
+             routes = routes.routes
++        if prefix is None:
++            for route in routes:
++                self.add_route(route)
++            return
++        if not isinstance(prefix, str) or (prefix and not prefix.startswith('/')) or '?' in prefix or '#' in prefix:
++            raise ValueError('路由前缀必须为绝对路径')
++        prefix = prefix.rstrip('/')
++        routes = list(routes)
++        names = {route.name for route in self.routes if route.name}
++        cloned = []
+         for route in routes:
++            if route.name and route.name in names:
++                raise ValueError('合并路由名称冲突')
++            if route.name:
++                names.add(route.name)
++            cloned.append(Route(self, prefix + route.rule, route.method, route.callback,
++                name=route.name, plugins=list(route.plugins), skiplist=list(route.skiplist), **dict(route.config)))
++        for route in cloned:
+             self.add_route(route)
+ 
+     def install(self, plugin):
+--- a/library/docs/development-bottle-o03-dev.md
++++ b/library/docs/development-bottle-o03-dev.md
+@@ -0,0 +1,5 @@
++# 前缀克隆合并原生路由并保留来源应用
++
++显式前缀合并创建当前应用拥有的路由副本，复制路由专有插件、跳过项和配置，来源规则不变。保留动态内置过滤器与反向URL，None仍沿旧owner行为；坏前缀及重名在添加前拒绝。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bottle_o03_dev.py
++++ b/library/test/test_development_bottle_o03_dev.py
+@@ -0,0 +1,31 @@
++"""前缀合并克隆规则并明确目标应用插件归属。"""
++import bottle
++
++def test_prefixed_clone_and_reverse_url():
++    """源规则不变，目标反向URL包含前缀。@return None。"""
++    child, target = bottle.Bottle(), bottle.Bottle()
++    child.route('/item/<name>', name='item', callback=lambda name: name)
++    target.merge(child, prefix='/v1/')
++    assert child.routes[0].rule == '/item/<name>'
++    assert target.routes[0].rule == '/v1/item/<name>' and target.routes[0].app is target
++    assert target.get_url('item', name='x') == '/v1/item/x'
++
++def test_legacy_owner_and_plugins():
++    """旧merge保持owner，前缀副本保留路由专有插件列表。@return None。"""
++    child, legacy, target = bottle.Bottle(), bottle.Bottle(), bottle.Bottle()
++    child.route('/x', callback=lambda: 'ok', apply=[lambda callback: callback])
++    legacy.merge(child)
++    target.merge(child, prefix='/api')
++    assert legacy.routes[0] is child.routes[0]
++    assert target.routes[0].plugins == child.routes[0].plugins
++    assert target.routes[0].plugins is not child.routes[0].plugins
++
++def test_invalid_and_conflicting_names():
++    """坏前缀和重名在添加前拒绝。@return None。"""
++    import pytest
++    child, target = bottle.Bottle(), bottle.Bottle()
++    child.route('/x', name='same', callback=lambda: 'child')
++    target.route('/y', name='same', callback=lambda: 'target')
++    with pytest.raises(ValueError): target.merge(child, prefix='/api')
++    with pytest.raises(ValueError): target.merge(child, prefix='relative')
++    assert len(target.routes) == 1

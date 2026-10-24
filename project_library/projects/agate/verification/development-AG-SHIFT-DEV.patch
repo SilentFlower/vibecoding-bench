@@ -1,0 +1,117 @@
+--- a/library/agate/computations/__init__.py
++++ b/library/agate/computations/__init__.py
+@@ -19,3 +19,5 @@
+ from agate.computations.percentile_rank import PercentileRank
+ from agate.computations.rank import Rank
+ from agate.computations.slug import Slug
++
++from agate.computations.shift import Lag, Lead
+--- a/library/agate/computations/shift.py
++++ b/library/agate/computations/shift.py
+@@ -0,0 +1,57 @@
++"""按已有行顺序计算分组Lag和Lead，不排序或改变输入表。"""
++from agate.computations.base import Computation
++
++
++class _Shift(Computation):
++    def __init__(self, column_name, offset=1, default=None, partition_by=None):
++        """保存位移契约。@param column_name 原列。@param offset 非负行数。@param default 边界值。
++        @param partition_by 分组列或列序列。@return None。
++        """
++        if type(offset) is not int or offset < 0:
++            raise ValueError('位移必须是非负整数')
++        if partition_by is None:
++            partition_by = ()
++        elif isinstance(partition_by, str):
++            partition_by = (partition_by,)
++        elif not isinstance(partition_by, (tuple, list)):
++            raise TypeError('分组必须是列名或有限列序列')
++        if any(not isinstance(name, str) for name in partition_by) or len(set(partition_by)) != len(partition_by):
++            raise ValueError('分组列名必须有效且不重复')
++        self._column_name, self._offset, self._default = column_name, offset, default
++        self._partition_by = tuple(partition_by)
++
++    def get_computed_data_type(self, table):
++        """沿用原列类型。@param table 原表。@return 原DataType。"""
++        return table.columns[self._column_name].data_type
++
++    def validate(self, table):
++        """先核列名与边界默认值。@param table 原表。@return None。"""
++        kind = table.columns[self._column_name].data_type
++        kind.cast(self._default)
++        for name in self._partition_by:
++            table.columns[name]
++
++    def run(self, table):
++        """按分组内原出现顺序位移。@param table 已验证表。@return 与原表等长的值序列。"""
++        default = table.columns[self._column_name].data_type.cast(self._default)
++        result = [default] * len(table.rows)
++        groups = {}
++        for index, row in enumerate(table.rows):
++            key = tuple(row[name] for name in self._partition_by)
++            groups.setdefault(key, []).append(index)
++        for indices in groups.values():
++            for position, index in enumerate(indices):
++                source = position + self._direction * self._offset
++                if 0 <= source < len(indices):
++                    result[index] = table.rows[indices[source]][self._column_name]
++        return result
++
++
++class Lag(_Shift):
++    """前序值。@param column_name 原列。@param offset 非负位移。@param default 边界值。@param partition_by 分组。"""
++    _direction = -1
++
++
++class Lead(_Shift):
++    """后序值。@param column_name 原列。@param offset 非负位移。@param default 边界值。@param partition_by 分组。"""
++    _direction = 1
+--- a/library/development_tests/test_development_ag_shift_dev.py
++++ b/library/development_tests/test_development_ag_shift_dev.py
+@@ -0,0 +1,38 @@
++"""公开分组前后记录回归。"""
++from decimal import Decimal
++import agate
++import pytest
++
++def table():
++    return agate.Table([('a', 10), ('b', 20), ('a', 30), ('b', 40)], ['client', 'value'], [agate.Text(), agate.Number()])
++
++def test_partition_lag_respects_interleaved_original_rows():
++    data = table().compute([('previous', agate.Lag('value', partition_by='client'))])
++    assert data.columns['previous'].values() == (None, None, Decimal(10), Decimal(20))
++
++def test_partition_lead_and_cast_default():
++    data = table().compute([('next', agate.Lead('value', default='99', partition_by=['client']))])
++    assert data.columns['next'].values() == (Decimal(30), Decimal(40), Decimal(99), Decimal(99))
++
++def test_zero_and_large_offsets_keep_type_and_length():
++    source = table()
++    data = source.compute([('same', agate.Lag('value', 0)), ('missing', agate.Lead('value', 100))])
++    assert data.columns['same'].values() == source.columns['value'].values()
++    assert data.columns['missing'].values() == (None,) * 4
++    assert isinstance(data.columns['same'].data_type, agate.Number)
++
++def test_invalid_offset_is_not_silently_coerced():
++    for value in (-1, 1.5, True):
++        with pytest.raises(ValueError):
++            agate.Lag('value', value)
++
++def test_default_and_partition_names_are_checked():
++    with pytest.raises(agate.CastError):
++        table().compute([('x', agate.Lag('value', default='invalid'))])
++    with pytest.raises(KeyError):
++        table().compute([('x', agate.Lag('value', partition_by='unknown'))])
++
++def test_original_table_is_not_mutated():
++    source = table()
++    source.compute([('x', agate.Lead('value'))])
++    assert source.column_names == ('client', 'value')
+--- a/library/docs/development-ag-shift-dev.md
++++ b/library/docs/development-ag-shift-dev.md
+@@ -0,0 +1,5 @@
++# 按客户顺序计算前笔与后笔记录
++
++客户订单需要取同客户前一笔和后一笔数值。Lag/Lead保持原行序与行数，支持交错分组、零／大位移和原列类型默认值；空值仍占一个位置，不排序、不跨组、不修改原表，不把现有Change的同一行语义改成跨行。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

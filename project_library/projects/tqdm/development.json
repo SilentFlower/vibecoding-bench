@@ -1,0 +1,300 @@
+{
+  "project_key": "tqdm",
+  "title": "tqdm后台处理工作场景",
+  "category": "进度显示与业务完成",
+  "seed_digest": "41b4635313eeebe48cc6a55189d16c1d1e1c50b5c28c9d9cb1ef241069fd22b2",
+  "environment": "tqdm-py312",
+  "source": {
+    "repository": "https://github.com/tqdm/tqdm",
+    "commit": "9cf5a12b1f955468a17f0ba3c59092b23e4258ac",
+    "license_files": [
+      "seed/library/LICENCE"
+    ]
+  },
+  "schema": 3,
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
+  "scenarios": [
+    {
+      "id": "TQDM-01-DEV-SCENE",
+      "title": "组合迭代重复数遵守整数协议且总量不溢出",
+      "goal": "组合迭代重复数遵守整数协议且总量不溢出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TQDM-01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQDM-01-DEV",
+          "kind": "modify",
+          "goal": "组合迭代重复数遵守整数协议且总量不溢出",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair tqdm.contrib.itertools.product repeat handling via operator.index before computing totals or delegating to itertools.product. Preserve Python arbitrary-precision exponent totals for numpy integer repeats and custom __index__ objects, standard zero/negative/nonintegral behavior, yielded combinations and explicit total precedence. Do not preconsume unknown-length inputs to infer total; total remains None where lengths are unavailable. Test actual product generation and wrapper-observed totals without enumerating astronomically large products. Preserve other combinator wrappers.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_tqdm_01_dev.py, and Chinese compatibility documentation at library/docs/development-tqdm-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TQDM-01-DEV-contract.md",
+            "materials/TQDM-01-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TQDM-01-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/tqdm/contrib/itertools.py",
+            "library/tests/test_development_tqdm_01_dev.py",
+            "library/docs/development-tqdm-01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TQDM-01-DEV.rubric.json",
+            "native": "verification/TQDM-01-DEV.native.json",
+            "public_native": "verification/TQDM-01-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TQDM-02-DEV-SCENE",
+      "title": "流式管道跨缓冲边界正确识别多字节分隔符并透传原字节",
+      "goal": "流式管道跨缓冲边界正确识别多字节分隔符并透传原字节",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TQDM-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQDM-02-DEV",
+          "kind": "modify",
+          "goal": "流式管道跨缓冲边界正确识别多字节分隔符并透传原字节",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair tqdm.cli.posix_pipe to combine retained tail with each bounded read before delimiter scanning. Handle delimiters split at every byte position, multiple/consecutive delimiters, delimiter-at-EOF, incomplete delimiter suffix and undelimited final record. Forward every original byte exactly once, preserve byte-count mode for delim=b\"\", record-count mode and full-record callback mode used by numeric --update. Reject nonpositive/noninteger buffer size and nonbytes delimiter. Keep caller stream ownership/flush behavior; incomplete records may require record-sized carry memory, not falsely constant memory. Do not decode or execute input records in the generic pipe helper.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_tqdm_02_dev.py, and Chinese compatibility documentation at library/docs/development-tqdm-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TQDM-02-DEV-contract.md",
+            "materials/TQDM-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TQDM-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/tqdm/cli.py",
+            "library/tests/test_development_tqdm_02_dev.py",
+            "library/docs/development-tqdm-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TQDM-02-DEV.rubric.json",
+            "native": "verification/TQDM-02-DEV.native.json",
+            "public_native": "verification/TQDM-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TQDM-03-DEV-SCENE",
+      "title": "IO进度包装按真实成功写入量计数并保留短写与返回值",
+      "goal": "IO进度包装按真实成功写入量计数并保留短写与返回值",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TQDM-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQDM-03-DEV",
+          "kind": "modify",
+          "goal": "IO进度包装按真实成功写入量计数并保留短写与返回值",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair CallbackIOWrapper write reporting: call the actual stream first, use a valid integer-index result as successful count, including zero and short writes, then invoke callback exactly once and return the unchanged original result. Binary buffer capacity uses memoryview.nbytes, text capacity uses character len. Reject bool/non-index/negative/over-capacity returned counts without progress callback; None retains explicitly documented legacy len(data) fallback. A stream write error never advances progress and the wrapper never retries short writes or closes/rewinds caller streams. Preserve the existing read reporting path.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_tqdm_03_dev.py, and Chinese compatibility documentation at library/docs/development-tqdm-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TQDM-03-DEV-contract.md",
+            "materials/TQDM-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TQDM-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/tqdm/utils.py",
+            "library/tests/test_development_tqdm_03_dev.py",
+            "library/docs/development-tqdm-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TQDM-03-DEV.rubric.json",
+            "native": "verification/TQDM-03-DEV.native.json",
+            "public_native": "verification/TQDM-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TQDM-04-DEV-SCENE",
+      "title": "异步完成进度支持无长度任务生成器并保持真实异常语义",
+      "goal": "异步完成进度支持无长度任务生成器并保持真实异常语义",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TQDM-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQDM-04-DEV",
+          "kind": "modify",
+          "goal": "异步完成进度支持无长度任务生成器并保持真实异常语义",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair tqdm_asyncio.as_completed to infer total only when len(fs) is supported. Accept standard asyncio.as_completed task generators under the pinned Python runtime, consume once through the real standard-library scheduler, use unknown total otherwise and preserve explicit total, empty input, timeout/cancellation/task errors and gather result-order behavior. Do not list() tasks solely to obtain a total or swallow non-TypeError length failures. All acceptance tasks use local asyncio.sleep(0), not network services or real accounts.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_tqdm_04_dev.py, and Chinese compatibility documentation at library/docs/development-tqdm-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TQDM-04-DEV-contract.md",
+            "materials/TQDM-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TQDM-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/tqdm/asyncio.py",
+            "library/tests/test_development_tqdm_04_dev.py",
+            "library/docs/development-tqdm-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TQDM-04-DEV.rubric.json",
+            "native": "verification/TQDM-04-DEV.native.json",
+            "public_native": "verification/TQDM-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TQDM-05-DEV-SCENE",
+      "title": "并发进度锁上下文在异常与嵌套退出后精确恢复",
+      "goal": "并发进度锁上下文在异常与嵌套退出后精确恢复",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TQDM-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQDM-05-DEV",
+          "kind": "modify",
+          "goal": "并发进度锁上下文在异常与嵌套退出后精确恢复",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair contrib.concurrent.ensure_lock with finally restoration covering lock creation/subtype selection, normal exit and body/worker exceptions. Preserve exact original lock identity and whether _lock was owned, inherited, absent or explicitly None; a temporary class lock must not leak after failure. Nested contexts restore each prior level and thread_map/process_map continue using the same actual context manager. Keep normal worker error propagation, do not acquire unrelated locks or claim transaction/concurrent class-mutation isolation. Acceptance uses local locks and a one-thread failing worker, never external services.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_tqdm_05_dev.py, and Chinese compatibility documentation at library/docs/development-tqdm-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TQDM-05-DEV-contract.md",
+            "materials/TQDM-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TQDM-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/tqdm/contrib/concurrent.py",
+            "library/tests/test_development_tqdm_05_dev.py",
+            "library/docs/development-tqdm-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TQDM-05-DEV.rubric.json",
+            "native": "verification/TQDM-05-DEV.native.json",
+            "public_native": "verification/TQDM-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "TQDM-06-DEV-SCENE",
+      "title": "环境变量布尔覆盖使用明确真值且保留显式调用优先级",
+      "goal": "环境变量布尔覆盖使用明确真值且保留显式调用优先级",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TQDM-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TQDM-06-DEV",
+          "kind": "modify",
+          "goal": "环境变量布尔覆盖使用明确真值且保留显式调用优先级",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair built-in utils.envwrap boolean inference for actual bool/Optional[bool] annotations, bool defaults and explicit types fallback. Parse case-insensitive stripped true/false/1/0/yes/no/on/off, reject unknown/empty text clearly with parameter name and preserve direct-call argument precedence. Do not turn string-typed \"False\" into bool, change int/float/union inference or evaluate symbolic annotations as code. Keep environment-name prefixes/app precedence and external optional envwrap provider delegation untouched; this delivery targets the pinned built-in provider. Validate with isolated patched synthetic env keys only, no real credential/config changes.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_tqdm_06_dev.py, and Chinese compatibility documentation at library/docs/development-tqdm-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/TQDM-06-DEV-contract.md",
+            "materials/TQDM-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TQDM-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/tqdm/utils.py",
+            "library/tests/test_development_tqdm_06_dev.py",
+            "library/docs/development-tqdm-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TQDM-06-DEV.rubric.json",
+            "native": "verification/TQDM-06-DEV.native.json",
+            "public_native": "verification/TQDM-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    }
+  ]
+}

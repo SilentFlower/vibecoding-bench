@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "INJECTOR-O02-DEV",
+  "source_commit": "5daed12510fafc0bf73b6ef18d2884f78cd5e210",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix noninjectable applied to classes by validating/storing exclusions on the final __init__, preserving original class identity and both inject/noninjectable decorator orders. Handle kw-only/frozen dataclasses and merged multiple exclusions. When restricting an inherited constructor, create a subclass-local metadata wrapper instead of mutating the shared base method. Preserve function/method behavior, get_bindings exclusion, explicit additional_kwargs priority and UnknownArgument for nonexistent parameters; missing manual values must fail rather than auto-inject int zero.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

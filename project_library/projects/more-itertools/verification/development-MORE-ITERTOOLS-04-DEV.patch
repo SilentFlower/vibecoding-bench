@@ -1,0 +1,72 @@
+--- a/library/docs/development-more-itertools-04-dev.md
++++ b/library/docs/development-more-itertools-04-dev.md
+@@ -0,0 +1,5 @@
++# 事件流关联最近已生效版本并执行明确容忍差
++
++路线10：asof_join按已生效时间关联最后右版本，相同时间取最后项；容忍差闭边界、无匹配回退、左右不同key及惰性倒序校验明确。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/more_itertools/_asof_join.py
++++ b/library/more_itertools/_asof_join.py
+@@ -0,0 +1,19 @@
++def asof_join(left,right,key,*,right_key=None,tolerance=None,default=None):
++    """把左事件关联最近不晚于它的右版本。@param left 左有序流。@param right 右有序流。@param key 左时间键。@param right_key 可选右键。@param tolerance 非负容忍差或None。@param default 无匹配值。@return (左项,右项)流。"""
++    if tolerance is not None and tolerance<tolerance-tolerance:raise ValueError("tolerance不能为负")
++    right_key=key if right_key is None else right_key
++    sentinel=object();iterator=iter(right);pending=next(iterator,sentinel)
++    pending_time=right_key(pending) if pending is not sentinel else None
++    previous_right=None;right_started=False;previous_left=None;left_started=False;chosen=sentinel;chosen_time=None
++    for item in left:
++        timestamp=key(item)
++        if left_started and timestamp<previous_left:raise ValueError("左时间倒序")
++        previous_left=timestamp;left_started=True
++        while pending is not sentinel and pending_time<=timestamp:
++            if right_started and pending_time<previous_right:raise ValueError("右时间倒序")
++            chosen,chosen_time=pending,pending_time;previous_right=pending_time;right_started=True
++            pending=next(iterator,sentinel)
++            pending_time=right_key(pending) if pending is not sentinel else None
++            if pending is not sentinel and pending_time<previous_right:raise ValueError("右时间倒序")
++        matched=chosen is not sentinel and (tolerance is None or timestamp-chosen_time<=tolerance)
++        yield item,chosen if matched else default
+--- a/library/more_itertools/more.py
++++ b/library/more_itertools/more.py
+@@ -112,6 +112,7 @@
+     'islice_extended',
+     'iter_suppress',
+     'iterate',
++    'asof_join',
+     'join_mappings',
+     'last',
+     'locate',
+@@ -5175,6 +5176,9 @@
+     )
+ 
+ 
++from ._asof_join import asof_join
++
++
+ def join_mappings(**field_to_map):
+     """
+     Joins multiple mappings together using their common keys.
+--- a/library/tests/test_development_more_itertools_04_dev.py
++++ b/library/tests/test_development_more_itertools_04_dev.py
+@@ -0,0 +1,19 @@
++"""报价生效时间关联用最后一个不晚于左事件的真实版本。"""
++import unittest
++from more_itertools import asof_join
++
++def test_last_duplicate_before_left_and_tolerance():
++    """相同右时间取最后版本，未来报价不能提前生效。@return None。"""
++    left=[(0,'order0'),(2,'order2'),(5,'order5'),(9,'order9')]
++    right=[(1,'v1'),(2,'old'),(2,'new'),(6,'v6')]
++    result=list(asof_join(left,right,lambda value:value[0],tolerance=2,default='missing'))
++    assert result==[(left[0],'missing'),(left[1],right[2]),(left[2],'missing'),(left[3],'missing')]
++    assert list(asof_join(left,right,lambda value:value[0]))[-1][1] is right[-1]
++
++def test_empty_one_shot_distinct_keys_and_invalid_order():
++    """不用物化全表，左右可有不同时间字段。@return None。"""
++    left=[{'at':2}];right=[{'since':1}]
++    assert list(asof_join(iter(left),iter(right),lambda value:value['at'],right_key=lambda value:value['since']))==[(left[0],right[0])]
++    assert list(asof_join(left,[],lambda value:value['at']))==[(left[0],None)]
++    with unittest.TestCase().assertRaises(ValueError):list(asof_join([(2,),(1,)],[],lambda value:value[0]))
++    with unittest.TestCase().assertRaises(ValueError):list(asof_join([(9,)],[(2,),(1,)],lambda value:value[0]))

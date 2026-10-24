@@ -1,0 +1,46 @@
+--- a/library/docs/development-html5lib-o01-dev.md
++++ b/library/docs/development-html5lib-o01-dev.md
+@@ -0,0 +1,5 @@
++# 让DOCTYPE令牌逐字段校验真实publicId及systemId类型
++
++对应路线01：DOCTYPE逐字段检查publicId/systemId而非重复name，name可None时合法文本仍通过；非法值拒绝且真实walker/对象身份/其他lint保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/html5lib/filters/lint.py
++++ b/library/html5lib/filters/lint.py
+@@ -78,8 +78,8 @@
+             elif type == "Doctype":
+                 name = token["name"]
+                 assert name is None or isinstance(name, text_type)
+-                assert token["publicId"] is None or isinstance(name, text_type)
+-                assert token["systemId"] is None or isinstance(name, text_type)
++                assert token["publicId"] is None or isinstance(token["publicId"], text_type)
++                assert token["systemId"] is None or isinstance(token["systemId"], text_type)
+ 
+             elif type == "Entity":
+                 assert isinstance(token["name"], text_type)
+--- a/library/tests/test_development_html5lib_o01_dev.py
++++ b/library/tests/test_development_html5lib_o01_dev.py
+@@ -0,0 +1,22 @@
++"""Doctype lint必须检查每个实际字段，而非错误复用name类型。"""
++from html5lib.filters.lint import Filter
++import pytest
++
++def test_bad_public_and_system_ids_fail_independently_of_valid_name():
++    """name合法不能放行整数/字节/容器ID字段。@return None。"""
++    for key in ['publicId','systemId']:
++        for value in [42,b'bytes',{},[]]:
++            token={'type':'Doctype','name':'html','publicId':None,'systemId':None};token[key]=value
++            with pytest.raises(AssertionError):list(Filter([token]))
++
++def test_optional_name_does_not_reject_valid_text_identifiers():
++    """name可为None，独立文本public/system仍合法且对象身份保持。@return None。"""
++    token={'type':'Doctype','name':None,'publicId':'public','systemId':'system'}
++    assert list(Filter([token]))==[token] and list(Filter([token]))[0] is token
++
++def test_real_tree_walker_doctype_and_other_token_validation_stay_valid():
++    """真实DOM walker声明通过，其他无效注释仍被原lint拒绝。@return None。"""
++    import html5lib
++    tree=html5lib.parse('<!doctype html><p>text',treebuilder='dom')
++    tokens=list(html5lib.getTreeWalker('dom')(tree));assert list(Filter(tokens))==tokens
++    with pytest.raises(AssertionError):list(Filter([{'type':'Comment','data':42}]))

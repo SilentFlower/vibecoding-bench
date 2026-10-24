@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MM-ERRORS-DEV",
+  "source_commit": "b762ea2d59ca52fe5df76b90de14bed7e5ec5607",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement marshmallow.error_paths.flatten_errors(error) and problem(error,*,status=422,title=...). Accept real ValidationError using normalized_messages or native dict/list/string message trees; return frozen ErrorItem(pointer,messages tuple) leaves in original traversal order. Encode JSON Pointer escaping including integer array keys, retain _schema explicitly and all messages, handle root/empty errors and reject cycles/unsupported leaves. problem returns a detached status/title/errors mapping only, never exception data/valid_data or traceback. Preserve original errors and support custom field_name normalization.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

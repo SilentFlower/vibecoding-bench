@@ -1,0 +1,63 @@
+--- a/library/bidict/compose.py
++++ b/library/bidict/compose.py
+@@ -0,0 +1,24 @@
++"""按共同中间域组合两个真实双向映射。"""
++from bidict import BidirectionalMapping
++
++
++def compose(mapping, other, *, missing='error'):
++    """返回同类型的正向组合，两个输入都不修改。
++
++    :param mapping: A到B双向映射。
++    :param other: B到C双向映射。
++    :param missing: error或ignore中间缺项。
++    :return: 按左侧顺序构造的A到C双向映射。
++    """
++    if not isinstance(mapping, BidirectionalMapping) or not isinstance(other, BidirectionalMapping):
++        raise TypeError('组合两侧必须为双向映射')
++    if missing not in ('error', 'ignore'):
++        raise ValueError('未知中间域缺失政策')
++    items = []
++    for key, value in mapping.items():
++        if value not in other:
++            if missing == 'error':
++                raise KeyError(value)
++        else:
++            items.append((key, other[value]))
++    return type(mapping)(items)
+--- a/library/docs/development-bidict-o01-dev.md
++++ b/library/docs/development-bidict-o01-dev.md
+@@ -0,0 +1,5 @@
++# 按共同中间域组合真实双向业务关系
++
++按公共中间域组合两个双向映射，返回同类且可反查的新关系。严格缺项或显式交集策略可选择，保留左侧顺序、None、冻结和有序类型及输入；不改变union或putall。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bidict_o01_dev.py
++++ b/library/tests/test_development_bidict_o01_dev.py
+@@ -0,0 +1,25 @@
++"""组合仍能反查，顺序和源对象保持。"""
++from bidict import bidict, OrderedBidict, frozenbidict
++
++def test_forward_inverse_composition():
++    """正组合的inverse等于反向组合。@return None。"""
++    from bidict.compose import compose
++    left, right = bidict(a=1, b=2), bidict({1: 'x', 2: 'y'})
++    result = compose(left, right)
++    assert result == {'a': 'x', 'b': 'y'}
++    assert result.inverse == compose(right.inverse, left.inverse)
++    assert left == {'a': 1, 'b': 2}
++
++def test_missing_policies():
++    """严格缺项失败，交集策略保留匹配项。@return None。"""
++    import pytest
++    from bidict.compose import compose
++    with pytest.raises(KeyError): compose(bidict(a=1), bidict())
++    assert compose(bidict(a=1), bidict(), missing='ignore') == {}
++
++def test_types_and_order():
++    """有序和冻结结果保持各自类型。@return None。"""
++    from bidict.compose import compose
++    result = compose(OrderedBidict([('b', 2), ('a', 1)]), bidict({1: 'x', 2: 'y'}))
++    assert isinstance(result, OrderedBidict) and list(result) == ['b', 'a']
++    assert isinstance(compose(frozenbidict(a=1), bidict({1: 2})), frozenbidict)

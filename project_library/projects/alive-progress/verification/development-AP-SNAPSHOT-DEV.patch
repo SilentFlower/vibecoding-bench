@@ -1,0 +1,102 @@
+--- a/library/alive_progress/core/progress.py
++++ b/library/alive_progress/core/progress.py
+@@ -12,6 +12,7 @@
+ 
+ from .calibration import calibrated_fps, custom_fps
+ from .configuration import config_handler
++from .snapshots import ProgressSnapshot
+ from .hook_manager import buffered_hook_manager, passthrough_hook_manager
+ from ..utils import terminal
+ from ..utils.cells import combine_cells, fix_cells, print_cells, to_cells
+@@ -346,9 +347,14 @@
+         alive_repr(tbuf)
+         return buffer.getvalue().strip()
+ 
++    def get_snapshot():
++        return ProgressSnapshot(run.count,processed(),total,
++            run.percent if total or config.manual else None,run.elapsed,run.rate,
++            bool(config.manual),bar_handle._handle is not None)
++
+     bar_handle = __AliveBarHandle(pause_monitoring, set_title, set_text,
+                                   current, lambda: run.monitor_text, lambda: run.rate_text,
+-                                  lambda: run.eta_text, lambda: run.elapsed, get_receipt)
++                                  lambda: run.eta_text, lambda: run.elapsed, get_receipt,get_snapshot)
+     set_text(), set_title()
+     start_monitoring()
+     try:
+@@ -446,11 +452,17 @@
+     receipt = _Function()
+ 
+     def __init__(self, pause, set_title, set_text, get_current, get_monitor, get_rate, get_eta,
+-                 get_elapsed, get_receipt):
++                 get_elapsed, get_receipt,get_snapshot=None):
+         self._handle, self._pause, self._current = None, pause, get_current
+         self._title, self._text = set_title, set_text
+         self._monitor, self._rate, self._eta = get_monitor, get_rate, get_eta
+         self._elapsed, self._receipt = get_elapsed, get_receipt
++        self._snapshot = get_snapshot
++
++    def snapshot(self):
++        """取得不可变原始状态。@return ProgressSnapshot，不刷新、推进计时或写输出。
++        """
++        return self._snapshot()
+ 
+     # support for disabling the bar() implementation.
+     def __call__(self, *args, **kwargs):
+--- a/library/alive_progress/core/snapshots.py
++++ b/library/alive_progress/core/snapshots.py
+@@ -0,0 +1,15 @@
++"""进度条最后一次采样的不可变原始状态。"""
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True)
++class ProgressSnapshot:
++    """包含原始计数、总量、比例及最近采样的时间／速率，不写终端。"""
++    count: int
++    processed: float
++    total: object
++    percent: object
++    elapsed: float
++    rate: float
++    manual: bool
++    active: bool
+--- a/library/development_tests/test_development_ap_snapshot_dev.py
++++ b/library/development_tests/test_development_ap_snapshot_dev.py
+@@ -0,0 +1,28 @@
++"""公开原始进度快照回归。"""
++from io import StringIO
++import pytest
++from alive_progress import alive_bar
++
++def test_actual_count_skipped_processed_and_frozen_values():
++    with alive_bar(10,disable=True) as bar:
++        bar(2);first=bar.snapshot();bar(3,skipped=True);second=bar.snapshot()
++        assert first.count==2 and first.processed==2 and second.count==5 and second.processed==2 and second.percent==0.5
++        with pytest.raises((AttributeError,TypeError)):
++            first.count=9
++
++def test_unknown_and_manual_modes_have_explicit_raw_meaning():
++    with alive_bar(disable=True) as bar:
++        bar(3);snapshot=bar.snapshot();assert snapshot.count==3 and snapshot.total is None and snapshot.percent is None
++    with alive_bar(10,manual=True,disable=True) as bar:
++        bar(0.4);snapshot=bar.snapshot();assert snapshot.manual and snapshot.count==4 and snapshot.percent==0.4
++
++def test_snapshot_does_not_write_and_remains_available_after_finish():
++    output=StringIO()
++    with alive_bar(2,file=output,force_tty=False,enrich_print=False,receipt=False) as bar:
++        bar();before=output.getvalue();snapshot=bar.snapshot();assert output.getvalue()==before and snapshot.active
++    assert not bar.snapshot().active and bar.snapshot().count==1
++
++def test_earlier_snapshot_does_not_change_with_later_progress():
++    with alive_bar(3,disable=True) as bar:
++        first=bar.snapshot();bar(2);second=bar.snapshot()
++        assert first.count==0 and second.count==2 and first is not second
+--- a/library/docs/development-ap-snapshot-dev.md
++++ b/library/docs/development-ap-snapshot-dev.md
+@@ -0,0 +1,5 @@
++# 读取无终端副作用的不可变原始进度快照
++
++调用方需要结构化原始进度，不解析显示字符串。快照包含真实计数、处理量、总量和最近采样时间／速率，只读且不可变，不触发渲染或刷新；暂停和结束后也可读取，未知总量与手动比例有明确语义。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

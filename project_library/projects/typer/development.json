@@ -3,7 +3,7 @@
   "project_key": "typer",
   "title": "Typer 本地商品 CLI",
   "category": "命令行工具",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
   "seed_digest": "fd8db542b38dd5da63cdbd625dc964acd6648da242cec842bd161b84c8fa852b",
   "environment": "typer-py312",
   "source": {
@@ -74,6 +74,268 @@
           ],
           "development_cycle": "feature",
           "branches": []
+        }
+      ]
+    },
+    {
+      "id": "TYPER-02-DEV-SCENE",
+      "title": "商品应用导入供应商CSV并原子交付规范清单且保留原导出",
+      "goal": "商品应用导入供应商CSV并原子交付规范清单且保留原导出",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TYPER-02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TYPER-02-DEV",
+          "kind": "modify",
+          "goal": "商品应用导入供应商CSV并原子交付规范清单且保留原导出",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend the already delivered app/shop.py product/export application with real import-csv SOURCE --output NEW_JSON. Require exactly sku/name/quantity CSV headers in any order; UTF8/BOM, normal CSV quoted commas/newlines and Unicode supported, integer ASCII nonnegative quantity and unique nonempty sku/name. Validate all rows before publishing canonical three-field JSON in input order; header-only emits []. Preserve original input, refuse existing/symlink/same-path output, use same-directory completed temp+exclusive link so no partial/overwrite race. Add reusable app/inventory_store.py and command-module registration to support subsequent real business commands without replacing delivered product/export. Do not modify Typer library or dependency environment.\n\nDeliver real implementation, original-failing public tests at app/development_tests/test_development_typer_02_dev.py, and Chinese compatibility documentation at app/docs/development-typer-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "TY-M01-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TYPER-02-DEV-contract.md",
+            "materials/TYPER-02-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TYPER-02-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "app/shop.py",
+            "app/inventory_store.py",
+            "app/inventory_import.py",
+            "app/development_tests/test_development_typer_02_dev.py",
+            "app/docs/development-typer-02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TYPER-02-DEV.rubric.json",
+            "native": "verification/TYPER-02-DEV.native.json",
+            "public_native": "verification/TYPER-02-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TYPER-03-DEV-SCENE",
+      "title": "商品库存调账按明确SKU生成新清单并拒绝负库存或未知商品",
+      "goal": "商品库存调账按明确SKU生成新清单并拒绝负库存或未知商品",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TYPER-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TYPER-03-DEV",
+          "kind": "modify",
+          "goal": "商品库存调账按明确SKU生成新清单并拒绝负库存或未知商品",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd real shop.py adjust SOURCE --sku SKU --delta SIGNED_INT --output NEW_JSON using delivered validated inventory store. Apply delta exactly once to existing unique sku, permit positive/negative/zero changes, reject underflow and unknown sku before any write. Preserve product order/name/other quantities and all input bytes. Publish complete new canonical catalog with original exclusive atomic-output policy, print structured sku/before/delta/after receipt only after success; invalid inputs/existing outputs nonzero without partial result. Keep product/export/import-csv and original Typer source/environment.\n\nDeliver real implementation, original-failing public tests at app/development_tests/test_development_typer_03_dev.py, and Chinese compatibility documentation at app/docs/development-typer-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "TYPER-02-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TYPER-03-DEV-contract.md",
+            "materials/TYPER-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TYPER-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "app/inventory_adjust.py",
+            "app/development_tests/test_development_typer_03_dev.py",
+            "app/docs/development-typer-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TYPER-03-DEV.rubric.json",
+            "native": "verification/TYPER-03-DEV.native.json",
+            "public_native": "verification/TYPER-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TYPER-04-DEV-SCENE",
+      "title": "本地订单履约汇总重复SKU后全单验证并交付库存与凭据",
+      "goal": "本地订单履约汇总重复SKU后全单验证并交付库存与凭据",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TYPER-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TYPER-04-DEV",
+          "kind": "modify",
+          "goal": "本地订单履约汇总重复SKU后全单验证并交付库存与凭据",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd shop.py fulfill CATALOG ORDERS_JSON --output NEW_JSON. Orders is array of existing sku plus strict positive int quantity (bool forbidden); aggregate repeated sku in first-seen order, validate combined demand against real inventory before publishing one complete new catalog. Unknown sku/malformed line/underflow reject whole batch, no input mutation or partial output. Preserve catalog order and unaffected fields, empty batch explicitly copies catalog. Print structured aggregate fulfillment before/after receipt only after exclusive atomic publication; do not publish receipt on failure or silently fulfill partial demand. All earlier commands and original Typer remain.\n\nDeliver real implementation, original-failing public tests at app/development_tests/test_development_typer_04_dev.py, and Chinese compatibility documentation at app/docs/development-typer-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "TYPER-02-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TYPER-04-DEV-contract.md",
+            "materials/TYPER-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TYPER-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "app/inventory_fulfill.py",
+            "app/development_tests/test_development_typer_04_dev.py",
+            "app/docs/development-typer-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TYPER-04-DEV.rubric.json",
+            "native": "verification/TYPER-04-DEV.native.json",
+            "public_native": "verification/TYPER-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TYPER-05-DEV-SCENE",
+      "title": "实盘库存对账以绝对数量交付新账面并准确列出业务差异",
+      "goal": "实盘库存对账以绝对数量交付新账面并准确列出业务差异",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TYPER-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TYPER-05-DEV",
+          "kind": "modify",
+          "goal": "实盘库存对账以绝对数量交付新账面并准确列出业务差异",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd shop.py reconcile CATALOG COUNTS_JSON --output NEW_JSON for a real physical-count reconciliation. Each existing sku appears at most once with strict nonnegative integer absolute quantity; reject duplicate/unknown/negative/bool/malformed records for whole batch. Uncounted items remain unchanged, counted zero is real zero, same value creates no difference. Preserve catalog order/names/input bytes, atomically publish complete new canonical catalog using delivered exclusive output policy. Print counted/changed and exact sku/before/after/delta differences only after success. This differs from delta adjustment/order fulfillment by explicit absolute-count semantics.\n\nDeliver real implementation, original-failing public tests at app/development_tests/test_development_typer_05_dev.py, and Chinese compatibility documentation at app/docs/development-typer-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "TYPER-02-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TYPER-05-DEV-contract.md",
+            "materials/TYPER-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TYPER-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "app/inventory_reconcile.py",
+            "app/development_tests/test_development_typer_05_dev.py",
+            "app/docs/development-typer-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TYPER-05-DEV.rubric.json",
+            "native": "verification/TYPER-05-DEV.native.json",
+            "public_native": "verification/TYPER-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "TYPER-06-DEV-SCENE",
+      "title": "商品低库存报告按真实阈值筛选排序并以CSV保真交付",
+      "goal": "商品低库存报告按真实阈值筛选排序并以CSV保真交付",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "TYPER-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "TYPER-06-DEV",
+          "kind": "modify",
+          "goal": "商品低库存报告按真实阈值筛选排序并以CSV保真交付",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd real shop.py low-stock CATALOG --threshold NONNEGATIVE_INT --output NEW_CSV. Validate catalog first, include quantity zero and exact threshold, stable ascending quantity order with original-order ties. CSV header sku/name/quantity always present including empty selection; Unicode, commas, quotes and multiline names preserve csv roundtrip. Publish new report with exclusive atomic output helper, preserve input bytes and existing reports, reject negative threshold/bad catalog. Print selected count/total selected quantity/threshold only after success. Keep all prior inventory/product/export commands and fixed Typer unchanged; report is a real generated application artifact, not advice or documentation.\n\nDeliver real implementation, original-failing public tests at app/development_tests/test_development_typer_06_dev.py, and Chinese compatibility documentation at app/docs/development-typer-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [
+            {
+              "task_id": "TYPER-02-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/TYPER-06-DEV-contract.md",
+            "materials/TYPER-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/TYPER-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "app/inventory_report.py",
+            "app/development_tests/test_development_typer_06_dev.py",
+            "app/docs/development-typer-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/TYPER-06-DEV.rubric.json",
+            "native": "verification/TYPER-06-DEV.native.json",
+            "public_native": "verification/TYPER-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
         }
       ]
     }

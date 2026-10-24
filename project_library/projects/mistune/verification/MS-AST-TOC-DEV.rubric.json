@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MS-AST-TOC-DEV",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend add_toc_hook with include_nested=False and support renderer=None AST mode. Preserve default top-level heading selection, explicit/custom IDs, allocator collision handling and level bounds. When opted in, walk block-container descendants in source preorder; normalize AST heading display text through completed PlainTextRenderer. Expose real state.env[\"toc_items\"] and assigned heading IDs without HTML renderer assertions. Inline normalization must use an isolated environment so collecting metadata does not register additional footnote references or mutate document plugin state.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

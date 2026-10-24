@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-FRONTMATTER-04-DEV",
+  "source_commit": "d2977d71638cb451bc06f2af3bb48e09e0dbe8c6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add frontmatter.parsing ParseResult/ParseError/parse_result(text, encoding=\"utf-8\", handler=None, defaults=None, strict=False). Results expose status (absent/present/malformed/non_mapping), independent metadata, stripped content, actual handler and error. Explicitly distinguish malformed/split failure and non-mapping roots from absent metadata; empty/null YAML is a valid empty mapping. Strict mode raises ParseError carrying the same result for malformed/non_mapping only. Preserve legacy parse/loads behavior and custom-handler authority. Compact/nested JSON introduced by the earlier delivery must work through the new result API. Decode errors remain real decode errors, never absent status.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

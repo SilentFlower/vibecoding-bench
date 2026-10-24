@@ -1,0 +1,64 @@
+--- a/library/docs/development-more-itertools-03-dev.md
++++ b/library/docs/development-more-itertools-03-dev.md
+@@ -0,0 +1,5 @@
++# 传感器事件按时间跨度输出准确滑动窗口
++
++路线08：每个事件输出[t-span,t]闭区间内完整事件tuple，重复时间按输入次序；缓存仅有效窗口，正跨度/非降序明确，不混入真实时钟。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/more_itertools/_windowed_time.py
++++ b/library/more_itertools/_windowed_time.py
+@@ -0,0 +1,11 @@
++from collections import deque
++def windowed_time(iterable,key,span):
++    """按事件时间生成闭区间窗口。@param iterable 非降序事件。@param key 时间键。@param span 正时间跨度。@return 每个输入事件结束的窗口tuple。"""
++    if span<=span-span:raise ValueError("span必须为正")
++    window=deque();previous=None;started=False
++    for item in iterable:
++        timestamp=key(item)
++        if started and timestamp<previous:raise ValueError("事件时间倒序")
++        window.append((timestamp,item));previous=timestamp;started=True
++        while window and timestamp-window[0][0]>span:window.popleft()
++        yield tuple(value for _,value in window)
+--- a/library/more_itertools/more.py
++++ b/library/more_itertools/more.py
+@@ -174,6 +174,7 @@
+     'unique_to_each',
+     'unzip',
+     'value_chain',
++    'windowed_time',
+     'windowed',
+     'windowed_complete',
+     'with_iter',
+@@ -1022,6 +1023,9 @@
+     counts = Counter(chain.from_iterable(map(set, pool)))
+     uniques = {element for element in counts if counts[element] == 1}
+     return [list(filter(uniques.__contains__, it)) for it in pool]
++
++
++from ._windowed_time import windowed_time
+ 
+ 
+ def windowed(seq, n, fillvalue=None, step=1):
+--- a/library/tests/test_development_more_itertools_03_dev.py
++++ b/library/tests/test_development_more_itertools_03_dev.py
+@@ -0,0 +1,19 @@
++"""窗口只缓存仍在真实事件时间范围内的项。"""
++from datetime import datetime,timedelta
++import unittest
++from more_itertools import windowed_time
++
++def test_dense_sparse_duplicate_and_lower_boundary_inclusive():
++    """窗口为[t-span,t]，每个事件仅对应一个输出。@return None。"""
++    events=[(0,'a'),(2,'b'),(2,'c'),(5,'d'),(10,'e')]
++    result=list(windowed_time(iter(events),lambda event:event[0],3))
++    assert result==[(events[0],),(events[0],events[1]),tuple(events[:3]),tuple(events[1:4]),(events[4],)]
++    assert result[2][0] is events[0]
++
++def test_datetime_empty_invalid_span_and_order():
++    """固定时钟样本和倒序拒绝，无宿主实时依赖。@return None。"""
++    start=datetime(2024,1,1);events=[start,start+timedelta(days=1)]
++    assert list(windowed_time(events,lambda row:row,timedelta(days=1)))==[(start,),tuple(events)]
++    assert list(windowed_time([],lambda row:row,1))==[]
++    for events,span in (([2,1],1),([1],0)):
++        with unittest.TestCase().assertRaises(ValueError):list(windowed_time(events,lambda row:row,span))

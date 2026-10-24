@@ -1,0 +1,25 @@
+{
+  "original_contract_sha256": "f43c260b092644aadceb5c3bb6ea08a5250c646752f02ea1e73801de41b88996",
+  "node_count": 1019,
+  "removed_nodes": 0,
+  "changed_test_bodies": 0,
+  "old_contract_edited": false,
+  "old_runner_edited": false,
+  "mapping": [
+    {
+      "index": 767,
+      "original": "tests/test_send_file.py::test_path[/tmp/bench-native-regression-pv3si5g9/project/tests/res/index.html]",
+      "normalized": "tests/test_send_file.py::test_path[path-case-1]",
+      "parameter": "path",
+      "case": 1
+    },
+    {
+      "index": 748,
+      "original": "tests/test_send_file.py::test_from_directory[/tmp/bench-native-regression-pv3si5g9/project/tests/res-test.txt]",
+      "normalized": "tests/test_send_file.py::test_from_directory[directory-case-0]",
+      "parameter": "directory",
+      "case": 0
+    }
+  ],
+  "reason": "仅规范原pytest参数展示中的随机scratch路径；实际当前路径值和断言继续完整执行，参数身份由控制器留证。"
+}

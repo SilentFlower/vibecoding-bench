@@ -1,0 +1,69 @@
+--- a/library/cerberus/validator.py
++++ b/library/cerberus/validator.py
+@@ -1259,6 +1259,28 @@
+             )
+             self._error(field, errors.EXCLUDES_FIELD, exclusion_str)
+ 
++    def _validate_finite(self, finite, field, value):
++        """可选数值有限性约束，不改变原有number规则。
++
++        :param finite: 是否启用。
++        :param field: 当前字段。
++        :param value: 实际值。
++        :return: None，失败写入原生错误树。
++
++        The rule's arguments are validated against this schema:
++        {'type': 'boolean'}
++        """
++        if not finite:
++            return
++        from decimal import Decimal
++        from math import isfinite
++        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
++            self._error(field, 'finite约束只适用于数值')
++        elif isinstance(value, Decimal) and not value.is_finite():
++            self._error(field, '数值必须有限')
++        elif isinstance(value, float) and not isfinite(value):
++            self._error(field, '数值必须有限')
++
+     def _validate_forbidden(self, forbidden_values, field, value):
+         """{'type': 'list'}"""
+         if isinstance(value, Sequence) and not isinstance(value, _str_type):
+--- a/library/docs/development-cerberus-o02-dev.md
++++ b/library/docs/development-cerberus-o02-dev.md
+@@ -0,0 +1,5 @@
++# 为浮点和Decimal增加显式有限数约束
++
++原生Validator增加显式finite规则并接入错误树，拒绝非有限及非数值输入。支持整数、浮点及注册Decimal，不把大Decimal转float；嵌套可用，未启用规则时原number/min/max行为不改。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cerberus_o02_dev.py
++++ b/library/tests/test_development_cerberus_o02_dev.py
+@@ -0,0 +1,27 @@
++"""finite约束是显式数值域政策，保留默认number行为。"""
++from decimal import Decimal
++from cerberus import Validator, TypeDefinition
++
++def test_finite_float_matrix():
++    """NaN与双向Infinity拒绝，普通值可用。@return None。"""
++    validator = Validator({'value': {'type': 'number', 'finite': True}})
++    assert validator.validate({'value': 0})
++    for value in (float('nan'), float('inf'), -float('inf')):
++        assert not validator.validate({'value': value})
++
++def test_decimal_custom_type():
++    """Decimal不经float降精度或范围转换。@return None。"""
++    class DecimalValidator(Validator):
++        types_mapping = Validator.types_mapping.copy()
++        types_mapping['decimal'] = TypeDefinition('decimal', (Decimal,), ())
++    validator = DecimalValidator({'value': {'type': 'decimal', 'finite': True}})
++    assert validator.validate({'value': Decimal('1e9999')})
++    assert not validator.validate({'value': Decimal('NaN')})
++
++def test_disabled_and_schema_validation():
++    """未启用finite的原行为保持，规则参数严格为bool。@return None。"""
++    import pytest
++    from cerberus import SchemaError
++    assert Validator({'value': {'type': 'number'}}).validate({'value': float('nan')})
++    assert Validator({'value': {'finite': False}}).validate({'value': float('inf')})
++    with pytest.raises(SchemaError): Validator({'value': {'finite': 'yes'}})

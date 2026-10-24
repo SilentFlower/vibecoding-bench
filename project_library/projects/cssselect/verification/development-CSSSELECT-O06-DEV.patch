@@ -1,0 +1,72 @@
+--- a/library/cssselect/editable.py
++++ b/library/cssselect/editable.py
+@@ -0,0 +1,32 @@
++"""静态可编辑选择器，区分表单自身状态与内容编辑继承。"""
++from cssselect.xpath import HTMLTranslator
++
++
++class EditableStateTranslator(HTMLTranslator):
++    """依据文档快照实现read-write/read-only互补状态。
++
++    :param xhtml: 沿用HTMLTranslator构造模式。
++    :return: 不模拟脚本或designMode的静态翻译器。
++    """
++    _namespace = "(namespace-uri() = '' or namespace-uri() = 'http://www.w3.org/1999/xhtml')"
++    _type = "translate(@type, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
++    _readonly_types = ('hidden', 'range', 'color', 'button', 'submit', 'reset', 'image', 'checkbox', 'radio', 'file')
++
++    def _editable_condition(self):
++        """表单控件先按自身状态，其他节点按最近有效contenteditable继承。@return 谓词。"""
++        excluded = ' or '.join(self._type + " = '" + value + "'" for value in self._readonly_types)
++        text_control = self._namespace + " and (local-name() = 'textarea' or (local-name() = 'input' and not(" + excluded + ')))'
++        form_state = '(' + text_control + ') and not(@readonly) and not(@disabled) and not(' + self._disabled_by_fieldset + ')'
++        lower = "translate(@contenteditable, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')"
++        nearest = 'ancestor-or-self::*[' + self._namespace + ' and @contenteditable and (' + lower + " = '' or " + lower + " = 'true' or " + lower + " = 'plaintext-only' or " + lower + " = 'false')][1]"
++        editable = nearest + '[' + lower + " != 'false']"
++        non_control = "not(" + self._namespace + " and (local-name() = 'input' or local-name() = 'textarea'))"
++        return '(' + form_state + ') or (' + non_control + ' and boolean(' + editable + '))'
++
++    def xpath_read_write_pseudo(self, xpath):
++        """只选择静态可推导为可编辑的节点。@return XPathExpr。"""
++        return xpath.add_condition(self._editable_condition())
++
++    def xpath_read_only_pseudo(self, xpath):
++        """对相同作用域取可编辑状态补集。@return XPathExpr。"""
++        return xpath.add_condition('not(' + self._editable_condition() + ')')
+--- a/library/docs/development-cssselect-o06-dev.md
++++ b/library/docs/development-cssselect-o06-dev.md
+@@ -0,0 +1,5 @@
++# 按静态HTML编辑继承和表单状态生成互补选择器
++
++对应路线08：完整交付read-write/read-only互补状态，表单自身readonly/disabled优先，其他节点按最近有效contenteditable继承；明确静态和既有fieldset近似边界。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cssselect_o06_dev.py
++++ b/library/tests/test_development_cssselect_o06_dev.py
+@@ -0,0 +1,26 @@
++"""可编辑继承与表单规则使用真实XPath树求值。"""
++from lxml import etree
++import cssselect
++import pytest
++
++def test_contenteditable_inherit_false_override_and_invalid():
++    """最近有效声明生效，无效值继承，false阻断。@return None。"""
++    from cssselect.editable import EditableStateTranslator
++    root=etree.fromstring('<r><div id="a" contenteditable="true"><p id="b"/><div id="c" contenteditable="false"><b id="d"/></div><i id="e" contenteditable="invalid"/></div></r>')
++    p=EditableStateTranslator();assert [x.get('id') for x in root.xpath(p.css_to_xpath(':read-write'))]==['a','b','e']
++    writable=set(root.xpath(p.css_to_xpath(':read-write')));readonly=set(root.xpath(p.css_to_xpath(':read-only')))
++    assert not writable&readonly and writable|readonly==set(root.iter())
++
++def test_form_text_readonly_disabled_and_nontext():
++    """文本控件不从祖先编辑状态绕过readonly或disabled。@return None。"""
++    from cssselect.editable import EditableStateTranslator
++    root=etree.fromstring('<r contenteditable="true"><input id="a"/><input id="b" readonly=""/><input id="c" disabled=""/><input id="d" type="checkbox"/><textarea id="e"/><textarea id="f" readonly=""/></r>')
++    ids=[x.get('id') for x in root.xpath(EditableStateTranslator().css_to_xpath(':read-write'))]
++    assert ids==[None,'a','e']
++
++def test_plaintext_case_xhtml_and_generic_unchanged():
++    """plaintext-only大小写及XHTML继承，XML通用翻译器仍拒绝。@return None。"""
++    from cssselect.editable import EditableStateTranslator
++    root=etree.fromstring('<h:div xmlns:h="http://www.w3.org/1999/xhtml" contenteditable="PLAINTEXT-ONLY"><h:p id="yes"/></h:div>')
++    assert len(root.xpath(EditableStateTranslator(xhtml=True).css_to_xpath(':read-write')))==2
++    with pytest.raises(cssselect.ExpressionError):cssselect.GenericTranslator().css_to_xpath(':read-write')

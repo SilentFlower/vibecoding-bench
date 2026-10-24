@@ -1,0 +1,99 @@
+--- a/library/docs/development-python-pptx-06-dev.md
++++ b/library/docs/development-python-pptx-06-dev.md
+@@ -0,0 +1,5 @@
++# 多形状按实际边界对齐和等间隙分布且保持层级几何
++
++路线18：同父非旋转形状按整体边界对齐，等间隙分布扣除真实尺寸、保持外边界并用有理数EMU取整；全量校验/失败坐标回滚，ID/Z/尺寸不动，不冒充旋转视觉包围盒。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pptx/layout.py
++++ b/library/src/pptx/layout.py
+@@ -0,0 +1,61 @@
++"""同一坐标空间的轴对齐形状排版，单位保持EMU整数。"""
++from fractions import Fraction
++
++
++def _shapes(values):
++    """先核同父、唯一形状、非旋转与完整几何，避免半更新。"""
++    values=tuple(values)
++    if len({id(shape.element) for shape in values})!=len(values):raise ValueError("形状重复")
++    if values and any(shape._parent is not values[0]._parent for shape in values):raise ValueError("形状不在同一坐标空间")
++    if any(shape.rotation!=0 or any(type(int(value)) is not int or value<0 for value in (shape.width,shape.height)) for shape in values):raise ValueError("仅支持非旋转非负尺寸形状")
++    return values
++
++
++def _apply(positions):
++    """失败恢复原坐标，不改宽高/Z顺序。"""
++    before=[(shape,shape.left,shape.top) for shape,_,_ in positions]
++    try:
++        for shape,left,top in positions:shape.left=left;shape.top=top
++    except Exception:
++        for shape,left,top in before:shape.left=left;shape.top=top
++        raise
++
++
++def align_shapes(shapes,mode):
++    """按整体边界对齐。@param shapes 同父轴对齐形状。@param mode left/right/top/bottom/center_x/center_y。@return 输入顺序形状tuple。"""
++    shapes=_shapes(shapes)
++    if mode not in ("left","right","top","bottom","center_x","center_y"):raise ValueError("未知对齐方式")
++    if not shapes:return shapes
++    left=min(shape.left for shape in shapes);right=max(shape.left+shape.width for shape in shapes)
++    top=min(shape.top for shape in shapes);bottom=max(shape.top+shape.height for shape in shapes)
++    positions=[]
++    for shape in shapes:
++        x,y=shape.left,shape.top
++        if mode=="left":x=left
++        elif mode=="right":x=right-shape.width
++        elif mode=="top":y=top
++        elif mode=="bottom":y=bottom-shape.height
++        elif mode=="center_x":x=(left+right-shape.width)//2
++        else:y=(top+bottom-shape.height)//2
++        positions.append((shape,x,y))
++    _apply(positions)
++    return shapes
++
++
++def distribute_shapes(shapes,axis="x"):
++    """保持外侧边界并均分可用间隙。@param shapes 同父轴对齐形状。@param axis x/y。@return 输入顺序tuple，少于3项不动。"""
++    shapes=_shapes(shapes)
++    if axis not in ("x","y"):raise ValueError("未知axis")
++    if len(shapes)<3:return shapes
++    position,size=("left","width") if axis=="x" else ("top","height")
++    ordered=sorted(shapes,key=lambda shape:getattr(shape,position))
++    start=getattr(ordered[0],position);end=getattr(ordered[-1],position)+getattr(ordered[-1],size)
++    gap=Fraction(end-start-sum(getattr(shape,size) for shape in ordered),len(ordered)-1)
++    if gap<0:raise ValueError("可用间隙为负")
++    cursor=Fraction(start);positions=[]
++    for shape in ordered:
++        value=round(cursor)
++        positions.append((shape,value if axis=="x" else shape.left,value if axis=="y" else shape.top))
++        cursor+=getattr(shape,size)+gap
++    _apply(positions)
++    return shapes
+--- a/library/tests/test_development_python_pptx_06_dev.py
++++ b/library/tests/test_development_python_pptx_06_dev.py
+@@ -0,0 +1,24 @@
++"""对齐与等距分布以EMU几何真实保存，不依赖截图猜测。"""
++from io import BytesIO
++import unittest
++from pptx import Presentation
++from pptx.layout import align_shapes,distribute_shapes
++
++def test_align_and_equal_gaps_with_unequal_widths_roundtrip():
++    """外侧边界保持，内侧间隙按宽度扣除而非等距左边点。@return None。"""
++    presentation=Presentation();slide=presentation.slides.add_slide(presentation.slide_layouts[6])
++    shapes=[slide.shapes.add_textbox(left,top,width,100000) for left,top,width in ((0,200000,100000),(270000,80000,200000),(700000,400000,100000))]
++    ids=[shape.shape_id for shape in shapes];align_shapes(shapes,'top');distribute_shapes(shapes,'x')
++    assert [shape.left for shape in shapes]==[0,300000,700000] and all(shape.top==80000 for shape in shapes)
++    output=BytesIO();presentation.save(output);output.seek(0);restored=Presentation(output).slides[0].shapes
++    assert [shape.left for shape in restored]==[0,300000,700000] and [shape.shape_id for shape in restored]==ids
++
++def test_centers_empty_and_invalid_rotated_or_mixed_parent_atomic():
++    """不处理旋转包围盒或跨组坐标，错误不留半更新。@return None。"""
++    presentation=Presentation();slide=presentation.slides.add_slide(presentation.slide_layouts[6])
++    a=slide.shapes.add_textbox(0,0,100,200);b=slide.shapes.add_textbox(500,500,200,100)
++    align_shapes([a,b],'center_x');assert a.left*2+a.width==b.left*2+b.width
++    assert align_shapes([],'left')==()
++    b.rotation=10;before=(a.left,a.top,b.left,b.top)
++    with unittest.TestCase().assertRaises(ValueError):align_shapes([a,b],'left')
++    assert (a.left,a.top,b.left,b.top)==before

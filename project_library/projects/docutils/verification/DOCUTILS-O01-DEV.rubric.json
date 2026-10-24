@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DOCUTILS-O01-DEV",
+  "source_commit": "3577cb69446ed0c94c15f9b0836571d6d5c46882",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix docutils.__main__.main ImportError handling so missing reader/parser/writer reports failure on stderr, exits nonzero and emits no stdout document/help hint or target artifact. Preserve explicit --traceback reraising with stack and normal successful HTML publication/exit. Do not swallow failures as success, change valid component selection or broadly catch arbitrary developer exceptions. Demonstrate actual python -m docutils subprocess behavior with isolated config.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,84 @@
+--- a/library/docs/development-cattrs-o06-dev.md
++++ b/library/docs/development-cattrs-o06-dev.md
+@@ -0,0 +1,5 @@
++# 按形状结构化单条记录或单序列联合
++
++明确配置单记录或单序列联合，映射选择记录、非文本Sequence选择序列，实际嵌套转换仍委托当前转换器钩子。支持空序列、tuple和自定义元素钩子；文本、bytes、生成器及多分支歧义明确拒绝，其他联合不受影响。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/cattrs/strategies/sequence_union.py
++++ b/library/src/cattrs/strategies/sequence_union.py
+@@ -0,0 +1,35 @@
++"""明确单序列联合的按输入形状分支策略。"""
++from collections.abc import Mapping, Sequence
++from dataclasses import is_dataclass
++from types import UnionType
++from typing import Union, get_args, get_origin
++from attrs import has
++
++
++def configure_sequence_union(converter, union):
++    """为恰好一个序列分支和一个记录分支注册真实结构钩子。
++
++    :param converter: 当前真实转换器。
++    :param union: 两分支联合，序列为list/tuple/Sequence，另一侧为attrs/dataclass/dict。
++    :return: 同一转换器；不改变其他联合默认选择。
++    """
++    if get_origin(union) not in (UnionType, Union):
++        raise TypeError('需要联合类型')
++    branches = get_args(union)
++    sequences = [branch for branch in branches if (get_origin(branch) or branch) in (list, tuple, Sequence)]
++    records = [branch for branch in branches if branch not in sequences]
++    if len(sequences) != 1 or len(records) != 1:
++        raise TypeError('需要恰好一个序列和一个记录分支')
++    sequence, record = sequences[0], records[0]
++    record_type = get_origin(record) or record
++    if not (is_dataclass(record_type) or has(record_type) or record_type is dict):
++        raise TypeError('非序列分支必须为受支持记录')
++    def structure(value, target):
++        """只按明确形状选择，再委托现有真实钩子。@param value 输入。@param target 联合。@return 记录或序列。"""
++        if isinstance(value, Mapping):
++            return converter.structure(value, record)
++        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
++            return converter.structure(value, sequence)
++        raise TypeError('联合输入必须为映射或非文本序列')
++    converter.register_structure_hook(union, structure)
++    return converter
+--- a/library/tests/test_development_cattrs_o06_dev.py
++++ b/library/tests/test_development_cattrs_o06_dev.py
+@@ -0,0 +1,35 @@
++"""同一API可接单条记录或一组记录，仍走真实嵌套钩子。"""
++from dataclasses import dataclass
++from collections.abc import Sequence
++import pytest
++from cattrs import Converter
++
++@dataclass
++class Product:
++    """真实产品记录。"""
++    quantity: int
++
++def test_mapping_and_sequence():
++    """字典结构成单条，列表结构成序列。@return None。"""
++    from cattrs.strategies.sequence_union import configure_sequence_union
++    target = Sequence[Product] | Product
++    converter = configure_sequence_union(Converter(), target)
++    assert converter.structure({'quantity': '2'}, target) == Product(2)
++    assert list(converter.structure([{'quantity': '3'}], target)) == [Product(3)]
++
++def test_empty_tuple_and_nested_hook():
++    """空序列及tuple可用，元素继续应用用户钩子。@return None。"""
++    from cattrs.strategies.sequence_union import configure_sequence_union
++    target = list[Product] | Product
++    converter = Converter()
++    converter.register_structure_hook(int, lambda value, target: int(value) + 10)
++    configure_sequence_union(converter, target)
++    assert converter.structure([], target) == []
++    assert converter.structure(({'quantity': '1'},), target) == [Product(11)]
++
++def test_text_and_ambiguous_rejected():
++    """文本不当业务序列，多个序列分支拒绝。@return None。"""
++    from cattrs.strategies.sequence_union import configure_sequence_union
++    converter = configure_sequence_union(Converter(), list[Product] | Product)
++    with pytest.raises(TypeError): converter.structure('not a record', list[Product] | Product)
++    with pytest.raises(TypeError): configure_sequence_union(Converter(), list[int] | tuple[int, ...])

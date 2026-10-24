@@ -1,0 +1,98 @@
+--- a/library/bottle.py
++++ b/library/bottle.py
+@@ -2576,6 +2576,12 @@
+ 
+                 res.add_path('./resources/', __file__)
+         """
++        original_path = path
++        path = os.fsdecode(os.fspath(path))
++        if isinstance(original_path, os.PathLike) and os.path.isdir(path):
++            path += os.sep
++        if base is not None:
++            base = os.fsdecode(os.fspath(base))
+         base = os.path.abspath(os.path.dirname(base or self.base))
+         path = os.path.abspath(os.path.join(base, os.path.dirname(path)))
+         path += os.sep
+@@ -2679,7 +2685,9 @@
+             :param overwrite: If True, replace existing files. (default: False)
+             :param chunk_size: Bytes to read at a time. (default: 64kb)
+         """
+-        if isinstance(destination, str):  # Except file-likes here
++        if isinstance(destination, (str, bytes, os.PathLike)):
++            destination = os.fsdecode(os.fspath(destination))
++        if isinstance(destination, str):  # 路径与调用者流明确区分
+             if os.path.isdir(destination):
+                 destination = os.path.join(destination, self.filename)
+             if not overwrite and os.path.exists(destination):
+@@ -2760,7 +2768,8 @@
+         check or continue partial downloads) are also handled automatically.
+     """
+ 
+-    root = os.path.join(os.path.abspath(root), '')
++    root = os.path.join(os.path.abspath(os.fsdecode(os.fspath(root))), '')
++    filename = os.fsdecode(os.fspath(filename))
+     filename = os.path.abspath(os.path.join(root, filename.strip('/\\')))
+     headers = headers.copy() if headers else {}
+     getenv = request.environ.get
+@@ -3961,10 +3970,12 @@
+         The encoding parameter should be used to decode byte strings or files.
+         The settings parameter contains a dict for engine-specific settings.
+         """
+-        self.name = name
++        self.name = os.fsdecode(os.fspath(name)) if name is not None else None
++        if isinstance(lookup, (str, bytes, os.PathLike)):
++            lookup = [lookup]
+         self.source = source.read() if hasattr(source, 'read') else source
+         self.filename = source.filename if hasattr(source, 'filename') else None
+-        self.lookup = [os.path.abspath(x) for x in lookup] if lookup else []
++        self.lookup = [os.path.abspath(os.fsdecode(os.fspath(x))) for x in lookup] if lookup else []
+         self.encoding = encoding
+         self.settings = self.settings.copy()  # Copy from class variable
+         self.settings.update(settings)  # Apply
+--- a/library/docs/development-bottle-o01-dev.md
++++ b/library/docs/development-bottle-o01-dev.md
+@@ -0,0 +1,5 @@
++# 在原生文件入口识别真实PathLike并保持流所有权
++
++上传、静态文件、模板名与搜索目录、资源目录入口统一使用真实fspath协议。路径和流明确区分，支持目录目标及自定义PathLike；非法返回类型不伪装为字符串，调用者流、冲突规则和静态目录边界保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bottle_o01_dev.py
++++ b/library/test/test_development_bottle_o01_dev.py
+@@ -0,0 +1,36 @@
++"""真实PathLike应作为路径，流所有权保持。"""
++import io
++from pathlib import Path
++import bottle
++
++def test_upload_path_and_stream(tmp_path):
++    """路径和目录上传实际保存，外部流不关闭。@param tmp_path 临时目录。@return None。"""
++    upload = bottle.FileUpload(io.BytesIO(b'hello'), 'file', 'name.txt')
++    upload.save(tmp_path / 'target.txt')
++    assert (tmp_path / 'target.txt').read_bytes() == b'hello'
++    output = io.BytesIO()
++    upload.save(output)
++    assert output.getvalue() == b'hello' and not output.closed
++
++def test_template_pathlike_lookup(tmp_path):
++    """模板名和单目录PathLike真实渲染。@param tmp_path 临时目录。@return None。"""
++    (tmp_path / 'view.tpl').write_text('Hello {{name}}', encoding='utf-8')
++    template = bottle.SimpleTemplate(name=Path('view'), lookup=tmp_path)
++    assert template.render(name='world') == 'Hello world'
++
++def test_custom_fspath_and_invalid(tmp_path):
++    """遵守__fspath__协议，不用str伪造路径。@param tmp_path 临时目录。@return None。"""
++    import pytest
++    class Location:
++        """自定义真实路径。"""
++        def __fspath__(self):
++            """返回本次目标。@return 字符串路径。"""
++            return str(tmp_path / 'custom.txt')
++    bottle.FileUpload(io.BytesIO(b'x'), 'file', 'x').save(Location())
++    assert (tmp_path / 'custom.txt').read_bytes() == b'x'
++    class Invalid:
++        """错误路径协议。"""
++        def __fspath__(self):
++            """故意返回非法类型。@return int。"""
++            return 7
++    with pytest.raises(TypeError): bottle.FileUpload(io.BytesIO(b'x'), 'file', 'x').save(Invalid())

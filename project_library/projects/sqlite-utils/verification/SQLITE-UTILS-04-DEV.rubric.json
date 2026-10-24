@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SQLITE-UTILS-04-DEV",
+  "source_commit": "9c66bafa52ae23d40499c74b0db3b635bcddb876",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Forward existing ignore_extras/extras_key through recursive rows_from_file calls for explicit TSV and automatic CSV/TSV detection. All entry paths must collect extras list, ignore extras or default RowError identically, while short rows retain None and mutually exclusive options remain rejected before consumption. Preserve existing resource-close iterator behavior, explicit dialect and data values. Do not bypass bad rows, change CLI default truncate policy or claim the automatic sniffing defect itself fixed by this goal.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

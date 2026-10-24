@@ -1,0 +1,95 @@
+--- a/library/docs/development-jsonschema-o06-dev.md
++++ b/library/docs/development-jsonschema-o06-dev.md
+@@ -0,0 +1,5 @@
++# 显式组合内建格式与业务约束且保持短路及异常cause
++
++对应路线12：当前FormatChecker显式组合已有格式与业务检查，all/any按序短路、声明异常cause保留，未声明错误传播；原checks覆盖和其他实例/全局登记不改。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/jsonschema/_format.py
++++ b/library/jsonschema/_format.py
+@@ -113,6 +113,46 @@
+             return func
+ 
+         return _checks
++
++    def compose(self, format, checker, *, mode='all', raises=()):
++        """在当前实例上显式组合已有格式与业务检查，不改其他实例或全局登记。
++
++        :param format: 已在当前实例登记的格式名称。
++        :param checker: 新增业务可调用检查器。
++        :param mode: all顺序全部成立，any顺序任意成立，均短路。
++        :param raises: 业务检查声明的用户输入异常族，其他异常传播。
++        :return: 当前FormatChecker，原checks覆盖语义保持。
++        """
++        if mode not in ('all', 'any'):
++            raise ValueError('组合模式必须为all或any')
++        if not callable(checker):
++            raise TypeError('checker必须可调用')
++        declared = raises if isinstance(raises, tuple) else (raises,)
++        if not all(isinstance(item, type) and issubclass(item, Exception) for item in declared):
++            raise TypeError('raises必须为Exception子类或其tuple')
++        original, original_raises = self.checkers[format]
++        previous = original_raises if isinstance(original_raises, tuple) else (original_raises,)
++        failures = tuple(dict.fromkeys(previous + declared))
++        def composed(instance):
++            """只捕获各检查器声明的输入异常，保留真实cause。@return 组合布尔结果。"""
++            last_cause = None
++            for function, exceptions in ((original, previous), (checker, declared)):
++                try:
++                    valid = bool(function(instance))
++                except exceptions as error:
++                    valid = False
++                    last_cause = error
++                if mode == 'all' and not valid:
++                    if last_cause is not None:
++                        raise last_cause
++                    return False
++                if mode == 'any' and valid:
++                    return True
++            if mode == 'any' and last_cause is not None:
++                raise last_cause
++            return mode == 'all'
++        self.checkers[format] = (composed, failures)
++        return self
+ 
+     def check(self, instance: object, format: str) -> None:
+         """
+--- a/library/tests/test_development_jsonschema_o06_dev.py
++++ b/library/tests/test_development_jsonschema_o06_dev.py
+@@ -0,0 +1,35 @@
++"""内建格式与业务约束显式组合，不靠覆盖丢失原校验。"""
++from jsonschema import FormatChecker,Draft202012Validator
++from jsonschema.exceptions import FormatError
++import pytest
++
++def test_builtin_date_and_business_year_shortcircuit_without_global_change():
++    """先真实日期语法再业务年份，另一个checker完全不受影响。@return None。"""
++    checker=FormatChecker();other=FormatChecker();calls=[]
++    checker.compose('date',lambda value:calls.append(value) or value.startswith('2026-'),mode='all')
++    assert checker.conforms('2026-02-01','date') and not checker.conforms('2025-02-01','date')
++    assert not checker.conforms('not-a-date','date') and calls==['2026-02-01','2025-02-01']
++    assert other.conforms('2025-02-01','date')
++    validator=Draft202012Validator({'format':'date'},format_checker=checker);assert not validator.is_valid('2025-02-01')
++
++def test_any_shortcircuit_declared_errors_and_original_causes():
++    """any在旧格式成功即停，全部失败保留声明异常原因。@return None。"""
++    checker=FormatChecker();calls=[]
++    checker.compose('date',lambda value:calls.append(value) or value=='today',mode='any')
++    assert checker.conforms('2026-02-01','date') and calls==[]
++    assert checker.conforms('today','date') and calls==['today']
++    other=FormatChecker()
++    def domain(value):raise LookupError('domain rejected')
++    other.compose('date',domain,raises=LookupError)
++    with pytest.raises(FormatError) as caught:other.check('2026-01-01','date')
++    assert isinstance(caught.value.cause,LookupError)
++
++def test_invalid_compositions_and_programming_errors_keep_explicit_boundaries():
++    """未知名称/模式/非回调拒绝，未声明编程错误不被吞为用户格式失败。@return None。"""
++    checker=FormatChecker()
++    with pytest.raises(KeyError):checker.compose('unknown',lambda value:True)
++    with pytest.raises(ValueError):checker.compose('date',lambda value:True,mode='maybe')
++    with pytest.raises(TypeError):checker.compose('date',None)
++    def broken(value):raise RuntimeError('programming error')
++    checker.compose('date',broken)
++    with pytest.raises(RuntimeError):checker.check('2026-01-01','date')

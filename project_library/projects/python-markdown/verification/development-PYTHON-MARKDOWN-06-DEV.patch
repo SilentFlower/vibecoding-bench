@@ -1,0 +1,80 @@
+--- a/library/docs/development-python-markdown-06-dev.md
++++ b/library/docs/development-python-markdown-06-dev.md
+@@ -0,0 +1,5 @@
++# 文件文档转换明确PathLike、双向编码与流所有权并安全提交
++
++路线14/15/20合并为完整文件转换入口：PathLike及标准文本/二进制流，输入输出编码独立，当前游标与调用方所有权明确；返回前置真实结构化结果。路径输出先完整编码再原子替换，失败保原字节并清临时文件，旧API不改。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/markdown/documents.py
++++ b/library/markdown/documents.py
+@@ -0,0 +1,39 @@
++"""显式编码和流所有权的文件转换入口，返回真实结构化结果。"""
++import io
++import os
++import stat
++import tempfile
++from pathlib import Path
++from .results import convert_document
++
++
++def convert_file(input,output=None,input_encoding='utf-8',output_encoding='utf-8',close_input=False,**options):
++    """转换路径或调用方流，不静默关闭外部对象。@param input 路径或可读流。@param output 路径/可写流/None。@param input_encoding 字节解码。@param output_encoding 输出编码。@param close_input 是否主动关闭调用方输入。@param options 真实转换选项。@return ConversionResult。"""
++    if type(close_input) is not bool:raise ValueError('close_input必须为bool')
++    owned=isinstance(input,(str,os.PathLike))
++    try:
++        if owned:raw=Path(input).read_bytes()
++        else:raw=input.read()
++        text=raw.decode(input_encoding) if isinstance(raw,bytes) else raw
++        if not isinstance(text,str):raise TypeError('输入流必须返回str或bytes')
++        result=convert_document(text,**options)
++        if output is None:return result
++        if not isinstance(output,(str,os.PathLike)):
++            payload=result.html.encode(output_encoding) if isinstance(output,(io.BufferedIOBase,io.RawIOBase)) else result.html
++            output.write(payload)
++            return result
++        # 先编码全部结果，失败时不截断目标路径；路径输出采用原子替换。
++        payload=result.html.encode(output_encoding);target=Path(output);info=target.lstat() if target.exists() or target.is_symlink() else None
++        if info is not None and not stat.S_ISREG(info.st_mode):raise ValueError('输出路径必须是普通文件')
++        temporary=None
++        try:
++            descriptor,temporary=tempfile.mkstemp(prefix='.'+target.name+'.',dir=target.parent)
++            with os.fdopen(descriptor,'wb') as destination:
++                if info is not None:os.fchmod(destination.fileno(),stat.S_IMODE(info.st_mode))
++                destination.write(payload);destination.flush();os.fsync(destination.fileno())
++            os.replace(temporary,target);temporary=None
++        finally:
++            if temporary is not None:os.unlink(temporary)
++        return result
++    finally:
++        if close_input and not owned:input.close()
+--- a/library/tests/test_development_python_markdown_06_dev.py
++++ b/library/tests/test_development_python_markdown_06_dev.py
+@@ -0,0 +1,27 @@
++"""路径、文本/二进制流显式编码并保留调用方所有权。"""
++import io
++import tempfile
++import unittest
++from pathlib import Path
++from markdown.documents import convert_file
++
++
++def test_pathlike_input_output_and_independent_encodings():
++    """真正读取Path并从UTF16文档写UTF8 HTML，返回结构化目录。@return None。"""
++    with tempfile.TemporaryDirectory() as temporary:
++        source=Path(temporary)/'input.md';output=Path(temporary)/'output.html'
++        source.write_bytes('# 中文'.encode('utf-16-le'))
++        result=convert_file(source,output,input_encoding='utf-16-le',output_encoding='utf-8',extensions=['markdown.extensions.toc'])
++        assert output.read_text() == result.html and result.toc_tokens[0]['name']=='中文'
++
++
++def test_stream_cursor_ownership_and_encoding_failure_preserves_file():
++    """流不倒带、不关闭，显式close输入可选，失败不截断旧输出。@return None。"""
++    stream=io.BytesIO(b'ignored# Title');stream.seek(7);output=io.BytesIO()
++    result=convert_file(stream,output,output_encoding='utf-16-le')
++    assert output.getvalue().decode('utf-16-le')==result.html and not stream.closed and not output.closed
++    text=io.StringIO('body');convert_file(text,close_input=True);assert text.closed
++    with tempfile.TemporaryDirectory() as temporary:
++        path=Path(temporary)/'out';path.write_bytes(b'old')
++        with unittest.TestCase().assertRaises(UnicodeEncodeError):convert_file(io.StringIO('中文'),path,output_encoding='ascii')
++        assert path.read_bytes()==b'old'

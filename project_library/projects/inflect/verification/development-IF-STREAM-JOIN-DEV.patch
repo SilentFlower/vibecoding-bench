@@ -1,0 +1,74 @@
+--- a/library/development_tests/test_development_if_stream_join_dev.py
++++ b/library/development_tests/test_development_if_stream_join_dev.py
+@@ -0,0 +1,22 @@
++"""公开英语列表文本流回归。"""
++import pytest
++from inflect.streams import iter_join
++
++def test_empty_single_pair_and_many_are_distinct():
++    assert ''.join(iter_join([]))=='' and ''.join(iter_join(['a']))=='a'
++    assert ''.join(iter_join(['a','b']))=='a and b'
++    assert ''.join(iter_join(['a','b','c','d']))=='a, b, c, and d'
++
++def test_streaming_has_bounded_lookahead_and_no_initial_consumption():
++    calls=[]
++    def source():
++        for index in range(1000): calls.append(index);yield str(index)
++    result=iter_join(source());assert calls==[] and next(result)=='0' and len(calls)<=3
++
++def test_explicit_oxford_and_pair_policies_preserve_empty_elements():
++    assert ''.join(iter_join(['a','b','c'],final=' and '))=='a, b and c'
++    assert ''.join(iter_join(['','b'],pair='/'))=='/b'
++
++def test_invalid_inputs_and_late_generator_errors_propagate():
++    with pytest.raises(TypeError): iter_join('abc')
++    with pytest.raises(TypeError): list(iter_join(['a',3]))
+--- a/library/docs/development-if-stream-join-dev.md
++++ b/library/docs/development-if-stream-join-dev.md
+@@ -0,0 +1,5 @@
++# 提供有限前瞻的英语列表文本流并明确两项和末项分隔
++
++为大型报表输出提供有限前瞻的连接器，不物化整个词项流。零项、两项与多项规则明确，可控制牛津逗号且保留空词项，消费节奏受下游控制；已输出流不承诺回滚。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/inflect/streams.py
++++ b/library/inflect/streams.py
+@@ -0,0 +1,38 @@
++"""只保留有限前瞻的英语列表文本流。"""
++_END=object()
++
++
++def iter_join(words,*,sep=', ',pair=' and ',final=', and '):
++    """流式连接文本词项。@param words 文本迭代器，不接受裸字符串。
++    @param sep 中间分隔。@param pair 两项分隔。@param final 三项以上末项分隔。
++    @return 文本块迭代器，最多前瞻三项；输出开始后来源错误不会回滚。
++    """
++    if isinstance(words,(str,bytes)) or any(not isinstance(value,str) for value in (sep,pair,final)):
++        raise TypeError('需要词项迭代器和文本分隔符')
++    iterator=iter(words)
++    def take():
++        value=next(iterator,_END)
++        if value is not _END and not isinstance(value,str):
++            raise TypeError('每个词项必须为文本')
++        return value
++    def produce():
++        first=take()
++        if first is _END:
++            return
++        second=take()
++        if second is _END:
++            yield first
++            return
++        third=take()
++        if third is _END:
++            yield first;yield pair;yield second
++            return
++        yield first
++        current=second;following=third
++        while True:
++            yield sep;yield current
++            current=following;following=take()
++            if following is _END:
++                yield final;yield current
++                return
++    return produce()

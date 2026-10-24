@@ -1,0 +1,99 @@
+--- a/library/docs/development-markdownify-o03-dev.md
++++ b/library/docs/development-markdownify-o03-dev.md
+@@ -0,0 +1,5 @@
++# 统一解析链接图像视频及海报的真实目的地
++
++对应路线10：a/img/video/source及poster共用真实urljoin和一次回调，锚点/空地址不伪造；回调可省略目的地且类型明确，无网络访问。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/markdownify/__init__.py
++++ b/library/markdownify/__init__.py
+@@ -435,13 +435,38 @@
+         text = (text or '').rstrip()
+         return '\n\n%s\n%s\n\n' % (text, pad_char * len(text)) if text else ''
+ 
++    def _resolve_url(self, value, kind):
++        """统一解析实际链接目的地，不触发任何网络访问。
++
++        :param value: HTML中的原目的地，空值保持无目的地。
++        :param kind: link、image、video或poster。
++        :return: 基址解析并由回调一次变换后的字符串，None回调结果表示省略。
++        """
++        from urllib.parse import urljoin
++        if not value:
++            return ''
++        base = self.options.get('base_url')
++        if base is not None and not isinstance(base, str):
++            raise TypeError('base_url必须为字符串或None')
++        resolved = urljoin(base, value) if base and not value.startswith('#') else value
++        transform = self.options.get('url_transform')
++        if transform is not None:
++            if not callable(transform):
++                raise TypeError('url_transform必须可调用')
++            resolved = transform(resolved, kind)
++            if resolved is None:
++                return ''
++            if not isinstance(resolved, str):
++                raise TypeError('url_transform必须返回字符串或None')
++        return resolved
++
+     def convert_a(self, el, text, parent_tags):
+         if '_noformat' in parent_tags:
+             return text
+         prefix, suffix, text = chomp(text)
+         if not text:
+             return ''
+-        href = el.get('href')
++        href = self._resolve_url(el.get('href'), 'link')
+         title = el.get('title')
+         # For the replacement see #29: text nodes underscores are escaped
+         if (self.options['autolinks']
+@@ -581,7 +606,7 @@
+ 
+     def convert_img(self, el, text, parent_tags):
+         alt = el.attrs.get('alt', None) or ''
+-        src = el.attrs.get('src', None) or ''
++        src = self._resolve_url(el.attrs.get('src'), 'image')
+         title = el.attrs.get('title', None) or ''
+         title_part = ' "%s"' % title.replace('"', r'\"') if title else ''
+         if ('_inline' in parent_tags
+@@ -599,7 +624,8 @@
+             sources = el.find_all('source', attrs={'src': True})
+             if sources:
+                 src = sources[0].attrs.get('src', None) or ''
+-        poster = el.attrs.get('poster', None) or ''
++        src = self._resolve_url(src, 'video')
++        poster = self._resolve_url(el.attrs.get('poster'), 'poster')
+         if src and poster:
+             return '[![%s](%s)](%s)' % (text, poster, src)
+         if src:
+--- a/library/tests/test_development_markdownify_o03_dev.py
++++ b/library/tests/test_development_markdownify_o03_dev.py
+@@ -0,0 +1,27 @@
++"""所有真实媒体目的地共享基址与显式变换，过程不抓取网络。"""
++from markdownify import markdownify
++import pytest
++
++def test_base_url_covers_links_images_sources_and_posters():
++    """相对地址按标准urljoin解析，源元素fallback和poster也覆盖。@return None。"""
++    html='<a href="../page">page</a><img src="pic.png" alt="pic"><video poster="/poster"><source src="movie.mp4"></video>'
++    actual=markdownify(html,base_url='https://example.test/docs/index.html')
++    assert '[page](https://example.test/page)' in actual
++    assert '![pic](https://example.test/docs/pic.png)' in actual
++    assert '[![](https://example.test/poster)](https://example.test/docs/movie.mp4)' in actual
++
++def test_callback_receives_resolved_value_once_and_can_suppress():
++    """每个实际目的地恰好一次，None明确省略，不自行补空链接。@return None。"""
++    seen=[]
++    def transform(url,kind):
++        seen.append((url,kind));return None if kind=='image' else url+'?tag'
++    result=markdownify('<a href="one">a</a><img src="two" alt="i"><video src="three" poster="four"></video>',base_url='https://e.test/',url_transform=transform)
++    assert seen==[('https://e.test/one','link'),('https://e.test/two','image'),('https://e.test/three','video'),('https://e.test/four','poster')]
++    assert '[a](https://e.test/one?tag)' in result and '![i]()' in result
++
++def test_fragment_empty_absolute_and_invalid_callback_results():
++    """页面内锚点和空目的地不被基址伪造，非法回调结果拒绝。@return None。"""
++    seen=[]
++    result=markdownify('<a href="#part">local</a><a href="">empty</a><a href="mailto:a@b">mail</a>',base_url='https://e.test/x',url_transform=lambda url,kind:seen.append(url) or url)
++    assert '[local](#part)' in result and 'empty' in result and seen==['#part','mailto:a@b']
++    with pytest.raises(TypeError):markdownify('<a href="x">x</a>',url_transform=lambda *args:42)

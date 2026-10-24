@@ -1,0 +1,3 @@
+# 嵌套函数与聚合过滤共享真实参数绑定上下文
+
+路线07：parameter等序列化上下文进入每个函数参数，统一嵌套with_alias/subquery；聚合FILTER和WHERE保持真实遍历顺序，SQLite实际绑定执行。

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSSSELECT-O05-DEV",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add cssselect.formstates.FormStateTranslator(HTMLTranslator) supporting static :required and :optional. Eligible controls are select, textarea and input except hidden/range/color/button/submit/reset/image, with missing/unknown input type behaving as text and ASCII-insensitive type values. State is based on required attribute presence; disabled does not change this declaration state. The two states partition only eligible controls, not arbitrary nodes. Support unnamespaced HTML and XHTML namespace, excluding foreign same-name elements, and preserve all inherited translator APIs and GenericTranslator unsupported behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

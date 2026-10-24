@@ -1,0 +1,165 @@
+--- a/library/docs/development-docutils-o05-dev.md
++++ b/library/docs/development-docutils-o05-dev.md
+@@ -0,0 +1,5 @@
++# 给真实doctree提供白名单版本化JSON writer及受约束重建
++
++对应路线18：真实JSON writer和schema1白名单读写保留节点类型/raw/source/line/attrs/顺序/Unicode，重建ID后可再发布引用；未知/畸形/循环/超预算/非JSON明确拒绝，不pickle或任意构造。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/docutils/docutils/doctree_json.py
++++ b/library/docutils/docutils/doctree_json.py
+@@ -0,0 +1,96 @@
++"""版本化标准doctree JSON交换，不使用pickle或从输入导入Python代码。"""
++import json
++import math
++from docutils import nodes
++from docutils.utils import new_document
++
++SUPPORTED = frozenset(('document section title subtitle paragraph emphasis strong literal literal_block reference target '
++    'bullet_list enumerated_list list_item block_quote attribution figure image caption table tgroup colspec thead tbody row entry '
++    'footnote label footnote_reference citation citation_reference rubric container transition note warning admonition field_list field '
++    'field_name field_body definition_list definition_list_item term definition classifier math math_block inline raw comment').split())
++
++
++def _json_value(value, depth=0):
++    """只允许明确JSON数据，拒绝任意Python属性或过深容器。@return 独立JSON值。"""
++    if depth > 64:
++        raise ValueError('属性容器过深')
++    if value is None or type(value) in (str,bool,int):return value
++    if type(value) is float and math.isfinite(value):return value
++    if type(value) in (list,tuple):return [_json_value(item,depth+1) for item in value]
++    if type(value) is dict and all(type(key) is str for key in value):return {key:_json_value(item,depth+1) for key,item in value.items()}
++    raise ValueError('属性包含非JSON数据')
++
++
++def to_data(document, *, max_depth=64, max_nodes=10000):
++    """编码允许的真实标准节点及来源，不读取settings/reporter任意对象。
++
++    :param document: 原doctree根。
++    :param max_depth: 最大节点深度。
++    :param max_nodes: 最大节点总数。
++    :return: schema=1及root结构，不改变原树。
++    """
++    if not isinstance(document,nodes.document):raise TypeError('根必须为document')
++    seen=set()
++    def encode(node,depth):
++        """按真实节点身份检测循环/共享及预算。@return 节点数据。"""
++        if depth>max_depth or len(seen)>=max_nodes or id(node) in seen:raise ValueError('doctree循环、共享或超预算')
++        seen.add(id(node))
++        if isinstance(node,nodes.Text):return {'node':'#text','text':node.astext()}
++        name=type(node).__name__
++        if name not in SUPPORTED:raise ValueError('不支持的节点: '+name)
++        return {'node':name,'rawsource':node.rawsource,'source':node.source,'line':node.line,
++                'attributes':_json_value(node.attributes),'children':[encode(child,depth+1) for child in node.children]}
++    return {'schema':1,'root':encode(document,0)}
++
++
++def from_data(data, *, settings=None, max_depth=64, max_nodes=10000):
++    """只从白名单结构创建标准节点，重建真实ID映射。
++
++    :param data: schema=1数据，不接受任意类名或额外节点字段。
++    :param settings: 调用方明确提供的原Docutils设置。
++    :return: 新document，节点/属性/来源与原输入脱离。
++    """
++    if type(data) is not dict or set(data)!={'schema','root'} or type(data['schema']) is not int or data['schema']!=1:raise ValueError('未知doctree JSON schema')
++    root=data['root'];count=0
++    if not isinstance(root,dict) or root.get('node')!='document':raise ValueError('根必须为document')
++    document=new_document(root.get('source') or '<json-doctree>',settings=settings)
++    def decode(item,depth):
++        """验证完整节点形状后使用已允许的标准构造函数。@return 新节点。"""
++        nonlocal count
++        count+=1
++        if depth>max_depth or count>max_nodes or type(item) is not dict:raise ValueError('doctree结构或预算错误')
++        name=item.get('node')
++        if name=='#text':
++            if set(item)!={'node','text'} or not isinstance(item['text'],str):raise ValueError('文本节点错误')
++            return nodes.Text(item['text'])
++        if name not in SUPPORTED or set(item)!={'node','rawsource','source','line','attributes','children'}:raise ValueError('未知或畸形标准节点')
++        if not isinstance(item['rawsource'],str) or item['source'] is not None and not isinstance(item['source'],str):raise ValueError('来源类型错误')
++        if item['line'] is not None and (isinstance(item['line'],bool) or not isinstance(item['line'],int) or item['line']<0):raise ValueError('来源行类型错误')
++        if type(item['attributes']) is not dict or type(item['children']) is not list:raise ValueError('节点属性或子节点错误')
++        attributes=_json_value(item['attributes'])
++        if name=='document':
++            if depth!=0:raise ValueError('document只能为根')
++            node=document;node.attributes=attributes
++        else:node=getattr(nodes,name)(rawsource=item['rawsource'],**attributes)
++        node.rawsource=item['rawsource'];node.source=item['source'];node.line=item['line'];node._document=document
++        for child in item['children']:node.append(decode(child,depth+1))
++        return node
++    decode(root,0)
++    document.ids.clear();document.nameids.clear()
++    for node in document.findall(nodes.Element):
++        for identifier in node.get('ids',[]):
++            if not isinstance(identifier,str) or identifier in document.ids:raise ValueError('重复或非法ID')
++            document.ids[identifier]=node
++        for name in node.get('names',[]):
++            if node.get('ids'):document.nameids[name]=node['ids'][0]
++    return document
++
++
++def dumps(document, **kwargs):
++    """编码为确定UTF8可读JSON文本。@param document 树。@return JSON字符串。"""
++    return json.dumps(to_data(document,**kwargs),ensure_ascii=False,sort_keys=True,separators=(',',':'),allow_nan=False)
++
++
++def loads(text, **kwargs):
++    """读取受约束JSON树。@param text JSON文本。@return 新document。"""
++    return from_data(json.loads(text),**kwargs)
+--- a/library/docutils/docutils/writers/json.py
++++ b/library/docutils/docutils/writers/json.py
+@@ -0,0 +1,11 @@
++"""真实Docutils JSON writer，复用受约束版本化树交换合同。"""
++from docutils import writers
++from docutils.doctree_json import dumps
++
++
++class Writer(writers.Writer):
++    """发布标准doctree的JSON结构。@return schema=1文本。"""
++    supported=('json',)
++    def translate(self):
++        """序列化当前真实document，不执行任意属性对象。@return None。"""
++        self.output=dumps(self.document)
+--- a/library/tests/test_development_docutils_o05_dev.py
++++ b/library/tests/test_development_docutils_o05_dev.py
+@@ -0,0 +1,41 @@
++"""标准doctree JSON可独立重建真实节点并再发布，不使用pickle。"""
++from docutils.core import publish_doctree,publish_string,publish_from_doctree
++from docutils import nodes
++import io,json,copy
++import pytest
++
++def settings():
++    """构建真实可解析配置。@return 配置。"""
++    return {'warning_stream':io.StringIO(),'halt_level':6,'report_level':5}
++
++def test_json_writer_and_reader_preserve_chinese_ids_refs_and_real_node_types():
++    """writer产物经json读取再建doctree，引用与真实HTML仍对应。@return None。"""
++    from docutils.doctree_json import loads,dumps
++    source='.. _target:\n\n章节\n====\n\n中文 **重点** and target_.\n'
++    original=publish_doctree(source,source_path='source.rst',settings_overrides=settings())
++    encoded=publish_string(source,writer='json',settings_overrides=settings());assert json.loads(encoded)['schema']==1
++    rebuilt=loads(dumps(original),settings=original.settings)
++    assert rebuilt.astext()==original.astext() and isinstance(next(rebuilt.findall(nodes.strong)),nodes.strong)
++    assert next(rebuilt.findall(nodes.reference))['refid'] in rebuilt.ids
++    html=publish_from_doctree(rebuilt,writer='html5',settings_overrides=settings()).decode('utf8');assert '中文' in html and '<strong>重点</strong>' in html
++
++def test_sources_attributes_and_detached_roundtrip_remain_exact():
++    """实际source/line/attrs/children保持，修改副本不污染原树。@return None。"""
++    from docutils.doctree_json import to_data,from_data
++    original=publish_doctree('Title\n=====\n\nParagraph.\n',source_path='input.rst',settings_overrides=settings())
++    data=to_data(original);rebuilt=from_data(data,settings=original.settings)
++    assert to_data(rebuilt)==data
++    paragraph=next(rebuilt.findall(nodes.paragraph));paragraph['classes'].append('new')
++    assert not next(original.findall(nodes.paragraph))['classes']
++
++def test_unknown_schema_nodes_shapes_cycles_depth_and_opaque_attributes_reject():
++    """任意节点/属性不能变成执行入口或无界递归。@return None。"""
++    from docutils.doctree_json import to_data,from_data
++    document=publish_doctree('Text',settings_overrides=settings());data=to_data(document)
++    bad=copy.deepcopy(data);bad['schema']=99
++    with pytest.raises(ValueError):from_data(bad)
++    bad=copy.deepcopy(data);bad['root']['children'][0]['node']='__import__'
++    with pytest.raises(ValueError):from_data(bad)
++    with pytest.raises(ValueError):to_data(document,max_nodes=1)
++    document['opaque']=object()
++    with pytest.raises(ValueError):to_data(document)

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARSET-NORMALIZER-O06-DEV",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Build charset_normalizer.atomic.normalize_file_atomic on the delivered strict transcode API. Bound source reads, detect actual text, complete target encoding before touching destination and atomically publish a same-directory temporary file. Default in-place or explicit separate output, preserve existing target mode/new-file private mode, reject symlink paths and clean only owned temporary files on encoding/write/replace failures. Source and old target bytes must survive failures; report actual written bytes/loss count, keep default APIs read-only and do not claim directory crash durability.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

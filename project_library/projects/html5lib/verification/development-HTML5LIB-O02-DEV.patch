@@ -1,0 +1,52 @@
+--- a/library/docs/development-html5lib-o02-dev.md
++++ b/library/docs/development-html5lib-o02-dev.md
+@@ -0,0 +1,5 @@
++# 让完整令牌lint在EOF拒绝未闭合元素且保留惰性及片段模式
++
++对应路线02：完整消费后检查开放栈，EOF截断及孤立关闭都AssertionError；部分消费仍惰性、显式宽松片段及HTML/SVG/void平衡流保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/html5lib/filters/lint.py
++++ b/library/html5lib/filters/lint.py
+@@ -61,6 +61,7 @@
+                 if (not namespace or namespace == namespaces["html"]) and name in voidElements:
+                     assert False, "Void element reported as EndTag token: %(tag)s" % {"tag": name}
+                 elif self.require_matching_tags:
++                    assert open_elements, '结束标签没有匹配的开放元素'
+                     start = open_elements.pop()
+                     assert start == (namespace, name)
+ 
+@@ -91,3 +92,6 @@
+                 assert False, "Unknown token type: %(type)s" % {"type": type}
+ 
+             yield token
++        # 最后一个yield之后仍需检查EOF，截断流不能悄悄通过结构lint。
++        if self.require_matching_tags:
++            assert not open_elements, '令牌流结束时仍有未闭合元素'
+--- a/library/tests/test_development_html5lib_o02_dev.py
++++ b/library/tests/test_development_html5lib_o02_dev.py
+@@ -0,0 +1,24 @@
++"""完整消耗令牌流后必须发现EOF未闭合，宽松模式保持可用。"""
++from html5lib.filters.lint import Filter
++import pytest
++
++def start(name,namespace=None):
++    """构造标准实际walker StartTag。@return Token。"""
++    return {'type':'StartTag','name':name,'namespace':namespace,'data':{}}
++
++def test_one_and_nested_unclosed_elements_rejected_after_actual_eof():
++    """不是只发现错配EndTag，还要在最后的yield之后检测截断。@return None。"""
++    for tokens in [[start('div')],[start('section'),start('span'),{'type':'EndTag','name':'span','namespace':None}]]:
++        with pytest.raises(AssertionError,match='未闭合'):list(Filter(tokens))
++
++def test_lazy_prefix_is_yielded_and_relaxed_mode_does_not_require_closing():
++    """读取部分仍惰性，真正完整消费才检查EOF，显式宽松允许片段。@return None。"""
++    token=start('div');iterator=iter(Filter(iter([token])));assert next(iterator) is token
++    with pytest.raises(AssertionError):next(iterator)
++    assert list(Filter([token],require_matching_tags=False))==[token]
++
++def test_balanced_foreign_empty_and_unmatched_end_contract():
++    """HTML void及SVG命名空间保持，空流合法，孤立关闭统一AssertionError。@return None。"""
++    svg='http://www.w3.org/2000/svg';tokens=[start('svg',svg),{'type':'EndTag','name':'svg','namespace':svg},{'type':'EmptyTag','name':'br','namespace':None,'data':{}}]
++    assert list(Filter(tokens))==tokens and list(Filter([]))==[]
++    with pytest.raises(AssertionError):list(Filter([{'type':'EndTag','name':'div','namespace':None}]))

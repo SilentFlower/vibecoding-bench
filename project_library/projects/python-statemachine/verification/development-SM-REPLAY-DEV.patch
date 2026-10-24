@@ -1,0 +1,82 @@
+--- a/library/development_tests/test_development_sm_replay_dev.py
++++ b/library/development_tests/test_development_sm_replay_dev.py
+@@ -0,0 +1,36 @@
++"""公开真实状态机日志重放端到端回归。"""
++import json
++import pytest
++from statemachine.runner import MachineRunner
++from statemachine.journal import dumps_journal
++from statemachine.replay import replay
++from statemachine import StateMachine,State
++
++class Flow(StateMachine):
++    draft=State(initial=True)
++    ready=State()
++    done=State(final=True)
++    advance=draft.to(ready)
++    finish=ready.to(done)
++    reset=ready.to(draft)
++
++def test_actual_events_replay_on_fresh_factory_machine():
++    original=Flow();document=dumps_journal(list(MachineRunner(original).run(['advance','reset','advance','finish'])))
++    result=replay(Flow,document)
++    assert result.machine is not original and result.results[-1].after.states==('done',) and tuple(original.configuration_values)==('done',)
++
++def test_expected_disallowed_events_and_empty_log_are_supported():
++    document=dumps_journal(list(MachineRunner(Flow()).run(['finish','advance'],errors='collect')))
++    result=replay(Flow,document)
++    assert [row.status for row in result.results]==['error','passed'] and replay(Flow,dumps_journal([])).results==()
++
++def test_divergent_expected_configuration_is_not_silently_accepted():
++    data=json.loads(dumps_journal(list(MachineRunner(Flow()).run(['advance']))));data['records'][0]['after']['states']=['done']
++    with pytest.raises(ValueError,match='索引0'): replay(Flow,json.dumps(data))
++    assert replay(Flow,json.dumps(data),verify=False).results[0].after.states==('ready',)
++
++def test_invalid_log_is_rejected_before_factory_is_called():
++    calls=[]
++    def factory(): calls.append(1);return Flow()
++    with pytest.raises(ValueError): replay(factory,'{"schema":2,"records":[]}')
++    assert calls==[]
+--- a/library/docs/development-sm-replay-dev.md
++++ b/library/docs/development-sm-replay-dev.md
+@@ -0,0 +1,5 @@
++# 在明确工厂的新实例中重放事件日志并核对真实配置
++
++日志先完整验证，再由明确工厂创建新机器并执行真实事件。逐条核对前后配置、值和成功状态，发现偏离即停止；不能从日志类名动态导入或绕过回调伪造状态。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/statemachine/replay.py
++++ b/library/statemachine/replay.py
+@@ -0,0 +1,32 @@
++"""先验证日志，再在调用者明确提供的新机器上重放真实事件。"""
++from dataclasses import dataclass
++from .journal import loads_journal
++from .runner import MachineRunner
++from .snapshots import snapshot
++
++
++@dataclass(frozen=True)
++class ReplayResult:
++    """重放后的真实机器及实际事件结果。"""
++    machine: object
++    results: tuple
++
++
++def replay(factory,document,*,verify=True,max_records=10000):
++    """在工厂新实例上重放。@param factory 无参数新状态机工厂。@param document 固定JSON日志。
++    @param verify 是否逐条核对前后配置和值及状态。@param max_records 日志记录预算。
++    @return ReplayResult；不执行类名字符串，不承诺回滚外部回调副作用。
++    """
++    if not callable(factory) or type(verify) is not bool:
++        raise TypeError('需要明确工厂及布尔校验策略')
++    expected=loads_journal(document,max_records=max_records)
++    machine=factory();runner=MachineRunner(machine);results=[]
++    for step in expected:
++        before=snapshot(machine)
++        if verify and (before.states!=step.before.states or before.values!=step.before.values):
++            raise ValueError('重放前配置与日志不符，索引'+str(step.index))
++        actual=runner.dispatch(step.call,index=step.index,errors='collect')
++        if verify and (actual.status!=step.status or actual.after.states!=step.after.states or actual.after.values!=step.after.values):
++            raise ValueError('重放后配置与日志不符，索引'+str(step.index))
++        results.append(actual)
++    return ReplayResult(machine,tuple(results))

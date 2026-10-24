@@ -1,0 +1,75 @@
+--- a/library/docs/development-petl-02-dev.md
++++ b/library/docs/development-petl-02-dev.md
+@@ -0,0 +1,5 @@
++# 数量转换一次生成业务结果和不含原值的结构化问题表
++
++路线03：convert_report单次消费并冻结可重放结果和问题表，记录数据行号/字段/错误类型而不带原值；一行多错和短行明确，原convert不变。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/petl/transform/__init__.py
++++ b/library/petl/transform/__init__.py
+@@ -7,7 +7,7 @@
+ from petl.transform.headers import rename, setheader, extendheader, \
+     pushheader, skip, skiplast, prefixheader, suffixheader, sortheader
+ 
+-from petl.transform.conversions import convert, convertall, replace, \
++from petl.transform.conversions import convert_report, convert, convertall, replace, \
+     replaceall, update, convertnumbers, format, formatall, interpolate, \
+     interpolateall
+ 
+--- a/library/petl/transform/conversions.py
++++ b/library/petl/transform/conversions.py
+@@ -570,3 +570,30 @@
+ 
+ 
+ Table.interpolateall = interpolateall
++
++
++def convert_report(table,converters,errorvalue=None):
++    """一次消费生成转换表和不含原值的问题表。@param table 单次或可重放源。@param converters 字段到callable映射。@param errorvalue 失败替代。@return (可重复table,可重复issues)。"""
++    mapping=dict(converters)
++    if any(not callable(function) for function in mapping.values()):raise TypeError("converters值必须可调用")
++    source=iter(table)
++    try:header=tuple(next(source))
++    except StopIteration:return (), (("row","field","error_type"),)
++    if len(set(header))!=len(header):raise ValueError("convert_report要求唯一字段名")
++    positions={field:header.index(field) for field in mapping}
++    output=[header];issues=[("row","field","error_type")]
++    for number,row in enumerate(source,1):
++        result=list(row)
++        for field,function in mapping.items():
++            index=positions[field]
++            try:
++                result[index]=function(result[index])
++            except Exception as error:
++                if index>=len(result):result.extend([errorvalue]*(index+1-len(result)))
++                else:result[index]=errorvalue
++                issues.append((number,field,type(error).__name__))
++        output.append(tuple(result))
++    return tuple(output),tuple(issues)
++
++
++Table.convert_report=convert_report
+--- a/library/tests/test_development_petl_02_dev.py
++++ b/library/tests/test_development_petl_02_dev.py
+@@ -0,0 +1,20 @@
++"""转换结果与问题表同一次消费，默认不泄露原值。"""
++import petl
++
++def test_mixed_numeric_fields_have_ordered_issues_without_raw_values():
++    """一行多字段失败分别记录来源行及类型。@return None。"""
++    source=[['qty','price'],['2','3.5'],['private','bad']]
++    table,issues=petl.convert_report(source,{'qty':int,'price':float})
++    assert list(table)==[('qty','price'),(2,3.5),(None,None)]
++    assert list(issues)==[('row','field','error_type'),(2,'qty','ValueError'),(2,'price','ValueError')]
++    assert 'private' not in repr(issues)
++
++def test_one_shot_source_replay_short_row_and_empty():
++    """返回值可重复读取，源不会因问题表再消费。@return None。"""
++    count=[]
++    def source():
++        for row in [('qty','other'),('3','x'),()]:count.append(1);yield row
++    table,issues=petl.convert_report(source(),{'qty':int},errorvalue='ERR')
++    assert list(table)==[('qty','other'),(3,'x'),('ERR',)] and len(count)==3
++    assert list(issues)[-1]==(2,'qty','IndexError') and list(table)==list(table)
++    assert petl.convert_report(iter(()),{'qty':int})==((),(('row','field','error_type'),))

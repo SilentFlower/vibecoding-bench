@@ -1,0 +1,74 @@
+--- a/library/development_tests/test_development_sg_report_dev.py
++++ b/library/development_tests/test_development_sg_report_dev.py
+@@ -0,0 +1,25 @@
++"""公开报表准备端到端真实执行回归。"""
++import sqlite3
++import pytest
++from sqlglot import parse_one
++from sqlglot.report import prepare_report
++
++def test_composed_query_executes_against_remapped_table_with_values_and_bounds():
++    connection=sqlite3.connect(':memory:');connection.execute('create table actual(id integer)');connection.executemany('insert into actual values(?)',[(1,),(2,),(3,)])
++    result=prepare_report('SELECT old.id AS value FROM old WHERE old.id>:minimum ORDER BY old.id',values={'minimum':1},tables={('','','old'):('','','actual')},max_rows=1,write='sqlite')
++    assert connection.execute(result.sql).fetchall()==[(2,)] and result.output_columns==('value',) and result.parameters==('minimum',)
++    assert [table.name for table in result.tables]==['actual']
++
++def test_original_ast_is_preserved_across_reusable_preparations():
++    tree=parse_one('SELECT :n AS value');before=tree.dump()
++    first=prepare_report(tree,values={'n':1});second=prepare_report(tree,values={'n':2})
++    assert first.sql!=second.sql and tree.dump()==before and tree.parent is None
++
++def test_missing_parameters_unused_mapping_and_unbounded_offset_fail():
++    with pytest.raises(ValueError): prepare_report('SELECT :missing')
++    with pytest.raises(ValueError): prepare_report('SELECT * FROM a',tables={('','','b'):('','','c')})
++    with pytest.raises(ValueError): prepare_report('SELECT 1',offset=1)
++
++def test_read_and_write_dialects_are_real_parser_and_generator_options():
++    result=prepare_report('SELECT `a` AS `value` FROM `table`',read='mysql',write='postgres',max_rows=2)
++    assert '"a"' in result.sql and 'LIMIT 2' in result.sql and result.output_columns==('value',)
+--- a/library/docs/development-sg-report-dev.md
++++ b/library/docs/development-sg-report-dev.md
+@@ -0,0 +1,5 @@
++# 组合真实表映射、参数绑定与结果边界准备报表查询
++
++完整报表准备流程真正复用表映射、参数绑定和行数限制。输出可执行SQL与实际引用元数据，保留包装前的投影名称及原参数名；方言显式选择，未绑定参数和未命中映射不能静默通过。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/sqlglot/report.py
++++ b/library/sqlglot/report.py
+@@ -0,0 +1,35 @@
++"""组合物理表映射、值绑定和结果边界生成可执行报表查询。"""
++from dataclasses import dataclass
++from .report_inspection import query_copy,inspect_tables
++from .report_remap import remap_tables
++from .report_binding import bind_parameters,parameter_names
++from .report_bounds import bounded_query
++
++
++@dataclass(frozen=True)
++class PreparedReport:
++    """准备完成的SQL及实际物理表、输出字段与原参数名。"""
++    sql: str
++    tables: tuple
++    output_columns: tuple
++    parameters: tuple
++
++
++def prepare_report(query,*,values=None,tables=None,max_rows=None,offset=0,read=None,write=None):
++    """准备单个报表查询，不连接数据库。@param query 原单查询。
++    @param values 命名普通值。@param tables 可选精确物理表映射。@param max_rows 可选最终行数上限。
++    @param offset 有界结果偏移。@param read 输入方言。@param write 输出方言。
++    @return PreparedReport；保留原输入语法树。
++    """
++    tree=query_copy(query,read);names=parameter_names(tree)
++    if tables is not None:
++        tree=remap_tables(tree,tables,require_all=True)
++    tree=bind_parameters(tree,{} if values is None else values)
++    columns=tuple(expression.alias_or_name or expression.sql(dialect=write or read) for expression in tree.selects)
++    if max_rows is not None:
++        tree=bounded_query(tree,max_rows,offset=offset)
++    elif offset:
++        raise ValueError('结果偏移必须同时声明行数边界')
++    elif type(offset) is not int:
++        raise ValueError('偏移必须为整数')
++    return PreparedReport(tree.sql(dialect=write or read),inspect_tables(tree),columns,names)

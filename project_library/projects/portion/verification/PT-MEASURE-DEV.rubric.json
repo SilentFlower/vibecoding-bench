@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PT-MEASURE-DEV",
+  "source_commit": "622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Interval.measure(metric, *, start=0): invoke the caller-supplied metric exactly once for each atomic interval in order and combine with addition beginning at start. The metric receives actual bound openness and endpoints so the same protocol can express continuous duration or bounded integer cardinality; no generic endpoint subtraction is implicit. Empty intervals return start without callbacks; preserve Decimal/timedelta result types with an appropriate identity, propagate callback errors and let metrics explicitly reject unbounded domains. Preserve len as the number of atomic pieces, subclasses, laziness of existing APIs and every frozen test.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

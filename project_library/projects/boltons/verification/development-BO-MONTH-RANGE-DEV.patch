@@ -1,0 +1,68 @@
+--- a/library/boltons/timeutils.py
++++ b/library/boltons/timeutils.py
+@@ -307,6 +307,34 @@
+     return whence.date()
+ 
+ 
++def month_range(start,stop,step=1,*,inclusive=False,month_end='clip'):
++    """按起始日锚点逐月枚举日期。@param start 起始date。@param stop 停止date。
++    @param step 非零整数月步长。@param inclusive 是否包含相等停止日。@param month_end clip/skip/raise。
++    @return 日期迭代器；每月始终使用原始日，不由二月截断后的日继续漂移。
++    """
++    import calendar
++    if type(start) is not date or type(stop) is not date:
++        raise TypeError('月序列仅接受date对象')
++    if type(step) is not int or step==0 or type(inclusive) is not bool or month_end not in ('clip','skip','raise'):
++        raise ValueError('月步长、边界或月底策略无效')
++    cursor=start.year*12+start.month-1
++    boundary=stop.year*12+stop.month-1
++    while cursor<=boundary if step>0 else cursor>=boundary:
++        year,month=divmod(cursor,12);month+=1
++        last=calendar.monthrange(year,month)[1]
++        if start.day>last:
++            if month_end=='raise':
++                raise ValueError('锚点日在目标月份不存在')
++            if month_end=='skip':
++                cursor+=step
++                continue
++        current=date(year,month,min(start.day,last))
++        if (current>stop or current==stop and not inclusive) if step>0 else (current<stop or current==stop and not inclusive):
++            break
++        yield current
++        cursor+=step
++
++
+ def daterange(start, stop, step=1, inclusive=False):
+     """In the spirit of :func:`range` and :func:`xrange`, the `daterange`
+     generator that yields a sequence of :class:`~datetime.date`
+--- a/library/development_tests/test_development_bo_month_range_dev.py
++++ b/library/development_tests/test_development_bo_month_range_dev.py
+@@ -0,0 +1,20 @@
++"""公开月度日期序列回归。"""
++from datetime import date
++import pytest
++from boltons.timeutils import month_range
++
++def test_clipped_february_does_not_shift_the_march_anchor():
++    assert list(month_range(date(2024,1,31),date(2024,4,1)))==[date(2024,1,31),date(2024,2,29),date(2024,3,31)]
++
++def test_skip_and_raise_policies_are_explicit():
++    assert list(month_range(date(2023,1,31),date(2023,4,1),month_end='skip'))==[date(2023,1,31),date(2023,3,31)]
++    with pytest.raises(ValueError):
++        list(month_range(date(2023,1,31),date(2023,4,1),month_end='raise'))
++
++def test_reverse_and_inclusive_boundaries_are_supported():
++    assert list(month_range(date(2023,3,31),date(2023,1,31),-1,inclusive=True))==[date(2023,3,31),date(2023,2,28),date(2023,1,31)]
++
++def test_invalid_steps_and_policies_fail():
++    for options in ({'step':0},{'step':True},{'month_end':'guess'}):
++        with pytest.raises(ValueError):
++            list(month_range(date(2024,1,1),date(2024,2,1),**options))
+--- a/library/docs/development-bo-month-range-dev.md
++++ b/library/docs/development-bo-month-range-dev.md
+@@ -0,0 +1,5 @@
++# 按固定起始日和显式月底策略生成月度日期序列
++
++月度批处理按原始日锚点排期，月底缺失日明确选择截断、跳过或拒绝，不能从二月截断结果继续漂移。支持闰年、反向步长和边界，原daterange保持不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

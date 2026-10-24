@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "LOGURU-O02-DEV",
+  "source_commit": "bce5dfd3b435b1d1658507d7e095ad7a9919bf1c",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Logger.sink_context(sink, **add_options) yielding the actual new handler id and removing only that handler on every exit, including BaseException, using existing queue/file/coroutine remove/stop ownership semantics. Nested contexts and external early removal are supported; caller streams remain open as add/remove already promise. Normal cleanup failure propagates. If body and cleanup both fail, preserve the original body exception and emit a RuntimeWarning for cleanup; do not silence body failures or delete unrelated handlers. Existing queued records finish through normal remove before exit.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

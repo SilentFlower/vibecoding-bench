@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CERBERUS-O01-DEV",
+  "source_commit": "83f5dada76aa3179ef21b677a7f4235bf20c1566",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair rename identity and combined rename/rename_handler normalization. rename to the same field must preserve its value; when both rules are present, apply the handler to the explicit rename target and move the original value only after the final name is resolved. Keep handler failure diagnostics and original value, caller input isolation and existing overwrite-target policy. Preserve standalone rename/handler, nested normalization and frozen upstream controls; do not silently drop fields or raise KeyError from an already removed old key.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

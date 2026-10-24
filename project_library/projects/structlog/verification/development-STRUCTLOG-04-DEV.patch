@@ -1,0 +1,70 @@
+--- a/library/docs/development-structlog-04-dev.md
++++ b/library/docs/development-structlog-04-dev.md
+@@ -0,0 +1,5 @@
++# 嵌套事件按明确业务路径投影并区分空值与缺项
++
++路线05：EventProjector按明确段序列映射业务摘要，dict/list精确访问、字面点号和None保真；输出范围与缺项策略明确，配置冲突提前拒绝。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/structlog/_event_projector.py
++++ b/library/src/structlog/_event_projector.py
+@@ -0,0 +1,27 @@
++class EventProjector:
++    """按明确段序列投影字段。@param fields 输出名到路径。@param keep 保留原顶层字段。@param missing error/omit/default。@param default 缺项值。@return 处理器。"""
++    def __init__(self,fields,*,keep=(),missing="error",default=None):
++        """冻结投影配置。@param fields 路径映射。@param keep 字段序列。@param missing 缺项策略。@param default 回退。@return None。"""
++        self.fields={name:tuple(path) for name,path in fields.items()}
++        self.keep=tuple(keep);self.missing=missing;self.default=default
++        if missing not in ("error","omit","default"):raise ValueError("未知missing")
++        if any(isinstance(path,(str,bytes)) for path in fields.values()):raise TypeError("路径必须为段序列")
++        if any(not isinstance(name,str) for name in self.fields) or set(self.fields)&set(self.keep):raise ValueError("输出字段冲突或非法")
++        if any(type(token) not in (str,int) or type(token) is int and token<0 for path in self.fields.values() for token in path):raise ValueError("路径段须str或非负int")
++
++    def __call__(self,logger,name,event_dict):
++        """仅访问dict/list，不解析点号也不执行属性。@param logger 原logger。@param name 级别。@param event_dict 来源。@return 投影新dict。"""
++        result={key:event_dict[key] for key in self.keep if key in event_dict}
++        for alias,path in self.fields.items():
++            value=event_dict
++            try:
++                for token in path:
++                    if isinstance(value,dict):value=value[token]
++                    elif isinstance(value,list) and type(token) is int:value=value[token]
++                    else:raise KeyError(path)
++            except (KeyError,IndexError):
++                if self.missing=="error":raise KeyError(path) from None
++                if self.missing=="omit":continue
++                value=self.default
++            result[alias]=value
++        return result
+--- a/library/src/structlog/processors.py
++++ b/library/src/structlog/processors.py
+@@ -33,6 +33,7 @@
+     cast,
+ )
+ 
++from ._event_projector import EventProjector
+ from ._frames import (
+     _find_first_app_frame_and_name,
+     _format_exception,
+--- a/library/tests/test_development_structlog_04_dev.py
++++ b/library/tests/test_development_structlog_04_dev.py
+@@ -0,0 +1,19 @@
++"""路径字段投影只输出声明范围，字面点号不改解释。"""
++import unittest
++from structlog.processors import EventProjector
++
++def test_nested_order_summary_and_literal_key_list_identity():
++    """客户名和订单金额按明确路径，不调用业务对象getter。@return None。"""
++    payload=[];source={'event':'order','customer':{'name':'Ada'},'orders':[{'total':payload}],'literal.key':None,'secret':'omit'}
++    result=EventProjector({'name':('customer','name'),'total':('orders',0,'total'),'null':('literal.key',)},keep=['event'])(None,'info',source)
++    assert result=={'event':'order','name':'Ada','total':payload,'null':None}
++    assert result['total'] is payload and 'secret' not in result and source['secret']=='omit'
++
++def test_missing_policies_zero_indices_and_configuration_collisions():
++    """显式None与缺项不同，路径不会当字符串逐字符走。@return None。"""
++    source={'x':None}
++    assert EventProjector({'value':('x',),'absent':('y',)},missing='omit')(None,'info',source)=={'value':None}
++    assert EventProjector({'absent':('y',)},missing='default',default=False)(None,'info',source)=={'absent':False}
++    with unittest.TestCase().assertRaises(KeyError):EventProjector({'absent':('y',)})(None,'info',source)
++    with unittest.TestCase().assertRaises(TypeError):EventProjector({'bad':'a.b'})
++    with unittest.TestCase().assertRaises(ValueError):EventProjector({'x':('y',)},keep=['x'])

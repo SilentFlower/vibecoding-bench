@@ -1,0 +1,3 @@
+# 长报告表格公开设置重复表头与三态跨页拆行政策
+
+路线13：Row公开repeat_header/allow_split_across_pages三态，正确tblHeader/cantSplit顺序与反向语义；None才继承，保原其他格式，Word要求连续首行由调用方负责，不计算页数。

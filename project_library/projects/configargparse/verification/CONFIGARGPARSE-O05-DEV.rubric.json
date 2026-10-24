@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CONFIGARGPARSE-O05-DEV",
+  "source_commit": "3ab2f323abcdd321b6c423f9eb6304ce35681307",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement DispatchConfigFileParser(parsers, *, fallback=None, output_format=None) with an application-owned extension registry of ConfigFileParser instances/classes. Normalize suffix case, reject duplicate normalized extensions and invalid parser registrations. Dispatch once from stream.name without reading/rewinding/sniffing/importing; unknown or unnamed sources require explicit fallback. Propagate actual parse and optional dependency errors. Serialization requires an explicitly registered output_format and delegates to that parser. Preserve existing CompositeConfigParser and support nonseek streams.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

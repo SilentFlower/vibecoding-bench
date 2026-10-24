@@ -1,0 +1,57 @@
+--- a/library/development_tests/test_development_wz_negotiate_dev.py
++++ b/library/development_tests/test_development_wz_negotiate_dev.py
+@@ -0,0 +1,23 @@
++"""公开JSON内容协商回归。"""
++import pytest
++from werkzeug.wrappers import Request
++from werkzeug.exceptions import NotAcceptable
++from werkzeug.negotiated_json import json_response
++
++def test_quality_specificity_and_vendor_types_use_real_accept_parser():
++    request=Request.from_values(headers={'Accept':'application/json;q=0.2, application/vnd.example+json;q=0.9'})
++    result=json_response({'text':'中文'},request,offers=['application/json','application/vnd.example+json'])
++    assert result.mimetype=='application/vnd.example+json' and result.get_json()=={'text':'中文'}
++
++def test_absent_accept_defaults_but_explicit_q_zero_raises_406():
++    assert json_response(False,Request.from_values()).get_json() is False
++    with pytest.raises(NotAcceptable): json_response({},Request.from_values(headers={'Accept':'application/json;q=0'}))
++
++def test_wildcards_ties_and_vary_header_are_consistent():
++    request=Request.from_values(headers={'Accept':'application/*'})
++    result=json_response(None,request,offers=['application/vnd.example+json','application/json'])
++    assert result.mimetype=='application/vnd.example+json' and 'Accept' in result.vary and result.content_length==len(result.get_data())
++
++def test_invalid_offers_and_nonfinite_values_fail():
++    with pytest.raises(ValueError): json_response({},Request.from_values(),offers=['text/plain'])
++    with pytest.raises(ValueError): json_response(float('nan'),Request.from_values())
+--- a/library/docs/development-wz-negotiate-dev.md
++++ b/library/docs/development-wz-negotiate-dev.md
+@@ -0,0 +1,5 @@
++# 按真实Accept权重协商JSON及厂商表示并设置Vary
++
++按真实Accept质量值与通配规则选择JSON表示，缺省与明确拒绝要区分。支持厂商JSON且保留候选优先级，全部不可接受返回406，正文、类型、长度和Vary保持一致。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/werkzeug/negotiated_json.py
++++ b/library/src/werkzeug/negotiated_json.py
+@@ -0,0 +1,20 @@
++"""使用真实Accept权重选择JSON表示。"""
++import json
++from .exceptions import NotAcceptable
++from .wrappers import Response
++
++
++def json_response(value,request,*,offers=('application/json',),status=200):
++    """协商并编码JSON。@param value JSON数据。@param request 原Request。
++    @param offers 有序JSON媒体类型。@param status 状态。@return 含Vary Accept的真实Response。
++    """
++    offers=tuple(offers)
++    if not offers or any(not isinstance(media,str) or ';' in media or not (media=='application/json' or (media.startswith('application/') and media.endswith('+json'))) for media in offers) or len(set(offers))!=len(offers):
++        raise ValueError('需要唯一JSON媒体类型列表')
++    selected=offers[0] if 'Accept' not in request.headers else request.accept_mimetypes.best_match(offers)
++    if selected is None:
++        raise NotAcceptable()
++    data=json.dumps(value,ensure_ascii=False,allow_nan=False,separators=(',',':')).encode('utf-8')
++    response=Response(data,status=status,content_type=selected)
++    response.vary.add('Accept')
++    return response

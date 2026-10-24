@@ -1,0 +1,47 @@
+--- a/library/docs/development-pyparsing-05-dev.md
++++ b/library/docs/development-pyparsing-05-dev.md
+@@ -0,0 +1,5 @@
++# 解析错误提供稳定机器诊断且保持原异常文字
++
++路线14：真实解析异常投影为schema1机器诊断，字符范围/行列/EOF/fatal/节点类型可稳定读取；保持原文字、未知期待项明确None，不把动作ValueError冒充语法失败。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyparsing/diagnostics.py
++++ b/library/pyparsing/diagnostics.py
+@@ -0,0 +1,12 @@
++"""机器诊断使用真实异常字段，保持原文字格式。"""
++from .exceptions import ParseBaseException,ParseFatalException
++
++def to_diagnostic(error):
++    """投影稳定诊断。@param error 真实ParseBaseException。@return schema1字典，字符坐标/EOF/错误类型/节点类型/消息，不猜全部期待项。"""
++    if not isinstance(error,ParseBaseException):raise TypeError('需要真实解析异常')
++    text=error.pstr;offset=min(max(error.loc,0),len(text));prefix=text[:offset]
++    line=prefix.count('\n')+1;column=len(prefix.rsplit('\n',1)[-1])+1
++    return {'schema':1,'code':'parse-fatal' if isinstance(error,ParseFatalException) else 'parse-error',
++        'offset':offset,'end_offset':min(offset+1,len(text)),'line':line,'column':column,'at_eof':offset==len(text),
++        'message':error.msg,'node_type':None if error.parser_element is None else type(error.parser_element).__name__,
++        'expected':None}
+--- a/library/tests/test_development_pyparsing_05_dev.py
++++ b/library/tests/test_development_pyparsing_05_dev.py
+@@ -0,0 +1,21 @@
++"""机器错误坐标为字符口径，不能伪称字节或显示宽度。"""
++import unittest
++import pyparsing as pp
++from pyparsing.diagnostics import to_diagnostic
++
++def test_real_multiline_unicode_error_preserves_existing_text():
++    """真实失败的异常文字不被投影过程改写。@return None。"""
++    grammar=(pp.Literal('雪')+pp.Literal('ok')).parse_with_tabs()
++    with unittest.TestCase().assertRaises(pp.ParseException) as caught:grammar.parse_string('雪\n?',parse_all=True)
++    error=caught.exception;before=str(error);report=to_diagnostic(error)
++    assert report['schema']==1 and report['offset']==2 and report['end_offset']==3
++    assert report['line']==2 and report['column']==1 and report['at_eof'] is False
++    assert report['code']=='parse-error' and report['expected'] is None and str(error)==before
++
++def test_eof_fatal_and_nonparse_exceptions_have_explicit_policy():
++    """EOF范围为零宽，fatal单独代码，用户普通错误不装成语法错误。@return None。"""
++    error=pp.ParseFatalException('茶',1,'fatal',pp.Literal('x'))
++    report=to_diagnostic(error)
++    assert report['code']=='parse-fatal' and report['at_eof'] and report['offset']==report['end_offset']==1
++    assert report['node_type'] in ('Literal','_SingleCharLiteral')
++    with unittest.TestCase().assertRaises(TypeError):to_diagnostic(ValueError('action'))

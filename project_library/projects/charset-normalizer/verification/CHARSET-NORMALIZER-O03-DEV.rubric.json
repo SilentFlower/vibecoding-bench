@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARSET-NORMALIZER-O03-DEV",
+  "source_commit": "0a9201767e9d888b5a5ed7ca44400192474ad1b0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add CharsetMatch.transcode(encoding=\"utf_8\", *, errors=\"strict\", bom=\"codec\") returning output bytes and unencodable codepoint count. Strict must fail on unrepresentable characters; replace/ignore explicitly report losses without counting literal question marks. Support codec/strip/add BOM policy for UTF8/16/32 and reject adding unsupported BOMs. Reuse current encoding-declaration rewriting, preserve empty input and keep old output default/cache behavior independent from the new strategy.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

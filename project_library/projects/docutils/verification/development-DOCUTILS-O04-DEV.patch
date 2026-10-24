@@ -1,0 +1,99 @@
+--- a/library/docs/development-docutils-o04-dev.md
++++ b/library/docs/development-docutils-o04-dev.md
+@@ -0,0 +1,5 @@
++# 把显式可折叠提示发布为真实details summary并保留非HTML内容
++
++对应路线20：显式collapsible/expanded保留真实提示节点和本地化标题，HTML5原生details/summary及open，嵌套/转义保持；无flag仍aside、其他writer完整可见，非法组合诊断。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/docutils/docutils/parsers/rst/directives/admonitions.py
++++ b/library/docutils/docutils/parsers/rst/directives/admonitions.py
+@@ -19,17 +19,24 @@
+ 
+     final_argument_whitespace = True
+     option_spec = {'class': directives.class_option,
+-                   'name': directives.unchanged}
++                   'name': directives.unchanged,
++                   'collapsible': directives.flag,
++                   'expanded': directives.flag}
+     has_content = True
+ 
+     node_class = None
+     """Subclasses must set this to the appropriate admonition node class."""
+ 
+     def run(self):
++        if 'expanded' in self.options and 'collapsible' not in self.options:
++            raise self.error('expanded必须与collapsible一起使用')
+         options = normalize_options(self.options)
+         self.assert_has_content()
+         text = '\n'.join(self.content)
+         admonition_node = self.node_class(text, **options)
++        if 'collapsible' in self.options:
++            admonition_node['collapsible'] = True
++            admonition_node['expanded'] = 'expanded' in self.options
+         self.add_name(admonition_node)
+         admonition_node.source, admonition_node.line = \
+             self.state_machine.get_source_and_line(self.lineno)
+--- a/library/docutils/docutils/writers/html5_polyglot/__init__.py
++++ b/library/docutils/docutils/writers/html5_polyglot/__init__.py
+@@ -175,6 +175,28 @@
+             self.body.append('</blockquote>\n')
+ 
+     # Wrap in a <figcaption> semantic tag (together with optional <legend>).
++    def visit_admonition(self, node):
++        """HTML5用原生details呈现明确折叠提示，普通提示沿原路径。@return None。"""
++        if not node.get('collapsible'):
++            return super().visit_admonition(node)
++        attributes = {'open': 'open'} if node.get('expanded') else {}
++        self.body.append(self.starttag(node, 'details', classes=['admonition'], **attributes))
++
++    def depart_admonition(self, node=None):
++        """只关闭本提示对应的语义容器，支持嵌套。@return None。"""
++        if node is not None and node.get('collapsible'):
++            self.body.append('</details>\n')
++        else:
++            super().depart_admonition(node)
++
++    def visit_title(self, node):
++        """折叠提示标题生成真实summary，原行内节点和转义保持。@return None。"""
++        if isinstance(node.parent, nodes.Admonition) and node.parent.get('collapsible'):
++            self.body.append(self.starttag(node, 'summary', ''))
++            self.context.append('</summary>\n')
++        else:
++            super().visit_title(node)
++
+     def visit_caption(self, node) -> None:
+         if isinstance(node.parent, nodes.figure
+                       ) and node.parent.children.index(node) == 1:
+--- a/library/tests/test_development_docutils_o04_dev.py
++++ b/library/tests/test_development_docutils_o04_dev.py
+@@ -0,0 +1,29 @@
++"""真实RST提示可原生折叠，其他writer仍保留完整内容。"""
++from docutils.core import publish_parts,publish_doctree
++from docutils import nodes
++import io
++
++def settings():
++    """隔离真实构建诊断。@return 配置。"""
++    return {'warning_stream':io.StringIO(),'halt_level':6,'report_level':5}
++
++def test_collapsible_expanded_inline_summary_and_escaped_body():
++    """标题summary只有一次，open按声明，内容不是默认丢弃。@return None。"""
++    source='.. admonition:: Read **more**\n   :collapsible:\n   :expanded:\n\n   Body <unsafe>\n'
++    html=publish_parts(source,writer='html5',settings_overrides=settings())['html_body']
++    assert '<details' in html and 'open="open"' in html and '<summary>' in html and '<strong>more</strong>' in html
++    assert html.count('Read ')==1 and '&lt;unsafe&gt;' in html and '</summary>' in html and '</details>' in html
++
++def test_specific_note_nested_admonitions_default_closed_and_plain_fallback():
++    """原生note本地化标题也可折叠，嵌套各自配对且普通提示保持aside。@return None。"""
++    source='.. note::\n   :collapsible:\n\n   Outer\n\n   .. admonition:: Inner\n      :collapsible:\n\n      Inner body\n'
++    html=publish_parts(source,writer='html5',settings_overrides=settings())['html_body']
++    assert html.count('<details')==html.count('</details>')==2 and html.count('<summary')==2 and 'open=' not in html
++    assert 'Outer' in html and 'Inner body' in html
++    normal=publish_parts('.. note:: Body\n',writer='html5',settings_overrides=settings())['html_body'];assert '<aside' in normal and '<details' not in normal
++
++def test_expanded_without_collapse_rejects_and_other_writer_keeps_visible_text():
++    """非法组合有真实诊断，非HTML5降级保留标题及正文。@return None。"""
++    bad=publish_doctree('.. note::\n   :expanded:\n\n   Body\n',settings_overrides=settings());assert list(bad.findall(nodes.system_message))
++    output=publish_parts('.. admonition:: Title\n   :collapsible:\n\n   Body\n',writer='pseudoxml',settings_overrides=settings())['whole']
++    assert 'Title' in output and 'Body' in output

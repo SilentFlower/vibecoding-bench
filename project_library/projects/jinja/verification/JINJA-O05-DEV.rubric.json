@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JINJA-O05-DEV",
+  "source_commit": "5ef70112a1ff19c05324ff889dd30405b1002044",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend actual compiler common import path for import/from to use Environment.get_or_select_template, preserving existing cache/module/context behavior. Accept static or dynamic ordered candidates, select first existing template and expose TemplatesNotFound for empty/all missing; an existing selected template syntax error or missing requested macro must never be swallowed as a reason to choose another candidate. Preserve string imports, aliasing, with/without context and asynchronous module handling through the actual render APIs.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

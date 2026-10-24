@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "ICECREAM-O06-DEV",
+  "source_commit": "05af3e95b0080162813bb017de90966bc75f3b91",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add icecream.builtins.managed_install(name=\"ic\",debugger=None) and already-installed BuiltinInstallation handle/context, leaving original install/uninstall unchanged. Record previous value and ownership tokens, restore/remove only when the current binding still belongs to this installation, and leave foreign replacements untouched. Support same/different debugger nested installs, idempotent and out-of-order close without resurrecting closed ancestors, exception cleanup and rejection of closed reentry/invalid identifiers/keywords/wrong debugger. Never scan other builtins; all verification uses synthetic names, not print or production globals.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

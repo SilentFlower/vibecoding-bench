@@ -1,0 +1,92 @@
+--- a/library/docs/development-pyrsistent-02-dev.md
++++ b/library/docs/development-pyrsistent-02-dev.md
+@@ -0,0 +1,5 @@
++# 自动序列字段按不变量身份隔离并显式恢复序列化政策
++
++路线02：动态向量/集合字段缓存加入不变量对象身份，同函数可复用、不同闭包不串规则，不要求回调可hash。新pickle携带明确可pickle政策或默认标记；lambda遵循标准限制，旧三参数缺失政策明确拒绝并要求可信模型指定迁移，绝不悄悄换规则。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pyrsistent/_field_common.py
++++ b/library/pyrsistent/_field_common.py
+@@ -175,10 +175,15 @@
+ # Global dictionary to hold auto-generated field types: used for unpickling
+ _seq_field_types = {}
+ 
+-def _restore_seq_field_pickle(checked_class, item_type, data):
+-    """Unpickling function for auto-generated PVec/PSet field types."""
+-    type_ = _seq_field_types[checked_class, item_type]
+-    return _restore_pickle(type_, data)
++_MISSING_SEQUENCE_POLICY = object()
++
++
++def _restore_seq_field_pickle(checked_class,item_type,data,item_invariant=_MISSING_SEQUENCE_POLICY):
++    """按明确政策恢复动态序列类型。@param checked_class 容器类。@param item_type 单元类型。@param data 值。@param item_invariant 明确不变量或None默认。@return 合法序列。"""
++    if item_invariant is _MISSING_SEQUENCE_POLICY:
++        raise ValueError('旧序列字段pickle未携带不变量；请从可信模型提供明确政策迁移')
++    policy=PFIELD_NO_INVARIANT if item_invariant is None else item_invariant
++    return _restore_pickle(_make_seq_field_type(checked_class,item_type,policy),data)
+ 
+ def _types_to_names(types):
+     """Convert a tuple of types to a human-readable string."""
+@@ -186,7 +191,8 @@
+ 
+ def _make_seq_field_type(checked_class, item_type, item_invariant):
+     """Create a subclass of the given checked class with the given item type."""
+-    type_ = _seq_field_types.get((checked_class, item_type))
++    cache_key=(checked_class,item_type,id(item_invariant))
++    type_ = _seq_field_types.get(cache_key)
+     if type_ is not None:
+         return type_
+ 
+@@ -196,11 +202,11 @@
+ 
+         def __reduce__(self):
+             return (_restore_seq_field_pickle,
+-                    (checked_class, item_type, list(self)))
++                    (checked_class, item_type, list(self),None if item_invariant is PFIELD_NO_INVARIANT else item_invariant))
+ 
+     suffix = SEQ_FIELD_TYPE_SUFFIXES[checked_class]
+     TheType.__name__ = _types_to_names(TheType._checked_types) + suffix
+-    _seq_field_types[checked_class, item_type] = TheType
++    _seq_field_types[cache_key] = TheType
+     return TheType
+ 
+ def _sequence_field(checked_class, item_type, optional, initial,
+--- a/library/tests/test_development_pyrsistent_02_dev.py
++++ b/library/tests/test_development_pyrsistent_02_dev.py
+@@ -0,0 +1,35 @@
++"""相同单元类型的不同不变量不能共享同一动态序列类。"""
++import operator
++import pickle
++import unittest
++from functools import partial
++from pyrsistent import PClass,pvector_field,pset_field,InvariantException
++
++
++def test_vector_and_set_policy_identity_isolation_in_both_orders():
++    """正数与负数规则按声明各自生效。@return None。"""
++    for factory in (pvector_field,pset_field):
++        positive=lambda value:(value>0,'positive');negative=lambda value:(value<0,'negative')
++        class Positive(PClass):
++            """正数业务字段。"""
++            values=factory(int,item_invariant=positive)
++        class Negative(PClass):
++            """负数业务字段。"""
++            values=factory(int,item_invariant=negative)
++        assert list(Positive(values=[1]).values)==[1] and list(Negative(values=[-1]).values)==[-1]
++        with unittest.TestCase().assertRaises(InvariantException):Positive(values=[-1])
++        with unittest.TestCase().assertRaises(InvariantException):Negative(values=[1])
++        assert type(Positive().values) is not type(Negative().values)
++
++
++def test_pickle_retains_policy_and_ambiguous_old_payload_rejects():
++    """新pickle携带真实可pickle政策，旧缺失政策不得误套默认类。@return None。"""
++    from pyrsistent import CheckedPVector
++    from pyrsistent._field_common import _restore_seq_field_pickle
++    policy=partial(operator.getitem,{2:(True,None),3:(True,None),-1:(False,'negative')})
++    field=pvector_field(int,item_invariant=policy)
++    value=field.factory([2,3]);restored=pickle.loads(pickle.dumps(value))
++    assert restored==value
++    with unittest.TestCase().assertRaises(InvariantException):restored.append(-1)
++    with unittest.TestCase().assertRaises(ValueError):_restore_seq_field_pickle(CheckedPVector,int,[1])
++    assert list(_restore_seq_field_pickle(CheckedPVector,int,[1],None))==[1]

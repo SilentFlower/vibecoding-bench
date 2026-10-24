@@ -1,0 +1,66 @@
+--- a/library/docs/development-more-itertools-02-dev.md
++++ b/library/docs/development-more-itertools-02-dev.md
+@@ -0,0 +1,5 @@
++# 事件日志按实际时间间隙惰性合并完整会话
++
++路线07：sessionize只在相邻事件间隙超过阈值分组，完整事件及身份保留；等于阈值同组，数值/跨日时间、倒序/负间隙政策明确。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/more_itertools/_sessionize.py
++++ b/library/more_itertools/_sessionize.py
+@@ -0,0 +1,13 @@
++def sessionize(iterable,key,gap):
++    """按事件时间间隙分会话。@param iterable 有序事件流。@param key 时间提取。@param gap 非负间隙。@return 完整事件列表的惰性会话流。"""
++    if gap<gap-gap:raise ValueError("gap不能为负")
++    current=[];previous=None;started=False
++    for item in iterable:
++        timestamp=key(item)
++        if started:
++            if timestamp<previous:raise ValueError("事件时间倒序")
++            if timestamp-previous>gap:
++                yield current
++                current=[]
++        current.append(item);previous=timestamp;started=True
++    if current:yield current
+--- a/library/more_itertools/more.py
++++ b/library/more_itertools/more.py
+@@ -148,6 +148,7 @@
+     'rstrip',
+     'run_length',
+     'sample',
++    'sessionize',
+     'seekable',
+     'serialize',
+     'set_partitions',
+@@ -2985,6 +2986,9 @@
+         return f'{self.__class__.__name__}({self._target!r})'
+ 
+ 
++from ._sessionize import sessionize
++
++
+ class seekable:
+     """Wrap an iterator to allow for seeking backward and forward. This
+     progressively caches the items in the source iterable so they can be
+--- a/library/tests/test_development_more_itertools_02_dev.py
++++ b/library/tests/test_development_more_itertools_02_dev.py
+@@ -0,0 +1,19 @@
++"""日志会话只在超过间隙时切组。"""
++from datetime import datetime,timedelta
++import unittest
++from more_itertools import sessionize
++
++def test_exact_gap_and_business_payload_identity():
++    """等于阈值仍在同一组，事件不简化为时间戳。@return None。"""
++    rows=[{'t':0},{'t':3},{'t':6},{'t':10}]
++    result=list(sessionize(iter(rows),lambda row:row['t'],3))
++    assert result==[rows[:3],rows[3:]] and result[0][0] is rows[0]
++    assert list(sessionize([],lambda row:row,0))==[]
++
++def test_cross_day_zero_gap_reverse_and_negative_policy():
++    """datetime/timedelta使用事件时间，不读系统时钟。@return None。"""
++    start=datetime(2024,1,1,23,59)
++    assert list(sessionize([start,start+timedelta(minutes=2),start+timedelta(hours=1)],lambda row:row,timedelta(minutes=5)))==[[start,start+timedelta(minutes=2)],[start+timedelta(hours=1)]]
++    assert list(sessionize([1,1,2],lambda row:row,0))==[[1,1],[2]]
++    for values,gap in (([2,1],1),([1],-1)):
++        with unittest.TestCase().assertRaises(ValueError):list(sessionize(values,lambda row:row,gap))

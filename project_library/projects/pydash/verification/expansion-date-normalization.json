@@ -1,0 +1,5 @@
+{
+  "policy": "仅冻结case7的动态date.today显示ID，实际输入/断言不变，主节点全部保留",
+  "normalized_nodes": 1,
+  "nodes": 2880
+}

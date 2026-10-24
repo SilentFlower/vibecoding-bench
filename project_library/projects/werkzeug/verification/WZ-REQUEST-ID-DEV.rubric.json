@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "WZ-REQUEST-ID-DEV",
+  "source_commit": "665e760ca6325a348ce03e5cf780b17e4be01848",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement werkzeug.request_id.RequestIdMiddleware(app,*,factory=None). Accept incoming X-Request-ID only when it matches ASCII [A-Za-z0-9][A-Za-z0-9._-]{0,63}, otherwise generate a UUID hex or injected factory value and validate it. Store werkzeug.request_id in environ and emit exactly one matching X-Request-ID response header, replacing application duplicates case-insensitively. Forward status, all other repeated headers, start_response exc_info and write return unchanged. Return original app iterable without pre-reading/wrapping so close and streaming/backpressure remain native. Propagate app errors; do not trust multiline header input or silently accept invalid factory results.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

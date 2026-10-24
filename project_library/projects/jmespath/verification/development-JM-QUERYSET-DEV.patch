@@ -1,0 +1,97 @@
+--- a/library/development_tests/test_development_jm_queryset_dev.py
++++ b/library/development_tests/test_development_jm_queryset_dev.py
+@@ -0,0 +1,28 @@
++"""公开命名查询集逐项状态回归。"""
++import pytest
++from jmespath.queries import QuerySet
++from jmespath.exceptions import JMESPathError
++
++def test_named_queries_preserve_order_and_null_success():
++    queries=QuerySet({'value':'a','missing':'not_found'})
++    result=queries.search({'a':3})
++    assert list(result)==['value','missing'] and result['value'].value==3 and result['missing'].status=='passed' and result['missing'].value is None
++
++def test_compilation_and_evaluation_errors_are_independent():
++    queries=QuerySet({'invalid':'[','runtime':'unknown_function(a)','valid':'a'},errors='collect')
++    result=queries.search({'a':4})
++    assert result['invalid'].phase=='compile' and result['runtime'].phase=='evaluate' and result['valid'].value==4
++
++def test_default_errors_propagate_and_literal_results_do_not_pollute_reuse():
++    with pytest.raises(JMESPathError):
++        QuerySet({'bad':'['})
++    queries=QuerySet({'template':'`{"items":[]}`'})
++    first=queries.search({});first['template'].value['items'].append(1)
++    assert queries.search({})['template'].value=={'items':[]}
++
++def test_result_metadata_is_frozen_and_input_mapping_is_snapshotted():
++    definitions={'a':'a'};queries=QuerySet(definitions);definitions['a']='b'
++    result=queries.search({'a':1,'b':2})['a']
++    assert result.value==1
++    with pytest.raises((AttributeError,TypeError)):
++        result.status='changed'
+--- a/library/docs/development-jm-queryset-dev.md
++++ b/library/docs/development-jm-queryset-dev.md
+@@ -0,0 +1,5 @@
++# 一次编译命名查询集并逐项返回编译或求值状态
++
++多项业务检查一次编译、逐项执行，可选择立即失败或收集JMESPath标准错误，编译与求值阶段可区分。null仍是成功结果，不吞掉程序错误，不保存回溯对象，后续查询不被一次结果修改污染。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/jmespath/queries.py
++++ b/library/jmespath/queries.py
+@@ -0,0 +1,55 @@
++"""一组命名查询的独立编译与标准错误结果。"""
++from collections.abc import Mapping
++from dataclasses import dataclass
++from .bound import BoundExpression
++from .exceptions import JMESPathError
++
++
++@dataclass(frozen=True)
++class QueryResult:
++    """单条查询结果，只保存值及错误文本，不保留异常／回溯对象。"""
++    status: str
++    value: object=None
++    error_type: object=None
++    error: object=None
++    phase: str='complete'
++
++
++class QuerySet:
++    """命名查询一次编译，在多份输入上重复求值。"""
++    def __init__(self,queries,*,options=None,errors='raise'):
++        """编译查询集。@param queries 非空字符串名到表达式的映射。
++        @param options 绑定选项。@param errors raise或collect。@return None。
++        """
++        if not isinstance(queries,Mapping) or errors not in ('raise','collect'):
++            raise ValueError('需要命名查询映射和明确错误策略')
++        entries=list(queries.items())
++        if any(not isinstance(name,str) or not name for name,expression in entries):
++            raise ValueError('查询名称必须为非空字符串')
++        self._queries=[];self._errors=errors
++        for name,expression in entries:
++            try:
++                compiled=BoundExpression(expression,options)
++            except JMESPathError as error:
++                if errors=='raise':
++                    raise
++                compiled=QueryResult('error',error_type=type(error).__name__,error=str(error),phase='compile')
++            self._queries.append((name,compiled))
++
++    def search(self,data):
++        """对同一输入执行查询。@param data JSON输入。@return 保序名称到QueryResult映射。
++        """
++        results={}
++        for name,compiled in self._queries:
++            if isinstance(compiled,QueryResult):
++                results[name]=compiled
++                continue
++            try:
++                value=compiled.search(data)
++            except JMESPathError as error:
++                if self._errors=='raise':
++                    raise
++                results[name]=QueryResult('error',error_type=type(error).__name__,error=str(error),phase='evaluate')
++            else:
++                results[name]=QueryResult('passed',value=value)
++        return results

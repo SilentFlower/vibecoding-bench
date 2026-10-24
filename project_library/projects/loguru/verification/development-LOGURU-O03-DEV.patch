@@ -1,0 +1,112 @@
+--- a/library/docs/development-loguru-o03-dev.md
++++ b/library/docs/development-loguru-o03-dev.md
+@@ -0,0 +1,5 @@
++# 在真实记录路径实现任务局部阈值及模块静默
++
++对应路线04：ContextVar局部策略在真实格式化前按阈值/模块阻止记录，只影响同core；嵌套叠加、退出恢复，兄弟任务/线程隔离、子任务继承，全局activation不改。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/loguru/_logger.py
++++ b/library/loguru/_logger.py
+@@ -153,6 +153,7 @@
+ start_time = aware_now()
+ 
+ context = ContextVar("loguru_context", default={})
++silence_context = ContextVar("loguru_silence", default=())
+ 
+ 
+ class Core:
+@@ -1069,6 +1070,28 @@
+ 
+         return handler_id
+ 
++    @contextlib.contextmanager
++    def silence(self, level="INFO", *, module=None):
++        """在当前ContextVar范围抑制不高于阈值的匹配模块记录。
++
++        :param level: 阈值名称或非负整数，边界级别也被抑制。
++        :param module: None匹配全部，字符串匹配模块本身和点分子模块。
++        :return: 退出自动还原的上下文，不修改全局activation。
++        """
++        if isinstance(level, str):
++            threshold = self.level(level).no
++        elif isinstance(level, int) and not isinstance(level, bool) and level >= 0:
++            threshold = level
++        else:
++            raise ValueError('静默阈值必须为有效名称或非负整数')
++        if module is not None and not isinstance(module, str):
++            raise TypeError('module必须为字符串或None')
++        token = silence_context.set(silence_context.get() + ((self._core, threshold, module),))
++        try:
++            yield
++        finally:
++            silence_context.reset(token)
++
+     def remove(self, handler_id=None):
+         """Remove a previously added handler and stop sending logs to its sink.
+ 
+@@ -2123,6 +2146,12 @@
+                         return
+                 enabled[name] = True
+ 
++        for scoped_core, threshold, module in silence_context.get():
++            if scoped_core is core and level_no <= threshold and (
++                module is None or name is not None and (name == module or name.startswith(module + "."))
++            ):
++                return
++
+         current_datetime = aware_now()
+ 
+         file_name = basename(co_filename)
+--- a/library/tests/test_development_loguru_o03_dev.py
++++ b/library/tests/test_development_loguru_o03_dev.py
+@@ -0,0 +1,49 @@
++"""局部静默策略在真实记录路径生效，不改变全局模块activation。"""
++from copy import deepcopy
++from loguru import logger
++import asyncio
++import pytest
++
++def clean():
++    """创建独立logger及真实输出列表。@return logger/messages。"""
++    logger.remove();log=deepcopy(logger);log.remove();out=[];log.add(out.append,format='{level}:{message}');return log,out
++
++def test_threshold_nested_and_exception_restore_actual_output():
++    """阈值包含边界，嵌套只收紧，异常后完整恢复。@return None。"""
++    log,out=clean()
++    with log.silence('INFO'):
++        log.info('hidden');log.warning('visible')
++        with log.silence('ERROR'):log.warning('also hidden');log.critical('critical')
++    with pytest.raises(ValueError):
++        with log.silence(50):raise ValueError('body')
++    log.info('restored');assert ''.join(out)=='WARNING:visible\nCRITICAL:critical\nINFO:restored\n';log.remove()
++
++def test_async_siblings_and_new_threads_keep_contextvar_boundaries():
++    """兄弟协程/新线程不被另一个上下文静默；子协程继承当前上下文。@return None。"""
++    import threading
++    log,out=clean()
++    async def run():
++        entered=asyncio.Event();release=asyncio.Event()
++        async def muted():
++            with log.silence('INFO'):
++                entered.set();await release.wait();log.info('muted')
++                await asyncio.create_task(child())
++        async def child():log.info('inherited')
++        async def sibling():await entered.wait();log.info('sibling');release.set()
++        await asyncio.gather(muted(),sibling())
++    asyncio.run(run())
++    with log.silence('INFO'):
++        thread=threading.Thread(target=lambda:log.info('thread'));thread.start();thread.join()
++    assert ''.join(out)=='INFO:sibling\nINFO:thread\n';log.remove()
++
++def test_module_match_logger_core_isolation_and_invalid_config():
++    """模块点边界与logger核心隔离，参数错误在进入前拒绝。@return None。"""
++    log,out=clean();other,other_out=clean()
++    with log.silence('INFO',module=__name__):log.info('hidden');other.info('other')
++    with log.silence('INFO',module='not-this-module'):log.info('visible')
++    assert ''.join(out)=='INFO:visible\n' and ''.join(other_out)=='INFO:other\n'
++    with pytest.raises(ValueError):
++        with log.silence(True):pass
++    with pytest.raises(TypeError):
++        with log.silence(module=42):pass
++    log.remove();other.remove()

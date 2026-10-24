@@ -1,0 +1,14 @@
+{
+  "script": "verification/MARKDOWN-IT-O01-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_markdown_it_o01_dev.py"
+}

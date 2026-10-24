@@ -1,0 +1,55 @@
+--- a/library/docs/development-python-markdown-05-dev.md
++++ b/library/docs/development-python-markdown-05-dev.md
+@@ -0,0 +1,5 @@
++# 文档转换返回绑定本轮的HTML、目录、元数据和引用结果快照
++
++路线13：结构化转换函数每次创建真实Markdown实例，返回实际HTML、目录、meta及引用独立快照，无扩展字段明确为空。后续文档和调用方修改结果容器不串状态；旧API和扩展生命周期不改，不虚构诊断或位置字段。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/markdown/results.py
++++ b/library/markdown/results.py
+@@ -0,0 +1,22 @@
++"""一次转换的结构化结果快照，不要求业务读取并复用可变转换器。"""
++import copy
++from dataclasses import dataclass
++from .core import Markdown
++
++
++@dataclass(frozen=True)
++class ConversionResult:
++    """本次独立交付。@param html 输出。@param toc 目录HTML。@param toc_tokens 目录结构。@param metadata meta字典。@param references 引用快照。"""
++    html: str
++    toc: str
++    toc_tokens: list
++    metadata: dict
++    references: dict
++
++
++def convert_document(text,extensions=(),extension_configs=None,**options):
++    """用全新Markdown实例返回本轮全部结果。@param text Unicode文本。@param extensions 原扩展声明。@param extension_configs 扩展配置。@param options 构造选项。@return ConversionResult。"""
++    if not isinstance(text,str):raise TypeError('convert_document只接受已解码文本')
++    md=Markdown(extensions=extensions,extension_configs=extension_configs or {},**options)
++    rendered=md.convert(text)
++    return ConversionResult(rendered,getattr(md,'toc',''),copy.deepcopy(getattr(md,'toc_tokens',[])),copy.deepcopy(getattr(md,'Meta',{})),copy.deepcopy(md.references))
+--- a/library/tests/test_development_python_markdown_05_dev.py
++++ b/library/tests/test_development_python_markdown_05_dev.py
+@@ -0,0 +1,19 @@
++"""结果真实来自本次转换的HTML、目录、元数据及引用。"""
++from markdown.results import convert_document
++
++
++def test_actual_metadata_toc_and_reference_snapshot():
++    """不凭输入标题拼装结果，使用真实扩展输出。@return None。"""
++    result=convert_document('title: 中文\n\n# Heading\n\n[link][ref]\n\n[ref]: https://example.com "Title"',extensions=['markdown.extensions.meta','markdown.extensions.toc'])
++    assert '<h1 id="heading">Heading</h1>' in result.html
++    assert result.metadata=={'title':['中文']} and result.toc_tokens[0]['id']=='heading'
++    assert result.references['ref']==('https://example.com','Title') and '#heading' in result.toc
++
++
++def test_result_defaults_and_later_calls_are_independent():
++    """无扩展字段明确为空，修改快照不会污染其他文档。@return None。"""
++    first=convert_document('# One',extensions=['markdown.extensions.toc']);first.toc_tokens[0]['name']='changed'
++    second=convert_document('# Two',extensions=['markdown.extensions.toc'])
++    assert second.toc_tokens[0]['name']=='Two'
++    plain=convert_document('plain')
++    assert plain.html=='<p>plain</p>' and plain.metadata=={} and plain.toc_tokens==[] and plain.toc=='' and plain.references=={}

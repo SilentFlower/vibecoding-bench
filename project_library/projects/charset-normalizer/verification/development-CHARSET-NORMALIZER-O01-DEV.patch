@@ -1,0 +1,77 @@
+--- a/library/docs/development-charset-normalizer-o01-dev.md
++++ b/library/docs/development-charset-normalizer-o01-dev.md
+@@ -0,0 +1,5 @@
++# 冻结缓冲事实并支持连续memoryview生命周期
++
++模型保存不可变字节，防止raw与缓存文字分裂。新增连续buffer入口，非bytes明确复制并报告大小，调用者视图可释放或底层复用而结果不变；不连续和非法缓冲拒绝，实际检测仍由from_bytes完成。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/charset_normalizer/buffers.py
++++ b/library/src/charset_normalizer/buffers.py
+@@ -0,0 +1,23 @@
++"""连续缓冲的显式快照入口，不冒称所有codec零复制。"""
++from charset_normalizer import from_bytes
++
++
++def from_buffer(buffer, **options):
++    """检查连续buffer并在调用者改变或释放视图前冻结事实。
++
++    :param buffer: bytes或支持连续buffer协议的对象。
++    :param options: 传给真实from_bytes的检测选项。
++    :return: matches/copied/nbytes，bytes可复用，其他缓冲明确复制。
++    """
++    copied = not isinstance(buffer, bytes)
++    if not copied:
++        payload = buffer
++    else:
++        view = memoryview(buffer)
++        try:
++            if not view.c_contiguous:
++                raise ValueError('仅支持连续缓冲')
++            payload = view.tobytes()
++        finally:
++            view.release()
++    return {'matches': from_bytes(payload, **options), 'copied': copied, 'nbytes': len(payload)}
+--- a/library/src/charset_normalizer/models.py
++++ b/library/src/charset_normalizer/models.py
+@@ -19,7 +19,8 @@
+         decoded_payload: str | None = None,
+         preemptive_declaration: str | None = None,
+     ):
+-        self._payload: bytes | bytearray = payload
++        # 原始字节与已解码缓存必须指向同一不可变事实。
++        self._payload: bytes | bytearray = bytes(payload)
+ 
+         self._encoding: str = guessed_encoding
+         self._mean_mess_ratio: float = mean_mess_ratio
+--- a/library/tests/test_development_charset_normalizer_o01_dev.py
++++ b/library/tests/test_development_charset_normalizer_o01_dev.py
+@@ -0,0 +1,28 @@
++"""缓冲生命周期和缓存文本必须保持同一字节快照。"""
++from charset_normalizer.models import CharsetMatch
++
++def test_mutable_model_snapshot():
++    """直接模型也不能保存可变payload引用。@return None。"""
++    source = bytearray(b'ABC')
++    match = CharsetMatch(source, 'ascii', 0.0, False, [])
++    assert str(match) == 'ABC'
++    source[:] = b'XYZ'
++    assert match.raw == b'ABC' and str(match) == 'ABC'
++
++def test_view_release_and_copy_metadata():
++    """视图释放或底层改写不改变结果。@return None。"""
++    from charset_normalizer.buffers import from_buffer
++    source = bytearray(b'ordinary ascii')
++    view = memoryview(source)
++    result = from_buffer(view)
++    view.release()
++    source[:] = b'changed bytes!!'
++    assert str(result['matches'].best()) == 'ordinary ascii' and result['copied'] and result['nbytes'] == 14
++
++def test_bytes_and_noncontiguous():
++    """bytes不复制，非连续视图明确拒绝。@return None。"""
++    import pytest
++    from charset_normalizer.buffers import from_buffer
++    assert from_buffer(b'abc')['copied'] is False
++    with pytest.raises(ValueError): from_buffer(memoryview(b'abcdef')[::2])
++    with pytest.raises(TypeError): from_buffer('not bytes')

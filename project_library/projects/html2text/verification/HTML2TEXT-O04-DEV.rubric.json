@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HTML2TEXT-O04-DEV",
+  "source_commit": "5cf85510a2498546d5b48ad1bf7d75b146aac591",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add image_density=None opt-in selection to actual img conversion, not a standalone unused parser. For finite positive nonbool numeric targets, parse unordered x-density srcset candidates (unmarked means 1x), select the smallest density >= target or largest available, and resolve through existing baseurl/link behavior. Permit missing src when srcset is sufficient. Explicitly reject duplicate/nonpositive/nonfinite/malformed/mixed w descriptors; document data: sets containing ambiguous commas as unsupported and retain src. Default None uses src unchanged, images_to_alt/ignore_images bypass unused source parsing, and HTML-image output uses the chosen source. Do not fetch resources or infer CSS layout.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

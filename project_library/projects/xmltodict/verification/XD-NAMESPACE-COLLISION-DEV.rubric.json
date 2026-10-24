@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "XD-NAMESPACE-COLLISION-DEV",
+  "source_commit": "6e29fba282e68631034dd2722a413b4e35276584",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add parse handler option namespace_collision=\"merge\"|\"error\". Preserve existing merge default; error rejects when different expanded element names under the same parent or distinct expanded attributes on one element collapse to one mapped dictionary key through namespaces. Repeated identical expanded names remain valid lists, and equal local keys under separate parents are independent. Check before postprocessor transformations; do not classify ordinary repeats or user postprocessor collisions as namespace collisions. Support item_depth streaming, inherited maps and prefix remapping without global state.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

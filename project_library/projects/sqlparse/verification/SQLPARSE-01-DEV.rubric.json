@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SQLPARSE-01-DEV",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair actual sqlparse CLI file lifecycle: read input, validate formatter options and complete formatting/encoding before touching any output destination. For --in-place and explicit outfile use same-directory temporary bytes, flush/fsync and os.replace, preserve existing mode/owner and clean temporary files on pre-replace failure. Reject symlink/nonregular output. Invalid options, formatting exceptions, encoding and IO failures return nonzero without truncating old bytes; stdout remains caller-owned and stdin in-place stays forbidden. Continue other explicit files after one fails using current aggregate status. Preserve successful output text, ordinary parser flags, input encoding and existing diagnostic prefixes. Never execute SQL or contact a database.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

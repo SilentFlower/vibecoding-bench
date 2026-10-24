@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AN-SLOTS-DEV",
+  "source_commit": "2e0a1b956172654d75aff93277ce3d883355e0bf",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add optional attribute_provider=None to DictExporter. A callable receives each visited node and returns a mapping or finite key/value iterable. Use only explicitly supplied fields, then apply existing attriter/dictcls; never enumerate arbitrary slots or properties. Exclude parent/children and NodeMixin/LightNodeMixin structural private fields from provider results. Require string attribute keys, propagate provider errors, preserve maxlevel/childiter and ordinary __dict__ export. Support LightNodeMixin-only slots nodes and normal DictImporter round trips without hidden structure leakage.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

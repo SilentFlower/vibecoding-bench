@@ -1,0 +1,92 @@
+--- a/library/docs/development-treelib-03-dev.md
++++ b/library/docs/development-treelib-03-dev.md
+@@ -0,0 +1,5 @@
++# 分类树通过版本化完整节点快照保留同名、顺序和折叠后代
++
++路线07：新增版本化扁平快照，完整保存id、tag、父子顺序、expanded与data，折叠不丢后代，同tag不覆盖。恢复先校验全量结构/版本，再构造显式类的新树；data独立复制，旧展示JSON接口保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_treelib_03_dev.py
++++ b/library/tests/test_development_treelib_03_dev.py
+@@ -0,0 +1,26 @@
++"""持久化快照完整保存所有节点，不依赖expanded展示状态。"""
++import json
++import unittest
++from treelib import Tree
++from treelib.snapshot import snapshot,restore
++
++
++def test_collapsed_duplicate_tag_order_and_data_roundtrip():
++    """同名兄弟、折叠后代及兄弟插入顺序全部保留。@return None。"""
++    tree=Tree();tree.create_node('Root','r');tree.create_node('Same','b',parent='r',data={'x':[1]});tree.create_node('Same','a',parent='r');tree.create_node('Leaf','l',parent='b')
++    tree['b'].expanded=False
++    document=snapshot(tree);again=restore(json.loads(json.dumps(document)))
++    assert snapshot(again)==document and len(again)==4
++    assert [node.identifier for node in again.children('r')]==['b','a'] and not again['b'].expanded
++    again['b'].data['x'].append(2)
++    assert tree['b'].data=={'x':[1]}
++
++
++def test_empty_and_invalid_documents():
++    """空树明确编码，未知版本及缺失关系拒绝。@return None。"""
++    assert snapshot(restore(snapshot(Tree())))=={'schema':1,'root':None,'nodes':[]}
++    tree=Tree();tree.create_node('R','r');document=snapshot(tree)
++    document['schema']=2
++    with unittest.TestCase().assertRaises(ValueError):restore(document)
++    document['schema']=1;document['nodes'][0]['children']=['missing']
++    with unittest.TestCase().assertRaises(ValueError):restore(document)
+--- a/library/treelib/snapshot.py
++++ b/library/treelib/snapshot.py
+@@ -0,0 +1,52 @@
++"""版本化扁平树快照，完整保存折叠后代与同名节点。"""
++import copy
++from .tree import Tree
++
++
++def snapshot(tree):
++    """导出完整节点关系，不使用展示剪枝。@param tree 健康Tree。@return schema1可序列化快照。"""
++    records=[];seen=set()
++    pending=[tree.root] if tree.root is not None else []
++    while pending:
++        identity=pending.pop()
++        if identity in seen or identity not in tree.nodes:raise ValueError('树含环或缺失子节点')
++        seen.add(identity);node=tree[identity]
++        children=list(node.successors(tree.identifier))
++        records.append({'id':identity,'tag':node.tag,'parent':node.predecessor(tree.identifier),'children':children,'expanded':node.expanded,'data':copy.deepcopy(node.data)})
++        pending.extend(reversed(children))
++    if len(seen)!=len(tree):raise ValueError('树含不可达节点')
++    return {'schema':1,'root':tree.root,'nodes':records}
++
++
++def restore(document,tree_class=Tree,**tree_kwargs):
++    """验证全量记录后恢复独立树。@param document 快照。@param tree_class 显式类。@param tree_kwargs 构造参数。@return 新树。"""
++    if not isinstance(document,dict) or set(document)!={'schema','root','nodes'} or type(document['schema']) is not int or document['schema']!=1:raise ValueError('未知快照合同')
++    rows=document['nodes']
++    if not isinstance(rows,list):raise ValueError('节点必须是列表')
++    records={}
++    for row in rows:
++        if not isinstance(row,dict) or set(row)!={'id','tag','parent','children','expanded','data'} or type(row['expanded']) is not bool or not isinstance(row['children'],list):raise ValueError('节点记录形状错误')
++        identity=row['id']
++        if not isinstance(identity,str) or not identity or identity in records:raise ValueError('节点标识无效或重复')
++        records[identity]=copy.deepcopy(row)
++    root=document['root']
++    if not rows:
++        if root is not None:raise ValueError('空树不能有根')
++        return tree_class(**tree_kwargs)
++    if root not in records or records[root]['parent'] is not None:raise ValueError('根不合法')
++    visited=set();order=[];pending=[root]
++    while pending:
++        identity=pending.pop()
++        if identity in visited or identity not in records:raise ValueError('重复、环或缺失节点')
++        visited.add(identity);order.append(identity);row=records[identity]
++        for child in row['children']:
++            if not isinstance(child,str) or child not in records or records[child]['parent']!=identity:raise ValueError('父子关系不一致')
++        pending.extend(reversed(row['children']))
++    if len(visited)!=len(records):raise ValueError('快照有不可达节点')
++    tree=tree_class(**tree_kwargs)
++    if len(tree):raise ValueError('构造器必须创建空树')
++    for identity in order:
++        row=records[identity]
++        tree.create_node(row['tag'],identity,parent=row['parent'],data=row['data'])
++        tree[identity].expanded=row['expanded']
++    return tree

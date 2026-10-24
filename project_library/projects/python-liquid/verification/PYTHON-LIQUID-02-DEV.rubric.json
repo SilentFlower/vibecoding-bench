@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYTHON-LIQUID-02-DEV",
+  "source_commit": "878f589adff6cb6bf08ccea7895570f96980248e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add liquid.versioned_loader.VersionedDictLoader implementing real BaseLoader source/load/load_async contracts with explicit update/delete/snapshot, owned initial source mapping, monotonic per-name revisions, same-content no-op, bounded LRU compiled cache and in-memory RLock atomic loads. Old BoundTemplate and snapshot stay old; only changed name invalidates, missing loads/delete raise TemplateNotFoundError. Separate environments by actual environment object, and explicit globals loads do not mutate cached shared template globals. Async memory loads use same atomic operation without await split. Leave existing mutable DictLoader/CachingDictLoader behavior unchanged.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

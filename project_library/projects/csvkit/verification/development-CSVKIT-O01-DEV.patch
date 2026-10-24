@@ -1,0 +1,116 @@
+--- a/library/csvkit/cleaning.py
++++ b/library/csvkit/cleaning.py
+@@ -0,0 +1,75 @@
++"""复用原生RowChecker的有界非CLI清洗结果。"""
++from dataclasses import dataclass
++import agate
++from csvkit.cleanup import RowChecker
++
++
++@dataclass(frozen=True)
++class CleanIssue:
++    """不持有原始行值的清洗问题。@return 行号、类别和原生消息。"""
++    line_number: int
++    code: str
++    message: str
++
++
++@dataclass(frozen=True)
++class CleanResult:
++    """一次完整有界清洗的不可变外层结果。@return 版本、表头、行及错误。"""
++    schema: int
++    header: tuple
++    rows: tuple
++    errors: tuple
++
++
++class CleanLimitError(ValueError):
++    """输入超过调用者明确预算时拒绝伪装成完整结果。"""
++
++
++def clean_rows(reader, *, max_rows=10000, max_errors=1000, **options):
++    """真实清洗reader而不接管流、进程或标准输出。
++
++    :param reader: 带line_num的真实CSV读取器；首行为表头。
++    :param max_rows: 最多数据记录数，去空列也受此完整输入预算约束。
++    :param max_errors: 完成后最多保留的原生问题数。
++    :param options: RowChecker现有检查和修复选项。
++    :return: 完成全部检查后的CleanResult，不返回部分成功。
++    """
++    for name, value in [('max_rows', max_rows), ('max_errors', max_errors)]:
++        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
++            raise ValueError(name + '必须为非负整数')
++    if options.get('join_short_rows') and options.get('fill_short_rows'):
++        raise ValueError('拼接与补齐不能同时启用')
++    class BoundedReader:
++        """保留底层物理行号，并限制逻辑记录总量。"""
++        def __init__(self):
++            self.count = -1
++        def __iter__(self):
++            return self
++        @property
++        def line_num(self):
++            return reader.line_num
++        def __next__(self):
++            row = next(reader)
++            self.count += 1
++            if self.count > max_rows:
++                raise CleanLimitError('数据记录超过预算')
++            return list(row)
++    checker = RowChecker(BoundedReader(), **options)
++    rows = tuple(tuple(row) for row in checker.checked_rows())
++    if len(checker.errors) > max_errors:
++        raise CleanLimitError('清洗问题超过预算')
++    errors = tuple(CleanIssue(error.line_number,
++        'length_mismatch' if error.msg.startswith('Expected ') else 'empty_columns', error.msg)
++        for error in checker.errors)
++    return CleanResult(1, tuple(checker.output_column_names), rows, errors)
++
++
++def clean_file(stream, *, reader_options=None, **options):
++    """把调用方文本流接入真实agate.csv.reader，绝不关闭它。
++
++    :param stream: 调用方拥有的文本流。
++    :param reader_options: 真实CSV读取器参数。
++    :param options: clean_rows预算及RowChecker选项。
++    :return: CleanResult，输入IO错误原样传播。
++    """
++    return clean_rows(agate.csv.reader(stream, **(reader_options or {})), **options)
+--- a/library/docs/development-csvkit-o01-dev.md
++++ b/library/docs/development-csvkit-o01-dev.md
+@@ -0,0 +1,5 @@
++# 复用原生清洗器交付有界非CLI完整结果
++
++对应路线02：真实复用RowChecker及agate读取器，完整有界清洗后返回稳定结果，去空列等晚检查真实执行；流归调用者，异常不伪装部分成功。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_csvkit_o01_dev.py
++++ b/library/tests/test_development_csvkit_o01_dev.py
+@@ -0,0 +1,27 @@
++"""库级清洗真实复用原生检查器，晚发现列在完成后处理。"""
++from io import StringIO
++import pytest
++
++def test_real_fixes_and_error_contract():
++    """短行补齐和错误保持原生顺序及消息。@return None。"""
++    from csvkit.cleaning import clean_file
++    result=clean_file(StringIO(' a ,b\n1\n2,3,4\n'),header_normalize_space=True,fill_short_rows=True,length_mismatch=True)
++    assert result.schema==1 and result.header==('a','b') and result.rows==(('1',None),('2','3','4'))
++    assert len(result.errors)==1 and result.errors[0].code=='length_mismatch' and not hasattr(result.errors[0],'row')
++
++def test_remove_late_empty_column_and_stream_ownership():
++    """去空列必须读完全体，调用方流仍可用。@return None。"""
++    from csvkit.cleaning import clean_file
++    stream=StringIO('a,b,c\n1,,3\n2,,4\n')
++    result=clean_file(stream,remove_empty_columns=True,empty_columns=True)
++    assert result.header==('a','c') and result.rows==(('1','3'),('2','4')) and not stream.closed
++    assert result.errors[0].code=='empty_columns'
++
++def test_empty_limits_and_io_failure():
++    """空输入和预算明确，异常不被部分结果掩盖。@return None。"""
++    from csvkit.cleaning import clean_file,CleanLimitError
++    assert clean_file(StringIO('')).header==()
++    with pytest.raises(CleanLimitError):clean_file(StringIO('a\n1\n2\n'),max_rows=1)
++    class Broken(StringIO):
++        def __next__(self):raise OSError('read failure')
++    with pytest.raises(OSError):clean_file(Broken('a\n'))

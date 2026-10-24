@@ -1,0 +1,109 @@
+--- a/library/development_tests/test_development_sm_async_dev.py
++++ b/library/development_tests/test_development_sm_async_dev.py
+@@ -0,0 +1,42 @@
++"""公开异步状态机实际事件回归。"""
++import asyncio
++import pytest
++from statemachine.async_runner import AsyncMachineRunner
++from statemachine import StateMachine,State
++
++class Flow(StateMachine):
++    draft=State(initial=True)
++    ready=State()
++    done=State(final=True)
++    advance=draft.to(ready)
++    finish=ready.to(done)
++    reset=ready.to(draft)
++
++def test_async_callback_is_completed_before_receipt_and_next_event():
++    seen=[]
++    class AsyncFlow(Flow):
++        async def on_advance(self): await asyncio.sleep(0);seen.append('advance');return 7
++        async def on_finish(self): seen.append('finish')
++    async def scenario():
++        machine=AsyncFlow();rows=[row async for row in AsyncMachineRunner(machine).run(['advance','finish'])]
++        assert rows[0].after.states==('ready',) and rows[0].result==7 and rows[1].after.states==('done',)
++    asyncio.run(scenario());assert seen==['advance','finish']
++
++def test_async_source_is_lazy_and_collect_continues():
++    calls=[]
++    async def source():
++        for event in ['finish','advance']: calls.append(event);yield event
++    async def scenario():
++        stream=AsyncMachineRunner(Flow()).run(source(),errors='collect');assert calls==[]
++        rows=[row async for row in stream];assert [row.status for row in rows]==['error','passed']
++    asyncio.run(scenario())
++
++def test_cancelled_callback_is_not_converted_to_transition_error():
++    class Cancelled(Flow):
++        async def on_advance(self): raise asyncio.CancelledError()
++    async def scenario():
++        with pytest.raises(asyncio.CancelledError): await AsyncMachineRunner(Cancelled()).dispatch('advance',errors='collect')
++    asyncio.run(scenario())
++
++def test_invalid_strategy_is_checked_before_async_source_consumption():
++    with pytest.raises(ValueError): AsyncMachineRunner(Flow()).run([],errors='skip')
+--- a/library/docs/development-sm-async-dev.md
++++ b/library/docs/development-sm-async-dev.md
+@@ -0,0 +1,5 @@
++# 在原事件循环串行等待状态机激活与异步事件完成
++
++在当前事件循环等待真实异步激活和事件完成，再读取下一条事件。支持同步与异步来源并复用参数隔离和状态记录，取消及程序故障原样传播，不嵌套启动新循环。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/statemachine/async_runner.py
++++ b/library/statemachine/async_runner.py
+@@ -0,0 +1,53 @@
++"""在当前事件循环等待真实异步激活及每次事件完成。"""
++from copy import deepcopy
++from inspect import isawaitable
++from .exceptions import TransitionNotAllowed
++from .snapshots import snapshot
++from .runner import normalize_call,EventResult
++
++
++class AsyncMachineRunner:
++    """逐条等待事件完成，不创建隐藏线程或后台事件任务。"""
++    def __init__(self,machine):
++        """绑定真实状态机。@param machine 同步或异步StateChart。@return None。
++        """
++        snapshot(machine);self.machine=machine
++
++    async def dispatch(self,call,*,index=0,errors='raise'):
++        """激活并执行事件。@param call 明确事件。@param index 记录序号。
++        @param errors raise或collect。@return 完成后的EventResult。
++        """
++        if errors not in ('raise','collect'):
++            raise ValueError('无效事件错误策略')
++        call=normalize_call(call)
++        activated=self.machine.activate_initial_state()
++        if isawaitable(activated):
++            await activated
++        before=snapshot(self.machine)
++        try:
++            result=self.machine.send(call.event,*deepcopy(call.args),**deepcopy(call.kwargs))
++            if isawaitable(result):
++                result=await result
++        except TransitionNotAllowed as error:
++            if errors=='raise':
++                raise
++            return EventResult(index,call,'error',before,snapshot(self.machine),error=str(error))
++        return EventResult(index,call,'passed',before,snapshot(self.machine),result=result)
++
++    def run(self,calls,*,errors='raise'):
++        """串行消费同步或异步来源。@param calls 原事件流。@param errors 错误策略。
++        @return 异步结果迭代器，取消与来源／回调异常原样传播。
++        """
++        if errors not in ('raise','collect'):
++            raise ValueError('无效事件错误策略')
++        async def produce():
++            index=0
++            if hasattr(calls,'__aiter__'):
++                async for call in calls:
++                    yield await self.dispatch(call,index=index,errors=errors)
++                    index+=1
++            else:
++                for call in calls:
++                    yield await self.dispatch(call,index=index,errors=errors)
++                    index+=1
++        return produce()

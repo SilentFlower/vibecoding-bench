@@ -1,0 +1,302 @@
+{
+  "schema": 3,
+  "project_key": "jsonschema",
+  "title": "JSON Schema数据准入工作场景",
+  "category": "结构校验与schema治理",
+  "description": "固定真实源码上的完整工程交付：修复2019-09布尔items的真实评估索引与未评估校验；让错误JSONPath精确引用含换行及控制字符的真实键；让一次性错误上下文保持真实对象身份及完整绝对父链；把受控正则编译异常映射为保留cause的格式验证错误；一次收集真实独立验证错误并对无限错误源明确截断；显式组合内建格式与业务约束且保持短路及异常cause。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "e02048d8535190fc19f8bac854606439982d2097f55ccf53d2000e70c41399ca",
+  "environment": "jsonschema-py312",
+  "source": {
+    "repository": "https://github.com/python-jsonschema/jsonschema",
+    "commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "JSONSCHEMA-O01-DEV-SCENE",
+      "title": "修复2019-09布尔items的真实评估索引与未评估校验",
+      "goal": "修复2019-09布尔items的真实评估索引与未评估校验",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JSONSCHEMA-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JSONSCHEMA-O01-DEV",
+          "kind": "modify",
+          "goal": "修复2019-09布尔items的真实评估索引与未评估校验",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix draft-2019-09 find_evaluated_item_indexes_by_schema so boolean single-schema items is never treated as a tuple and len(bool) never occurs under unevaluatedItems. items=true evaluates all array positions; items=false must still yield standard validation failure for nonempty arrays and accept empty arrays without TypeError. Preserve tuple/additionalItems behavior, successful combinator annotations, nonarray handling and independent draft-2020-12 prefixItems semantics. Use actual Draft201909Validator paths, not special-case input data or disable unevaluatedItems.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jsonschema_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-jsonschema-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/JSONSCHEMA-O01-DEV-contract.md",
+            "materials/JSONSCHEMA-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jsonschema/_legacy_keywords.py",
+            "library/tests/test_development_jsonschema_o01_dev.py",
+            "library/docs/development-jsonschema-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JSONSCHEMA-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JSONSCHEMA-O01-DEV.native.json",
+            "public_native": "verification/JSONSCHEMA-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JSONSCHEMA-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "JSONSCHEMA-O02-DEV-SCENE",
+      "title": "让错误JSONPath精确引用含换行及控制字符的真实键",
+      "goal": "让错误JSONPath精确引用含换行及控制字符的真实键",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JSONSCHEMA-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JSONSCHEMA-O02-DEV",
+          "kind": "modify",
+          "goal": "让错误JSONPath精确引用含换行及控制字符的真实键",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix _Error.json_path dot-safe identification with full-string matching and correct single-quoted bracket escaping for quote/backslash and every C0 control character. A key x followed by LF must never render as $.x plus a raw LF or resolve to the separate key x. Preserve ordinary ASCII identifier dot notation, Unicode/empty bracket keys, array indexes, original path values and absolute parent-path composition. Demonstrate independent decoding/selection round trips rather than only comparing a hard-coded diagnostic string.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jsonschema_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-jsonschema-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/JSONSCHEMA-O02-DEV-contract.md",
+            "materials/JSONSCHEMA-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jsonschema/exceptions.py",
+            "library/tests/test_development_jsonschema_o02_dev.py",
+            "library/docs/development-jsonschema-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JSONSCHEMA-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JSONSCHEMA-O02-DEV.native.json",
+            "public_native": "verification/JSONSCHEMA-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JSONSCHEMA-O02-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "JSONSCHEMA-O03-DEV-SCENE",
+      "title": "让一次性错误上下文保持真实对象身份及完整绝对父链",
+      "goal": "让一次性错误上下文保持真实对象身份及完整绝对父链",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JSONSCHEMA-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JSONSCHEMA-O03-DEV",
+          "kind": "modify",
+          "goal": "让一次性错误上下文保持真实对象身份及完整绝对父链",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix _Error.__init__ to materialize context exactly once and assign parent on the retained children rather than re-iterating the source. Generator/list/tuple and deliberately one-shot iterable inputs must preserve child identities and equal absolute instance/schema paths through multiple ancestors. Apply to both ValidationError and SchemaError/create_from, keep empty contexts and existing list behavior, and introduce no copied child objects or fabricated paths.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jsonschema_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-jsonschema-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/JSONSCHEMA-O03-DEV-contract.md",
+            "materials/JSONSCHEMA-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jsonschema/exceptions.py",
+            "library/tests/test_development_jsonschema_o03_dev.py",
+            "library/docs/development-jsonschema-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JSONSCHEMA-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JSONSCHEMA-O03-DEV.native.json",
+            "public_native": "verification/JSONSCHEMA-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JSONSCHEMA-O03-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "JSONSCHEMA-O04-DEV-SCENE",
+      "title": "把受控正则编译异常映射为保留cause的格式验证错误",
+      "goal": "把受控正则编译异常映射为保留cause的格式验证错误",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JSONSCHEMA-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JSONSCHEMA-O04-DEV",
+          "kind": "modify",
+          "goal": "把受控正则编译异常映射为保留cause的格式验证错误",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend only the builtin regex format registration to catch declared regular-expression compilation failures: re.error, ValueError for incompatible inline flags, RecursionError for bounded deeply nested patterns and OverflowError for repeat limits. FormatChecker.check must produce FormatError retaining cause and real format validation must yield ValidationError instead of leaking those failures. Preserve empty/valid patterns and nonstring JSON Schema format semantics. Never catch arbitrary BaseException or broaden unrelated custom checker programming-error handling.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jsonschema_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-jsonschema-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/JSONSCHEMA-O04-DEV-contract.md",
+            "materials/JSONSCHEMA-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jsonschema/_format.py",
+            "library/tests/test_development_jsonschema_o04_dev.py",
+            "library/docs/development-jsonschema-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JSONSCHEMA-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JSONSCHEMA-O04-DEV.native.json",
+            "public_native": "verification/JSONSCHEMA-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JSONSCHEMA-O04-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "JSONSCHEMA-O05-DEV-SCENE",
+      "title": "一次收集真实独立验证错误并对无限错误源明确截断",
+      "goal": "一次收集真实独立验证错误并对无限错误源明确截断",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JSONSCHEMA-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JSONSCHEMA-O05-DEV",
+          "kind": "modify",
+          "goal": "一次收集真实独立验证错误并对无限错误源明确截断",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd validate_all(instance, *, max_errors=100) to generated validator classes and the Validator protocol, raising public exceptions.ValidationErrorGroup for nonempty actual iter_errors results and returning None when valid. Preserve original ValidationError identities/paths and normal validate/is_valid semantics. A positive nonbool integer budget bounds stored errors and consumes at most one additional error to determine truncated; group exposes truncated/limit and derive preserves them for except*. Always close the underlying generator on completion/failure/cancellation. Keyword programming/resolution/schema errors must propagate instead of being misclassified as instance errors.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jsonschema_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-jsonschema-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/JSONSCHEMA-O05-DEV-contract.md",
+            "materials/JSONSCHEMA-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jsonschema/validators.py",
+            "library/jsonschema/exceptions.py",
+            "library/jsonschema/protocols.py",
+            "library/tests/test_development_jsonschema_o05_dev.py",
+            "library/docs/development-jsonschema-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JSONSCHEMA-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JSONSCHEMA-O05-DEV.native.json",
+            "public_native": "verification/JSONSCHEMA-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JSONSCHEMA-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "JSONSCHEMA-O06-DEV-SCENE",
+      "title": "显式组合内建格式与业务约束且保持短路及异常cause",
+      "goal": "显式组合内建格式与业务约束且保持短路及异常cause",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "JSONSCHEMA-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "JSONSCHEMA-O06-DEV",
+          "kind": "modify",
+          "goal": "显式组合内建格式与业务约束且保持短路及异常cause",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd FormatChecker.compose(format, checker, *, mode=\"all\", raises=()) for an existing registered format on this instance only, returning self. Combine the captured prior checker and new callable in order with all/any short circuit, preserving declared input-exception causes in FormatError and propagating undeclared programming errors. Keep original checks decorator overwrite semantics and independent/global checker registries unchanged. Reject unknown formats, invalid mode/callable/raises before mutation. Exercise actual builtin date syntax plus business conditions through FormatChecker and a real JSON Schema format keyword; no global monkeypatch or duplicated fake validation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jsonschema_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-jsonschema-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/JSONSCHEMA-O06-DEV-contract.md",
+            "materials/JSONSCHEMA-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/jsonschema/_format.py",
+            "library/tests/test_development_jsonschema_o06_dev.py",
+            "library/docs/development-jsonschema-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/JSONSCHEMA-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/JSONSCHEMA-O06-DEV.native.json",
+            "public_native": "verification/JSONSCHEMA-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/JSONSCHEMA-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+--- a/library/development_tests/test_development_tb_load_dev.py
++++ b/library/development_tests/test_development_tb_load_dev.py
+@@ -0,0 +1,25 @@
++"""公开真实表格导入端到端回归。"""
++from decimal import Decimal
++import pytest
++from tablib.loading import load_records
++
++def test_aliases_and_reordered_records_follow_explicit_output_columns():
++    records=[{'sku':'A','quantity':'2'},{'quantity':'3','sku':'B'}]
++    result=load_records(iter(records),['id','qty'],aliases={'id':'sku','qty':'quantity'},converters={'qty':int})
++    assert result.dataset.headers==['id','qty'] and list(result.dataset)==[('A',2),('B',3)] and records[0]['quantity']=='2'
++
++def test_falsey_missing_and_extra_policies_are_not_conflated():
++    result=load_records([{'n':0,'flag':False,'text':'','extra':1}],['n','flag','text','missing'],missing='none',extra='ignore')
++    assert result.dataset[0]==(0,False,'',None)
++    with pytest.raises(ValueError): load_records([{'n':1,'extra':2}],['n'])
++
++def test_conversion_collection_and_empty_dataset_keep_schema():
++    result=load_records([{'n':'bad'},{'n':'2'}],['n'],converters={'n':int},errors='collect')
++    assert result.errors[0].row==0 and list(result.dataset)==[('bad',),(2,)]
++    empty=load_records([],['n'],title='Empty');assert empty.dataset.headers==['n'] and empty.dataset.title=='Empty'
++
++def test_input_failure_and_alias_collision_are_explicit():
++    records=[{'a':1},7]
++    with pytest.raises(TypeError): load_records(records,['a'])
++    with pytest.raises(ValueError): load_records([],['a','b'],aliases={'b':'a'})
++    assert records==[{'a':1},7]
+--- a/library/docs/development-tb-load-dev.md
++++ b/library/docs/development-tb-load-dev.md
+@@ -0,0 +1,5 @@
++# 组合外部字段合同、真实字典导入与类型转换流程
++
++把外部键别名、缺失和多余字段规则接入真实Dataset字典导入，再组合类型转换。输出列序明确，后续记录键序变化不能错位，保留零值、空文本和None，结构错误不返回半成品。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/tablib/loading.py
++++ b/library/src/tablib/loading.py
+@@ -0,0 +1,39 @@
++"""显式外部字段合同驱动实际Dataset字典导入。"""
++from copy import deepcopy
++from collections.abc import Mapping
++from .core import Dataset
++from .projection import schema
++from .conversion import convert_columns,ConversionResult
++
++
++def load_records(records,columns,*,aliases=None,missing='raise',extra='raise',converters=None,errors='raise',title=None):
++    """按明确字段导入记录。@param records 映射记录迭代器。@param columns 规范输出字段顺序。
++    @param aliases 输出字段到外部键映射。@param missing raise或none。@param extra raise或ignore。
++    @param converters 可选真实列转换器。@param errors 转换错误策略。@param title 数据集标题。
++    @return ConversionResult，不修改输入记录，结构合同失败不返回半成品。
++    """
++    columns=list(columns);dataset=Dataset(headers=columns,title=title);schema(dataset)
++    aliases=dict(aliases or {})
++    if set(aliases)-set(columns) or missing not in ('raise','none') or extra not in ('raise','ignore') or errors not in ('raise','collect'):
++        raise ValueError('无效记录导入策略')
++    external=[aliases.get(name,name) for name in columns]
++    if any(not isinstance(name,str) or not name for name in external) or len(set(external))!=len(external):
++        raise ValueError('外部字段名必须非空且唯一')
++    inverse=dict(zip(external,columns));prepared=[]
++    for record in records:
++        if not isinstance(record,Mapping):
++            raise TypeError('每条记录必须为映射')
++        absent=set(external)-set(record);unknown=set(record)-set(external)
++        if missing=='raise' and absent:
++            raise ValueError('记录缺少字段：'+','.join(sorted(absent)))
++        if extra=='raise' and unknown:
++            raise ValueError('记录含未授权字段')
++        row={inverse[key]:deepcopy(value) for key,value in record.items() if key in inverse}
++        for name in columns:
++            row.setdefault(name,None)
++        prepared.append(row)
++    if prepared:
++        # 固定首行建立业务列序，其余记录保留实际键序，必须依赖修复后的按表头对齐入口。
++        dataset.dict=[dict.fromkeys(columns)]+prepared
++        del dataset[0]
++    return convert_columns(dataset,converters,errors=errors) if converters is not None else ConversionResult(dataset,())

@@ -1,0 +1,52 @@
+--- a/library/development_tests/test_development_pa_beneath_dev.py
++++ b/library/development_tests/test_development_pa_beneath_dev.py
+@@ -0,0 +1,22 @@
++"""公开词法相对路径约束回归。"""
++from path import Path
++import pytest
++
++def test_nested_and_equal_paths_return_relative_path_types(tmp_path):
++    root=Path(tmp_path)
++    result=(root/'nested'/'file').relative_beneath(root)
++    assert isinstance(result,Path) and result=='nested/file' and root.relative_beneath(root)=='.'
++
++def test_sibling_prefix_and_parent_escape_are_rejected(tmp_path):
++    root=Path(tmp_path/'root')
++    for target in (Path(str(root)+'-other')/'file',root/'..'/'outside'):
++        with pytest.raises(ValueError):
++            target.relative_beneath(root)
++
++def test_nonexistent_paths_are_valid_lexical_inputs(tmp_path):
++    root=Path(tmp_path/'absent')
++    assert (root/'child').relative_beneath(root)=='child' and not root.exists()
++
++def test_symlink_is_not_resolved_by_lexical_operation(tmp_path):
++    outside=tmp_path/'outside';outside.mkdir();root=tmp_path/'root';root.mkdir();(root/'link').symlink_to(outside,target_is_directory=True)
++    assert Path(root/'link'/'file').relative_beneath(root)=='link/file'
+--- a/library/docs/development-pa-beneath-dev.md
++++ b/library/docs/development-pa-beneath-dev.md
+@@ -0,0 +1,5 @@
++# 为工作区文件引用提供明确的词法相对路径约束
++
++批处理清单中的文件引用需要明确位于基目录内，正确处理点点、相邻目录同前缀和相同目录。只做词法约束并保留Path类型，不读取文件系统，也不把它当作符号链接安全边界。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/path/__init__.py
++++ b/library/path/__init__.py
+@@ -482,6 +482,16 @@
+         """
+         cwd = self._next_class(start)
+         return cwd.relpathto(self)
++
++    def relative_beneath(self,base):
++        """词法验证并返回基目录内的相对路径。@param base 基目录，不解析链接。
++        @return 当前Path类的相对值；越界或跨驱动器时ValueError，不访问文件系统。
++        """
++        target=self.module.abspath(self)
++        root=self.module.abspath(base)
++        if self.module.normcase(self.module.commonpath((target,root)))!=self.module.normcase(root):
++            raise ValueError('路径不位于指定基目录内')
++        return self._next_class(self.module.relpath(target,root))
+ 
+     def relpathto(self, dest: str) -> Self:
+         """Return a relative path from `self` to `dest`.

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CK-STABLE-WRITE-DEV",
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement click.writing.write_if_changed(path,content,*,encoding=\"utf-8\") returning whether actual write occurred. Compare final encoded bytes first; identical bytes preserve inode/mtime/mode exactly. Changed/new data is serialized before I/O, written to same-directory temporary, flushed/fsynced, mode preserved (0600 when new) then atomically replaced, with cleanup on failure. Support bytes and encoded text; reject invalid content and symlinks. Verify real CliRunner invocation; do not alter open_file defaults or promise compare-and-swap locking/parent-directory fsync durability.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

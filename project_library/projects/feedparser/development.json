@@ -1,0 +1,307 @@
+{
+  "schema": 3,
+  "project_key": "feedparser",
+  "title": "Feedparser本地订阅验收工作场景",
+  "category": "容错、字段与内容归档",
+  "description": "固定真实源码上的完整工程交付：修复JSON修改日期字段判断并保留正式时间与UTC解析事实；补全已声明JSON1.1的多作者头像语言及条目继承语义；给真实单次订阅解析提供隔离不可变日期处理器注册集；基于真实条目键生成明确标可靠性的稳定身份而不伪造ID；合并真实订阅快照并明确报告新增修订未变及缺席保留；从真实跨格式条目选择可读正文并保留类型语言及来源。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "a3718cee7f475eb11e6af28a43b8c3dc88954909949cfb9d41e526bccf2a16e9",
+  "environment": "feedparser-py312",
+  "source": {
+    "repository": "https://github.com/kurtmckee/feedparser",
+    "commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+    "license_files": [
+      "seed/library/LICENSE"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "FEEDPARSER-O01-DEV-SCENE",
+      "title": "修复JSON修改日期字段判断并保留正式时间与UTC解析事实",
+      "goal": "修复JSON修改日期字段判断并保留正式时间与UTC解析事实",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FEEDPARSER-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FEEDPARSER-O01-DEV",
+          "kind": "modify",
+          "goal": "修复JSON修改日期字段判断并保留正式时间与UTC解析事实",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix JSONParser.parse_entry date_modified detection/value consistency through actual feedparser.parse. Preserve the original date string and UTC parsed tuple, prefer correct date_modified when both spellings exist and explicitly support legacy date_updated only as fallback without KeyError. Missing modified dates must not create real updated keys from published aliases; invalid strings remain raw with parsed None. Do not replace published or merely rely on FeedParserDict compatibility fallback to claim a modified date exists.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-feedparser-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FEEDPARSER-O01-DEV-contract.md",
+            "materials/FEEDPARSER-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedparser/parsers/json.py",
+            "library/tests/test_development_feedparser_o01_dev.py",
+            "library/docs/development-feedparser-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FEEDPARSER-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FEEDPARSER-O01-DEV.native.json",
+            "public_native": "verification/FEEDPARSER-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FEEDPARSER-O01-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "FEEDPARSER-O02-DEV-SCENE",
+      "title": "补全已声明JSON1.1的多作者头像语言及条目继承语义",
+      "goal": "补全已声明JSON1.1的多作者头像语言及条目继承语义",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FEEDPARSER-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FEEDPARSER-O02-DEV",
+          "kind": "modify",
+          "goal": "补全已声明JSON1.1的多作者头像语言及条目继承语义",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nComplete actual JSON1.1 adapter metadata: ordered authors arrays with name/url/avatar mapped to authors details, first author compatibility fields, feed/item language and detached item inheritance when absent. Explicit authors=[] suppresses author inheritance, and authors takes precedence over legacy author; retain existing single-author behavior. Validate array/member/string shapes and nonempty language explicitly so original parse bozo reports malformed data rather than silently dropping it. Preserve actual raw content/date handling, no new network or invented language inference.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-feedparser-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FEEDPARSER-O02-DEV-contract.md",
+            "materials/FEEDPARSER-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedparser/parsers/json.py",
+            "library/tests/test_development_feedparser_o02_dev.py",
+            "library/docs/development-feedparser-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FEEDPARSER-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FEEDPARSER-O02-DEV.native.json",
+            "public_native": "verification/FEEDPARSER-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FEEDPARSER-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FEEDPARSER-O03-DEV-SCENE",
+      "title": "给真实单次订阅解析提供隔离不可变日期处理器注册集",
+      "goal": "给真实单次订阅解析提供隔离不可变日期处理器注册集",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FEEDPARSER-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FEEDPARSER-O03-DEV",
+          "kind": "modify",
+          "goal": "给真实单次订阅解析提供隔离不可变日期处理器注册集",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd public immutable DateHandlerRegistry(handlers=(), include_builtin=True) and parse(..., date_handlers=registry). Apply through actual shared _parse_date paths with ContextVar scoping/reset on every exit, preserving default global registerDateHandler behavior and built-in order. Freeze/deduplicate custom handler identities, accept only nine nonbool integer tuple/list returns, skip mismatches/declared custom failures and continue to later handlers; never catch BaseException cancellation. Interleaved/concurrent/nested parsing must not leak registries. Use real RSS/JSON date parsing, not a separate unused date utility or global list swapping.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-feedparser-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FEEDPARSER-O03-DEV-contract.md",
+            "materials/FEEDPARSER-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedparser/datetimes/__init__.py",
+            "library/feedparser/api.py",
+            "library/feedparser/__init__.py",
+            "library/tests/test_development_feedparser_o03_dev.py",
+            "library/docs/development-feedparser-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FEEDPARSER-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FEEDPARSER-O03-DEV.native.json",
+            "public_native": "verification/FEEDPARSER-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FEEDPARSER-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FEEDPARSER-O04-DEV-SCENE",
+      "title": "基于真实条目键生成明确标可靠性的稳定身份而不伪造ID",
+      "goal": "基于真实条目键生成明确标可靠性的稳定身份而不伪造ID",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FEEDPARSER-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FEEDPARSER-O04-DEV",
+          "kind": "modify",
+          "goal": "基于真实条目键生成明确标可靠性的稳定身份而不伪造ID",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd feedparser.records.entry_identity for actual parsed entry mappings. Prefer a nonempty native string id with reliable=True; otherwise compute deterministic SHA256 from explicit selected actual fields with configurable NFC string normalization, canonical JSON and reliable=False/source=fields metadata. Never inject an id, read compatibility alias fallbacks as real facts, strip tracking parameters or identify entries merely by similar titles. Reject missing usable data, duplicate/invalid field names, nonstring native ids and unsupported/nonfinite JSON values explicitly. Preserve inputs, distinguish equal titles with different links and document fallback collision/stability scope.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-feedparser-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FEEDPARSER-O04-DEV-contract.md",
+            "materials/FEEDPARSER-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedparser/records.py",
+            "library/tests/test_development_feedparser_o04_dev.py",
+            "library/docs/development-feedparser-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FEEDPARSER-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FEEDPARSER-O04-DEV.native.json",
+            "public_native": "verification/FEEDPARSER-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FEEDPARSER-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FEEDPARSER-O05-DEV-SCENE",
+      "title": "合并真实订阅快照并明确报告新增修订未变及缺席保留",
+      "goal": "合并真实订阅快照并明确报告新增修订未变及缺席保留",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FEEDPARSER-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FEEDPARSER-O05-DEV",
+          "kind": "modify",
+          "goal": "合并真实订阅快照并明确报告新增修订未变及缺席保留",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd records.merge_feeds(previous,incoming,*,partial=False) using the delivered explicit entry_identity. Return {result,changes:{added,updated,unchanged,retained}} with incoming order first and previous absent entries retained in old order; absence never deletes. Inputs and nested output are detached. Duplicate identities within either batch raise. Full mode replaces same-id content, partial mode overlays only supplied top-level fields; report actual data changes even if date strings move backward, without guessed conflict winners. Current non-entry metadata overlays prior metadata, and no network fetch or original result mutation occurs.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-feedparser-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [
+            {
+              "task_id": "FEEDPARSER-O04-DEV",
+              "artifact": "code"
+            }
+          ],
+          "materials": [
+            "materials/FEEDPARSER-O05-DEV-contract.md",
+            "materials/FEEDPARSER-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedparser/records.py",
+            "library/tests/test_development_feedparser_o05_dev.py",
+            "library/docs/development-feedparser-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FEEDPARSER-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FEEDPARSER-O05-DEV.native.json",
+            "public_native": "verification/FEEDPARSER-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FEEDPARSER-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "FEEDPARSER-O06-DEV-SCENE",
+      "title": "从真实跨格式条目选择可读正文并保留类型语言及来源",
+      "goal": "从真实跨格式条目选择可读正文并保留类型语言及来源",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "FEEDPARSER-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "FEEDPARSER-O06-DEV",
+          "kind": "modify",
+          "goal": "从真实跨格式条目选择可读正文并保留类型语言及来源",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd feedparser.readers.entry_text(entry,*,prefer=(text/plain,text/html,application/xhtml+xml),languages=(),strip_html=True). Select existing nonempty local content with MIME priority then declared language order/source order, accepting native content lists and legacy JSON single-content dict; normalize text/html/xhtml aliases. Fall back to real summary_detail or summary only when no usable content. Return text plus original value/type/language/source/index, leaving entry unchanged. Optional limited HTML text extraction preserves block/break/entity order and excludes script/style text; do not claim sanitization. Never fetch src, invent a body from title, accept unknown types silently or generate a summary.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-feedparser-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/FEEDPARSER-O06-DEV-contract.md",
+            "materials/FEEDPARSER-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/feedparser/readers.py",
+            "library/tests/test_development_feedparser_o06_dev.py",
+            "library/docs/development-feedparser-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/FEEDPARSER-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/FEEDPARSER-O06-DEV.native.json",
+            "public_native": "verification/FEEDPARSER-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/FEEDPARSER-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

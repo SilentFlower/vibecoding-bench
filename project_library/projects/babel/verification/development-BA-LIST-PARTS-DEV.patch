@@ -1,0 +1,84 @@
+--- a/library/babel/lists.py
++++ b/library/babel/lists.py
+@@ -113,6 +113,43 @@
+     return result
+ 
+ 
++def format_list_to_parts(lst, style='standard', locale=None):
++    """返回可单独样式化的列表元素及连接文字。@param lst 字符串序列。
++    @param style CLDR列表样式。@param locale 区域。@return type/value/index分段。
++    """
++    from string import Formatter
++
++    items = list(lst)
++    if any(not isinstance(item, str) for item in items):
++        raise TypeError('列表元素必须是字符串')
++    if not items:
++        return []
++    result = [{'type': 'element', 'value': items[0], 'index': 0}]
++    if len(items) == 1:
++        return result
++    resolved = Locale.parse(locale or _DEFAULT_LOCALE)
++    patterns = _resolve_list_style(resolved, style)
++
++    def combine(pattern, left, right):
++        combined = []
++        # 直接解释CLDR占位符，不向用户文本注入可能碰撞的哨兵。
++        for literal, field, spec, conversion in Formatter().parse(pattern):
++            if literal:
++                combined.append({'type': 'literal', 'value': literal, 'index': None})
++            if field is not None:
++                if field not in ('0', '1') or spec or conversion:
++                    raise ValueError('不支持的列表模板')
++                combined.extend(left if field == '0' else right)
++        return combined
++
++    if len(items) == 2 and '2' in patterns:
++        return combine(patterns['2'], result, [{'type': 'element', 'value': items[1], 'index': 1}])
++    result = combine(patterns['start'], result, [{'type': 'element', 'value': items[1], 'index': 1}])
++    for index, item in enumerate(items[2:-1], 2):
++        result = combine(patterns['middle'], result, [{'type': 'element', 'value': item, 'index': index}])
++    return combine(patterns['end'], result, [{'type': 'element', 'value': items[-1], 'index': len(items)-1}])
++
++
+ # Based on CLDR 45's root.xml file's `<alias>`es.
+ # The root file defines both `standard` and `or`,
+ # so they're always available.
+--- a/library/development_tests/test_development_ba_list_parts_dev.py
++++ b/library/development_tests/test_development_ba_list_parts_dev.py
+@@ -0,0 +1,27 @@
++"""公开列表分段交付回归。"""
++import pytest
++from babel.lists import format_list, format_list_to_parts
++
++def test_concatenation_matches_localized_lists():
++    for locale in ('en', 'zh', 'fr', 'fi'):
++        for count in range(5):
++            values = ['a', 'b', 'c', 'd'][:count]
++            assert ''.join(p['value'] for p in format_list_to_parts(values, locale=locale)) == format_list(values, locale=locale)
++
++def test_repeated_empty_and_braced_elements_keep_original_indices():
++    values = ['', '{0}', '{0}', '雪']
++    parts = format_list_to_parts(values, locale='en')
++    assert [(p['index'], p['value']) for p in parts if p['type'] == 'element'] == list(enumerate(values))
++    assert all(p['index'] is None for p in parts if p['type'] == 'literal')
++
++def test_style_fallback_matches_existing_formatter():
++    values = ['one', 'two', 'three']
++    for style in ('or', 'unit-short', 'standard-narrow'):
++        assert ''.join(p['value'] for p in format_list_to_parts(values, style, 'en')) == format_list(values, style, 'en')
++
++def test_input_is_unchanged_and_non_text_is_rejected():
++    values = ['a', 'b']
++    format_list_to_parts(values, locale='en')
++    assert values == ['a', 'b']
++    with pytest.raises(TypeError):
++        format_list_to_parts(['a', 1], locale='en')
+--- a/library/docs/development-ba-list-parts-dev.md
++++ b/library/docs/development-ba-list-parts-dev.md
+@@ -0,0 +1,5 @@
++# 为区域化列表保留原元素身份与连接文字
++
++列表页面需要给原始条目单独绑定链接和样式，不能通过搜索文本猜位置。实现保留来源索引的分段，支持重复值、空串、Unicode及样式回退，拼接结果与原format_list完全一致。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

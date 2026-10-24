@@ -1,0 +1,104 @@
+--- a/library/docs/development-html2text-o04-dev.md
++++ b/library/docs/development-html2text-o04-dev.md
+@@ -0,0 +1,5 @@
++# 在真实图片转换中按明确像素密度选择离线srcset来源
++
++对应路线16：显式image_density在真实img链路选最小足够x密度并复用baseurl；缺src可选，重复/非法/w混用拒绝，data集合明确回退src，alt/ignore/default保持且不联网。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/html2text/__init__.py
++++ b/library/html2text/__init__.py
+@@ -65,6 +65,7 @@
+         self.ignore_links = config.IGNORE_ANCHORS  # covered in cli
+         self.ignore_mailto_links = config.IGNORE_MAILTO_LINKS  # covered in cli
+         self.ignore_images = config.IGNORE_IMAGES  # covered in cli
++        self.image_density = None
+         self.images_as_html = config.IMAGES_AS_HTML  # covered in cli
+         self.images_to_alt = config.IMAGES_TO_ALT  # covered in cli
+         self.images_with_size = config.IMAGES_WITH_SIZE  # covered in cli
+@@ -200,6 +201,39 @@
+     def handle_endtag(self, tag: str) -> None:
+         self.handle_tag(tag, {}, start=False)
+ 
++    def _density_source(self, attrs):
++        """按显式像素密度选择当前img的srcset，不读取图片或网络。
++
++        :param attrs: 当前HTML图片属性。
++        :return: 选中的源字符串；未配置/不支持的data URL集合保留原src。
++        """
++        import math
++        target = self.image_density
++        fallback = attrs.get('src')
++        if target is None:
++            return fallback
++        if isinstance(target, bool) or not isinstance(target, (int, float)) or not math.isfinite(target) or target <= 0:
++            raise ValueError('image_density必须为有限正数')
++        value = attrs.get('srcset')
++        if not value or 'data:' in value.lower():
++            return fallback
++        candidates = []
++        seen = set()
++        for candidate in value.split(','):
++            parts = candidate.strip().split()
++            if len(parts) == 1:
++                source, density = parts[0], 1.0
++            elif len(parts) == 2 and re.fullmatch(r'(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)x', parts[1]):
++                source, density = parts[0], float(parts[1][:-1])
++            else:
++                raise ValueError('srcset仅支持明确的x密度描述符')
++            if not source or density <= 0 or not math.isfinite(density) or density in seen:
++                raise ValueError('srcset含无效或重复密度')
++            seen.add(density)
++            candidates.append((density, source))
++        candidates.sort(key=lambda item: item[0])
++        return next((source for density, source in candidates if density >= target), candidates[-1][1])
++
+     def previousIndex(self, attrs: Dict[str, Optional[str]]) -> Optional[int]:
+         """
+         :type attrs: dict
+@@ -546,6 +580,10 @@
+                             self.o("][" + str(a_props.count) + "]")
+ 
+         if tag == "img" and start and not self.ignore_images:
++            if not self.images_to_alt:
++                selected = self._density_source(attrs)
++                if selected is not None:
++                    attrs['src'] = selected
+             if "src" in attrs and attrs["src"] is not None:
+                 if not self.images_to_alt:
+                     attrs["href"] = attrs["src"]
+--- a/library/test/test_development_html2text_o04_dev.py
++++ b/library/test/test_development_html2text_o04_dev.py
+@@ -0,0 +1,32 @@
++"""显式密度选图作用于实际图片链接且不获取任何资源。"""
++from html2text import HTML2Text
++import pytest
++
++def convert(text,density,**options):
++    """调用真实img转换设置目标密度。@return Markdown。"""
++    converter=HTML2Text(baseurl='https://e.test/docs/',bodywidth=0);converter.image_density=density
++    for key,value in options.items():setattr(converter,key,value)
++    return converter.handle(text)
++
++def test_smallest_sufficient_density_and_largest_fallback_real_url():
++    """候选顺序不影响选择，超过最大密度选最大，默认仍用src。@return None。"""
++    html='<img src="fallback" alt="A" srcset="large.png 3x, small.png 1x, medium.png 2x">'
++    for target,source in [(1,'small'),(1.5,'medium'),(2,'medium'),(4,'large')]:
++        assert 'https://e.test/docs/'+source+'.png' in convert(html,target)
++    assert '/docs/fallback' in convert(html,None)
++
++def test_implicit_one_fractional_density_missing_src_and_image_modes():
++    """无描述符等于1x，可无src，alt/忽略模式不强迫解析用不到的候选。@return None。"""
++    assert '/docs/two' in convert('<img alt="A" srcset="one, two 1.5x">',1.2)
++    html='<img src="x" alt="Alt" srcset="bad 100w">'
++    assert convert(html,2,images_to_alt=True).strip()=='Alt'
++    assert convert(html,2,ignore_images=True).strip()==''
++    assert "src='two'" in convert('<img src="one" srcset="two 2x">',2,images_as_html=True)
++
++def test_invalid_duplicate_mixed_density_and_data_url_policy():
++    """无效/重复/混用描述符明确拒绝，带逗号data集合明确保留原src。@return None。"""
++    for value in ['one 1x, two 1x','one 0x','one 100w, two 2x','one 2x,', 'one invalid']:
++        with pytest.raises(ValueError):convert('<img src="fallback" srcset="'+value+'">',2)
++    for target in [0,-1,True,float('nan'),float('inf')]:
++        with pytest.raises(ValueError):convert('<img src="x" srcset="one 1x">',target)
++    assert '/docs/fallback' in convert('<img src="fallback" srcset="data:image/png;base64,AAAA 1x, large 2x">',2)

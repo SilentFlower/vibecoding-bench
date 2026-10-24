@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SJ-LINES-DEV",
+  "source_commit": "9950b7e5f4443fff8defb51e80e41ab40d0a36b9",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement simplejson.lines.iterloads(lines,*,errors=\"raise\",use_decimal=False,max_chars=None), iterdumps(records), dump(records,stream) and frozen LineResult(line,status,value,error). Inputs are physical text/UTF-8 byte lines, optional BOM only on first line, blank lines ignored but counted. Validate options before consuming data. Reuse strict_loads duplicate/finite policy; collect returns a result per nonblank or invalid line and keeps later records, raise reports the physical line. Bound character size before parsing. Output uses stable_dumps, exactly one LF per record, validates each full record before its write, stays lazy and does not buffer all records. Detect short writes.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

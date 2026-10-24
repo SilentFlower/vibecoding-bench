@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARDET-O05-DEV",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement chardet.validated.detect_validated(data, *, validator=None). Snapshot bytes, obtain real detect_all candidates, stable-sort confidence, deduplicate supported codec aliases and strictly decode the entire payload for every candidate before an optional (text, candidate) callback. Return selected original facts and per-candidate accepted/business-rejected/decode-error/unsupported-codec statuses without returning full text. All-rejected/empty/unsupported results must not claim whole validation; callback errors propagate and confidence is never fabricated or represented as an accuracy guarantee.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

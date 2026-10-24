@@ -1,0 +1,29 @@
+"""动态幂和常量折叠一致，但保留Jinja左结合幂语义。"""
+from jinja2 import Environment
+from jinja2.sandbox import SandboxedEnvironment
+
+def test_dynamic_negative_bases_and_constant_parity():
+    """不同底数和指数在开关优化后都一致，不特判-1。@return None。"""
+    for optimized in [False,True]:
+        env=Environment(optimized=optimized)
+        for base in [-3,-1,0,2]:
+            for exponent in [0,1,2,3,-1]:
+                if base==0 and exponent<0:continue
+                dynamic=env.from_string('{{('+str(base)+')**power}}').render(power=exponent)
+                constant=env.from_string('{{('+str(base)+')**('+str(exponent)+')}}').render()
+                assert dynamic==constant==str(base**exponent)
+
+def test_unparenthesized_negative_ast_and_left_associative_chain():
+    """原Jinja AST的负底数和幂左结合都保留。@return None。"""
+    env=Environment()
+    assert env.from_string('{{ -1**x}}').render(x=2)=='1'
+    assert env.from_string('{{2**3**2}}').render()=='64'
+    assert env.from_string('{{base**exponent}}').render(base=-2,exponent=2)=='4'
+
+def test_sandbox_intercepted_binop_still_receives_real_operands():
+    """沙箱显式拦截路径不绕过自定义运算策略。@return None。"""
+    class Sandbox(SandboxedEnvironment):
+        """记录真实幂操作数。"""
+        intercepted_binops=frozenset(['**'])
+        def call_binop(self,context,operator,left,right):return f'{left}:{right}'
+    assert Sandbox().from_string('{{ -3**x}}').render(x=2)=='-3:2'

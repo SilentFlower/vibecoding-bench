@@ -1,0 +1,87 @@
+--- a/library/development_tests/test_development_dp_walk_dev.py
++++ b/library/development_tests/test_development_dp_walk_dev.py
+@@ -0,0 +1,27 @@
++"""公开有界类型化路径遍历回归。"""
++import pytest
++from dpath.walking import walk_paths,PathCycleError
++
++def test_typed_paths_and_empty_containers_are_preserved():
++    data={1:{'a/b':['value',{}]},'1':[]}
++    assert list(walk_paths(data))==[((1,'a/b',0),'value'),((1,'a/b',1),{}),(('1',),[])]
++
++def test_shared_aliases_are_not_misclassified_as_cycles():
++    shared={'x':1};data={'a':shared,'b':shared}
++    assert list(walk_paths(data))==[(('a','x'),1),(('b','x'),1)]
++
++def test_cycle_policy_reports_path_or_skips_only_cyclic_edge():
++    data={'keep':1};data['self']=data
++    with pytest.raises(PathCycleError) as caught:
++        list(walk_paths(data))
++    assert caught.value.path==('self',) and list(walk_paths(data,cycles='skip'))==[(('keep',),1)]
++
++def test_deep_inputs_and_exact_resource_budgets():
++    data=1
++    for _ in range(1500):
++        data={'x':data}
++    assert len(next(walk_paths(data))[0])==1500
++    with pytest.raises(ValueError):
++        list(walk_paths({'x':1},max_nodes=1))
++    with pytest.raises(ValueError):
++        list(walk_paths({'x':1},max_depth=0))
+--- a/library/docs/development-dp-walk-dev.md
++++ b/library/docs/development-dp-walk-dev.md
+@@ -0,0 +1,5 @@
++# 非递归返回类型化路径并执行祖先循环和访问预算策略
++
++配置检查需要无损的类型化路径，并明确祖先循环和资源上限。用非递归遍历处理深层数据，共享但不循环的对象保留两条路径，空容器仍可见，预算超限前停止而不改原数据。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dpath/walking.py
++++ b/library/dpath/walking.py
+@@ -0,0 +1,46 @@
++"""非递归、保留类型路径的有界嵌套对象遍历。"""
++from collections.abc import Mapping
++
++
++class PathCycleError(ValueError):
++    """保留引起祖先循环的类型化路径。"""
++    def __init__(self,path):
++        """登记循环。@param path 路径组件元组。@return None。
++        """
++        self.path=path
++        super().__init__('嵌套对象存在祖先循环')
++
++
++def walk_paths(root,*,include_containers=False,cycles='error',max_depth=None,max_nodes=None):
++    """按源顺序遍历。@param root 根。@param include_containers 是否包含非空容器。
++    @param cycles error或skip。@param max_depth 根为0的最大深度。@param max_nodes 含根的访问预算。
++    @return (类型化路径元组,原节点)迭代器，空容器也是叶子，共享但非循环别名逐路径访问。
++    """
++    if type(include_containers) is not bool or cycles not in ('error','skip'):
++        raise ValueError('遍历策略无效')
++    for limit in (max_depth,max_nodes):
++        if limit is not None and (type(limit) is not int or limit<0):
++            raise ValueError('遍历预算必须为非负整数或None')
++    pending=[((),root,False)];active=set();visited=0
++    while pending:
++        path,value,leaving=pending.pop()
++        if leaving:
++            active.remove(id(value))
++            continue
++        visited+=1
++        if max_nodes is not None and visited>max_nodes or max_depth is not None and len(path)>max_depth:
++            raise ValueError('嵌套遍历超过资源预算')
++        container=isinstance(value,(Mapping,list))
++        if container and id(value) in active:
++            if cycles=='error':
++                raise PathCycleError(path)
++            continue
++        if not container or not value:
++            yield path,value
++            continue
++        if include_containers:
++            yield path,value
++        active.add(id(value));pending.append((path,value,True))
++        entries=list(value.items()) if isinstance(value,Mapping) else list(enumerate(value))
++        for key,child in reversed(entries):
++            pending.append((path+(key,),child,False))

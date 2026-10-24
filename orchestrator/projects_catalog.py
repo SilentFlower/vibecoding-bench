@@ -78,6 +78,8 @@ class ProjectsCatalog:
                 if task.get('development_cycle') not in ('feature', 'bug'):
                     continue
                 objectives.append({field: task[field] for field in ('id', 'goal', 'development_cycle')})
+                objectives[-1]['requires'] = [{field: dependency[field] for field in ('task_id', 'artifact')}
+                    for dependency in task['requires']]
                 if detail:
                     objectives[-1].update(prompt=task['prompt'], allowed_paths=task['allowed_paths'],
                         materials={relative: self._text(project.root / safe_relative(relative))

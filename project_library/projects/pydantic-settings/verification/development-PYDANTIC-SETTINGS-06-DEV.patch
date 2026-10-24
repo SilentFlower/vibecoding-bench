@@ -1,0 +1,69 @@
+--- a/library/docs/development-pydantic-settings-06-dev.md
++++ b/library/docs/development-pydantic-settings-06-dev.md
+@@ -0,0 +1,5 @@
++# 命名模型别名的多层嵌套环境配置按真实结构解码
++
++路线06：next_field先归一TypeAliasType/Annotated包装再逐环境路径找真实子字段；可选、多层命名别名、None/整个JSON和非法元素保持原验证，复用既有类型参数替换。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/pydantic_settings/sources/providers/env.py
++++ b/library/pydantic_settings/sources/providers/env.py
+@@ -28,6 +28,8 @@
+     _get_field_annotation_and_metadata,
+     _get_model_config,
+     _get_model_fields,
++    _resolve_type_alias,
++    _strip_annotated,
+     _literal_has_numeric_enum,
+     _union_has_strict_types,
+     _union_is_complex,
+@@ -250,6 +252,12 @@
+             return None
+ 
+         annotation = field.annotation if isinstance(field, FieldInfo) else field
++        # next_field必须看到命名别名的实际模型结构；每轮只展开包装层，递归模型按路径逐段解析。
++        while True:
++            resolved = _strip_annotated(_resolve_type_alias(_strip_annotated(annotation)))
++            if resolved is annotation:
++                break
++            annotation = resolved
+         for type_ in get_args(annotation):
+             type_has_key = self.next_field(type_, key, case_sensitive)
+             if type_has_key:
+--- a/library/tests/test_development_pydantic_settings_06_dev.py
++++ b/library/tests/test_development_pydantic_settings_06_dev.py
+@@ -0,0 +1,34 @@
++"""命名可选模型别名下的分段环境值按真实子字段类型解码。"""
++import os
++import unittest
++from typing import Annotated
++from typing_extensions import TypeAliasType
++from unittest.mock import patch
++from pydantic import BaseModel,ValidationError
++from pydantic_settings import BaseSettings,SettingsConfigDict
++
++def test_optional_named_model_alias_decodes_nested_list_and_plain_text():
++    """模型别名不能把values留成原始JSON字符串。@return None。"""
++    class Inner(BaseModel):
++        values:list[int]
++        label:str='plain'
++    MaybeInner=TypeAliasType('MaybeInner',Inner|None)
++    class Config(BaseSettings):
++        model_config=SettingsConfigDict(env_nested_delimiter='__')
++        child:MaybeInner=None
++    with patch.dict(os.environ,{'CHILD__VALUES':'[1,2]','CHILD__LABEL':'hello'},clear=True):
++        value=Config();assert value.child.values==[1,2] and value.child.label=='hello'
++    with patch.dict(os.environ,{'CHILD':'null'},clear=True):assert Config().child is None
++    with patch.dict(os.environ,{'CHILD__VALUES':'["bad"]'},clear=True):
++        with unittest.TestCase().assertRaises(ValidationError):Config()
++
++def test_alias_of_annotated_alias_and_whole_json_keep_policy():
++    """多层包装归一不能丢模型类型，整个JSON仍走原路径。@return None。"""
++    class Inner(BaseModel):values:list[str]
++    Direct=TypeAliasType('Direct',Annotated[Inner,'business'])
++    Wrapped=TypeAliasType('Wrapped',Direct|None)
++    class Config(BaseSettings):
++        model_config=SettingsConfigDict(env_nested_delimiter='__')
++        child:Wrapped=None
++    with patch.dict(os.environ,{'CHILD__VALUES':'["茶","雪"]'},clear=True):assert Config().child.values==['茶','雪']
++    with patch.dict(os.environ,{'CHILD':'{"values":["whole"]}'},clear=True):assert Config().child.values==['whole']

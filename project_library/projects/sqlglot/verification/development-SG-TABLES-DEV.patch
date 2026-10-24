@@ -1,0 +1,88 @@
+--- a/library/development_tests/test_development_sg_tables_dev.py
++++ b/library/development_tests/test_development_sg_tables_dev.py
+@@ -0,0 +1,20 @@
++"""公开真实SQL物理表识别回归。"""
++import pytest
++from sqlglot import parse_one
++from sqlglot.report_inspection import inspect_tables
++
++def test_cte_references_are_not_mistaken_for_physical_tables():
++    result=inspect_tables('WITH source AS (SELECT * FROM raw.events) SELECT * FROM source JOIN users u ON source.id=u.id')
++    assert [(row.database,row.name) for row in result]==[('raw','events'),('','users')]
++
++def test_self_joins_and_quoted_parts_keep_occurrences():
++    result=inspect_tables('SELECT a.id FROM "Catalog"."Schema"."Table" a JOIN "Catalog"."Schema"."Table" b ON a.id=b.id')
++    assert [row.alias for row in result]==['a','b'] and all(row.quoted==(True,True,True) for row in result)
++
++def test_nested_scope_and_input_ast_are_preserved():
++    tree=parse_one('SELECT * FROM (SELECT * FROM events) e');before=tree.dump()
++    assert inspect_tables(tree)[0].name=='events' and tree.dump()==before and tree.parent is None
++
++def test_empty_multistatement_and_mutations_are_rejected():
++    for text in ('','SELECT 1;SELECT 2','DELETE FROM events'):
++        with pytest.raises(ValueError): inspect_tables(text)
+--- a/library/docs/development-sg-tables-dev.md
++++ b/library/docs/development-sg-tables-dev.md
+@@ -0,0 +1,5 @@
++# 通过真实SQL作用域区分物理表与CTE并保留引用元数据
++
++通过真实作用域识别物理表，CTE引用与CTE正文内的物理表要区分。自连接、子查询与半连接右表都保留出现位置和引用标记，输入必须是单查询且原AST不被修改。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/sqlglot/report_inspection.py
++++ b/library/sqlglot/report_inspection.py
+@@ -0,0 +1,54 @@
++"""通过真实作用域分辨物理命名表和CTE引用。"""
++from dataclasses import dataclass
++from . import exp,parse
++from .optimizer.scope import Scope,traverse_scope
++
++
++@dataclass(frozen=True)
++class TableReference:
++    """一个物理命名表出现位置；限定名保留原大小写和引用标记。"""
++    catalog: str
++    database: str
++    name: str
++    alias: str
++    quoted: tuple
++    scope: int
++
++
++def query_copy(query,dialect=None):
++    """解析单个查询或复制真实AST。@param query SQL文本或Query。
++    @param dialect 输入方言。@return 独立Query，拒绝空输入、多语句及非查询。
++    """
++    if isinstance(query,str):
++        statements=[item for item in parse(query,read=dialect) if item is not None]
++        if len(statements)!=1:
++            raise ValueError('只接受一个SQL查询')
++        query=statements[0]
++    if not isinstance(query,exp.Query):
++        raise ValueError('需要查询语法树')
++    return query.copy()
++
++
++def physical_nodes(query):
++    """枚举实际命名表节点。@param query 独立Query。@return 作用域序号、别名和Table列表。
++    CTE别名和表函数不属于物理命名表，SEMI/ANTI连接右表仍计入。
++    """
++    result=[]
++    for index,scope in enumerate(traverse_scope(query)):
++        for table in scope.tables:
++            if isinstance(scope.sources.get(table.alias_or_name),Scope):
++                continue
++            if not isinstance(table.this,exp.Identifier) or any(not isinstance(part,exp.Identifier) for part in table.parts):
++                continue
++            result.append((index,table.alias_or_name,table))
++    return result
++
++
++def inspect_tables(query,*,dialect=None):
++    """识别所有物理表出现位置。@param query 文本或Query。@param dialect 输入方言。
++    @return TableReference元组，按实际作用域遍历与表出现顺序，不合并自连接。
++    """
++    tree=query_copy(query,dialect)
++    return tuple(TableReference(table.catalog,table.db,table.name,alias,
++        tuple(bool(table.args.get(key) is not None and table.args[key].args.get('quoted')) for key in ('catalog','db','this')),index)
++        for index,alias,table in physical_nodes(tree))

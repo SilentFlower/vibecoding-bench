@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYDASH-06-DEV",
+  "source_commit": "ef6a6427e488e29e827e0e0819f2630ad3ff4cdc",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add explicit pydash.async_flow.async_flow and top-level callable export. First function receives original args/kwargs; subsequent functions receive one completed result, awaiting any inspect.isawaitable value including custom awaitables. Run entirely in caller event loop, propagate exceptions and cancellation without later steps, validate callables up front. Empty flow is identity for one positional value or None for zero; reject extra args/kwargs. Existing synchronous flow/flow_right remain unchanged, no internal asyncio.run.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

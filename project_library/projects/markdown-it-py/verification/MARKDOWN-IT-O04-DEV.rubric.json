@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MARKDOWN-IT-O04-DEV",
+  "source_commit": "6f586542653a56d2ee8549a0dccfaa6ba5ebe14a",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add --encoding-errors strict|replace|ignore to real CLI conversion while preserving its existing default ignore behavior and exact ordinary file output. Route the explicit policy through main/convert/convert_file and raw-buffer stdin where available, keeping existing direct calls valid with keyword-only errors=\"ignore\" defaults. Explicit strict decoding exits nonzero before publishing that document and reports only input source plus byte position on stderr, without echoing content. Explicit replace/ignore follow standard codec semantics; valid Unicode output is unchanged and unknown policies are rejected. Do not treat strict decoding failures as successful truncated documents.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

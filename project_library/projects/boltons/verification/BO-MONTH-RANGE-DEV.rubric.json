@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "BO-MONTH-RANGE-DEV",
+  "source_commit": "4e5faa3d7e4008d89e0d8bf1ea87b6d9a061a16d",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add timeutils.month_range(start,stop,step=1,*,inclusive=False,month_end=\"clip\") for actual date objects. Use absolute month arithmetic with the original start.day as anchor; clip/skip/raise explicitly controls months lacking that day, without drifting March to a February-clipped day. Support negative month steps, leap years and exclusive/inclusive bounds, reject zero/bool/noninteger step and unknown policy. Preserve existing daterange and never model a calendar month as a fixed number of days.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

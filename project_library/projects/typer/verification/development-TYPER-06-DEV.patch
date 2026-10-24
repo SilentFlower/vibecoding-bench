@@ -1,0 +1,59 @@
+--- a/app/development_tests/test_development_typer_06_dev.py
++++ b/app/development_tests/test_development_typer_06_dev.py
+@@ -0,0 +1,24 @@
++"""低库存报告真实筛选零/阈值边界并保持CSV字段内容。"""
++import csv,io,json,tempfile
++from pathlib import Path
++from typer.testing import CliRunner
++import shop
++
++def test_threshold_zero_boundary_stable_ties_unicode_and_multiline_csv():
++    """按数量升序，同数量保原目录顺序，中文/逗号/换行引用保真。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'catalog';out=base/'report'
++        values=[{'sku':'a','name':'茶,\n雪','quantity':2},{'sku':'b','name':'B','quantity':0},{'sku':'c','name':'C','quantity':2},{'sku':'d','name':'D','quantity':3}];source.write_text(json.dumps(values));before=source.read_bytes()
++        result=CliRunner().invoke(shop.app,['low-stock',str(source),'--threshold','2','--output',str(out)])
++        rows=list(csv.DictReader(io.StringIO(out.read_text())))
++        assert result.exit_code==0 and [r['sku'] for r in rows]==['b','a','c'] and rows[1]['name']=='茶,\n雪'
++        assert json.loads(result.stdout)=={'selected':3,'total_quantity':4,'threshold':2} and source.read_bytes()==before
++
++def test_empty_selection_header_invalid_threshold_and_output_collision():
++    """无结果仍可交付带表头报告，负阈值及覆盖不执行写入。@return None。"""
++    with tempfile.TemporaryDirectory() as directory:
++        base=Path(directory);source=base/'catalog';out=base/'report';source.write_text('[{"sku":"x","name":"X","quantity":4}]');runner=CliRunner()
++        assert runner.invoke(shop.app,['low-stock',str(source),'--threshold','0','--output',str(out)]).exit_code==0
++        assert list(csv.reader(io.StringIO(out.read_text())))==[['sku','name','quantity']]
++        assert runner.invoke(shop.app,['low-stock',str(source),'--threshold=-1','--output',str(base/'bad')]).exit_code!=0 and not (base/'bad').exists()
++        before=out.read_bytes();assert runner.invoke(shop.app,['low-stock',str(source),'--threshold','5','--output',str(out)]).exit_code!=0 and out.read_bytes()==before
+--- a/app/docs/development-typer-06-dev.md
++++ b/app/docs/development-typer-06-dev.md
+@@ -0,0 +1,5 @@
++# 商品低库存报告按真实阈值筛选排序并以CSV保真交付
++
++完整补货交付报告按真实quantity≤阈值筛选，零/边界包含、数量升序同值保原序；CSV头/中文引用多行保真、空选择有头，独占原子写新文件，原清单/已有报告不变，成功汇报数量。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/app/inventory_report.py
++++ b/app/inventory_report.py
+@@ -0,0 +1,21 @@
++"""可移交补货报告按真实库存阈值筛选并以CSV保真交付。"""
++import csv
++import io
++import json
++from pathlib import Path
++from typing import Annotated
++import typer
++from inventory_store import load,save_new
++
++def register(app):
++    """注册low-stock命令。@param app 既有应用。@return None。"""
++    @app.command('low-stock')
++    def low_stock(source:Path,threshold:Annotated[int,typer.Option('--threshold',min=0)],output:Annotated[Path,typer.Option('--output')]):
++        """生成可移交CSV补货报告。@param source 账面。@param threshold 包含边界的非负阈值。@param output 新CSV。@return None，成功给选择数及数量总和。"""
++        try:
++            values=load(source);selected=sorted((item for item in values if item['quantity']<=threshold),key=lambda item:item['quantity'])
++            buffer=io.StringIO(newline='');writer=csv.DictWriter(buffer,fieldnames=['sku','name','quantity']);writer.writeheader();writer.writerows(selected)
++            save_new(output,buffer.getvalue(),inputs=(source,))
++        except (OSError,UnicodeError,ValueError,csv.Error) as error:
++            typer.echo('报告失败：'+str(error),err=True);raise typer.Exit(1) from error
++        typer.echo(json.dumps({'selected':len(selected),'total_quantity':sum(item['quantity'] for item in selected),'threshold':threshold},ensure_ascii=False))

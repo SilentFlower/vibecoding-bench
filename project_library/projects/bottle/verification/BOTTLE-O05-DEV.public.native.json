@@ -1,0 +1,14 @@
+{
+  "script": "verification/BOTTLE-O05-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/test/test_development_bottle_o05_dev.py"
+}

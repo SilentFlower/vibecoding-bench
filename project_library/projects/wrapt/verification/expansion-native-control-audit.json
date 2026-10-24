@@ -1,0 +1,59 @@
+{
+  "purpose": "只规范八个对象repr内存地址，保留全部节点与子项字段/顺序/结果",
+  "original_contract_sha256": "bd964e9459c23edf25611d05b943090f515a5e5500bb4222d8ea1536472f07d9",
+  "new_contract_sha256": "96d3126b8410b5e6df41bcda7b92d4b8fea4fd05297f1a3ab4ee28554a2f355d",
+  "main_nodes": 1418,
+  "subtests": 43,
+  "normalized_fields": 8,
+  "normalization_scope": [
+    {
+      "parent_nodeid": "tests/core/test_auto_object_proxy.py::TestAutoObjectProxy::test_descriptor_optional_owner",
+      "ordinal": 1,
+      "when": "call",
+      "field": "context.kwargs.descriptor"
+    },
+    {
+      "parent_nodeid": "tests/core/test_auto_object_proxy.py::TestAutoObjectProxy::test_descriptor_optional_owner",
+      "ordinal": 2,
+      "when": "call",
+      "field": "context.kwargs.descriptor"
+    },
+    {
+      "parent_nodeid": "tests/core/test_lazy_object_proxy.py::TestLazyObjectProxy::test_descriptor_optional_owner",
+      "ordinal": 1,
+      "when": "call",
+      "field": "context.kwargs.descriptor"
+    },
+    {
+      "parent_nodeid": "tests/core/test_lazy_object_proxy.py::TestLazyObjectProxy::test_descriptor_optional_owner",
+      "ordinal": 2,
+      "when": "call",
+      "field": "context.kwargs.descriptor"
+    },
+    {
+      "parent_nodeid": "tests/core/test_weak_function_proxy.py::TestWeakFunctionProxy::test_decorated_descriptors",
+      "ordinal": 3,
+      "when": "call",
+      "field": "context.kwargs.target"
+    },
+    {
+      "parent_nodeid": "tests/core/test_weak_function_proxy.py::TestWeakFunctionProxy::test_decorated_descriptors",
+      "ordinal": 4,
+      "when": "call",
+      "field": "context.kwargs.target"
+    },
+    {
+      "parent_nodeid": "tests/core/test_weak_function_proxy.py::TestWeakFunctionProxy::test_decorated_descriptors",
+      "ordinal": 7,
+      "when": "call",
+      "field": "context.kwargs.target"
+    },
+    {
+      "parent_nodeid": "tests/core/test_weak_function_proxy.py::TestWeakFunctionProxy::test_decorated_descriptors",
+      "ordinal": 8,
+      "when": "call",
+      "field": "context.kwargs.target"
+    }
+  ],
+  "original_assets_changed": false
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TREELIB-02-DEV",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair Tree.update_node identifier updates: preflight hashability/None/collisions before mutating anything, preserve object identity and update index/root/parent successors/child predecessors consistently. Same identifier is a no-op for identity while other attributes may update. Reject renaming a node shared across multiple tree contexts rather than corrupt another view. If a property setter or relationship update fails, restore all node attribute containers, index and current-tree pointers; do not claim to reverse arbitrary external side effects or mutate/copy user data internals. Preserve existing ordinary tag/data updates and node subclass behavior. Duplicate IDs may use existing DuplicatedNodeIdError; other invalid identities fail clearly.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

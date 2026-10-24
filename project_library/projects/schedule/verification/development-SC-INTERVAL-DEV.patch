@@ -1,0 +1,65 @@
+--- a/library/development_tests/test_development_sc_interval_dev.py
++++ b/library/development_tests/test_development_sc_interval_dev.py
+@@ -0,0 +1,29 @@
++"""公开调度间隔校验回归。"""
++import datetime
++import pytest
++import schedule
++
++def test_invalid_intervals_fail_at_construction():
++    for value in (0,-1,float('nan'),float('inf'),True,'1',None):
++        with pytest.raises(schedule.ScheduleValueError):
++            schedule.Job(value)
++
++def test_rejected_jobs_are_not_registered():
++    scheduler=schedule.Scheduler()
++    with pytest.raises(schedule.ScheduleValueError):
++        scheduler.every(0).seconds.do(lambda:None)
++    assert scheduler.jobs==[]
++
++def test_positive_fractional_intervals_still_schedule():
++    scheduler=schedule.Scheduler()
++    before=datetime.datetime.now()
++    job=scheduler.every(0.25).seconds.do(lambda:None)
++    assert 0 < (job.next_run-before).total_seconds() < 1
++
++def test_mutated_invalid_interval_and_fractional_random_are_rejected():
++    job=schedule.Scheduler().every().seconds.do(lambda:None)
++    job.interval=0
++    with pytest.raises(schedule.ScheduleValueError):
++        job._schedule_next_run()
++    with pytest.raises(schedule.ScheduleValueError):
++        schedule.Scheduler().every(0.5).to(2).seconds.do(lambda:None)
+--- a/library/docs/development-sc-interval-dev.md
++++ b/library/docs/development-sc-interval-dev.md
+@@ -0,0 +1,5 @@
++# 在注册或计算前拒绝无效间隔并防止调度死循环
++
++非法间隔可能让注册进入无限循环。创建及计算前明确拒绝零、负数、非有限值和布尔值，保留正小数固定间隔和原整数随机区间，不改变合法时区与截止时间计算。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/schedule/__init__.py
++++ b/library/schedule/__init__.py
+@@ -225,6 +225,9 @@
+     """
+ 
+     def __init__(self, interval: int, scheduler: Optional[Scheduler] = None):
++        import math
++        if type(interval) not in (int, float) or not math.isfinite(interval) or interval <= 0:
++            raise ScheduleValueError('调度间隔必须是正的有限数')
+         self.interval: int = interval  # pause interval * unit between runs
+         self.latest: Optional[int] = None  # upper limit to the interval
+         self.job_func: Optional[functools.partial] = None  # the job job_func to run
+@@ -706,7 +709,12 @@
+                 "Invalid unit (valid units are `seconds`, `minutes`, `hours`, "
+                 "`days`, and `weeks`)"
+             )
++        import math
++        if type(self.interval) not in (int, float) or not math.isfinite(self.interval) or self.interval <= 0:
++            raise ScheduleValueError('调度间隔必须是正的有限数')
+         if self.latest is not None:
++            if type(self.interval) is not int or type(self.latest) is not int:
++                raise ScheduleValueError('随机间隔必须使用整数边界')
+             if not (self.latest >= self.interval):
+                 raise ScheduleError("`latest` is greater than `interval`")
+             interval = random.randint(self.interval, self.latest)

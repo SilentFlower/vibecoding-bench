@@ -1,0 +1,120 @@
+--- a/library/cssselect/extensions.py
++++ b/library/cssselect/extensions.py
+@@ -0,0 +1,75 @@
++"""实例隔离的伪类扩展，保留原生subclass翻译协议。"""
++import re
++from cssselect.xpath import ExpressionError, GenericTranslator, HTMLTranslator, XPathExpr
++
++
++class PseudoRegistryMixin:
++    """为实际translator增加显式受控插件注册。
++
++    :return: 初始化后仅持有本实例插件，不修改类或全局字典。
++    """
++
++    def __init__(self, *args, **kwargs):
++        """保留原translator构造参数。@return None。"""
++        super().__init__(*args, **kwargs)
++        self._pseudo_registry = {}
++
++    def register_pseudo(self, name, callback, *, functional=False, min_args=0, max_args=None, version='1'):
++        """注册一个静态或函数伪类，禁止覆盖内置名字。
++
++        :param name: 字面CSS伪类名称。
++        :param callback: 接收XPathExpr；函数插件额外接收真实Function节点。
++        :param functional: 是否为函数形式。
++        :param min_args: 函数Token最少数量。
++        :param max_args: 函数Token最多数量或None。
++        :param version: 应用声明的非空扩展版本。
++        :return: self，方便应用显式配置。
++        """
++        if not isinstance(name, str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9-]*', name):
++            raise ValueError('插件名必须为字面标识符')
++        if not callable(callback) or not isinstance(version, str) or not version:
++            raise TypeError('插件必须可调用且声明版本')
++        if isinstance(min_args, bool) or not isinstance(min_args, int) or min_args < 0 or (max_args is not None and (isinstance(max_args, bool) or not isinstance(max_args, int) or max_args < min_args)):
++            raise ValueError('参数数量边界错误')
++        name = name.lower()
++        normalized = name.replace('-', '_')
++        if name in self._pseudo_registry or hasattr(self, 'xpath_' + normalized + '_pseudo') or hasattr(self, 'xpath_' + normalized + '_function'):
++            raise ValueError('不能重复注册或覆盖内置伪类')
++        self._pseudo_registry[name] = (callback, bool(functional), min_args, max_args, version)
++        return self
++
++    def extension_fingerprint(self):
++        """返回有序稳定能力声明，不把callback地址当版本。@return tuple。"""
++        return tuple((name, *entry[1:]) for name, entry in sorted(self._pseudo_registry.items()))
++
++    def _extension(self, name, xpath, function=None):
++        """检查调用形状和返回类型后执行已注册插件。@return XPathExpr。"""
++        callback, functional, minimum, maximum, version = self._pseudo_registry[name]
++        if functional != (function is not None):
++            raise ExpressionError('插件静态与函数形式不匹配')
++        if function is not None and (len(function.arguments) < minimum or (maximum is not None and len(function.arguments) > maximum)):
++            raise ExpressionError('插件参数数量不匹配')
++        result = callback(xpath, function) if function is not None else callback(xpath)
++        if not isinstance(result, XPathExpr):
++            raise ExpressionError('插件必须返回XPathExpr')
++        return result
++
++    def xpath_pseudo(self, pseudo):
++        """保留原生静态分派，只有本实例注册名走扩展。@return XPathExpr。"""
++        if pseudo.ident not in self._pseudo_registry:
++            return super().xpath_pseudo(pseudo)
++        return self._extension(pseudo.ident, self.xpath(pseudo.selector))
++
++    def xpath_function(self, function):
++        """函数插件收到原生解析节点及Token。@return XPathExpr。"""
++        if function.name not in self._pseudo_registry:
++            return super().xpath_function(function)
++        return self._extension(function.name, self.xpath(function.selector), function)
++
++
++class PluginTranslator(PseudoRegistryMixin, GenericTranslator):
++    """保留XML语义的插件翻译器。@return 独立实例。"""
++
++
++class HTMLPluginTranslator(PseudoRegistryMixin, HTMLTranslator):
++    """保留HTML/XHTML语义的插件翻译器。@return 独立实例。"""
+--- a/library/docs/development-cssselect-o04-dev.md
++++ b/library/docs/development-cssselect-o04-dev.md
+@@ -0,0 +1,5 @@
++# 为真实翻译器注册实例隔离的受控伪类插件
++
++对应路线19：在真实translator上提供本实例插件，区分静态/函数形态、数量和返回类型，函数接收真实解析节点；禁止覆盖内置，版本能力声明稳定。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_cssselect_o04_dev.py
++++ b/library/tests/test_development_cssselect_o04_dev.py
+@@ -0,0 +1,31 @@
++"""插件实际改变匹配，但实例隔离和原生翻译不变。"""
++from lxml import etree
++import cssselect
++import pytest
++
++def test_static_plugin_real_match_and_isolation():
++    """属性业务谓词被真实XPath求值，另一实例仍拒绝。@return None。"""
++    from cssselect.extensions import PluginTranslator
++    p=PluginTranslator();p.register_pseudo('reviewed',lambda x:x.add_condition('@reviewed="yes"'))
++    root=etree.fromstring('<root><p id="a" reviewed="yes"/><p id="b"/></root>')
++    assert [e.get('id') for e in root.xpath(p.css_to_xpath('p:reviewed'))]==['a']
++    with pytest.raises(cssselect.ExpressionError):PluginTranslator().css_to_xpath(':reviewed')
++    assert p.css_to_xpath('p:first-child')==cssselect.GenericTranslator().css_to_xpath('p:first-child')
++
++def test_function_tokens_and_arity():
++    """函数插件实际收到已解析Token。@return None。"""
++    from cssselect.extensions import PluginTranslator
++    p=PluginTranslator();p.register_pseudo('marked',lambda x,f:x.add_condition('@mark='+p.xpath_literal(f.arguments[0].value)),functional=True,min_args=1,max_args=1,version='2')
++    assert '@mark' in p.css_to_xpath(':marked("a")')
++    with pytest.raises(cssselect.ExpressionError):p.css_to_xpath(':marked()')
++    with pytest.raises(cssselect.ExpressionError):p.css_to_xpath(':marked')
++    assert p.extension_fingerprint()==(('marked',True,1,1,'2'),)
++
++def test_conflicts_bad_results_and_html_configuration():
++    """内置冲突、错误返回和大小写配置各自受控。@return None。"""
++    from cssselect.extensions import HTMLPluginTranslator
++    p=HTMLPluginTranslator();p.register_pseudo('bad',lambda x:'not XPath')
++    with pytest.raises(ValueError):p.register_pseudo('checked',lambda x:x)
++    with pytest.raises(ValueError):p.register_pseudo('bad',lambda x:x)
++    with pytest.raises(cssselect.ExpressionError):p.css_to_xpath(':bad')
++    assert p.css_to_xpath('DIV').endswith('div')

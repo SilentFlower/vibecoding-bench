@@ -1,0 +1,96 @@
+--- a/library/development_tests/test_development_mm_stream_dev.py
++++ b/library/development_tests/test_development_mm_stream_dev.py
+@@ -0,0 +1,29 @@
++"""公开逐记录Schema导入回归。"""
++import pytest
++from marshmallow import Schema,fields,post_load,EXCLUDE,ValidationError
++
++class Item(Schema): value=fields.Integer(required=True)
++
++def test_stream_is_lazy_and_collect_continues_after_invalid_row():
++    calls=[]
++    def source():
++        for value in ('1','bad','3'): calls.append(value);yield {'value':value}
++    stream=Item().iterload(source(),errors='collect');assert calls==[]
++    first=next(stream);assert first.data=={'value':1} and calls==['1']
++    rest=list(stream);assert rest[0].errors[0].pointer=='/value' and rest[1].index==2
++
++def test_many_schema_uses_single_record_hooks_and_explicit_unknown_policy():
++    class Hooked(Item):
++        @post_load
++        def build(self,data,**kwargs): return ('built',data['value'])
++    assert list(Hooked(many=True).iterload([{'value':'2','extra':1}],unknown=EXCLUDE))==[('built',2)]
++
++def test_raise_preserves_native_validation_error_and_partial_values_are_collected():
++    with pytest.raises(ValidationError): list(Item().iterload([{'value':'bad'}]))
++    result=next(Item().iterload([{'value':'bad'}],errors='collect'))
++    assert result.status=='error' and result.valid_data=={}
++
++def test_partial_and_invalid_strategy_do_not_modify_schema():
++    schema=Item();assert list(schema.iterload([{}],partial=True))==[{}]
++    with pytest.raises(ValueError): schema.iterload([],errors='skip')
++    assert schema.partial is None
+--- a/library/docs/development-mm-stream-dev.md
++++ b/library/docs/development-mm-stream-dev.md
+@@ -0,0 +1,5 @@
++# 实现逐记录Schema导入并收集标准化错误和部分成功值
++
++使用真实Schema逐条导入，正确运行钩子与未知字段策略，错误可原样抛出或收集后继续。收集结果复用已实现的错误定位接口，保留独立部分成功数据，不把整个输入物化。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/marshmallow/schema.py
++++ b/library/src/marshmallow/schema.py
+@@ -734,6 +734,13 @@
+         return self._do_load(
+             data, many=many, partial=partial, unknown=unknown, postprocess=True
+         )
++
++    def iterload(self, records, *, errors='raise', partial=None, unknown=None):
++        """惰性逐条加载。@param records 输入记录。@param errors 错误策略。
++        @param partial 部分加载。@param unknown 未知字段策略。@return 结果迭代器。
++        """
++        from marshmallow.streaming import iterload
++        return iterload(self, records, errors=errors, partial=partial, unknown=unknown)
+ 
+     def loads(
+         self,
+--- a/library/src/marshmallow/streaming.py
++++ b/library/src/marshmallow/streaming.py
+@@ -0,0 +1,37 @@
++"""以原Schema逐记录加载，避免把整批输入物化。"""
++from copy import deepcopy
++from dataclasses import dataclass
++from .schema import Schema
++from .exceptions import ValidationError
++from .error_paths import flatten_errors
++
++
++@dataclass(frozen=True)
++class LoadResult:
++    """一条记录的载入结果；错误项不可变且不包含原输入。"""
++    index: int
++    status: str
++    data: object=None
++    errors: tuple=()
++    valid_data: object=None
++
++
++def iterload(schema,records,*,errors='raise',partial=None,unknown=None):
++    """惰性逐记录转换。@param schema 原Schema实例。@param records 输入迭代器。
++    @param errors raise或collect。@param partial 原部分加载参数。@param unknown 原未知字段策略。
++    @return collect时产出LoadResult，否则直接产出成功值；真实非校验异常仍传播。
++    """
++    if not isinstance(schema,Schema) or errors not in ('raise','collect'):
++        raise ValueError('需要Schema实例和有效错误策略')
++    iterator=iter(records)
++    def produce():
++        for index,record in enumerate(iterator):
++            try:
++                loaded=schema.load(record,many=False,partial=partial,unknown=unknown)
++            except ValidationError as error:
++                if errors=='raise':
++                    raise
++                yield LoadResult(index,'error',errors=flatten_errors(error),valid_data=deepcopy(error.valid_data))
++            else:
++                yield LoadResult(index,'passed',data=loaded) if errors=='collect' else loaded
++    return produce()

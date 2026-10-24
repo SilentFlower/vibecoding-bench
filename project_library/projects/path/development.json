@@ -3,7 +3,7 @@
   "project_key": "path",
   "title": "Path文件处理开发任务",
   "category": "文件保真与工作流",
-  "description": "固定真实源码上的 1 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "六项真实文件处理工程交付，覆盖中断回滚、受控遍历、相对约束、摘要、逐行读取与原子发布；逐项及累计验收。",
   "seed_digest": "19de9272761218bbb76d83f0bcb136ce2a6a3a5e61173238c4f8c400c47b93cd",
   "environment": "path-py312",
   "source": {
@@ -58,6 +58,241 @@
             "disclosure/PA-M01-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "PA-WALK-DEV-SCENE",
+      "title": "为文件批处理提供有深度、排除及链接策略的稳定遍历",
+      "goal": "为文件批处理提供有深度、排除及链接策略的稳定遍历",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PA-WALK-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-WALK-DEV",
+          "kind": "modify",
+          "goal": "为文件批处理提供有深度、排除及链接策略的稳定遍历",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Path.walk_controlled(*,follow_symlinks=False,max_depth=None,exclude=(),stable=False,errors=\"strict\"). Yield Path descendants in depth-first preorder, root depth=0; exclude relative POSIX fnmatch patterns before yielding or descending, optionally sort names per directory. Default yields links without following directory links; opted-in following tracks directory (device,inode) identities to prevent cycles/repeated subtree traversal. Respect original error handler resolution and caller Path subclass; close scandir handles, validate policies, preserve legacy walk and do not follow links implicitly.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_walk_dev.py and concise Chinese compatibility documentation at library/docs/development-pa-walk-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PA-WALK-DEV-contract.md",
+            "materials/PA-WALK-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/path/__init__.py",
+            "library/development_tests/test_development_pa_walk_dev.py",
+            "library/docs/development-pa-walk-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PA-WALK-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-WALK-DEV.native.json",
+            "public_native": "verification/PA-WALK-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/PA-WALK-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PA-BENEATH-DEV-SCENE",
+      "title": "为工作区文件引用提供明确的词法相对路径约束",
+      "goal": "为工作区文件引用提供明确的词法相对路径约束",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PA-BENEATH-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-BENEATH-DEV",
+          "kind": "modify",
+          "goal": "为工作区文件引用提供明确的词法相对路径约束",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Path.relative_beneath(base), normalizing absolute lexical paths then requiring commonpath containment and returning relative Path of the caller class. Same path returns \".\"; sibling prefix collisions and normalized .. escapes reject with ValueError, including cross-drive errors from the path module. Do no filesystem reads, symlink resolution or existence checks. Preserve original relpath and clearly distinguish this lexical operation from a symlink-safe containment/security boundary.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_beneath_dev.py and concise Chinese compatibility documentation at library/docs/development-pa-beneath-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PA-BENEATH-DEV-contract.md",
+            "materials/PA-BENEATH-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/path/__init__.py",
+            "library/development_tests/test_development_pa_beneath_dev.py",
+            "library/docs/development-pa-beneath-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PA-BENEATH-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-BENEATH-DEV.native.json",
+            "public_native": "verification/PA-BENEATH-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/PA-BENEATH-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PA-MULTI-HASH-DEV-SCENE",
+      "title": "一次顺序读取计算多种固定长度文件摘要",
+      "goal": "一次顺序读取计算多种固定长度文件摘要",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PA-MULTI-HASH-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-MULTI-HASH-DEV",
+          "kind": "modify",
+          "goal": "一次顺序读取计算多种固定长度文件摘要",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Path.read_hashes(algorithms,*,chunk_size=8192,hex=True), returning insertion-ordered algorithm->digest mapping. Materialize/deduplicate algorithm names, validate fixed-size hash objects and positive integer chunk size before opening, read one stream once and update every digest for each bounded chunk. Support empty/binary/large files and raw digest output, close stream on read errors and propagate them. Reject empty algorithms, bool sizes, unknown hashes and XOFs requiring a length; preserve old hash APIs.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_multi_hash_dev.py and concise Chinese compatibility documentation at library/docs/development-pa-multi-hash-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PA-MULTI-HASH-DEV-contract.md",
+            "materials/PA-MULTI-HASH-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/path/__init__.py",
+            "library/development_tests/test_development_pa_multi_hash_dev.py",
+            "library/docs/development-pa-multi-hash-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PA-MULTI-HASH-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-MULTI-HASH-DEV.native.json",
+            "public_native": "verification/PA-MULTI-HASH-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/PA-MULTI-HASH-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PA-ITER-LINES-DEV-SCENE",
+      "title": "逐行读取大文本并明确原始或归一化换行语义",
+      "goal": "逐行读取大文本并明确原始或归一化换行语义",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PA-ITER-LINES-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-ITER-LINES-DEV",
+          "kind": "modify",
+          "goal": "逐行读取大文本并明确原始或归一化换行语义",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Path.iter_lines(encoding=None,errors=\"strict\",*,retain=True,newline=None), a lazy text iterator owning one context-managed stream. None uses universal newline normalization; \"\" retains original CR/LF/CRLF terminators; retain=False removes exactly the physical line ending. Preserve blank lines, Unicode, missing final newline and codec error policy. Early generator.close and decode/I/O exceptions must close the stream, with no whole-file read or changes to existing lines/read_text behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_iter_lines_dev.py and concise Chinese compatibility documentation at library/docs/development-pa-iter-lines-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PA-ITER-LINES-DEV-contract.md",
+            "materials/PA-ITER-LINES-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/path/__init__.py",
+            "library/development_tests/test_development_pa_iter_lines_dev.py",
+            "library/docs/development-pa-iter-lines-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PA-ITER-LINES-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-ITER-LINES-DEV.native.json",
+            "public_native": "verification/PA-ITER-LINES-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/PA-ITER-LINES-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "PA-ATOMIC-WRITE-DEV-SCENE",
+      "title": "完整编码后原子发布文件并可保留相同内容的时间",
+      "goal": "完整编码后原子发布文件并可保留相同内容的时间",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "PA-ATOMIC-WRITE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "PA-ATOMIC-WRITE-DEV",
+          "kind": "modify",
+          "goal": "完整编码后原子发布文件并可保留相同内容的时间",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Path.atomic_write(content,*,encoding=\"utf-8\",if_changed=False). Validate and encode str/bytes before creating a same-directory temp, flush/fsync, retain old mode or use 0600 when new, replace atomically and clean failure paths. Reject symlinks; if_changed=True preserves inode/mtime/mode when bytes match and returns False, otherwise True. Serialization/replace failures preserve old bytes. Keep ordinary write methods unchanged and do not promise concurrent compare-and-swap or directory-fsync crash guarantees.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_atomic_write_dev.py and concise Chinese compatibility documentation at library/docs/development-pa-atomic-write-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/PA-ATOMIC-WRITE-DEV-contract.md",
+            "materials/PA-ATOMIC-WRITE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/path/__init__.py",
+            "library/development_tests/test_development_pa_atomic_write_dev.py",
+            "library/docs/development-pa-atomic-write-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/PA-ATOMIC-WRITE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/PA-ATOMIC-WRITE-DEV.native.json",
+            "public_native": "verification/PA-ATOMIC-WRITE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/PA-ATOMIC-WRITE-DEV-business.md"
+          ],
+          "development_cycle": "feature"
         }
       ]
     }

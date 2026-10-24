@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TYPER-04-DEV",
+  "source_commit": "a5882dedf0bc7a46cd861fdfca020f88519e0f21",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add shop.py fulfill CATALOG ORDERS_JSON --output NEW_JSON. Orders is array of existing sku plus strict positive int quantity (bool forbidden); aggregate repeated sku in first-seen order, validate combined demand against real inventory before publishing one complete new catalog. Unknown sku/malformed line/underflow reject whole batch, no input mutation or partial output. Preserve catalog order and unaffected fields, empty batch explicitly copies catalog. Print structured aggregate fulfillment before/after receipt only after exclusive atomic publication; do not publish receipt on failure or silently fulfill partial demand. All earlier commands and original Typer remain.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

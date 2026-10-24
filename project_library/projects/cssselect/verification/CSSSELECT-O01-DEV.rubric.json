@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSSSELECT-O01-DEV",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement cssselect.compiled.compile_selector(css, *, mode=\"xml\", xhtml=False, prefix=\"descendant-or-self::\") returning frozen CompiledSelector with canonical tuple, per-branch specificity tuple, XPath, mode, xhtml and prefix. Parse the complete real selector group once, never split literal commas, use actual selector_to_xpath with pseudo-element rejection and retain original exceptions. Support XML/HTML/XHTML casing and explicit prefixes, reject invalid mode/type combinations. Store no mutable parse tree or bound document and add no lxml runtime dependency; callers can evaluate the same XPath against multiple actual trees.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,15 @@
+{
+  "script": "verification/CONFIGOBJ-O01-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library/src",
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_configobj_o01_dev.py"
+}

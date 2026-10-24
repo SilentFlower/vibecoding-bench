@@ -3,7 +3,7 @@
   "project_key": "sqlite-utils",
   "title": "sqlite-utils 本地数据整理开发任务",
   "category": "数据处理",
-  "description": "固定真实源码上的 2 项完整需求／BUG；调查、方案确认、实施与修复在各自原会话连续推进。",
+  "description": "固定真实源码上的完整工程交付，保留调查、方案确认、实施、独立验收及失败返工。",
   "seed_digest": "ad04f5bd2eab0ed5a5df85293e9e4a4d93c3fd0dfbe1212f30f668a87a971eb9",
   "environment": "sqlite-utils-py312",
   "source": {
@@ -107,6 +107,194 @@
             "disclosure/SQ-M02-DEV-business.md"
           ],
           "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "SQLITE-UTILS-03-DEV-SCENE",
+      "title": "本地单列CSV自动导入保留完整姓名与URL字段",
+      "goal": "本地单列CSV自动导入保留完整姓名与URL字段",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SQLITE-UTILS-03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SQLITE-UTILS-03-DEV",
+          "kind": "modify",
+          "goal": "本地单列CSV自动导入保留完整姓名与URL字段",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair rows_from_file automatic CSV dialect detection to consider explicit common delimiters comma/tab/semicolon/pipe, not arbitrary repeated letters in URLs or names. If sniffing fails and no candidate delimiter appears, treat as single CSV column with normal header/rows; preserve Unicode, header-only and ordinary multi-column files. Existing explicit format/dialect and CLI explicit --sniff semantics remain unchanged. If candidate separators are present but inconsistent, do not silently downgrade malformed multicolumn data. Real row dicts must match input, not only format labels.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlite_utils_03_dev.py, and Chinese compatibility documentation at library/docs/development-sqlite-utils-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SQLITE-UTILS-03-DEV-contract.md",
+            "materials/SQLITE-UTILS-03-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SQLITE-UTILS-03-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/sqlite_utils/utils.py",
+            "library/tests/test_development_sqlite_utils_03_dev.py",
+            "library/docs/development-sqlite-utils-03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SQLITE-UTILS-03-DEV.rubric.json",
+            "native": "verification/SQLITE-UTILS-03-DEV.native.json",
+            "public_native": "verification/SQLITE-UTILS-03-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "SQLITE-UTILS-04-DEV-SCENE",
+      "title": "TSV及自动探测导入统一遵守额外字段收集忽略与拒绝政策",
+      "goal": "TSV及自动探测导入统一遵守额外字段收集忽略与拒绝政策",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SQLITE-UTILS-04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SQLITE-UTILS-04-DEV",
+          "kind": "modify",
+          "goal": "TSV及自动探测导入统一遵守额外字段收集忽略与拒绝政策",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nForward existing ignore_extras/extras_key through recursive rows_from_file calls for explicit TSV and automatic CSV/TSV detection. All entry paths must collect extras list, ignore extras or default RowError identically, while short rows retain None and mutually exclusive options remain rejected before consumption. Preserve existing resource-close iterator behavior, explicit dialect and data values. Do not bypass bad rows, change CLI default truncate policy or claim the automatic sniffing defect itself fixed by this goal.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlite_utils_04_dev.py, and Chinese compatibility documentation at library/docs/development-sqlite-utils-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SQLITE-UTILS-04-DEV-contract.md",
+            "materials/SQLITE-UTILS-04-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SQLITE-UTILS-04-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/sqlite_utils/utils.py",
+            "library/tests/test_development_sqlite_utils_04_dev.py",
+            "library/docs/development-sqlite-utils-04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SQLITE-UTILS-04-DEV.rubric.json",
+            "native": "verification/SQLITE-UTILS-04-DEV.native.json",
+            "public_native": "verification/SQLITE-UTILS-04-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "SQLITE-UTILS-05-DEV-SCENE",
+      "title": "日期配方处理超大年份时遵守明确忽略置空和默认抛错政策",
+      "goal": "日期配方处理超大年份时遵守明确忽略置空和默认抛错政策",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SQLITE-UTILS-05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SQLITE-UTILS-05-DEV",
+          "kind": "modify",
+          "goal": "日期配方处理超大年份时遵守明确忽略置空和默认抛错政策",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair parsedate and parsedatetime to apply existing IGNORE/SET_NULL policy to genuine dateutil OverflowError as well as ParserError. Keep original value for IGNORE, None for SET_NULL, and re-raise original exception under default/unknown policy; preserve legal date/dayfirst/yearfirst, empty/falsy and normal parser error behavior. Do not catch arbitrary TypeError/RuntimeError or convert out-of-range dates into guessed valid values. Prove real huge-year data and both recipe entry points.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlite_utils_05_dev.py, and Chinese compatibility documentation at library/docs/development-sqlite-utils-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SQLITE-UTILS-05-DEV-contract.md",
+            "materials/SQLITE-UTILS-05-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SQLITE-UTILS-05-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/sqlite_utils/recipes.py",
+            "library/tests/test_development_sqlite_utils_05_dev.py",
+            "library/docs/development-sqlite-utils-05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SQLITE-UTILS-05-DEV.rubric.json",
+            "native": "verification/SQLITE-UTILS-05-DEV.native.json",
+            "public_native": "verification/SQLITE-UTILS-05-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "SQLITE-UTILS-06-DEV-SCENE",
+      "title": "Python API流式导出选定查询为CSV并保留调用方文件所有权",
+      "goal": "Python API流式导出选定查询为CSV并保留调用方文件所有权",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "SQLITE-UTILS-06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "SQLITE-UTILS-06-DEV",
+          "kind": "modify",
+          "goal": "Python API流式导出选定查询为CSV并保留调用方文件所有权",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Queryable.export_csv(stream,columns=None,where=None,where_args=None,order_by=None,limit=None,offset=None,dialect=\"excel\"), available on real Table/View. Validate requested column order/no duplicates against actual schema before writing, then csv.writer header and iterate rows_where lazily with quoted selected identifiers and bound where_args. Return actual data row count; empty table still header, Unicode/commas/quotes/multiline fields roundtrip through csv.reader, NULL follows CSV empty-field convention. Never close caller stream, materialize all rows, mutate DB or claim lossless SQLite type encoding. Existing CLI export remains.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlite_utils_06_dev.py, and Chinese compatibility documentation at library/docs/development-sqlite-utils-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/SQLITE-UTILS-06-DEV-contract.md",
+            "materials/SQLITE-UTILS-06-DEV-tests.py"
+          ],
+          "owner_materials": [
+            "disclosure/SQLITE-UTILS-06-DEV-business.md"
+          ],
+          "allowed_paths": [
+            "library/sqlite_utils/db.py",
+            "library/tests/test_development_sqlite_utils_06_dev.py",
+            "library/docs/development-sqlite-utils-06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/SQLITE-UTILS-06-DEV.rubric.json",
+            "native": "verification/SQLITE-UTILS-06-DEV.native.json",
+            "public_native": "verification/SQLITE-UTILS-06-DEV.public.native.json",
+            "semantic": true
+          },
+          "branches": [],
+          "development_cycle": "feature"
         }
       ]
     }

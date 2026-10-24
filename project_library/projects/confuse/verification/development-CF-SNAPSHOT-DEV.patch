@@ -1,0 +1,116 @@
+--- a/library/confuse/core.py
++++ b/library/confuse/core.py
+@@ -274,6 +274,13 @@
+             yield from it
+ 
+     # Validation and conversion.
++
++    def snapshot(self, template=templates.REQUIRED, *, redact=False):
++        """捕获深层不可变配置。@param template 可选原生验证模板。
++        @param redact 是否脱敏。@return 与未来来源修改隔离的快照。
++        """
++        from .snapshots import snapshot
++        return snapshot(self, template, redact=redact)
+ 
+     def flatten(self, redact: bool = False) -> OrderedDict[str, Any]:
+         """Create a hierarchy of OrderedDicts containing the data from
+--- a/library/confuse/snapshots.py
++++ b/library/confuse/snapshots.py
+@@ -0,0 +1,61 @@
++"""按分层视图捕获脱离来源的不可变值。"""
++from datetime import date,datetime,time,timedelta
++from decimal import Decimal
++from pathlib import PurePath
++from types import MappingProxyType
++from .templates import REQUIRED
++
++
++def freeze(value,redactions=(),path=(),active=None):
++    """冻结标准配置树并按相对路径脱敏。@param value 配置树。@param redactions 敏感路径。
++    @param path 当前相对路径。@param active 递归身份集合。@return 不可变结果。
++    """
++    if any(path[:len(mark)]==mark for mark in redactions):
++        return 'REDACTED'
++    if type(value) in (type(None),bool,int,float,complex,str,bytes,date,datetime,time,timedelta,Decimal) or isinstance(value,PurePath):
++        return value
++    if not isinstance(value,(dict,list,tuple)):
++        raise TypeError('快照仅支持标准配置值')
++    active=set() if active is None else active
++    identity=id(value)
++    if identity in active:
++        raise ValueError('配置存在循环引用')
++    active.add(identity)
++    try:
++        if isinstance(value,dict):
++            output={}
++            for key,item in value.items():
++                if type(key) not in (str,int,float,bool,bytes,type(None)):
++                    raise TypeError('不支持的配置键')
++                output[key]=freeze(item,redactions,path+(key,),active)
++            return MappingProxyType(output)
++        return tuple(freeze(item,redactions,path+(index,),active) for index,item in enumerate(value))
++    finally:
++        active.remove(identity)
++
++
++def _capture(view,active):
++    value,_=view.first()
++    if not isinstance(value,(dict,list,tuple)):
++        return value
++    identity=id(value)
++    if identity in active:
++        raise ValueError('配置存在循环引用')
++    active.add(identity)
++    try:
++        if isinstance(value,dict):
++            return {key:_capture(child,active) for key,child in view.items()}
++        return [_capture(child,active) for child in view.sequence()]
++    finally:
++        active.remove(identity)
++
++
++def snapshot(view,template=REQUIRED,*,redact=False):
++    """捕获验证后配置。@param view 配置视图。@param template 可选原生模板。
++    @param redact 是否应用该视图相对敏感路径。@return 深层不可变快照。
++    """
++    marks=tuple(view.get_redactions()) if redact else ()
++    if () in marks:
++        return 'REDACTED'
++    value=_capture(view,set()) if template is REQUIRED else view.get(template)
++    return freeze(value,marks)
+--- a/library/development_tests/test_development_cf_snapshot_dev.py
++++ b/library/development_tests/test_development_cf_snapshot_dev.py
+@@ -0,0 +1,25 @@
++"""公开不可变配置快照回归。"""
++import pytest
++from confuse import RootView,ConfigSource,ConfigValueError,Sequence
++
++def test_nested_precedence_and_detachment():
++    high=ConfigSource({'db':{'host':'top'}});low=ConfigSource({'db':{'host':'base','port':8}})
++    view=RootView([high,low]);result=view.snapshot();high['db']['host']='later'
++    assert dict(result['db'])=={'host':'top','port':8}
++    with pytest.raises(TypeError): result['db']['host']='bad'
++
++def test_list_redaction_and_subview_relative_paths():
++    view=RootView([ConfigSource({'users':[{'name':'a','token':'secret'}]})]);view['users'][0]['token'].redact=True
++    result=view['users'].snapshot(redact=True)
++    assert result[0]['token']=='REDACTED' and result[0]['name']=='a'
++    assert view['users'].snapshot()[0]['token']=='secret'
++
++def test_template_validation_and_immutable_arrays():
++    view=RootView([ConfigSource({'v':[1,2],'bad':'wrong'})]);assert view['v'].snapshot()==(1,2)
++    assert view['v'].snapshot(Sequence(int))==(1,2)
++    with pytest.raises(ConfigValueError): view['bad'].snapshot(int)
++
++def test_cycles_and_unsupported_mutable_objects_are_rejected():
++    value=[];value.append(value);view=RootView([ConfigSource({'v':value,'bad':set([1])})])
++    with pytest.raises(ValueError): view['v'].snapshot()
++    with pytest.raises(TypeError): view['bad'].snapshot()
+--- a/library/docs/development-cf-snapshot-dev.md
++++ b/library/docs/development-cf-snapshot-dev.md
+@@ -0,0 +1,5 @@
++# 按实际分层语义生成可验证且脱敏的不可变快照
++
++快照必须沿用实际多来源优先级和原生模板验证，深层不可变且脱离之后的来源修改。相对敏感路径在字典、列表和整视图上均生效，循环与未知可变对象明确拒绝。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

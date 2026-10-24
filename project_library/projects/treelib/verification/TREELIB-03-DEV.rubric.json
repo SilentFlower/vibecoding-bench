@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TREELIB-03-DEV",
+  "source_commit": "83b3b87eaa7c56c9c7b86d19b2eede5252a1b482",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add treelib.snapshot.snapshot(tree) and restore(document,tree_class=Tree,**tree_kwargs) using schema=1/root/nodes flat records with id/tag/parent/ordered children/expanded/data. Include all descendants regardless of expanded and preserve duplicate tags and sibling insertion order. Validate exact supported shape/version, unique nonempty string IDs, one coherent root, bidirectional parent/children relationships, no cycles/duplicate references/missing or unreachable nodes, and explicit empty-tree representation before returning a tree. Restore a fresh explicitly selected tree class without dynamic class execution; copy data ownership and preserve falsy data. Keep old to_json/from_json display format unchanged. Plain data must be JSON-compatible for actual JSON encoding; no arbitrary class codecs are implied.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

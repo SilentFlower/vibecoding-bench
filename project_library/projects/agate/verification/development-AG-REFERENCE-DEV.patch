@@ -1,0 +1,100 @@
+--- a/library/agate/data_types/date.py
++++ b/library/agate/data_types/date.py
+@@ -20,9 +20,16 @@
+         A locale specification such as :code:`en_US` or :code:`de_DE` to use
+         for parsing formatted dates.
+     """
+-    def __init__(self, date_format=None, locale=None, **kwargs):
++    def __init__(self, date_format=None, locale=None, reference_datetime=None, **kwargs):
++        """建立可复现日期解析器。@param date_format 显式格式。@param locale 解析区域。
++        @param reference_datetime 无时区参考时刻或None。@param kwargs 原DataType参数。@return None。
++        """
+         super().__init__(**kwargs)
+ 
++        if reference_datetime is not None and (not isinstance(reference_datetime, datetime)
++                or reference_datetime.utcoffset() is not None):
++            raise TypeError('reference_datetime必须是无时区datetime或None')
++        self._reference_datetime = reference_datetime
+         self.date_format = date_format
+         self.locale = locale
+ 
+@@ -86,7 +93,7 @@
+             return dt.date()
+ 
+         try:
+-            (value, ctx, _, _, matched_text), = self._parser.nlp(d, sourceTime=ZERO_DT)
++            (value, ctx, _, _, matched_text), = self._parser.nlp(d, sourceTime=getattr(self, '_reference_datetime', None) or ZERO_DT)
+         except (TypeError, ValueError, OverflowError):
+             raise CastError('Value "%s" does not match date format.' % d)
+         else:
+--- a/library/agate/data_types/date_time.py
++++ b/library/agate/data_types/date_time.py
+@@ -21,15 +21,21 @@
+         A locale specification such as :code:`en_US` or :code:`de_DE` to use
+         for parsing formatted datetimes.
+     """
+-    def __init__(self, datetime_format=None, timezone=None, locale=None, **kwargs):
++    def __init__(self, datetime_format=None, timezone=None, locale=None, reference_datetime=None, **kwargs):
++        """建立固定参考日期时间解析器。@param datetime_format 显式格式。@param timezone 原时区策略。
++        @param locale 解析区域。@param reference_datetime 无时区参考或None。@param kwargs 原DataType参数。@return None。
++        """
+         super().__init__(**kwargs)
+ 
+         self.datetime_format = datetime_format
+         self.timezone = timezone
+         self.locale = locale
+ 
++        if reference_datetime is not None and (not isinstance(reference_datetime, datetime.datetime)
++                or reference_datetime.utcoffset() is not None):
++            raise TypeError('reference_datetime必须是无时区datetime或None')
+         now = datetime.datetime.now()
+-        self._source_time = datetime.datetime(
++        self._source_time = reference_datetime if reference_datetime is not None else datetime.datetime(
+             now.year, now.month, now.day, 0, 0, 0, 0, None
+         )
+         self._constants = parsedatetime.Constants(localeID=self.locale)
+--- a/library/development_tests/test_development_ag_reference_dev.py
++++ b/library/development_tests/test_development_ag_reference_dev.py
+@@ -0,0 +1,34 @@
++"""公开的固定参考时刻回归。"""
++from datetime import date, datetime, timezone
++import pickle
++import pytest
++import agate
++
++def test_relative_date_uses_fixed_reference():
++    field = agate.Date(reference_datetime=datetime(2024, 2, 28, 12), locale='en_US')
++    assert field.cast('tomorrow') == date(2024, 2, 29)
++
++def test_relative_datetime_uses_fixed_reference():
++    field = agate.DateTime(reference_datetime=datetime(2024, 2, 28, 12), locale='en_US')
++    assert field.cast('tomorrow at 9am') == datetime(2024, 2, 29, 9)
++
++def test_reference_survives_serialization():
++    field = agate.Date(reference_datetime=datetime(2025, 12, 31, 23), locale='en_US')
++    assert pickle.loads(pickle.dumps(field)).cast('tomorrow') == date(2026, 1, 1)
++
++def test_formats_and_absolute_values_keep_their_priority():
++    field = agate.Date(date_format='%d/%m/%Y', reference_datetime=datetime(2024, 1, 1))
++    assert field.cast('16/07/2030') == date(2030, 7, 16)
++    assert agate.DateTime(reference_datetime=datetime(2024, 1, 1)).cast('2030-07-16T10:20:30') == datetime(2030, 7, 16, 10, 20, 30)
++
++def test_invalid_reference_types_are_rejected():
++    for invalid in (date(2024, 1, 1), '2024-01-01', datetime(2024, 1, 1, tzinfo=timezone.utc)):
++        with pytest.raises(TypeError):
++            agate.Date(reference_datetime=invalid)
++        with pytest.raises(TypeError):
++            agate.DateTime(reference_datetime=invalid)
++
++def test_nulls_and_existing_typed_values_are_preserved():
++    field = agate.Date(reference_datetime=datetime(2024, 1, 1))
++    value = date(2040, 5, 6)
++    assert field.cast(None) is None and field.cast(value) is value
+--- a/library/docs/development-ag-reference-dev.md
++++ b/library/docs/development-ag-reference-dev.md
+@@ -0,0 +1,5 @@
++# 让相对日期导入采用可复现的参考时刻
++
++历史订单导入需要固定“明天／下周”等相对文本的参考时刻，保证重跑和pickle后结果一致。新增reference_datetime仅接受无时区datetime；带时区参考、date和字符串明确拒绝。Date与DateTime各自原默认、格式优先级、空值和timezone参数保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

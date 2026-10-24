@@ -1,0 +1,106 @@
+--- a/library/docs/development-python-frontmatter-06-dev.md
++++ b/library/docs/development-python-frontmatter-06-dev.md
+@@ -0,0 +1,5 @@
++# 文档编辑通过严格解析和原子替换避免半写及版本冲突
++
++路线06：完整文档安全编辑API，先严格解析、按真实格式与编码转换，再同目录临时文件fsync后原子替换；版本摘要和转换期间源变化明确冲突，符号链接拒绝。替换前失败保留原文并清理临时文件，权限与属主保留。乐观检查不宣称能锁住不合作进程，复用先前解析结果和二进制流能力。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/frontmatter/atomic.py
++++ b/library/frontmatter/atomic.py
+@@ -0,0 +1,52 @@
++"""同目录原子替换式文档编辑，失败前不破坏源文件。"""
++import hashlib
++import io
++import os
++import stat
++import tempfile
++from pathlib import Path
++from frontmatter import Post, dumps, load
++from frontmatter.parsing import parse_result
++
++
++class UpdateConflict(ValueError):
++    """输入版本或提交前源文件已变化，拒绝覆盖。"""
++
++
++def atomic_update(path, transform, encoding='utf-8', expected_sha256=None):
++    """严格读取后以同目录临时文件提交完整新文档。@param path 已有普通文件。@param transform 返回Post的转换。@param encoding 编码。@param expected_sha256 可选原字节摘要。@return 提交的Post。"""
++    target = Path(path)
++    before = target.lstat()
++    if not stat.S_ISREG(before.st_mode):
++        raise ValueError('只允许已有普通文件，不跟随符号链接')
++    raw = target.read_bytes()
++    digest = hashlib.sha256(raw).hexdigest()
++    if expected_sha256 is not None and expected_sha256 != digest:
++        raise UpdateConflict('文档版本已经变化')
++    parse_result(raw, encoding=encoding, strict=True)
++    post = load(io.BytesIO(raw), encoding=encoding)
++    updated = transform(post)
++    if not isinstance(updated, Post):
++        raise TypeError('转换必须返回Post')
++    payload = dumps(updated).encode(encoding)
++    temporary = None
++    try:
++        descriptor, temporary = tempfile.mkstemp(prefix='.'+target.name+'.', suffix='.tmp', dir=target.parent)
++        with os.fdopen(descriptor, 'wb') as output:
++            os.fchmod(output.fileno(), stat.S_IMODE(before.st_mode))
++            owned = os.fstat(output.fileno())
++            if (owned.st_uid, owned.st_gid) != (before.st_uid, before.st_gid):
++                os.fchown(output.fileno(), before.st_uid, before.st_gid)
++            output.write(payload)
++            output.flush()
++            os.fsync(output.fileno())
++        now = target.lstat()
++        # 这是乐观并发检查；不承诺锁住不合作外部进程在检查后的写入。
++        if not stat.S_ISREG(now.st_mode) or (now.st_dev, now.st_ino, now.st_mtime_ns, now.st_size) != (before.st_dev, before.st_ino, before.st_mtime_ns, before.st_size) or hashlib.sha256(target.read_bytes()).hexdigest() != digest:
++            raise UpdateConflict('提交前源文档已经变化')
++        os.replace(temporary, target)
++        temporary = None
++        return updated
++    finally:
++        if temporary is not None:
++            os.unlink(temporary)
+--- a/library/tests/test_development_python_frontmatter_06_dev.py
++++ b/library/tests/test_development_python_frontmatter_06_dev.py
+@@ -0,0 +1,40 @@
++"""文档转换完整落盘，错误与冲突不得留下半文件。"""
++import hashlib
++import stat
++import tempfile
++import unittest
++from pathlib import Path
++import frontmatter
++from frontmatter.atomic import UpdateConflict, atomic_update
++from frontmatter.parsing import ParseError
++
++
++def test_atomic_unicode_update_and_mode():
++    """真实二进制读取、严格解析及同目录替换保持格式。@return None。"""
++    with tempfile.TemporaryDirectory() as temporary:
++        path=Path(temporary)/'doc.md';raw=' \n+++\ncontent="摘要"\n+++\n旧正文'.encode('utf-16-le');path.write_bytes(raw);path.chmod(0o640)
++        def change(post):
++            """模拟一次业务编辑。@param post 文档。@return 更新文档。"""
++            post.content='新正文';post['version']=2;return post
++        atomic_update(path,change,encoding='utf-16-le',expected_sha256=hashlib.sha256(raw).hexdigest())
++        again=frontmatter.load(path,encoding='utf-16-le')
++        assert again.content=='新正文' and again.metadata=={'content':'摘要','version':2}
++        assert isinstance(again.handler,frontmatter.TOMLHandler) and stat.S_IMODE(path.stat().st_mode)==0o640
++        assert sorted(item.name for item in path.parent.iterdir())==['doc.md']
++
++
++def test_conflict_transform_and_malformed_failures_preserve_input():
++    """乐观版本、转换失败及坏头部均不得覆盖源。@return None。"""
++    with tempfile.TemporaryDirectory() as temporary:
++        path=Path(temporary)/'doc.md';raw=b'{"content":"meta"}\nbody';path.write_bytes(raw)
++        with unittest.TestCase().assertRaises(UpdateConflict):atomic_update(path,lambda post:post,expected_sha256='0'*64)
++        with unittest.TestCase().assertRaises(TypeError):atomic_update(path,lambda post:None)
++        assert path.read_bytes()==raw
++        def race(post):
++            """模拟转换期间外部编辑。@param post 原文档。@return 原文档。"""
++            path.write_bytes(b'external');return post
++        with unittest.TestCase().assertRaises(UpdateConflict):atomic_update(path,race)
++        assert path.read_bytes()==b'external'
++        path.write_bytes(b'{broken}\nbody')
++        with unittest.TestCase().assertRaises(ParseError):atomic_update(path,lambda post:post)
++        assert path.read_bytes()==b'{broken}\nbody' and len(list(path.parent.iterdir()))==1

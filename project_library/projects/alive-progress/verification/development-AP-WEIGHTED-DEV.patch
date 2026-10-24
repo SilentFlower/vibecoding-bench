@@ -1,0 +1,75 @@
+--- a/library/alive_progress/weighted.py
++++ b/library/alive_progress/weighted.py
+@@ -0,0 +1,22 @@
++"""按每项实际工作量确认进度，而不按项目数量猜总量。"""
++from .core.progress import alive_bar
++
++
++def alive_weighted_it(source,weight,*,total=None,finalize=None,**options):
++    """跟踪加权输入。@param source 同步可迭代对象。@param weight 每项非负整数工作量函数。
++    @param total 显式总工作量或None。@param finalize 正常耗尽回调。@param options 原进度配置。
++    @return 保持项身份的惰性迭代器；继续消费后才计入上一项权重。
++    """
++    if not callable(weight) or finalize is not None and not callable(finalize):
++        raise TypeError('权重及收尾必须为可调用对象')
++    if options.get('manual'):
++        raise UserWarning('加权迭代适配器不能使用手动模式')
++    with alive_bar(total,**options) as bar:
++        for item in source:
++            amount=weight(item)
++            if type(amount) is not int or amount<0:
++                raise ValueError('每项工作量必须为非负整数')
++            yield item
++            bar(amount)
++        if finalize is not None:
++            finalize(bar)
+--- a/library/development_tests/test_development_ap_weighted_dev.py
++++ b/library/development_tests/test_development_ap_weighted_dev.py
+@@ -0,0 +1,39 @@
++"""公开按项工作量进度回归。"""
++import pytest
++from alive_progress.weighted import alive_weighted_it
++
++def test_actual_work_units_and_item_identity_are_preserved():
++    values=[{'n':2},{'n':0},{'n':3}];finished=[]
++    result=list(alive_weighted_it(values,lambda value:value['n'],total=5,disable=True,finalize=lambda bar:finished.append(bar.snapshot())))
++    assert all(a is b for a,b in zip(result,values)) and finished[0].count==5 and finished[0].processed==5
++
++def test_weight_is_evaluated_once_without_prefetching():
++    seen=[]
++    def weight(value):
++        seen.append(value)
++        return value
++    iterator=alive_weighted_it(iter([1,2]),weight,disable=True)
++    assert next(iterator)==1 and seen==[1]
++    iterator.close();assert seen==[1]
++
++def test_invalid_weight_prevents_yield_and_success_finalization():
++    for amount in (-1,True,1.5):
++        calls=[];iterator=alive_weighted_it([1],lambda value:amount,disable=True,finalize=lambda bar:calls.append(1))
++        with pytest.raises(ValueError):
++            next(iterator)
++        assert calls==[]
++
++def test_empty_source_and_falsey_callable_follow_explicit_presence():
++    calls=[]
++    class Weight:
++        def __bool__(self):
++            return False
++        def __call__(self,value):
++            return 2
++    class Ending:
++        def __len__(self):
++            return 0
++        def __call__(self,bar):
++            calls.append(bar.snapshot().count)
++    assert list(alive_weighted_it([],Weight(),disable=True,finalize=Ending()))==[]
++    assert list(alive_weighted_it([1],Weight(),disable=True,finalize=Ending()))==[1] and calls==[0,2]
+--- a/library/docs/development-ap-weighted-dev.md
++++ b/library/docs/development-ap-weighted-dev.md
+@@ -0,0 +1,5 @@
++# 按每项实际工作量确认进度并保持惰性和准确收尾
++
++每条记录的处理量不同时，按显式权重而非记录数推进。每项只计算一次，继续消费才确认完成，总量用真实工作单位，零权重合法；不提前扫描全输入，异常或提前关闭不执行成功收尾。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

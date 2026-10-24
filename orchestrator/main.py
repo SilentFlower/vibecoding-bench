@@ -8127,6 +8127,7 @@ async def lifespan(app: FastAPI):
         projects_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, terminal, _projects_account,
             _projects_admission, project_requester_settings.agent_configuration, verification, pi, _quota_identity)
         verification.event = projects_service._event
+        verification.accepted = projects_service.accepted_work
         projects_service.recover()
     # 清掉上次进程残留的 login 容器，避免重启后僵尸容器堆积
     login_manager.cleanup_stale()

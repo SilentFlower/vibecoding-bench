@@ -1,0 +1,13 @@
+{
+  "script": "verification/BA-PREFERENCES-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_ba_preferences_dev.py"
+}

@@ -1,0 +1,71 @@
+--- a/library/development_tests/test_development_sc_priority_dev.py
++++ b/library/development_tests/test_development_sc_priority_dev.py
+@@ -0,0 +1,33 @@
++"""公开同时到期优先级回归。"""
++import datetime
++import pytest
++import schedule
++
++def test_equal_due_times_use_priority_then_registration_order():
++    scheduler=schedule.Scheduler();events=[]
++    jobs=[scheduler.every().day.do(events.append,name).set_priority(priority) for name,priority in [('low',0),('first',5),('second',5)]]
++    for job in jobs:
++        job.next_run=datetime.datetime(2020,1,1)
++    scheduler.run_pending()
++    assert events==['first','second','low']
++
++def test_earlier_due_time_wins_over_priority():
++    scheduler=schedule.Scheduler();events=[]
++    older=scheduler.every().day.do(events.append,'older').set_priority(-10)
++    newer=scheduler.every().day.do(events.append,'newer').set_priority(100)
++    older.next_run=datetime.datetime(2020,1,1);newer.next_run=datetime.datetime(2020,1,2)
++    scheduler.run_pending()
++    assert events==['older','newer']
++
++def test_canceljob_still_removes_only_that_job():
++    scheduler=schedule.Scheduler();events=[]
++    first=scheduler.every().day.do(lambda:schedule.CancelJob).set_priority(1)
++    second=scheduler.every().day.do(events.append,'second')
++    first.next_run=second.next_run=datetime.datetime(2020,1,1)
++    scheduler.run_pending()
++    assert scheduler.jobs==[second] and events==['second']
++
++def test_invalid_priority_is_rejected():
++    for value in (True,1.2,'1'):
++        with pytest.raises(schedule.ScheduleValueError):
++            schedule.Job(1).set_priority(value)
+--- a/library/docs/development-sc-priority-dev.md
++++ b/library/docs/development-sc-priority-dev.md
+@@ -0,0 +1,5 @@
++# 让同时到期任务按显式优先级稳定执行
++
++多个任务同时到期时，允许关键任务优先，同优先级仍保留注册顺序；更早的截止时间始终优先。只改变到期集合排序，取消、异常、快照及run_all语义继续兼容。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/schedule/__init__.py
++++ b/library/schedule/__init__.py
+@@ -97,7 +97,7 @@
+         between but only once.
+         """
+         runnable_jobs = (job for job in self.jobs if job.should_run)
+-        for job in sorted(runnable_jobs):
++        for job in sorted(runnable_jobs, key=lambda job: (job.next_run, -getattr(job, '_run_priority', 0))):
+             self._run_job(job)
+ 
+     def run_all(self, delay_seconds: int = 0) -> None:
+@@ -453,6 +453,15 @@
+             )
+         self.start_day = "sunday"
+         return self.weeks
++
++    def set_priority(self, priority):
++        """设置同时到期任务的优先级。@param priority 非布尔整数，越大越优先。
++        @return 当前Job；只作为next_run相同的排序条件。
++        """
++        if type(priority) is not int:
++            raise ScheduleValueError('优先级必须为整数')
++        self._run_priority = priority
++        return self
+ 
+     def tag(self, *tags: Hashable):
+         """

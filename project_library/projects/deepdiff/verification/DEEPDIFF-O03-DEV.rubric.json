@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "DEEPDIFF-O03-DEV",
+  "source_commit": "79e4379278b1cfdd8e9e3dccac364956908e8989",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add explicit datetime.timezone value handling in actual DeepDiff dispatch and DeepHash preparation. Compare native fixed offsets (including negative, fractional hour and microsecond offsets), ignoring display names exactly like Python equality. Different offsets report values_changed, including nested and ignore_order structures, and canonical hashes must agree with equality. Preserve dynamic tzinfo/other-class type rules and existing datetime normalization; do not claim arbitrary timezone-rule comparison.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

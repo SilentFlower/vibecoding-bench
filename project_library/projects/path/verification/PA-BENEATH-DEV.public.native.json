@@ -1,0 +1,14 @@
+{
+  "script": "verification/PA-BENEATH-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 4,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_pa_beneath_dev.py"
+}

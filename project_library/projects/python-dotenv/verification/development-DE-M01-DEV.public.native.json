@@ -1,0 +1,13 @@
+{
+  "script": "verification/development-DE-M01-DEV-public.py",
+  "args": [],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_main.py"
+}

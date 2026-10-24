@@ -1,0 +1,106 @@
+--- a/library/docs/development-pluggy-06-dev.md
++++ b/library/docs/development-pluggy-06-dev.md
+@@ -0,0 +1,5 @@
++# 入口点元数据先只读发现再精确选择加载并核环境变化
++
++路线16：只读发现返回完整元数据候选和独立错误，不导入插件；明确选择后重读核组/名/目标/分发/版本，变化、重复或不完整先拒绝，blocked/已有名不导入。真实加载只选一项并复用前置成功注册提交路径。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/pluggy/discovery.py
++++ b/library/src/pluggy/discovery.py
+@@ -0,0 +1,56 @@
++"""入口点只读发现与显式候选加载，发现阶段绝不导入插件。"""
++import importlib.metadata
++from dataclasses import dataclass
++
++
++@dataclass(frozen=True)
++class EntryPointCandidate:
++    """稳定元数据身份。@param group 组。@param name 名。@param value 导入目标。@param distribution 分发名。@param version 版本。"""
++    group: str
++    name: str
++    value: str
++    distribution: str
++    version: str
++
++
++@dataclass(frozen=True)
++class DiscoveryReport:
++    """发现结果与单独元数据错误。@param candidates 候选。@param errors 错误摘要。"""
++    candidates: tuple
++    errors: tuple
++
++
++def _scan(group,name=None):
++    """读取分发及入口字段，不调用ep.load。@param group 组。@param name 可选名字。@return 内部候选、错误。"""
++    if not isinstance(group,str) or not group:raise ValueError('入口组必须非空字符串')
++    records=[];errors=[]
++    for index,distribution in enumerate(importlib.metadata.distributions()):
++        try:
++            dist_name=distribution.metadata['Name'];version=distribution.version
++            if not isinstance(dist_name,str) or not isinstance(version,str):raise ValueError('分发名称或版本缺失')
++            for entry in distribution.entry_points:
++                if entry.group!=group or name is not None and entry.name!=name:continue
++                if not isinstance(entry.name,str) or not isinstance(entry.value,str):raise ValueError('入口点元数据字段无效')
++                candidate=EntryPointCandidate(group,entry.name,entry.value,dist_name,version)
++                records.append((candidate,distribution,entry))
++        except Exception as error:
++            errors.append({'distribution_index':index,'error_type':type(error).__name__})
++    return records,errors
++
++
++def discover_entrypoints(group,name=None):
++    """预览候选元数据，不验证插件行为或执行导入。@param group 组。@param name 名字过滤。@return DiscoveryReport。"""
++    records,errors=_scan(group,name)
++    ordered=sorted((row[0] for row in records),key=lambda row:(row.name,row.distribution,row.version,row.value))
++    return DiscoveryReport(tuple(ordered),tuple(errors))
++
++
++def load_entrypoint(manager,candidate):
++    """重新核对完整元数据身份后只加载所选候选。@param manager 真实管理器。@param candidate 预览候选。@return 实际注册名或None。"""
++    if not isinstance(candidate,EntryPointCandidate):raise TypeError('必须提供发现候选')
++    if manager.has_plugin(candidate.name) or manager.is_blocked(candidate.name):return None
++    records,errors=_scan(candidate.group,candidate.name)
++    matches=[row for row in records if row[0]==candidate]
++    if len(matches)!=1 or errors:raise ValueError('入口元数据变化、重复或不完整，请重新发现')
++    _,distribution,entry=matches[0]
++    return manager.register_entrypoint(entry.load(),candidate.name,distribution)
+--- a/library/tests/test_development_pluggy_06_dev.py
++++ b/library/tests/test_development_pluggy_06_dev.py
+@@ -0,0 +1,36 @@
++"""预览不导入，选择按完整候选身份重新验证后才实际注册。"""
++from types import SimpleNamespace
++from unittest.mock import patch
++import unittest
++from pluggy import PluginManager
++from pluggy.discovery import discover_entrypoints,load_entrypoint
++
++
++def fixture():
++    """构造可计数的离线入口。@return 分发、调用记录、插件。"""
++    calls=[];plugin=object()
++    entries=[SimpleNamespace(group='app',name=name,value='pkg:'+name,load=lambda name=name:calls.append(name) or plugin) for name in ('one','two')]
++    return SimpleNamespace(metadata={'Name':'package'},version='1',entry_points=entries),calls,plugin
++
++
++def test_preview_then_only_one_selected_plugin_loads():
++    """真正选中一条，不用原group-wide loader代替选择。@return None。"""
++    dist,calls,plugin=fixture();pm=PluginManager('app')
++    with patch('importlib.metadata.distributions',return_value=[dist]):
++        report=discover_entrypoints('app')
++        assert [row.name for row in report.candidates]==['one','two'] and calls==[] and report.errors==()
++        assert load_entrypoint(pm,report.candidates[1])=='two'
++    assert calls==['two'] and pm.list_plugin_distributions()==[(plugin,dist)]
++
++
++def test_changed_blocked_and_bad_metadata_never_import():
++    """环境变化或拒绝名称不应先执行插件导入。@return None。"""
++    dist,calls,plugin=fixture();pm=PluginManager('app')
++    with patch('importlib.metadata.distributions',return_value=[dist]):candidate=discover_entrypoints('app').candidates[0]
++    dist.version='2'
++    with patch('importlib.metadata.distributions',return_value=[dist]):
++        with unittest.TestCase().assertRaises(ValueError):load_entrypoint(pm,candidate)
++        pm.set_blocked('one');assert load_entrypoint(pm,candidate) is None
++    assert calls==[]
++    with patch('importlib.metadata.distributions',return_value=[SimpleNamespace(metadata={},version='1',entry_points=[])]):
++        report=discover_entrypoints('app');assert report.candidates==() and report.errors

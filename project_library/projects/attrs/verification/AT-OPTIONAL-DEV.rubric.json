@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AT-OPTIONAL-DEV",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Fix attr.converters.optional for first-parameter and return annotations stored as strings, including unknown forward references. Build a valid optional annotation representation without evaluating arbitrary annotation text or changing the original converter annotations. Preserve actual-type annotations, unannotated/builtin callables, None bypass and Converter takes_self/takes_field forwarding. The wrapped converter must still execute normally for non-None values.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

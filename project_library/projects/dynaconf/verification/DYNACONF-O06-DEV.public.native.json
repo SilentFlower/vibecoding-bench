@@ -1,0 +1,14 @@
+{
+  "script": "verification/DYNACONF-O06-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library",
+    "app"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 3,
+    "failures": 0
+  },
+  "test_file": "library/tests/test_development_dynaconf_o06_dev.py"
+}

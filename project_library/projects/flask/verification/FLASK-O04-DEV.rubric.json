@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FLASK-O04-DEV",
+  "source_commit": "d086db856be187255b8ec61ef409357393020f32",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend Config.from_prefixed_env with opt-in atomic=False and strict=False. Atomic mode stages a deep detached dictionary, parses sorted matching variables and validates nonempty nested path segments plus dictionary intermediates before any self mutation; errors name the full environment key and preserve all prior nested external aliases. Non-strict atomic mode retains text on declared parse ValueError/TypeError; strict atomic raises, and custom loader programming errors propagate. Valid batches commit together. Keep default legacy loading behavior exactly, require strict with atomic explicitly, and do not silently swallow conflicts or call a failed partial batch successful.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

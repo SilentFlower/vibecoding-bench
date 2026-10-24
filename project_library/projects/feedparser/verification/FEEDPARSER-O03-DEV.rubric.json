@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "FEEDPARSER-O03-DEV",
+  "source_commit": "a22c5521cbb109871f1a2318948581901bd47e26",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add public immutable DateHandlerRegistry(handlers=(), include_builtin=True) and parse(..., date_handlers=registry). Apply through actual shared _parse_date paths with ContextVar scoping/reset on every exit, preserving default global registerDateHandler behavior and built-in order. Freeze/deduplicate custom handler identities, accept only nine nonbool integer tuple/list returns, skip mismatches/declared custom failures and continue to later handlers; never catch BaseException cancellation. Interleaved/concurrent/nested parsing must not leak registries. Use real RSS/JSON date parsing, not a separate unused date utility or global list swapping.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

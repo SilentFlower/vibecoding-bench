@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CHARDET-O02-DEV",
+  "source_commit": "fa905b359cbcaba93a35fd6429ba9ec4b156c1c1",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement chardet.details.detect_details(data, *, names=\"legacy\") retaining actual raw encoding/confidence/language while reporting canonical Python codec and availability. Explicit names=\"python\" may select the canonical codec only when supported; unusual UCS4 labels must retain their identity and report unsupported status instead of being relabelled UTF32. Distinguish empty/no-match, snapshot mutable bytearray input and reject invalid policies/types without changing detect defaults.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,64 @@
+--- a/library/dataset/table.py
++++ b/library/dataset/table.py
+@@ -721,6 +721,7 @@
+         _limit: int | None = None,
+         _offset: int = 0,
+         order_by: str | Sequence[str] | None = None,
++        _columns: str | Sequence[str] | None = None,
+         _streamed: bool = False,
+         _step: int | None = QUERY_STEP,
+         **kwargs: SQLWriteValue,
+@@ -763,7 +764,15 @@
+ 
+         orderings = self._args_to_order_by(order_by)
+         args = self._args_to_clause(kwargs, clauses=_clauses)
+-        query = self.table.select().where(args).limit(_limit).offset(_offset)
++        if _columns is None:
++            query = self.table.select()
++        else:
++            requested = ensure_strings(_columns)
++            names = [self._get_column_name(name) for name in requested]
++            if not names or len(set(names)) != len(names) or any(name not in self.table.c for name in names):
++                raise ValueError('投影列必须存在且非空、唯一')
++            query = select(*(self.table.c[name] for name in names))
++        query = query.where(args).limit(_limit).offset(_offset)
+         if len(orderings):
+             query = query.order_by(*orderings)
+ 
+--- a/library/docs/development-dataset-o02-dev.md
++++ b/library/docs/development-dataset-o02-dev.md
+@@ -0,0 +1,5 @@
++# 让查询和单行查询在数据库侧完成明确字段投影
++
++对应路线03：真实SELECT仅投影指定字段，保持过滤/排序/分页/流式及row_type；列名引用安全，空、重复和缺列拒绝，find_one同步可用。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_dataset_o02_dev.py
++++ b/library/test/test_development_dataset_o02_dev.py
+@@ -0,0 +1,26 @@
++"""投影发生在真实SQL SELECT，保持过滤排序及row_type。"""
++import dataset
++import pytest
++
++def test_find_findone_order_and_named_projection():
++    """只返回指定顺序列，过滤及降序不需出现在投影中。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items'];t.insert_many([{'sku':'a','qty':1,'secret':'x'},{'sku':'b','qty':3,'secret':'y'}])
++    rows=list(t.find(_columns=['sku','qty'],order_by='-qty',qty={'>':0}))
++    assert list(rows[0])==['sku','qty'] and rows[0]['sku']=='b' and 'secret' not in rows[0]
++    assert t.find_one(sku='a',_columns='qty')=={'qty':1}
++    db.close()
++
++def test_invalid_empty_duplicate_unknown_and_space_name():
++    """列名走SQLAlchemy引用，不拼SQL。@return None。"""
++    db=dataset.connect('sqlite://');t=db['items'];t.insert({'with space':'ok'})
++    assert t.find_one(_columns=['with space'])=={'with space':'ok'}
++    for columns in [[],['id','id'],['missing']]:
++        with pytest.raises(ValueError):list(t.find(_columns=columns))
++    db.close()
++
++def test_streamed_custom_row_type_and_no_match():
++    """真实流式和自定义row_type按投影字段转换。@return None。"""
++    db=dataset.connect('sqlite://',row_type=lambda items:tuple(items));t=db['items'];t.insert({'x':1,'y':2})
++    assert list(t.find(_columns=['y'],_streamed=True))==[(('y',2),)]
++    assert t.find_one(x=999,_columns=['y']) is None
++    db.close()

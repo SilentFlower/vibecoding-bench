@@ -1,0 +1,63 @@
+--- a/library/cli_helpers/tabular_output/preprocessors.py
++++ b/library/cli_helpers/tabular_output/preprocessors.py
+@@ -415,3 +415,23 @@
+         for row in data
+     )
+     return data, headers
++
++
++def spreadsheet_formula_policy(data,headers,formula_policy='preserve',**_):
++    """显式处理电子表格公式型文本。@param data 惰性行。@param headers 表头。
++    @param formula_policy preserve/escape/error。@return (新行迭代器,新表头)，不修改输入。
++    """
++    if formula_policy not in ('preserve','escape','error'):
++        raise ValueError('未知公式处理策略')
++    def cell(value,row,column):
++        dangerous=isinstance(value,str) and value.lstrip(' \t\r\n').startswith(('=','+','-','@'))
++        if not dangerous or formula_policy=='preserve':
++            return value
++        if formula_policy=='error':
++            raise ValueError('电子表格公式型文本：行'+str(row)+'列'+str(column))
++        return "'"+value
++    headers=[cell(value,0,index) for index,value in enumerate(headers,1)]
++    def rows():
++        for row_number,row in enumerate(data,1):
++            yield [cell(value,row_number,column) for column,value in enumerate(row,1)]
++    return rows(),headers
+--- a/library/development_tests/test_development_ch_formula_dev.py
++++ b/library/development_tests/test_development_ch_formula_dev.py
+@@ -0,0 +1,26 @@
++"""公开电子表格公式策略回归。"""
++import pytest
++from cli_helpers.tabular_output.preprocessors import spreadsheet_formula_policy
++from cli_helpers.tabular_output import TabularOutputFormatter
++
++def test_escape_preserves_original_text_and_numeric_negatives():
++    rows,headers=spreadsheet_formula_policy([[' =SUM(A1)',-2,'normal']],['=header','n','s'],formula_policy='escape')
++    assert headers==["'=header",'n','s'] and list(rows)==[["' =SUM(A1)",-2,'normal']]
++
++def test_error_reports_location_without_contents():
++    rows,headers=spreadsheet_formula_policy([['safe'],['=private()']],['name'],formula_policy='error')
++    assert next(rows)==['safe']
++    with pytest.raises(ValueError) as caught:
++        next(rows)
++    assert '行2列1' in str(caught.value) and 'private' not in str(caught.value)
++
++def test_default_and_input_values_are_unchanged():
++    data=[['=1','-text',-3]];headers=['name','value','n']
++    rows,new_headers=spreadsheet_formula_policy(data,headers)
++    assert list(rows)==data and headers==new_headers and data==[['=1','-text',-3]]
++
++def test_real_csv_formatter_does_not_leak_explicit_policy():
++    formatter=TabularOutputFormatter('csv');processor=(spreadsheet_formula_policy,)
++    first=list(formatter.format_output([['=1']],['value'],preprocessors=processor,formula_policy='escape'))
++    second=list(formatter.format_output([['=1']],['value'],preprocessors=processor))
++    assert first==['value',"'=1"] and second==['value','=1']
+--- a/library/docs/development-ch-formula-dev.md
++++ b/library/docs/development-ch-formula-dev.md
+@@ -0,0 +1,5 @@
++# 在表格导出时显式保留、转义或拒绝公式型文本
++
++电子表格导出由调用者明确选择公式型文本策略，支持保留、前置单引号或拒绝，表头同样处理。数值负数保持数值，错误只报行列不泄漏内容，惰性消费且本次策略不影响下一次导出。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。

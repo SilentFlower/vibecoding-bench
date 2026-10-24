@@ -1,0 +1,82 @@
+--- a/library/docs/development-wtforms-05-dev.md
++++ b/library/docs/development-wtforms-05-dev.md
+@@ -0,0 +1,5 @@
++# 配置化编辑器独立派生表单并保留Meta与业务验证继承
++
++路线07：独立derive_form通过真实元类派生，保留Meta/inline继承，父字段顺序及覆盖槽位稳定，新字段按映射顺序追加；移除和覆盖须明确。父类、缓存、字段计数和已有实例不改，冲突名称预检拒绝。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wtforms/derive.py
++++ b/library/src/wtforms/derive.py
+@@ -0,0 +1,31 @@
++"""保留Meta与inline继承的独立Form派生工厂。"""
++import copy
++import keyword
++from .form import Form
++from .fields.core import UnboundField
++
++
++def derive_form(base,name,fields,remove=(),replace=False):
++    """生成独立类，不改变父类字段与缓存。@param base Form子类。@param name 类名。@param fields 有序字段映射。@param remove 明确移除名称。@param replace 是否允许覆盖字段。@return 新Form子类。"""
++    if not isinstance(base,type) or not issubclass(base,Form):raise ValueError('base必须是Form类')
++    if not isinstance(name,str) or not name.isidentifier() or keyword.iskeyword(name):raise ValueError('类名无效')
++    if type(replace) is not bool:raise ValueError('replace必须bool')
++    inherited=[(key,getattr(base,key)) for key in dir(base) if not key.startswith('_') and isinstance(getattr(base,key),UnboundField)]
++    inherited.sort(key=lambda item:(item[1].creation_counter,item[0]))
++    old=dict(inherited);removed=tuple(remove)
++    if len(set(removed))!=len(removed) or set(removed)-set(old):raise ValueError('移除字段重复或不存在')
++    additions=dict(fields)
++    if set(additions)&set(removed):raise ValueError('不能同时移除与重建同字段')
++    for key,value in additions.items():
++        if not isinstance(key,str) or not key.isidentifier() or key.startswith('_') or keyword.iskeyword(key):raise ValueError('字段名称无效')
++        if not isinstance(value,UnboundField):raise ValueError('新增值必须是未绑定字段')
++        if key in old and not replace:raise ValueError('覆盖字段必须显式replace')
++        if key not in old and hasattr(base,key):raise ValueError('字段名与表单行为冲突')
++    order=[key for key,_ in inherited if key not in removed]+[key for key in additions if key not in old]
++    namespace={key:None for key in removed}
++    namespace.update(additions)
++    derived=type(base)(name,(base,),namespace)
++    # 克隆定义容器并明确缓存顺序，绝不修改父类UnboundField的creation_counter。
++    final={key:copy.copy(additions.get(key,old.get(key))) for key in order}
++    derived._unbound_fields=[(key,final[key]) for key in order]
++    return derived
+--- a/library/tests/test_development_wtforms_05_dev.py
++++ b/library/tests/test_development_wtforms_05_dev.py
+@@ -0,0 +1,37 @@
++"""动态派生不修改父类，Meta、inline和字段顺序仍可用。"""
++import unittest
++from wtforms import Form,StringField,IntegerField
++from wtforms.validators import ValidationError
++from wtforms.derive import derive_form
++
++
++class Product(Form):
++    """有业务校验及Meta的真实父类。"""
++    name=StringField();quantity=IntegerField()
++    class Meta:
++        """保留项目Meta。"""
++        csrf=False
++        locale_marker='zh'
++    def validate_name(self,field):
++        """继承inline必须生效。@param field 字段。@return None。"""
++        if field.data=='bad':raise ValidationError('bad name')
++
++
++def test_parent_independence_inheritance_and_removal():
++    """两个派生类并存，父缓存及字段不污染。@return None。"""
++    before=[field.short_name for field in Product()]
++    WithNote=derive_form(Product,'WithNote',{'note':StringField()})
++    WithoutQuantity=derive_form(Product,'WithoutQuantity',{},remove=['quantity'])
++    assert [field.short_name for field in WithNote()]==['name','quantity','note']
++    assert [field.short_name for field in WithoutQuantity()]==['name']
++    assert [field.short_name for field in Product()]==before
++    assert not WithNote(data={'name':'bad'}).validate() and WithNote().meta.locale_marker=='zh'
++
++
++def test_override_requires_explicit_policy_and_conflicts_reject():
++    """覆盖与行为名称冲突不能悄悄改变父类。@return None。"""
++    with unittest.TestCase().assertRaises(ValueError):derive_form(Product,'Other',{'name':IntegerField()})
++    Override=derive_form(Product,'Override',{'name':IntegerField()},replace=True)
++    assert Override(data={'name':3}).name.data==3 and isinstance(Product().name,StringField)
++    for fields in ({'validate':StringField()},{'_hidden':StringField()},{'bad':object()}):
++        with unittest.TestCase().assertRaises(ValueError):derive_form(Product,'Other',fields)

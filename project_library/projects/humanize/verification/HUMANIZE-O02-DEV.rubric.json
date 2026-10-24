@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "HUMANIZE-O02-DEV",
+  "source_commit": "785e5dcc0d0308ad0dff3f6cc0faa7085ad0375b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add humanize.context.locale_scope(locale,path=None) / LocaleScope using ContextVar, the accepted source-aware real catalog loader and context-local translation plus decimal/thousands separators. Deterministically interleaved asyncio tasks must keep distinct same-locale catalogs; nested default-English scopes override thread state and restore outer state on exceptions/cancellation. Do not mutate global/other-task thread selections; legacy activate/deactivate remains thread-local and is hidden while an explicit scope is active. Reject active same-instance reentry, load failures leave context unchanged and permit sequential reuse after exit.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

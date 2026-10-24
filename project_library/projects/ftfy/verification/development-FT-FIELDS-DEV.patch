@@ -1,0 +1,92 @@
+--- a/library/development_tests/test_development_ft_fields_dev.py
++++ b/library/development_tests/test_development_ft_fields_dev.py
+@@ -0,0 +1,21 @@
++"""公开结构化文本字段修复回归。"""
++import pytest
++from ftfy import TextFixerConfig
++from ftfy.structured import fix_fields
++
++def test_selected_nested_values_only_and_input_is_detached():
++    value={'users':[{'name':'cafÃ©','raw':'cafÃ©'}]};result=fix_fields(value,[('users',0,'name')])
++    assert result=={'users':[{'name':'café','raw':'cafÃ©'}]} and value['users'][0]['name']=='cafÃ©'
++
++def test_dotted_keys_none_and_missing_policy_are_explicit():
++    value={'a.b':'cafÃ©','none':None}
++    assert fix_fields(value,[('a.b',),('none',),('missing',)],missing='skip')=={'a.b':'café','none':None}
++
++def test_later_bad_field_never_changes_original():
++    value={'name':'cafÃ©','bad':7}
++    with pytest.raises(TypeError): fix_fields(value,[('name',),('bad',)])
++    assert value=={'name':'cafÃ©','bad':7}
++
++def test_root_text_and_caller_policy_are_supported():
++    assert fix_fields('ﬁ',[()],TextFixerConfig(fix_latin_ligatures=False))=='ﬁ'
++    with pytest.raises(ValueError): fix_fields({},[('x',-1)])
+--- a/library/docs/development-ft-fields-dev.md
++++ b/library/docs/development-ft-fields-dev.md
+@@ -0,0 +1,5 @@
++# 按明确字典和数组路径原子修复结构化记录字段
++
++以明确字典键和数组下标选择需要修复的文本字段，点号是普通键内容。未选字段、键名和None保留，任何晚期失败都不修改原记录；支持明确缺失策略与根文本路径。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/ftfy/structured.py
++++ b/library/ftfy/structured.py
+@@ -0,0 +1,57 @@
++"""按显式结构路径修复值，键名与未选字段保持原值。"""
++from copy import deepcopy
++from . import fix_text
++
++
++def read_path(value,path):
++    """读取明确结构路径。@param value 字典／列表树。@param path 字符串键和整数下标序列。
++    @return 原叶子值，不支持点号猜测或负数下标。
++    """
++    for part in path:
++        if isinstance(value,dict) and isinstance(part,str):
++            value=value[part]
++        elif isinstance(value,list) and type(part) is int and part>=0:
++            value=value[part]
++        else:
++            raise TypeError('路径类型与容器不匹配')
++    return value
++
++
++def normalize_paths(paths):
++    """验证并去重明确路径。@param paths 路径迭代器。@return 稳定路径元组。
++    """
++    result=[]
++    for path in paths:
++        if not isinstance(path,(tuple,list)) or any(not isinstance(part,str) and (type(part) is not int or part<0) for part in path):
++            raise ValueError('路径必须由字符串键和非负整数下标构成')
++        path=tuple(path)
++        if path not in result:
++            result.append(path)
++    return tuple(result)
++
++
++def fix_fields(value,paths,config=None,*,missing='raise'):
++    """修复选中字符串或保留None。@param value 配置记录。@param paths 明确路径。
++    @param config 原修复政策。@param missing raise或skip。@return 深拷贝结果，失败不修改输入。
++    """
++    paths=normalize_paths(paths)
++    if missing not in ('raise','skip'):
++        raise ValueError('未知缺失策略')
++    result=deepcopy(value)
++    for path in paths:
++        try:
++            original=read_path(result,path)
++        except (KeyError,IndexError):
++            if missing=='skip':
++                continue
++            raise
++        if original is None:
++            continue
++        if not isinstance(original,str):
++            raise TypeError('选中字段必须为字符串或None')
++        repaired=fix_text(original,config=config)
++        if not path:
++            result=repaired
++        else:
++            parent=read_path(result,path[:-1]);parent[path[-1]]=repaired
++    return result

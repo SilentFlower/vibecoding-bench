@@ -1,0 +1,60 @@
+--- a/library/docs/development-pyyaml-03-dev.md
++++ b/library/docs/development-pyyaml-03-dev.md
+@@ -0,0 +1,5 @@
++# 严格安全配置加载拒绝显式重复字段并给出双位置
++
++路线05：独立StrictSafeLoader对同映射显式键在flatten前检查，语义碰撞给首次/再次位置；merge继承+本地覆盖合法，默认safe_load后值胜出保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/lib/yaml/strict.py
++++ b/library/lib/yaml/strict.py
+@@ -0,0 +1,28 @@
++"""显式严格安全加载，不改变默认后值覆盖政策。"""
++from yaml.loader import SafeLoader
++from yaml.nodes import MappingNode
++from yaml.constructor import ConstructorError
++
++
++class StrictSafeLoader(SafeLoader):
++    """拒绝同一映射显式重复键，merge继承不当作本地重复。"""
++    def construct_mapping(self,node,deep=False):
++        """先验证显式键再交原合并构造。@param node 映射节点。@param deep 深构造。@return 标准dict。"""
++        if isinstance(node,MappingNode):
++            seen={}
++            for key_node,value_node in node.value:
++                if key_node.tag=="tag:yaml.org,2002:merge":continue
++                key=self.construct_object(key_node,deep=True)
++                try:
++                    if key in seen:
++                        raise ConstructorError("first explicit key",seen[key],"duplicate explicit mapping key",key_node.start_mark)
++                    seen[key]=key_node.start_mark
++                except TypeError as error:
++                    raise ConstructorError("while constructing a mapping",node.start_mark,"found unhashable key",key_node.start_mark) from error
++        return super().construct_mapping(node,deep=deep)
++
++
++def strict_load(stream):
++    """使用明确严格loader。@param stream YAML输入。@return 安全构造结果。"""
++    from yaml import load
++    return load(stream,Loader=StrictSafeLoader)
+--- a/library/tests/test_development_pyyaml_03_dev.py
++++ b/library/tests/test_development_pyyaml_03_dev.py
+@@ -0,0 +1,18 @@
++"""严格配置重复字段带首次/再次位置，默认兼容仍不变。"""
++import unittest
++import yaml
++from yaml.strict import strict_load
++from yaml.constructor import ConstructorError
++
++def test_explicit_duplicates_mark_both_occurrences_and_default_still_overwrites():
++    """嵌套字段和Python相等键碰撞均可诊断。@return None。"""
++    with unittest.TestCase().assertRaises(ConstructorError) as context:strict_load('a: 1\na: 2')
++    assert context.exception.context_mark.line==0 and context.exception.problem_mark.line==1
++    assert yaml.safe_load('a: 1\na: 2')=={'a':2}
++    with unittest.TestCase().assertRaises(ConstructorError):strict_load('1: first\ntrue: second')
++
++def test_merge_local_override_and_alias_reuse_are_valid():
++    """继承键和本地覆盖不是两个显式声明，不误判。@return None。"""
++    text='base: &base {x: 1, y: 2}\nfirst: {<<: *base, x: 3}\nsecond: {<<: *base, x: 4}'
++    value=strict_load(text)
++    assert value['first']=={'x':3,'y':2} and value['second']=={'x':4,'y':2}

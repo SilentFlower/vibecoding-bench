@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PYRSISTENT-05-DEV",
+  "source_commit": "0c0b7aec8cd25b1d2d8ba07b10acdefd0f38f2c7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend real PMap.update/update_with input adaptation from mapping-only .items() to mappings OR single-pass (key,value) iterables. Preserve multi-source left-to-right order, duplicate-pair last-write or update_fn fold semantics, persistent original ownership and CheckedPMap evolver checks. Consume generators once, propagate malformed pair/source/callback/type failures and never return a partially updated original. Keep pmap constructor and existing union API unchanged because they already support their documented roles; this goal specifically implements missing update input capability.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

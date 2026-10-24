@@ -1,0 +1,5 @@
+# 让DOCTYPE令牌逐字段校验真实publicId及systemId类型
+
+对应路线01：DOCTYPE逐字段检查publicId/systemId而非重复name，name可None时合法文本仍通过；非法值拒绝且真实walker/对象身份/其他lint保持。
+
+请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。

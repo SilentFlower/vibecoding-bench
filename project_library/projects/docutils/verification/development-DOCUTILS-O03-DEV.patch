@@ -1,0 +1,70 @@
+--- a/library/docs/development-docutils-o03-dev.md
++++ b/library/docs/development-docutils-o03-dev.md
+@@ -0,0 +1,5 @@
++# 让代码指令原生caption与真实高亮块具名关联并发布语义HTML
++
++对应路线19：code新增caption，原tag_code/高亮/行号不变，真实figure首literal次caption且name归figure，可引用并发布figure/figcaption；空标题拒绝、无caption路径保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/docutils/docutils/parsers/rst/directives/body.py
++++ b/library/docutils/docutils/parsers/rst/directives/body.py
+@@ -158,6 +158,7 @@
+     option_spec = {'class': directives.class_option,
+                    'name': directives.unchanged,
+                    'number-lines': directives.value_or((None,), int),
++                   'caption': directives.unchanged_required,
+                    }
+     has_content = True
+ 
+@@ -169,6 +170,17 @@
+                             self.state.document.settings, self.options)
+         except LexerError as error:
+             raise self.warning(error)
++        if 'caption' in self.options:
++            # figure的第一个真实子节点仍是原高亮literal_block，caption与name归容器所有。
++            figure = nodes.figure(classes=['code-figure'])
++            figure.source, figure.line = self.state_machine.get_source_and_line(self.lineno)
++            node.source, node.line = figure.source, self.content_offset + 1
++            figure += node
++            caption_text = self.options['caption']
++            text, messages = self.state.inline_text(caption_text, self.lineno)
++            figure += nodes.caption(caption_text, '', *text)
++            self.add_name(figure)
++            return [figure] + messages
+         self.add_name(node)
+         return [node]
+ 
+--- a/library/tests/test_development_docutils_o03_dev.py
++++ b/library/tests/test_development_docutils_o03_dev.py
+@@ -0,0 +1,31 @@
++"""代码caption是真实figure/caption节点，保留原语法高亮和代码文本。"""
++from docutils.core import publish_doctree,publish_parts
++from docutils import nodes
++import io
++
++def settings():
++    """隔离构建警告。@return 配置。"""
++    return {'warning_stream':io.StringIO(),'halt_level':6,'report_level':5,'syntax_highlight':'none'}
++
++def test_caption_name_real_figure_and_inline_title_are_published():
++    """figure与figcaption对应，name可引用，代码内尖括号不泄漏成HTML。@return None。"""
++    source='.. code:: text\n   :caption: Example **one**\n   :name: code-example\n\n   <value>\n\nSee code-example_.\n'
++    document=publish_doctree(source,settings_overrides=settings());figure=next(document.findall(nodes.figure))
++    assert figure['ids']==['code-example'] and isinstance(figure[0],nodes.literal_block) and isinstance(figure[1],nodes.caption)
++    assert figure[0].astext()=='<value>' and figure[1].astext()=='Example one'
++    html=publish_parts(source,writer='html5',settings_overrides=settings())['html_body']
++    assert '<figure' in html and '<figcaption' in html and '&lt;value&gt;' in html and 'href="#code-example"' in html
++
++def test_number_lines_and_caption_free_compatibility_keep_actual_code():
++    """原number-lines仍存在，无caption的树仍只有literal_block而非figure。@return None。"""
++    source='.. code:: text\n   :caption: Lines\n   :number-lines: 3\n\n   one\n   two\n'
++    document=publish_doctree(source,settings_overrides=settings());block=next(document.findall(nodes.literal_block))
++    assert 'one' in block.astext() and 'two' in block.astext() and '3' in block.astext() and '4' in block.astext()
++    plain=publish_doctree('.. code:: text\n\n   simple\n',settings_overrides=settings())
++    assert len(list(plain.findall(nodes.literal_block)))==1 and not list(plain.findall(nodes.figure))
++
++def test_empty_caption_is_diagnostic_and_unicode_multiline_caption_stays_text():
++    """空caption拒绝，多行选项及中文不改代码主体。@return None。"""
++    bad=publish_doctree('.. code:: text\n   :caption:\n\n   value\n',settings_overrides=settings());assert list(bad.findall(nodes.system_message))
++    source='.. code:: text\n   :caption: 中文\n      continuation\n\n   body\n'
++    document=publish_doctree(source,settings_overrides=settings());assert '中文' in next(document.findall(nodes.caption)).astext() and next(document.findall(nodes.literal_block)).astext()=='body'

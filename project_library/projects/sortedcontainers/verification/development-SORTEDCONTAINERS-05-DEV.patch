@@ -1,0 +1,92 @@
+--- a/library/docs/development-sortedcontainers-05-dev.md
++++ b/library/docs/development-sortedcontainers-05-dev.md
+@@ -0,0 +1,5 @@
++# 按排序边界批量取出计划时间窗并同步删除索引
++
++路线07：按值/key边界直接批量取出区间，返回原对象且复用现有块/视图切片删除，重复次数/闭开/反向key明确，reverse仅影响返回顺序。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/sortedcontainers/_poprange.py
++++ b/library/src/sortedcontainers/_poprange.py
+@@ -0,0 +1,17 @@
++"""先定位和收集，再按既有切片协议一次删除。"""
++
++
++def pop_range(container,minimum=None,maximum=None,inclusive=(True,True),reverse=False):
++    """取出区间。@param container 有序容器。@param minimum 下界或无界。@param maximum 上界或无界。@param inclusive 两个布尔。@param reverse 只反向返回。@return 原顺序值列表/映射item列表。"""
++    if len(inclusive)!=2 or any(type(flag) is not bool for flag in inclusive):raise ValueError("inclusive需要两个bool")
++    left=0 if minimum is None else (container.bisect_left(minimum) if inclusive[0] else container.bisect_right(minimum))
++    right=len(container) if maximum is None else (container.bisect_right(maximum) if inclusive[1] else container.bisect_left(maximum))
++    if right<left:right=left
++    if isinstance(container,dict):
++        keys=list(container.islice(left,right))
++        result=[(key,container[key]) for key in keys]
++        del container.keys()[left:right]
++    else:
++        result=list(container[left:right])
++        del container[left:right]
++    return result[::-1] if reverse else result
+--- a/library/src/sortedcontainers/sorteddict.py
++++ b/library/src/sortedcontainers/sorteddict.py
+@@ -197,6 +197,11 @@
+             )
+             _iloc = self._iloc = SortedKeysView(self)
+             return _iloc
++
++    def pop_range(self,minimum=None,maximum=None,inclusive=(True,True),reverse=False):
++        """取出排序区间并删除。@param minimum 下界。@param maximum 上界。@param inclusive 闭开策略。@param reverse 返回逆序。@return 被删值或items。"""
++        from ._poprange import pop_range
++        return pop_range(self,minimum,maximum,inclusive,reverse)
+ 
+     def clear(self):
+         """Remove all items from sorted dict.
+--- a/library/src/sortedcontainers/sortedlist.py
++++ b/library/src/sortedcontainers/sortedlist.py
+@@ -175,6 +175,11 @@
+         self._clear()
+         self._load = load
+         self._update(values)
++
++    def pop_range(self,minimum=None,maximum=None,inclusive=(True,True),reverse=False):
++        """取出排序区间并删除。@param minimum 下界。@param maximum 上界。@param inclusive 闭开策略。@param reverse 返回逆序。@return 被删值或items。"""
++        from ._poprange import pop_range
++        return pop_range(self,minimum,maximum,inclusive,reverse)
+ 
+     def clear(self):
+         """Remove all values from sorted list.
+--- a/library/src/sortedcontainers/sortedset.py
++++ b/library/src/sortedcontainers/sortedset.py
+@@ -338,6 +338,11 @@
+             self._list.add(value)
+ 
+     _add = add
++
++    def pop_range(self,minimum=None,maximum=None,inclusive=(True,True),reverse=False):
++        """取出排序区间并删除。@param minimum 下界。@param maximum 上界。@param inclusive 闭开策略。@param reverse 返回逆序。@return 被删值或items。"""
++        from ._poprange import pop_range
++        return pop_range(self,minimum,maximum,inclusive,reverse)
+ 
+     def clear(self):
+         """Remove all values from sorted set.
+--- a/library/tests/test_development_sortedcontainers_05_dev.py
++++ b/library/tests/test_development_sortedcontainers_05_dev.py
+@@ -0,0 +1,19 @@
++"""计划时间窗批量取出保持索引与重复次数。"""
++from operator import neg
++from sortedcontainers import SortedList,SortedSet,SortedDict
++
++def test_halfopen_ranges_all_container_families_and_remaining_indexes():
++    """只删除区间内条目，集合和映射同步索引。@return None。"""
++    for source in (SortedList([1,2,3,4,5]),SortedSet([1,2,3,4,5]),SortedDict({x:str(x) for x in range(1,6)})):
++        result=source.pop_range(2,4,inclusive=(True,False))
++        assert result==([(2,'2'),(3,'3')] if isinstance(source,dict) else [2,3])
++        assert list(source)==[1,4,5];source._check()
++
++def test_duplicates_unbounded_empty_and_reverse_key():
++    """reverse只改变返回顺序，反向key仍使用其排序边界。@return None。"""
++    source=SortedList([1,2,2,3,4]);source._reset(4)
++    assert source.pop_range(2,3,reverse=True)==[3,2,2] and list(source)==[1,4]
++    assert source.pop_range(8,2)==[];source._check()
++    reverse=SortedList([1,2,3,4],key=neg)
++    assert reverse.pop_range(4,2,inclusive=(False,True))==[3,2] and list(reverse)==[4,1]
++    assert reverse.pop_range()==[4,1] and len(reverse)==0;reverse._check()

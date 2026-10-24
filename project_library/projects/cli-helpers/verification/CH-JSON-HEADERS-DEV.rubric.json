@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CH-JSON-HEADERS-DEV",
+  "source_commit": "e2538b1d338ead4ed803ec0017017bf6779a380b",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend existing JSONL adapter with duplicate_headers=\"last\"|\"error\"|\"suffix\" via formatter kwargs. Default last preserves old output; error rejects duplicate names before consuming a row; suffix creates deterministic collision-free names _2,_3,... while reserving every original name so real columns such as a_2 are not overwritten. Materialize one-shot headers once, keep row width validation and both unicode modes, preserve input header sequence and per-call formatter defaults. Explicit policies require text names.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

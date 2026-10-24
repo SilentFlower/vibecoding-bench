@@ -1,0 +1,123 @@
+--- a/library/development_tests/test_development_at_generated_source_dev.py
++++ b/library/development_tests/test_development_at_generated_source_dev.py
+@@ -0,0 +1,64 @@
++"""公开生成源码检查回归。"""
++import linecache
++import attrs
++import pytest
++from attrs.introspection import generated_sources
++
++def test_actual_generated_init_and_repr_source_are_available():
++    @attrs.define
++    class Model:
++        value: int = attrs.field(converter=int)
++    result = generated_sources(Model, ['__init__','__repr__'])
++    assert result['__init__']['generated'] and 'def __init__' in result['__init__']['source']
++    assert result['__repr__']['status'] == 'available'
++
++def test_default_names_and_both_mapping_levels_are_readonly():
++    @attrs.define
++    class Model:
++        value: int
++    result = generated_sources(Model)
++    assert '__init__' in result
++    with pytest.raises(TypeError):
++        result['x'] = 1
++    with pytest.raises(TypeError):
++        result['__init__']['source'] = 'fake'
++
++def test_custom_and_missing_methods_are_not_claimed_as_generated():
++    @attrs.define
++    class Model:
++        value: int
++        def custom(self):
++            raise AssertionError('不得执行')
++    result = generated_sources(Model, ['custom','missing'])
++    assert result['custom']['status'] == 'custom' and result['custom']['source'] is None
++    assert result['missing']['status'] == 'missing'
++
++def test_monkeypatched_method_reports_current_function():
++    @attrs.define
++    class Model:
++        value: int
++    def replacement(self):
++        return None
++    Model.__init__ = replacement
++    assert generated_sources(Model, ['__init__'])['__init__']['generated'] is False
++
++def test_missing_linecache_is_reported_without_invented_source():
++    @attrs.define
++    class Model:
++        value: int
++    filename = Model.__init__.__code__.co_filename
++    saved = linecache.cache.pop(filename, None)
++    try:
++        assert generated_sources(Model, ['__init__'])['__init__']['status'] == 'unavailable'
++    finally:
++        if saved is not None:
++            linecache.cache[filename] = saved
++
++def test_invalid_method_name_selections_are_rejected():
++    @attrs.define
++    class Model:
++        value: int
++    with pytest.raises(TypeError):
++        generated_sources(Model, '__init__')
++    with pytest.raises(ValueError):
++        generated_sources(Model, ['__init__','__init__'])
+--- a/library/docs/development-at-generated-source-dev.md
++++ b/library/docs/development-at-generated-source-dev.md
+@@ -0,0 +1,5 @@
++# 为模型转换顺序排查交付只读生成源码检查API
++
++数据模型转换顺序排查需要集中查看实际生成的init／eq／repr代码。新增generated_sources，读取当前描述符和MRO来源，只读返回源代码及状态；自定义、缺失、缓存丢失、继承和猴补均明确，不执行方法，不伪造完整类定义或导出闭包值。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/attr/introspection.py
++++ b/library/src/attr/introspection.py
+@@ -0,0 +1,38 @@
++"""集中检查当前生成方法的实际源代码，不执行方法或导出闭包值。"""
++import inspect
++from types import MappingProxyType
++
++from ._make import fields
++
++
++def generated_sources(cls, names=None):
++    """查看实际生成方法。@param cls attrs类。@param names 可选方法名列表或元组。
++    @return 两层只读映射，含generated/status/source/filename/owner。
++    """
++    fields(cls)
++    if names is None:
++        names = sorted({name for owner in cls.__mro__ for name, value in owner.__dict__.items()
++            if hasattr(value, '__code__') and value.__code__.co_filename.startswith('<attrs generated ')})
++    if not isinstance(names, (list,tuple)) or any(not isinstance(name,str) for name in names):
++        raise TypeError('方法名必须是有限字符串序列')
++    if len(set(names)) != len(names):
++        raise ValueError('方法名不得重复')
++    result = {}
++    for name in names:
++        owner = next((base for base in cls.__mro__ if name in base.__dict__), None)
++        function = owner.__dict__[name] if owner is not None else None
++        if isinstance(function, (classmethod,staticmethod)):
++            function = function.__func__
++        code = getattr(function, '__code__', None)
++        filename = code.co_filename if code is not None else None
++        generated = filename is not None and filename.startswith('<attrs generated ')
++        source, status = None, 'missing' if owner is None else 'custom'
++        if generated:
++            try:
++                source = inspect.getsource(function)
++                status = 'available'
++            except (OSError,TypeError):
++                status = 'unavailable'
++        result[name] = MappingProxyType({'generated':generated,'status':status,'source':source,
++            'filename':filename,'owner':None if owner is None else owner.__module__ + '.' + owner.__qualname__})
++    return MappingProxyType(result)
+--- a/library/src/attrs/introspection.py
++++ b/library/src/attrs/introspection.py
+@@ -0,0 +1,4 @@
++"""公开的生成方法源码检查。"""
++from attr.introspection import generated_sources
++
++__all__ = ['generated_sources']

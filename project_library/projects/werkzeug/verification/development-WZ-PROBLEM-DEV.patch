@@ -1,0 +1,67 @@
+--- a/library/development_tests/test_development_wz_problem_dev.py
++++ b/library/development_tests/test_development_wz_problem_dev.py
+@@ -0,0 +1,24 @@
++"""公开问题响应真实HTTP回归。"""
++import pytest
++from werkzeug.exceptions import BadRequest,MethodNotAllowed,TooManyRequests
++from werkzeug.wrappers import Response
++from werkzeug.problems import problem_response
++
++def test_standard_error_status_allow_and_utf8_detail_are_preserved():
++    result=problem_response(MethodNotAllowed(valid_methods=['GET','POST']),instance='/records')
++    assert result.status_code==405 and set(result.headers['Allow'].split(', '))=={'GET','POST'}
++    assert result.get_json()['instance']=='/records' and result.mimetype=='application/problem+json'
++
++def test_supplied_response_is_not_modified_and_duplicate_headers_survive():
++    original=Response('original',status=400,headers=[('Set-Cookie','a=1'),('Set-Cookie','b=2')]);error=BadRequest('中文错误',response=original)
++    result=problem_response(error)
++    assert original.get_data()==b'original' and original.mimetype=='text/plain'
++    assert result.headers.getlist('Set-Cookie')==['a=1','b=2'] and result.get_json()['detail']=='中文错误'
++
++def test_retry_after_and_content_length_match_actual_data():
++    result=problem_response(TooManyRequests(retry_after=30))
++    assert result.headers['Retry-After']=='30' and result.content_length==len(result.get_data())
++
++def test_reserved_extensions_and_nonfinite_json_are_rejected():
++    with pytest.raises(ValueError): problem_response(BadRequest(),extensions={'status':200})
++    with pytest.raises(ValueError): problem_response(BadRequest(),extensions={'value':float('nan')})
+--- a/library/docs/development-wz-problem-dev.md
++++ b/library/docs/development-wz-problem-dev.md
+@@ -0,0 +1,5 @@
++# 将HTTP领域异常转换为保留协议头的独立问题JSON响应
++
++真实HTTP异常输出独立问题JSON，保留Allow、认证、重试与重复Cookie等协议头。不能修改异常自带的原响应，扩展不能覆盖标准成员，输出类型和长度必须与实际正文一致。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/werkzeug/problems.py
++++ b/library/src/werkzeug/problems.py
+@@ -0,0 +1,29 @@
++"""以独立JSON响应表示原HTTP异常并保留协议头。"""
++import json
++from .exceptions import HTTPException
++from .wrappers import Response
++
++
++def problem_response(error,*,type='about:blank',instance=None,extensions=None):
++    """构建问题JSON响应。@param error 原HTTPException。@param type 问题类型字符串。
++    @param instance 可选资源标识。@param extensions 不覆盖标准成员的额外JSON映射。
++    @return 新Response，保留Allow、认证、重试等原协议头但不修改异常自带响应。
++    """
++    if not isinstance(error,HTTPException) or not isinstance(type,str):
++        raise TypeError('需要HTTP异常和问题类型文本')
++    original=error.get_response();status=original.status_code
++    if not 400<=status<=599 or (instance is not None and not isinstance(instance,str)):
++        raise ValueError('问题响应需要错误状态和文本实例')
++    data={'type':type,'title':error.name,'status':status,'detail':error.description}
++    if instance is not None:
++        data['instance']=instance
++    extra=dict(extensions or {})
++    if set(extra)&{'type','title','status','detail','instance'} or any(not isinstance(key,str) for key in extra):
++        raise ValueError('扩展不能覆盖问题标准成员')
++    data.update(extra)
++    encoded=json.dumps(data,ensure_ascii=False,allow_nan=False,separators=(',',':')).encode('utf-8')
++    representation={'content-type','content-length','content-encoding','content-range','transfer-encoding','etag','digest','content-md5'}
++    result=Response(encoded,status=status,headers=[(key,value) for key,value in original.headers if key.lower() not in representation])
++    result.content_type='application/problem+json'
++    result.content_length=len(encoded)
++    return result

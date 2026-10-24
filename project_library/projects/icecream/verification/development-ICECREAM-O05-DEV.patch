@@ -1,0 +1,88 @@
+--- a/library/docs/development-icecream-o05-dev.md
++++ b/library/docs/development-icecream-o05-dev.md
+@@ -0,0 +1,5 @@
++# 以标准日志级别门禁集成真实调试格式及用户来源
++
++对应路线15：标准Logger先门禁再执行真实IceCream格式，用用户调用帧建立LogRecord并释放帧引用；透传身份、原格式/开关保持，不另建日志服务。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/icecream/logging_adapter.py
++++ b/library/icecream/logging_adapter.py
+@@ -0,0 +1,37 @@
++"""标准logging适配，先检查级别再执行真实IceCream格式化。"""
++import inspect
++import logging
++from icecream import IceCreamDebugger
++
++
++class LoggingDebugger(IceCreamDebugger):
++    """保留ic透传值，以用户调用帧创建真实LogRecord。
++
++    :param logger: 已由应用配置的标准logging.Logger。
++    :param level: 整数日志级别。
++    :param kwargs: 原IceCreamDebugger格式配置，不创建日志handler或服务。
++    :return: 独立调试器。
++    """
++    def __init__(self, logger, level=logging.DEBUG, **kwargs):
++        """验证已有logger和level，沿用真实格式器。@return None。"""
++        if not isinstance(logger, logging.Logger) or isinstance(level, bool) or not isinstance(level, int):
++            raise TypeError('需要标准Logger和整数级别')
++        super().__init__(**kwargs)
++        self.logger, self.level = logger, level
++
++    def __call__(self, *args):
++        """只在级别及调试器都启用时取帧和格式化。@return 原None/单值/实参元组。"""
++        if self.enabled and self.logger.isEnabledFor(self.level):
++            current = inspect.currentframe()
++            try:
++                frame = current.f_back
++                message = self._format(frame, *args)
++                record = self.logger.makeRecord(self.logger.name, self.level,
++                    frame.f_code.co_filename, frame.f_lineno, message, (), None, func=frame.f_code.co_name)
++                self.logger.handle(record)
++            finally:
++                # 显式释放帧，避免调试集成延长用户局部业务对象生命周期。
++                del current
++                if 'frame' in locals():
++                    del frame
++        return None if not args else args[0] if len(args) == 1 else args
+--- a/library/tests/test_development_icecream_o05_dev.py
++++ b/library/tests/test_development_icecream_o05_dev.py
+@@ -0,0 +1,37 @@
++"""真实LogRecord保留用户来源，禁用级别不调用repr或格式器。"""
++import logging,inspect
++from pathlib import Path
++
++def test_real_logrecord_source_and_passthrough():
++    """文件、行号、函数名属于用户调用。@return None。"""
++    from icecream.logging_adapter import LoggingDebugger
++    records=[]
++    class Handler(logging.Handler):
++        """捕获实际标准日志记录。"""
++        def emit(self,record):records.append(record)
++    logger=logging.Logger('test',logging.DEBUG);logger.addHandler(Handler());debug=LoggingDebugger(logger,prefix='test|')
++    value=object();line=inspect.currentframe().f_lineno+1
++    assert debug(value) is value
++    assert records[0].lineno==line and records[0].funcName=='test_real_logrecord_source_and_passthrough' and Path(records[0].pathname)==Path(__file__)
++    assert records[0].getMessage().startswith('test|')
++
++def test_level_disabled_skips_all_formatting_and_same_values():
++    """被过滤日志不执行昂贵repr或prefix回调。@return None。"""
++    from icecream.logging_adapter import LoggingDebugger
++    class Bad:
++        """禁用日志不能触碰repr。"""
++        def __repr__(self):raise AssertionError('repr')
++    def badprefix():raise AssertionError('prefix')
++    debug=LoggingDebugger(logging.Logger('quiet',logging.ERROR),prefix=badprefix)
++    value=Bad();assert debug(value) is value and debug(1,2)==(1,2) and debug() is None
++
++def test_debugger_disabled_and_handler_failure_propagates():
++    """调试器独立关闭，handler错误沿原logging策略传播。@return None。"""
++    from icecream.logging_adapter import LoggingDebugger
++    import pytest
++    class Broken(logging.Handler):
++        """合成故障handler。"""
++        def emit(self,record):raise OSError('handler')
++    logger=logging.Logger('broken',logging.DEBUG);logger.addHandler(Broken());debug=LoggingDebugger(logger)
++    debug.disable();assert debug(9)==9;debug.enable()
++    with pytest.raises(OSError):debug(9)

@@ -1,0 +1,40 @@
+--- a/library/docs/development-webcolors-02-dev.md
++++ b/library/docs/development-webcolors-02-dev.md
+@@ -0,0 +1,5 @@
++# HTML旧式颜色解析保留非ASCII空白参与宽容算法
++
++路线02：旧式HTML颜色入口只移除规范限定的五种ASCII空白；NBSP、垂直制表与Unicode空白仍进入既有宽容算法。名称、短hex、透明关键字及严格simple入口行为各自保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/webcolors/_html5.py
++++ b/library/src/webcolors/_html5.py
+@@ -148,7 +148,7 @@
+         raise ValueError("HTML5 legacy color parsing forbids empty string as a value.")
+ 
+     # 3. Strip leading and trailing ASCII whitespace from input.
+-    value = value.strip()
++    value = value.strip(" \t\n\f\r")
+ 
+     # 4. If input is an ASCII case-insensitive match for the string "transparent", then
+     #    return an error.
+--- a/library/tests/test_development_webcolors_02_dev.py
++++ b/library/tests/test_development_webcolors_02_dev.py
+@@ -0,0 +1,18 @@
++"""旧式HTML颜色只移除规范中的五种ASCII空白。"""
++import unittest
++import webcolors
++
++
++def test_non_ascii_whitespace_remains_input_data():
++    """NBSP不允许被Python宽泛strip吞掉。@return None。"""
++    assert webcolors.html5_parse_legacy_color('\u00a0red\u00a0')==(0,237,0)
++    assert webcolors.html5_parse_legacy_color('red')==(255,0,0)
++
++
++def test_ascii_trim_and_strict_simple_are_separate():
++    """旧宽容入口的ASCII修剪不能污染严格simple入口。@return None。"""
++    for char in (' ','\t','\n','\r','\f'):
++        assert webcolors.html5_parse_legacy_color(char+'red'+char)==(255,0,0)
++    with unittest.TestCase().assertRaises(ValueError):webcolors.html5_parse_legacy_color(' transparent ')
++    with unittest.TestCase().assertRaises(ValueError):webcolors.html5_parse_simple_color(' #ff0000 ')
++    assert webcolors.html5_parse_legacy_color(' \t\n')==(0,0,0)

@@ -59,6 +59,242 @@
           "development_cycle": "bug"
         }
       ]
+    },
+    {
+      "id": "BX-PICKLE-DEV-SCENE",
+      "title": "在pickle恢复阶段保留配置子类和对象图",
+      "goal": "在pickle恢复阶段保留配置子类和对象图",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BX-PICKLE-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-PICKLE-DEV",
+          "kind": "modify",
+          "goal": "在pickle恢复阶段保留配置子类和对象图",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair trusted-local pickle roundtrips for Box subclasses: root, direct/deep mapping children and mappings inside BoxList must preserve their actual classes and configuration for protocols 2 through the highest supported protocol. Preserve values, existing shared references, custom instance state, default_box/conversion_box/frozen_box options and frozen mutation guards. Restore configuration before replaying items, do not rerun business __init__, globally register pickle hooks or change normal construction and YAML/JSON conversion. Ordinary Box and BoxList must retain frozen upstream behavior.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bx_pickle_dev.py and concise Chinese compatibility documentation at library/docs/development-bx-pickle-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BX-PICKLE-DEV-contract.md",
+            "materials/BX-PICKLE-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/box/box.py",
+            "library/box/box_list.py",
+            "library/test/test_development_bx_pickle_dev.py",
+            "library/docs/development-bx-pickle-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BX-PICKLE-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-PICKLE-DEV.native.json",
+            "public_native": "verification/BX-PICKLE-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BX-PICKLE-DEV-business.md"
+          ],
+          "development_cycle": "bug"
+        }
+      ]
+    },
+    {
+      "id": "BX-PATH-DEV-SCENE",
+      "title": "交付无歧义的分段配置路径读写删除",
+      "goal": "交付无歧义的分段配置路径读写删除",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BX-PATH-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-PATH-DEV",
+          "kind": "modify",
+          "goal": "交付无歧义的分段配置路径读写删除",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Box.get_path(path, default=NO_DEFAULT), set_path(path, value) and delete_path(path) for explicit nonempty str/int segment iterables. Distinguish integer and string keys, literal dots/brackets and list indices including negatives. Reads must not invoke box_dots parsing or create default nodes; writes require existing parents, preserve Box value conversion/recast and frozen guards, and do not create arbitrary intermediate containers. Support explicit default=None only for missing keys/indexes, propagate scalar/type errors and keep existing dotted APIs unchanged.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bx_path_dev.py and concise Chinese compatibility documentation at library/docs/development-bx-path-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BX-PATH-DEV-contract.md",
+            "materials/BX-PATH-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/box/box.py",
+            "library/test/test_development_bx_path_dev.py",
+            "library/docs/development-bx-path-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BX-PATH-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-PATH-DEV.native.json",
+            "public_native": "verification/BX-PATH-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BX-PATH-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BX-RENAME-DEV-SCENE",
+      "title": "在原位置原子重命名配置键并保持子对象",
+      "goal": "在原位置原子重命名配置键并保持子对象",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BX-RENAME-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-RENAME-DEV",
+          "kind": "modify",
+          "goal": "在原位置原子重命名配置键并保持子对象",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd mutating Box.rename_key(old, new) returning self. Rename a literal existing key at exactly its original insertion position, preserve value/sub-Box identity and configuration without recasting or reconversion, and update safe-attribute lookup. Reject missing old keys, existing targets, protected attributes, safe-alias collisions and frozen mutation before changing any data; old==new is an unchanged success for mutable boxes. Preserve integer keys and ordinary assignment semantics.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bx_rename_dev.py and concise Chinese compatibility documentation at library/docs/development-bx-rename-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BX-RENAME-DEV-contract.md",
+            "materials/BX-RENAME-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/box/box.py",
+            "library/test/test_development_bx_rename_dev.py",
+            "library/docs/development-bx-rename-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BX-RENAME-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-RENAME-DEV.native.json",
+            "public_native": "verification/BX-RENAME-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BX-RENAME-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BX-STRICT-CAST-DEV-SCENE",
+      "title": "为ConfigBox交付显式严格转换和缺值哨兵",
+      "goal": "为ConfigBox交付显式严格转换和缺值哨兵",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BX-STRICT-CAST-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-STRICT-CAST-DEV",
+          "kind": "modify",
+          "goal": "为ConfigBox交付显式严格转换和缺值哨兵",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd opt-in keyword-only strict=False to ConfigBox bool/int/float/list and numeric/boolean aliases. Preserve default loose casting, distinguish omitted defaults from explicit default=None, and do not confuse an existing empty value with missing. Strict booleans accept bool, integer 0/1 and explicit true/false/yes/no/on/off/1/0 tokens; strict integers reject bool and truncating non-string numeric conversions; strict floats reject bool, NaN and Infinity. Strict lists accept string splitting or existing list/tuple values, apply mod once per item and report safe item positions on failure. Redact input values from strict conversion messages while retaining causes.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bx_strict_cast_dev.py and concise Chinese compatibility documentation at library/docs/development-bx-strict-cast-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BX-STRICT-CAST-DEV-contract.md",
+            "materials/BX-STRICT-CAST-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/box/config_box.py",
+            "library/test/test_development_bx_strict_cast_dev.py",
+            "library/docs/development-bx-strict-cast-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BX-STRICT-CAST-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-STRICT-CAST-DEV.native.json",
+            "public_native": "verification/BX-STRICT-CAST-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BX-STRICT-CAST-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "BX-JSONL-DEV-SCENE",
+      "title": "逐条惰性编码和写入真实JSONL业务记录",
+      "goal": "逐条惰性编码和写入真实JSONL业务记录",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "BX-JSONL-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "BX-JSONL-DEV",
+          "kind": "modify",
+          "goal": "逐条惰性编码和写入真实JSONL业务记录",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd BoxList.iter_jsonl_records(records, **json_kwargs), iter_jsonl(**json_kwargs) and write_jsonl(destination, *, encoding=\"utf-8\", **json_kwargs). Encode one record at a time with standard JSON semantics and one trailing newline, preserve Unicode/options and nested Box values, and never materialize the complete input before yielding. Reject multiline indentation, report a safe one-based record number for encoding failures, support empty input and early generator close. Write to paths or caller-owned text streams without closing caller streams; preserve existing JSON/JSONL import behavior and state that write failures may leave a written prefix.\n\nDeliver meaningful original-failing public regression tests at library/test/test_development_bx_jsonl_dev.py and concise Chinese compatibility documentation at library/docs/development-bx-jsonl-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/BX-JSONL-DEV-contract.md",
+            "materials/BX-JSONL-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/box/box_list.py",
+            "library/test/test_development_bx_jsonl_dev.py",
+            "library/docs/development-bx-jsonl-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/BX-JSONL-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/BX-JSONL-DEV.native.json",
+            "public_native": "verification/BX-JSONL-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/BX-JSONL-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
     }
   ]
 }

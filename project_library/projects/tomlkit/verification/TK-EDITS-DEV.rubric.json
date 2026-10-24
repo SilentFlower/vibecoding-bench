@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TK-EDITS-DEV",
+  "source_commit": "eddd27e43a62fe58707c311bfad2f52e72493f53",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement tomlkit.editing.apply_edits(document,operations), materializing a finite ordered sequence of set/delete/test records on a detached deep copy. Paths are nonempty sequences of literal string keys and nonnegative integer array indices, never dotted-string parsing. Set may explicitly create missing mapping parents, not arrays; array indices must exist. Test compares unwrapped value and exact Python type before continuing. A late invalid operation, path error or failed test must leave original text and objects unchanged. Preserve unaffected formatting/comments, serialize and reparse final candidate. Do not modify parser internals or promise file-system transactions.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

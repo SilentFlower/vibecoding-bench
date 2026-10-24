@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "MS-CLI-AST-DEV",
+  "source_commit": "4bbaa04c391d650a2e1219781c9a9acd60571cce",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Support existing CLI --renderer ast by serializing the actual list of token dictionaries as UTF8 JSON on stdout or --output. Preserve input priority, explicit/piped empty documents as [], source Unicode, nested token attributes and configured plugins; do not stringify Python repr or wrap JSON in HTML. Existing html/markdown/rst/version behavior and file/stdout side effects stay compatible. Use the completed empty-document fix as prerequisite; errors still yield a nonzero process status.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

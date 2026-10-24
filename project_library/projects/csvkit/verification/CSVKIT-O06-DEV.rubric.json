@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSVKIT-O06-DEV",
+  "source_commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add csvkit.utilities.csvfind.find_columns and actual CSVFind utility/module entry using CSVKitUtility and native FilteringCSVReader predicates. Accept exact --value (including empty) or explicit --regex, selected columns and nonnegative bounded --sample-size; scan logical records once and report every selected column by zero-based index/name/count plus bounded 1-based logical data-row samples. Duplicate column names remain distinct. JSON schema=1 reports rows and columns; CSV output respects --zero only for displayed column indexes. Preserve cells, handle short rows as native empty missing fields, empty inputs, no matches and generator errors; never rescan per column or silently drop matches beyond sample budget.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

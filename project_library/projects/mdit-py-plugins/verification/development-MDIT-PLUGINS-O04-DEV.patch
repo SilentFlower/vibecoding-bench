@@ -1,0 +1,83 @@
+--- a/library/docs/development-mdit-plugins-o04-dev.md
++++ b/library/docs/development-mdit-plugins-o04-dev.md
+@@ -0,0 +1,5 @@
++# 提供兼容默认输出的显式GFM任务空白与真实checkbox模式
++
++对应路线08：显式gfm_whitespace=True时checkbox与起始规则使用同一GFM空白集合，tab等真实任务得到正确input；严格布尔参数，默认False保留全部原输出及普通空格行为。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/mdit_py_plugins/tasklists/__init__.py
++++ b/library/mdit_py_plugins/tasklists/__init__.py
+@@ -35,6 +35,7 @@
+     enabled: bool = False,
+     label: bool = False,
+     label_after: bool = False,
++    gfm_whitespace: bool = False,
+ ) -> None:
+     """Plugin for building task/todo lists out of markdown lists with items starting with [ ] or [x]
+     .. Nothing else
+@@ -49,7 +50,10 @@
+     :param enabled: True enables the rendered checkboxes
+     :param label: True wraps the rendered list items in a <label> element for UX purposes,
+     :param label_after: True adds the <label> element after the checkbox.
++    :param gfm_whitespace: 显式启用全部GFM分隔空白的checkbox输出，False保留既有字节。
+     """
++    if type(gfm_whitespace) is not bool:
++        raise TypeError("gfm_whitespace必须为布尔值")
+     disable_checkboxes = not enabled
+     use_label_wrapper = label
+     use_label_after = label_after
+@@ -107,12 +111,14 @@
+     def make_checkbox(token: Token) -> Token:
+         checkbox = Token("html_inline", "", 0)
+         disabled_attr = 'disabled="disabled"' if disable_checkboxes else ""
+-        if token.content.startswith("[ ] "):
++        # 默认保留既有输出；显式模式才统一起始识别与checkbox的全部GFM空白。
++        marker = re.match(rf"\[([ xX])]{_GFM_WHITESPACE_RE}+" if gfm_whitespace else r"\[([ xX])] ", token.content)
++        if marker is not None and marker.group(1) == " ":
+             checkbox.content = (
+                 '<input class="task-list-item-checkbox" '
+                 f'{disabled_attr} type="checkbox">'
+             )
+-        elif token.content.startswith("[x] ") or token.content.startswith("[X] "):
++        elif marker is not None and marker.group(1) in ("x", "X"):
+             checkbox.content = (
+                 '<input class="task-list-item-checkbox" checked="checked" '
+                 f'{disabled_attr} type="checkbox">'
+--- a/library/tests/test_development_mdit_plugins_o04_dev.py
++++ b/library/tests/test_development_mdit_plugins_o04_dev.py
+@@ -0,0 +1,34 @@
++"""显式GFM模式生成真实checkbox，默认输出严格兼容。"""
++from markdown_it import MarkdownIt
++from mdit_py_plugins.tasklists import tasklists_plugin
++import pytest
++
++def test_tab_and_formfeed_delimiters_produce_checkbox():
++    """tab/formfeed等已认可分隔符不能仅留下task class。@return None。"""
++    for separator in ['\t','\v','\f','  ']:
++        for mark,checked in [(' ',False),('x',True),('X',True)]:
++            html=MarkdownIt().use(tasklists_plugin,gfm_whitespace=True).render('- ['+mark+']'+separator+'done')
++            assert html.count('type="checkbox"')==1 and ('checked="checked"' in html)==checked
++            assert 'done' in html and '['+mark+']' not in html
++
++def test_enabled_and_label_modes_use_same_matching_result():
++    """可交互与包裹label模式共享状态识别而不改变既有默认字节。@return None。"""
++    for options in [dict(enabled=True),dict(label=True),dict(label=True,label_after=True)]:
++        html=MarkdownIt().use(tasklists_plugin,gfm_whitespace=True,**options).render('- [X]\tdone')
++        assert 'type="checkbox"' in html and 'checked="checked"' in html
++        assert ('disabled="disabled"' not in html)==bool(options.get('enabled'))
++
++def test_no_separator_non_gfm_space_and_plain_list_are_not_tasks():
++    """不扩大成无分隔标记或Unicode不可承诺空白。@return None。"""
++    for text in ['- [x]text','- [ ]\u00a0text','- plain']:
++        html=MarkdownIt().use(tasklists_plugin,gfm_whitespace=True).render(text)
++        assert 'type="checkbox"' not in html and 'task-list-item"' not in html
++    assert 'type="checkbox"' not in MarkdownIt().use(tasklists_plugin).render('- [x]\tdone')
++    assert 'type="checkbox"' in MarkdownIt().use(tasklists_plugin).render('- [x] done')
++    legacy=MarkdownIt('commonmark').use(tasklists_plugin);legacy.options['xhtmlOut']=False
++    for separator in ['\t','\f']:
++        text='+ [x]'+separator+'item 1\n+ [ ]'+separator+separator+'item 2\n'
++        expected='<ul class="contains-task-list">\n<li class="task-list-item">'+separator+'item 1</li>\n<li class="task-list-item">'+separator+separator+'item 2</li>\n</ul>\n'
++        assert legacy.render(text)==expected
++    for invalid in [None,'yes',1]:
++        with pytest.raises(TypeError):MarkdownIt().use(tasklists_plugin,gfm_whitespace=invalid)

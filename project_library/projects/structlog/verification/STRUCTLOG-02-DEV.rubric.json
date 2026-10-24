@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "STRUCTLOG-02-DEV",
+  "source_commit": "19c4f21059e853114efa7a93b6e675d93bf7934e",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Extend UnicodeDecoder with opt-in recursive=False/max_depth=32. Recursive mode builds new built-in dict/list/tuple containers, decodes bytes values using configured encoding/errors, leaves keys and opaque objects untouched. Preserve container types, reject active-path cycles with path diagnostics (shared DAG is legal), enforce finite depth. Default shallow in-place behavior stays unchanged. No arbitrary object getter/deepcopy or claim to preserve alias identity of copied shared subtrees.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

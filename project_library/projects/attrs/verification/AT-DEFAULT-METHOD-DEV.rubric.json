@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "AT-DEFAULT-METHOD-DEV",
+  "source_commit": "ee66e7274852438cc23d4240a1a9cd632fda8b52",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Factory.from_method(method_name) as an explicit opt-in default factory. Resolve the current instance class MRO at initialization and call the winning bound instance method, allowing subclasses to override it. Validate a nonempty identifier name; reject staticmethod/classmethod/property or unbound/nonmethod values without executing them. Propagate missing methods and method exceptions. Preserve ordinary Factory callable binding, takes_self behavior, explicit supplied field values and default decorators. Do not make arbitrary generated factory closures pickleable.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

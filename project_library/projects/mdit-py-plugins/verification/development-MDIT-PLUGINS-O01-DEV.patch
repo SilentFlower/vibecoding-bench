@@ -1,0 +1,72 @@
+--- a/library/docs/development-mdit-plugins-o01-dev.md
++++ b/library/docs/development-mdit-plugins-o01-dev.md
+@@ -0,0 +1,5 @@
++# 让文本span真正执行调用方属性白名单
++
++对应路线05：span接入真实_add_attrs过滤，允许项进入Token/HTML，拒绝项保留insecure_attrs；None与空名单区分，嵌套与既有元素策略保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/mdit_py_plugins/attrs/index.py
++++ b/library/mdit_py_plugins/attrs/index.py
+@@ -59,7 +59,7 @@
+     """
+ 
+     if spans:
+-        md.inline.ruler.after(span_after, "span", _span_rule)
++        md.inline.ruler.after(span_after, "span", partial(_span_rule, allowed=None if allowed is None else set(allowed)))
+     if after:
+         md.inline.ruler.push(
+             "attr",
+@@ -115,7 +115,7 @@
+     return None
+ 
+ 
+-def _span_rule(state: StateInline, silent: bool) -> bool:
++def _span_rule(state: StateInline, silent: bool, *, allowed: set[str] | None = None) -> bool:
+     if state.src[state.pos] != "[":
+         return False
+ 
+@@ -144,7 +144,8 @@
+         state.pos = labelStart
+         state.posMax = labelEnd
+         token = state.push("span_open", "span", 1)
+-        token.attrs = attrs  # type: ignore[assignment]
++        # span必须使用与链接/图片一致的白名单策略，不能绕过调用方授权。
++        _add_attrs(token, attrs, allowed)
+         state.md.inline.tokenize(state)
+         token = state.push("span_close", "span", -1)
+ 
+--- a/library/tests/test_development_mdit_plugins_o01_dev.py
++++ b/library/tests/test_development_mdit_plugins_o01_dev.py
+@@ -0,0 +1,31 @@
++"""span本身不能绕过真实Token属性白名单。"""
++from markdown_it import MarkdownIt
++from mdit_py_plugins.attrs import attrs_plugin
++
++def spans(md,text):
++    """取实际解析后的span开放Token。@return Token列表。"""
++    return [child for token in md.parse(text) for child in (token.children or []) if child.type=='span_open']
++
++def test_allowed_attribute_and_rejected_metadata_are_both_real():
++    """允许class进入HTML，拒绝onclick保留在诊断meta。@return None。"""
++    md=MarkdownIt().use(attrs_plugin,spans=True,allowed=['class'])
++    token=spans(md,'[word]{.ok onclick=synthetic #hidden}')[0]
++    assert token.attrs=={'class':'ok'}
++    assert token.meta['insecure_attrs']=={'onclick':'synthetic','id':'hidden'}
++    assert 'onclick=' not in md.render('[word]{.ok onclick=synthetic}')
++
++def test_empty_allowlist_and_none_keep_their_distinct_contracts():
++    """空白名单移除全部，None保留既有开放模式。@return None。"""
++    text='[word]{#id .a data-x="quoted value"}'
++    denied=spans(MarkdownIt().use(attrs_plugin,spans=True,allowed=[]),text)[0]
++    opened=spans(MarkdownIt().use(attrs_plugin,spans=True),text)[0]
++    assert denied.attrs=={} and denied.meta['insecure_attrs']['data-x']=='quoted value'
++    assert opened.attrs=={'id':'id','class':'a','data-x':'quoted value'}
++
++def test_nested_spans_and_other_supported_elements_keep_policy():
++    """嵌套span和已有图片/代码过滤均不被新路径破坏。@return None。"""
++    md=MarkdownIt().use(attrs_plugin,spans=True,allowed=['class'])
++    tokens=spans(md,'[outer [inner]{.inside onclick=bad}]{.outside data-x=bad}')
++    assert len(tokens)==2 and all(set(token.attrs)<= {'class'} for token in tokens)
++    html=md.render('`code`{.ok onclick=bad} ![pic](x){.ok onclick=bad}')
++    assert 'onclick=' not in html and html.count('class="ok"')==2

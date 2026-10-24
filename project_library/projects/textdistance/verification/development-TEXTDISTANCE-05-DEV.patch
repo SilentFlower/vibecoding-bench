@@ -1,0 +1,59 @@
+--- a/library/docs/development-textdistance-05-dev.md
++++ b/library/docs/development-textdistance-05-dev.md
+@@ -0,0 +1,5 @@
++# 近似匹配阈值查询只计算必要带宽并返回明确超限状态
++
++路线06：阈值查询使用长度差下界和稀疏带状动态规划，阈内返回精确距离、阈外明确None，不将哨兵当真实分数。支持原单位准备和自定义谓词，严格整数阈值；独立验收核实际比较次数避免伪剪枝。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/tests/test_development_textdistance_05_dev.py
++++ b/library/tests/test_development_textdistance_05_dev.py
+@@ -0,0 +1,23 @@
++"""阈内精确、阈外None，用户无需分配完整长矩阵。"""
++import unittest
++from textdistance.bounded import bounded_levenshtein
++
++
++def test_exact_boundary_zero_and_units():
++    """恰好阈值保留，长度差下界及词单元正确。@return None。"""
++    assert bounded_levenshtein('kitten','sitting',3)==3
++    assert bounded_levenshtein('kitten','sitting',2) is None
++    assert bounded_levenshtein('same','same',0)==0
++    assert bounded_levenshtein('a','b',0) is None
++    assert bounded_levenshtein('one two','one three',1,qval=None)==1
++    assert bounded_levenshtein('A','a',0,test_func=lambda a,b:a.casefold()==b.casefold())==0
++
++
++def test_length_gate_and_invalid_threshold():
++    """长度差无需调用相等谓词；坏阈值不能被当数字。@return None。"""
++    def forbidden(a,b):
++        """下界已拒绝时不应比较。@param a 单元。@param b 单元。@return 不返回。"""
++        raise AssertionError('不应执行')
++    assert bounded_levenshtein('x'*100000,'',1,test_func=forbidden) is None
++    for cutoff in (-1,True,0.5):
++        with unittest.TestCase().assertRaises(ValueError):bounded_levenshtein('a','b',cutoff)
+--- a/library/textdistance/bounded.py
++++ b/library/textdistance/bounded.py
+@@ -0,0 +1,22 @@
++"""带阈值的纯Python单位Levenshtein，不把截断哨兵冒充真实距离。"""
++from .algorithms.edit_based import Levenshtein
++
++
++def bounded_levenshtein(left,right,cutoff,qval=1,test_func=None):
++    """仅在距离不超过cutoff时返回精确值。@param left 源。@param right 目标。@param cutoff 非负整数。@param qval 单位。@param test_func 谓词。@return 精确整数或None表示超过阈值。"""
++    if type(cutoff) is not int or cutoff<0:raise ValueError('阈值必须是非负整数')
++    algorithm=Levenshtein(qval=qval,test_func=test_func,external=False)
++    left,right=algorithm._get_sequences(left,right)
++    if abs(len(left)-len(right))>cutoff:return None
++    # 带外距离必然大于cutoff，稀疏行避免分配完整矩阵。
++    infinity=cutoff+1
++    previous={index:index for index in range(min(len(right),cutoff)+1)}
++    for row,source in enumerate(left,1):
++        current={}
++        for column in range(max(0,row-cutoff),min(len(right),row+cutoff)+1):
++            if column==0:current[0]=row;continue
++            current[column]=min(previous.get(column,infinity)+1,current.get(column-1,infinity)+1,previous.get(column-1,infinity)+(not algorithm.test_func(source,right[column-1])))
++        if not current or min(current.values())>cutoff:return None
++        previous=current
++    result=previous.get(len(right),infinity)
++    return result if result<=cutoff else None

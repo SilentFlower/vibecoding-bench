@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "NATSORT-01-DEV",
+  "source_commit": "e9a3a2a307580a1f2be8c57bba50fba45789ada0",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Repair the actual Natsort CLI numeric filtering: default int/i mode must preserve arbitrary-size integer tokens and exact decimal thresholds through argument parsing, inclusive range/reverse-range and exclusion comparisons. Do not round thresholds or tokens to float; fractional boundaries compare without truncation. Float/f/real/r retain existing float semantics. Invalid or nonfinite integer thresholds fail clearly. Preserve sorting, sign/exponent policy, Unicode token recognition and ordinary CLI behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

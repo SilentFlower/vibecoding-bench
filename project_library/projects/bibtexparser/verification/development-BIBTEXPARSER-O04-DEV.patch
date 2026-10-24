@@ -1,0 +1,114 @@
+--- a/library/bibtexparser/keywords.py
++++ b/library/bibtexparser/keywords.py
+@@ -0,0 +1,73 @@
++"""保护花括号和转义的关键词双向中间件。"""
++from bibtexparser.middlewares.middleware import BlockMiddleware
++
++
++def _split(value, delimiter, keep_empty):
++    """按括号深度拆分。@param value 文本。@param delimiter 分隔符。@param keep_empty 保留空项。@return 列表。"""
++    result, buffer, depth, escaped = [], [], 0, False
++    for character in value:
++        if escaped:
++            buffer.append(character)
++            escaped = False
++            continue
++        if character == '\\':
++            buffer.append(character)
++            escaped = True
++            continue
++        if character == '{':
++            depth += 1
++        elif character == '}':
++            depth -= 1
++            if depth < 0:
++                raise ValueError('关键词括号不平衡')
++        if character == delimiter and depth == 0:
++            item = ''.join(buffer).strip()
++            if item or keep_empty:
++                result.append(item)
++            buffer = []
++        else:
++            buffer.append(character)
++    if depth != 0:
++        raise ValueError('关键词括号不平衡')
++    item = ''.join(buffer).strip()
++    if item or keep_empty:
++        result.append(item)
++    return result
++
++
++class SplitKeywords(BlockMiddleware):
++    """显式拆分keywords，保留保护括号和反斜杠。
++
++    :param delimiter: 单字符分隔符。
++    :param keep_empty: 是否保留空项。
++    """
++    def __init__(self, *, delimiter=',', keep_empty=False):
++        """保存分隔政策。参数见类说明。@return None。"""
++        super().__init__(allow_inplace_modification=False)
++        if not isinstance(delimiter, str) or len(delimiter) != 1 or delimiter in '{}\\':
++            raise ValueError('关键词分隔符无效')
++        self.delimiter, self.keep_empty = delimiter, keep_empty
++
++    def transform_entry(self, entry, library):
++        """转换真实keywords字段。@param entry 条目。@param library 文献库。@return 条目。"""
++        field = entry.get('keywords')
++        if field is not None:
++            if not isinstance(field.value, str):
++                raise TypeError('拆分前keywords必须为字符串')
++            field.value = _split(field.value, self.delimiter, self.keep_empty)
++        return entry
++
++
++class MergeKeywords(SplitKeywords):
++    """把关键词列表写回可逆的受保护字符串。"""
++    def transform_entry(self, entry, library):
++        """合并真实列表，必要时保护含分隔符的项。@param entry 条目。@param library 文献库。@return 条目。"""
++        field = entry.get('keywords')
++        if field is not None:
++            if not isinstance(field.value, list) or any(not isinstance(value, str) for value in field.value):
++                raise TypeError('合并前keywords必须为字符串列表')
++            parts = []
++            for value in field.value:
++                parts.append('{' + value + '}' if len(_split(value, self.delimiter, True)) > 1 else value)
++            field.value = self.delimiter.join(parts)
++        return entry
+--- a/library/docs/development-bibtexparser-o04-dev.md
++++ b/library/docs/development-bibtexparser-o04-dev.md
+@@ -0,0 +1,5 @@
++# 双向处理保护括号与转义的书目关键词
++
++关键词按顶层分隔符拆分，保护嵌套花括号与反斜杠转义，可明确保留空项。合并真实列表时必要保护包含分隔符的词，保留顺序和重复词；坏括号拒绝，原Library及作者解析不变。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_bibtexparser_o04_dev.py
++++ b/library/tests/test_development_bibtexparser_o04_dev.py
+@@ -0,0 +1,27 @@
++"""关键词拆分与合并基于实际Field，不复用作者and规则。"""
++from bibtexparser import Library
++from bibtexparser.model import Entry, Field
++
++def test_nested_and_escaped_delimiters():
++    """括号和转义保护的逗号不是分隔点。@return None。"""
++    from bibtexparser.keywords import SplitKeywords
++    source = Library([Entry('article', 'x', [Field('keywords', r'alpha,{beta,{gamma,delta}},escaped\,comma')])])
++    result = SplitKeywords().transform(source)
++    assert result.entries[0]['keywords'] == ['alpha', '{beta,{gamma,delta}}', r'escaped\,comma']
++    assert isinstance(source.entries[0]['keywords'], str)
++
++def test_merge_roundtrip_and_empty_policy():
++    """正常双向往返和空项政策可检验。@return None。"""
++    from bibtexparser.keywords import SplitKeywords, MergeKeywords
++    source = Library([Entry('article', 'x', [Field('keywords', 'a,,{b,c},')])])
++    split = SplitKeywords(keep_empty=True).transform(source)
++    assert split.entries[0]['keywords'] == ['a', '', '{b,c}', '']
++    assert MergeKeywords().transform(split).entries[0]['keywords'] == 'a,,{b,c},'
++
++def test_unbalanced_rejected():
++    """不平衡括号拒绝且原对象不变。@return None。"""
++    import pytest
++    from bibtexparser.keywords import SplitKeywords
++    source = Library([Entry('article', 'x', [Field('keywords', 'a,{b,c')])])
++    with pytest.raises(ValueError): SplitKeywords().transform(source)
++    assert source.entries[0]['keywords'] == 'a,{b,c'

@@ -1,0 +1,69 @@
+--- a/library/development_tests/test_development_dp_transform_dev.py
++++ b/library/development_tests/test_development_dp_transform_dev.py
+@@ -0,0 +1,32 @@
++"""公开嵌套配置叶子转换回归。"""
++from copy import deepcopy
++import pytest
++from dpath.transforming import transform_existing
++
++def test_selected_typed_paths_are_transformed_without_mutating_input():
++    root={1:{'*':2},'1':{'*':3}}
++    result=transform_existing(root,lambda path,value:value*10,predicate=lambda path,value:path[0]==1)
++    assert result=={1:{'*':20},'1':{'*':3}} and root=={1:{'*':2},'1':{'*':3}}
++
++def test_new_containers_are_not_visited_again():
++    seen=[]
++    def transform(path,value):
++        seen.append(path)
++        return {'new':value}
++    result=transform_existing({'a':1},transform)
++    assert result=={'a':{'new':1}} and seen==[('a',)]
++
++def test_late_failure_leaves_original_and_callback_values_detached():
++    root={'a':bytearray(b'old'),'b':2};before=deepcopy(root)
++    def transform(path,value):
++        if path==('a',):
++            value.extend(b'changed')
++            return value
++        raise LookupError('synthetic')
++    with pytest.raises(LookupError):
++        transform_existing(root,transform)
++    assert root==before
++
++def test_empty_root_and_empty_nested_containers_can_be_replaced():
++    assert transform_existing({},lambda path,value:['root'])==['root']
++    assert transform_existing({'a':[]},lambda path,value:'empty')=={'a':'empty'}
+--- a/library/docs/development-dp-transform-dev.md
++++ b/library/docs/development-dp-transform-dev.md
+@@ -0,0 +1,5 @@
++# 按类型化路径转换原有配置叶子并隔离原对象
++
++数据清理按原快照叶子和类型化路径转换，回调拿到独立值，新生成的内容不再次递归处理。任意后项或循环错误都不修改原配置，根叶子可整体替换，筛选及转换顺序明确。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/dpath/transforming.py
++++ b/library/dpath/transforming.py
+@@ -0,0 +1,23 @@
++"""只转换原快照中的现有叶子，不把新生成内容再次递归处理。"""
++from copy import deepcopy
++from .exact import get_exact
++from .walking import walk_paths
++
++
++def transform_existing(root,transform,*,predicate=None):
++    """在独立副本转换现有节点。@param root 原配置。@param transform (path,value)转换器。
++    @param predicate 可选(path,value)筛选器。@return 新配置；异常不修改原对象。
++    """
++    if not callable(transform) or predicate is not None and not callable(predicate):
++        raise TypeError('转换器及筛选器必须可调用')
++    working=deepcopy(root)
++    for path,value in walk_paths(root):
++        if predicate is not None and not predicate(path,deepcopy(value)):
++            continue
++        replacement=transform(path,deepcopy(value))
++        if not path:
++            working=replacement
++        else:
++            parent=get_exact(working,path[:-1])
++            parent[path[-1]]=replacement
++    return working

@@ -1,0 +1,94 @@
+--- a/library/docs/development-funcy-o05-dev.md
++++ b/library/docs/development-funcy-o05-dev.md
+@@ -0,0 +1,5 @@
++# 按真实业务键稳定关联两份记录且保留全部重复组合
++
++对应路线16：真实业务键关系连接保留重复键笛卡尔组合和稳定未匹配顺序，右侧一次物化左侧惰性，None存在性明确，不混淆原集合join。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/funcy/relations.py
++++ b/library/funcy/relations.py
+@@ -0,0 +1,52 @@
++"""以真实键选择器稳定连接两份业务记录，不覆盖重复键。"""
++from dataclasses import dataclass
++from operator import itemgetter
++from funcy.funcmakers import make_func
++
++
++@dataclass(frozen=True)
++class JoinPair:
++    """保留两侧原记录身份和显式存在性，None可为合法业务记录。"""
++    left: object
++    right: object
++    left_present: bool
++    right_present: bool
++
++
++def join_by(left, right, left_key, right_key=None, *, how='inner'):
++    """物化右侧一次，左侧惰性输出一对多匹配。
++
++    :param left: 左记录迭代器。
++    :param right: 右记录迭代器，会为索引完整物化。
++    :param left_key: 文本字段名、索引或Funcy可调用选择器。
++    :param right_key: 右侧键选择器，None表示复用左侧。
++    :param how: inner、left或full；未匹配右侧最后按原顺序输出。
++    :return: JoinPair迭代器，不合并或改写字段，不丢弃重复键。
++    """
++    if how not in ('inner', 'left', 'full'):
++        raise ValueError('未知关系连接政策')
++    def selector(value):
++        return itemgetter(value) if isinstance(value, str) else make_func(value)
++    lkey = selector(left_key)
++    rkey = selector(left_key if right_key is None else right_key)
++    records, index = [], {}
++    for position, row in enumerate(right):
++        key = rkey(row)
++        hash(key)
++        records.append(row)
++        index.setdefault(key, []).append(position)
++    matched = set()
++    for row in left:
++        key = lkey(row)
++        hash(key)
++        matches = index.get(key, ())
++        if matches:
++            for position in matches:
++                matched.add(position)
++                yield JoinPair(row, records[position], True, True)
++        elif how in ('left', 'full'):
++            yield JoinPair(row, None, True, False)
++    if how == 'full':
++        for position, row in enumerate(records):
++            if position not in matched:
++                yield JoinPair(None, row, False, True)
+--- a/library/tests/test_development_funcy_o05_dev.py
++++ b/library/tests/test_development_funcy_o05_dev.py
+@@ -0,0 +1,28 @@
++"""关系连接保留所有重复键组合及未匹配身份。"""
++import pytest
++
++def test_duplicate_keys_cartesian_match_and_stable_full_order():
++    """重复SKU不覆盖，full保留左右未匹配行。@return None。"""
++    from funcy.relations import join_by
++    left=[{'sku':'a','n':1},{'sku':'a','n':2},{'sku':'missing'}];right=[{'sku':'a','p':3},{'sku':'a','p':4},{'sku':'other'}]
++    rows=list(join_by(left,right,'sku',how='full'))
++    assert [(r.left.get('n'),r.right.get('p')) for r in rows[:4]]==[(1,3),(1,4),(2,3),(2,4)]
++    assert rows[4].left_present and not rows[4].right_present and not rows[5].left_present and rows[5].right['sku']=='other'
++
++def test_left_laziness_none_key_and_record_presence():
++    """右侧索引完成后左侧按需消费，合法None不等于缺项。@return None。"""
++    from funcy.relations import join_by
++    touched=[]
++    def left():
++        for value in [None,2]:touched.append(value);yield value
++    rows=join_by(left(),[None],lambda row:row,how='left');assert touched==[]
++    first=next(rows);assert first.left is None and first.right is None and first.left_present and first.right_present and touched==[None]
++    assert next(rows).right_present is False
++
++def test_empty_keys_indices_and_source_failures():
++    """索引选择器复用Funcy协议，不可hash键明确失败。@return None。"""
++    from funcy.relations import join_by
++    assert list(join_by([],[],0))==[]
++    assert list(join_by([(1,'x')],[(1,'y')],0))[0].right==(1,'y')
++    with pytest.raises(TypeError):list(join_by([{'k':[]}],[],'k'))
++    with pytest.raises(ValueError):list(join_by([],[],0,how='guess'))

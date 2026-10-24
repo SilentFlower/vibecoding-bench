@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CSSSELECT-O03-DEV",
+  "source_commit": "3069b6da75e1adf27939ca541dcc9fb9b961abc6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement cssselect.cache.SelectorCache(capacity=128) with translate(css, *, mode=\"xml\", xhtml=False, prefix=...), stats(), clear(reset_stats=False). Cache actual builtin XML/HTML translation by complete CSS and every supported mode/XHTML/prefix field; no arbitrary custom translator sharing without fingerprint. Enforce positive non-bool capacity, true access-order LRU, isolated instances, fresh stats and lock-protected consistent concurrent access. Count failures as misses but never cache them. Preserve native parse/translation exceptions, old uncached APIs, and explicit clear/stat-reset semantics.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

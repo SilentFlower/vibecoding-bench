@@ -1,0 +1,83 @@
+--- a/library/chardet/universaldetector.py
++++ b/library/chardet/universaldetector.py
+@@ -141,6 +141,8 @@
+         self.result = {"encoding": None, "confidence": 0.0, "language": None}
+         self.done = False
+         self._got_data = False
++        self._bom_buffer = bytearray()
++        self._bom_finalizing = False
+         self._has_win_bytes = False
+         self._input_state = InputState.PURE_ASCII
+         self._last_char = b""
+@@ -173,6 +175,17 @@
+ 
+         if not isinstance(byte_str, bytearray):
+             byte_str = bytearray(byte_str)
++
++        if not self._got_data:
++            pending = self._bom_buffer + byte_str
++            boms = (codecs.BOM_UTF8, codecs.BOM_UTF32_LE, codecs.BOM_UTF32_BE,
++                b"\xFE\xFF\x00\x00", b"\x00\x00\xFF\xFE", codecs.BOM_LE, codecs.BOM_BE)
++            # 只缓存尚可能匹配完整BOM的最多三字节，确定不匹配后立即交原探测器。
++            if not self._bom_finalizing and any(len(pending) < len(bom) and bom.startswith(pending) for bom in boms):
++                self._bom_buffer = pending
++                return
++            self._bom_buffer = bytearray()
++            byte_str = pending
+ 
+         # First check for known BOMs, since these are guaranteed to be correct
+         if not self._got_data:
+@@ -290,6 +303,14 @@
+         :returns:  The ``result`` attribute, a ``dict`` with the keys
+                    `encoding`, `confidence`, and `language`.
+         """
++        if not self.done and self._bom_buffer:
++            pending = self._bom_buffer
++            self._bom_buffer = bytearray()
++            self._bom_finalizing = True
++            try:
++                self.feed(pending)
++            finally:
++                self._bom_finalizing = False
+         # Don't bother with checks if we're already done
+         if self.done:
+             return self.result
+--- a/library/docs/development-chardet-o01-dev.md
++++ b/library/docs/development-chardet-o01-dev.md
+@@ -0,0 +1,5 @@
++# 让分块BOM识别与整份输入一致且不丢前缀
++
++初始仅缓存尚可能属于BOM的最多三字节，正确区分UTF16/32共享前缀及特殊UCS4。任意分块、空块、近似前缀、EOF残片和reset均不丢不重字节，普通文本立即探测；原标签及探测器保持。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tests/test_development_chardet_o01_dev.py
++++ b/library/tests/test_development_chardet_o01_dev.py
+@@ -0,0 +1,28 @@
++"""任意初始分块必须与整份BOM识别一致。"""
++import codecs
++from chardet import UniversalDetector, detect
++
++def test_utf_boms_one_byte_chunks():
++    """UTF8/16/32的一字节feed保留完整BOM身份。@return None。"""
++    samples = [codecs.BOM_UTF8 + '中文'.encode('utf-8'), codecs.BOM_UTF16_LE + 'ab'.encode('utf-16-le'), codecs.BOM_UTF16_BE + 'ab'.encode('utf-16-be'), codecs.BOM_UTF32_LE + 'ab'.encode('utf-32-le'), codecs.BOM_UTF32_BE + 'ab'.encode('utf-32-be')]
++    for sample in samples:
++        detector = UniversalDetector()
++        for value in sample:
++            detector.feed(bytes([value]))
++        assert detector.close()['encoding'] == detect(sample)['encoding']
++
++def test_prefix_close_and_reset():
++    """不完整BOM在close时也需进入原检测，reset不残留。@return None。"""
++    detector = UniversalDetector()
++    detector.feed(b'\xef')
++    assert detector.close()['encoding'] is not None
++    detector.reset()
++    detector.feed(b'ordinary ascii')
++    assert detector.close()['encoding'] == 'ascii'
++
++def test_near_prefix_and_empty_chunks():
++    """相似但不匹配前缀不能丢字节。@return None。"""
++    sample = b'\xef\xbbX plain text'
++    detector = UniversalDetector()
++    for part in (b'', sample[:1], b'', sample[1:2], sample[2:]): detector.feed(part)
++    assert detector.close() == detect(sample)

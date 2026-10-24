@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TD-PAGE-DEV",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add Table.query_page(cond=None, *, limit=100, after=None) returning (documents,next_cursor). Integer document IDs are sorted ascending, after is exclusive, condition is optional and evaluated on detached Documents. Return at most limit rows; next_cursor is the last returned matching ID only if another match exists, otherwise None. Support sparse IDs, insert/remove between pages, MemoryStorage and JSONStorage. Deep-copy returned data so caller or predicate changes cannot mutate storage. Validate limit 1..1000 and nonnegative integer cursor, excluding booleans. This is keyset pagination, without snapshot/concurrent-writer guarantees.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

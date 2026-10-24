@@ -1,0 +1,65 @@
+--- a/library/docs/development-pt-measure-dev.md
++++ b/library/docs/development-pt-measure-dev.md
+@@ -0,0 +1,5 @@
++# 为真实区间增加显式业务度量聚合
++
++提供measure(metric, start=0)，按原子区间顺序调用一次业务度量并从显式单位元累加。业务回调可根据真实开闭端点计算整数数量或连续时长，也可拒绝无界区间；不擅自给任意端点做减法。空集不回调，保留Decimal和timedelta类型、子类和len片段数语义。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/portion/interval.py
++++ b/library/portion/interval.py
+@@ -411,6 +411,20 @@
+             except Exception:  # noqa
+                 pass
+         raise AttributeError
++
++    def measure(self, metric, *, start=0):
++        """以显式业务度量累加原子区间，保留原片段数语义。
++
++        :param metric: 接收单个原子区间的度量函数，可自行处理开闭及无穷。
++        :param start: 加法单位元，日期时长可传timedelta()。
++        :return: 从start依序累加各原子度量的结果。
++        """
++        if not callable(metric):
++            raise TypeError('区间度量必须可调用')
++        result = start
++        for atomic in self:
++            result = result + metric(atomic)
++        return result
+ 
+     def __len__(self):
+         return len(self._intervals)
+--- a/library/tests/test_development_pt_measure_dev.py
++++ b/library/tests/test_development_pt_measure_dev.py
+@@ -0,0 +1,31 @@
++"""显式度量支持时长和离散计数，不改变len。"""
++from datetime import datetime, timedelta
++from decimal import Decimal
++import pytest
++import portion as P
++
++
++def test_duration_and_parts():
++    """两个会议空闲窗口总长为3，片段数仍为2。@return None。"""
++    windows = P.closedopen(9, 11) | P.closedopen(13, 14)
++    assert windows.measure(lambda atom: atom.upper - atom.lower) == 3
++    assert len(windows) == 2
++
++
++def test_discrete_and_decimal():
++    """度量协议可以解释开闭边界并保持Decimal类型。@return None。"""
++    def count(atom):
++        """计算整数原子区间的元素数。@param atom 原子区间。@return 数量。"""
++        return atom.upper - atom.lower + 1 - (atom.left is P.OPEN) - (atom.right is P.OPEN)
++    assert P.closed(1, 3).measure(count) == 3
++    assert P.open(1, 3).measure(count) == 1
++    assert P.closed(Decimal('1.2'), Decimal('2.7')).measure(lambda atom: atom.upper - atom.lower, start=Decimal(0)) == Decimal('1.5')
++
++
++def test_empty_and_callback_error():
++    """空集不调用回调，定制度量异常不吞掉。@return None。"""
++    calls = []
++    assert P.empty().measure(lambda atom: calls.append(atom), start=timedelta()) == timedelta()
++    assert calls == []
++    with pytest.raises(ZeroDivisionError):
++        P.singleton(1).measure(lambda atom: 1 / 0)

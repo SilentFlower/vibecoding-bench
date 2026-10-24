@@ -1,0 +1,13 @@
+{
+  "script": "verification/AN-CLONE-DEV-public-observe.py",
+  "args": [],
+  "python_paths": [
+    "library/src"
+  ],
+  "expected": {
+    "passed": true,
+    "executed": 6,
+    "failures": 0
+  },
+  "test_file": "library/development_tests/test_development_an_clone_dev.py"
+}

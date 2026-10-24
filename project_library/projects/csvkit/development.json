@@ -1,0 +1,301 @@
+{
+  "schema": 3,
+  "project_key": "csvkit",
+  "title": "CSVkit数据导出工作场景",
+  "category": "CSV命令行与本地查询",
+  "description": "固定真实源码上的完整工程交付：复用原生清洗器交付有界非CLI完整结果；让真实CSVGrep统一支持Unicode忽略大小写策略；让SQL2CSV通过真实命名参数安全执行查询；按CSV逻辑记录切片并以有界队列取末尾；在真实CSV管道中按精确原名一致重命名列；单遍查找业务值所在列并交付有界行样本。每项均包含调查、方案确认、实现、独立验收及失败返工；原项目研究另保留。",
+  "seed_digest": "3ebbccf986d52a1a95f98dfa2e8c0335ae5e996005472ee70e4343708b1ce027",
+  "environment": "csvkit-py312",
+  "source": {
+    "repository": "https://github.com/wireservice/csvkit",
+    "commit": "6d19c625214977ab2988e674441ca24638bc12d3",
+    "license_files": [
+      "seed/library/COPYING"
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "CSVKIT-O01-DEV-SCENE",
+      "title": "复用原生清洗器交付有界非CLI完整结果",
+      "goal": "复用原生清洗器交付有界非CLI完整结果",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSVKIT-O01-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSVKIT-O01-DEV",
+          "kind": "modify",
+          "goal": "复用原生清洗器交付有界非CLI完整结果",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement csvkit.cleaning.clean_rows(reader, *,max_rows=10000,max_errors=1000,**RowChecker_options), clean_file(stream,reader_options=None,**options), immutable CleanResult(schema,header,rows,errors) and CleanIssue(line_number,code,message). Reuse the actual RowChecker and agate reader, including physical multiline line numbers and late empty-column removal, without returning before file-level checks. Do not retain raw error rows, close caller streams, write stdout/stderr or call sys.exit. Enforce nonnegative non-bool budgets, conflicting fixes, full completion and explicit CleanLimitError instead of partial success; propagate IO/errors. Preserve RowChecker/CLI APIs.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_csvkit_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-csvkit-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSVKIT-O01-DEV-contract.md",
+            "materials/CSVKIT-O01-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/csvkit/cleaning.py",
+            "library/tests/test_development_csvkit_o01_dev.py",
+            "library/docs/development-csvkit-o01-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSVKIT-O01-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSVKIT-O01-DEV.native.json",
+            "public_native": "verification/CSVKIT-O01-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSVKIT-O01-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSVKIT-O02-DEV-SCENE",
+      "title": "让真实CSVGrep统一支持Unicode忽略大小写策略",
+      "goal": "让真实CSVGrep统一支持Unicode忽略大小写策略",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSVKIT-O02-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSVKIT-O02-DEV",
+          "kind": "modify",
+          "goal": "让真实CSVGrep统一支持Unicode忽略大小写策略",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd --ignore-case to actual CSVGrep without stealing -i/invert-match. Preserve existing -m substring semantics using Unicode casefold on pattern/cell, -f whole-cell exact membership using casefold and regex mode using re.IGNORECASE (not regex casefold rewriting). Preserve default case sensitivity, any/all, inverse, header and short-row behavior; support empty regex and empty substring coherently. Keep output cell bytes/text unchanged and close match files. Demonstrate real utility output including Unicode casefold and regex-specific differences.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_csvkit_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-csvkit-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSVKIT-O02-DEV-contract.md",
+            "materials/CSVKIT-O02-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/csvkit/utilities/csvgrep.py",
+            "library/tests/test_development_csvkit_o02_dev.py",
+            "library/docs/development-csvkit-o02-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSVKIT-O02-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSVKIT-O02-DEV.native.json",
+            "public_native": "verification/CSVKIT-O02-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSVKIT-O02-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSVKIT-O03-DEV-SCENE",
+      "title": "让SQL2CSV通过真实命名参数安全执行查询",
+      "goal": "让SQL2CSV通过真实命名参数安全执行查询",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSVKIT-O03-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSVKIT-O03-DEV",
+          "kind": "modify",
+          "goal": "让SQL2CSV通过真实命名参数安全执行查询",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd --params-json to real SQL2CSV. Accept a finite JSON object of scalar/null values, require exact agreement with named binds parsed by SQLAlchemy text(query), execute through connection.execute(statement,parameters) without string interpolation, eval or logging parameter values. Reject invalid JSON, nested values and missing/extra binds. Preserve the original exec_driver_sql path when absent, CSV headers/type output and query/file precedence. Ensure connection context and engine disposal execute on success, validation, query and output failures; all tests use only temporary SQLite, never network databases.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_csvkit_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-csvkit-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSVKIT-O03-DEV-contract.md",
+            "materials/CSVKIT-O03-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/csvkit/utilities/sql2csv.py",
+            "library/tests/test_development_csvkit_o03_dev.py",
+            "library/docs/development-csvkit-o03-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSVKIT-O03-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSVKIT-O03-DEV.native.json",
+            "public_native": "verification/CSVKIT-O03-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSVKIT-O03-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSVKIT-O04-DEV-SCENE",
+      "title": "按CSV逻辑记录切片并以有界队列取末尾",
+      "goal": "按CSV逻辑记录切片并以有界队列取末尾",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSVKIT-O04-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSVKIT-O04-DEV",
+          "kind": "modify",
+          "goal": "按CSV逻辑记录切片并以有界队列取末尾",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd real csvkit.utilities.csvslice.CSVSlice and python -m entry using CSVKitUtility reader/writer conventions. Support zero-based nonnegative --start/--stop and positive --step (exclusive stop) through lazy islice, or mutually compatible --tail N through bounded deque, with tail=0 emitting only header. Preserve complete quoted/multiline records, dialect/encoding/skip/headerless options and exactly one header. Reject negative ranges, zero step and combined tail/range modes before output, support empty/header-only inputs and never preload ordinary forward slices.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_csvkit_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-csvkit-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSVKIT-O04-DEV-contract.md",
+            "materials/CSVKIT-O04-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/csvkit/utilities/csvslice.py",
+            "library/tests/test_development_csvkit_o04_dev.py",
+            "library/docs/development-csvkit-o04-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSVKIT-O04-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSVKIT-O04-DEV.native.json",
+            "public_native": "verification/CSVKIT-O04-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSVKIT-O04-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSVKIT-O05-DEV-SCENE",
+      "title": "在真实CSV管道中按精确原名一致重命名列",
+      "goal": "在真实CSV管道中按精确原名一致重命名列",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSVKIT-O05-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSVKIT-O05-DEV",
+          "kind": "modify",
+          "goal": "在真实CSV管道中按精确原名一致重命名列",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement csvkit.headers.rename_columns(names,mapping,*,collision=\"error\") and actual CSVCut --rename-columns-json / --rename-collision=error|suffix. Validate exact unique original source names, nonempty string targets and unknown mappings, apply against the full original header before projecting originally selected columns and change no cell values. Reject collisions by default; suffix mode preserves first occurrence and avoids all reserved eventual target names. Reject headerless rename before output, invalid JSON/shapes and ambiguous duplicate source names. Keep old cut/default headers, order and mapping inputs unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_csvkit_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-csvkit-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSVKIT-O05-DEV-contract.md",
+            "materials/CSVKIT-O05-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/csvkit/headers.py",
+            "library/csvkit/utilities/csvcut.py",
+            "library/tests/test_development_csvkit_o05_dev.py",
+            "library/docs/development-csvkit-o05-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSVKIT-O05-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSVKIT-O05-DEV.native.json",
+            "public_native": "verification/CSVKIT-O05-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSVKIT-O05-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    },
+    {
+      "id": "CSVKIT-O06-DEV-SCENE",
+      "title": "单遍查找业务值所在列并交付有界行样本",
+      "goal": "单遍查找业务值所在列并交付有界行样本",
+      "default_entry": "development",
+      "entries": [
+        {
+          "id": "development",
+          "task_ids": [
+            "CSVKIT-O06-DEV"
+          ]
+        }
+      ],
+      "tasks": [
+        {
+          "id": "CSVKIT-O06-DEV",
+          "kind": "modify",
+          "goal": "单遍查找业务值所在列并交付有界行样本",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd csvkit.utilities.csvfind.find_columns and actual CSVFind utility/module entry using CSVKitUtility and native FilteringCSVReader predicates. Accept exact --value (including empty) or explicit --regex, selected columns and nonnegative bounded --sample-size; scan logical records once and report every selected column by zero-based index/name/count plus bounded 1-based logical data-row samples. Duplicate column names remain distinct. JSON schema=1 reports rows and columns; CSV output respects --zero only for displayed column indexes. Preserve cells, handle short rows as native empty missing fields, empty inputs, no matches and generator errors; never rescan per column or silently drop matches beyond sample budget.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_csvkit_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-csvkit-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "requires": [],
+          "materials": [
+            "materials/CSVKIT-O06-DEV-contract.md",
+            "materials/CSVKIT-O06-DEV-tests.py"
+          ],
+          "allowed_paths": [
+            "library/csvkit/utilities/csvfind.py",
+            "library/tests/test_development_csvkit_o06_dev.py",
+            "library/docs/development-csvkit-o06-dev.md"
+          ],
+          "outcomes": [
+            "implemented"
+          ],
+          "evaluation": {
+            "version": 2,
+            "rubric": "verification/CSVKIT-O06-DEV.rubric.json",
+            "semantic": true,
+            "native": "verification/CSVKIT-O06-DEV.native.json",
+            "public_native": "verification/CSVKIT-O06-DEV.public.native.json"
+          },
+          "branches": [],
+          "owner_materials": [
+            "disclosure/CSVKIT-O06-DEV-business.md"
+          ],
+          "development_cycle": "feature"
+        }
+      ]
+    }
+  ]
+}

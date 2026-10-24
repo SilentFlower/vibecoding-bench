@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "JSONSCHEMA-O05-DEV",
+  "source_commit": "c497561ea0a95f5aac09cd63d15eb1420eb7bbec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add validate_all(instance, *, max_errors=100) to generated validator classes and the Validator protocol, raising public exceptions.ValidationErrorGroup for nonempty actual iter_errors results and returning None when valid. Preserve original ValidationError identities/paths and normal validate/is_valid semantics. A positive nonbool integer budget bounds stored errors and consumes at most one additional error to determine truncated; group exposes truncated/limit and derive preserves them for except*. Always close the underlying generator on completion/failure/cancellation. Keyword programming/resolution/schema errors must propagate instead of being misclassified as instance errors.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

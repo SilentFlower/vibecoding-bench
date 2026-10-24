@@ -1,0 +1,108 @@
+--- a/library/docs/development-wtforms-03-dev.md
++++ b/library/docs/development-wtforms-03-dev.md
+@@ -0,0 +1,5 @@
++# 嵌套JSON显式适配为真实表单提交并保留数组与多值边界
++
++路线06：独立JSONFormData将对象/数组转标准减号请求路径，多选字段必须显式multi_values；null为明确空提交、布尔和数字编码固定、缺失不伪造。完整快照、深度/值预算、含糊键拒绝，真实FormField/FieldList处理并定位错误，不改旧dict/data语义。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/wtforms/jsondata.py
++++ b/library/src/wtforms/jsondata.py
+@@ -0,0 +1,64 @@
++"""嵌套JSON的显式formdata适配，不改变普通dict/data的既有含义。"""
++import math
++from collections.abc import Mapping
++
++
++class JSONFormData:
++    """快照JSON为WTForms getlist路径。@param document JSON对象。@param multi_values 显式多选字段路径。@param max_depth 深度。@param max_items 输出值预算。"""
++    def __init__(self,document,multi_values=(),max_depth=20,max_items=10000):
++        """完整验证后持有独立字符串列表。@param document 输入。@param multi_values 路径集合。@param max_depth 最大深度。@param max_items 值预算。@return None。"""
++        if not isinstance(document,Mapping):raise ValueError('顶层JSON必须是对象')
++        if type(max_depth) is not int or max_depth<1 or type(max_items) is not int or max_items<1:raise ValueError('预算必须为正整数')
++        selected=set(multi_values);values={};count=0
++        def scalar(value):
++            """明确JSON标量的请求编码。@param value 标量。@return 文本。"""
++            if value is None:return ''
++            if type(value) is bool:return 'true' if value else 'false'
++            if isinstance(value,str):return value
++            if type(value) in (int,float):
++                if isinstance(value,float) and not math.isfinite(value):raise ValueError('JSON数字必须有限')
++                return str(value)
++            raise ValueError('不支持的JSON标量')
++        def store(path,items):
++            """保存独立请求值并核预算。@param path 路径。@param items 文本列表。@return None。"""
++            nonlocal count
++            if path in values:raise ValueError('JSON路径冲突')
++            count+=max(1,len(items))
++            if count>max_items:raise ValueError('JSON输入超过值预算')
++            values[path]=tuple(items)
++        def visit(value,path,depth):
++            """映射对象与索引数组，拒绝含混名称。@param value 节点。@param path 路径。@param depth 层级。@return None。"""
++            if depth>max_depth:raise ValueError('JSON输入过深')
++            if isinstance(value,Mapping):
++                for key,item in value.items():
++                    if not isinstance(key,str) or not key or '-' in key:raise ValueError('JSON键必须为无减号非空字符串')
++                    visit(item,path+'-'+key if path else key,depth+1)
++            elif isinstance(value,list):
++                if path in selected:store(path,[scalar(item) for item in value])
++                else:
++                    for index,item in enumerate(value):visit(item,path+'-'+str(index),depth+1)
++            else:store(path,[scalar(value)])
++        visit(document,'',0)
++        self._values=values
++
++    def __iter__(self):
++        """提供FieldList所需的完整路径迭代。@return 路径迭代器。"""
++        return iter(self._values)
++
++    def __len__(self):
++        """返回提交路径数。@return 数量。"""
++        return len(self._values)
++
++    def __contains__(self,key):
++        """区分缺失和明确空提交。@param key 路径。@return bool。"""
++        return key in self._values
++
++    def getlist(self,key):
++        """返回独立值列表，调用方不能改内部快照。@param key 路径。@return 文本列表。"""
++        return list(self._values.get(key,()))
++
++    def __getitem__(self,key):
++        """多值路径按首值读取。@param key 路径。@return 首值或KeyError。"""
++        values=self._values[key]
++        if not values:raise KeyError(key)
++        return values[0]
+--- a/library/tests/test_development_wtforms_03_dev.py
++++ b/library/tests/test_development_wtforms_03_dev.py
+@@ -0,0 +1,30 @@
++"""JSON字典显式转请求路径，嵌套表单和列表真实处理。"""
++import unittest
++from wtforms import Form,StringField,IntegerField,BooleanField,FormField,FieldList,SelectMultipleField
++from wtforms.validators import InputRequired
++from wtforms.jsondata import JSONFormData
++
++
++def test_nested_form_list_and_explicit_multivalue_selection():
++    """嵌套规格按提交语义转换，false和数字不当Python默认值。@return None。"""
++    class Variant(Form):
++        """商品变体。"""
++        sku=StringField(validators=[InputRequired()]);stock=IntegerField()
++    class Product(Form):
++        """商品提交。"""
++        name=StringField();enabled=BooleanField();variants=FieldList(FormField(Variant));tags=SelectMultipleField(choices=[('a','A'),('b','B')])
++    payload={'name':'中文','enabled':False,'variants':[{'sku':'one','stock':2},{'sku':'two','stock':0}],'tags':['a','b']}
++    data=JSONFormData(payload,multi_values=['tags']);form=Product(data)
++    assert form.validate() and form.enabled.data is False
++    assert form.variants.data==[{'sku':'one','stock':2},{'sku':'two','stock':0}] and form.tags.data==['a','b']
++    payload['variants'][0]['stock']=99
++    assert data.getlist('variants-0-stock')==['2']
++
++
++def test_missing_null_bad_names_and_resource_limits():
++    """缺失与显式null分离，路径冲突与非JSON类型拒绝。@return None。"""
++    data=JSONFormData({'empty':None,'tags':[]},multi_values=['tags'])
++    assert 'empty' in data and data.getlist('empty')==[''] and 'missing' not in data and data.getlist('tags')==[]
++    for payload in ({'bad-name':'x'},{'number':float('nan')},{'bad':object()}):
++        with unittest.TestCase().assertRaises(ValueError):JSONFormData(payload)
++    with unittest.TestCase().assertRaises(ValueError):JSONFormData({'a':[1,2]},max_items=1)

@@ -1,0 +1,107 @@
+--- a/library/docs/development-configobj-o04-dev.md
++++ b/library/docs/development-configobj-o04-dev.md
+@@ -0,0 +1,5 @@
++# 组合标量归一化与逐元素真实类型验证
++
++对应路线16：组合真实Validator检查与标量归一化，保留长度、强制策略、自定义检查和元素错误位置，不将各种元素类型拆成多个目标。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/src/configobj/validate.py
++++ b/library/src/configobj/validate.py
+@@ -340,6 +340,20 @@
+     """
+ 
+ 
++class VdtListItemError(ValidateError):
++    """携带首个失败元素下标，不把秘密原值放进消息。
++
++    :param index: 从零开始的元素下标。
++    :param cause: 原始ValidateError。
++    :return: 可检查index与cause的验证错误。
++    """
++
++    def __init__(self, index, cause):
++        """保存位置和原异常。@return None。"""
++        self.index, self.cause = index, cause
++        super().__init__('列表第%d项验证失败：%s' % (index, type(cause).__name__))
++
++
+ class VdtMissingValue(ValidateError):
+     """No value was supplied to a check that needed one."""
+ 
+@@ -555,6 +569,7 @@
+             'pass': self._pass,
+             'option': is_option,
+             'force_list': force_list,
++            'typed_list': self._typed_list,
+         }
+         if functions is not None:
+             self.functions.update(functions)
+@@ -597,6 +612,36 @@
+         
+         return self._check_value(value, fun_name, fun_args, fun_kwargs)
+ 
++
++    def _typed_list(self, value, item_check='string', force=True, min=None, max=None):
++        """将受控标量归一为列表，再复用本Validator逐项检查。
++
++        :param value: 标量或列表/元组，不接受None。
++        :param item_check: 已注册的真实元素检查表达式。
++        :param force: 是否允许单个标量；可用显式true/false文本。
++        :param min: 最少元素数。
++        :param max: 最多元素数。
++        :return: 新的已转换列表；失败携带元素下标。
++        """
++        if isinstance(force, str):
++            force = is_boolean(force)
++        if not isinstance(force, bool):
++            raise VdtParamError('force', force)
++        if value is None or (not isinstance(value, (list, tuple)) and not force):
++            raise VdtTypeError(value)
++        items = list(value) if isinstance(value, (list, tuple)) else [value]
++        lower, upper = _is_num_param(('min', 'max'), (min, max))
++        if lower is not None and len(items) < lower:
++            raise VdtValueTooShortError(items)
++        if upper is not None and len(items) > upper:
++            raise VdtValueTooLongError(items)
++        converted = []
++        for index, item in enumerate(items):
++            try:
++                converted.append(self.check(item_check, item))
++            except ValidateError as error:
++                raise VdtListItemError(index, error) from error
++        return converted
+ 
+     def _handle_none(self, value):
+         if value == 'None':
+--- a/library/tests/test_development_configobj_o04_dev.py
++++ b/library/tests/test_development_configobj_o04_dev.py
+@@ -0,0 +1,28 @@
++"""组合类型列表走真实Validator及ConfigObj配置规范。"""
++from configobj import ConfigObj
++from configobj.validate import Validator
++import pytest
++
++def test_scalar_and_list_same_typed_output():
++    """单值和列表都转换为整数列表。@return None。"""
++    v=Validator()
++    assert v.check('typed_list(integer)','42')==[42]
++    assert v.check('typed_list(integer,min=2,max=3)',['1','2'])==[1,2]
++    cfg=ConfigObj(['ports=1, 2'],configspec=['ports=typed_list(integer)'])
++    assert cfg.validate(v) is True and cfg['ports']==[1,2]
++
++def test_failure_index_and_source_unchanged():
++    """第N项失败可检查，输入没有部分转换。@return None。"""
++    from configobj.validate import VdtListItemError
++    source=['1','secret-invalid']
++    with pytest.raises(VdtListItemError) as error:Validator().check('typed_list(integer)',source)
++    assert error.value.index==1 and 'secret-invalid' not in str(error.value) and source==['1','secret-invalid']
++
++def test_bounds_force_and_custom_check():
++    """强制策略、空列表和自定义检查明确。@return None。"""
++    from configobj.validate import ValidateError
++    v=Validator({'upper':lambda x:x.upper()})
++    assert v.check('typed_list(upper)',('a','b'))==['A','B']
++    assert v.check('typed_list(integer)',[])==[]
++    with pytest.raises(ValidateError):v.check('typed_list(integer,force=false)','1')
++    with pytest.raises(ValidateError):v.check('typed_list(integer,min=1)',[])

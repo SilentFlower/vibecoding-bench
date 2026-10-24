@@ -1,0 +1,71 @@
+--- a/library/docs/development-petl-03-dev.md
++++ b/library/docs/development-petl-03-dev.md
+@@ -0,0 +1,5 @@
++# 透视报表按复合行维度准确分组和聚合
++
++路线06：pivot行维度支持非空字段序列，完整复合key排序/分组/输出，重复格聚合与缺失格准确；单字段及presorted原语义保持。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/petl/transform/reshape.py
++++ b/library/petl/transform/reshape.py
+@@ -568,7 +568,9 @@
+         if presorted:
+             self.source = source
+         else:
+-            self.source = sort(source, key=(f1, f2), buffersize=buffersize,
++            rowfields=tuple(f1) if isinstance(f1,(tuple,list)) else (f1,)
++            if not rowfields:raise ValueError("透视行字段不能为空")
++            self.source = sort(source, key=rowfields+(f2,), buffersize=buffersize,
+                                tempdir=tempdir, cache=cache)
+         self.f1, self.f2, self.f3 = f1, f2, f3
+         self.aggfun = aggfun
+@@ -585,7 +587,9 @@
+     f2vals = set(itervalues(source, f2))  # TODO only make one pass
+     f2vals = list(f2vals)
+     f2vals.sort()
+-    outhdr = [f1]
++    rowfields=list(f1) if isinstance(f1,(tuple,list)) else [f1]
++    if not rowfields:raise ValueError("透视行字段不能为空")
++    outhdr = list(rowfields)
+     outhdr.extend(f2vals)
+     yield tuple(outhdr)
+ 
+@@ -596,15 +600,16 @@
+     except StopIteration:
+         hdr = []
+     flds = list(map(text_type, hdr))
+-    f1i = flds.index(f1)
++    f1indices=[flds.index(field) for field in rowfields]
++    f1key=operator.itemgetter(*f1indices)
+     f2i = flds.index(f2)
+     f3i = flds.index(f3)
+-    for v1, v1rows in itertools.groupby(it, key=operator.itemgetter(f1i)):
+-        outrow = [v1] + [missing] * len(f2vals)
++    for v1, v1rows in itertools.groupby(it, key=f1key):
++        outrow = ([v1] if len(f1indices)==1 else list(v1)) + [missing] * len(f2vals)
+         for v2, v12rows in itertools.groupby(v1rows,
+                                              key=operator.itemgetter(f2i)):
+             aggval = aggfun([row[f3i] for row in v12rows])
+-            outrow[1 + f2vals.index(v2)] = aggval
++            outrow[len(rowfields) + f2vals.index(v2)] = aggval
+         yield tuple(outrow)
+ 
+ 
+--- a/library/tests/test_development_petl_03_dev.py
++++ b/library/tests/test_development_petl_03_dev.py
+@@ -0,0 +1,15 @@
++"""复合行维度透视保留所有业务维度与缺失格。"""
++import petl
++
++def test_region_gender_pivot_aggregates_full_composite_groups():
++    """同地区不同性别不能混在一组。@return None。"""
++    source=[['region','gender','style','units'],['east','f','a',2],['east','m','b',3],['east','f','a',4],['west','f','b',5]]
++    result=list(petl.pivot(source,('region','gender'),'style','units',sum,missing=0))
++    assert result==[('region','gender','a','b'),('east','f',6,0),('east','m',0,3),('west','f',0,5)]
++
++def test_presorted_one_field_compatibility_and_empty_data():
++    """普通单字段不改，多维presorted与排序路径一致。@return None。"""
++    source=[['a','b','kind','value'],[1,1,'x',2],[1,2,'y',3]]
++    assert list(petl.pivot(source,['a','b'],'kind','value',sum,presorted=True))==list(petl.pivot(source,['a','b'],'kind','value',sum))
++    assert list(petl.pivot([['a','kind','value'],[1,'x',2]],'a','kind','value',sum))==[('a','x'),(1,2)]
++    assert list(petl.pivot([['a','b','kind','value']],['a','b'],'kind','value',sum))==[('a','b')]

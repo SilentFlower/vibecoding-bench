@@ -1,0 +1,89 @@
+--- a/library/development_tests/test_development_tn_group_dev.py
++++ b/library/development_tests/test_development_tn_group_dev.py
+@@ -0,0 +1,39 @@
++"""公开异常组重试回归。"""
++import pytest
++from tenacity import Future,Retrying,RetryCallState,stop_after_attempt
++from tenacity.retry import retry_if_exception_group
++
++def state(error):
++    result=RetryCallState(Retrying(),None,(),{})
++    result.outcome=Future.construct(1,error,True)
++    return result
++
++def test_nested_group_all_and_any_modes():
++    error=ExceptionGroup('outer',[TimeoutError(),ExceptionGroup('inner',[ValueError()])])
++    assert not retry_if_exception_group(lambda e:isinstance(e,TimeoutError))(state(error))
++    assert retry_if_exception_group(lambda e:isinstance(e,TimeoutError),mode='any')(state(error))
++
++def test_leaf_identity_order_and_short_circuit():
++    first,second=TimeoutError(),ValueError();seen=[]
++    policy=retry_if_exception_group(lambda error:not seen.append(error) and isinstance(error,TimeoutError),mode='any')
++    assert policy(state(ExceptionGroup('x',[first,second]))) and seen==[first]
++
++def test_real_controller_retries_group_then_returns_success():
++    calls=[]
++    def work():
++        calls.append(1)
++        if len(calls)==1:
++            raise ExceptionGroup('temporary',[TimeoutError()])
++        return 42
++    assert Retrying(retry=retry_if_exception_group(lambda e:isinstance(e,TimeoutError)),stop=stop_after_attempt(3),sleep=lambda _:None)(work)==42
++    assert len(calls)==2
++
++def test_success_missing_outcome_and_invalid_mode():
++    result=RetryCallState(Retrying(),None,(),{})
++    policy=retry_if_exception_group(lambda error:True)
++    with pytest.raises(RuntimeError):
++        policy(result)
++    result.set_result(1)
++    assert not policy(result)
++    with pytest.raises(ValueError):
++        retry_if_exception_group(lambda error:True,mode='guess')
+--- a/library/docs/development-tn-group-dev.md
++++ b/library/docs/development-tn-group-dev.md
+@@ -0,0 +1,5 @@
++# 按异常组真实叶子决定整次调用是否重试
++
++并行作业可能返回嵌套异常组，按真实叶子分类整次重试，支持全部或任一叶子满足，短路顺序明确。保留原异常对象与组合策略，不递归展开导致栈溢出，成功结果不调用异常谓词。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/tenacity/retry.py
++++ b/library/tenacity/retry.py
+@@ -281,6 +281,36 @@
+         return self.predicate(exception)
+ 
+ 
++class retry_if_exception_group(retry_base):
++    """按异常组叶子分类，普通异常按一个叶子处理，不改变异常组结构。"""
++    def __init__(self,predicate,*,mode='all'):
++        """创建策略。@param predicate 叶子异常谓词。@param mode all或any。@return None。
++        """
++        if not callable(predicate) or mode not in ('all','any'):
++            raise ValueError('需要可调用叶子谓词及all/any模式')
++        self.predicate,self.mode=predicate,mode
++
++    def __call__(self,retry_state):
++        """分类真实失败结果。@param retry_state 已设置outcome的状态。@return 是否重试。
++        """
++        if retry_state.outcome is None:
++            raise RuntimeError('分类前必须有尝试结果')
++        if not retry_state.outcome.failed:
++            return False
++        pending=[retry_state.outcome.exception()]
++        while pending:
++            error=pending.pop()
++            if isinstance(error,BaseExceptionGroup):
++                pending.extend(reversed(error.exceptions))
++                continue
++            accepted=bool(self.predicate(error))
++            if self.mode=='all' and not accepted:
++                return False
++            if self.mode=='any' and accepted:
++                return True
++        return self.mode=='all'
++
++
+ class retry_any(retry_base):
+     """Retries if any of the retries condition is valid."""
+ 

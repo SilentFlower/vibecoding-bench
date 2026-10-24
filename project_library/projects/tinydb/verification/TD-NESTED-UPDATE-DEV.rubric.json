@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "TD-NESTED-UPDATE-DEV",
+  "source_commit": "edff96aeb2616402e9489d46e90a592c05565621",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add tinydb.operations.set_path(path,value,*,create=False) and delete_path(path,*,missing_ok=False), returning ordinary Table.update callbacks. Paths are finite nonempty string-key sequences with literal punctuation. Set deep-copies the supplied value when building the operation and separately per document; optionally create missing mapping parents. Delete preserves siblings and optionally tolerates missing keys. Nonmapping parents remain errors. Validate a complete candidate document before replacing that document contents so a failed callback leaves it unchanged; do not promise a transaction across all documents or modify old operations.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

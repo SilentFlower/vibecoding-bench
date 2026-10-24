@@ -1,0 +1,193 @@
+--- a/library/box/config_box.py
++++ b/library/box/config_box.py
+@@ -2,7 +2,8 @@
+ # -*- coding: utf-8 -*-
+ from __future__ import annotations
+ 
+-from box.box import Box
++from box.box import Box, NO_DEFAULT
++from math import isfinite
+ 
+ 
+ class ConfigBox(Box):
+@@ -33,7 +34,7 @@
+     def __dir__(self) -> list[str]:
+         return super().__dir__() + ["bool", "int", "float", "list", "getboolean", "getfloat", "getint"]
+ 
+-    def bool(self, item, default=None):
++    def bool(self, item, default=NO_DEFAULT, *, strict=False):
+         """
+         Return value of key as a boolean
+ 
+@@ -44,10 +45,22 @@
+         try:
+             item = self.__getattr__(item)
+         except AttributeError as err:
+-            if default is not None:
++            if default is not NO_DEFAULT:
+                 return default
+             raise err
+ 
++        if strict:
++            if isinstance(item, bool):
++                return item
++            if isinstance(item, int) and item in (0, 1):
++                return bool(item)
++            if isinstance(item, str):
++                normalized = item.strip().lower()
++                if normalized in ('true', 'yes', 'on', '1'):
++                    return True
++                if normalized in ('false', 'no', 'off', '0'):
++                    return False
++            raise ValueError('配置布尔转换失败')
+         if isinstance(item, (bool, int)):
+             return bool(item)
+ 
+@@ -56,7 +69,7 @@
+ 
+         return True if item else False
+ 
+-    def int(self, item, default=None):
++    def int(self, item, default=NO_DEFAULT, *, strict=False):
+         """
+         Return value of key as an int
+ 
+@@ -67,12 +80,19 @@
+         try:
+             item = self.__getattr__(item)
+         except AttributeError as err:
+-            if default is not None:
++            if default is not NO_DEFAULT:
+                 return default
+             raise err
++        if strict:
++            if isinstance(item, bool) or not isinstance(item, (int, str)):
++                raise ValueError('配置整数转换失败')
++            try:
++                return int(item)
++            except (TypeError, ValueError) as error:
++                raise ValueError('配置整数转换失败') from error
+         return int(item)
+ 
+-    def float(self, item, default=None):
++    def float(self, item, default=NO_DEFAULT, *, strict=False):
+         """
+         Return value of key as a float
+ 
+@@ -83,12 +103,22 @@
+         try:
+             item = self.__getattr__(item)
+         except AttributeError as err:
+-            if default is not None:
++            if default is not NO_DEFAULT:
+                 return default
+             raise err
++        if strict:
++            try:
++                if isinstance(item, bool):
++                    raise ValueError('bool不是严格浮点配置')
++                result = float(item)
++                if not isfinite(result):
++                    raise ValueError('严格浮点配置必须有限')
++                return result
++            except (TypeError, ValueError, OverflowError) as error:
++                raise ValueError('配置浮点转换失败') from error
+         return float(item)
+ 
+-    def list(self, item, default=None, spliter: str = ",", strip=True, mod=None):
++    def list(self, item, default=NO_DEFAULT, spliter: str = ",", strip=True, mod=None, *, strict=False):
+         """
+         Return value of key as a list
+ 
+@@ -102,9 +132,24 @@
+         try:
+             item = self.__getattr__(item)
+         except AttributeError as err:
+-            if default is not None:
++            if default is not NO_DEFAULT:
+                 return default
+             raise err
++        if strict:
++            if isinstance(item, (list, tuple)):
++                values = list(item)
++            elif isinstance(item, str):
++                raw = item.lstrip('[').rstrip(']') if strip else item
++                values = [part.strip() if strip else part for part in raw.split(spliter)]
++            else:
++                raise ValueError('配置列表转换失败')
++            output = []
++            for index, value in enumerate(values):
++                try:
++                    output.append(mod(value) if mod else value)
++                except Exception as error:
++                    raise ValueError('配置列表第%d项转换失败' % (index + 1)) from error
++            return output
+         if strip:
+             item = item.lstrip("[").rstrip("]")
+         out = [x.strip() if strip else x for x in item.split(spliter)]
+@@ -114,14 +159,14 @@
+ 
+     # loose configparser compatibility
+ 
+-    def getboolean(self, item, default=None):
+-        return self.bool(item, default)
++    def getboolean(self, item, default=NO_DEFAULT, *, strict=False):
++        return self.bool(item, default, strict=strict)
+ 
+-    def getint(self, item, default=None):
+-        return self.int(item, default)
++    def getint(self, item, default=NO_DEFAULT, *, strict=False):
++        return self.int(item, default, strict=strict)
+ 
+-    def getfloat(self, item, default=None):
+-        return self.float(item, default)
++    def getfloat(self, item, default=NO_DEFAULT, *, strict=False):
++        return self.float(item, default, strict=strict)
+ 
+     def __repr__(self):
+         return f"{self.__class__.__name__}({str(self.to_dict())})"
+--- a/library/docs/development-bx-strict-cast-dev.md
++++ b/library/docs/development-bx-strict-cast-dev.md
+@@ -0,0 +1,5 @@
++# 为ConfigBox交付显式严格转换和缺值哨兵
++
++ConfigBox新增显式strict转换并用缺值哨兵区分未指定默认与default=None。严格布尔只接受明确词和0/1，严格整数不截断浮点且拒绝bool，严格浮点拒绝NaN/Infinity。列表支持原生序列或既有分割规则，逐项mod并给出安全位置；主错误消息不回显输入。默认宽松转换保留。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/test/test_development_bx_strict_cast_dev.py
++++ b/library/test/test_development_bx_strict_cast_dev.py
+@@ -0,0 +1,34 @@
++"""ConfigBox严格类型转换显式启用，默认保持宽松。"""
++import pytest
++from box import ConfigBox
++
++
++def test_strict_boolean_and_default_none():
++    """未知布尔词拒绝，缺值可显式返回None。@return None。"""
++    value = ConfigBox(known=' YES ', unknown='maybe', zero='0')
++    assert value.bool('known', strict=True) is True
++    assert value.bool('zero', strict=True) is False
++    with pytest.raises(ValueError):
++        value.bool('unknown', strict=True)
++    assert value.bool('missing', default=None, strict=True) is None
++    assert value.bool('unknown') is True
++
++
++def test_strict_numeric_boundaries():
++    """禁止bool整数和非有限浮点，合法字符串照常。@return None。"""
++    value = ConfigBox(port='8080', flag=True, nan='nan', inf='inf')
++    assert value.int('port', strict=True) == 8080
++    with pytest.raises(ValueError):
++        value.int('flag', strict=True)
++    for key in ('nan', 'inf'):
++        with pytest.raises(ValueError):
++            value.float(key, strict=True)
++
++
++def test_strict_list_and_safe_error():
++    """列表逐项转换，错误消息不回显秘密输入。@return None。"""
++    value = ConfigBox(rows='1,2,3', secret='private-secret')
++    assert value.list('rows', mod=int, strict=True) == [1, 2, 3]
++    with pytest.raises(ValueError) as result:
++        value.int('secret', strict=True)
++    assert 'private-secret' not in str(result.value)

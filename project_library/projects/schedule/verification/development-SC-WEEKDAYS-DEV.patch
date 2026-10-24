@@ -1,0 +1,80 @@
+--- a/library/development_tests/test_development_sc_weekdays_dev.py
++++ b/library/development_tests/test_development_sc_weekdays_dev.py
+@@ -0,0 +1,35 @@
++"""公开星期集合调度回归。"""
++import datetime
++import pytest
++from unittest.mock import patch
++import schedule
++
++class Friday(datetime.datetime):
++    @classmethod
++    def now(cls,tz=None):
++        return cls(2026,10,23,12,0)
++
++def test_weekend_skips_to_monday_at_the_same_clock():
++    with patch.object(schedule.datetime,'datetime',Friday):
++        job=schedule.Scheduler().every().day.on_weekdays(0,1,2,3,4).at('09:00').do(lambda:None)
++    assert job.next_run==datetime.datetime(2026,10,26,9,0)
++
++def test_later_allowed_time_today_is_preserved():
++    with patch.object(schedule.datetime,'datetime',Friday):
++        job=schedule.Scheduler().every().day.on_weekdays(4).at('18:30').do(lambda:None)
++    assert job.next_run==datetime.datetime(2026,10,23,18,30)
++
++def test_duplicate_days_are_harmless_and_invalid_days_fail():
++    scheduler=schedule.Scheduler()
++    assert scheduler.every().day.on_weekdays(0,0)._allowed_weekdays==frozenset({0})
++    for days in ((),(7,),(-1,),(True,),('monday',)):
++        with pytest.raises(schedule.ScheduleValueError):
++            scheduler.every().day.on_weekdays(*days)
++
++def test_incompatible_units_and_mutated_configuration_are_rejected():
++    with pytest.raises(schedule.ScheduleValueError):
++        schedule.Scheduler().every(2).days.on_weekdays(0)
++    job=schedule.Scheduler().every().day.on_weekdays(0)
++    job.interval=2
++    with pytest.raises(schedule.ScheduleValueError):
++        job.do(lambda:None)
+--- a/library/docs/development-sc-weekdays-dev.md
++++ b/library/docs/development-sc-weekdays-dev.md
+@@ -0,0 +1,5 @@
++# 按每日时间和显式星期集合选择下一次运行
++
++日常任务可限定工作日或选定星期，同时沿用每日时间及原时区校正。星期集合只支持每一日任务，返回严格未来的合法日期，拒绝不明确的多日间隔组合，保留旧每周API。
++
++公开回归与完整冻结上游回归都必须通过；不更改固定测试、依赖或测试控制。
+--- a/library/schedule/__init__.py
++++ b/library/schedule/__init__.py
+@@ -466,6 +466,17 @@
+         if not all(isinstance(tag, Hashable) for tag in tags):
+             raise TypeError("Tags must be hashable")
+         self.tags.update(tags)
++        return self
++
++    def on_weekdays(self, *weekdays):
++        """为每日任务限定星期集合。@param weekdays 0周一至6周日的非空集合。
++        @return 当前Job；不支持多日间隔或其它单位，原weekday快捷API保持不变。
++        """
++        if self.unit != 'days' or self.interval != 1 or self.start_day is not None:
++            raise ScheduleValueError('星期集合仅用于每一日任务')
++        if not weekdays or any(type(day) is not int or not 0 <= day <= 6 for day in weekdays):
++            raise ScheduleValueError('星期必须是0至6整数的非空集合')
++        self._allowed_weekdays = frozenset(weekdays)
+         return self
+ 
+     def at(self, time_str: str, tz: Optional[str] = None):
+@@ -733,6 +744,13 @@
+         while next_run <= now:
+             next_run += period
+ 
++        allowed = getattr(self, '_allowed_weekdays', None)
++        if allowed is not None:
++            if self.unit != 'days' or self.interval != 1 or self.start_day is not None:
++                raise ScheduleValueError('星期集合仅用于每一日任务')
++            while next_run.weekday() not in allowed:
++                next_run += datetime.timedelta(days=1)
++
+         next_run = self._correct_utc_offset(
+             next_run, fixate_time=(self.at_time is not None)
+         )

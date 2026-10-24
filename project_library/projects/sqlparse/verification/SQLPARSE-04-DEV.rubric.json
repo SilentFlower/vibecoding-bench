@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SQLPARSE-04-DEV",
+  "source_commit": "60cdc649726bf1bc4f1b336050560b336da715ec",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add sqlparse.fingerprint.fingerprint(text,encoding=None,digest=False,replace_constants=True) using real candidate lexer token types. Remove actual comments/whitespace, normalize keyword spelling/spacing and replace numeric/single-quoted/dollar-quoted literals with ?, optionally also NULL/TRUE/FALSE. Preserve identifiers including quoted names, operators, statement boundaries, existing named/positional placeholders and IN-list cardinality. Return deterministic canonical text or SHA256 of it. Do not treat comment markers inside strings as comments, do not connect to databases, and explicitly state this groups token shape rather than proving semantic equivalence or generating safe executable parameterized SQL.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

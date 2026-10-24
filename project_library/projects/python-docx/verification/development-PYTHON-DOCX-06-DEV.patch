@@ -1,0 +1,67 @@
+--- a/library/docs/development-python-docx-06-dev.md
++++ b/library/docs/development-python-docx-06-dev.md
+@@ -0,0 +1,5 @@
++# 图片无障碍说明与标题通过公开接口安全往返
++
++路线19：InlineShape无障碍alternative_text/title映射真实docPr，缺失None与空串区分，None仅删自身；图片字节、关系、尺寸、id/name不动，真实PNG文档往返。
++
++交付包含真实实现、公开正反回归、兼容说明及完整冻结上游回归；不修改原始测试或控制配置。
+--- a/library/src/docx/shape.py
++++ b/library/src/docx/shape.py
+@@ -57,6 +57,30 @@
+         self._inline = inline
+ 
+     @property
++    def alternative_text(self):
++        """读取图片无障碍元信息。@return 原字符串或None缺失。"""
++        return self._inline.docPr.get('descr')
++
++    @alternative_text.setter
++    def alternative_text(self,value):
++        """设置或移除无障碍元信息。@param value str或None，空字符串明确保留。@return None。"""
++        if value is not None and not isinstance(value,str):raise TypeError("value必须为str或None")
++        if value is None:self._inline.docPr.attrib.pop('descr',None)
++        else:self._inline.docPr.set('descr',value)
++
++    @property
++    def title(self):
++        """读取图片无障碍元信息。@return 原字符串或None缺失。"""
++        return self._inline.docPr.get('title')
++
++    @title.setter
++    def title(self,value):
++        """设置或移除无障碍元信息。@param value str或None，空字符串明确保留。@return None。"""
++        if value is not None and not isinstance(value,str):raise TypeError("value必须为str或None")
++        if value is None:self._inline.docPr.attrib.pop('title',None)
++        else:self._inline.docPr.set('title',value)
++
++    @property
+     def height(self) -> Length:
+         """Read/write.
+ 
+--- a/library/tests/test_development_python_docx_06_dev.py
++++ b/library/tests/test_development_python_docx_06_dev.py
+@@ -0,0 +1,23 @@
++"""图片说明和标题使用真实wp:docPr，无需视觉猜测。"""
++from io import BytesIO
++from pathlib import Path
++from zipfile import ZipFile
++from docx import Document
++
++def test_inline_picture_accessibility_survives_docx_roundtrip():
++    """保图片关系、尺寸和未知属性，仅编辑对应说明。@return None。"""
++    document=Document();picture=document.add_picture(str(Path(__file__).resolve().parent/'test_files'/'python-icon.png'))
++    width,height=picture.width,picture.height
++    picture.alternative_text='中文说明 & details';picture.title='Figure 1'
++    output=BytesIO();document.save(output);output.seek(0);restored=Document(output).inline_shapes[0]
++    assert restored.alternative_text=='中文说明 & details' and restored.title=='Figure 1'
++    assert restored.width==width and restored.height==height
++
++def test_empty_is_explicit_none_removes_and_other_metadata_stays():
++    """未设置与故意空说明可区分，不改绘图id/name。@return None。"""
++    document=Document();picture=document.add_picture(str(Path(__file__).resolve().parent/'test_files'/'python-icon.png'))
++    original=picture._inline.docPr.get('name')
++    assert picture.alternative_text is None
++    picture.alternative_text='';picture.title='keep'
++    assert picture.alternative_text=='';picture.alternative_text=None
++    assert picture.alternative_text is None and picture.title=='keep' and picture._inline.docPr.get('name')==original

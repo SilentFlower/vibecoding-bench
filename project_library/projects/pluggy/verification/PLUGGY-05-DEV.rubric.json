@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "PLUGGY-05-DEV",
+  "source_commit": "0224f79fc75efadaafe24dbab9deee2ff616ecd7",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Add pluggy.scoped.temporary_plugins(manager,[(name,plugin),...]) context manager. Preflight all names/identities/blocked/existing conflicts before registration, preserve declared order and existing plugins, then remove only still-registered identical owned objects in reverse order on success/body error/partial historic registration failure. Respect manager-returned actual names via identity lookup, keep nested scopes independent and never remove an unrelated replacement subsequently installed under the same name. Reuse earlier identity repair for eq-equal/unhashable plugins. Roll back registrations/hooks/distribution associations via actual unregister semantics, not arbitrary external callback effects or all newly declared hookspecs.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "workflow",
+      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+}

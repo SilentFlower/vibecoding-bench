@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "CK-DELIMITED-DEV",
+  "source_commit": "2247b35ea1c47c727d7a06e51fa280e12a863ff6",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Implement click.delimited.DelimitedList(item_type=str,*,separator=\",\",min_items=0,max_items=None) as ParamType, converting one CSV-style record or preexisting list/tuple to a tuple through the pinned item ParamType. Support quoted separators, escaped double quotes and explicit empty fields; empty text is an empty list. Reject malformed quotes, multiple records, invalid separators and invalid length bounds before invoking target commands. Preserve item BadParameter context and report one-based failing item position. Verify real option parsing and multiple=True without changing existing Tuple/Choice behavior.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}

@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "version": 2,
+  "task_id": "SC-INTERVAL-DEV",
+  "source_commit": "82a43db1b938d8fdf60103bd41f329e06c8d3651",
+  "criteria": [
+    {
+      "id": "business",
+      "requirement": "Validate Job interval as a positive finite nonboolean int/float at construction and revalidate before _schedule_next_run, because existing public attributes can be mutated. Raise ScheduleValueError before registering a callback or entering the next-run advancement loop for zero/negative/nonfinite/invalid types. Keep positive fractional fixed intervals working and original integer random intervals; reject noninteger random bounds clearly rather than delegating them to randint. Preserve deadline, timezone and weekday logic.",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    },
+    {
+      "id": "delivery",
+      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "evidence": [],
+      "allow_candidate_evidence": true
+    }
+  ],
+  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+}
