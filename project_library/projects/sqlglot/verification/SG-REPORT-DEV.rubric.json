@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 2,
+  "version": 3,
   "task_id": "SG-REPORT-DEV",
   "source_commit": "67961afbed7c986dfe26ab82db89a25814c1bdcb",
   "criteria": [
@@ -12,10 +12,10 @@
     },
     {
       "id": "delivery",
-      "requirement": "必须交付授权源码、能在原版失败的公开回归和中文兼容说明；所有冻结原生回归通过。",
+      "requirement": "Deliver the authorized source changes, public regression tests that fail on the original version, and English compatibility documentation. All frozen native regression tests must pass.",
       "evidence": [],
       "allow_candidate_evidence": true
     }
   ],
-  "comparison": "依据真实程序行为接受等价实现，不按参考文本或篇幅评分。"
+  "comparison": "Accept equivalent implementations according to actual program behavior; do not grade by matching reference text or its length."
 }

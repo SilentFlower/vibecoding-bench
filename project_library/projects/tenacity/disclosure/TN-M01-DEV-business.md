@@ -4,7 +4,7 @@ Avoid computing an irrelevant exponential contribution when the multiplier is ze
 
 # Investigation topics
 
-- 定位浮点零倍率的大编号溢出
+- Locate overflow at large retry numbers when the floating-point multiplier is zero.
 
 # Supplied business material: materials/zero-reproducer.py
 

@@ -35,7 +35,7 @@
           "id": "PACKAGING-01-DEV",
           "kind": "modify",
           "goal": "发行报表保留原版本拼写并独立使用PEP440比较",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd packaging.display.DisplayVersion as an immutable standalone display wrapper, not a change to Version internals. Construct from exact text, expose raw_version and parsed version, normalize str while display preserves exact spelling, comparison/order/hash only use Version semantics (also with plain Version). from_version represents derived/from_parts/replaced versions with raw_version=None and normalized display. Preserve pickle round trips, reject invalid versions and mutation. No raw spelling in canonical comparison keys or original Version pickle formats.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_01_dev.py, and Chinese compatibility documentation at library/docs/development-packaging-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd packaging.display.DisplayVersion as an immutable standalone display wrapper, not a change to Version internals. Construct from exact text, expose raw_version and parsed version, normalize str while display preserves exact spelling, comparison/order/hash only use Version semantics (also with plain Version). from_version represents derived/from_parts/replaced versions with raw_version=None and normalized display. Preserve pickle round trips, reject invalid versions and mutation. No raw spelling in canonical comparison keys or original Version pickle formats.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_01_dev.py, and English compatibility documentation at library/docs/development-packaging-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PACKAGING-01-DEV-contract.md",
@@ -53,7 +53,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PACKAGING-01-DEV.rubric.json",
             "native": "verification/PACKAGING-01-DEV.native.json",
             "public_native": "verification/PACKAGING-01-DEV.public.native.json",
@@ -82,7 +82,7 @@
           "id": "PACKAGING-02-DEV",
           "kind": "modify",
           "goal": "跨平台Marker可仅使用声明的完整目标环境求值",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd keyword-only strict=False to Marker.evaluate. Default environment overlay behavior remains byte-compatible. Opt-in strict=True starts from no host variables and uses only caller mapping plus existing context defaults (metadata extra=\"\", lock_file empty extras/dependency_groups). Missing referenced variables raise UndefinedEnvironmentName, including RHS variables. Repair supplied python_full_version dev suffix only if present, normalize supplied extra and never mutate caller mappings. Do not query host default_environment in strict mode or invent values for unrelated variables.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_02_dev.py, and Chinese compatibility documentation at library/docs/development-packaging-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd keyword-only strict=False to Marker.evaluate. Default environment overlay behavior remains byte-compatible. Opt-in strict=True starts from no host variables and uses only caller mapping plus existing context defaults (metadata extra=\"\", lock_file empty extras/dependency_groups). Missing referenced variables raise UndefinedEnvironmentName, including RHS variables. Repair supplied python_full_version dev suffix only if present, normalize supplied extra and never mutate caller mappings. Do not query host default_environment in strict mode or invent values for unrelated variables.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_02_dev.py, and English compatibility documentation at library/docs/development-packaging-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PACKAGING-02-DEV-contract.md",
@@ -100,7 +100,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PACKAGING-02-DEV.rubric.json",
             "native": "verification/PACKAGING-02-DEV.native.json",
             "public_native": "verification/PACKAGING-02-DEV.public.native.json",
@@ -129,7 +129,7 @@
           "id": "PACKAGING-03-DEV",
           "kind": "modify",
           "goal": "依赖声明按所选extras与同一目标环境判断适用性",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Requirement.applies(selected_extras=(),environment=None). Evaluate singular standard extra for each selected normalized name and return any match, binding the same extra throughout the whole marker; empty selection uses extra=\"\" once. Markerless requirements always apply. Selected consumer extras are separate from Requirement.extras (requested dependency features). Copy environment, chosen extra takes priority, preserve existing Marker evaluation and set-valued lock_file extras semantics. Validate iterable names and reject a bare string or non-string name; do not mutate inputs.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_03_dev.py, and Chinese compatibility documentation at library/docs/development-packaging-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Requirement.applies(selected_extras=(),environment=None). Evaluate singular standard extra for each selected normalized name and return any match, binding the same extra throughout the whole marker; empty selection uses extra=\"\" once. Markerless requirements always apply. Selected consumer extras are separate from Requirement.extras (requested dependency features). Copy environment, chosen extra takes priority, preserve existing Marker evaluation and set-valued lock_file extras semantics. Validate iterable names and reject a bare string or non-string name; do not mutate inputs.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_03_dev.py, and English compatibility documentation at library/docs/development-packaging-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PACKAGING-03-DEV-contract.md",
@@ -147,7 +147,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PACKAGING-03-DEV.rubric.json",
             "native": "verification/PACKAGING-03-DEV.native.json",
             "public_native": "verification/PACKAGING-03-DEV.public.native.json",
@@ -176,7 +176,7 @@
           "id": "PACKAGING-04-DEV",
           "kind": "modify",
           "goal": "离线RECORD清单用严格CSV模型读写并诊断坏条目",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd packaging.record immutable RecordEntry plus parse_record/format_record. Support exact CSV three-column path/hash/size rows, comma/Unicode/newline paths, optional empty hash/size and explicit zero sizes. Strict policy accepts canonical unpadded URLsafe-base64 SHA256/384/512 digests of correct length, rejects unsupported hashes, invalid or negative/bool sizes, wrong columns and duplicate paths. Stable LF output preserves row order and semantic roundtrip. Parsing never accesses disk, imports archive code or verifies actual installed file content; document this scope.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_04_dev.py, and Chinese compatibility documentation at library/docs/development-packaging-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd packaging.record immutable RecordEntry plus parse_record/format_record. Support exact CSV three-column path/hash/size rows, comma/Unicode/newline paths, optional empty hash/size and explicit zero sizes. Strict policy accepts canonical unpadded URLsafe-base64 SHA256/384/512 digests of correct length, rejects unsupported hashes, invalid or negative/bool sizes, wrong columns and duplicate paths. Stable LF output preserves row order and semantic roundtrip. Parsing never accesses disk, imports archive code or verifies actual installed file content; document this scope.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_04_dev.py, and English compatibility documentation at library/docs/development-packaging-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PACKAGING-04-DEV-contract.md",
@@ -194,7 +194,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PACKAGING-04-DEV.rubric.json",
             "native": "verification/PACKAGING-04-DEV.native.json",
             "public_native": "verification/PACKAGING-04-DEV.public.native.json",
@@ -223,7 +223,7 @@
           "id": "PACKAGING-05-DEV",
           "kind": "modify",
           "goal": "结构化分发信息生成语义可逆wheel与sdist文件名",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd packaging.utils.build_wheel_filename(name,version,tags,build=()) and build_sdist_filename(name,version,extension=\".tar.gz\"). Validate/normalize project names and versions using existing APIs. Stable compressed tag components must parse back to the EXACT supplied Tag set; reject non-Cartesian sets instead of inventing compatibility. Validate build tuple and exact roundtrip, reject empty tags and invalid suffix/components. Sdist supports tar.gz/zip, canonical underscore escape. Never create/install archives or alter parsing permissiveness.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_05_dev.py, and Chinese compatibility documentation at library/docs/development-packaging-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd packaging.utils.build_wheel_filename(name,version,tags,build=()) and build_sdist_filename(name,version,extension=\".tar.gz\"). Validate/normalize project names and versions using existing APIs. Stable compressed tag components must parse back to the EXACT supplied Tag set; reject non-Cartesian sets instead of inventing compatibility. Validate build tuple and exact roundtrip, reject empty tags and invalid suffix/components. Sdist supports tar.gz/zip, canonical underscore escape. Never create/install archives or alter parsing permissiveness.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_05_dev.py, and English compatibility documentation at library/docs/development-packaging-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PACKAGING-05-DEV-contract.md",
@@ -241,7 +241,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PACKAGING-05-DEV.rubric.json",
             "native": "verification/PACKAGING-05-DEV.native.json",
             "public_native": "verification/PACKAGING-05-DEV.public.native.json",
@@ -270,7 +270,7 @@
           "id": "PACKAGING-06-DEV",
           "kind": "modify",
           "goal": "旧sdist连字符版本通过显式候选审查消除静默误判",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd packaging.utils.parse_legacy_sdist_filename(filename,expected_name=None). For tar.gz/zip enumerate every split whose project name validates and version parses, deduplicate semantic pairs preserving order. Without expected_name return all valid candidates as a tuple and never silently choose. With a normalized validated expected project name return only a unique matching (name,Version) pair, otherwise InvalidSdistFilename. Support legacy post releases and hyphenated names, reject unsupported extensions/no-valid-split. Existing modern parse_sdist_filename behavior remains unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_06_dev.py, and Chinese compatibility documentation at library/docs/development-packaging-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd packaging.utils.parse_legacy_sdist_filename(filename,expected_name=None). For tar.gz/zip enumerate every split whose project name validates and version parses, deduplicate semantic pairs preserving order. Without expected_name return all valid candidates as a tuple and never silently choose. With a normalized validated expected project name return only a unique matching (name,Version) pair, otherwise InvalidSdistFilename. Support legacy post releases and hyphenated names, reject unsupported extensions/no-valid-split. Existing modern parse_sdist_filename behavior remains unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_packaging_06_dev.py, and English compatibility documentation at library/docs/development-packaging-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PACKAGING-06-DEV-contract.md",
@@ -288,7 +288,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PACKAGING-06-DEV.rubric.json",
             "native": "verification/PACKAGING-06-DEV.native.json",
             "public_native": "verification/PACKAGING-06-DEV.public.native.json",

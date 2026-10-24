@@ -4,9 +4,9 @@ Fix enable_fts so a finite one-shot iterable of column names behaves like equiva
 
 # Investigation topics
 
-- 理解内容表、全文索引与触发器职责
-- 选择触发器或重建同步 FTS5 搜索
-- 定位一次性列迭代耗尽的建索引失败
+- Explain the responsibilities of the content table, full-text index, and triggers.
+- Choose between triggers and rebuilding to synchronize FTS5 search.
+- Diagnose index creation failures caused by exhausting a one-shot column iterator.
 
 # Supplied business material: materials/fts-context.md
 

@@ -1,9 +1,9 @@
-"""TTL按完成时开始，所有判断用假时钟无需真实sleep。"""
+"Public regression tests for WRAPT-04-DEV; the complete business contract is in materials/WRAPT-04-DEV-contract.md."
 import unittest
 from wrapt.ttl_cache import ttl_cache
 
 def test_ttl_completion_boundary_lru_and_expired_cleanup():
-    """耗时计算不吃掉可复用期，边界恰好过期。@return None。"""
+    "Verify ttl completion boundary lru and expired cleanup."
     clock=[0];calls=[]
     @ttl_cache(5,maxsize=2,clock=lambda:clock[0])
     def value(x):calls.append(x);clock[0]+=2;return x*3
@@ -14,7 +14,7 @@ def test_ttl_completion_boundary_lru_and_expired_cleanup():
     clock[0]+=6;assert value.cache_info().currsize==0
 
 def test_zero_policy_errors_and_backward_clock_are_explicit():
-    """零TTL不缓存，异常不缓存，不接受NaN/回退时钟。@return None。"""
+    "Verify zero policy errors and backward clock are explicit."
     calls=[]
     @ttl_cache(0,clock=lambda:0)
     def value(x):calls.append(x);return x

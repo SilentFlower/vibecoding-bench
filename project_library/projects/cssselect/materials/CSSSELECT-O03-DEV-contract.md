@@ -1,5 +1,12 @@
-# 提供模式隔离且可观测的有界选择器翻译缓存
+# Engineering contract: CSSSELECT-O03-DEV
 
-对应路线17：独立LRU服务只接受可明确指纹的内置配置，容量、访问顺序淘汰、统计、清空和并发可观测；失败不缓存，不隐式修改旧API。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement cssselect.cache.SelectorCache(capacity=128) with translate(css, *, mode="xml", xhtml=False, prefix=...), stats(), clear(reset_stats=False). Cache actual builtin XML/HTML translation by complete CSS and every supported mode/XHTML/prefix field; no arbitrary custom translator sharing without fingerprint. Enforce positive non-bool capacity, true access-order LRU, isolated instances, fresh stats and lock-protected consistent concurrent access. Count failures as misses but never cache them. Preserve native parse/translation exceptions, old uncached APIs, and explicit clear/stat-reset semantics.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o03_dev.py and concise English compatibility documentation at library/docs/development-cssselect-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cssselect/cache.py
+- library/tests/test_development_cssselect_o03_dev.py
+- library/docs/development-cssselect-o03-dev.md

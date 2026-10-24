@@ -1,8 +1,8 @@
-"""继承类方法的LRU不能固定到首次调用类。"""
+"Public regression tests for WRAPT-01-DEV; the complete business contract is in materials/WRAPT-01-DEV-contract.md."
 import wrapt
 
 def test_both_classmethod_orders_return_real_class_and_cache_per_class_key():
-    """两种装饰次序都保持绑定，重复调用命中。@return None。"""
+    "Verify both classmethod orders return real class and cache per class key."
     for reverse in (False,True):
         calls=[]
         def body(cls,x):calls.append((cls,x));return cls.__name__,x
@@ -14,7 +14,7 @@ def test_both_classmethod_orders_return_real_class_and_cache_per_class_key():
         assert calls==[(Base,1),(Child,1)]
 
 def test_reverse_first_multiple_subclasses_and_shared_clear_policy():
-    """Derived先调用不污染Base，清除共享类缓存后各自重算。@return None。"""
+    "Verify reverse first multiple subclasses and shared clear policy."
     calls=[]
     class Base:
         @wrapt.lru_cache
@@ -27,7 +27,7 @@ def test_reverse_first_multiple_subclasses_and_shared_clear_policy():
     assert B.label('x')=='Bx' and calls==[A,Base,B,B]
 
 def test_proxies_over_same_class_keep_real_instance_identity_and_gc():
-    """Proxy的__class__可伪装为type，不能因此改用共享类缓存。@return None。"""
+    "Verify proxies over same class keep real instance identity and gc."
     import gc
     import weakref
     class Target:pass

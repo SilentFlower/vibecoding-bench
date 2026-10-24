@@ -1,4 +1,4 @@
-"""公开有界TTL过期清理回归。"""
+"Public regression tests for CT-EXPIRE-LIMIT-DEV; the complete business contract is in materials/CT-EXPIRE-LIMIT-DEV-contract.md."
 import pytest
 from cachetools import TTLCache
 

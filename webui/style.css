@@ -1716,9 +1716,12 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-events { list-style: none; padding: 0; margin: 0; min-height: 280px; max-height: 440px; overflow: auto; }
 .projects-events li { padding: 10px 0; border-bottom: 1px solid var(--border); }
 .projects-events pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.projects-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 12px; }
+.projects-pagination .hint { flex: 1; min-width: 180px; }
 .projects-records { display: grid; gap: 10px; margin-bottom: 14px; }
 .projects-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .projects-history-row > span:nth-child(2) { flex: 1; min-width: 150px; overflow-wrap: anywhere; }
+.projects-history-row small { display: block; margin-top: 4px; }
 #projects-delivery-files .btn, #projects-submissions .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; margin-block: 4px; }
 @media (max-width: 760px) {
   .projects-header { flex-direction: column; align-items: stretch; }

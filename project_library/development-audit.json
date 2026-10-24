@@ -13289,5 +13289,17 @@
         }
       ]
     }
-  ]
+  ],
+  "language_revision": {
+    "catalog_version": "real-development-cycles-v3-600-en-20261024",
+    "catalog_digest": "2d40b2f6796bf8be41c0484a88dc3d1599230fdccb5db3d939eff4eb4249d449",
+    "base_native_validated_catalog_digest": "fef30293bad965ef70566c15d538e41978d21e13068ec78c7f2d84035acd7550",
+    "scope": "English task instructions, public explanatory text and compatibility documentation requirements",
+    "objectives": 600,
+    "public_python_files_with_unchanged_executable_ast_and_business_string_tokens": 571,
+    "source_seed_environment_native_verifiers_and_reference_patches_unchanged": true,
+    "native_validation_rerun": false,
+    "validation": "Content structure, exact manifest/rubric translation, Python AST and business string token equivalence",
+    "normalization_command": "python3 scripts/normalize-project-language.py --check"
+  }
 }

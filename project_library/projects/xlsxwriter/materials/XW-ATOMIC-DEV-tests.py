@@ -1,4 +1,4 @@
-"""公开真实原子工作簿文件回归。"""
+"Public regression tests for XW-ATOMIC-DEV; the complete business contract is in materials/XW-ATOMIC-DEV-contract.md."
 from zipfile import ZipFile
 import pytest
 from xlsxwriter.atomic import atomic_workbook

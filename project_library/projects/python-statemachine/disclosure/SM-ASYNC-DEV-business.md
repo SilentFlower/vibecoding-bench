@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-在当前事件循环等待真实异步激活和事件完成，再读取下一条事件。支持同步与异步来源并复用参数隔离和状态记录，取消及程序故障原样传播，不嵌套启动新循环。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement statemachine.async_runner.AsyncMachineRunner using completed EventCall validation, EventResult and snapshots. dispatch awaits actual activate_initial_state and send only when awaitable, records actual completed states/results and supports normal sync machines. run accepts sync or async event sources, stays lazy, awaits one event before reading the next, stable indices and collect only TransitionNotAllowed. Propagate cancellation, callback and source errors. No nested asyncio.run, hidden threads, tasks or no-op guard shortcuts; preserve actual lifecycle and callback parameter isolation.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_async_dev.py and concise English compatibility documentation at library/docs/development-sm-async-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/statemachine/async_runner.py
+- library/development_tests/test_development_sm_async_dev.py
+- library/docs/development-sm-async-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

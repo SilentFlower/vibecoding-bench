@@ -1,4 +1,4 @@
-"""公开订阅历史排序回归。"""
+"Public regression tests for FG-ORDER-DEV; the complete business contract is in materials/FG-ORDER-DEV-contract.md."
 from datetime import datetime,timezone,timedelta
 import pytest
 from feedgen.feed import FeedGenerator

@@ -1,5 +1,12 @@
-# 一致转换Todo完成重开取消状态及进度
+# Engineering contract: COLLECTIVE-ICALENDAR-O04-DEV
 
-对真实Todo完整维护状态、进度和完成时间，所有动作返回独立副本。完成必须明确带时区时间并转UTC；重开和取消清理旧完成字段。版本及DTSTAMP仅显式修改，不读墙钟、不发送邀请。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement icalendar.todo_transition.transition_todo for actual Todo objects with complete/reopen/cancel actions, returning an isolated same-class copy. Completion requires an explicit aware timestamp normalized to UTC and 100 percent; reopen clears COMPLETED and uses 0..99 progress/NEEDS-ACTION or IN-PROCESS; cancel clears completion and uses CANCELLED/zero. Validate progress and timestamps before publication, preserve UID/start/due and by-default SEQUENCE/DTSTAMP, offer explicit sequence bump/stamp, and never read a wall clock or send invitations.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o04_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/icalendar/todo_transition.py
+- library/tests/test_development_collective_icalendar_o04_dev.py
+- library/docs/development-collective-icalendar-o04-dev.md

@@ -1,11 +1,11 @@
-"""实盘绝对数对账区分未盘点、无差异和零库存。"""
+"Public regression tests for TYPER-05-DEV; the complete business contract is in materials/TYPER-05-DEV-contract.md."
 import json,tempfile
 from pathlib import Path
 from typer.testing import CliRunner
 import shop
 
 def test_partial_counts_zero_and_unchanged_records_keep_order_and_exact_diff():
-    """未盘点不当作零，无变化不制造差异。@return None。"""
+    "Verify partial counts zero and unchanged records keep order and exact diff."
     with tempfile.TemporaryDirectory() as directory:
         base=Path(directory);source=base/'catalog';counts=base/'counts';out=base/'out'
         source.write_text('[{"sku":"a","name":"A","quantity":3},{"sku":"b","name":"B","quantity":2},{"sku":"c","name":"C","quantity":4}]')
@@ -15,7 +15,7 @@ def test_partial_counts_zero_and_unchanged_records_keep_order_and_exact_diff():
         assert json.loads(result.stdout)=={'counted':2,'changed':1,'differences':[{'sku':'a','before':3,'after':0,'delta':-3}]} and source.read_bytes()==before
 
 def test_duplicate_unknown_negative_bool_and_existing_output_reject_whole_batch():
-    """盘点不采用最后值悄悄盖重复记录。@return None。"""
+    "Verify duplicate unknown negative bool and existing output reject whole batch."
     with tempfile.TemporaryDirectory() as directory:
         base=Path(directory);source=base/'catalog';counts=base/'counts';source.write_text('[{"sku":"a","name":"A","quantity":1}]')
         for n,items in enumerate(([{'sku':'a','quantity':0},{'sku':'a','quantity':1}],[{'sku':'x','quantity':1}],[{'sku':'a','quantity':-1}],[{'sku':'a','quantity':True}])):

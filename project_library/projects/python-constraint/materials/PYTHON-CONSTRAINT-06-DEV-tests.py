@@ -1,11 +1,11 @@
-"""最优值来自真实可行解，部分搜索绝不标已最优。"""
+"Public regression tests for PYTHON-CONSTRAINT-06-DEV; the complete business contract is in materials/PYTHON-CONSTRAINT-06-DEV-contract.md."
 import unittest
 from constraint import Problem,BacktrackingSolver
 from constraint.optimization import optimize
 
 
 def test_min_max_repeat_and_model_preservation():
-    """同一字符串排班模型多轮目标变化不累积规则或缩域。@return None。"""
+    "Verify min max repeat and model preservation."
     problem=Problem(BacktrackingSolver());problem.addVariables(['x','y'],(value for value in range(4)));problem.addConstraint('x < y')
     minimum=optimize(problem,lambda row:row['x']+row['y'])
     maximum=optimize(problem,lambda row:row['x']+row['y'],direction='max')
@@ -15,7 +15,7 @@ def test_min_max_repeat_and_model_preservation():
 
 
 def test_budget_unsatisfiable_and_invalid_objective():
-    """预算没有最优性证明，无解必须完整穷尽。@return None。"""
+    "Verify budget unsatisfiable and invalid objective."
     problem=Problem(BacktrackingSolver());problem.addVariables(['a','b'],range(5))
     result=optimize(problem,lambda row:row['a'],max_solutions=2)
     assert result.examined==2 and not result.complete and result.reason=='budget'

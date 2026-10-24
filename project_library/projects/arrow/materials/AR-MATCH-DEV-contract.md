@@ -1,5 +1,12 @@
-# 为离线日志导入交付原文位置完整的时间解析报告
+# Engineering contract: AR-MATCH-DEV
 
-离线日志编辑器需要知道日期来自原文哪一段，并保留其余文字。新增不可变解析报告，跨格式取最早有效日期；空白归一时仍返回准确原文范围，同时单列归一索引，不把错误日期或纯字面格式当作日期。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add DateTimeParser.parse_match(text, format_or_list, normalize_whitespace=False) returning immutable ParsedDateTimeMatch with value datetime, selected format, original span/matched/prefix/suffix and a separate normalized_span. Select the earliest calendar-valid match across formats, breaking equal-position ties by format order; skip invalid dates and empty/literal-only matches. Preserve raw Unicode and whitespace exactly. If whitespace is normalized for matching, map every matched normalized character back to its original span rather than pretending normalized indices refer to raw input. Use the complete strict token parser and preserve old parse return types and boundaries.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_match_dev.py and concise English compatibility documentation at library/docs/development-ar-match-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/arrow/parser.py
+- library/development_tests/test_development_ar_match_dev.py
+- library/docs/development-ar-match-dev.md

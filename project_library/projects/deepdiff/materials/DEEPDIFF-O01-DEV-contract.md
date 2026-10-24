@@ -1,5 +1,12 @@
-# 修复复数负虚部精度格式化并贯通真实比较哈希
+# Engineering contract: DEEPDIFF-O01-DEV
 
-对应路线01：实虚部分别沿原精度规则处理，以数值方式构造复数，避免负虚部非法+-；真实Diff/Hash、无序比较及边界矩阵同时证明。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix helper.number_to_string complex precision without string-concatenating an invalid real+-imagj representation. Apply the existing recursive precision and f/e notation separately to real/imag components, reconstruct numerically preserving supported complex subclasses and existing signed-zero/nonfinite policies. Prove four quadrants, pure imaginary, zero digits, small exponents, NaN/Infinity and supported subclasses, plus actual DeepDiff/DeepHash and ignore_order paths. Keep noncomplex numeric behavior and native precision rules unchanged.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o01_dev.py and concise English compatibility documentation at library/docs/development-deepdiff-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/deepdiff/helper.py
+- library/tests/test_development_deepdiff_o01_dev.py
+- library/docs/development-deepdiff-o01-dev.md

@@ -1,3 +1,13 @@
-# 混合同步异步业务flow遵守调用方事件循环与取消语义
+# Engineering contract: PYDASH-06-DEV
 
-路线12：异步flow逐步await普通协程或自定义awaitable，首步原参数转发；异常/取消立即传播，不抢占调用方循环，旧同步flow不变。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add explicit pydash.async_flow.async_flow and top-level callable export. First function receives original args/kwargs; subsequent functions receive one completed result, awaiting any inspect.isawaitable value including custom awaitables. Run entirely in caller event loop, propagate exceptions and cancellation without later steps, validate callables up front. Empty flow is identity for one positional value or None for zero; reject extra args/kwargs. Existing synchronous flow/flow_right remain unchanged, no internal asyncio.run.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pydash_06_dev.py, and English compatibility documentation at library/docs/development-pydash-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pydash/async_flow.py
+- library/src/pydash/__init__.py
+- library/tests/test_development_pydash_06_dev.py
+- library/docs/development-pydash-06-dev.md

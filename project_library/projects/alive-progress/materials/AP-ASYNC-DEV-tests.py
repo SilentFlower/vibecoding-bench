@@ -1,4 +1,4 @@
-"""公开异步进度生命周期回归。"""
+"Public regression tests for AP-ASYNC-DEV; the complete business contract is in materials/AP-ASYNC-DEV-contract.md."
 import asyncio
 import pytest
 from alive_progress.asyncio import alive_async_it

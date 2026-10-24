@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-提供真实JSON树寻址，严格区分字典字符串键与数组下标，正确处理空键、空根和转义。不接受坏转义、前导零、负数或URI片段，返回原值且不修改输入。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement simplejson.pointer.tokens(pointer), index(token,length,*,append=False) and resolve(document,pointer). Support empty root, empty mapping keys and RFC6901 ~0/~1 escapes with exact one-pass semantics. Reject malformed escapes, URI fragments, non-string pointers and non-canonical array indices (negative, leading zero, bool-like, dash except append mode). Mappings keep numeric-looking string keys; arrays use bounds-checked numeric indices. Resolution returns the original referenced value and never mutates the input.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sj_pointer_dev.py and concise English compatibility documentation at library/docs/development-sj-pointer-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/simplejson/pointer.py
+- library/development_tests/test_development_sj_pointer_dev.py
+- library/docs/development-sj-pointer-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

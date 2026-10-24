@@ -1,4 +1,4 @@
-"""公开复现跨模型等值字段被误选。"""
+"""Public reproduction of incorrectly selecting equal-valued attributes from another model."""
 import attr
 from attr.filters import include, exclude
 A = attr.make_class('A', {'x':attr.ib()})

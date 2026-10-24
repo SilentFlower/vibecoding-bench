@@ -1,4 +1,4 @@
-"""公开电子表格公式策略回归。"""
+"Public regression tests for CH-FORMULA-DEV; the complete business contract is in materials/CH-FORMULA-DEV-contract.md."
 import pytest
 from cli_helpers.tabular_output.preprocessors import spreadsheet_formula_policy
 from cli_helpers.tabular_output import TabularOutputFormatter

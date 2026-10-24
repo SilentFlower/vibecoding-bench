@@ -1,10 +1,10 @@
-"""集合CLI往返恢复frozenset/deque的值与类型。"""
+"Public regression tests for PYDANTIC-SETTINGS-03-DEV; the complete business contract is in materials/PYDANTIC-SETTINGS-03-DEV-contract.md."
 from collections import deque
 from enum import Enum
 from pydantic_settings import BaseSettings,CliApp
 
 def test_frozen_and_queue_containers_roundtrip_real_cli():
-    """不是检查JSON文本，而是真实serialize后再次解析。@return None。"""
+    "Verify frozen and queue containers roundtrip real cli."
     class Config(BaseSettings):
         frozen:frozenset[str]
         queue:deque[str]
@@ -15,7 +15,7 @@ def test_frozen_and_queue_containers_roundtrip_real_cli():
     assert list(copy.queue)==expected
 
 def test_empty_containers_and_enum_elements_keep_types():
-    """空容器不落回默认，enum通过既有JSON编码恢复。@return None。"""
+    "Verify empty containers and enum elements keep types."
     class Color(str,Enum):RED='red';BLUE='blue'
     class Config(BaseSettings):
         frozen:frozenset[Color]=frozenset([Color.RED])
@@ -26,7 +26,7 @@ def test_empty_containers_and_enum_elements_keep_types():
     assert CliApp.run(Config,cli_args=CliApp.serialize(full))==full
 
 def test_optional_queue_and_existing_repeated_shorthand_keep_policy():
-    """新完整JSON分支不能改变原列表及重复选项简写。@return None。"""
+    "Verify optional queue and existing repeated shorthand keep policy."
     class Config(BaseSettings):
         plain:list[str]
         frozen:frozenset[str]

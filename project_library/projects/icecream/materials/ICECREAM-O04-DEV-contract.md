@@ -1,5 +1,12 @@
-# 在整体生效前验证真实调试器配置并拒绝半更新
+# Engineering contract: ICECREAM-O04-DEV
 
-对应路线07：真实构造/配置先完整验证类型才生效，内置颜色输出器切换也不能先改；保留Sentinel、空prefix及合法callable，不在验证时执行用户回调。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Validate real IceCreamDebugger constructor/configureOutput declarations before mutating any field or auto-swapping builtin color output. Prefix must be text/callable, formatting/output callbacks callable, flags actual bool and lineWrapWidth positive non-bool int. Preserve Sentinel.absent, empty prefixes, valid callbacks and existing builtin noColor output swap rules. Never execute a prefix/formatter during validation or pretend to know its eventual return type; callback execution failures remain runtime failures. Invalid combinations, unknown kwargs or no-arg configure must leave all previous fields identical, including prefix and outputFunction.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o04_dev.py and concise English compatibility documentation at library/docs/development-icecream-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/icecream/icecream.py
+- library/tests/test_development_icecream_o04_dev.py
+- library/docs/development-icecream-o04-dev.md

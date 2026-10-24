@@ -1,9 +1,9 @@
-"""Todo动作必须同步更新状态进度和完成时间。"""
+"Public regression tests for COLLECTIVE-ICALENDAR-O04-DEV; the complete business contract is in materials/COLLECTIVE-ICALENDAR-O04-DEV-contract.md."
 from datetime import datetime, timedelta, timezone
 from icalendar import Todo
 
 def test_complete_utc_and_original():
-    """完成统一UTC及100%，原Todo保持。@return None。"""
+    "Verify complete utc and original."
     from icalendar.todo_transition import transition_todo
     source = Todo()
     moment = datetime(2026, 1, 1, 10, tzinfo=timezone(timedelta(hours=8)))
@@ -13,7 +13,7 @@ def test_complete_utc_and_original():
     assert 'COMPLETED' not in source
 
 def test_reopen_cancel_sequence_policy():
-    """重开清完成字段，版本变化仅显式执行。@return None。"""
+    "Verify reopen cancel sequence policy."
     from icalendar.todo_transition import transition_todo
     source = transition_todo(Todo(), 'complete', completed_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     reopened = transition_todo(source, 'reopen', progress=25, bump_sequence=True)
@@ -21,7 +21,7 @@ def test_reopen_cancel_sequence_policy():
     assert str(transition_todo(reopened, 'cancel')['STATUS']) == 'CANCELLED'
 
 def test_invalid_progress_and_naive():
-    """非法进度或无时区完成时间拒绝。@return None。"""
+    "Verify invalid progress and naive."
     import pytest
     from icalendar.todo_transition import transition_todo
     for progress in (-1, 100, True):

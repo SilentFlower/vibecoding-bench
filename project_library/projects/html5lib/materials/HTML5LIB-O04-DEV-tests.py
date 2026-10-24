@@ -1,9 +1,9 @@
-"""恢复诊断与真实树/编码/兼容模式分开交付，严格模式不伪成功。"""
+"Public regression tests for HTML5LIB-O04-DEV; the complete business contract is in materials/HTML5LIB-O04-DEV-contract.md."
 import html5lib
 import pytest
 
 def test_recovering_report_contains_real_tree_errors_encoding_and_quirks():
-    """宽容恢复仍保留可用树及每条真实诊断来源。@return None。"""
+    "Verify recovering report contains real tree errors encoding and quirks."
     from html5lib.diagnostics import parse_with_report
     result=parse_with_report('<p>broken</div>')
     assert result.errors and all(set(error)=={'position','code','details'} for error in result.errors)
@@ -12,7 +12,7 @@ def test_recovering_report_contains_real_tree_errors_encoding_and_quirks():
     assert html5lib.serialize(result.tree)==html5lib.serialize(html5lib.parse('<p>broken</div>'))
 
 def test_strict_ignore_and_budget_do_not_change_default_parse_contract():
-    """error抛原异常、ignore只隐藏报告；上限只截报告不丢真实树。@return None。"""
+    "Verify strict ignore and budget do not change default parse contract."
     from html5lib.diagnostics import parse_with_report
     from html5lib.html5parser import ParseError
     with pytest.raises(ParseError):parse_with_report('<p>x',policy='error')
@@ -20,7 +20,7 @@ def test_strict_ignore_and_budget_do_not_change_default_parse_contract():
     limited=parse_with_report('<p>x',max_errors=0);assert limited.errors==[] and limited.truncated and 'x' in ''.join(limited.tree.itertext())
 
 def test_backend_namespaces_valid_documents_and_invalid_policies():
-    """DOM后端及无命名空间选项真实生效，合法文档无伪诊断。@return None。"""
+    "Verify backend namespaces valid documents and invalid policies."
     from html5lib.diagnostics import parse_with_report
     result=parse_with_report(b'<!doctype html><html><head><title>T</title></head><body><p>x</p></body></html>',treebuilder='dom',override_encoding='utf8')
     assert result.tree.documentElement.tagName=='html' and result.compat_mode=='no quirks' and result.errors==[]

@@ -1,5 +1,12 @@
-# 按规范默认值区分真正必需的dataclass联合字段
+# Engineering contract: CATTRS-O01-DEV
 
-联合判别统一使用已适配默认值，dataclass默认工厂不是必需字段且判别时不执行工厂。真正歧义按任意成员顺序均拒绝；保留独有必需字段、普通默认、attrs工厂及Literal/重命名规则。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Repair union disambiguation so dataclass default_factory fields are treated as optional using the actual adapted field defaults, without invoking factories during discrimination. Truly ambiguous unions must raise TypeError independently of member order instead of selecting the class with the factory field. Preserve real required unique fields, ordinary defaults, attrs factories, Literal/renaming overrides and every frozen regression.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o01_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/cattrs/disambiguators.py
+- library/tests/test_development_cattrs_o01_dev.py
+- library/docs/development-cattrs-o01-dev.md

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-新增独立MappingCast，显式选择键值记录或JSON对象；首个等号之后的URL保持完整，引用逗号、空值和井号保留。键转换后判重复，支持明确末项获胜；JSON嵌套保持原生类型。坏项、不合法顶层或空键报错，不自动猜测格式、不改Csv。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add MappingCast(key_cast=str, value_cast=undefined, *, format='pairs', delimiter=',', duplicate='error'). Parse strict one-record CSV key=value pairs by splitting only the first equals sign, or explicitly selected JSON objects with native nested values. Convert each key/value once, detect duplicate keys after key conversion and support explicit duplicate='last'. Preserve empty values and # characters; reject empty keys, missing separators, multiple records and non-object JSON without leaking entire values. None yields an empty mapping. Do not change Csv or guess formats automatically.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_dc_mapping_dev.py and concise English compatibility documentation at library/docs/development-dc-mapping-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/decouple.py
+- library/tests/test_development_dc_mapping_dev.py
+- library/docs/development-dc-mapping-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

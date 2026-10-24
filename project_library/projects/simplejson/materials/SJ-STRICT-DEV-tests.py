@@ -1,4 +1,4 @@
-"""公开严格解码回归。"""
+"Public regression tests for SJ-STRICT-DEV; the complete business contract is in materials/SJ-STRICT-DEV-contract.md."
 from decimal import Decimal
 import pytest
 import simplejson

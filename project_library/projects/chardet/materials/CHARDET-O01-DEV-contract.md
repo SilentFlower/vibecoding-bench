@@ -1,5 +1,12 @@
-# 让分块BOM识别与整份输入一致且不丢前缀
+# Engineering contract: CHARDET-O01-DEV
 
-初始仅缓存尚可能属于BOM的最多三字节，正确区分UTF16/32共享前缀及特殊UCS4。任意分块、空块、近似前缀、EOF残片和reset均不丢不重字节，普通文本立即探测；原标签及探测器保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Repair UniversalDetector startup to buffer only incomplete possible BOM prefixes until a complete UTF8/16/32 or unusual UCS4 BOM can be distinguished, then use existing detection semantics. Handle UTF16-vs-UTF32 prefix overlap, arbitrary byte/empty chunks, near-prefix mismatches, EOF partial prefixes and reset reuse without losing or duplicating bytes. Ordinary non-BOM input must start probing immediately; preserve original labels, confidence, all probers and frozen upstream tests.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o01_dev.py and concise English compatibility documentation at library/docs/development-chardet-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/chardet/universaldetector.py
+- library/tests/test_development_chardet_o01_dev.py
+- library/docs/development-chardet-o01-dev.md

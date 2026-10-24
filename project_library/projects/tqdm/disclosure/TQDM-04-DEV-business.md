@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线08：仅可len时推断总量，标准库支持的任务生成器单次消费且用未知total，不为显示总量物化任务。显式total、空输入、异常/超时及gather原顺序保持，验收只用本地异步任务。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Repair tqdm_asyncio.as_completed to infer total only when len(fs) is supported. Accept standard asyncio.as_completed task generators under the pinned Python runtime, consume once through the real standard-library scheduler, use unknown total otherwise and preserve explicit total, empty input, timeout/cancellation/task errors and gather result-order behavior. Do not list() tasks solely to obtain a total or swallow non-TypeError length failures. All acceptance tasks use local asyncio.sleep(0), not network services or real accounts.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_tqdm_04_dev.py, and English compatibility documentation at library/docs/development-tqdm-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/tqdm/asyncio.py
+- library/tests/test_development_tqdm_04_dev.py
+- library/docs/development-tqdm-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

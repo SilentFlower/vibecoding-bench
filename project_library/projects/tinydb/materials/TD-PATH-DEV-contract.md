@@ -1,5 +1,12 @@
-# 以显式字段序列构造嵌套查询并保持缓存身份
+# Engineering contract: TD-PATH-DEV
 
-订单字段由配置动态指定时，需要显式字段序列而非点号拆分，保留空键、方法同名键和原缓存规则。实现新查询构造能力，不修改原构造器及map动态路径行为。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Query.at_path(segments), appending a nonempty finite iterable of string keys to the current query path. Treat dots, slashes, empty strings and names of Query methods as literal keys. Preserve Query subclasses, immutability of the original builder, full-path cache identity and uncacheable map paths. Reject plain string/bytes inputs and nonstring segments before returning a query; preserve missing-path false behavior.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_td_path_dev.py and concise English compatibility documentation at library/docs/development-td-path-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tinydb/queries.py
+- library/development_tests/test_development_td_path_dev.py
+- library/docs/development-td-path-dev.md

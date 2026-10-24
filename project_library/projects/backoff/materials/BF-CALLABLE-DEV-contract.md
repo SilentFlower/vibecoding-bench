@@ -1,5 +1,12 @@
-# 为partial和可调用对象提供安全日志名称
+# Engineering contract: BF-CALLABLE-DEV
 
-默认重试日志安全取得partial底层函数名或可调用对象类型名，不调用repr、不输出绑定实参。日志不得用AttributeError覆盖原始异常或返回值；保留目标执行次数、日志级别、普通函数和禁用日志行为。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Repair default backoff/giveup logging for functools.partial and callable instances without __name__. Unwrap nested partials to a safe function name when available, otherwise use a stable type name; never call repr or expose bound arguments. Logs must not replace real return values or original exceptions with AttributeError. Preserve existing functions/methods, logger=None, levels and both predicate/exception modes without changing target call counts.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bf_callable_dev.py and concise English compatibility documentation at library/docs/development-bf-callable-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/backoff/_common.py
+- library/tests/test_development_bf_callable_dev.py
+- library/docs/development-bf-callable-dev.md

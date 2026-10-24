@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线15：业务允许/禁止元组表真实接入Constraint协议，列按显式variables，表持有独立快照及规模预算；允许表根据当前域支持安全剪枝，禁止表不误拒绝未完成赋值。单变量预处理复用前置独立域能力，原模型不永久缩小。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add constraint.tables.AllowedTuples/ForbiddenTuples as real Constraint subclasses, with copied immutable row values, explicit variable-column order, shape/duplicate-variable checks and bounded max_rows preflight. Allowed tables filter support against assigned values AND remaining domains and prune only unsupported values in forward-check mode; forbidden tables reject exact complete rows and safely prune a single remaining variable. Support nonnumeric and unhashable comparable domain values without requiring hash-based membership. Empty allowed table is unsatisfiable, empty forbidden table imposes no restriction. Preserve original solvers and the earlier per-query independent Domain contract, including unary preprocessing without permanent model-domain mutation.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_04_dev.py, and English compatibility documentation at library/docs/development-python-constraint-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/constraint/tables.py
+- library/tests/test_development_python_constraint_04_dev.py
+- library/docs/development-python-constraint-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

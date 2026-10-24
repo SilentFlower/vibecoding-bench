@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-keymap新增显式first/error/combine碰撞政策，默认last保持。每个原键只转换一次，严格错误报告冲突原键，归并按顺序执行。保留输入、工厂、插入顺序、curried及回调错误，不改其他映射函数覆盖规则。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Extend keymap with keyword-only collision='last' and combine=None. Preserve default last-value semantics; add first, error with original-key context, and ordered combine(existing, incoming) policies. Transform each original key exactly once, preserve input mapping and factory/insertion order, propagate unhashable-key and callback errors, validate policies and expose behavior through curried/tlz without changing itemmap/merge semantics.
+
+Deliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_keymap_dev.py and concise English compatibility documentation at library/docs/development-tz-keymap-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/toolz/dicttoolz.py
+- library/toolz/tests/test_development_tz_keymap_dev.py
+- library/docs/development-tz-keymap-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

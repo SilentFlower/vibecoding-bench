@@ -1,5 +1,12 @@
-# 以标准日志级别门禁集成真实调试格式及用户来源
+# Engineering contract: ICECREAM-O05-DEV
 
-对应路线15：标准Logger先门禁再执行真实IceCream格式，用用户调用帧建立LogRecord并释放帧引用；透传身份、原格式/开关保持，不另建日志服务。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add icecream.logging_adapter.LoggingDebugger(logger,level=logging.DEBUG,**IceCreamDebugger_kwargs) using existing Logger only. Check enabled and logger.isEnabledFor before prefix/repr/source-formatting work, use the actual IceCream _format against the original caller frame, create a real makeRecord with caller file/line/function and pass to logger.handle. Preserve original None/single-object/multiple-argument identity return, inherited formatting/disable semantics, no handlers/services/global logging config. Release retained frame references; propagate handler/format failures according to normal logging behavior and prove disabled levels never evaluate dangerous repr.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o05_dev.py and concise English compatibility documentation at library/docs/development-icecream-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/icecream/logging_adapter.py
+- library/tests/test_development_icecream_o05_dev.py
+- library/docs/development-icecream-o05-dev.md

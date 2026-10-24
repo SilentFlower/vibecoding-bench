@@ -4,7 +4,7 @@ Implement only the explicitly authorized parse-before-output-open repair and pub
 
 # Investigation topics
 
-- 先核CLI参数和路径再定位输出丢失
+- Check CLI arguments and paths before diagnosing lost output.
 
 # Supplied business material: materials/cli-repair.md
 

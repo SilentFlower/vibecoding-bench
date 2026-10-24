@@ -1,4 +1,4 @@
-"""公开显式嵌套查询回归。"""
+"Public regression tests for TD-PATH-DEV; the complete business contract is in materials/TD-PATH-DEV-contract.md."
 import pytest
 from tinydb import TinyDB, Query
 from tinydb.storages import MemoryStorage

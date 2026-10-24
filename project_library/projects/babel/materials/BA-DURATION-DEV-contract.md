@@ -1,5 +1,12 @@
-# 按固定单位分解并本地化多分量时长
+# Engineering contract: BA-DURATION-DEV
 
-倒计时和作业耗时需要“1小时2分钟”这样的多分量表达。按显式固定单位分解、保留末级小数，沿用复数规则及区域列表连接；省略零分量，可限制显示数量，不把月份年份当固定秒数。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add babel.dates.format_duration(delta, *, units=("day","hour","minute","second"), max_parts=None, length="long", locale=None). Accept nonnegative finite seconds or timedelta, decompose by explicit strictly descending unique week/day/hour/minute/second units, preserve fractional remainder in the smallest unit, omit zero components and render zero in the smallest unit. Use existing format_unit pluralization and CLDR unit list styles, falling back to standard list style for incomplete unit list patterns. max_parts truncates nonzero components without rounding. Reject calendar months/years, invalid order, negative/nonfinite values and invalid part counts; preserve format_timedelta.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_duration_dev.py and concise English compatibility documentation at library/docs/development-ba-duration-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/babel/dates.py
+- library/development_tests/test_development_ba_duration_dev.py
+- library/docs/development-ba-duration-dev.md

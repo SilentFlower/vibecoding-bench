@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线16：提供默认源的无打开预览，保留真实glob和重复顺序，明确缺路径和未执行provider；不调用repr、不执行Action、不改变上次解析状态。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add ArgumentParser.discover_config_files() for declared default_config_files only. Return ordered fresh records matching existing glob expansion and duplicate source order: path records contain kind,index,path,exists; unmatched declarations produce exists=false; provider records contain only kind="provider",index,executed=false. Support PathLike and expanduser with path-before-callable precedence. Do not open files, invoke providers, inspect their repr, run argument actions or mutate last parse/source state. Discovery is a filesystem snapshot, not a promise of later readability; real parsing behavior stays unchanged.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o04_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/configargparse.py
+- library/tests/test_development_configargparse_o04_dev.py
+- library/docs/development-configargparse-o04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

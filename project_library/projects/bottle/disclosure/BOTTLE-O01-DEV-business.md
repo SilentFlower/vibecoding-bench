@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-上传、静态文件、模板名与搜索目录、资源目录入口统一使用真实fspath协议。路径和流明确区分，支持目录目标及自定义PathLike；非法返回类型不伪装为字符串，调用者流、冲突规则和静态目录边界保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Extend FileUpload.save, static_file, BaseTemplate name/lookup and ResourceManager.add_path boundaries to accept str/bytes/os.PathLike via os.fspath/fsdecode, including custom PathLike and Unicode. Distinguish real paths from writable streams, support upload target directories and one directory lookup input, preserve caller stream ownership/cursor and existing file conflict/static containment rules. Invalid __fspath__ return types must fail instead of being stringified. Do not reinterpret template source text as filenames.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_bottle_o01_dev.py and concise English compatibility documentation at library/docs/development-bottle-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bottle.py
+- library/test/test_development_bottle_o01_dev.py
+- library/docs/development-bottle-o01-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

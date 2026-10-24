@@ -1,4 +1,4 @@
-"""公开异常组重试回归。"""
+"Public regression tests for TN-GROUP-DEV; the complete business contract is in materials/TN-GROUP-DEV-contract.md."
 import pytest
 from tenacity import Future,Retrying,RetryCallState,stop_after_attempt
 from tenacity.retry import retry_if_exception_group

@@ -1,5 +1,12 @@
-# 在原生文件入口识别真实PathLike并保持流所有权
+# Engineering contract: BOTTLE-O01-DEV
 
-上传、静态文件、模板名与搜索目录、资源目录入口统一使用真实fspath协议。路径和流明确区分，支持目录目标及自定义PathLike；非法返回类型不伪装为字符串，调用者流、冲突规则和静态目录边界保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend FileUpload.save, static_file, BaseTemplate name/lookup and ResourceManager.add_path boundaries to accept str/bytes/os.PathLike via os.fspath/fsdecode, including custom PathLike and Unicode. Distinguish real paths from writable streams, support upload target directories and one directory lookup input, preserve caller stream ownership/cursor and existing file conflict/static containment rules. Invalid __fspath__ return types must fail instead of being stringified. Do not reinterpret template source text as filenames.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_bottle_o01_dev.py and concise English compatibility documentation at library/docs/development-bottle-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bottle.py
+- library/test/test_development_bottle_o01_dev.py
+- library/docs/development-bottle-o01-dev.md

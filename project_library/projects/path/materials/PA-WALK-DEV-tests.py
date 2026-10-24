@@ -1,4 +1,4 @@
-"""公开受控目录遍历回归。"""
+"Public regression tests for PA-WALK-DEV; the complete business contract is in materials/PA-WALK-DEV-contract.md."
 from path import Path
 import pytest
 

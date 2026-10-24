@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线03：读取块先与残留合并再查完整分隔符，支持UTF8等多字节边界、连续分隔及末尾半分隔；原字节只透传一次，计数/数字记录回调正确。读取有界，长未结束记录仍需相应残留内存，不伪称常量内存。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Repair tqdm.cli.posix_pipe to combine retained tail with each bounded read before delimiter scanning. Handle delimiters split at every byte position, multiple/consecutive delimiters, delimiter-at-EOF, incomplete delimiter suffix and undelimited final record. Forward every original byte exactly once, preserve byte-count mode for delim=b"", record-count mode and full-record callback mode used by numeric --update. Reject nonpositive/noninteger buffer size and nonbytes delimiter. Keep caller stream ownership/flush behavior; incomplete records may require record-sized carry memory, not falsely constant memory. Do not decode or execute input records in the generic pipe helper.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_tqdm_02_dev.py, and English compatibility documentation at library/docs/development-tqdm-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/tqdm/cli.py
+- library/tests/test_development_tqdm_02_dev.py
+- library/docs/development-tqdm-02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

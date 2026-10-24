@@ -1,3 +1,12 @@
-# IO进度包装按真实成功写入量计数并保留短写与返回值
+# Engineering contract: TQDM-03-DEV
 
-路线04：write先实际调用，再按有效整数返回量更新，二进制buffer按nbytes、文本按字符，短写和0准确且原返回值透传。None明确沿旧len回退；非法量及写异常不回调，不擅自重试短写，read保持。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair CallbackIOWrapper write reporting: call the actual stream first, use a valid integer-index result as successful count, including zero and short writes, then invoke callback exactly once and return the unchanged original result. Binary buffer capacity uses memoryview.nbytes, text capacity uses character len. Reject bool/non-index/negative/over-capacity returned counts without progress callback; None retains explicitly documented legacy len(data) fallback. A stream write error never advances progress and the wrapper never retries short writes or closes/rewinds caller streams. Preserve the existing read reporting path.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_tqdm_03_dev.py, and English compatibility documentation at library/docs/development-tqdm-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/tqdm/utils.py
+- library/tests/test_development_tqdm_03_dev.py
+- library/docs/development-tqdm-03-dev.md

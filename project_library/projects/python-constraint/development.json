@@ -32,7 +32,7 @@
           "id": "PYTHON-CONSTRAINT-01-DEV",
           "kind": "modify",
           "goal": "重复排班求解不累积字符串编译约束且重置完整清空规则",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Problem._getArgs so parsed string constraints live only in the current solve list, never get appended to the permanent explicit _constraints on every query. Preserve explicitly repeated constraints/callable objects, all existing string-expression semantics and each solver picklable policy; compile failures must not partially alter the model. reset clears string rules as well as regular constraints and variables. Repeated mixed string/function solving, solver changes and later variable declarations retain identical legal solution sets without model-list growth. Deliver a complete state-lifecycle repair, not a cache counter test.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_01_dev.py, and Chinese compatibility documentation at library/docs/development-python-constraint-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Problem._getArgs so parsed string constraints live only in the current solve list, never get appended to the permanent explicit _constraints on every query. Preserve explicitly repeated constraints/callable objects, all existing string-expression semantics and each solver picklable policy; compile failures must not partially alter the model. reset clears string rules as well as regular constraints and variables. Repeated mixed string/function solving, solver changes and later variable declarations retain identical legal solution sets without model-list growth. Deliver a complete state-lifecycle repair, not a cache counter test.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_01_dev.py, and English compatibility documentation at library/docs/development-python-constraint-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-CONSTRAINT-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-CONSTRAINT-01-DEV.rubric.json",
             "native": "verification/PYTHON-CONSTRAINT-01-DEV.native.json",
             "public_native": "verification/PYTHON-CONSTRAINT-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PYTHON-CONSTRAINT-02-DEV",
           "kind": "modify",
           "goal": "排班导出正确投影单列、零列与任意标识变量顺序",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Problem.getSolutionsOrderedList: order=None keeps the prior default value order, every explicit variable sequence (including length one and empty) projects exactly those columns and always returns tuples. Reject string/bytes order, duplicate variables and unknown IDs before search. Preserve arbitrary hashable variable identities without sorting/comparing them. getSolutionsAsListDict must operate on the projected rows and retain its existing validate=True duplicate-projection check; do not silently deduplicate full solutions. Deliver source repair, meaningful public failure cases and compatibility documentation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_02_dev.py, and Chinese compatibility documentation at library/docs/development-python-constraint-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Problem.getSolutionsOrderedList: order=None keeps the prior default value order, every explicit variable sequence (including length one and empty) projects exactly those columns and always returns tuples. Reject string/bytes order, duplicate variables and unknown IDs before search. Preserve arbitrary hashable variable identities without sorting/comparing them. getSolutionsAsListDict must operate on the projected rows and retain its existing validate=True duplicate-projection check; do not silently deduplicate full solutions. Deliver source repair, meaningful public failure cases and compatibility documentation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_02_dev.py, and English compatibility documentation at library/docs/development-python-constraint-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-CONSTRAINT-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-CONSTRAINT-02-DEV.rubric.json",
             "native": "verification/PYTHON-CONSTRAINT-02-DEV.native.json",
             "public_native": "verification/PYTHON-CONSTRAINT-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "PYTHON-CONSTRAINT-03-DEV",
           "kind": "modify",
           "goal": "生成器域批量声明与每轮求解状态完整隔离",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair actual domain ingestion: addVariable checks/materializes the domain, not the variable identity, so tuple/hashable IDs and one-shot iterables work. addVariables materializes a shared iterable once, preflights duplicate/existing IDs, prepares all independent domains before commit and leaves no partial variables on empty/domain-source/copy failure. Preserve Domain subclass deepcopy semantics and never share hidden-value state. Allocate fresh Domain copies for each _getArgs solve so preprocessing does not permanently shrink declared model domains. Preserve original list/set/range and ordinary solver results; arbitrary user constraint external side effects are outside this isolation guarantee.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_03_dev.py, and Chinese compatibility documentation at library/docs/development-python-constraint-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair actual domain ingestion: addVariable checks/materializes the domain, not the variable identity, so tuple/hashable IDs and one-shot iterables work. addVariables materializes a shared iterable once, preflights duplicate/existing IDs, prepares all independent domains before commit and leaves no partial variables on empty/domain-source/copy failure. Preserve Domain subclass deepcopy semantics and never share hidden-value state. Allocate fresh Domain copies for each _getArgs solve so preprocessing does not permanently shrink declared model domains. Preserve original list/set/range and ordinary solver results; arbitrary user constraint external side effects are outside this isolation guarantee.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_03_dev.py, and English compatibility documentation at library/docs/development-python-constraint-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-CONSTRAINT-03-DEV-contract.md",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-CONSTRAINT-03-DEV.rubric.json",
             "native": "verification/PYTHON-CONSTRAINT-03-DEV.native.json",
             "public_native": "verification/PYTHON-CONSTRAINT-03-DEV.public.native.json",
@@ -173,7 +173,7 @@
           "id": "PYTHON-CONSTRAINT-04-DEV",
           "kind": "modify",
           "goal": "课程与教室业务表通过允许及禁止元组约束完整求解",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd constraint.tables.AllowedTuples/ForbiddenTuples as real Constraint subclasses, with copied immutable row values, explicit variable-column order, shape/duplicate-variable checks and bounded max_rows preflight. Allowed tables filter support against assigned values AND remaining domains and prune only unsupported values in forward-check mode; forbidden tables reject exact complete rows and safely prune a single remaining variable. Support nonnumeric and unhashable comparable domain values without requiring hash-based membership. Empty allowed table is unsatisfiable, empty forbidden table imposes no restriction. Preserve original solvers and the earlier per-query independent Domain contract, including unary preprocessing without permanent model-domain mutation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_04_dev.py, and Chinese compatibility documentation at library/docs/development-python-constraint-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd constraint.tables.AllowedTuples/ForbiddenTuples as real Constraint subclasses, with copied immutable row values, explicit variable-column order, shape/duplicate-variable checks and bounded max_rows preflight. Allowed tables filter support against assigned values AND remaining domains and prune only unsupported values in forward-check mode; forbidden tables reject exact complete rows and safely prune a single remaining variable. Support nonnumeric and unhashable comparable domain values without requiring hash-based membership. Empty allowed table is unsatisfiable, empty forbidden table imposes no restriction. Preserve original solvers and the earlier per-query independent Domain contract, including unary preprocessing without permanent model-domain mutation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_04_dev.py, and English compatibility documentation at library/docs/development-python-constraint-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "PYTHON-CONSTRAINT-03-DEV",
@@ -196,7 +196,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-CONSTRAINT-04-DEV.rubric.json",
             "native": "verification/PYTHON-CONSTRAINT-04-DEV.native.json",
             "public_native": "verification/PYTHON-CONSTRAINT-04-DEV.public.native.json",
@@ -225,7 +225,7 @@
           "id": "PYTHON-CONSTRAINT-05-DEV",
           "kind": "modify",
           "goal": "有限域排班按多个班次分别限制人数上下界",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd constraint.cardinality.GlobalCardinality(value_bounds,closed=True) as a real Constraint. Snapshot each value min/max nonnegative strict integer bounds; simultaneously enforce per-value counts, using assigned counts and remaining-domain support as safe necessary pruning conditions. closed=True excludes unlisted values; closed=False allows them. Do not confuse one combined SomeInSet count with independent bounds. Reject repeated variables and invalid bound shapes/ranges; impossible but structurally legal bounds produce no solutions. Forward checking must preserve every brute-force legal assignment across solver modes; unary preprocessing must preserve the earlier declared-domain isolation. Document that this is safe support pruning, not a claim of complete generalized arc consistency.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_05_dev.py, and Chinese compatibility documentation at library/docs/development-python-constraint-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd constraint.cardinality.GlobalCardinality(value_bounds,closed=True) as a real Constraint. Snapshot each value min/max nonnegative strict integer bounds; simultaneously enforce per-value counts, using assigned counts and remaining-domain support as safe necessary pruning conditions. closed=True excludes unlisted values; closed=False allows them. Do not confuse one combined SomeInSet count with independent bounds. Reject repeated variables and invalid bound shapes/ranges; impossible but structurally legal bounds produce no solutions. Forward checking must preserve every brute-force legal assignment across solver modes; unary preprocessing must preserve the earlier declared-domain isolation. Document that this is safe support pruning, not a claim of complete generalized arc consistency.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_05_dev.py, and English compatibility documentation at library/docs/development-python-constraint-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "PYTHON-CONSTRAINT-03-DEV",
@@ -248,7 +248,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-CONSTRAINT-05-DEV.rubric.json",
             "native": "verification/PYTHON-CONSTRAINT-05-DEV.native.json",
             "public_native": "verification/PYTHON-CONSTRAINT-05-DEV.public.native.json",
@@ -277,7 +277,7 @@
           "id": "PYTHON-CONSTRAINT-06-DEV",
           "kind": "modify",
           "goal": "有限可行排班按显式目标优化并清楚区分预算与最优证明",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd constraint.optimization.optimize(problem,objective,direction=\"min\",max_solutions=None) and immutable OptimizationResult(solution,score,examined,complete,reason). Enumerate actual feasible solutions through the selected solver iterator, preserve input-order first tie, snapshot assignments before objective/history and validate finite non-bool numeric scores. Full exhaustion proves optimal/unsatisfiable; reaching a strict nonnegative evaluation budget reports incomplete budget even when total may equal that boundary, without lookahead or false optimality. max_solutions=0 does not start iteration. Always close supported iterators on return/error; unsupported solver iteration remains an explicit capability error, never secretly materialize all solutions. Reuse earlier repeat-string and independent declared-domain behavior so running different objectives never mutates the model.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_06_dev.py, and Chinese compatibility documentation at library/docs/development-python-constraint-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd constraint.optimization.optimize(problem,objective,direction=\"min\",max_solutions=None) and immutable OptimizationResult(solution,score,examined,complete,reason). Enumerate actual feasible solutions through the selected solver iterator, preserve input-order first tie, snapshot assignments before objective/history and validate finite non-bool numeric scores. Full exhaustion proves optimal/unsatisfiable; reaching a strict nonnegative evaluation budget reports incomplete budget even when total may equal that boundary, without lookahead or false optimality. max_solutions=0 does not start iteration. Always close supported iterators on return/error; unsupported solver iteration remains an explicit capability error, never secretly materialize all solutions. Reuse earlier repeat-string and independent declared-domain behavior so running different objectives never mutates the model.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_constraint_06_dev.py, and English compatibility documentation at library/docs/development-python-constraint-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "PYTHON-CONSTRAINT-01-DEV",
@@ -304,7 +304,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-CONSTRAINT-06-DEV.rubric.json",
             "native": "verification/PYTHON-CONSTRAINT-06-DEV.native.json",
             "public_native": "verification/PYTHON-CONSTRAINT-06-DEV.public.native.json",

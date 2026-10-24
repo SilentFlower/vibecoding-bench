@@ -32,7 +32,7 @@
           "id": "MORE-ITERTOOLS-01-DEV",
           "kind": "modify",
           "goal": "流式清洗的转换异常通过一次性旁路回调报告",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd keyword-only on_error=None to map_except/filter_except, reporting zero-based input index, original item and actual caught exception once per listed conversion failure. Successful map values/filter item identities and lazy prefix consumption remain unchanged. Support falsey callable, validate non-None callbacks, propagate callback exceptions and unlisted exceptions. Restrict map exception catching to function execution, not consumer-injected errors across yield. No internal unbounded error collection.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_01_dev.py, and Chinese compatibility documentation at library/docs/development-more-itertools-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd keyword-only on_error=None to map_except/filter_except, reporting zero-based input index, original item and actual caught exception once per listed conversion failure. Successful map values/filter item identities and lazy prefix consumption remain unchanged. Support falsey callable, validate non-None callbacks, propagate callback exceptions and unlisted exceptions. Restrict map exception catching to function execution, not consumer-injected errors across yield. No internal unbounded error collection.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_01_dev.py, and English compatibility documentation at library/docs/development-more-itertools-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MORE-ITERTOOLS-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MORE-ITERTOOLS-01-DEV.rubric.json",
             "native": "verification/MORE-ITERTOOLS-01-DEV.native.json",
             "public_native": "verification/MORE-ITERTOOLS-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "MORE-ITERTOOLS-02-DEV",
           "kind": "modify",
           "goal": "事件日志按实际时间间隙惰性合并完整会话",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sessionize(iterable,key,gap) yielding ordered lists of original events. Start a new session only when consecutive event gap is STRICTLY greater than nonnegative numeric/timedelta gap, preserving identity and source order; equality stays in session. Support one-shot/empty/duplicate/cross-day inputs, reject observed reverse timestamps and negative gap, propagate incompatible key/arithmetic errors. Use no real clock and keep only current session plus lookahead, with documented full-session memory.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_02_dev.py, and Chinese compatibility documentation at library/docs/development-more-itertools-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sessionize(iterable,key,gap) yielding ordered lists of original events. Start a new session only when consecutive event gap is STRICTLY greater than nonnegative numeric/timedelta gap, preserving identity and source order; equality stays in session. Support one-shot/empty/duplicate/cross-day inputs, reject observed reverse timestamps and negative gap, propagate incompatible key/arithmetic errors. Use no real clock and keep only current session plus lookahead, with documented full-session memory.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_02_dev.py, and English compatibility documentation at library/docs/development-more-itertools-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MORE-ITERTOOLS-02-DEV-contract.md",
@@ -98,7 +98,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MORE-ITERTOOLS-02-DEV.rubric.json",
             "native": "verification/MORE-ITERTOOLS-02-DEV.native.json",
             "public_native": "verification/MORE-ITERTOOLS-02-DEV.public.native.json",
@@ -127,7 +127,7 @@
           "id": "MORE-ITERTOOLS-03-DEV",
           "kind": "modify",
           "goal": "传感器事件按时间跨度输出准确滑动窗口",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd windowed_time(iterable,key,span) yielding a tuple of original events for each consumed event, inclusive interval [event_time-span,event_time]. Nondecreasing timestamp requirement, positive numeric/timedelta span, duplicates remain separate input-ordered events. Evict expired items before output, retain no full history, support sparse/empty/cross-day streams and propagate invalid order/arithmetic. Event time only, no clock or fake constant-memory claim when many events share span.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_03_dev.py, and Chinese compatibility documentation at library/docs/development-more-itertools-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd windowed_time(iterable,key,span) yielding a tuple of original events for each consumed event, inclusive interval [event_time-span,event_time]. Nondecreasing timestamp requirement, positive numeric/timedelta span, duplicates remain separate input-ordered events. Evict expired items before output, retain no full history, support sparse/empty/cross-day streams and propagate invalid order/arithmetic. Event time only, no clock or fake constant-memory claim when many events share span.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_03_dev.py, and English compatibility documentation at library/docs/development-more-itertools-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MORE-ITERTOOLS-03-DEV-contract.md",
@@ -146,7 +146,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MORE-ITERTOOLS-03-DEV.rubric.json",
             "native": "verification/MORE-ITERTOOLS-03-DEV.native.json",
             "public_native": "verification/MORE-ITERTOOLS-03-DEV.public.native.json",
@@ -175,7 +175,7 @@
           "id": "MORE-ITERTOOLS-04-DEV",
           "kind": "modify",
           "goal": "事件流关联最近已生效版本并执行明确容忍差",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd asof_join(left,right,key,*,right_key=None,tolerance=None,default=None) yielding (left event,last right event whose time <= left time). Equal right timestamps select last input version; optional nonnegative tolerance inclusive, explicit unmatched default. Preserve original identities, one-shot ordering, separate right key, empty streams and finite lookahead memory. Reject reverse timestamps as observed; do not eagerly validate unconsumed tail, sort entire streams or use nearest future values. No dependency on equality join.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_04_dev.py, and Chinese compatibility documentation at library/docs/development-more-itertools-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd asof_join(left,right,key,*,right_key=None,tolerance=None,default=None) yielding (left event,last right event whose time <= left time). Equal right timestamps select last input version; optional nonnegative tolerance inclusive, explicit unmatched default. Preserve original identities, one-shot ordering, separate right key, empty streams and finite lookahead memory. Reject reverse timestamps as observed; do not eagerly validate unconsumed tail, sort entire streams or use nearest future values. No dependency on equality join.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_04_dev.py, and English compatibility documentation at library/docs/development-more-itertools-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MORE-ITERTOOLS-04-DEV-contract.md",
@@ -194,7 +194,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MORE-ITERTOOLS-04-DEV.rubric.json",
             "native": "verification/MORE-ITERTOOLS-04-DEV.native.json",
             "public_native": "verification/MORE-ITERTOOLS-04-DEV.public.native.json",
@@ -223,7 +223,7 @@
           "id": "MORE-ITERTOOLS-05-DEV",
           "kind": "modify",
           "goal": "多个数据源按明确整数配额确定混流且保持源内顺序",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd interleave_weighted(*iterables,weights) with one positive index-protocol integer quota per input, rejecting bool/zero/negative/count mismatch. Round-robin in declaration order, at most that source quota per round, exhausted sources leave scheduling while survivors continue. Preserve source order and original identity, support empty and infinite sources via bounded prefix consumption; no random calls or whole-input copies. Propagate source errors and do not close caller-owned sources implicitly.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_05_dev.py, and Chinese compatibility documentation at library/docs/development-more-itertools-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd interleave_weighted(*iterables,weights) with one positive index-protocol integer quota per input, rejecting bool/zero/negative/count mismatch. Round-robin in declaration order, at most that source quota per round, exhausted sources leave scheduling while survivors continue. Preserve source order and original identity, support empty and infinite sources via bounded prefix consumption; no random calls or whole-input copies. Propagate source errors and do not close caller-owned sources implicitly.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_05_dev.py, and English compatibility documentation at library/docs/development-more-itertools-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MORE-ITERTOOLS-05-DEV-contract.md",
@@ -242,7 +242,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MORE-ITERTOOLS-05-DEV.rubric.json",
             "native": "verification/MORE-ITERTOOLS-05-DEV.native.json",
             "public_native": "verification/MORE-ITERTOOLS-05-DEV.public.native.json",
@@ -271,7 +271,7 @@
           "id": "MORE-ITERTOOLS-06-DEV",
           "kind": "modify",
           "goal": "带长度流在严格模式按实际消费报告声明不符",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sized_iterator(...,strict=False) with opt-in exact observed-length validation. Strict nonnegative integer declaration, preserve fixed __len__ as declared length and lazy consumption. At premature exhaustion raise ValueError, or consume first extra item then raise before yielding it; previously valid prefix may already be delivered. After mismatch become exhausted, do not repeatedly consume. Exact/zero lengths pass; default remains unchecked historical behavior. Early consumer stop cannot claim full-length validation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_06_dev.py, and Chinese compatibility documentation at library/docs/development-more-itertools-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sized_iterator(...,strict=False) with opt-in exact observed-length validation. Strict nonnegative integer declaration, preserve fixed __len__ as declared length and lazy consumption. At premature exhaustion raise ValueError, or consume first extra item then raise before yielding it; previously valid prefix may already be delivered. After mismatch become exhausted, do not repeatedly consume. Exact/zero lengths pass; default remains unchecked historical behavior. Early consumer stop cannot claim full-length validation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_06_dev.py, and English compatibility documentation at library/docs/development-more-itertools-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MORE-ITERTOOLS-06-DEV-contract.md",
@@ -289,7 +289,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MORE-ITERTOOLS-06-DEV.rubric.json",
             "native": "verification/MORE-ITERTOOLS-06-DEV.native.json",
             "public_native": "verification/MORE-ITERTOOLS-06-DEV.public.native.json",

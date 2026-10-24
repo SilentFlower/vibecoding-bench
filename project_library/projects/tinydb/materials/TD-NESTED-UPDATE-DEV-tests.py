@@ -1,4 +1,4 @@
-"""公开嵌套字段编辑回归。"""
+"Public regression tests for TD-NESTED-UPDATE-DEV; the complete business contract is in materials/TD-NESTED-UPDATE-DEV-contract.md."
 import pytest
 from tinydb import TinyDB, Query
 from tinydb.storages import MemoryStorage

@@ -1,4 +1,4 @@
-"""公开JSON指针回归。"""
+"Public regression tests for SJ-POINTER-DEV; the complete business contract is in materials/SJ-POINTER-DEV-contract.md."
 import pytest
 from simplejson.pointer import tokens,index,resolve
 

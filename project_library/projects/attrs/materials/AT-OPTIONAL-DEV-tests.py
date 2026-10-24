@@ -1,4 +1,4 @@
-"""公开字符串注解可选转换回归。"""
+"Public regression tests for AT-OPTIONAL-DEV; the complete business contract is in materials/AT-OPTIONAL-DEV-contract.md."
 import typing
 import attrs
 

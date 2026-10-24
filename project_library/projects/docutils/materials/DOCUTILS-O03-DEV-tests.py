@@ -1,14 +1,14 @@
-"""代码caption是真实figure/caption节点，保留原语法高亮和代码文本。"""
+"Public regression tests for DOCUTILS-O03-DEV; the complete business contract is in materials/DOCUTILS-O03-DEV-contract.md."
 from docutils.core import publish_doctree,publish_parts
 from docutils import nodes
 import io
 
 def settings():
-    """隔离构建警告。@return 配置。"""
+    "Support the public regression through settings."
     return {'warning_stream':io.StringIO(),'halt_level':6,'report_level':5,'syntax_highlight':'none'}
 
 def test_caption_name_real_figure_and_inline_title_are_published():
-    """figure与figcaption对应，name可引用，代码内尖括号不泄漏成HTML。@return None。"""
+    "Verify caption name real figure and inline title are published."
     source='.. code:: text\n   :caption: Example **one**\n   :name: code-example\n\n   <value>\n\nSee code-example_.\n'
     document=publish_doctree(source,settings_overrides=settings());figure=next(document.findall(nodes.figure))
     assert figure['ids']==['code-example'] and isinstance(figure[0],nodes.literal_block) and isinstance(figure[1],nodes.caption)
@@ -17,7 +17,7 @@ def test_caption_name_real_figure_and_inline_title_are_published():
     assert '<figure' in html and '<figcaption' in html and '&lt;value&gt;' in html and 'href="#code-example"' in html
 
 def test_number_lines_and_caption_free_compatibility_keep_actual_code():
-    """原number-lines仍存在，无caption的树仍只有literal_block而非figure。@return None。"""
+    "Verify number lines and caption free compatibility keep actual code."
     source='.. code:: text\n   :caption: Lines\n   :number-lines: 3\n\n   one\n   two\n'
     document=publish_doctree(source,settings_overrides=settings());block=next(document.findall(nodes.literal_block))
     assert 'one' in block.astext() and 'two' in block.astext() and '3' in block.astext() and '4' in block.astext()
@@ -25,7 +25,7 @@ def test_number_lines_and_caption_free_compatibility_keep_actual_code():
     assert len(list(plain.findall(nodes.literal_block)))==1 and not list(plain.findall(nodes.figure))
 
 def test_empty_caption_is_diagnostic_and_unicode_multiline_caption_stays_text():
-    """空caption拒绝，多行选项及中文不改代码主体。@return None。"""
+    "Verify empty caption is diagnostic and unicode multiline caption stays text."
     bad=publish_doctree('.. code:: text\n   :caption:\n\n   value\n',settings_overrides=settings());assert list(bad.findall(nodes.system_message))
     source='.. code:: text\n   :caption: 中文\n      continuation\n\n   body\n'
     document=publish_doctree(source,settings_overrides=settings());assert '中文' in next(document.findall(nodes.caption)).astext() and next(document.findall(nodes.literal_block)).astext()=='body'

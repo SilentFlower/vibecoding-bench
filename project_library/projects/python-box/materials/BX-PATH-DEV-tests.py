@@ -1,10 +1,10 @@
-"""显式分段路径区分字面点键、整数键和列表索引。"""
+"Public regression tests for BX-PATH-DEV; the complete business contract is in materials/BX-PATH-DEV-contract.md."
 import pytest
 from box import Box, BoxError
 
 
 def test_literal_segments():
-    """整数键和字符串键及含点键保持区别。@return None。"""
+    "Verify literal segments."
     value = Box({'a.b': {'2': 'text', 2: 'integer'}, 'rows': [{'n': 1}]})
     assert value.get_path(['a.b', 2]) == 'integer'
     assert value.get_path(['a.b', '2']) == 'text'
@@ -12,7 +12,7 @@ def test_literal_segments():
 
 
 def test_assignment_and_delete():
-    """仅已存在父结构内写删，字面点不解析。@return None。"""
+    "Verify assignment and delete."
     value = Box({'node': {}}, box_dots=True, default_box=True)
     value.set_path(['node', 'a.b'], {'x': 2})
     assert value.get_path(['node', 'a.b', 'x']) == 2
@@ -21,7 +21,7 @@ def test_assignment_and_delete():
 
 
 def test_missing_no_default_creation_and_frozen():
-    """读取不创建默认节点，冻结写入拒绝。@return None。"""
+    "Verify missing no default creation and frozen."
     value = Box(default_box=True)
     assert value.get_path(['missing'], None) is None and value.to_dict() == {}
     with pytest.raises(ValueError):

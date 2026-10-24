@@ -1,5 +1,12 @@
-# 逐条检测带标识记录并隔离局部失败
+# Engineering contract: CHARDET-O04-DEV
 
-惰性处理带id字节pair，每条调用独立真实detect并保留编号、顺序及重复id。局部错误无成功结果，继续/停止/抛错政策明确，停止和close不读尾部，整bytes不可误当批次。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement chardet.batch.detect_many(records, *, on_error="continue", should_rename_legacy=False). Lazily process (id, bytes/bytearray) pairs with fresh real detect calls, preserve index/order/duplicate identifiers and local error facts, and provide continue/stop/raise policies. A failed record has no successful result, stop/close must not consume the tail, upstream generator errors propagate and raw bytes must not be misinterpreted as an iterable batch. Preserve standard detection/fallback facts.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o04_dev.py and concise English compatibility documentation at library/docs/development-chardet-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/chardet/batch.py
+- library/tests/test_development_chardet_o04_dev.py
+- library/docs/development-chardet-o04-dev.md

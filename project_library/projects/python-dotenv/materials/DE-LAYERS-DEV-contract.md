@@ -1,5 +1,12 @@
-# 确定性合并命名配置层并保留每键来源
+# Engineering contract: DE-LAYERS-DEV
 
-应用需要可重复的基础／环境／本地配置合并。所有层先严格解析，插值仅使用显式快照和已解析键，每个最终值保留层名与行号；不隐式依赖宿主环境，禁用插值及无值键语义明确。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement dotenv.layers.load_layers(sources, *, environment=None, override=True, interpolate=True), accepting a finite iterable of uniquely named (name,text) layers. Strictly parse all layers before returning, merge in order using last definition per layer, resolve variables against explicit environment and previously resolved keys with pinned override precedence. Return immutable LayeredValues(values, origins); each origin is (layer_name, original_line). Do not read or mutate ambient os.environ or input mappings; unknown variables and defaults follow pinned parse_variables semantics. Preserve valueless keys and raw values when disabled.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_de_layers_dev.py and concise English compatibility documentation at library/docs/development-de-layers-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/dotenv/layers.py
+- library/development_tests/test_development_de_layers_dev.py
+- library/docs/development-de-layers-dev.md

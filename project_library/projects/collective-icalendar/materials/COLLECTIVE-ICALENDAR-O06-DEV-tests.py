@@ -1,9 +1,9 @@
-"""摘要忽略声明范围内排版，不忽略真实日程改变。"""
+"Public regression tests for COLLECTIVE-ICALENDAR-O06-DEV; the complete business contract is in materials/COLLECTIVE-ICALENDAR-O06-DEV-contract.md."
 from datetime import date, datetime, timezone
 from icalendar import Calendar, Event
 
 def test_property_and_component_order():
-    """属性和子组件重排不改变规范摘要。@return None。"""
+    "Verify property and component order."
     from icalendar.fingerprint import calendar_fingerprint
     one, two = Calendar(), Calendar()
     a = Event(); a.add('UID', 'a'); a.add('SUMMARY', 'A'); a.add('DTSTART', date(2026, 1, 1))
@@ -13,7 +13,7 @@ def test_property_and_component_order():
     assert calendar_fingerprint(one) == calendar_fingerprint(two)
 
 def test_real_changes_and_explicit_ignore():
-    """真实SUMMARY变更有差异，时间戳只按白名单显式忽略。@return None。"""
+    "Verify real changes and explicit ignore."
     from icalendar.fingerprint import calendar_fingerprint
     event = Event(); event.add('UID', 'a'); event.add('SUMMARY', 'A')
     other = event.copy(recursive=True); other['SUMMARY'] = 'B'
@@ -23,7 +23,7 @@ def test_real_changes_and_explicit_ignore():
     assert calendar_fingerprint(event, ignore_fields=['DTSTAMP']) == calendar_fingerprint(other, ignore_fields=['dtstamp'])
 
 def test_unknown_preserved_and_bad_profile():
-    """未知扩展参与摘要，业务字段不准静默忽略。@return None。"""
+    "Verify unknown preserved and bad profile."
     import pytest
     from icalendar.fingerprint import calendar_fingerprint
     event = Event(); event.add('X-PRIVATE', 'one')

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-按CAL-ADDRESS匹配并返回独立同类组件，只折叠URI scheme大小写。增量更新指定参数或删除None参数，保留姓名、角色、RSVP、委派列表及其他参会者；重复与无匹配政策明确，源组件不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement icalendar.attendee_update.upsert_attendee/remove_attendee on real component/vCalAddress objects, returning isolated same-class copies. Match URI scheme case-insensitively and preserve the remaining URI exactly, update only supplied parameters (None removes), retain CN/ROLE/RSVP/delegation lists and unrelated attendees. Explicit duplicate error/all and strict missing-remove policies must work; reject malformed addresses, never modify the source or claim all URI parts are case-insensitive.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o03_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/icalendar/attendee_update.py
+- library/tests/test_development_collective_icalendar_o03_dev.py
+- library/docs/development-collective-icalendar-o03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

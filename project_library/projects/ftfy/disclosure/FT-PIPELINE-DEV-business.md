@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-固定路径与修复政策的导入流程复用字段修复和真实审计，记录实际变化的字段及可重放结果。逐条输出并支持错误收集，不保存异常对象，不吞掉来源迭代器故障，多次运行不能共享记录状态。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement ftfy.pipeline.TextRepairPipeline(paths,config=None,*,missing="raise") with process(record,*,index=0), run(records,*,errors="raise") and frozen RecordResult(index,status,value,changes,error). Compose completed fix_fields and real audit.repair: retain only actual changed paths and replayable RepairResult summaries, preserve nonselected fields and original records. Reuse immutable config and normalized paths, stay lazy and independent between streams. Collect per-record domain/type/path errors and continue, retaining index and error type/text without exception objects; source iterator errors must propagate. Validate errors before consuming source and do not execute content as code.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_pipeline_dev.py and concise English compatibility documentation at library/docs/development-ft-pipeline-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/ftfy/pipeline.py
+- library/development_tests/test_development_ft_pipeline_dev.py
+- library/docs/development-ft-pipeline-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

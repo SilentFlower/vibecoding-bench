@@ -1,3 +1,12 @@
-# 围栏代码块可选择同字符更长结束围栏且保持原默认
+# Engineering contract: PYTHON-MARKDOWN-04-DEV
 
-路线09：围栏结束长度新增显式at_least模式，同字符不少于开围栏长度才结束，较短段保留代码，混合字符及尾随文本不误闭合；语言/属性与转义保持。默认exact及后续实例行为不变。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Extend fenced_code with closing_fence="exact" default and opt-in "at_least". At-least mode accepts a standalone closing fence of the same character at least as long as the opening run, keeps shorter runs inside code, rejects mixed-character/nonstandalone closers and supports backticks/tildes, language/attrs/highlight metadata and normal escaping. Scope regex/configuration per processor instance so one conversion cannot change later default output. Unknown mode rejects. Preserve all legacy exact-mode fixtures, including the intentional historical behavior, and avoid converting container/indentation semantics not included in this delivery.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_04_dev.py, and English compatibility documentation at library/docs/development-python-markdown-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/markdown/extensions/fenced_code.py
+- library/tests/test_development_python_markdown_04_dev.py
+- library/docs/development-python-markdown-04-dev.md

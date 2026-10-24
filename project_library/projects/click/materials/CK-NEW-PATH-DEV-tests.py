@@ -1,4 +1,4 @@
-"""公开未占用输出路径回归。"""
+"Public regression tests for CK-NEW-PATH-DEV; the complete business contract is in materials/CK-NEW-PATH-DEV-contract.md."
 from pathlib import Path
 import pytest
 import click

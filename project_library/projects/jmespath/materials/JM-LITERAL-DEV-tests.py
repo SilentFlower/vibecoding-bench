@@ -1,4 +1,4 @@
-"""公开可变查询字面量隔离回归。"""
+"Public regression tests for JM-LITERAL-DEV; the complete business contract is in materials/JM-LITERAL-DEV-contract.md."
 import jmespath
 
 def test_compiled_literal_results_are_detached_on_each_search():

@@ -1,11 +1,11 @@
-"""批注必须先核归属/顺序，再创建部件和范围标记。"""
+"Public regression tests for PYTHON-DOCX-03-DEV; the complete business contract is in materials/PYTHON-DOCX-03-DEV-contract.md."
 from io import BytesIO
 from zipfile import ZipFile
 import unittest
 from docx import Document
 
 def test_foreign_empty_reversed_and_header_ranges_have_no_side_effects():
-    """两个包都不应出现悬挂comments关系或范围。@return None。"""
+    "Verify foreign empty reversed and header ranges have no side effects."
     target=Document();a=target.add_paragraph('a').runs[0];b=target.add_paragraph('b').runs[0]
     foreign=Document();other=foreign.add_paragraph('foreign').runs[0]
     header=target.sections[0].header.paragraphs[0].add_run('header')
@@ -17,7 +17,7 @@ def test_foreign_empty_reversed_and_header_ranges_have_no_side_effects():
     with ZipFile(output) as archive:assert 'word/comments.xml' not in archive.namelist()
 
 def test_same_document_cross_paragraph_comment_saves_with_consistent_ids():
-    """首末边界允许跨段，中间内容自然包含，不要求逐个传run。@return None。"""
+    "Verify same document cross paragraph comment saves with consistent ids."
     document=Document();first=document.add_paragraph('first').runs[0];last=document.add_paragraph('last').runs[0]
     comment=document.add_comment([first,last],'review',author='Reviewer')
     assert comment.text=='review'

@@ -1,5 +1,12 @@
-# 逐行读取大文本并明确原始或归一化换行语义
+# Engineering contract: PA-ITER-LINES-DEV
 
-大文件读取按行消费，明确选择通用换行或保留原CR/LF，保留空行和无末尾换行的最后一行。提前关闭及解码失败都会关闭流，既有一次性读取API保持不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Path.iter_lines(encoding=None,errors="strict",*,retain=True,newline=None), a lazy text iterator owning one context-managed stream. None uses universal newline normalization; "" retains original CR/LF/CRLF terminators; retain=False removes exactly the physical line ending. Preserve blank lines, Unicode, missing final newline and codec error policy. Early generator.close and decode/I/O exceptions must close the stream, with no whole-file read or changes to existing lines/read_text behavior.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_iter_lines_dev.py and concise English compatibility documentation at library/docs/development-pa-iter-lines-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/path/__init__.py
+- library/development_tests/test_development_pa_iter_lines_dev.py
+- library/docs/development-pa-iter-lines-dev.md

@@ -1,11 +1,11 @@
-"""品牌色板持有自己的数据，不修改内建名称。"""
+"Public regression tests for WEBCOLORS-06-DEV; the complete business contract is in materials/WEBCOLORS-06-DEV-contract.md."
 import unittest
 import webcolors
 from webcolors.palette import Palette
 
 
 def test_copied_case_normalized_aliases_and_roundtrip():
-    """来源及导出副本随后变化不影响色板。@return None。"""
+    "Verify copied case normalized aliases and roundtrip."
     source={'Primary':'#369','accent':'#336699'}
     palette=Palette(source);source['Primary']='#000'
     assert palette['PRIMARY']=='#336699' and palette.rgb('primary')==(51,102,153)
@@ -17,7 +17,7 @@ def test_copied_case_normalized_aliases_and_roundtrip():
 
 
 def test_conflict_policies_and_invalid_input():
-    """品牌和内建冲突必须选择政策，非法数据拒绝。@return None。"""
+    "Verify conflict policies and invalid input."
     with unittest.TestCase().assertRaises(ValueError):Palette({'red':'#000'},base_spec=webcolors.CSS3)
     assert Palette({'red':'#000'},base_spec=webcolors.CSS3,conflict='brand')['red']=='#000000'
     assert Palette({'red':'#000'},base_spec=webcolors.CSS3,conflict='builtin')['red']=='#ff0000'

@@ -1,5 +1,12 @@
-# 按记录业务键对齐深合并并保持稳定顺序和输入隔离
+# Engineering contract: DP-MERGE-KEY-DEV
 
-配置记录列表按业务ID对齐，而不是盲目追加。先校验两侧唯一、可哈希的类型敏感ID，保持原顺序，相同记录递归合并，新记录按覆盖层顺序追加，所有结果节点与输入隔离，不改变旧merge默认规则。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement dpath.keymerge.merge_by_key(left,right,key). Materialize and validate both record iterables before merging: every mapping has a hashable business key and no duplicates within a side, using (type,value) identity so bool/int/string keys are not silently conflated. Preserve left order, recursively merge matching dictionary fields with right scalar/list replacement, append new records in right order, and deep-copy all retained/incoming nodes. Reject malformed/duplicate/unhashable keys without mutating either input. Do not change default dpath.merge list concatenation or original source references.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_merge_key_dev.py and concise English compatibility documentation at library/docs/development-dp-merge-key-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/dpath/keymerge.py
+- library/development_tests/test_development_dp_merge_key_dev.py
+- library/docs/development-dp-merge-key-dev.md

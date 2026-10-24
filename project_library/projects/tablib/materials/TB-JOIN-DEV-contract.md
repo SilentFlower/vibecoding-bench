@@ -1,5 +1,12 @@
-# 支持有预算的稳定多对多表格关联和明确空键策略
+# Engineering contract: TB-JOIN-DEV
 
-实现稳定多对多关联，明确空键是否匹配、重名列后缀和完整外关联键回填。输出行预算防止笛卡尔展开失控，复制数据与标签，任何失败都不污染两份来源。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement tablib.joining.join(left,right,on,*,how="left",suffixes=("_left","_right"),nulls="never",max_rows=100000) using completed static schema/key/copy semantics. Support inner/left/full outer, composite same-name keys, strict typed keys, many-to-many in stable left then right order and unmatched right rows last. Default None keys never match; equal is explicit. Omit repeated right join keys, populate left key columns on unmatched right rows, suffix colliding nonkeys and reject resulting name collisions. Preserve copied cells/title and combined row tags; fail before return on output budget overflow or mutable key, leaving both inputs unchanged.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_join_dev.py and concise English compatibility documentation at library/docs/development-tb-join-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/tablib/joining.py
+- library/development_tests/test_development_tb_join_dev.py
+- library/docs/development-tb-join-dev.md

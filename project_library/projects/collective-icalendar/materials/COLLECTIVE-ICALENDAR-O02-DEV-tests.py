@@ -1,9 +1,9 @@
-"""显式严格入口覆盖完整文本，旧容错入口保持兼容。"""
+"Public regression tests for COLLECTIVE-ICALENDAR-O02-DEV; the complete business contract is in materials/COLLECTIVE-ICALENDAR-O02-DEV-contract.md."
 from icalendar import Calendar, LazyCalendar
 
 
 def test_mismatch_is_opt_in_and_legacy_unchanged():
-    """严格入口拒绝错配，旧from_ical仍按冻结行为容错。@return None。"""
+    "Verify mismatch is opt in and legacy unchanged."
     import pytest
     raw = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nEND:VTODO\r\nEND:VCALENDAR\r\n'
     assert len(Calendar.from_ical(raw).walk('VEVENT')) == 1
@@ -13,7 +13,7 @@ def test_mismatch_is_opt_in_and_legacy_unchanged():
 
 
 def test_valid_nested_case_and_unknown_components():
-    """严格入口保持大小写、合法嵌套和真实未知组件。@return None。"""
+    "Verify valid nested case and unknown components."
     raw = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT5M\r\nEND:valarm\r\nEND:vevent\r\nEND:vcalendar\r\n'
     for calendar_type in (Calendar, LazyCalendar):
         calendar = calendar_type.from_ical_strict(raw)
@@ -23,13 +23,13 @@ def test_valid_nested_case_and_unknown_components():
 
 
 def test_invalid_complete_input_precedes_parser_and_cache():
-    """尾部损坏也必须在真实解析器、组件工厂和缓存之前被拒绝。@return None。"""
+    "Verify invalid complete input precedes parser and cache."
     import pytest
     class Guard(Calendar):
-        """监测损坏结构是否错误进入模型解析。"""
+        "Public regression fixture: Guard."
         @classmethod
         def _get_ical_parser(cls, st):
-            """禁止损坏输入调用解析器。@param st 输入。@return 不返回。"""
+            "Support the public regression through _get_ical_parser."
             raise AssertionError('不应先构造解析器')
     valid = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n'
     for raw in ('END:VCALENDAR\r\n', 'BEGIN:VCALENDAR\r\n', valid + 'END:X-OTHER\r\n',
@@ -39,7 +39,7 @@ def test_invalid_complete_input_precedes_parser_and_cache():
 
 
 def test_bytes_path_multiple_and_subclass_dispatch(tmp_path):
-    """文件、字节、多组件及子类解析器均沿真实API。@return None。"""
+    "Verify bytes path multiple and subclass dispatch."
     import pytest
     raw = b'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n'
     path = tmp_path / 'strict.ics'
@@ -49,11 +49,11 @@ def test_bytes_path_multiple_and_subclass_dispatch(tmp_path):
     with pytest.raises(ValueError):
         Calendar.from_ical_strict(path)
     class Recording(Calendar):
-        """严格校验后仍必须使用真实子类解析入口。"""
+        "Public regression fixture: Recording."
         observed = []
         @classmethod
         def _get_ical_parser(cls, st):
-            """记录输入并委托原解析器。@param st 文本。@return 解析器。"""
+            "Support the public regression through _get_ical_parser."
             cls.observed.append(st)
             return super()._get_ical_parser(st)
     assert Recording.from_ical_strict(raw).name == 'VCALENDAR'

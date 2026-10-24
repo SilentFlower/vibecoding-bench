@@ -32,7 +32,7 @@
           "id": "PYYAML-01-DEV",
           "kind": "modify",
           "goal": "配置合并按真实键语义保持首源优先和本地覆盖",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair SafeConstructor.flatten_mapping merge deduplication using constructed hashable YAML key semantics, not id(key_node.value) or raw spelling. Earlier sources in merge sequence win, local explicit keys still override, nested/single/multiple merge and semantically equal scalar keys (01/1, bool/int under existing Python mapping semantics) consistent. Invalid unhashable keys must raise marked ConstructorError. Preserve default YAML1.1 typing and original merge-node behavior; no arbitrary object equality policy change.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_01_dev.py, and Chinese compatibility documentation at library/docs/development-pyyaml-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair SafeConstructor.flatten_mapping merge deduplication using constructed hashable YAML key semantics, not id(key_node.value) or raw spelling. Earlier sources in merge sequence win, local explicit keys still override, nested/single/multiple merge and semantically equal scalar keys (01/1, bool/int under existing Python mapping semantics) consistent. Invalid unhashable keys must raise marked ConstructorError. Preserve default YAML1.1 typing and original merge-node behavior; no arbitrary object equality policy change.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_01_dev.py, and English compatibility documentation at library/docs/development-pyyaml-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYYAML-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYYAML-01-DEV.rubric.json",
             "native": "verification/PYYAML-01-DEV.native.json",
             "public_native": "verification/PYYAML-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PYYAML-02-DEV",
           "kind": "modify",
           "goal": "非法显式标量通过带源位置YAML构造错误统一报告",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nNormalize expected data-conversion errors of builtin bool/int/float/timestamp constructors into ConstructorError/YAMLError with node.start_mark and original cause where an underlying conversion failed. Handle empty/sign-only/nonnumeric/bad timestamp syntax and impossible calendar values. Check missing timestamp regex match explicitly rather than leaking AttributeError. Preserve legal types and ordinary constructors; do not broadly catch arbitrary Exception, TypeError/AttributeError from unknown programming mistakes or user custom constructor errors.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_02_dev.py, and Chinese compatibility documentation at library/docs/development-pyyaml-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nNormalize expected data-conversion errors of builtin bool/int/float/timestamp constructors into ConstructorError/YAMLError with node.start_mark and original cause where an underlying conversion failed. Handle empty/sign-only/nonnumeric/bad timestamp syntax and impossible calendar values. Check missing timestamp regex match explicitly rather than leaking AttributeError. Preserve legal types and ordinary constructors; do not broadly catch arbitrary Exception, TypeError/AttributeError from unknown programming mistakes or user custom constructor errors.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_02_dev.py, and English compatibility documentation at library/docs/development-pyyaml-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYYAML-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYYAML-02-DEV.rubric.json",
             "native": "verification/PYYAML-02-DEV.native.json",
             "public_native": "verification/PYYAML-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "PYYAML-03-DEV",
           "kind": "modify",
           "goal": "严格安全配置加载拒绝显式重复字段并给出双位置",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd yaml.strict.StrictSafeLoader/strict_load as opt-in safe parsing. Detect duplicate EXPLICIT keys in each MappingNode before flattening, using constructed key equality including 1/true, raise ConstructorError with first and repeated marks. Inherited merge keys and one local override are not explicit duplicates; preserve alias reuse and default yaml.safe_load last-wins behavior. No global resolver/constructor registrations, no arbitrary Python objects or blanket merge rejection.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_03_dev.py, and Chinese compatibility documentation at library/docs/development-pyyaml-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd yaml.strict.StrictSafeLoader/strict_load as opt-in safe parsing. Detect duplicate EXPLICIT keys in each MappingNode before flattening, using constructed key equality including 1/true, raise ConstructorError with first and repeated marks. Inherited merge keys and one local override are not explicit duplicates; preserve alias reuse and default yaml.safe_load last-wins behavior. No global resolver/constructor registrations, no arbitrary Python objects or blanket merge rejection.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_03_dev.py, and English compatibility documentation at library/docs/development-pyyaml-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYYAML-03-DEV-contract.md",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYYAML-03-DEV.rubric.json",
             "native": "verification/PYYAML-03-DEV.native.json",
             "public_native": "verification/PYYAML-03-DEV.public.native.json",
@@ -173,7 +173,7 @@
           "id": "PYYAML-04-DEV",
           "kind": "modify",
           "goal": "未知YAML标签可作为安全数据保留并往返转储",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd yaml.tagged TaggedValue plus PreservingLoader/Dumper and load_preserving/dump_preserving. Unknown scalar keeps exact scalar text, unknown sequence/mapping safely constructs contents; preserve tag and node kind, recursive/shared alias identity via generator construction and representer. Unknown Python object/apply tags remain inert TaggedValue, never import/call targets. Existing known SafeLoader typing/default unknown-tag rejection unchanged; complex tagged keys with unhashable payload remain unsupported safe key errors. No global class registration changes.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_04_dev.py, and Chinese compatibility documentation at library/docs/development-pyyaml-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd yaml.tagged TaggedValue plus PreservingLoader/Dumper and load_preserving/dump_preserving. Unknown scalar keeps exact scalar text, unknown sequence/mapping safely constructs contents; preserve tag and node kind, recursive/shared alias identity via generator construction and representer. Unknown Python object/apply tags remain inert TaggedValue, never import/call targets. Existing known SafeLoader typing/default unknown-tag rejection unchanged; complex tagged keys with unhashable payload remain unsupported safe key errors. No global class registration changes.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_04_dev.py, and English compatibility documentation at library/docs/development-pyyaml-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYYAML-04-DEV-contract.md",
@@ -191,7 +191,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYYAML-04-DEV.rubric.json",
             "native": "verification/PYYAML-04-DEV.native.json",
             "public_native": "verification/PYYAML-04-DEV.public.native.json",
@@ -220,7 +220,7 @@
           "id": "PYYAML-05-DEV",
           "kind": "modify",
           "goal": "安全配置加载显式限制文本节点深度和别名预算",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd yaml.limits.LimitedSafeLoader/load_limited for decoded str single-document input only. Optional strict nonnegative integer max_chars, max_nodes (nonalias nodes), max_depth (root=1, keys count), max_aliases (reference occurrences). Check text length before parse and node/depth/alias budgets before compose; marked ComposerError for node constraints, YAMLError for text budget. Preserve normal safe graph identity and finally dispose, empty document zero budgets legal. No byte/stream budget claim, no large exhaustion payloads, no changes to default loader limits.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_05_dev.py, and Chinese compatibility documentation at library/docs/development-pyyaml-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd yaml.limits.LimitedSafeLoader/load_limited for decoded str single-document input only. Optional strict nonnegative integer max_chars, max_nodes (nonalias nodes), max_depth (root=1, keys count), max_aliases (reference occurrences). Check text length before parse and node/depth/alias budgets before compose; marked ComposerError for node constraints, YAMLError for text budget. Preserve normal safe graph identity and finally dispose, empty document zero budgets legal. No byte/stream budget claim, no large exhaustion payloads, no changes to default loader limits.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_05_dev.py, and English compatibility documentation at library/docs/development-pyyaml-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYYAML-05-DEV-contract.md",
@@ -238,7 +238,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYYAML-05-DEV.rubric.json",
             "native": "verification/PYYAML-05-DEV.native.json",
             "public_native": "verification/PYYAML-05-DEV.public.native.json",
@@ -267,7 +267,7 @@
           "id": "PYYAML-06-DEV",
           "kind": "modify",
           "goal": "配置构造值通过结构路径侧表追溯真实源码范围",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd yaml.marked.load_with_marks returning (ordinary SafeLoader value, tuple-path->immutable SourceSpan(start,end,line,column)). Zero-based CHARACTER offsets/line/column, root path (), mapping actual constructed keys and list indices. Use same composed node graph as actual construction, including flattened merge value origin, explicit override, alias multiple paths and finite recursive alias metadata. Do not wrap/change str/int/list/dict values, guess byte offsets, retain full Mark buffer in side table or silently load multiple documents. Empty returns (None,{}).\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_06_dev.py, and Chinese compatibility documentation at library/docs/development-pyyaml-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd yaml.marked.load_with_marks returning (ordinary SafeLoader value, tuple-path->immutable SourceSpan(start,end,line,column)). Zero-based CHARACTER offsets/line/column, root path (), mapping actual constructed keys and list indices. Use same composed node graph as actual construction, including flattened merge value origin, explicit override, alias multiple paths and finite recursive alias metadata. Do not wrap/change str/int/list/dict values, guess byte offsets, retain full Mark buffer in side table or silently load multiple documents. Empty returns (None,{}).\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_06_dev.py, and English compatibility documentation at library/docs/development-pyyaml-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYYAML-06-DEV-contract.md",
@@ -285,7 +285,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYYAML-06-DEV.rubric.json",
             "native": "verification/PYYAML-06-DEV.native.json",
             "public_native": "verification/PYYAML-06-DEV.public.native.json",

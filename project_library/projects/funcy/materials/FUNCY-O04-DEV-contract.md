@@ -1,5 +1,12 @@
-# 迭代遍历真实嵌套树并交付带路径成对事件
+# Engineering contract: FUNCY-O04-DEV
 
-对应路线12：迭代栈遍历真实树并输出带键/下标路径的pre/post事件，剪枝发生在访问children前；深树、祖先循环、共享节点和深度预算明确。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add funcy.walktree.tree_walk(root,*,children=None,follow=None,prune=None,max_depth=None), frozen WalkEvent(event,path,depth,node,pruned) and TreeCycleError(path). Default mapping keys/sequence indexes use real Funcy is_seqcont, keeping text/bytes leaves; explicit children yields labeled edges. Generate stable lazy pre/post events with an iterative stack, prune before children access and support nonnegative depth cap. Detect ancestor cycles by identity while allowing shared acyclic nodes under separate paths, propagate callbacks/source errors and leave inputs unchanged. Prove deep 1500-level trees, exact event order and balanced pruned nodes without changing old tree_nodes/leaves.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o04_dev.py and concise English compatibility documentation at library/docs/development-funcy-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/funcy/walktree.py
+- library/tests/test_development_funcy_o04_dev.py
+- library/docs/development-funcy-o04-dev.md

@@ -1,9 +1,9 @@
-"""规则上下文异常退出也必须还原所有真实规则链。"""
+"Public regression tests for MARKDOWN-IT-O01-DEV; the complete business contract is in materials/MARKDOWN-IT-O01-DEV-contract.md."
 from markdown_it import MarkdownIt
 import pytest
 
 def test_exception_restores_four_active_chains_and_original_error():
-    """进入前快照与退出后相等，原异常对象原样传播。@return None。"""
+    "Verify exception restores four active chains and original error."
     md=MarkdownIt();before=md.get_active_rules();error=RuntimeError('consumer failed')
     with pytest.raises(RuntimeError) as caught:
         with md.reset_rules():
@@ -13,7 +13,7 @@ def test_exception_restores_four_active_chains_and_original_error():
     assert '<em>x</em>' in md.render('*x*')
 
 def test_nested_contexts_restore_their_own_disabled_baseline():
-    """内层异常恢复外层状态，外层退出恢复最初已禁用集合。@return None。"""
+    "Verify nested contexts restore their own disabled baseline."
     md=MarkdownIt().disable('heading');before=md.get_active_rules()
     with md.reset_rules():
         md.disable('emphasis');outer=md.get_active_rules()
@@ -23,7 +23,7 @@ def test_nested_contexts_restore_their_own_disabled_baseline():
     assert md.get_active_rules()==before
 
 def test_baseexception_and_normal_exit_both_restore():
-    """取消类异常也收口，普通上下文仍沿既有语义。@return None。"""
+    "Verify baseexception and normal exit both restore."
     md=MarkdownIt();before=md.get_active_rules()
     with pytest.raises(KeyboardInterrupt):
         with md.reset_rules():md.disable('emphasis');raise KeyboardInterrupt()

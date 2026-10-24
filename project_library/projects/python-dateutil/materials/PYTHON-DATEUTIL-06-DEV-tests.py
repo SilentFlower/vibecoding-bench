@@ -1,11 +1,11 @@
-"""规则与规则集只保存定义，缓存锁/生成器独立重建。"""
+"Public regression tests for PYTHON-DATEUTIL-06-DEV; the complete business contract is in materials/PYTHON-DATEUTIL-06-DEV-contract.md."
 import copy
 import pickle
 from datetime import datetime
 from dateutil.rrule import rrule,rruleset,DAILY
 
 def test_cached_rule_partial_complete_pickle_and_deepcopy():
-    """部分/完整消费后持久化不固定旧迭代位置。@return None。"""
+    "Verify cached rule partial complete pickle and deepcopy."
     for complete in (False,True):
         rule=rrule(DAILY,dtstart=datetime(2024,1,1),count=4,cache=True)
         if complete:list(rule)
@@ -15,7 +15,7 @@ def test_cached_rule_partial_complete_pickle_and_deepcopy():
             assert restored._cache_lock is not rule._cache_lock
 
 def test_cached_ruleset_include_exclude_and_uncached_old_state():
-    """包含/排除规则、日期和旧无缓存dict均兼容。@return None。"""
+    "Verify cached ruleset include exclude and uncached old state."
     values=rruleset(cache=True);values.rrule(rrule(DAILY,dtstart=datetime(2024,1,1),count=3))
     values.exdate(datetime(2024,1,2));values.rdate(datetime(2024,1,6))
     restored=pickle.loads(pickle.dumps(values))

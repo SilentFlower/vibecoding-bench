@@ -1,4 +1,4 @@
-"""公开Unicode字段规范化回归。"""
+"Public regression tests for MM-NORMALIZE-DEV; the complete business contract is in materials/MM-NORMALIZE-DEV-contract.md."
 import pytest
 from marshmallow import Schema,ValidationError,validate
 from marshmallow.normalized import NormalizedString

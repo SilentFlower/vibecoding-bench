@@ -1,5 +1,12 @@
-# 让缺失字段按归一化后的条件参与必需校验
+# Engineering contract: CERBERUS-O04-DEV
 
-required_if在归一化后的真实required阶段检查，即使目标字段缺失也生效。支持兄弟和根条件、False/None与默认判别字段；存在性复用required、nullable和ignore_none_values政策，update及排除规则保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add actual required_if rule with schema-validated {field, equals}. Evaluate conditions at the real required-fields phase after normalization, even when the constrained field is absent; support existing sibling/dotted/root lookup, False/None conditions and defaulted discriminator fields. Reuse required/ignore_none_values/nullable semantics for presence, respect update=True and excludes handling, preserve type/ordinary dependencies behavior and report missing fields through native required errors.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o04_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cerberus/validator.py
+- library/tests/test_development_cerberus_o04_dev.py
+- library/docs/development-cerberus-o04-dev.md

@@ -1,5 +1,13 @@
-# 冻结缓冲事实并支持连续memoryview生命周期
+# Engineering contract: CHARSET-NORMALIZER-O01-DEV
 
-模型保存不可变字节，防止raw与缓存文字分裂。新增连续buffer入口，非bytes明确复制并报告大小，调用者视图可释放或底层复用而结果不变；不连续和非法缓冲拒绝，实际检测仍由from_bytes完成。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Make CharsetMatch retain immutable payload bytes so caller bytearray mutation cannot diverge raw bytes from cached text. Add charset_normalizer.buffers.from_buffer(buffer, **options) for continuous buffer protocol input, explicitly snapshot non-bytes, preserve caller view ownership and return matches/copied/nbytes. Reject noncontiguous/released/nonbuffer inputs clearly, support empty/read-only/writable buffers and delegate detection options to actual from_bytes. Do not promise universal zero-copy decoding or change existing immutable bytes results.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o01_dev.py and concise English compatibility documentation at library/docs/development-charset-normalizer-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/charset_normalizer/models.py
+- library/src/charset_normalizer/buffers.py
+- library/tests/test_development_charset_normalizer_o01_dev.py
+- library/docs/development-charset-normalizer-o01-dev.md

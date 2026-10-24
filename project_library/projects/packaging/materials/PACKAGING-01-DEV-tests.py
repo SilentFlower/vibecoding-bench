@@ -1,4 +1,4 @@
-"""展示原文不进入版本比较键，旧Version协议不改变。"""
+"Public regression tests for PACKAGING-01-DEV; the complete business contract is in materials/PACKAGING-01-DEV-contract.md."
 import pickle
 import unittest
 from dataclasses import FrozenInstanceError
@@ -6,7 +6,7 @@ from packaging.display import DisplayVersion
 from packaging.version import Version
 
 def test_raw_spelling_comparison_hash_and_normalized_text():
-    """CalVer、空白和local大小写均可展示原文。@return None。"""
+    "Verify raw spelling comparison hash and normalized text."
     value=DisplayVersion(' v2026.01.01+ABC ')
     assert value.raw_version==' v2026.01.01+ABC ' and value.display==value.raw_version
     assert str(value)=='2026.1.1+abc' and value==Version('2026.1.1+abc')
@@ -14,7 +14,7 @@ def test_raw_spelling_comparison_hash_and_normalized_text():
     assert len({value,Version('2026.1.1+abc')})==1
 
 def test_derived_version_pickle_and_readonly_policy():
-    """已有parts结果明确无原文，pickle保持只读内容。@return None。"""
+    "Verify derived version pickle and readonly policy."
     value=DisplayVersion.from_version(Version.from_parts(release=(2,0)))
     assert value.raw_version is None and value.display=='2.0'
     restored=pickle.loads(pickle.dumps(DisplayVersion('02.00')))

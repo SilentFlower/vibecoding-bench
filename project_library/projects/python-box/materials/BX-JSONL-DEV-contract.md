@@ -1,5 +1,12 @@
-# 逐条惰性编码和写入真实JSONL业务记录
+# Engineering contract: BX-JSONL-DEV
 
-新增JSONL惰性编码与逐条写入，首条输出只读取一条记录，支持任意有界消费迭代器、Unicode和嵌套Box。每条准确一个末尾换行，坏记录给安全编号，拒绝多行缩进。路径由库关闭，调用者文本流保持打开；写入失败可留下已写前缀，不冒称整文件原子。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add BoxList.iter_jsonl_records(records, **json_kwargs), iter_jsonl(**json_kwargs) and write_jsonl(destination, *, encoding="utf-8", **json_kwargs). Encode one record at a time with standard JSON semantics and one trailing newline, preserve Unicode/options and nested Box values, and never materialize the complete input before yielding. Reject multiline indentation, report a safe one-based record number for encoding failures, support empty input and early generator close. Write to paths or caller-owned text streams without closing caller streams; preserve existing JSON/JSONL import behavior and state that write failures may leave a written prefix.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_bx_jsonl_dev.py and concise English compatibility documentation at library/docs/development-bx-jsonl-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/box/box_list.py
+- library/test/test_development_bx_jsonl_dev.py
+- library/docs/development-bx-jsonl-dev.md

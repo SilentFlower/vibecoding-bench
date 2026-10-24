@@ -1,4 +1,4 @@
-"""公开不可变配置快照回归。"""
+"Public regression tests for CF-SNAPSHOT-DEV; the complete business contract is in materials/CF-SNAPSHOT-DEV-contract.md."
 import pytest
 from confuse import RootView,ConfigSource,ConfigValueError,Sequence
 

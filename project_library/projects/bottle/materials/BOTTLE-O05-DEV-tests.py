@@ -1,9 +1,9 @@
-"""上传原子发布保持旧文件、竞争者和输入位置。"""
+"Public regression tests for BOTTLE-O05-DEV; the complete business contract is in materials/BOTTLE-O05-DEV-contract.md."
 import io
 import bottle
 
 def test_atomic_save_and_cursor(tmp_path):
-    """成功后内容和游标保持，目录目标可用。@param tmp_path 临时目录。@return None。"""
+    "Verify atomic save and cursor."
     source = io.BytesIO(b'abcdef')
     source.seek(2)
     upload = bottle.FileUpload(source, 'file', 'x.bin')
@@ -12,7 +12,7 @@ def test_atomic_save_and_cursor(tmp_path):
     assert list(tmp_path.glob('.bottle-upload-*')) == []
 
 def test_exclusive_keeps_existing(tmp_path):
-    """排他保存不能覆盖已有目标。@param tmp_path 临时目录。@return None。"""
+    "Verify exclusive keeps existing."
     import pytest
     target = tmp_path / 'x.bin'
     target.write_bytes(b'old')
@@ -23,12 +23,12 @@ def test_exclusive_keeps_existing(tmp_path):
     assert target.read_bytes() == b'new'
 
 def test_replace_failure_is_atomic(tmp_path, monkeypatch):
-    """发布失败不留下半文件并清理本次临时文件。@param tmp_path 临时目录。@param monkeypatch 故障注入。@return None。"""
+    "Verify replace failure is atomic."
     import pytest
     target = tmp_path / 'x.bin'
     target.write_bytes(b'old')
     def fail(source, destination):
-        """模拟发布故障。@param source 临时文件。@param destination 目标。@return 不返回。"""
+        "Support the public regression through fail."
         raise OSError('replace failed')
     monkeypatch.setattr(bottle.os, 'replace', fail)
     upload = bottle.FileUpload(io.BytesIO(b'new'), 'file', 'x')

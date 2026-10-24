@@ -1,5 +1,12 @@
-# 按预声明文件扩展名分派真实配置解析器
+# Engineering contract: CONFIGARGPARSE-O05-DEV
 
-对应路线20：根据应用注册的扩展名一次分派真实解析器，未知格式只能显式fallback；不探测内容、不rewind、不动态导入，输出格式也必须显式。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement DispatchConfigFileParser(parsers, *, fallback=None, output_format=None) with an application-owned extension registry of ConfigFileParser instances/classes. Normalize suffix case, reject duplicate normalized extensions and invalid parser registrations. Dispatch once from stream.name without reading/rewinding/sniffing/importing; unknown or unnamed sources require explicit fallback. Propagate actual parse and optional dependency errors. Serialization requires an explicitly registered output_format and delegates to that parser. Preserve existing CompositeConfigParser and support nonseek streams.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o05_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/configargparse.py
+- library/tests/test_development_configargparse_o05_dev.py
+- library/docs/development-configargparse-o05-dev.md

@@ -1,4 +1,4 @@
-"""公开原生纯文本渲染回归。"""
+"Public regression tests for MS-PLAIN-TEXT-DEV; the complete business contract is in materials/MS-PLAIN-TEXT-DEV-contract.md."
 import mistune
 from mistune.renderers.text import PlainTextRenderer
 

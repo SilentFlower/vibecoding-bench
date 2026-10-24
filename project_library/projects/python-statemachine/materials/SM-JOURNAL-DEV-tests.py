@@ -1,4 +1,4 @@
-"""公开事件日志真实往返回归。"""
+"Public regression tests for SM-JOURNAL-DEV; the complete business contract is in materials/SM-JOURNAL-DEV-contract.md."
 import json
 import pytest
 from statemachine.runner import MachineRunner

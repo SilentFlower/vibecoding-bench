@@ -78,7 +78,7 @@
           "id": "TZ-TAIL-DEV",
           "kind": "modify",
           "goal": "统一零长度末尾查询并避免消费迭代器",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair tail(n, seq) so n=0 returns an empty result of the normal slice type for sliceable inputs and an empty tuple for iterator inputs without reading them. Reject negative index-protocol counts consistently with ValueError before consuming input. Preserve positive tail, last, index-protocol integers, top-level/curried/tlz APIs and all frozen tests. Do not eagerly materialize input or special-case the public example.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_tail_dev.py and concise Chinese compatibility documentation at library/docs/development-tz-tail-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair tail(n, seq) so n=0 returns an empty result of the normal slice type for sliceable inputs and an empty tuple for iterator inputs without reading them. Reject negative index-protocol counts consistently with ValueError before consuming input. Preserve positive tail, last, index-protocol integers, top-level/curried/tlz APIs and all frozen tests. Do not eagerly materialize input or special-case the public example.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_tail_dev.py and concise English compatibility documentation at library/docs/development-tz-tail-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TZ-TAIL-DEV-contract.md",
@@ -93,7 +93,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TZ-TAIL-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TZ-TAIL-DEV.native.json",
@@ -125,7 +125,7 @@
           "id": "TZ-DISTINCT-DEV",
           "kind": "modify",
           "goal": "让无长度可重读流单次扫描判重",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair isdistinct for reiterable data sources that implement __iter__ but no length protocol. Scan once, stop at the first duplicate and preserve hashability/error semantics. Keep the existing sized-sequence fast path, propagate errors from a genuinely implemented __len__ or iterator, and do not read a second iterator or consume unreachable tails. Preserve iterators, lists, empty input and exported namespaces.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_distinct_dev.py and concise Chinese compatibility documentation at library/docs/development-tz-distinct-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair isdistinct for reiterable data sources that implement __iter__ but no length protocol. Scan once, stop at the first duplicate and preserve hashability/error semantics. Keep the existing sized-sequence fast path, propagate errors from a genuinely implemented __len__ or iterator, and do not read a second iterator or consume unreachable tails. Preserve iterators, lists, empty input and exported namespaces.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_distinct_dev.py and concise English compatibility documentation at library/docs/development-tz-distinct-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TZ-DISTINCT-DEV-contract.md",
@@ -140,7 +140,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TZ-DISTINCT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TZ-DISTINCT-DEV.native.json",
@@ -172,7 +172,7 @@
           "id": "TZ-DISSOC-IN-DEV",
           "kind": "modify",
           "goal": "交付不可变嵌套映射删除与路径策略",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd dissoc_in(d, keys, factory=dict, *, strict=False, prune=False). Copy only affected mapping branches and delete the leaf, retain untouched references and input data, preserve empty ancestors by default or prune them explicitly. Missing paths return a shallow root copy unless strict=True; empty paths raise ValueError and scalar ancestors raise TypeError. Support one-shot key paths, mapping factories and toolz/curried/tlz exports in the frozen environment. Keep existing dissoc/assoc_in/update_in semantics unchanged.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_dissoc_in_dev.py and concise Chinese compatibility documentation at library/docs/development-tz-dissoc-in-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd dissoc_in(d, keys, factory=dict, *, strict=False, prune=False). Copy only affected mapping branches and delete the leaf, retain untouched references and input data, preserve empty ancestors by default or prune them explicitly. Missing paths return a shallow root copy unless strict=True; empty paths raise ValueError and scalar ancestors raise TypeError. Support one-shot key paths, mapping factories and toolz/curried/tlz exports in the frozen environment. Keep existing dissoc/assoc_in/update_in semantics unchanged.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_dissoc_in_dev.py and concise English compatibility documentation at library/docs/development-tz-dissoc-in-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TZ-DISSOC-IN-DEV-contract.md",
@@ -188,7 +188,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TZ-DISSOC-IN-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TZ-DISSOC-IN-DEV.native.json",
@@ -220,7 +220,7 @@
           "id": "TZ-UPDATE-ONLY-DEV",
           "kind": "modify",
           "goal": "为嵌套更新增加禁止隐式创建的明确模式",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend update_in with keyword-only create=True. With create=False, update only fully existing paths; if any key is absent, return a shallow root copy without calling func or creating branches. Existing None counts as present. Preserve input data and untouched branch identities, one-shot paths, factory types, curried exports, callback exceptions and default upsert behavior. Reject an empty only-update path with ValueError and invalid create types with TypeError.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_update_only_dev.py and concise Chinese compatibility documentation at library/docs/development-tz-update-only-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend update_in with keyword-only create=True. With create=False, update only fully existing paths; if any key is absent, return a shallow root copy without calling func or creating branches. Existing None counts as present. Preserve input data and untouched branch identities, one-shot paths, factory types, curried exports, callback exceptions and default upsert behavior. Reject an empty only-update path with ValueError and invalid create types with TypeError.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_update_only_dev.py and concise English compatibility documentation at library/docs/development-tz-update-only-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TZ-UPDATE-ONLY-DEV-contract.md",
@@ -235,7 +235,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TZ-UPDATE-ONLY-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TZ-UPDATE-ONLY-DEV.native.json",
@@ -267,7 +267,7 @@
           "id": "TZ-KEYMAP-DEV",
           "kind": "modify",
           "goal": "为映射键转换增加可选择的碰撞处理",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend keymap with keyword-only collision='last' and combine=None. Preserve default last-value semantics; add first, error with original-key context, and ordered combine(existing, incoming) policies. Transform each original key exactly once, preserve input mapping and factory/insertion order, propagate unhashable-key and callback errors, validate policies and expose behavior through curried/tlz without changing itemmap/merge semantics.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_keymap_dev.py and concise Chinese compatibility documentation at library/docs/development-tz-keymap-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend keymap with keyword-only collision='last' and combine=None. Preserve default last-value semantics; add first, error with original-key context, and ordered combine(existing, incoming) policies. Transform each original key exactly once, preserve input mapping and factory/insertion order, propagate unhashable-key and callback errors, validate policies and expose behavior through curried/tlz without changing itemmap/merge semantics.\n\nDeliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_keymap_dev.py and concise English compatibility documentation at library/docs/development-tz-keymap-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TZ-KEYMAP-DEV-contract.md",
@@ -282,7 +282,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TZ-KEYMAP-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TZ-KEYMAP-DEV.native.json",

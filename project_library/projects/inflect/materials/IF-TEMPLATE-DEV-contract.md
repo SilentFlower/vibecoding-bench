@@ -1,5 +1,12 @@
-# 实现受限且可复用的命名英语报表模板
+# Engineering contract: IF-TEMPLATE-DEV
 
-模板只允许明确命名字段与固定业务格式，不执行表达式或访问对象属性。复用真实数字、冠词、数量短语和流式连接接口，渲染前检查缺失字段并隔离引擎状态。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement inflect.templates.ReportTemplate(text) with compiled unique fields and render(engine,values). Allow simple named placeholders and escaped braces; reject attribute/index access, conversion flags, arbitrary format specs and nested expressions at construction. Support raw text, :words, :ordinal, :article, :join and :counted(noun), using real engine APIs and completed counted/stream join implementations. Validate all required names before formatting, preserve repeated fields/literal braces and custom noun rules. Work on an isolated clone so number formatting does not mutate original state. No eval or method dispatch from template text; content values are not reparsed as templates.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_if_template_dev.py and concise English compatibility documentation at library/docs/development-if-template-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/inflect/templates.py
+- library/development_tests/test_development_if_template_dev.py
+- library/docs/development-if-template-dev.md

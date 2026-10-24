@@ -1,5 +1,12 @@
-# 让图片组及图说明在真实输出中保持段落关系和图片配置
+# Engineering contract: HTML2TEXT-O03-DEV
 
-对应路线11：显式figure分组使每图、图说明及组前后正文按真实段落呈现；alt不替换、嵌套多图保序，ignore/alt等图片选项仍生效，EOF清理默认保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add figure_mode="legacy"|"group" to actual figure/figcaption/image processing. Group mode creates readable paragraph boundaries around the group, each image and each caption, preserving source order, original alt text, inline caption formatting, multiple/nested figures, caption-only/empty cases and neighboring body text. Existing ignore_images/images_to_alt/images-as-HTML behavior remains authoritative; never replace alt with caption or drop captions when images are disabled. Reset grouping depth at finish including unclosed EOF, retain default compatibility and reject unknown figure strategies.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_html2text_o03_dev.py and concise English compatibility documentation at library/docs/development-html2text-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/html2text/__init__.py
+- library/test/test_development_html2text_o03_dev.py
+- library/docs/development-html2text-o03-dev.md

@@ -1,4 +1,4 @@
-"""公开回归：按需校验迭代进度，并用全局数量上限保护调用者。"""
+"""Public regressions: validate iteration progress on demand and protect callers with a global item limit."""
 from datetime import date, timedelta
 from itertools import islice
 import portion as P
@@ -6,7 +6,7 @@ import pytest
 
 
 def test_checked_rejects_stagnation_and_wrong_direction():
-    """静止或反向步进必须有限失败，开放端点跳过也受保护。@return None。"""
+    """Fail finitely for stationary or backward steps and also guard skipped open endpoints. @return None."""
     for interval, step, reverse in ((P.closed(1, 3), 0, False), (P.open(1, 3), lambda x: x, False),
         (P.closed(1, 3), 1, True), (P.closed(1, 3), -1, False)):
         with pytest.raises(ValueError):
@@ -14,14 +14,14 @@ def test_checked_rejects_stagnation_and_wrong_direction():
 
 
 def test_limit_counts_across_disjoint_parts_and_reverse():
-    """数量上限作用整条区间流，不在每个片段重新计数。@return None。"""
+    """Apply the item limit to the entire interval stream without resetting it for each segment. @return None."""
     interval = P.closed(0, 2) | P.closed(10, 12)
     assert list(P.iterate(interval, 1, checked=True, max_items=4)) == [0, 1, 2, 10]
     assert list(P.iterate(interval, -1, reverse=True, checked=True, max_items=4)) == [12, 11, 10, 2]
 
 
 def test_zero_limit_does_not_evaluate_callbacks_and_rejects_bad_limits():
-    """零项不做业务回调，非法上限不会被隐式转整数。@return None。"""
+    """Make no business callbacks for a zero-item limit and do not coerce invalid limits to integers. @return None."""
     calls = []
     assert list(P.iterate(P.closed(1, 4), lambda value: calls.append(value),
         base=lambda value: calls.append(value), checked=True, max_items=0)) == []
@@ -32,7 +32,7 @@ def test_zero_limit_does_not_evaluate_callbacks_and_rejects_bad_limits():
 
 
 def test_date_callable_and_legacy_default_are_preserved():
-    """日期用实际完成值判断进度，默认不擅自收紧原行为。@return None。"""
+    """Measure date progress using the actual produced value and preserve the original default behavior. @return None."""
     first = date(2026, 1, 2)
     assert list(P.iterate(P.closed(first, first + timedelta(days=2)),
         lambda value: value + timedelta(days=1), checked=True)) == [first, first + timedelta(days=1), first + timedelta(days=2)]

@@ -1,3 +1,12 @@
-# 有界持久队列完整遵守序列切片及零容量边界
+# Engineering contract: PYRSISTENT-03-DEV
 
-路线03/04作为完整有界队列边界修复：slice.indices统一切片，空/超界/负端点/逆序/步长0与list一致；单位步长保留双列表共享。容量0不保留元素，切片、反转、删除及pickle派生仍保留容量，原对象不变。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair the PDeque bounded-sequence contract: normalize slices with slice.indices, match list values for empty/extreme/negative/full-length/reversed/zero-step cases, retain structural pop-based sharing for unit steps and original tuple fallback for other steps. maxlen=0 construction consumes input but stores no elements and both-end append/extend remain empty. Preserve capacity through slicing/reverse/remove/pickle-derived queues and leave the original immutable queue unchanged; retain existing negative-maxlen checks and positive truncation rules. Do not confuse pop negative-count opposite-end semantics with slice normalization.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_03_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/pyrsistent/_pdeque.py
+- library/tests/test_development_pyrsistent_03_dev.py
+- library/docs/development-pyrsistent-03-dev.md

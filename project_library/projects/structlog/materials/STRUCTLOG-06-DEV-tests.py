@@ -1,10 +1,10 @@
-"""业务时区输出有明确offset和小数精度，可注入固定时钟。"""
+"Public regression tests for STRUCTLOG-06-DEV; the complete business contract is in materials/STRUCTLOG-06-DEV-contract.md."
 from datetime import datetime,timezone,timedelta
 import unittest
 from structlog.processors import ZonedTimeStamper
 
 def test_fixed_zone_precision_conversion_and_event_identity():
-    """真实瞬间转换而非简单改tzinfo标签。@return None。"""
+    "Verify fixed zone precision conversion and event identity."
     now=datetime(2024,1,1,23,59,59,123456,tzinfo=timezone.utc)
     stamp=ZonedTimeStamper(timezone(timedelta(hours=5,minutes=30)),timespec='milliseconds',key='at',clock=lambda:now)
     event={'event':'order'}
@@ -12,7 +12,7 @@ def test_fixed_zone_precision_conversion_and_event_identity():
     assert now.hour==23
 
 def test_utc_name_invalid_clock_and_invalid_policy():
-    """明确命名UTC可用，naive时钟拒绝而非猜本地。@return None。"""
+    "Verify utc name invalid clock and invalid policy."
     stamp=ZonedTimeStamper('UTC',timespec='seconds',clock=lambda:datetime(2024,1,1,tzinfo=timezone.utc))
     assert stamp(None,'info',{})['timestamp']=='2024-01-01T00:00:00+00:00'
     with unittest.TestCase().assertRaises(ValueError):ZonedTimeStamper(timezone.utc,clock=lambda:datetime(2024,1,1))(None,'info',{})

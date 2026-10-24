@@ -1,9 +1,9 @@
-"""渲染之前一次列出声明数据合同的问题，不运行模板过滤器。"""
+"Public regression tests for PYTHON-LIQUID-03-DEV; the complete business contract is in materials/PYTHON-LIQUID-03-DEV-contract.md."
 import unittest
 from liquid.context_schema import ContextField,ContextSchema,validate_context
 
 def test_aggregate_missing_types_optional_nullable_and_list_positions():
-    """明确数组位置与可选/空值独立，不强迫条件分支字段。@return None。"""
+    "Verify aggregate missing types optional nullable and list positions."
     schema=ContextSchema([ContextField(('user','name'),str),ContextField(('items',0,'amount'),int),ContextField(('note',),str,False),ContextField(('label',),str,True,True)])
     value={'user':{},'items':[{'amount':'bad'}],'label':None}
     problems=validate_context(value,schema)
@@ -11,7 +11,7 @@ def test_aggregate_missing_types_optional_nullable_and_list_positions():
     assert validate_context({'user':{'name':'茶'},'items':[{'amount':3}],'label':None},schema)==()
 
 def test_no_property_access_no_value_leak_bool_int_and_schema_errors():
-    """仅Mapping/list路径，不读取任意对象属性或把bool当int。@return None。"""
+    "Verify no property access no value leak bool int and schema errors."
     class Object:
         @property
         def secret(self):raise AssertionError('getter')

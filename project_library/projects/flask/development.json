@@ -32,7 +32,7 @@
           "id": "FLASK-O01-DEV",
           "kind": "modify",
           "goal": "为真实路由命令提供稳定JSON清单及可组合过滤",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual flask routes CLI with --format table|json (default table), --endpoint exact name and --blueprint registered-name prefix including nested blueprints. JSON is one versioned object {schema:1,routes:[...]}, including endpoint/rule/sorted full methods/host/subdomain/defaults/automatic_options, honoring sort and empty apps/filters without terminal prose. Convert bounded native JSON defaults without executing opaque repr; unknown values use {$type: class_name}. Preserve ordinary table output, existing --all-methods and matching order semantics; use actual url_map metadata and do not invoke views.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-flask-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual flask routes CLI with --format table|json (default table), --endpoint exact name and --blueprint registered-name prefix including nested blueprints. JSON is one versioned object {schema:1,routes:[...]}, including endpoint/rule/sorted full methods/host/subdomain/defaults/automatic_options, honoring sort and empty apps/filters without terminal prose. Convert bounded native JSON defaults without executing opaque repr; unknown values use {$type: class_name}. Preserve ordinary table output, existing --all-methods and matching order semantics; use actual url_map metadata and do not invoke views.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o01_dev.py and concise English compatibility documentation at library/docs/development-flask-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/FLASK-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FLASK-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FLASK-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "FLASK-O02-DEV",
           "kind": "modify",
           "goal": "只读发现真实路由覆盖缺视图及可证明签名不匹配",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd App.validate_routes() returning structured overlap/missing_view/view_signature diagnostics using actual url_map/view_functions without invoking views. Report identical rule/host/subdomain overlaps in non-HEAD/OPTIONS methods, missing runtime views and inspect.signature(...).bind mismatches for actual route/default arguments. Ignore build_only, preserve wrapped signatures, optional args/**kwargs/MethodView and skip uninspectable callables or signature claims when url-value preprocessors may alter arguments. Do not speculate about intersection of different converter patterns or change default route registration/dispatch; this is explicit API inspection, not an unimplemented CLI.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-flask-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd App.validate_routes() returning structured overlap/missing_view/view_signature diagnostics using actual url_map/view_functions without invoking views. Report identical rule/host/subdomain overlaps in non-HEAD/OPTIONS methods, missing runtime views and inspect.signature(...).bind mismatches for actual route/default arguments. Ignore build_only, preserve wrapped signatures, optional args/**kwargs/MethodView and skip uninspectable callables or signature claims when url-value preprocessors may alter arguments. Do not speculate about intersection of different converter patterns or change default route registration/dispatch; this is explicit API inspection, not an unimplemented CLI.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o02_dev.py and concise English compatibility documentation at library/docs/development-flask-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/FLASK-O02-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FLASK-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FLASK-O02-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "FLASK-O03-DEV",
           "kind": "modify",
           "goal": "在实际配置对象聚合必填类型枚举范围与嵌套路径诊断",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Config.validate(constraints) explicit lightweight nonmutating validation returning aggregated {path:[keys],code} diagnostics for required/type/nullable/choices/minimum/maximum/properties. Missing and None differ; reject bool as int/float unless bool explicitly allowed, preserve literal dotted keys and recurse only through explicit properties. Existing loading/dict semantics remain unchanged and values are never converted or included in diagnostics. Correct configurations pass unchanged; invalid rule fields/types raise configuration errors rather than guessing a schema or leaking values. Do not broaden this into HTTP request validation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-flask-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Config.validate(constraints) explicit lightweight nonmutating validation returning aggregated {path:[keys],code} diagnostics for required/type/nullable/choices/minimum/maximum/properties. Missing and None differ; reject bool as int/float unless bool explicitly allowed, preserve literal dotted keys and recurse only through explicit properties. Existing loading/dict semantics remain unchanged and values are never converted or included in diagnostics. Correct configurations pass unchanged; invalid rule fields/types raise configuration errors rather than guessing a schema or leaking values. Do not broaden this into HTTP request validation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o03_dev.py and concise English compatibility documentation at library/docs/development-flask-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/FLASK-O03-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FLASK-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FLASK-O03-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "FLASK-O04-DEV",
           "kind": "modify",
           "goal": "为环境配置提供先解析后发布的事务加载及冲突定位",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Config.from_prefixed_env with opt-in atomic=False and strict=False. Atomic mode stages a deep detached dictionary, parses sorted matching variables and validates nonempty nested path segments plus dictionary intermediates before any self mutation; errors name the full environment key and preserve all prior nested external aliases. Non-strict atomic mode retains text on declared parse ValueError/TypeError; strict atomic raises, and custom loader programming errors propagate. Valid batches commit together. Keep default legacy loading behavior exactly, require strict with atomic explicitly, and do not silently swallow conflicts or call a failed partial batch successful.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-flask-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Config.from_prefixed_env with opt-in atomic=False and strict=False. Atomic mode stages a deep detached dictionary, parses sorted matching variables and validates nonempty nested path segments plus dictionary intermediates before any self mutation; errors name the full environment key and preserve all prior nested external aliases. Non-strict atomic mode retains text on declared parse ValueError/TypeError; strict atomic raises, and custom loader programming errors propagate. Valid batches commit together. Keep default legacy loading behavior exactly, require strict with atomic explicitly, and do not silently swallow conflicts or call a failed partial batch successful.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o04_dev.py and concise English compatibility documentation at library/docs/development-flask-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/FLASK-O04-DEV-contract.md",
@@ -188,7 +188,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FLASK-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FLASK-O04-DEV.native.json",
@@ -220,7 +220,7 @@
           "id": "FLASK-O05-DEV",
           "kind": "modify",
           "goal": "通过当前JSON provider惰性生成NDJSON响应并管理源生命周期",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd JSONProvider.stream(values) returning the application response class with application/x-ndjson, lazily invoking this actual provider.dumps once per consumed value in compact single physical lines plus newline. Preserve custom provider encoding, Unicode/newline escaping and request context through stream_with_context when a request is active. Do not materialize the iterable; response close/failure/normal exhaustion closes its source once, including unstarted close. Empty input works; unsupported or multiline provider output terminates with an explicit error. Document that a late failure after first bytes cannot revise HTTP status, and leave jsonify array behavior unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-flask-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd JSONProvider.stream(values) returning the application response class with application/x-ndjson, lazily invoking this actual provider.dumps once per consumed value in compact single physical lines plus newline. Preserve custom provider encoding, Unicode/newline escaping and request context through stream_with_context when a request is active. Do not materialize the iterable; response close/failure/normal exhaustion closes its source once, including unstarted close. Empty input works; unsupported or multiline provider output terminates with an explicit error. Document that a late failure after first bytes cannot revise HTTP status, and leave jsonify array behavior unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o05_dev.py and concise English compatibility documentation at library/docs/development-flask-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/FLASK-O05-DEV-contract.md",
@@ -235,7 +235,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FLASK-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FLASK-O05-DEV.native.json",
@@ -267,7 +267,7 @@
           "id": "FLASK-O06-DEV",
           "kind": "modify",
           "goal": "让endpoint冲突的失败注册不泄漏真实新路由到旧视图",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix real App.add_url_rule endpoint conflict ordering so a conflicting different view is rejected before mutating url_map or view_functions. After catching AssertionError, the proposed new URL must remain 404 and previous rules/views/methods/defaults/matcher behavior exactly match preattempt state. Preserve identical-view aliases, view_func=None later binding, automatic methods, blueprint-qualified endpoints and existing exception text. Do not hide conflicts, delete the existing view, rebuild the entire map or alter frozen tests.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-flask-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix real App.add_url_rule endpoint conflict ordering so a conflicting different view is rejected before mutating url_map or view_functions. After catching AssertionError, the proposed new URL must remain 404 and previous rules/views/methods/defaults/matcher behavior exactly match preattempt state. Preserve identical-view aliases, view_func=None later binding, automatic methods, blueprint-qualified endpoints and existing exception text. Do not hide conflicts, delete the existing view, rebuild the entire map or alter frozen tests.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_flask_o06_dev.py and concise English compatibility documentation at library/docs/development-flask-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/FLASK-O06-DEV-contract.md",
@@ -282,7 +282,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FLASK-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FLASK-O06-DEV.native.json",

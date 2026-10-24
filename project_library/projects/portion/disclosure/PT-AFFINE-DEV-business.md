@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-连续区间新增affine和translate，负比例交换端点及开闭，零比例把非空集合映为单点，空集仍空。保留多片段、无穷方向、Decimal和连续子类。非有限参数及无法保证连续表示的离散点像显式拒绝，不改集合差与现有apply。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add Interval.affine(scale, offset=0) and translate(offset) for continuous intervals. Positive scales preserve bounds, negative scales swap endpoints and openness, zero maps every nonempty input to a singleton and empty remains empty. Preserve disjoint pieces, infinity direction, Decimal arithmetic and concrete continuous subclasses; reject nonfinite/NaN parameters and explicitly reject AbstractDiscreteInterval images that cannot generally be represented as continuous intervals. Do not change subtraction, replace or apply semantics.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_pt_affine_dev.py and concise English compatibility documentation at library/docs/development-pt-affine-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/portion/interval.py
+- library/tests/test_development_pt_affine_dev.py
+- library/docs/development-pt-affine-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

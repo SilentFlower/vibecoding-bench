@@ -1,4 +1,4 @@
-"""公开XML读取预算回归。"""
+"Public regression tests for XD-BUDGET-DEV; the complete business contract is in materials/XD-BUDGET-DEV-contract.md."
 import pytest
 import xmltodict
 

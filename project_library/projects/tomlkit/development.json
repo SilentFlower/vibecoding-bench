@@ -123,7 +123,7 @@
           "id": "TK-EDITS-DEV",
           "kind": "modify",
           "goal": "在格式保留副本上事务式实施配置路径编辑",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tomlkit.editing.apply_edits(document,operations), materializing a finite ordered sequence of set/delete/test records on a detached deep copy. Paths are nonempty sequences of literal string keys and nonnegative integer array indices, never dotted-string parsing. Set may explicitly create missing mapping parents, not arrays; array indices must exist. Test compares unwrapped value and exact Python type before continuing. A late invalid operation, path error or failed test must leave original text and objects unchanged. Preserve unaffected formatting/comments, serialize and reparse final candidate. Do not modify parser internals or promise file-system transactions.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_edits_dev.py and concise Chinese compatibility documentation at library/docs/development-tk-edits-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tomlkit.editing.apply_edits(document,operations), materializing a finite ordered sequence of set/delete/test records on a detached deep copy. Paths are nonempty sequences of literal string keys and nonnegative integer array indices, never dotted-string parsing. Set may explicitly create missing mapping parents, not arrays; array indices must exist. Test compares unwrapped value and exact Python type before continuing. A late invalid operation, path error or failed test must leave original text and objects unchanged. Preserve unaffected formatting/comments, serialize and reparse final candidate. Do not modify parser internals or promise file-system transactions.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_edits_dev.py and concise English compatibility documentation at library/docs/development-tk-edits-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TK-EDITS-DEV-contract.md",
@@ -138,7 +138,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TK-EDITS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TK-EDITS-DEV.native.json",
@@ -170,7 +170,7 @@
           "id": "TK-MERGE-DEV",
           "kind": "modify",
           "goal": "按明确数组和冲突策略递归合并配置层",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tomlkit.merging.merge_documents(base,overlay,*,arrays=\"replace\",conflicts=\"replace\"). Deep-copy base, recursively merge mapping children, and choose explicit replace/append/unique for arrays (including arrays of tables, using native value equality for uniqueness). Copy incoming mutable nodes, preserve unaffected base comments/layout and validate the final serialized TOML. conflicts=\"error\" rejects differing scalar/type conflicts without changing either input. Reject unknown policies/nonmapping overlay; preserve existing parse/dumps behavior and do not infer merges from implicit global settings.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_merge_dev.py and concise Chinese compatibility documentation at library/docs/development-tk-merge-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tomlkit.merging.merge_documents(base,overlay,*,arrays=\"replace\",conflicts=\"replace\"). Deep-copy base, recursively merge mapping children, and choose explicit replace/append/unique for arrays (including arrays of tables, using native value equality for uniqueness). Copy incoming mutable nodes, preserve unaffected base comments/layout and validate the final serialized TOML. conflicts=\"error\" rejects differing scalar/type conflicts without changing either input. Reject unknown policies/nonmapping overlay; preserve existing parse/dumps behavior and do not infer merges from implicit global settings.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_merge_dev.py and concise English compatibility documentation at library/docs/development-tk-merge-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TK-MERGE-DEV-contract.md",
@@ -185,7 +185,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TK-MERGE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TK-MERGE-DEV.native.json",
@@ -217,7 +217,7 @@
           "id": "TK-STRING-STYLE-DEV",
           "kind": "modify",
           "goal": "替换字符串语义值并保留可表达的引号及注释风格",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd String.replace_value(value,*,fallback=False), returning a detached String that retains original single/multiline and basic/literal quote kind and an independent copy of trivia. Encode semantic value through existing from_raw so escaped characters and leading multiline newlines roundtrip. If literal style cannot represent the value, propagate InvalidStringError unless fallback=True, then switch only to the matching-width basic style. Preserve original node and str.replace semantics; validate arguments.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_string_style_dev.py and concise Chinese compatibility documentation at library/docs/development-tk-string-style-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd String.replace_value(value,*,fallback=False), returning a detached String that retains original single/multiline and basic/literal quote kind and an independent copy of trivia. Encode semantic value through existing from_raw so escaped characters and leading multiline newlines roundtrip. If literal style cannot represent the value, propagate InvalidStringError unless fallback=True, then switch only to the matching-width basic style. Preserve original node and str.replace semantics; validate arguments.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_string_style_dev.py and concise English compatibility documentation at library/docs/development-tk-string-style-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TK-STRING-STYLE-DEV-contract.md",
@@ -232,7 +232,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TK-STRING-STYLE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TK-STRING-STYLE-DEV.native.json",
@@ -264,7 +264,7 @@
           "id": "TK-ATOMIC-FILE-DEV",
           "kind": "modify",
           "goal": "带陈旧版本检查原子保存格式化TOML文件",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tomlkit.files.load_with_digest(path) returning (UTF8 parsed_document,raw_bytes_sha256), and atomic_save(document,path,*,expected_digest=None) returning the new digest. Validate serialized TOML before I/O, check optional original digest before temp creation and before replacement, reject stale files with StaleDocumentError, preserve mode or choose 0600 for new files, flush/fsync a same-directory temporary then os.replace and clean failures. Reject symlinks and preserve old bytes on validation, staleness or replacement failure. Do not claim cross-process compare-and-swap locking or directory-fsync crash durability; ordinary parse/dump APIs stay unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_atomic_file_dev.py and concise Chinese compatibility documentation at library/docs/development-tk-atomic-file-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement tomlkit.files.load_with_digest(path) returning (UTF8 parsed_document,raw_bytes_sha256), and atomic_save(document,path,*,expected_digest=None) returning the new digest. Validate serialized TOML before I/O, check optional original digest before temp creation and before replacement, reject stale files with StaleDocumentError, preserve mode or choose 0600 for new files, flush/fsync a same-directory temporary then os.replace and clean failures. Reject symlinks and preserve old bytes on validation, staleness or replacement failure. Do not claim cross-process compare-and-swap locking or directory-fsync crash durability; ordinary parse/dump APIs stay unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_atomic_file_dev.py and concise English compatibility documentation at library/docs/development-tk-atomic-file-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/TK-ATOMIC-FILE-DEV-contract.md",
@@ -279,7 +279,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TK-ATOMIC-FILE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/TK-ATOMIC-FILE-DEV.native.json",

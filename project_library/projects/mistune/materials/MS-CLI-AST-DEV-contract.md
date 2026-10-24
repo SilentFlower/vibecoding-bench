@@ -1,5 +1,12 @@
-# 通过CLI把真实Markdown AST导出为可解析JSON
+# Engineering contract: MS-CLI-AST-DEV
 
-文档工具可直接导出真实AST的UTF8 JSON，包含嵌套属性及插件结果，消息、文件和空文档优先级沿用已修复合同。输出文件和标准输出行为明确，不能把Python repr当作JSON，也不改变原渲染模式。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Support existing CLI --renderer ast by serializing the actual list of token dictionaries as UTF8 JSON on stdout or --output. Preserve input priority, explicit/piped empty documents as [], source Unicode, nested token attributes and configured plugins; do not stringify Python repr or wrap JSON in HTML. Existing html/markdown/rst/version behavior and file/stdout side effects stay compatible. Use the completed empty-document fix as prerequisite; errors still yield a nonzero process status.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ms_cli_ast_dev.py and concise English compatibility documentation at library/docs/development-ms-cli-ast-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/mistune/__main__.py
+- library/development_tests/test_development_ms_cli_ast_dev.py
+- library/docs/development-ms-cli-ast-dev.md

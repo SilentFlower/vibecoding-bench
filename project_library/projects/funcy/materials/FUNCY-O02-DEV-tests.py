@@ -1,9 +1,9 @@
-"""异步缓存完成值，同键共享producer但单个等待者取消隔离。"""
+"Public regression tests for FUNCY-O02-DEV; the complete business contract is in materials/FUNCY-O02-DEV-contract.md."
 import asyncio
 import pytest
 
 def test_completed_values_singleflight_and_cancel_waiter():
-    """再次await不重用协程对象，同键并发仅执行一次。@return None。"""
+    "Verify completed values singleflight and cancel waiter."
     from funcy.async_calc import amemoize
     async def run():
         calls=[];started=asyncio.Event();release=asyncio.Event()
@@ -16,7 +16,7 @@ def test_completed_values_singleflight_and_cancel_waiter():
     asyncio.run(run())
 
 def test_ttl_skip_failure_and_invalidation():
-    """假时钟、SkipMemory和异常均有明确缓存结果。@return None。"""
+    "Verify ttl skip failure and invalidation."
     from funcy.async_calc import amemoize,acache
     async def run():
         now=[0];calls=[]
@@ -36,7 +36,7 @@ def test_ttl_skip_failure_and_invalidation():
     asyncio.run(run())
 
 def test_loop_isolation_and_pending_invalidation():
-    """循环间不共享任务，失效后的旧producer不能回填缓存。@return None。"""
+    "Verify loop isolation and pending invalidation."
     from funcy.async_calc import amemoize
     calls=[]
     @amemoize

@@ -1,5 +1,12 @@
-# 显式稳定排序XML属性并保持元素及文本顺序
+# Engineering contract: XD-ATTR-SORT-DEV
 
-对账导出可选择稳定的属性顺序，按最终输出属性名逐元素排序，保留子元素、文本与输入映射顺序。默认字节行为不变，同时支持流式输出、格式化和短空元素；该选项不等于XML规范化。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add unparse(...,sort_attributes=False) with boolean validation before writing. When enabled, sort emitted attribute names lexicographically at every element after namespace rewriting, including namespace declarations; preserve child-element order, text, comments, escaping, pretty/short-empty settings and input mapping order. Default serialization must remain byte-identical. Support output streams and roundtrip parse, but do not describe this limited attribute-order option as XML canonicalization.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_xd_attr_sort_dev.py and concise English compatibility documentation at library/docs/development-xd-attr-sort-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/xmltodict.py
+- library/development_tests/test_development_xd_attr_sort_dev.py
+- library/docs/development-xd-attr-sort-dev.md

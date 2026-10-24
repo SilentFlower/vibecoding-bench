@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-新增dissoc_in，只复制受影响映射路径并删除叶子，未修改分支保留引用。默认保留空父节点、忽略缺失但返回根副本；strict和prune显式启用。支持一次性键路径、工厂和三个冻结环境导出入口；不修改既有顶层删除或更新语义。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add dissoc_in(d, keys, factory=dict, *, strict=False, prune=False). Copy only affected mapping branches and delete the leaf, retain untouched references and input data, preserve empty ancestors by default or prune them explicitly. Missing paths return a shallow root copy unless strict=True; empty paths raise ValueError and scalar ancestors raise TypeError. Support one-shot key paths, mapping factories and toolz/curried/tlz exports in the frozen environment. Keep existing dissoc/assoc_in/update_in semantics unchanged.
+
+Deliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_dissoc_in_dev.py and concise English compatibility documentation at library/docs/development-tz-dissoc-in-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/toolz/dicttoolz.py
+- library/toolz/curried/__init__.py
+- library/toolz/tests/test_development_tz_dissoc_in_dev.py
+- library/docs/development-tz-dissoc-in-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

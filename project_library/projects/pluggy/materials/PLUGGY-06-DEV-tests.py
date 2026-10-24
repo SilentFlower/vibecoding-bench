@@ -1,4 +1,4 @@
-"""预览不导入，选择按完整候选身份重新验证后才实际注册。"""
+"Public regression tests for PLUGGY-06-DEV; the complete business contract is in materials/PLUGGY-06-DEV-contract.md."
 from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
@@ -7,14 +7,14 @@ from pluggy.discovery import discover_entrypoints,load_entrypoint
 
 
 def fixture():
-    """构造可计数的离线入口。@return 分发、调用记录、插件。"""
+    "Support the public regression through fixture."
     calls=[];plugin=object()
     entries=[SimpleNamespace(group='app',name=name,value='pkg:'+name,load=lambda name=name:calls.append(name) or plugin) for name in ('one','two')]
     return SimpleNamespace(metadata={'Name':'package'},version='1',entry_points=entries),calls,plugin
 
 
 def test_preview_then_only_one_selected_plugin_loads():
-    """真正选中一条，不用原group-wide loader代替选择。@return None。"""
+    "Verify preview then only one selected plugin loads."
     dist,calls,plugin=fixture();pm=PluginManager('app')
     with patch('importlib.metadata.distributions',return_value=[dist]):
         report=discover_entrypoints('app')
@@ -24,7 +24,7 @@ def test_preview_then_only_one_selected_plugin_loads():
 
 
 def test_changed_blocked_and_bad_metadata_never_import():
-    """环境变化或拒绝名称不应先执行插件导入。@return None。"""
+    "Verify changed blocked and bad metadata never import."
     dist,calls,plugin=fixture();pm=PluginManager('app')
     with patch('importlib.metadata.distributions',return_value=[dist]):candidate=discover_entrypoints('app').candidates[0]
     dist.version='2'

@@ -1,4 +1,4 @@
-"""抽象PathLike字段需要明确文本策略及读入目标。"""
+"Public regression tests for CATTRS-O05-DEV; the complete business contract is in materials/CATTRS-O05-DEV-contract.md."
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path, PurePosixPath
@@ -6,30 +6,30 @@ import pytest
 from cattrs.preconf.json import make_converter
 
 def test_abstract_path_json_roundtrip():
-    """字段真实注解为PathLike[str]时可JSON往返。@return None。"""
+    "Verify abstract path json roundtrip."
     from cattrs.strategies.pathlike import configure_pathlike
     @dataclass
     class Record:
-        """文件索引。"""
+        "Public regression fixture: Record."
         location: PathLike[str]
     converter = configure_pathlike(make_converter(), factory=PurePosixPath)
     result = converter.loads(converter.dumps(Record(PurePosixPath('/virtual/x'))), Record)
     assert result.location == PurePosixPath('/virtual/x')
 
 def test_custom_fspath_and_bytes_rejected():
-    """自定义fspath可用，bytes不可隐式解码。@return None。"""
+    "Verify custom fspath and bytes rejected."
     from cattrs.strategies.pathlike import configure_pathlike
     converter = configure_pathlike(make_converter())
     class Custom:
-        """文本路径实现。"""
+        "Public regression fixture: Custom."
         def __fspath__(self):
-            """返回文本。@return str。"""
+            "Support the public regression through __fspath__."
             return '/virtual/custom'
     assert converter.unstructure(Custom(), unstructure_as=PathLike[str]) == '/virtual/custom'
     with pytest.raises(TypeError): converter.structure(b'/bytes', PathLike[str])
 
 def test_bad_factory_and_concrete_path():
-    """工厂错误明确，具体Path已有能力保留。@return None。"""
+    "Verify bad factory and concrete path."
     from cattrs.strategies.pathlike import configure_pathlike
     converter = configure_pathlike(make_converter(), factory=lambda value: value)
     with pytest.raises(TypeError): converter.structure('/virtual/x', PathLike[str])

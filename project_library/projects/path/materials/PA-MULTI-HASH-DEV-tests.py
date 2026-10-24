@@ -1,4 +1,4 @@
-"""公开单次读取多摘要回归。"""
+"Public regression tests for PA-MULTI-HASH-DEV; the complete business contract is in materials/PA-MULTI-HASH-DEV-contract.md."
 import hashlib
 import pytest
 from path import Path

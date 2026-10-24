@@ -1,5 +1,12 @@
-# 比较书目内容语义并区分字段和外围块变化
+# Engineering contract: BIBTEXPARSER-O06-DEV
 
-按真实引用键比较条目类型和字段值，排版及字段顺序不算变更，缺字段与None保持区别。稳定记录新增删除修改，并单独比较宏、评论及失败块；可显式忽略字段，报告复制可变值，不修改或合并输入。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement bibtexparser.diff.diff_libraries(before, after, *, ignore_fields=()). Compare real entries by exact citation key, case-normalized entry/field names and actual values independent of formatting/field order. Return stable ordered added/removed/changed records, distinguish missing fields from None, support explicit ignored fields, and separately report string-macro/comment/failed-block changes preserving multiplicity. Reports must own copied mutable values and never mutate or merge input Libraries; avoid repr-based unstable facts.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o06_dev.py and concise English compatibility documentation at library/docs/development-bibtexparser-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bibtexparser/diff.py
+- library/tests/test_development_bibtexparser_o06_dev.py
+- library/docs/development-bibtexparser-o06-dev.md

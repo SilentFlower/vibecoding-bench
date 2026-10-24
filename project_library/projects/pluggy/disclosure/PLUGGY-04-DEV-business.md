@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线17：历史容量默认无限，可显式保留最新N或零存储但仍实时交付；清理返回数量，选择器错误不提交。重放使用开始快照，期间清空/追加只影响未来，子集共享原政策，并继承前置调用时浅快照。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add HookCaller.set_history_limit(None|nonnegative int) and clear_history(predicate=None)->removed count, only for historic hooks. Default unlimited remains unchanged. Retain newest N events for future replay, limit zero still delivers live calls but stores none; predicate receives a shallow kwargs copy and must be side-effect free. Selector errors before commit leave history unchanged. Historic replay iterates a stable start snapshot so clear/append during replay affect future replays without skipping or infinite growth in the current replay. Subset callers share the original history policy. Preserve previously accepted call-time shallow snapshots and result callbacks; clearing never retracts external effects.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pluggy_04_dev.py, and English compatibility documentation at library/docs/development-pluggy-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pluggy/_caller.py
+- library/tests/test_development_pluggy_04_dev.py
+- library/docs/development-pluggy-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

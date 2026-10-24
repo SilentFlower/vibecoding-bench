@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线19：公开LazyValue混普通参数，真实占位访问才算、同事件别名/多sink只算一次、跨事件重算；支持格式/颜色/下标，未引用extra标未求值避免JSON触发，旧lazy模式保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Expose loguru.LazyValue(zero_argument_callable) and integrate event-local wrappers into actual Logger argument formatting. Mix ordinary and wrapped positional/keyword values; only actually accessed placeholders evaluate, preserving standard format specs,!s,!r,attribute/index access and color formatting. Repeated references/aliases and multiple sinks share one result per event, but later events compute anew; level/activation short-circuit stays before evaluation. Captured kwargs publish evaluated values or an explicit <unevaluated LazyValue> marker so serialize=True never forces unused computation. Keep opt(lazy=True) old all-callable semantics and propagate computation errors. Top-level argument wrappers are supported; do not silently recurse into arbitrary business containers.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o06_dev.py and concise English compatibility documentation at library/docs/development-loguru-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/loguru/_logger.py
+- library/loguru/__init__.py
+- library/tests/test_development_loguru_o06_dev.py
+- library/docs/development-loguru-o06-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,5 +1,12 @@
-# 双向处理保护括号与转义的书目关键词
+# Engineering contract: BIBTEXPARSER-O04-DEV
 
-关键词按顶层分隔符拆分，保护嵌套花括号与反斜杠转义，可明确保留空项。合并真实列表时必要保护包含分隔符的词，保留顺序和重复词；坏括号拒绝，原Library及作者解析不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement bibtexparser.keywords.SplitKeywords and MergeKeywords as opt-in non-mutating BlockMiddleware classes. Split only top-level single-character delimiters, preserving nested braces and backslash-escaped delimiters, with explicit keep_empty behavior. Reject unbalanced braces, preserve keyword order/duplicates and support custom delimiters. Merge actual string lists back to reversible strings, protecting unbraced delimiter-containing items. Do not reuse author splitting or change default parse/write stacks.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o04_dev.py and concise English compatibility documentation at library/docs/development-bibtexparser-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bibtexparser/keywords.py
+- library/tests/test_development_bibtexparser_o04_dev.py
+- library/docs/development-bibtexparser-o04-dev.md

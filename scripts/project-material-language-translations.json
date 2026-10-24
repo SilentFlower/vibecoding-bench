@@ -1,0 +1,270 @@
+{
+  "schema": 1,
+  "files": {
+    "project_library/projects/python-frontmatter/disclosure/FM-FX-01-DEV-business.md": {
+      "先取得必要材料，再判断部分文档的 TypeError 原因": "Obtain the necessary materials before diagnosing TypeError in the affected documents."
+    },
+    "project_library/projects/pydantic-settings/materials/union-model.py": {
+      "字典联合值的公开最小复现。": "Public minimal reproduction for dictionary values in a union.",
+      "读取商品字符串或字符串列表配置。@param config 商品配置字典。": "Read product configuration containing a string or a list of strings. @param config Product configuration dictionary."
+    },
+    "project_library/projects/pydantic-settings/disclosure/PS-UNION-FIX-DEV-business.md": {
+      "字典联合值的公开最小复现。": "Public minimal reproduction for dictionary values in a union.",
+      "读取商品字符串或字符串列表配置。@param config 商品配置字典。": "Read product configuration containing a string or a list of strings. @param config Product configuration dictionary.",
+      "定位字典联合值未解码原因并给出不改库的临时办法": "Diagnose why dictionary union values are not decoded and suggest a workaround without modifying the library."
+    },
+    "project_library/projects/typer/materials/TY-M01/shop.py": {
+      "提供商品工具命令组。@return None。": "Provide the product command group. @return None.",
+      "显示商品数量。@param name 名称。@param quantity 数量。@return None。": "Display the product quantity. @param name Product name. @param quantity Product quantity. @return None."
+    },
+    "project_library/projects/typer/disclosure/TY-M01-DEV-business.md": {
+      "提供商品工具命令组。@return None。": "Provide the product command group. @return None.",
+      "显示商品数量。@param name 名称。@param quantity 数量。@return None。": "Display the product quantity. @param name Product name. @param quantity Product quantity. @return None."
+    },
+    "project_library/projects/tinydb/disclosure/TD-M01-DEV-business.md": {
+      "先补材料，再辨别共享缓存文档的正常约定": "Obtain the missing materials, then identify the expected conventions for shared cached documents.",
+      "定位不同嵌套字段 fragment 查询的缓存串用": "Diagnose cache collisions between fragment queries on different nested fields."
+    },
+    "project_library/projects/tinydb/materials/generator-reproducer.py": {
+      "枚举本次有限配置规则。@return 规则迭代器。": "Enumerate this finite set of configuration rules. @return Rule iterator."
+    },
+    "project_library/projects/tinydb/disclosure/TD-M02-DEV-business.md": {
+      "枚举本次有限配置规则。@return 规则迭代器。": "Enumerate this finite set of configuration rules. @return Rule iterator.",
+      "解释多规则顺序和重复返回文档 ID": "Explain the order of multiple rules and duplicate document IDs in the result.",
+      "定位一次性规则流只更新第一单的原因": "Diagnose why a one-shot rule stream updates only the first document."
+    },
+    "project_library/projects/jinja/disclosure/JI-M02-DEV-business.md": {
+      "解释 UserDict 查询值变成键字符的分派错误": "Explain the dispatch error that turns UserDict lookup values into key characters."
+    },
+    "project_library/projects/schedule/disclosure/SC-M01-DEV-business.md": {
+      "定位批量执行最后一次多余等待": "Locate the unnecessary final wait during batch execution."
+    },
+    "project_library/projects/schedule/disclosure/SC-M02-DEV-business.md": {
+      "解释默认未配置任务的表示异常与正常对照": "Explain the representation error for a default unconfigured job and compare it with normal behavior."
+    },
+    "project_library/projects/python-dotenv/disclosure/DE-M01-DEV-business.md": {
+      "从实际字节定位非目标换行变化": "Locate changes to unrelated newlines by inspecting the actual bytes."
+    },
+    "project_library/projects/python-dotenv/disclosure/DE-M02-DEV-business.md": {
+      "定位跨行键写入与解析不一致": "Diagnose the mismatch between writing and parsing multiline keys."
+    },
+    "project_library/projects/tomlkit/disclosure/TK-M01-DEV-business.md": {
+      "配置数组乘二后内存是四项，为什么写出来还是两项？": "Determine why multiplying a configuration array by two produces four items in memory but serializes only two."
+    },
+    "project_library/projects/tomlkit/disclosure/TK-M02-DEV-business.md": {
+      "删除 inline 配置的最后子字段后，为什么出现两个逗号，甚至空父表消失？": "Determine why deleting the final child field of an inline table produces two commas or removes an empty parent table."
+    },
+    "project_library/projects/sqlite-utils/disclosure/SQ-M01-DEV-business.md": {
+      "理解内容表、全文索引与触发器职责": "Explain the responsibilities of the content table, full-text index, and triggers.",
+      "选择触发器或重建同步 FTS5 搜索": "Choose between triggers and rebuilding to synchronize FTS5 search.",
+      "定位一次性列迭代耗尽的建索引失败": "Diagnose index creation failures caused by exhausting a one-shot column iterator."
+    },
+    "project_library/projects/sqlite-utils/disclosure/SQ-M02-DEV-business.md": {
+      "规划保留原列的选择性标准化试点": "Plan a selective normalization pilot that preserves the original columns.",
+      "诊断连续转换串用旧同名回调": "Diagnose reuse of a stale callback with the same name across successive conversions."
+    },
+    "project_library/projects/tenacity/disclosure/TN-M01-DEV-business.md": {
+      "定位浮点零倍率的大编号溢出": "Locate overflow at large retry numbers when the floating-point multiplier is zero."
+    },
+    "project_library/projects/tenacity/disclosure/TN-M02-DEV-business.md": {
+      "解释深组合栈溢出及不能直接展平的原因": "Explain stack overflow in deeply composed strategies and why flattening them directly is unsafe."
+    },
+    "project_library/projects/cachetools/materials/receiver-reproducer.py": {
+      "复现类入口与实例入口的调用差异。": "Reproduce the difference between class access and instance access.",
+      "创建独立缓存。@return None。": "Create an independent cache. @return None.",
+      "返回业务参数。@param sku 商品。@return 商品。": "Return the business argument. @param sku Product identifier. @return Product identifier."
+    },
+    "project_library/projects/cachetools/disclosure/CT-M01-DEV-business.md": {
+      "复现类入口与实例入口的调用差异。": "Reproduce the difference between class access and instance access.",
+      "创建独立缓存。@return None。": "Create an independent cache. @return None.",
+      "返回业务参数。@param sku 商品。@return 商品。": "Return the business argument. @param sku Product identifier. @return Product identifier.",
+      "定位类访问的关键字receiver绑定差异": "Diagnose the difference in keyword receiver binding through class access."
+    },
+    "project_library/projects/xmltodict/disclosure/XD-M01-DEV-business.md": {
+      "定位普通分块迭代器的输入分派差异": "Diagnose input dispatch for an ordinary chunk iterator."
+    },
+    "project_library/projects/tabulate/disclosure/TB-M01-DEV-business.md": {
+      "定位tuple排版参数与list的差异": "Diagnose the difference between tuple and list formatting parameters."
+    },
+    "project_library/projects/python-decouple/materials/development-contract.md": {
+      "# 兼容UTF-8配置文件首BOM且保留真实值": "# Support a leading UTF-8 BOM in configuration files while preserving real values",
+      "公开测试见同目录 development-tests.py。请在授权测试路径交付能在原版失败的回归，不修改现有测试控制或依赖；文档路径需说明行为、边界和兼容政策。私有验收独立执行，公开样例不代表全部边界。": "See development-tests.py in this directory for public examples. Deliver original-failing regression tests at the authorized test path without changing existing test controls or dependencies. Document behavior, boundaries, and compatibility policy at the authorized documentation path. Private verification runs independently; public examples do not cover every boundary.",
+      "固定源码：https://github.com/HBNetwork/python-decouple @ 0573e6f96637f08fb4cb85e0552f0622d36827d4。": "Pinned source: https://github.com/HBNetwork/python-decouple @ 0573e6f96637f08fb4cb85e0552f0622d36827d4."
+    },
+    "project_library/projects/python-decouple/materials/development-tests.py": {
+      "公开回归：只识别UTF-8文件最开头的BOM，不损坏真实配置内容。": "Public regressions: recognize only an initial BOM in a UTF-8 file without corrupting configuration data.",
+      "BOM不能成为首键的一部分。@return None。": "Keep the BOM out of the first key. @return None.",
+      "同样的兼容政策适用于INI首节。@return None。": "Apply the same compatibility policy to the first INI section. @return None.",
+      "值内部BOM是业务数据，不能全局清除。@return None。": "Preserve a BOM inside a value as business data instead of stripping it globally. @return None.",
+      "显式非UTF8编码及已有强制转换继续工作。@return None。": "Preserve explicit non-UTF-8 encodings and existing casts. @return None."
+    },
+    "project_library/projects/python-decouple/disclosure/DC-BOM-DEV-business.md": {
+      "# 交付验收边界": "# Delivery and verification boundaries",
+      "必须完成源码与公开回归交付，不能只报告调查结论。先调查与提出方案，确认后在同一原会话实施，依据真实失败返工。原版失败、参考实现通过和冻结完整上游回归分别核对，不把参考成绩算作模型成绩。": "Deliver source changes and public regressions rather than an investigation report alone. Investigate and propose a plan, obtain confirmation, and implement in the same original conversation. Rework actual reported failures. Check original failures, reference passes, and the complete frozen upstream regression separately; reference results do not count as model results."
+    },
+    "project_library/projects/click/materials/error-notes.py": {
+      "抛出带本地补救信息的合成错误。@return None。": "Raise a synthetic error with local remediation notes. @return None."
+    },
+    "project_library/projects/click/disclosure/CK-M01-DEV-business.md": {
+      "抛出带本地补救信息的合成错误。@return None。": "Raise a synthetic error with local remediation notes. @return None.",
+      "定位CLI错误附注未显示的边界": "Diagnose the boundaries where CLI error notes are omitted."
+    },
+    "project_library/projects/cli-helpers/disclosure/CH-M01-DEV-business.md": {
+      "定位跨实例缺值选项污染": "Diagnose leakage of missing-value options across instances."
+    },
+    "project_library/projects/mistune/disclosure/MS-M01-DEV-business.md": {
+      "定位空文档和未提供输入的混淆": "Diagnose confusion between an empty document and missing input."
+    },
+    "project_library/projects/boltons/materials/redundancy.py": {
+      "自身真值为False的合法业务归一化函数。": "A valid business normalizer whose own truth value is False.",
+      "返回业务键。@param value 原值。@return 小写值。": "Return the business key. @param value Original value. @return Lowercase value.",
+      "模拟falsey对象。@return False。": "Represent a falsey object. @return False."
+    },
+    "project_library/projects/boltons/disclosure/BO-M01-DEV-business.md": {
+      "自身真值为False的合法业务归一化函数。": "A valid business normalizer whose own truth value is False.",
+      "返回业务键。@param value 原值。@return 小写值。": "Return the business key. @param value Original value. @return Lowercase value.",
+      "模拟falsey对象。@return False。": "Represent a falsey object. @return False.",
+      "解释唯一项与首个重复项报告": "Explain reporting of unique items and the first duplicate.",
+      "用已有key选择业务重复规则": "Select business duplicate rules using the existing key parameter.",
+      "定位falsey归一化函数被忽略": "Diagnose why a falsey normalizer is ignored."
+    },
+    "project_library/projects/path/disclosure/PA-M01-DEV-business.md": {
+      "先取重写API和异常时序再判断原文丢失": "Obtain the rewrite API and exception timeline before diagnosing loss of original text.",
+      "界定用户块恢复和持久文件保证": "Define recovery guarantees for the user block and the persistent file."
+    },
+    "project_library/projects/toolz/materials/development-contract.md": {
+      "公开测试见同目录 development-tests.py。请在授权测试路径交付能在原版失败的回归，不修改现有测试控制或依赖；文档路径需说明行为、边界和兼容政策。私有验收独立执行，公开样例不代表全部边界。": "See development-tests.py in this directory for public examples. Deliver original-failing regression tests at the authorized test path without changing existing test controls or dependencies. Document behavior, boundaries, and compatibility policy at the authorized documentation path. Private verification runs independently; public examples do not cover every boundary.",
+      "# 修复分批占位字符串与真实业务文本冲突": "# Fix collisions between a partition padding sentinel and real business text",
+      "固定源码：https://github.com/pytoolz/toolz @ 451af60dec590a6010e2babdbf391ea8f815122f。": "Pinned source: https://github.com/pytoolz/toolz @ 451af60dec590a6010e2babdbf391ea8f815122f."
+    },
+    "project_library/projects/toolz/materials/development-tests.py": {
+      "公开回归：业务字符串不能被分批内部缺失标记吞掉。": "Public regressions: an internal partition sentinel must not consume business strings.",
+      "旧标记字面量出现在真实数据任意位置都应保留。@return None。": "Preserve the old sentinel literal wherever it appears in real data. @return None.",
+      "显式传入同值字符串仍表示填充值。@return None。": "An explicitly supplied string with the same value still acts as the padding value. @return None.",
+      "默认丢残批、无限流有限前缀和原批次类型保持。@return None。": "Preserve default remainder dropping, finite prefixes of infinite streams, and the original batch type. @return None.",
+      "空值是普通元素，空输入不制造批次。@return None。": "Treat null as an ordinary item and produce no batches for empty input. @return None."
+    },
+    "project_library/projects/toolz/disclosure/TZ-PAD-DEV-business.md": {
+      "# 交付验收边界": "# Delivery and verification boundaries",
+      "必须完成源码与公开回归交付，不能只报告调查结论。先调查与提出方案，确认后在同一原会话实施，依据真实失败返工。原版失败、参考实现通过和冻结完整上游回归分别核对，不把参考成绩算作模型成绩。": "Deliver source changes and public regressions rather than an investigation report alone. Investigate and propose a plan, obtain confirmation, and implement in the same original conversation. Rework actual reported failures. Check original failures, reference passes, and the complete frozen upstream regression separately; reference results do not count as model results."
+    },
+    "project_library/projects/agate/materials/development-reproducer.py": {
+      "公开复现索引键异常和等值右列被错误省略。": "Public reproduction of join-key resolution errors and incorrectly omitted equal-valued right columns."
+    },
+    "project_library/projects/agate/disclosure/AG-M01-DEV-business.md": {
+      "# 业务交付与验收边界": "# Business delivery and verification boundaries",
+      "连接键解析保持实际右列身份。用户需要真实实现与可复现公开测试，不能只交只读诊断或建议。": "Preserve the identity of the actual right column when resolving join keys. Deliver a real implementation and reproducible public tests rather than read-only diagnosis or advice.",
+      "实施前应先基于公开合同调查并确认方案；实施与失败修正连续保留在原会话。合同以 materials/development-contract.md 为准，不能读取或修改控制端隐藏验收。验收独立运行原版与参考候选，并复用已有冻结完整上游回归。": "Investigate the public contract and agree on a plan before editing. Keep implementation and failure fixes in the original conversation. Follow materials/development-contract.md; do not read or modify hidden controller verification. Verification independently runs the original and reference candidates and reuses the complete frozen upstream regression."
+    },
+    "project_library/projects/python-box/materials/development-contract.md": {
+      "公开测试见同目录 development-tests.py。请在授权测试路径交付能在原版失败的回归，不修改现有测试控制或依赖；文档路径需说明行为、边界和兼容政策。私有验收独立执行，公开样例不代表全部边界。": "See development-tests.py in this directory for public examples. Deliver original-failing regression tests at the authorized test path without changing existing test controls or dependencies. Document behavior, boundaries, and compatibility policy at the authorized documentation path. Private verification runs independently; public examples do not cover every boundary.",
+      "# 冻结嵌套配置的YAML导出不再泄漏Box对象": "# Export frozen nested configuration to YAML without leaking Box objects",
+      "固定源码：https://github.com/cdgriffith/Box @ a4c10e977b574114613431394b30412b50aaacce。": "Pinned source: https://github.com/cdgriffith/Box @ a4c10e977b574114613431394b30412b50aaacce."
+    },
+    "project_library/projects/python-box/materials/development-tests.py": {
+      "公开回归：冻结配置内的序列和Box可以无损导出YAML。": "Public regressions: export sequences and Box values in frozen configuration to YAML without data loss.",
+      "嵌套冻结序列必须导出普通YAML数据。@return None。": "Export nested frozen sequences as ordinary YAML data. @return None.",
+      "真实文件输出保留多层序列与中文。@return None。": "Preserve nested sequences and Unicode text in actual file output. @return None.",
+      "导出成功后源配置仍拒绝根和嵌套修改。@return None。": "Keep root and nested mutations forbidden after a successful export. @return None.",
+      "普通配置的YAML和JSON行为保持。@return None。": "Preserve YAML and JSON behavior for ordinary configuration. @return None."
+    },
+    "project_library/projects/python-box/disclosure/BX-YAML-DEV-business.md": {
+      "# 交付验收边界": "# Delivery and verification boundaries",
+      "必须完成源码与公开回归交付，不能只报告调查结论。先调查与提出方案，确认后在同一原会话实施，依据真实失败返工。原版失败、参考实现通过和冻结完整上游回归分别核对，不把参考成绩算作模型成绩。": "Deliver source changes and public regressions rather than an investigation report alone. Investigate and propose a plan, obtain confirmation, and implement in the same original conversation. Rework actual reported failures. Check original failures, reference passes, and the complete frozen upstream regression separately; reference results do not count as model results."
+    },
+    "project_library/projects/backoff/materials/development-contract.md": {
+      "公开测试见同目录 development-tests.py。请在授权测试路径交付能在原版失败的回归，不修改现有测试控制或依赖；文档路径需说明行为、边界和兼容政策。私有验收独立执行，公开样例不代表全部边界。": "See development-tests.py in this directory for public examples. Deliver original-failing regression tests at the authorized test path without changing existing test controls or dependencies. Document behavior, boundaries, and compatibility policy at the authorized documentation path. Private verification runs independently; public examples do not cover every boundary.",
+      "# 统一有限重试耗尽时的放弃政策": "# Apply a consistent give-up policy when a finite retry schedule is exhausted",
+      "固定源码：https://github.com/litl/backoff @ d82b23c42d7a7e2402903e71e7a7f03014a00076。": "Pinned source: https://github.com/litl/backoff @ d82b23c42d7a7e2402903e71e7a7f03014a00076."
+    },
+    "project_library/projects/backoff/materials/development-tests.py": {
+      "公开回归：有限等待耗尽与放弃政策在同步及异步中一致。": "Public regressions: apply the same finite-wait exhaustion and give-up policy to synchronous and asynchronous retries.",
+      "耗尽不覆盖明确要求的None返回，回调只执行一次。@return None。": "Preserve explicitly requested None returns on exhaustion and invoke the callback once. @return None.",
+      "模拟一次失败发送。@return 不返回。": "Simulate a failed send. @return Does not return.",
+      "异步耗尽采用相同政策并等待放弃回调。@return None。": "Apply the same exhaustion policy asynchronously and await the give-up callback. @return None.",
+      "保存真实异步回调详情。@param details 详情。@return None。": "Save actual asynchronous callback details. @param details Callback details. @return None.",
+      "模拟异步发送失败。@return 不返回。": "Simulate a failed asynchronous send. @return Does not return.",
+      "默认和显式抛出政策保持同一个异常对象。@return None。": "Preserve the same exception object under default and explicit re-raise policies. @return None.",
+      "抛出固定异常。@return 不返回。": "Raise the fixed exception. @return Does not return.",
+      "正常成功和predicate耗尽仍返回业务结果。@return None。": "Preserve business results on ordinary success and predicate exhaustion. @return None."
+    },
+    "project_library/projects/backoff/disclosure/BF-EXHAUST-DEV-business.md": {
+      "# 交付验收边界": "# Delivery and verification boundaries",
+      "必须完成源码与公开回归交付，不能只报告调查结论。先调查与提出方案，确认后在同一原会话实施，依据真实失败返工。原版失败、参考实现通过和冻结完整上游回归分别核对，不把参考成绩算作模型成绩。": "Deliver source changes and public regressions rather than an investigation report alone. Investigate and propose a plan, obtain confirmation, and implement in the same original conversation. Rework actual reported failures. Check original failures, reference passes, and the complete frozen upstream regression separately; reference results do not count as model results."
+    },
+    "project_library/projects/dpath/disclosure/DP-M01-DEV-business.md": {
+      "区分已有路径批改和字面新建": "Distinguish bulk updates to existing paths from literal path creation.",
+      "解释列表删除留空位及无匹配错误": "Explain holes left by list deletion and errors for unmatched paths."
+    },
+    "project_library/projects/alive-progress/disclosure/AP-M01-DEV-business.md": {
+      "核对完成标注缺失的完整复现": "Review the complete reproduction for missing completion annotations."
+    },
+    "project_library/projects/simplejson/disclosure/SJ-M01-DEV-business.md": {
+      "先核CLI参数和路径再定位输出丢失": "Check CLI arguments and paths before diagnosing lost output."
+    },
+    "project_library/projects/attrs/materials/development-reproducer.py": {
+      "公开复现跨模型等值字段被误选。": "Public reproduction of incorrectly selecting equal-valued attributes from another model."
+    },
+    "project_library/projects/attrs/disclosure/AT-M01-DEV-business.md": {
+      "# 业务交付与验收边界": "# Business delivery and verification boundaries",
+      "实施前应先基于公开合同调查并确认方案；实施与失败修正连续保留在原会话。合同以 materials/development-contract.md 为准，不能读取或修改控制端隐藏验收。验收独立运行原版与参考候选，并复用已有冻结完整上游回归。": "Investigate the public contract and agree on a plan before editing. Keep implementation and failure fixes in the original conversation. Follow materials/development-contract.md; do not read or modify hidden controller verification. Verification independently runs the original and reference candidates and reuses the complete frozen upstream regression.",
+      "Attribute过滤器只选择精确字段对象。用户需要真实实现与可复现公开测试，不能只交只读诊断或建议。": "Attribute filters must select the exact attribute objects. Deliver a real implementation and reproducible public tests rather than read-only diagnosis or advice."
+    },
+    "project_library/projects/anytree/materials/development-reproducer.py": {
+      "公开复现JSON预览污染共享深度。": "Public reproduction of JSON preview depth leaking into shared exporter state."
+    },
+    "project_library/projects/anytree/disclosure/AN-M01-DEV-business.md": {
+      "# 业务交付与验收边界": "# Business delivery and verification boundaries",
+      "实施前应先基于公开合同调查并确认方案；实施与失败修正连续保留在原会话。合同以 materials/development-contract.md 为准，不能读取或修改控制端隐藏验收。验收独立运行原版与参考候选，并复用已有冻结完整上游回归。": "Investigate the public contract and agree on a plan before editing. Keep implementation and failure fixes in the original conversation. Follow materials/development-contract.md; do not read or modify hidden controller verification. Verification independently runs the original and reference candidates and reuses the complete frozen upstream regression.",
+      "JSON深度覆盖不污染共享字典导出器。用户需要真实实现与可复现公开测试，不能只交只读诊断或建议。": "JSON depth overrides must not mutate a shared dictionary exporter. Deliver a real implementation and reproducible public tests rather than read-only diagnosis or advice."
+    },
+    "project_library/projects/babel/materials/development-reproducer.py": {
+      "公开展示现有字符串输出与缺少分段API的功能差距。": "Public demonstration of the gap between existing string output and the missing parts API."
+    },
+    "project_library/projects/babel/disclosure/BA-M01-DEV-business.md": {
+      "# 业务交付与验收边界": "# Business delivery and verification boundaries",
+      "实施前应先基于公开合同调查并确认方案；实施与失败修正连续保留在原会话。合同以 materials/development-contract.md 为准，不能读取或修改控制端隐藏验收。验收独立运行原版与参考候选，并复用已有冻结完整上游回归。": "Investigate the public contract and agree on a plan before editing. Keep implementation and failure fixes in the original conversation. Follow materials/development-contract.md; do not read or modify hidden controller verification. Verification independently runs the original and reference candidates and reuses the complete frozen upstream regression.",
+      "显式日期时间模式的可样式化字段分段。用户需要真实实现与可复现公开测试，不能只交只读诊断或建议。": "Produce styleable field parts for explicit date-time patterns. Deliver a real implementation and reproducible public tests rather than read-only diagnosis or advice."
+    },
+    "project_library/projects/arrow/materials/development-reproducer.py": {
+      "公开复现尾随内容与分钟溢出被接受。": "Public reproduction of accepting trailing content and minute overflow."
+    },
+    "project_library/projects/arrow/disclosure/AR-M01-DEV-business.md": {
+      "# 业务交付与验收边界": "# Business delivery and verification boundaries",
+      "实施前应先基于公开合同调查并确认方案；实施与失败修正连续保留在原会话。合同以 materials/development-contract.md 为准，不能读取或修改控制端隐藏验收。验收独立运行原版与参考候选，并复用已有冻结完整上游回归。": "Investigate the public contract and agree on a plan before editing. Keep implementation and failure fixes in the original conversation. Follow materials/development-contract.md; do not read or modify hidden controller verification. Verification independently runs the original and reference candidates and reuses the complete frozen upstream regression.",
+      "固定偏移完整匹配并统一拒绝非法分量。用户需要真实实现与可复现公开测试，不能只交只读诊断或建议。": "Fully match fixed offsets and consistently reject invalid components. Deliver a real implementation and reproducible public tests rather than read-only diagnosis or advice."
+    },
+    "project_library/projects/feedgen/materials/public-test-example.py": {
+      "公开回归只测试授权的Atom链接序列化行为。": "Public regressions cover only the authorized Atom link serialization behavior.",
+      "覆盖完整元数据、多链接和空属性语义。": "Cover complete metadata, multiple links, and empty-attribute semantics.",
+      "构造有效的合成条目。@return 条目。": "Build a valid synthetic entry. @return Entry.",
+      "非空字符串元数据和零长度字符串全部保留。@return None。": "Preserve non-empty metadata strings and a length value of zero. @return None.",
+      "多个关系保留独立属性且不修改输入状态。@return None。": "Preserve independent attributes for multiple relations without mutating input state. @return None.",
+      "缺省关系仍保留，空或None的可选属性不凭空写出。@return None。": "Preserve the default relation and omit optional attributes that are empty or None. @return None."
+    },
+    "project_library/projects/feedgen/disclosure/FG-M01-DEV-business.md": {
+      "公开回归只测试授权的Atom链接序列化行为。": "Public regressions cover only the authorized Atom link serialization behavior.",
+      "覆盖完整元数据、多链接和空属性语义。": "Cover complete metadata, multiple links, and empty-attribute semantics.",
+      "构造有效的合成条目。@return 条目。": "Build a valid synthetic entry. @return Entry.",
+      "非空字符串元数据和零长度字符串全部保留。@return None。": "Preserve non-empty metadata strings and a length value of zero. @return None.",
+      "多个关系保留独立属性且不修改输入状态。@return None。": "Preserve independent attributes for multiple relations without mutating input state. @return None.",
+      "缺省关系仍保留，空或None的可选属性不凭空写出。@return None。": "Preserve the default relation and omit optional attributes that are empty or None. @return None."
+    },
+    "project_library/projects/portion/materials/development-contract.md": {
+      "# 安全的区间采样": "# Safe interval sampling",
+      "公开复现见 development-tests.py。请将有意义的原版失败回归交付到 library/tests/test_development_checked_iterate.py，补充兼容文档。固定源码的分发版本为2.7.0-pre1；独立验收沿用原生可信绑定入口提供版本元数据，不安装另一份实现。": "See development-tests.py for the public reproduction. Deliver meaningful original-failing regressions at library/tests/test_development_checked_iterate.py and add compatibility documentation. The pinned source distribution version is 2.7.0-pre1; independent verification supplies version metadata through its existing trusted native binding rather than installing a second implementation.",
+      "固定源码：https://github.com/AlexandreDecan/portion @ 622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44。": "Pinned source: https://github.com/AlexandreDecan/portion @ 622e7ca1f3a36a7cb337e6f51abeef0ee5e40c44."
+    },
+    "project_library/projects/portion/materials/development-tests.py": {
+      "公开回归：按需校验迭代进度，并用全局数量上限保护调用者。": "Public regressions: validate iteration progress on demand and protect callers with a global item limit.",
+      "静止或反向步进必须有限失败，开放端点跳过也受保护。@return None。": "Fail finitely for stationary or backward steps and also guard skipped open endpoints. @return None.",
+      "数量上限作用整条区间流，不在每个片段重新计数。@return None。": "Apply the item limit to the entire interval stream without resetting it for each segment. @return None.",
+      "零项不做业务回调，非法上限不会被隐式转整数。@return None。": "Make no business callbacks for a zero-item limit and do not coerce invalid limits to integers. @return None.",
+      "日期用实际完成值判断进度，默认不擅自收紧原行为。@return None。": "Measure date progress using the actual produced value and preserve the original default behavior. @return None."
+    },
+    "project_library/projects/portion/disclosure/PT-CHECKED-DEV-business.md": {
+      "# 业务验收边界": "# Business verification boundaries",
+      "调查后提出兼容方案，确认后在同一会话完成实现、文档和公开回归。重复请求、异常分支与回归不另算新项目；不能只报告已有库的零步行为。": "Investigate and propose a compatible plan. After confirmation, deliver the implementation, documentation, and public regressions in the same conversation. Repeated requests, error branches, and regressions do not count as separate projects; reporting existing zero-step behavior alone is insufficient."
+    }
+  }
+}

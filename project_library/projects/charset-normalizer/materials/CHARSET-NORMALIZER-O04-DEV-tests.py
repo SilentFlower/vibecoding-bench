@@ -1,10 +1,10 @@
-"""三种实际压缩文本读取必须有严格解压预算。"""
+"Public regression tests for CHARSET-NORMALIZER-O04-DEV; the complete business contract is in materials/CHARSET-NORMALIZER-O04-DEV-contract.md."
 import bz2
 import gzip
 import lzma
 
 def test_three_formats_same_text(tmp_path):
-    """gzip/bz2/xz均调用真实检测得到同样文字。@param tmp_path 临时目录。@return None。"""
+    "Verify three formats same text."
     from charset_normalizer.compressed import from_compressed_path
     payload = 'Hello compressed 中文'.encode('utf-8')
     for format, compress in [('gzip', gzip.compress), ('bz2', bz2.compress), ('xz', lzma.compress)]:
@@ -14,7 +14,7 @@ def test_three_formats_same_text(tmp_path):
         assert str(result['matches'].best()) == payload.decode('utf-8') and result['decoded_bytes'] == len(payload)
 
 def test_over_budget_and_original(tmp_path):
-    """超限拒绝且压缩原文件不改变。@param tmp_path 临时目录。@return None。"""
+    "Verify over budget and original."
     import pytest
     from charset_normalizer.compressed import from_compressed_path
     path = tmp_path / 'text.gz'
@@ -24,7 +24,7 @@ def test_over_budget_and_original(tmp_path):
     assert path.read_bytes() == original
 
 def test_empty_and_truncated(tmp_path):
-    """空载荷可识别，损坏尾部不返回部分成功。@param tmp_path 临时目录。@return None。"""
+    "Verify empty and truncated."
     import pytest
     from charset_normalizer.compressed import from_compressed_path
     path = tmp_path / 'empty.gz'

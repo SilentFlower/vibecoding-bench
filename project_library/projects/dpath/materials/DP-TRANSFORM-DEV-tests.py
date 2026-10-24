@@ -1,4 +1,4 @@
-"""公开嵌套配置叶子转换回归。"""
+"Public regression tests for DP-TRANSFORM-DEV; the complete business contract is in materials/DP-TRANSFORM-DEV-contract.md."
 from copy import deepcopy
 import pytest
 from dpath.transforming import transform_existing

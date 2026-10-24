@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-应用运行中调整缓存预算时，应沿用LRU、LFU等现有淘汰规则和加权大小，先处理自然过期，再收缩到目标容量，返回容量淘汰结果，保留剩余条目的策略历史。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add Cache.resize(maxsize) for built-in policies. Validate a nonnegative real int/float excluding bool/NaN; allow positive infinity. Perform normal expiry cleanup for timed caches, then evict through their original popitem policy until currsize fits, update maxsize and return a tuple of capacity-evicted pairs (not expired pairs). Preserve weighted sizing, growth/no-op behavior, subsequent insertion semantics and zero capacity. Validation must happen before any cleanup or mutation; do not rebuild caches or reset policy history.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_resize_dev.py and concise English compatibility documentation at library/docs/development-ct-resize-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/cachetools/__init__.py
+- library/development_tests/test_development_ct_resize_dev.py
+- library/docs/development-ct-resize-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,4 +1,4 @@
-"""公开真实表格关联回归。"""
+"Public regression tests for TB-JOIN-DEV; the complete business contract is in materials/TB-JOIN-DEV-contract.md."
 import pytest
 from tablib import Dataset
 from tablib.joining import join

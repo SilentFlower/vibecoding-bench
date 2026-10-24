@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线07：版本化序列化规则定义与缓存开关，锁/迭代器和运行缓存独立重建；包含排除规则、部分/完整缓存、deepcopy和旧无缓存dict兼容，不承诺活动迭代位置。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Implement versioned pickle state for rrulebase covering rrule and rruleset with cache=True/False. Serialize only definition and cache policy, reconstruct independent locks/iterators, and restart cache computation rather than promising active iterator position. Preserve include/exclude rules/dates, timezone definitions and query results after empty/partial/full cache, deepcopy and legacy uncached dict states. Reject unknown state versions; never load untrusted external pickle. Old original tests/control files remain unchanged.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_06_dev.py, and English compatibility documentation at library/docs/development-python-dateutil-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/dateutil/rrule.py
+- library/tests/test_development_python_dateutil_06_dev.py
+- library/docs/development-python-dateutil-06-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

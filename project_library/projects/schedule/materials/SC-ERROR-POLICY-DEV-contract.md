@@ -1,5 +1,12 @@
-# 对显式选中的任务按连续失败次数取消调度
+# Engineering contract: SC-ERROR-POLICY-DEV
 
-长期运行的调度需要可选的连续失败熔断：仅包装选中任务，正常节奏每次执行一次，成功清零，达到上限自动取消。保留原异常对象的通知，处理器异常及BaseException仍传播，普通任务不受影响。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement schedule.policies.with_error_policy(job, *, max_failures=3, on_error=None) for configured jobs. Preserve its bound callback arguments and return the original Job. Suppress Exception from that callback only, increment job.consecutive_failures, notify optional (original_exception,count) once, and return CancelJob when consecutive failures reach the positive integer limit; otherwise let normal Job.run reschedule once. Success resets the count and preserves return/CancelJob. Do not catch BaseException, suppress handler errors, double-wrap a job, retry immediately, or change unwrapped jobs exception behavior.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_error_policy_dev.py and concise English compatibility documentation at library/docs/development-sc-error-policy-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/schedule/policies.py
+- library/development_tests/test_development_sc_error_policy_dev.py
+- library/docs/development-sc-error-policy-dev.md

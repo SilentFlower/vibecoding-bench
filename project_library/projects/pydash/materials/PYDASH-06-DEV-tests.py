@@ -1,10 +1,10 @@
-"""业务同步提取、异步处理与同步汇总保顺序。"""
+"Public regression tests for PYDASH-06-DEV; the complete business contract is in materials/PYDASH-06-DEV-contract.md."
 import asyncio
 import unittest
 import pydash
 
 def test_mixed_flow_runs_in_callers_loop_with_original_parameters():
-    """不能用内部asyncio.run，首步完整转发参数。@return None。"""
+    "Verify mixed flow runs in callers loop with original parameters."
     async def run():
         events=[]
         def first(x,*,offset):events.append('first');return x+offset
@@ -15,7 +15,7 @@ def test_mixed_flow_runs_in_callers_loop_with_original_parameters():
     asyncio.run(run())
 
 def test_exception_cancellation_and_empty_chain_do_not_continue():
-    """错误与取消不执行后续步骤，空链语义明确。@return None。"""
+    "Verify exception cancellation and empty chain do not continue."
     async def run():
         seen=[]
         async def fail(x):raise ValueError('stage')

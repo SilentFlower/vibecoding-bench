@@ -1,4 +1,4 @@
-"""公开配置层合并回归。"""
+"Public regression tests for TK-MERGE-DEV; the complete business contract is in materials/TK-MERGE-DEV-contract.md."
 import pytest
 import tomlkit
 from tomlkit.merging import merge_documents

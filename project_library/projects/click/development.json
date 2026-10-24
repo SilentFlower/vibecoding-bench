@@ -77,7 +77,7 @@
           "id": "CK-DELIMITED-DEV",
           "kind": "modify",
           "goal": "把有引号的列表选项转换为有界业务值序列",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement click.delimited.DelimitedList(item_type=str,*,separator=\",\",min_items=0,max_items=None) as ParamType, converting one CSV-style record or preexisting list/tuple to a tuple through the pinned item ParamType. Support quoted separators, escaped double quotes and explicit empty fields; empty text is an empty list. Reject malformed quotes, multiple records, invalid separators and invalid length bounds before invoking target commands. Preserve item BadParameter context and report one-based failing item position. Verify real option parsing and multiple=True without changing existing Tuple/Choice behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_delimited_dev.py and concise Chinese compatibility documentation at library/docs/development-ck-delimited-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement click.delimited.DelimitedList(item_type=str,*,separator=\",\",min_items=0,max_items=None) as ParamType, converting one CSV-style record or preexisting list/tuple to a tuple through the pinned item ParamType. Support quoted separators, escaped double quotes and explicit empty fields; empty text is an empty list. Reject malformed quotes, multiple records, invalid separators and invalid length bounds before invoking target commands. Preserve item BadParameter context and report one-based failing item position. Verify real option parsing and multiple=True without changing existing Tuple/Choice behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_delimited_dev.py and concise English compatibility documentation at library/docs/development-ck-delimited-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CK-DELIMITED-DEV-contract.md",
@@ -92,7 +92,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CK-DELIMITED-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CK-DELIMITED-DEV.native.json",
@@ -124,7 +124,7 @@
           "id": "CK-DYNAMIC-CHOICE-DEV",
           "kind": "modify",
           "goal": "按本次上下文生成真实选项并同步帮助与补全",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement click.dynamic.DynamicChoice(provider,*,case_sensitive=True) as ParamType. Provider accepts current Context or None and returns finite choices; snapshot once per conversion/help/completion operation and delegate actual normalization/identity/error behavior to Choice. Do not cache across calls or mutate provider results. Help metavars and shell completion must use current choices; metadata inspection must not eagerly call provider without context. Preserve original choice objects and provider exceptions, and verify independent CLI invocations with different ctx.obj values.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_dynamic_choice_dev.py and concise Chinese compatibility documentation at library/docs/development-ck-dynamic-choice-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement click.dynamic.DynamicChoice(provider,*,case_sensitive=True) as ParamType. Provider accepts current Context or None and returns finite choices; snapshot once per conversion/help/completion operation and delegate actual normalization/identity/error behavior to Choice. Do not cache across calls or mutate provider results. Help metavars and shell completion must use current choices; metadata inspection must not eagerly call provider without context. Preserve original choice objects and provider exceptions, and verify independent CLI invocations with different ctx.obj values.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_dynamic_choice_dev.py and concise English compatibility documentation at library/docs/development-ck-dynamic-choice-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CK-DYNAMIC-CHOICE-DEV-contract.md",
@@ -139,7 +139,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CK-DYNAMIC-CHOICE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CK-DYNAMIC-CHOICE-DEV.native.json",
@@ -171,7 +171,7 @@
           "id": "CK-NEW-PATH-DEV",
           "kind": "modify",
           "goal": "让输出路径参数明确拒绝已有文件、目录及悬空链接",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement click.newpath.NewPath(**Path_options) as Path with fixed exists=False/allow_dash=False, rejecting attempts to override those options. Reject existing files, directories, symlinks including dangling links, and dash before target callback; retain original path_type and resolve_path behavior for unoccupied paths. Validate both lexical input and converted path, never create/reserve targets or silently overwrite data. Preserve ordinary Path behavior and normal BadParameter exit code; document that validation is not an atomic filesystem reservation against concurrent creation.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_new_path_dev.py and concise Chinese compatibility documentation at library/docs/development-ck-new-path-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement click.newpath.NewPath(**Path_options) as Path with fixed exists=False/allow_dash=False, rejecting attempts to override those options. Reject existing files, directories, symlinks including dangling links, and dash before target callback; retain original path_type and resolve_path behavior for unoccupied paths. Validate both lexical input and converted path, never create/reserve targets or silently overwrite data. Preserve ordinary Path behavior and normal BadParameter exit code; document that validation is not an atomic filesystem reservation against concurrent creation.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_new_path_dev.py and concise English compatibility documentation at library/docs/development-ck-new-path-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CK-NEW-PATH-DEV-contract.md",
@@ -186,7 +186,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CK-NEW-PATH-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CK-NEW-PATH-DEV.native.json",
@@ -218,7 +218,7 @@
           "id": "CK-STABLE-WRITE-DEV",
           "kind": "modify",
           "goal": "命令重复生成相同内容时保留目标文件并原子提交变化",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement click.writing.write_if_changed(path,content,*,encoding=\"utf-8\") returning whether actual write occurred. Compare final encoded bytes first; identical bytes preserve inode/mtime/mode exactly. Changed/new data is serialized before I/O, written to same-directory temporary, flushed/fsynced, mode preserved (0600 when new) then atomically replaced, with cleanup on failure. Support bytes and encoded text; reject invalid content and symlinks. Verify real CliRunner invocation; do not alter open_file defaults or promise compare-and-swap locking/parent-directory fsync durability.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_stable_write_dev.py and concise Chinese compatibility documentation at library/docs/development-ck-stable-write-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement click.writing.write_if_changed(path,content,*,encoding=\"utf-8\") returning whether actual write occurred. Compare final encoded bytes first; identical bytes preserve inode/mtime/mode exactly. Changed/new data is serialized before I/O, written to same-directory temporary, flushed/fsynced, mode preserved (0600 when new) then atomically replaced, with cleanup on failure. Support bytes and encoded text; reject invalid content and symlinks. Verify real CliRunner invocation; do not alter open_file defaults or promise compare-and-swap locking/parent-directory fsync durability.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_stable_write_dev.py and concise English compatibility documentation at library/docs/development-ck-stable-write-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CK-STABLE-WRITE-DEV-contract.md",
@@ -233,7 +233,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CK-STABLE-WRITE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CK-STABLE-WRITE-DEV.native.json",
@@ -265,7 +265,7 @@
           "id": "CK-DESCRIBE-DEV",
           "kind": "modify",
           "goal": "在命令元数据中提供当前路径与真实用法而不执行业务",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Command.describe(ctx) returning an independent info dictionary with all existing to_info_dict fields plus usage=self.get_usage(ctx) and command_path=ctx.command_path. Require ctx.command is self. Respect actual parent/group invocation names, custom usage/formatter settings and subclass metadata overrides, without invoking command callbacks, parsing values or changing the original to_info_dict schema. Work for groups, aliases and nested commands; metadata remains Python data with existing value types rather than claiming arbitrary values are JSON serializable.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_describe_dev.py and concise Chinese compatibility documentation at library/docs/development-ck-describe-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Command.describe(ctx) returning an independent info dictionary with all existing to_info_dict fields plus usage=self.get_usage(ctx) and command_path=ctx.command_path. Require ctx.command is self. Respect actual parent/group invocation names, custom usage/formatter settings and subclass metadata overrides, without invoking command callbacks, parsing values or changing the original to_info_dict schema. Work for groups, aliases and nested commands; metadata remains Python data with existing value types rather than claiming arbitrary values are JSON serializable.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ck_describe_dev.py and concise English compatibility documentation at library/docs/development-ck-describe-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CK-DESCRIBE-DEV-contract.md",
@@ -280,7 +280,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CK-DESCRIBE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CK-DESCRIBE-DEV.native.json",

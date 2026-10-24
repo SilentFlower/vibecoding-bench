@@ -1,10 +1,10 @@
-"""中文、CRLF与分组位置都切回精确原字符，不伪称字节偏移。"""
+"Public regression tests for SQLPARSE-03-DEV; the complete business contract is in materials/SQLPARSE-03-DEV-contract.md."
 import unittest
 from sqlparse.sourcemap import SourceMap
 
 
 def test_atomic_and_group_half_open_character_ranges():
-    """每个叶子与Statement切片准确且偏移连续。@return None。"""
+    "Verify atomic and group half open character ranges."
     text=' \r\nSELECT 中文, 1;\r\nSELECT e\u0301 FROM t;  '
     mapping=SourceMap(text)
     entries=mapping.tokens()
@@ -19,7 +19,7 @@ def test_atomic_and_group_half_open_character_ranges():
 
 
 def test_bytes_empty_and_stale_tokens_reject():
-    """编码明确，编辑后映射失效不能继续报原坐标。@return None。"""
+    "Verify bytes empty and stale tokens reject."
     mapping=SourceMap('SELECT 中文;'.encode('utf-16-le'),encoding='utf-16-le')
     assert mapping.original=='SELECT 中文;'
     assert SourceMap('').tokens()==()

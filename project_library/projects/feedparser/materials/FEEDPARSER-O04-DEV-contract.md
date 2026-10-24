@@ -1,5 +1,12 @@
-# 基于真实条目键生成明确标可靠性的稳定身份而不伪造ID
+# Engineering contract: FEEDPARSER-O04-DEV
 
-对应路线09：实际id可靠优先，无id按明确真实字段/可选NFC生成稳定摘要并标推断；不写假id、不读别名、不删追踪参数，缺数据/非法配置明确拒绝。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add feedparser.records.entry_identity for actual parsed entry mappings. Prefer a nonempty native string id with reliable=True; otherwise compute deterministic SHA256 from explicit selected actual fields with configurable NFC string normalization, canonical JSON and reliable=False/source=fields metadata. Never inject an id, read compatibility alias fallbacks as real facts, strip tracking parameters or identify entries merely by similar titles. Reject missing usable data, duplicate/invalid field names, nonstring native ids and unsupported/nonfinite JSON values explicitly. Preserve inputs, distinguish equal titles with different links and document fallback collision/stability scope.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o04_dev.py and concise English compatibility documentation at library/docs/development-feedparser-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/feedparser/records.py
+- library/tests/test_development_feedparser_o04_dev.py
+- library/docs/development-feedparser-o04-dev.md

@@ -1,4 +1,4 @@
-"""公开词法相对路径约束回归。"""
+"Public regression tests for PA-BENEATH-DEV; the complete business contract is in materials/PA-BENEATH-DEV-contract.md."
 from path import Path
 import pytest
 

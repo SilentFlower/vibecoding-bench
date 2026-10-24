@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线13：结构化转换函数每次创建真实Markdown实例，返回实际HTML、目录、meta及引用独立快照，无扩展字段明确为空。后续文档和调用方修改结果容器不串状态；旧API和扩展生命周期不改，不虚构诊断或位置字段。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add markdown.results.convert_document(text,extensions=(),extension_configs=None,**options) and frozen ConversionResult(html,toc,toc_tokens,metadata,references). Use a fresh real Markdown instance for each decoded-text call and capture actual extension-produced fields with deep copied result containers. Without extensions return explicit empty fields. Later documents or caller mutation of returned containers cannot change earlier/later result snapshots; opaque extension objects retain their normal documented lifecycle and are not falsely claimed clonable. Preserve existing markdown()/Markdown.convert APIs, registered extension behavior, output-format options and actual reference tuples. No invented source-position/diagnostic data or model calls.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_05_dev.py, and English compatibility documentation at library/docs/development-python-markdown-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/markdown/results.py
+- library/tests/test_development_python_markdown_05_dev.py
+- library/docs/development-python-markdown-05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

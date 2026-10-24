@@ -76,7 +76,7 @@
           "id": "FT-CHUNKS-DEV",
           "kind": "modify",
           "goal": "为任意Unicode分块实现保留原文件语义的流式修复",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.streaming.fix_chunks(chunks,config=None,*,max_line_length=1000000). Assemble physical LF lines across arbitrary Unicode chunk boundaries (including CRLF and mojibake sequences), then use actual fix_file semantics including sticky auto-HTML policy across lines. Preserve final unterminated line, ignore empty chunks, stay lazy and buffer at most one bounded physical line. Validate positive character budget/config before consuming input, reject non-text chunks and over-budget lines before repairing them. Results must equal fix_file(StringIO(joined_input)) without materializing the full input or changing old fix_file.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_chunks_dev.py and concise Chinese compatibility documentation at library/docs/development-ft-chunks-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.streaming.fix_chunks(chunks,config=None,*,max_line_length=1000000). Assemble physical LF lines across arbitrary Unicode chunk boundaries (including CRLF and mojibake sequences), then use actual fix_file semantics including sticky auto-HTML policy across lines. Preserve final unterminated line, ignore empty chunks, stay lazy and buffer at most one bounded physical line. Validate positive character budget/config before consuming input, reject non-text chunks and over-budget lines before repairing them. Results must equal fix_file(StringIO(joined_input)) without materializing the full input or changing old fix_file.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_chunks_dev.py and concise English compatibility documentation at library/docs/development-ft-chunks-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/FT-CHUNKS-DEV-contract.md",
@@ -91,7 +91,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FT-CHUNKS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FT-CHUNKS-DEV.native.json",
@@ -123,7 +123,7 @@
           "id": "FT-FIELDS-DEV",
           "kind": "modify",
           "goal": "按明确字典和数组路径原子修复结构化记录字段",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.structured.fix_fields(value,paths,config=None,*,missing=\"raise\"), read_path and normalize_paths. Paths are explicit tuples/lists of string dict keys and nonnegative integer list indices, never dotted-string guesses; support empty root path and stable deduplication. Repair only selected text through actual fix_text, retain None and all nonselected data/keys. Return deep-copied result and leave original unchanged on any late failure. Missing keys/indices may raise or skip, type mismatches/nontext leaves always fail. Preserve caller config and original container structures.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_fields_dev.py and concise Chinese compatibility documentation at library/docs/development-ft-fields-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.structured.fix_fields(value,paths,config=None,*,missing=\"raise\"), read_path and normalize_paths. Paths are explicit tuples/lists of string dict keys and nonnegative integer list indices, never dotted-string guesses; support empty root path and stable deduplication. Repair only selected text through actual fix_text, retain None and all nonselected data/keys. Return deep-copied result and leave original unchanged on any late failure. Missing keys/indices may raise or skip, type mismatches/nontext leaves always fail. Preserve caller config and original container structures.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_fields_dev.py and concise English compatibility documentation at library/docs/development-ft-fields-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/FT-FIELDS-DEV-contract.md",
@@ -138,7 +138,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FT-FIELDS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FT-FIELDS-DEV.native.json",
@@ -170,7 +170,7 @@
           "id": "FT-AUDIT-DEV",
           "kind": "modify",
           "goal": "为真实文本修复提供不可变摘要与可重放解释结果",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.audit.repair(text,config=None) returning frozen RepairResult(source_sha256,input_length,text,changed,explanation). Call actual fix_and_explain, retain explanation=None when disabled without changing any fixer policy (requires completed explanation-config repair); otherwise freeze steps and verify actual apply_plan replays to the returned result. Hash original Unicode using UTF8 surrogatepass, do not retain original plaintext in result, preserve input/config, distinguish unchanged text from an absent explanation, and do not fabricate generic repair reasons.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_audit_dev.py and concise Chinese compatibility documentation at library/docs/development-ft-audit-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.audit.repair(text,config=None) returning frozen RepairResult(source_sha256,input_length,text,changed,explanation). Call actual fix_and_explain, retain explanation=None when disabled without changing any fixer policy (requires completed explanation-config repair); otherwise freeze steps and verify actual apply_plan replays to the returned result. Hash original Unicode using UTF8 surrogatepass, do not retain original plaintext in result, preserve input/config, distinguish unchanged text from an absent explanation, and do not fabricate generic repair reasons.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_audit_dev.py and concise English compatibility documentation at library/docs/development-ft-audit-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "FT-M01-DEV",
@@ -190,7 +190,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FT-AUDIT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FT-AUDIT-DEV.native.json",
@@ -222,7 +222,7 @@
           "id": "FT-ATOMIC-FILE-DEV",
           "kind": "modify",
           "goal": "以明确输入编码和有界文本流原子修复本地文件",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.atomic.fix_file_atomic(source,destination=None,*,encoding=\"utf-8\",config=None,max_line_length=1000000) and frozen FileRepairResult(input_chars,output_chars,changed). Read strict explicit encoding in bounded chunks, reuse completed fix_chunks including whole-file HTML policy, write UTF8 to same-directory temp, flush/fsync and replace only on full success. Support in-place and separate output, preserve existing output permissions; decode/budget/source/write/replace errors leave old output unchanged and remove temps. Reject symlink/nonfile paths. Changed compares text, not source encoding bytes; no encoding guessing or whole-file buffering.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_atomic_file_dev.py and concise Chinese compatibility documentation at library/docs/development-ft-atomic-file-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.atomic.fix_file_atomic(source,destination=None,*,encoding=\"utf-8\",config=None,max_line_length=1000000) and frozen FileRepairResult(input_chars,output_chars,changed). Read strict explicit encoding in bounded chunks, reuse completed fix_chunks including whole-file HTML policy, write UTF8 to same-directory temp, flush/fsync and replace only on full success. Support in-place and separate output, preserve existing output permissions; decode/budget/source/write/replace errors leave old output unchanged and remove temps. Reject symlink/nonfile paths. Changed compares text, not source encoding bytes; no encoding guessing or whole-file buffering.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_atomic_file_dev.py and concise English compatibility documentation at library/docs/development-ft-atomic-file-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "FT-CHUNKS-DEV",
@@ -242,7 +242,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FT-ATOMIC-FILE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FT-ATOMIC-FILE-DEV.native.json",
@@ -274,7 +274,7 @@
           "id": "FT-PIPELINE-DEV",
           "kind": "modify",
           "goal": "实现可复用结构化文本导入流程和逐记录修复审计",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.pipeline.TextRepairPipeline(paths,config=None,*,missing=\"raise\") with process(record,*,index=0), run(records,*,errors=\"raise\") and frozen RecordResult(index,status,value,changes,error). Compose completed fix_fields and real audit.repair: retain only actual changed paths and replayable RepairResult summaries, preserve nonselected fields and original records. Reuse immutable config and normalized paths, stay lazy and independent between streams. Collect per-record domain/type/path errors and continue, retaining index and error type/text without exception objects; source iterator errors must propagate. Validate errors before consuming source and do not execute content as code.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_pipeline_dev.py and concise Chinese compatibility documentation at library/docs/development-ft-pipeline-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ftfy.pipeline.TextRepairPipeline(paths,config=None,*,missing=\"raise\") with process(record,*,index=0), run(records,*,errors=\"raise\") and frozen RecordResult(index,status,value,changes,error). Compose completed fix_fields and real audit.repair: retain only actual changed paths and replayable RepairResult summaries, preserve nonselected fields and original records. Reuse immutable config and normalized paths, stay lazy and independent between streams. Collect per-record domain/type/path errors and continue, retaining index and error type/text without exception objects; source iterator errors must propagate. Validate errors before consuming source and do not execute content as code.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_pipeline_dev.py and concise English compatibility documentation at library/docs/development-ft-pipeline-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "FT-FIELDS-DEV",
@@ -298,7 +298,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/FT-PIPELINE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/FT-PIPELINE-DEV.native.json",

@@ -79,7 +79,7 @@
           "id": "BF-REUSE-DEV",
           "kind": "modify",
           "goal": "复用装饰器时隔离每个目标的日志和回调",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair reuse of the same on_exception or on_predicate decorator factory: each wrapped target must receive exactly one configured default backoff/giveup log and each user callback exactly once per event. Snapshot user handler iterables once per factory (including generators), do not mutate caller lists, and keep previously wrapped targets stable. Preserve normal success, exception identities, logger=None, custom levels and synchronous/asynchronous behavior. Do not suppress logging globally.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_reuse_dev.py and concise Chinese compatibility documentation at library/docs/development-bf-reuse-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair reuse of the same on_exception or on_predicate decorator factory: each wrapped target must receive exactly one configured default backoff/giveup log and each user callback exactly once per event. Snapshot user handler iterables once per factory (including generators), do not mutate caller lists, and keep previously wrapped targets stable. Preserve normal success, exception identities, logger=None, custom levels and synchronous/asynchronous behavior. Do not suppress logging globally.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_reuse_dev.py and concise English compatibility documentation at library/docs/development-bf-reuse-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BF-REUSE-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BF-REUSE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BF-REUSE-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "BF-EXPO-DEV",
           "kind": "modify",
           "goal": "使有上限指数退避避免中间幂溢出",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair expo for finite positive increasing bases/factors with a finite positive max_value so an intermediate exponentiation overflow does not terminate the sequence. Compute the true capped result, including cases where base**n overflows but factor*base**n is still below the cap. Preserve exact ordinary float outputs, priming, stable saturation, zero-factor and decreasing-base behavior. Unbounded and unsupported-domain overflow must remain explicit; do not blindly turn every OverflowError into max_value.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_expo_dev.py and concise Chinese compatibility documentation at library/docs/development-bf-expo-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair expo for finite positive increasing bases/factors with a finite positive max_value so an intermediate exponentiation overflow does not terminate the sequence. Compute the true capped result, including cases where base**n overflows but factor*base**n is still below the cap. Preserve exact ordinary float outputs, priming, stable saturation, zero-factor and decreasing-base behavior. Unbounded and unsupported-domain overflow must remain explicit; do not blindly turn every OverflowError into max_value.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_expo_dev.py and concise English compatibility documentation at library/docs/development-bf-expo-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BF-EXPO-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BF-EXPO-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BF-EXPO-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "BF-CALLABLE-DEV",
           "kind": "modify",
           "goal": "为partial和可调用对象提供安全日志名称",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair default backoff/giveup logging for functools.partial and callable instances without __name__. Unwrap nested partials to a safe function name when available, otherwise use a stable type name; never call repr or expose bound arguments. Logs must not replace real return values or original exceptions with AttributeError. Preserve existing functions/methods, logger=None, levels and both predicate/exception modes without changing target call counts.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_callable_dev.py and concise Chinese compatibility documentation at library/docs/development-bf-callable-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair default backoff/giveup logging for functools.partial and callable instances without __name__. Unwrap nested partials to a safe function name when available, otherwise use a stable type name; never call repr or expose bound arguments. Logs must not replace real return values or original exceptions with AttributeError. Preserve existing functions/methods, logger=None, levels and both predicate/exception modes without changing target call counts.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_callable_dev.py and concise English compatibility documentation at library/docs/development-bf-callable-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BF-CALLABLE-DEV-contract.md",
@@ -188,7 +188,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BF-CALLABLE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BF-CALLABLE-DEV.native.json",
@@ -220,7 +220,7 @@
           "id": "BF-AWAIT-DEV",
           "kind": "modify",
           "goal": "等待异步可调用判定和事件回调的真实完成值",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair asynchronous giveup and event callback adaptation to await any actual Awaitable result, including async __call__ instances and ordinary wrappers returning coroutine objects. Synchronous callbacks remain supported and are invoked exactly once; await results before deciding giveup and before completing the event. Preserve callback exception identity and prevent never-awaited warnings. Do not expand predicate or target APIs, change synchronous retry policy or swallow callback exceptions.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_await_dev.py and concise Chinese compatibility documentation at library/docs/development-bf-await-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair asynchronous giveup and event callback adaptation to await any actual Awaitable result, including async __call__ instances and ordinary wrappers returning coroutine objects. Synchronous callbacks remain supported and are invoked exactly once; await results before deciding giveup and before completing the event. Preserve callback exception identity and prevent never-awaited warnings. Do not expand predicate or target APIs, change synchronous retry policy or swallow callback exceptions.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_await_dev.py and concise English compatibility documentation at library/docs/development-bf-await-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BF-AWAIT-DEV-contract.md",
@@ -235,7 +235,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BF-AWAIT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BF-AWAIT-DEV.native.json",
@@ -267,7 +267,7 @@
           "id": "BF-TYPEERROR-DEV",
           "kind": "modify",
           "goal": "区分回调签名不匹配与回调内部TypeError",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair dynamic retry configuration and jitter adaptation so TypeError raised inside a valid callable propagates as the same exception and is never swallowed or retried with another signature. Use binding/introspection to preserve wait-generator runtime value callbacks requiring an argument, legal dynamic max_tries/max_time and truly nullary deprecated jitter with its warning. Resolve configuration before target execution and preserve synchronous/asynchronous behavior. Do not catch all TypeError around user execution as a signature probe.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_typeerror_dev.py and concise Chinese compatibility documentation at library/docs/development-bf-typeerror-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair dynamic retry configuration and jitter adaptation so TypeError raised inside a valid callable propagates as the same exception and is never swallowed or retried with another signature. Use binding/introspection to preserve wait-generator runtime value callbacks requiring an argument, legal dynamic max_tries/max_time and truly nullary deprecated jitter with its warning. Resolve configuration before target execution and preserve synchronous/asynchronous behavior. Do not catch all TypeError around user execution as a signature probe.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_bf_typeerror_dev.py and concise English compatibility documentation at library/docs/development-bf-typeerror-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BF-TYPEERROR-DEV-contract.md",
@@ -282,7 +282,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BF-TYPEERROR-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BF-TYPEERROR-DEV.native.json",

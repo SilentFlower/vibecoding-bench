@@ -1,4 +1,4 @@
-"""公开JSON Feed真实字段映射回归。"""
+"Public regression tests for FG-JSON-FEED-DEV; the complete business contract is in materials/FG-JSON-FEED-DEV-contract.md."
 import json
 import pytest
 from feedgen.feed import FeedGenerator

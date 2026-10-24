@@ -1,4 +1,4 @@
-"""公开Path原子发布回归。"""
+"Public regression tests for PA-ATOMIC-WRITE-DEV; the complete business contract is in materials/PA-ATOMIC-WRITE-DEV-contract.md."
 import pytest
 from path import Path
 

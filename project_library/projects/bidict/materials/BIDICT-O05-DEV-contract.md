@@ -1,5 +1,12 @@
-# 用显式类型codec交换可移植双向关系记录
+# Engineering contract: BIDICT-O05-DEV
 
-以版本化pairs记录交换双向关系，显式编码解码保留非字符串键和值及顺序。解码后重新核唯一性，未知codec、schema或坏pair拒绝；结果类由调用者明确提供，不从数据执行导入或表达式。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement bidict.records.to_records/from_records with explicit key/value codec callables, a schema1 ordered pairs format and checked codec identifier. Preserve tuple/int/str/None keys and values through caller-defined JSON-compatible encodings, reject malformed or duplicate-after-decoding keys/values instead of silently dropping rows, and allow the caller to explicitly choose ordered/frozen/custom result classes. Never import classes or execute expressions from data; preserve source relationships and callback errors.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o05_dev.py and concise English compatibility documentation at library/docs/development-bidict-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bidict/records.py
+- library/tests/test_development_bidict_o05_dev.py
+- library/docs/development-bidict-o05-dev.md

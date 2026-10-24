@@ -1,13 +1,13 @@
-"""真实流读取必须有界且不关闭调用者对象。"""
+"Public regression tests for CHARSET-NORMALIZER-O02-DEV; the complete business contract is in materials/CHARSET-NORMALIZER-O02-DEV-contract.md."
 import io
 
 def test_bounded_read_and_position():
-    """评分抽样设置不能代替读取预算。@return None。"""
+    "Verify bounded read and position."
     from charset_normalizer.streams import from_stream
     class Spy(io.BytesIO):
-        """记录实际read参数。"""
+        "Public regression fixture: Spy."
         def read(self, size=-1):
-            """禁止无界读取。@param size 大小。@return 字节。"""
+            "Support the public regression through read."
             assert 0 <= size <= 3
             return super().read(size)
     source = Spy(b'xxplain ascii tail')
@@ -17,18 +17,18 @@ def test_bounded_read_and_position():
     assert source.tell() == 2 and not source.closed
 
 def test_short_read_and_full_candidate():
-    """短读继续到EOF，真实候选文字一致。@return None。"""
+    "Verify short read and full candidate."
     from charset_normalizer.streams import from_stream
     class Short(io.BytesIO):
-        """每次最多一字节。"""
+        "Public regression fixture: Short."
         def read(self, size=-1):
-            """产生短读。@param size 请求。@return 字节。"""
+            "Support the public regression through read."
             return super().read(min(size, 1))
     result = from_stream(Short(b'hello'), max_bytes=20)
     assert result['eof'] and str(result['matches'].best()) == 'hello'
 
 def test_zero_and_text_errors():
-    """零不读取，文本流拒绝且恢复位置。@return None。"""
+    "Verify zero and text errors."
     import pytest
     from charset_normalizer.streams import from_stream
     source = io.BytesIO(b'abc')

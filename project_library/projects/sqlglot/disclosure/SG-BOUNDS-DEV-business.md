@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-在查询外层限制最终结果，不能覆盖内部原有分页或只给UNION单侧加限制。零行上限合法，偏移与类型严格校验，使用真实语法树生成各方言，原AST不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement sqlglot.report_bounds.bounded_query(query,max_rows,*,offset=0,dialect=None) using completed single-query copying and real AST builders. Wrap original query as an aliased subquery and apply outer limit/offset; never overwrite existing inner LIMIT/OFFSET/order/CTEs or apply limit independently to each UNION branch. Accept zero limit, reject negative/noninteger/bool values, preserve original AST and compile through requested output dialect. This bounds final row count, does not execute SQL or guarantee implicit order across dialects.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_bounds_dev.py and concise English compatibility documentation at library/docs/development-sg-bounds-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/sqlglot/report_bounds.py
+- library/development_tests/test_development_sg_bounds_dev.py
+- library/docs/development-sg-bounds-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

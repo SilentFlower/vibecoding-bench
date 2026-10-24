@@ -1,5 +1,13 @@
-# 交付不可变嵌套映射删除与路径策略
+# Engineering contract: TZ-DISSOC-IN-DEV
 
-新增dissoc_in，只复制受影响映射路径并删除叶子，未修改分支保留引用。默认保留空父节点、忽略缺失但返回根副本；strict和prune显式启用。支持一次性键路径、工厂和三个冻结环境导出入口；不修改既有顶层删除或更新语义。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add dissoc_in(d, keys, factory=dict, *, strict=False, prune=False). Copy only affected mapping branches and delete the leaf, retain untouched references and input data, preserve empty ancestors by default or prune them explicitly. Missing paths return a shallow root copy unless strict=True; empty paths raise ValueError and scalar ancestors raise TypeError. Support one-shot key paths, mapping factories and toolz/curried/tlz exports in the frozen environment. Keep existing dissoc/assoc_in/update_in semantics unchanged.
+
+Deliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_dissoc_in_dev.py and concise English compatibility documentation at library/docs/development-tz-dissoc-in-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/toolz/dicttoolz.py
+- library/toolz/curried/__init__.py
+- library/toolz/tests/test_development_tz_dissoc_in_dev.py
+- library/docs/development-tz-dissoc-in-dev.md

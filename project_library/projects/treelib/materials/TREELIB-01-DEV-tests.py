@@ -1,10 +1,10 @@
-"""全量映射导入不能静默丢掉孤儿或离线环。"""
+"Public regression tests for TREELIB-01-DEV; the complete business contract is in materials/TREELIB-01-DEV-contract.md."
 import unittest
 from treelib import Tree,Node
 
 
 def test_invalid_graph_is_rejected_before_callbacks():
-    """离线环、缺父与多根不触发转换业务副作用。@return None。"""
+    "Verify invalid graph is rejected before callbacks."
     for mapping in ({'root':None,'lost':'missing'},{'root':None,'a':'b','b':'a'},{'root':None,'a':'a'},{'a':None,'b':None},{}):
         calls=[]
         with unittest.TestCase().assertRaises(ValueError):Tree.from_map(mapping,id_func=lambda key:calls.append(key) or key)
@@ -12,11 +12,11 @@ def test_invalid_graph_is_rejected_before_callbacks():
 
 
 def test_out_of_order_subclass_and_single_id_conversion():
-    """合法乱序全导入、子类和显式构造参数保持。@return None。"""
+    "Verify out of order subclass and single id conversion."
     class CatalogTree(Tree):
-        """带业务上下文的真实子类。"""
+        "Public regression fixture: CatalogTree."
         def __init__(self,*,tenant,**kwargs):
-            """保存显式业务上下文。@param tenant 租户。@param kwargs 树构造。@return None。"""
+            "Support the public regression through __init__."
             self.tenant=tenant;super().__init__(**kwargs)
     calls=[]
     tree=CatalogTree.from_map({'leaf':'branch','root':None,'branch':'root'},id_func=lambda key:calls.append(key) or key.upper(),data_func=lambda key:{'name':key},tenant='catalog')

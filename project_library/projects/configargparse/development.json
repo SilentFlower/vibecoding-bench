@@ -32,7 +32,7 @@
           "id": "CONFIGARGPARSE-O01-DEV",
           "kind": "modify",
           "goal": "对单个配置输入实施可诊断重复键政策",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement DefaultConfigFileParser(*, duplicates=\"last\") with last/warn/error for exact case-sensitive keys within one parsed stream. Keep the old last-value policy by default. Warn/error diagnostics identify the source and first/current 1-based physical lines without values. Blank/comment lines count; repeated lists are whole-value replacement. Parsing separate streams never shares duplicate state; normal cross-file precedence and CLI override stay unchanged. Reject unknown policies and preserve all existing syntax and serialization.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-configargparse-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement DefaultConfigFileParser(*, duplicates=\"last\") with last/warn/error for exact case-sensitive keys within one parsed stream. Keep the old last-value policy by default. Warn/error diagnostics identify the source and first/current 1-based physical lines without values. Blank/comment lines count; repeated lists are whole-value replacement. Parsing separate streams never shares duplicate state; normal cross-file precedence and CLI override stay unchanged. Reject unknown policies and preserve all existing syntax and serialization.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o01_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CONFIGARGPARSE-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGARGPARSE-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGARGPARSE-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "CONFIGARGPARSE-O02-DEV",
           "kind": "modify",
           "goal": "让零依赖JSON配置真正驱动参数动作",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd JSONConfigFileParser as a ConfigFileParser accepting object roots, finite JSON scalars and flat scalar lists. Normalize bool to true/false and other scalar values to strings for the existing actual ArgumentParser action pipeline. Reject null, nested objects/lists, non-object roots, invalid JSON/encoding and NaN/Infinity. duplicates defaults to error and supports last/warn explicitly; never include values in duplicate diagnostics. Serialize supported values to Unicode-preserving valid JSON with roundtrip behavior; optional YAML must not be imported.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-configargparse-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd JSONConfigFileParser as a ConfigFileParser accepting object roots, finite JSON scalars and flat scalar lists. Normalize bool to true/false and other scalar values to strings for the existing actual ArgumentParser action pipeline. Reject null, nested objects/lists, non-object roots, invalid JSON/encoding and NaN/Infinity. duplicates defaults to error and supports last/warn explicitly; never include values in duplicate diagnostics. Serialize supported values to Unicode-preserving valid JSON with roundtrip behavior; optional YAML must not be imported.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o02_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CONFIGARGPARSE-O02-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGARGPARSE-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGARGPARSE-O02-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "CONFIGARGPARSE-O03-DEV",
           "kind": "modify",
           "goal": "让每次参数解析产出隔离的结果与来源快照",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ArgumentParser.parse_result with the existing parse_known_args inputs and a public ParseResult. Return actual parsed Namespace, ordered unknown tuple and source records identifying dest/value without retaining argparse.Action objects. Snapshot deeply at completion and return independent namespace/source accessor copies, including mutable defaults, append lists and custom Namespace attributes. Reusing the parser, changing defaults, mutating caller namespace/accessor values or a later failed parse must not change the earlier result. Keep parse_args and get_source_to_settings_dict behavior unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-configargparse-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement ArgumentParser.parse_result with the existing parse_known_args inputs and a public ParseResult. Return actual parsed Namespace, ordered unknown tuple and source records identifying dest/value without retaining argparse.Action objects. Snapshot deeply at completion and return independent namespace/source accessor copies, including mutable defaults, append lists and custom Namespace attributes. Reusing the parser, changing defaults, mutating caller namespace/accessor values or a later failed parse must not change the earlier result. Keep parse_args and get_source_to_settings_dict behavior unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o03_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CONFIGARGPARSE-O03-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGARGPARSE-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGARGPARSE-O03-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "CONFIGARGPARSE-O04-DEV",
           "kind": "modify",
           "goal": "无业务副作用地发现本次默认配置来源",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ArgumentParser.discover_config_files() for declared default_config_files only. Return ordered fresh records matching existing glob expansion and duplicate source order: path records contain kind,index,path,exists; unmatched declarations produce exists=false; provider records contain only kind=\"provider\",index,executed=false. Support PathLike and expanduser with path-before-callable precedence. Do not open files, invoke providers, inspect their repr, run argument actions or mutate last parse/source state. Discovery is a filesystem snapshot, not a promise of later readability; real parsing behavior stays unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-configargparse-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ArgumentParser.discover_config_files() for declared default_config_files only. Return ordered fresh records matching existing glob expansion and duplicate source order: path records contain kind,index,path,exists; unmatched declarations produce exists=false; provider records contain only kind=\"provider\",index,executed=false. Support PathLike and expanduser with path-before-callable precedence. Do not open files, invoke providers, inspect their repr, run argument actions or mutate last parse/source state. Discovery is a filesystem snapshot, not a promise of later readability; real parsing behavior stays unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o04_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CONFIGARGPARSE-O04-DEV-contract.md",
@@ -188,7 +188,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGARGPARSE-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGARGPARSE-O04-DEV.native.json",
@@ -220,7 +220,7 @@
           "id": "CONFIGARGPARSE-O05-DEV",
           "kind": "modify",
           "goal": "按预声明文件扩展名分派真实配置解析器",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement DispatchConfigFileParser(parsers, *, fallback=None, output_format=None) with an application-owned extension registry of ConfigFileParser instances/classes. Normalize suffix case, reject duplicate normalized extensions and invalid parser registrations. Dispatch once from stream.name without reading/rewinding/sniffing/importing; unknown or unnamed sources require explicit fallback. Propagate actual parse and optional dependency errors. Serialization requires an explicitly registered output_format and delegates to that parser. Preserve existing CompositeConfigParser and support nonseek streams.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-configargparse-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement DispatchConfigFileParser(parsers, *, fallback=None, output_format=None) with an application-owned extension registry of ConfigFileParser instances/classes. Normalize suffix case, reject duplicate normalized extensions and invalid parser registrations. Dispatch once from stream.name without reading/rewinding/sniffing/importing; unknown or unnamed sources require explicit fallback. Propagate actual parse and optional dependency errors. Serialization requires an explicitly registered output_format and delegates to that parser. Preserve existing CompositeConfigParser and support nonseek streams.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o05_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CONFIGARGPARSE-O05-DEV-contract.md",
@@ -235,7 +235,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGARGPARSE-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGARGPARSE-O05-DEV.native.json",
@@ -267,7 +267,7 @@
           "id": "CONFIGARGPARSE-O06-DEV",
           "kind": "modify",
           "goal": "把明确JSON层级映射为真实参数命名空间",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nBuild MappedJSONConfigFileParser(paths, *, unknown=\"error\", duplicates=\"error\") on the accepted JSON parser. paths maps explicit nonempty string tuples to unique flat action keys. Distinguish a literal dotted key from nested paths; reject prefix conflicts, duplicate destination keys, scalar/table conflicts, unsupported values and unknown leaves by default. Missing paths stay absent; unknown=\"ignore\" is explicit. Scalars/lists must use the existing JSON conversion and actual ArgumentParser type/action pipeline. Serialize flat mapped settings back to the matching nested JSON object without changing inputs or allowing unknown output keys; preserve duplicate and finite-number controls.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-configargparse-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nBuild MappedJSONConfigFileParser(paths, *, unknown=\"error\", duplicates=\"error\") on the accepted JSON parser. paths maps explicit nonempty string tuples to unique flat action keys. Distinguish a literal dotted key from nested paths; reject prefix conflicts, duplicate destination keys, scalar/table conflicts, unsupported values and unknown leaves by default. Missing paths stay absent; unknown=\"ignore\" is explicit. Scalars/lists must use the existing JSON conversion and actual ArgumentParser type/action pipeline. Serialize flat mapped settings back to the matching nested JSON object without changing inputs or allowing unknown output keys; preserve duplicate and finite-number controls.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o06_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "CONFIGARGPARSE-O02-DEV",
@@ -287,7 +287,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGARGPARSE-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGARGPARSE-O06-DEV.native.json",

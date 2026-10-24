@@ -1,5 +1,12 @@
-# 让分隔行不消耗自定义业务行索引
+# Engineering contract: TB-INDEX-DEV
 
-报表中的分隔线不代表业务记录，不应占用自定义行号。修复长度校验与实际消费逻辑不一致，列表、元组和一次性索引都按真实数据行工作，分隔位置及原API签名保留。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix sized custom showindex validation to count data rows after excluding SEPARATING_LINE records, matching the actual index-consumption loop. Preserve separators at their positions, use one index per real row for list/tuple/iterator inputs, reject sized index length mismatch against real rows, and keep rendering/numeric alignment and inputs unchanged. Do not change tabulate public signature or frozen tests.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_index_dev.py and concise English compatibility documentation at library/docs/development-tb-index-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tabulate/__init__.py
+- library/development_tests/test_development_tb_index_dev.py
+- library/docs/development-tb-index-dev.md

@@ -1,14 +1,14 @@
-"""实际占位才计算惰性参数，每事件缓存而非每sink重复计算。"""
+"Public regression tests for LOGURU-O06-DEV; the complete business contract is in materials/LOGURU-O06-DEV-contract.md."
 from copy import deepcopy
 from loguru import logger
 import pytest
 
 def clean():
-    """创建独立logger。@return Logger。"""
+    "Support the public regression through clean."
     logger.remove();log=deepcopy(logger);log.remove();return log
 
 def test_mixed_values_unused_and_repeated_placeholders_evaluate_once():
-    """普通参数可混用，未引用参数不算，同一个包装器的不同位置仍一次。@return None。"""
+    "Verify mixed values unused and repeated placeholders evaluate once."
     from loguru import LazyValue
     calls=[];log=clean();a=[];b=[];log.add(a.append,format='{message}');log.add(b.append,format='{message}')
     used=LazyValue(lambda:calls.append('used') or 12.345);unused=LazyValue(lambda:calls.append('unused') or 'never')
@@ -17,7 +17,7 @@ def test_mixed_values_unused_and_repeated_placeholders_evaluate_once():
     log.info('{v}',v=used);assert calls==['used','used'];log.remove()
 
 def test_filtered_arguments_and_serialized_extra_do_not_force_unused_values():
-    """低于全局级别直接短路，JSON明确标记未求值而不触发计算。@return None。"""
+    "Verify filtered arguments and serialized extra do not force unused values."
     import json
     from loguru import LazyValue
     log=clean();out=[];calls=[];log.add(out.append,level='INFO',serialize=True,format='{message}')
@@ -27,7 +27,7 @@ def test_filtered_arguments_and_serialized_extra_do_not_force_unused_values():
     log.remove()
 
 def test_conversion_index_attributes_colors_errors_and_legacy_lazy():
-    """标准访问及颜色格式使用真实值，异常传播且旧全callable模式保留。@return None。"""
+    "Verify conversion index attributes colors errors and legacy lazy."
     from loguru import LazyValue
     log=clean();out=[];log.add(out.append,format='{message}',colorize=False,catch=False)
     log.opt(colors=True).info('<red>{item[x]:03d}</red> {text!s}',item=LazyValue(lambda:{'x':7}),text=LazyValue(lambda:'ok'))

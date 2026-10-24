@@ -1,4 +1,4 @@
-"""公开异步状态机实际事件回归。"""
+"Public regression tests for SM-ASYNC-DEV; the complete business contract is in materials/SM-ASYNC-DEV-contract.md."
 import asyncio
 import pytest
 from statemachine.async_runner import AsyncMachineRunner

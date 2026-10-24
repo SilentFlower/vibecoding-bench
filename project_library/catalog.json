@@ -1,6 +1,6 @@
 {
   "schema": 3,
-  "version": "real-development-cycles-v3-600-20261024",
+  "version": "real-development-cycles-v3-600-en-20261024",
   "project_manifest": "development.json",
   "projects": [
     "python-frontmatter",

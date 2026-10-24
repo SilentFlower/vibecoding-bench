@@ -1,4 +1,4 @@
-"""公开精确配置补丁事务回归。"""
+"Public regression tests for DP-PATCH-DEV; the complete business contract is in materials/DP-PATCH-DEV-contract.md."
 import pytest
 from dpath.patches import apply_edits
 

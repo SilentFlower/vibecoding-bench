@@ -1,5 +1,12 @@
-# 调试展开实参时保留全部值且不重新求值来源
+# Engineering contract: ICECREAM-O01-DEV
 
-对应路线01：AST展开节点与运行实参数量并非一一对应，保留可确定的普通前后缀，展开中间值按序标记，绝不二次求值/消费或让zip漏值。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix actual IceCreamDebugger._formatArgs so ast.Starred expansion never truncates calculated values via zip. Preserve reliably identifiable ordinary prefix/suffix expressions; label indeterminate expanded middle values explicitly by index without guessing source lengths or reevaluating/reiterating expressions/generators. Support multiple/empty expansions, ordinary args between stars, no-source fallback and single/multiple passthrough object identity. Keep ordinary nonstar source/literal formatting unchanged and ensure every calculated argument appears once in output.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o01_dev.py and concise English compatibility documentation at library/docs/development-icecream-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/icecream/icecream.py
+- library/tests/test_development_icecream_o01_dev.py
+- library/docs/development-icecream-o01-dev.md

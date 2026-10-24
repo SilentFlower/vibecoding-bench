@@ -1,5 +1,12 @@
-# 按键值与谓词输出保持类型的独立双向子映射
+# Engineering contract: BIDICT-O02-DEV
 
-组合键、值及业务谓词筛选真实关系，空选择与未指定条件区别明确。返回同类独立双向子映射并保持原相对顺序；严格缺失在回调前失败，一次性请求只读取一次，回调错误保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement bidict.select.select(mapping, *, keys=None, values=None, predicate=None, strict=False). Combine requested key/value/predicate filters, distinguish absent filters from empty selections, retain original relative order and concrete bidict/frozen/ordered/custom type and inverse behavior. One-shot filters are consumed once. Strict missing requests raise before callbacks, callbacks propagate normally and result backing must be independent of source mutation.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o02_dev.py and concise English compatibility documentation at library/docs/development-bidict-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bidict/select.py
+- library/tests/test_development_bidict_o02_dev.py
+- library/docs/development-bidict-o02-dev.md

@@ -1,4 +1,4 @@
-"""公开Excel日期系统转换回归。"""
+"Public regression tests for AR-EXCEL-DEV; the complete business contract is in materials/AR-EXCEL-DEV-contract.md."
 from decimal import Decimal
 import pytest
 import arrow

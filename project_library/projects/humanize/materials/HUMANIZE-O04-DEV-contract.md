@@ -1,5 +1,12 @@
-# 让两个日期格式器共享明确参考日及时区边界
+# Engineering contract: HUMANIZE-O04-DEV
 
-对应路线16：naturalday/naturaldate显式when共享参考日及年份阈值；aware参考转入目标时区，混用和错误参考明确拒绝，不改已有naturaltime.when。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add keyword-only when=None to actual naturalday/naturaldate, retaining their default current-date behavior and existing naturaltime.when. An explicit date is a calendar reference; explicit aware datetime converts into an aware value datetime timezone, date values use reference own date, and aware/naive datetime mismatch or invalid when is rejected explicitly before fallback handling. naturaldate year-threshold and delegated naturalday must use the same reference. Preserve invalid value pass-through, custom format, locale translation and extreme dates; prove fixed historical references and cross-midnight offsets without wall-clock waiting.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_humanize_o04_dev.py and concise English compatibility documentation at library/docs/development-humanize-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/humanize/time.py
+- library/tests/test_development_humanize_o04_dev.py
+- library/docs/development-humanize-o04-dev.md

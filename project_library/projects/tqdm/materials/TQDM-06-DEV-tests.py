@@ -1,4 +1,4 @@
-"""环境布尔False不是非空字符串True，显式调用仍有优先级。"""
+"Public regression tests for TQDM-06-DEV; the complete business contract is in materials/TQDM-06-DEV-contract.md."
 import os
 import unittest
 from unittest.mock import patch
@@ -6,7 +6,7 @@ from tqdm.utils import envwrap
 
 
 def test_bool_default_annotation_and_explicit_type_fallback():
-    """三种真实类型来源都按明确字面量解析。@return None。"""
+    "Verify bool default annotation and explicit type fallback."
     for raw,expected in [('False',False),('0',False),('off',False),('TRUE',True),('1',True),('yes',True)]:
         with patch.dict(os.environ,{'BUSINESS_FLAG':raw}):
             @envwrap('business')
@@ -20,7 +20,7 @@ def test_bool_default_annotation_and_explicit_type_fallback():
 
 
 def test_unknown_boolean_rejects_and_other_types_keep_conversion():
-    """未知布尔不能静默开启，非布尔原推断不变。@return None。"""
+    "Verify unknown boolean rejects and other types keep conversion."
     with patch.dict(os.environ,{'BUSINESS_FLAG':'maybe'}):
         with unittest.TestCase().assertRaises(ValueError):
             envwrap('business')(lambda flag=False:flag)

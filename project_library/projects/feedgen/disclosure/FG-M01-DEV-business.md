@@ -13,17 +13,17 @@ Repair the pinned FeedEntry.atom_entry serialization so each link keeps all supp
 
 # Supplied business material: materials/public-test-example.py
 
-"""公开回归只测试授权的Atom链接序列化行为。"""
+"""Public regressions cover only the authorized Atom link serialization behavior."""
 import unittest
 
 from feedgen.entry import FeedEntry
 
 
 class AtomLinkTests(unittest.TestCase):
-    """覆盖完整元数据、多链接和空属性语义。"""
+    """Cover complete metadata, multiple links, and empty-attribute semantics."""
 
     def make_entry(self) -> FeedEntry:
-        """构造有效的合成条目。@return 条目。"""
+        """Build a valid synthetic entry. @return Entry."""
         item = FeedEntry()
         item.id('urn:test:1')
         item.title('Test')
@@ -31,7 +31,7 @@ class AtomLinkTests(unittest.TestCase):
         return item
 
     def test_all_attributes_and_zero_length(self) -> None:
-        """非空字符串元数据和零长度字符串全部保留。@return None。"""
+        """Preserve non-empty metadata strings and a length value of zero. @return None."""
         item = self.make_entry()
         link = {'href': 'https://example.test/page', 'rel': 'alternate', 'type': 'text/html',
             'hreflang': 'zh', 'title': '报告', 'length': '0'}
@@ -39,7 +39,7 @@ class AtomLinkTests(unittest.TestCase):
         self.assertEqual(dict(item.atom_entry().find('link').attrib), link)
 
     def test_multiple_links_do_not_share_metadata(self) -> None:
-        """多个关系保留独立属性且不修改输入状态。@return None。"""
+        """Preserve independent attributes for multiple relations without mutating input state. @return None."""
         item = self.make_entry()
         first = {'href': 'https://example.test/a', 'rel': 'alternate', 'title': 'A'}
         second = {'href': 'https://example.test/b', 'rel': 'enclosure', 'length': '12', 'type': 'audio/ogg'}
@@ -48,7 +48,7 @@ class AtomLinkTests(unittest.TestCase):
         self.assertEqual(item.link(), [first, second])
 
     def test_optional_empty_values_stay_omitted(self) -> None:
-        """缺省关系仍保留，空或None的可选属性不凭空写出。@return None。"""
+        """Preserve the default relation and omit optional attributes that are empty or None. @return None."""
         item = self.make_entry()
         item.link(href='https://example.test/a', title='', type=None)
         self.assertEqual(dict(item.atom_entry().find('link').attrib),

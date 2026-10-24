@@ -1,4 +1,4 @@
-"""公开含用法的命令元数据回归。"""
+"Public regression tests for CK-DESCRIBE-DEV; the complete business contract is in materials/CK-DESCRIBE-DEV-contract.md."
 import pytest
 import click
 

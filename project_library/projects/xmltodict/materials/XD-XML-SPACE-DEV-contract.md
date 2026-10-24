@@ -1,5 +1,12 @@
-# 按元素继承xml:space局部空白规则并恢复兄弟状态
+# Engineering contract: XD-XML-SPACE-DEV
 
-预格式化XML内容需要继承xml:space的局部空白规则，default恢复调用者原策略，子树结束后准确恢复父状态。支持命名空间及流式回调，不让一个保留空白的元素影响后面的兄弟元素。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add respect_xml_space=False parse handler option. When enabled, xml:space="preserve" disables stripping for that element, inherited descendants and comments; xml:space="default" restores the caller original strip_whitespace policy in that subtree. Restore parent policy when an element closes, including item_depth callback paths, so siblings do not leak state. Recognize raw xml:space and expanded XML namespace attributes with configured separator; unknown values inherit. Preserve exposed attribute values, legacy default behavior and concatenation semantics, without promising ordered mixed-content fidelity.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_xd_xml_space_dev.py and concise English compatibility documentation at library/docs/development-xd-xml-space-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/xmltodict.py
+- library/development_tests/test_development_xd_xml_space_dev.py
+- library/docs/development-xd-xml-space-dev.md

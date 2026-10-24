@@ -1,5 +1,12 @@
-# 为真实路由命令提供稳定JSON清单及可组合过滤
+# Engineering contract: FLASK-O01-DEV
 
-对应路线01：真实routes新增版本化JSON及endpoint/blueprint过滤，完整methods/host/subdomain/defaults/自动OPTIONS可读；未知默认值只报类型不repr，默认表格/排序保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend actual flask routes CLI with --format table|json (default table), --endpoint exact name and --blueprint registered-name prefix including nested blueprints. JSON is one versioned object {schema:1,routes:[...]}, including endpoint/rule/sorted full methods/host/subdomain/defaults/automatic_options, honoring sort and empty apps/filters without terminal prose. Convert bounded native JSON defaults without executing opaque repr; unknown values use {$type: class_name}. Preserve ordinary table output, existing --all-methods and matching order semantics; use actual url_map metadata and do not invoke views.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_flask_o01_dev.py and concise English compatibility documentation at library/docs/development-flask-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/flask/cli.py
+- library/tests/test_development_flask_o01_dev.py
+- library/docs/development-flask-o01-dev.md

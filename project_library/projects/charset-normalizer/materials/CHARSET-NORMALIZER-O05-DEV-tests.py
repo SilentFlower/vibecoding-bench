@@ -1,9 +1,9 @@
-"""文本摘要稳定，不把原始编码差异或Unicode形式偷偷合并。"""
+"Public regression tests for CHARSET-NORMALIZER-O05-DEV; the complete business contract is in materials/CHARSET-NORMALIZER-O05-DEV-contract.md."
 import hashlib
 from charset_normalizer.models import CharsetMatch
 
 def test_same_text_different_raw():
-    """相同文字不同输入编码，text相同raw不同。@return None。"""
+    "Verify same text different raw."
     text = 'café'
     one = CharsetMatch(text.encode('utf-8'), 'utf_8', 0.0, False, [])
     two = CharsetMatch(text.encode('latin-1'), 'latin_1', 0.0, False, [])
@@ -11,7 +11,7 @@ def test_same_text_different_raw():
     assert one.stable_digest(mode='raw') != two.stable_digest(mode='raw')
 
 def test_unicode_policy_and_snapshot():
-    """Unicode归一化显式，可变源仍保持已冻结事实。@return None。"""
+    "Verify unicode policy and snapshot."
     source = bytearray('é'.encode())
     one = CharsetMatch(source, 'utf_8', 0.0, False, [])
     two = CharsetMatch('e\u0301'.encode(), 'utf_8', 0.0, False, [])
@@ -20,7 +20,7 @@ def test_unicode_policy_and_snapshot():
     assert one.stable_digest(normalization='NFC') == two.stable_digest(normalization='NFC')
 
 def test_process_stability_and_invalid():
-    """不同hash种子下真实方法返回同一摘要。@return None。"""
+    "Verify process stability and invalid."
     import os
     import subprocess
     import sys

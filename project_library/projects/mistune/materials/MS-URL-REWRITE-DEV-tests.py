@@ -1,4 +1,4 @@
-"""公开链接图片URL改写回归。"""
+"Public regression tests for MS-URL-REWRITE-DEV; the complete business contract is in materials/MS-URL-REWRITE-DEV-contract.md."
 import pytest
 import mistune
 

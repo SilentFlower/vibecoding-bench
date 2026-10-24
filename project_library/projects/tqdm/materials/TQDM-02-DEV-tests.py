@@ -1,10 +1,10 @@
-"""管道分隔符跨块时仍精确透传、计数与逐记录回调。"""
+"Public regression tests for TQDM-02-DEV; the complete business contract is in materials/TQDM-02-DEV-contract.md."
 import io
 from tqdm.cli import posix_pipe
 
 
 def test_multibyte_delimiter_at_every_chunk_boundary():
-    """UTF8分隔符不能被拆成两段普通记录内容。@return None。"""
+    "Verify multibyte delimiter at every chunk boundary."
     raw='1é2é3'.encode();delimiter='é'.encode()
     for size in range(1,len(raw)+1):
         output=io.BytesIO();counts=[]
@@ -13,7 +13,7 @@ def test_multibyte_delimiter_at_every_chunk_boundary():
 
 
 def test_numeric_callbacks_consecutive_tail_and_byte_mode():
-    """数字更新收到完整记录，连续与末尾分隔计数政策保持。@return None。"""
+    "Verify numeric callbacks consecutive tail and byte mode."
     raw='1é2é3'.encode();output=io.BytesIO();values=[]
     posix_pipe(io.BytesIO(raw),output,delim='é'.encode(),buf_size=2,callback=lambda item:values.append(int(item)),callback_len=False)
     assert sum(values)==6 and output.getvalue()==raw

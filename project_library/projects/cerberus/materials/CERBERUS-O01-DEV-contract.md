@@ -1,5 +1,12 @@
-# 先规划重命名终点再移动字段避免丢值
+# Engineering contract: CERBERUS-O01-DEV
 
-先规划最终字段名再移动原值，自身改名保持原值，组合规则按显式rename后handler执行。handler失败保留原值和既有诊断，输入及原有目标覆盖政策保持，不能读取已删旧键或静默丢字段。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Repair rename identity and combined rename/rename_handler normalization. rename to the same field must preserve its value; when both rules are present, apply the handler to the explicit rename target and move the original value only after the final name is resolved. Keep handler failure diagnostics and original value, caller input isolation and existing overwrite-target policy. Preserve standalone rename/handler, nested normalization and frozen upstream controls; do not silently drop fields or raise KeyError from an already removed old key.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o01_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cerberus/validator.py
+- library/tests/test_development_cerberus_o01_dev.py
+- library/docs/development-cerberus-o01-dev.md

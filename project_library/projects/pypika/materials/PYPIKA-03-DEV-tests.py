@@ -1,8 +1,8 @@
-"""未完成PG语句不生成孤立RETURNING或冲突后缀。"""
+"Public regression tests for PYPIKA-03-DEV; the complete business contract is in materials/PYPIKA-03-DEV-contract.md."
 from pypika import PostgreSQLQuery,Table
 
 def test_empty_update_and_insert_remain_empty_with_suffixes():
-    """所有后缀组合服从基础空串契约。@return None。"""
+    "Verify empty update and insert remain empty with suffixes."
     table=Table('items')
     for query in (PostgreSQLQuery.update(table).returning('*'),
                   PostgreSQLQuery.into(table).on_conflict('id').do_nothing(),
@@ -10,7 +10,7 @@ def test_empty_update_and_insert_remain_empty_with_suffixes():
         assert query.get_sql()=='' and query.get_sql()==''
 
 def test_completing_a_copy_keeps_original_empty():
-    """补齐真实赋值或插入后才输出完整SQL。@return None。"""
+    "Verify completing a copy keeps original empty."
     table=Table('items');base=PostgreSQLQuery.update(table).returning('*')
     full=base.set('name','new').where(table.id==3)
     assert base.get_sql()=='' and full.get_sql().startswith('UPDATE "items" SET "name"=')

@@ -1,11 +1,11 @@
-"""配置资料递归合并有明确叶子政策与完整冲突路径。"""
+"Public regression tests for PYRSISTENT-06-DEV; the complete business contract is in materials/PYRSISTENT-06-DEV-contract.md."
 import unittest
 from pyrsistent import freeze,pmap,pvector
 from pyrsistent.merge import deep_merge,MergeConflict
 
 
 def test_nested_mapping_pairs_and_persistent_ownership():
-    """真正pairs前置能力复用，普通容器冻结且旧状态不改。@return None。"""
+    "Verify nested mapping pairs and persistent ownership."
     left=freeze({'settings':{'a':1,'b':2},'unchanged':[1]})
     right=[('settings',{'a':3,'c':[4]}),('added',{'x':1})]
     result=deep_merge(left,(item for item in right))
@@ -15,7 +15,7 @@ def test_nested_mapping_pairs_and_persistent_ownership():
 
 
 def test_explicit_conflict_error_callback_and_type_replacement():
-    """路径保留真实键，回调输出是新持久值。@return None。"""
+    "Verify explicit conflict error callback and type replacement."
     left=freeze({'a':{'n':1}})
     with unittest.TestCase().assertRaises(MergeConflict) as raised:deep_merge(left,{'a':{'n':2}},conflict='raise')
     assert raised.exception.path==('a','n') and left['a']['n']==1

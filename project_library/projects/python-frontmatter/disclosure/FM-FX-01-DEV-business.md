@@ -6,7 +6,7 @@ You may modify library/frontmatter, the related tests, and documentation. Preser
 
 # Investigation topics
 
-- 先取得必要材料，再判断部分文档的 TypeError 原因
+- Obtain the necessary materials before diagnosing TypeError in the affected documents.
 
 # Supplied business material: disclosure/unavailable.md
 

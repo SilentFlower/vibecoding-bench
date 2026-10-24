@@ -1,4 +1,4 @@
-"""公开按业务键对齐记录合并回归。"""
+"Public regression tests for DP-MERGE-KEY-DEV; the complete business contract is in materials/DP-MERGE-KEY-DEV-contract.md."
 import pytest
 from dpath.keymerge import merge_by_key
 

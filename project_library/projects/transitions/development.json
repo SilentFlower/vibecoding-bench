@@ -32,7 +32,7 @@
           "id": "TRANSITIONS-01-DEV",
           "kind": "modify",
           "goal": "流程Markup导出后置回调并保持配置往返业务顺序",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair MarkupMachine exported global after_state_change to use actual after list, not before list. Preserve callback representation, order, empty/after-only/before-only behavior and hierarchical/code-generation consumers of markup. Demonstrate a real exported then reconstructed order machine executes distinct before and after exactly once, not merely string equality. Existing markup/model binding and callback execution remain unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_01_dev.py, and Chinese compatibility documentation at library/docs/development-transitions-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair MarkupMachine exported global after_state_change to use actual after list, not before list. Preserve callback representation, order, empty/after-only/before-only behavior and hierarchical/code-generation consumers of markup. Demonstrate a real exported then reconstructed order machine executes distinct before and after exactly once, not merely string equality. Existing markup/model binding and callback execution remain unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_01_dev.py, and English compatibility documentation at library/docs/development-transitions-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/TRANSITIONS-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TRANSITIONS-01-DEV.rubric.json",
             "native": "verification/TRANSITIONS-01-DEV.native.json",
             "public_native": "verification/TRANSITIONS-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "TRANSITIONS-02-DEV",
           "kind": "modify",
           "goal": "流程编辑器按State与Enum对象列表精确删除迁移",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair remove_transition list normalization to inspect each source/dest element, accepting existing string/single State/Enum and mixed lists. Remove only selected edge combinations, preserve unrelated paths, wildcard/empty selections, and current final-event/model-method cleanup. Do not inspect container.name, silently remove all transitions, change unknown trigger error behavior or alter live transition execution.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_02_dev.py, and Chinese compatibility documentation at library/docs/development-transitions-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair remove_transition list normalization to inspect each source/dest element, accepting existing string/single State/Enum and mixed lists. Remove only selected edge combinations, preserve unrelated paths, wildcard/empty selections, and current final-event/model-method cleanup. Do not inspect container.name, silently remove all transitions, change unknown trigger error behavior or alter live transition execution.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_02_dev.py, and English compatibility documentation at library/docs/development-transitions-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/TRANSITIONS-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TRANSITIONS-02-DEV.rubric.json",
             "native": "verification/TRANSITIONS-02-DEV.native.json",
             "public_native": "verification/TRANSITIONS-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "TRANSITIONS-03-DEV",
           "kind": "modify",
           "goal": "Markup与模型代码生成读取配置时不消耗调用方容器",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nIsolate caller-owned config before MarkupMachine processing and generate_base_model removes/derives models. Copy built-in dict/list/tuple recursively with shared-alias preservation, retain opaque model/callback identity rather than arbitrary deepcopy, explicitly reject container cycles. Accept read-only outer Mapping by copying dict. Repeated model-code generation and multiple simple/hierarchical machine construction must leave original models/nested states/transitions unchanged. Internal mutable markup behavior remains supported; no promise to freeze arbitrary business objects.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_03_dev.py, and Chinese compatibility documentation at library/docs/development-transitions-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nIsolate caller-owned config before MarkupMachine processing and generate_base_model removes/derives models. Copy built-in dict/list/tuple recursively with shared-alias preservation, retain opaque model/callback identity rather than arbitrary deepcopy, explicitly reject container cycles. Accept read-only outer Mapping by copying dict. Repeated model-code generation and multiple simple/hierarchical machine construction must leave original models/nested states/transitions unchanged. Internal mutable markup behavior remains supported; no promise to freeze arbitrary business objects.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_03_dev.py, and English compatibility documentation at library/docs/development-transitions-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/TRANSITIONS-03-DEV-contract.md",
@@ -146,7 +146,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TRANSITIONS-03-DEV.rubric.json",
             "native": "verification/TRANSITIONS-03-DEV.native.json",
             "public_native": "verification/TRANSITIONS-03-DEV.public.native.json",
@@ -175,7 +175,7 @@
           "id": "TRANSITIONS-04-DEV",
           "kind": "modify",
           "goal": "流程按钮只读预览候选结构且不调用准备与规则",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Machine.preview_event(model,trigger) for core synchronous FLAT Machine, bound model required. Return current state, ordered candidate source/dest, stable ordinal and condition index/callback descriptor/target (unless false), callback descriptors and runnable=\"unknown\". Do not resolve string callbacks, access callback properties, execute prepare/guards/before/after or change state. Unknown trigger returns no candidates. Preserve internal None/reflexive/wildcard-expanded paths. No hierarchical/parallel/async completeness promise or fabricated allowed=True.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_04_dev.py, and Chinese compatibility documentation at library/docs/development-transitions-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Machine.preview_event(model,trigger) for core synchronous FLAT Machine, bound model required. Return current state, ordered candidate source/dest, stable ordinal and condition index/callback descriptor/target (unless false), callback descriptors and runnable=\"unknown\". Do not resolve string callbacks, access callback properties, execute prepare/guards/before/after or change state. Unknown trigger returns no candidates. Preserve internal None/reflexive/wildcard-expanded paths. No hierarchical/parallel/async completeness promise or fabricated allowed=True.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_04_dev.py, and English compatibility documentation at library/docs/development-transitions-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/TRANSITIONS-04-DEV-contract.md",
@@ -193,7 +193,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TRANSITIONS-04-DEV.rubric.json",
             "native": "verification/TRANSITIONS-04-DEV.native.json",
             "public_native": "verification/TRANSITIONS-04-DEV.public.native.json",
@@ -222,7 +222,7 @@
           "id": "TRANSITIONS-05-DEV",
           "kind": "modify",
           "goal": "多模型同步分发返回各订单真实成功拒绝和错误",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Machine.dispatch_report(trigger,*args,collect_errors=True,**kwargs) for nonqueued synchronous machines. Snapshot model declaration order, call actual bound trigger once each, return ordered tuple rows with ordinal/model identity/source/dest/result/status/error_type. False is rejected, True succeeded, exception failed without leaking error message. Collect mode continues, fail-fast stops after error row; prior successful states are not rolled back. Reject queued and async triggers before execution rather than call admission True final success. Existing dispatch bool unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_05_dev.py, and Chinese compatibility documentation at library/docs/development-transitions-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Machine.dispatch_report(trigger,*args,collect_errors=True,**kwargs) for nonqueued synchronous machines. Snapshot model declaration order, call actual bound trigger once each, return ordered tuple rows with ordinal/model identity/source/dest/result/status/error_type. False is rejected, True succeeded, exception failed without leaking error message. Collect mode continues, fail-fast stops after error row; prior successful states are not rolled back. Reject queued and async triggers before execution rather than call admission True final success. Existing dispatch bool unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_05_dev.py, and English compatibility documentation at library/docs/development-transitions-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/TRANSITIONS-05-DEV-contract.md",
@@ -240,7 +240,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TRANSITIONS-05-DEV.rubric.json",
             "native": "verification/TRANSITIONS-05-DEV.native.json",
             "public_native": "verification/TRANSITIONS-05-DEV.public.native.json",
@@ -269,7 +269,7 @@
           "id": "TRANSITIONS-06-DEV",
           "kind": "modify",
           "goal": "流程规则诊断报告真实短路条件并保留未执行项",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit Machine.explain_event for bound core FLAT nonqueued synchronous machines. This is NOT read-only: execute existing prepare_event/transition.prepare and Condition.check in actual candidate/condition order using EventData and send_event args. Report condition index/target/pass/fail/skipped/error type; failure skips remaining conditions then tries next candidate, success skips later candidates, errors stop without exception message. Never execute transition before/after/enter/exit or state change. Unknown event has no candidates/allowedFalse. No all-guards evaluation, pure-rule claim, hierarchical/async support or on_exception/finalize diagnostic callback promise.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_06_dev.py, and Chinese compatibility documentation at library/docs/development-transitions-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit Machine.explain_event for bound core FLAT nonqueued synchronous machines. This is NOT read-only: execute existing prepare_event/transition.prepare and Condition.check in actual candidate/condition order using EventData and send_event args. Report condition index/target/pass/fail/skipped/error type; failure skips remaining conditions then tries next candidate, success skips later candidates, errors stop without exception message. Never execute transition before/after/enter/exit or state change. Unknown event has no candidates/allowedFalse. No all-guards evaluation, pure-rule claim, hierarchical/async support or on_exception/finalize diagnostic callback promise.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_transitions_06_dev.py, and English compatibility documentation at library/docs/development-transitions-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/TRANSITIONS-06-DEV-contract.md",
@@ -287,7 +287,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/TRANSITIONS-06-DEV.rubric.json",
             "native": "verification/TRANSITIONS-06-DEV.native.json",
             "public_native": "verification/TRANSITIONS-06-DEV.public.native.json",

@@ -1,5 +1,12 @@
-# 添加深层严格常量模板并隔离可变默认值
+# Engineering contract: CF-LITERAL-DEV
 
-新增严格常量模板，递归区分布尔、整数、浮点和序列类型。期望值、默认值和返回结果彼此隔离，失败使用原配置领域异常，保留旧模板转换行为。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement confuse.literal.Literal(expected,default=REQUIRED) as a real Template. Require recursive type-and-value equality for scalars, dict keys/values and sequences: True,1,1.0 differ and list differs from tuple. Constructor detaches expected and validates explicit default against it. Conversion raises normal ConfigValueError with view path on mismatch, missing required values retain NotFoundError. Returned mutable values and defaults must be independent copies, without changing legacy Choice or coercive templates.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_cf_literal_dev.py and concise English compatibility documentation at library/docs/development-cf-literal-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/confuse/literal.py
+- library/development_tests/test_development_cf_literal_dev.py
+- library/docs/development-cf-literal-dev.md

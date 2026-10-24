@@ -1,5 +1,12 @@
-# 明确处理JSON对象导出中的重复列名
+# Engineering contract: CH-JSON-HEADERS-DEV
 
-查询可能含同名列，JSON对象不能悄悄丢字段。提供拒绝或稳定补后缀策略，预留真实已有列名避免二次冲突，默认继续旧末值行为，表头只消费一次，行宽及Unicode输出不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend existing JSONL adapter with duplicate_headers="last"|"error"|"suffix" via formatter kwargs. Default last preserves old output; error rejects duplicate names before consuming a row; suffix creates deterministic collision-free names _2,_3,... while reserving every original name so real columns such as a_2 are not overwritten. Materialize one-shot headers once, keep row width validation and both unicode modes, preserve input header sequence and per-call formatter defaults. Explicit policies require text names.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_json_headers_dev.py and concise English compatibility documentation at library/docs/development-ch-json-headers-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cli_helpers/tabular_output/json_output_adapter.py
+- library/development_tests/test_development_ch_json_headers_dev.py
+- library/docs/development-ch-json-headers-dev.md

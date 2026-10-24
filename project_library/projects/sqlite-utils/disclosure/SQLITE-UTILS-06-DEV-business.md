@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线14：Queryable.export_csv向调用方文本流逐行写真实查询、返回记录数，空表仍表头；列序/过滤绑定/排序分页正确，字段引用/中文/多行由csv处理，NULL按空字段，不关外部流、不全量堆内存。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add Queryable.export_csv(stream,columns=None,where=None,where_args=None,order_by=None,limit=None,offset=None,dialect="excel"), available on real Table/View. Validate requested column order/no duplicates against actual schema before writing, then csv.writer header and iterate rows_where lazily with quoted selected identifiers and bound where_args. Return actual data row count; empty table still header, Unicode/commas/quotes/multiline fields roundtrip through csv.reader, NULL follows CSV empty-field convention. Never close caller stream, materialize all rows, mutate DB or claim lossless SQLite type encoding. Existing CLI export remains.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_sqlite_utils_06_dev.py, and English compatibility documentation at library/docs/development-sqlite-utils-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/sqlite_utils/db.py
+- library/tests/test_development_sqlite_utils_06_dev.py
+- library/docs/development-sqlite-utils-06-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

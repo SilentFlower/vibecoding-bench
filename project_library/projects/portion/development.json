@@ -78,7 +78,7 @@
           "id": "PT-MEASURE-DEV",
           "kind": "modify",
           "goal": "为真实区间增加显式业务度量聚合",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Interval.measure(metric, *, start=0): invoke the caller-supplied metric exactly once for each atomic interval in order and combine with addition beginning at start. The metric receives actual bound openness and endpoints so the same protocol can express continuous duration or bounded integer cardinality; no generic endpoint subtraction is implicit. Empty intervals return start without callbacks; preserve Decimal/timedelta result types with an appropriate identity, propagate callback errors and let metrics explicitly reject unbounded domains. Preserve len as the number of atomic pieces, subclasses, laziness of existing APIs and every frozen test.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_measure_dev.py and concise Chinese compatibility documentation at library/docs/development-pt-measure-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Interval.measure(metric, *, start=0): invoke the caller-supplied metric exactly once for each atomic interval in order and combine with addition beginning at start. The metric receives actual bound openness and endpoints so the same protocol can express continuous duration or bounded integer cardinality; no generic endpoint subtraction is implicit. Empty intervals return start without callbacks; preserve Decimal/timedelta result types with an appropriate identity, propagate callback errors and let metrics explicitly reject unbounded domains. Preserve len as the number of atomic pieces, subclasses, laziness of existing APIs and every frozen test.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_measure_dev.py and concise English compatibility documentation at library/docs/development-pt-measure-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/PT-MEASURE-DEV-contract.md",
@@ -93,7 +93,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PT-MEASURE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/PT-MEASURE-DEV.native.json",
@@ -125,7 +125,7 @@
           "id": "PT-TRANSFORM-DEV",
           "kind": "modify",
           "goal": "为区间值表交付不可变转换与筛选",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd IntervalDict.transform_values(function, *, pass_interval=False) returning the same concrete class without mutating the source. Call once per stored (possibly composite) interval/value entry in order, optionally passing (value, interval). Only identity with IntervalDict.DROP deletes an entry; None and unhashable values are legitimate. Rebuild through existing normalization so equal outputs merge correctly. Preserve domain except dropped entries, propagate callback exceptions and retain custom IntervalDict subclasses.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_transform_dev.py and concise Chinese compatibility documentation at library/docs/development-pt-transform-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd IntervalDict.transform_values(function, *, pass_interval=False) returning the same concrete class without mutating the source. Call once per stored (possibly composite) interval/value entry in order, optionally passing (value, interval). Only identity with IntervalDict.DROP deletes an entry; None and unhashable values are legitimate. Rebuild through existing normalization so equal outputs merge correctly. Preserve domain except dropped entries, propagate callback exceptions and retain custom IntervalDict subclasses.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_transform_dev.py and concise English compatibility documentation at library/docs/development-pt-transform-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/PT-TRANSFORM-DEV-contract.md",
@@ -140,7 +140,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PT-TRANSFORM-DEV.rubric.json",
             "semantic": true,
             "native": "verification/PT-TRANSFORM-DEV.native.json",
@@ -172,7 +172,7 @@
           "id": "PT-SPLIT-DEV",
           "kind": "modify",
           "goal": "按业务切点输出不会重新归并的区间分区",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Interval.split(points, *, ownership='right') returning an ordered tuple of same-class nonempty atomic intervals. Sort/deduplicate a finite one-shot cut iterable, ignore cuts outside the interior of each atomic part and explicitly assign internal cut points to the right or left partition. Preserve original exterior openness, gaps, empty/singleton intervals and comparable date endpoints. Returned pieces must be pairwise disjoint and their union exactly the input; do not change Interval normalization to keep partitions apart.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_split_dev.py and concise Chinese compatibility documentation at library/docs/development-pt-split-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Interval.split(points, *, ownership='right') returning an ordered tuple of same-class nonempty atomic intervals. Sort/deduplicate a finite one-shot cut iterable, ignore cuts outside the interior of each atomic part and explicitly assign internal cut points to the right or left partition. Preserve original exterior openness, gaps, empty/singleton intervals and comparable date endpoints. Returned pieces must be pairwise disjoint and their union exactly the input; do not change Interval normalization to keep partitions apart.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_split_dev.py and concise English compatibility documentation at library/docs/development-pt-split-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/PT-SPLIT-DEV-contract.md",
@@ -187,7 +187,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PT-SPLIT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/PT-SPLIT-DEV.native.json",
@@ -219,7 +219,7 @@
           "id": "PT-AFFINE-DEV",
           "kind": "modify",
           "goal": "交付保留开闭边界的连续区间仿射变换",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Interval.affine(scale, offset=0) and translate(offset) for continuous intervals. Positive scales preserve bounds, negative scales swap endpoints and openness, zero maps every nonempty input to a singleton and empty remains empty. Preserve disjoint pieces, infinity direction, Decimal arithmetic and concrete continuous subclasses; reject nonfinite/NaN parameters and explicitly reject AbstractDiscreteInterval images that cannot generally be represented as continuous intervals. Do not change subtraction, replace or apply semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_affine_dev.py and concise Chinese compatibility documentation at library/docs/development-pt-affine-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Interval.affine(scale, offset=0) and translate(offset) for continuous intervals. Positive scales preserve bounds, negative scales swap endpoints and openness, zero maps every nonempty input to a singleton and empty remains empty. Preserve disjoint pieces, infinity direction, Decimal arithmetic and concrete continuous subclasses; reject nonfinite/NaN parameters and explicitly reject AbstractDiscreteInterval images that cannot generally be represented as continuous intervals. Do not change subtraction, replace or apply semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_affine_dev.py and concise English compatibility documentation at library/docs/development-pt-affine-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/PT-AFFINE-DEV-contract.md",
@@ -234,7 +234,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PT-AFFINE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/PT-AFFINE-DEV.native.json",
@@ -266,7 +266,7 @@
           "id": "PT-COALESCE-DEV",
           "kind": "modify",
           "goal": "按业务容差合并区间并报告填补空隙",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Interval.coalesce(max_gap, metric=None, *, report=False). Bridge consecutive normalized atomic pieces when their endpoint distance is at most a nonnegative explicit tolerance, using subtraction by default or a caller metric(lower_endpoint, upper_endpoint). Preserve external bounds and class, never mutate the source, and optionally return the exact added gap intervals. Support numeric/Decimal and timedelta distances, zero-width missing points, empty input, and propagate metric errors; reject negative/NaN tolerance and negative metric results. This is explicitly approximate and must not change exact union/overlap semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_coalesce_dev.py and concise Chinese compatibility documentation at library/docs/development-pt-coalesce-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Interval.coalesce(max_gap, metric=None, *, report=False). Bridge consecutive normalized atomic pieces when their endpoint distance is at most a nonnegative explicit tolerance, using subtraction by default or a caller metric(lower_endpoint, upper_endpoint). Preserve external bounds and class, never mutate the source, and optionally return the exact added gap intervals. Support numeric/Decimal and timedelta distances, zero-width missing points, empty input, and propagate metric errors; reject negative/NaN tolerance and negative metric results. This is explicitly approximate and must not change exact union/overlap semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_pt_coalesce_dev.py and concise English compatibility documentation at library/docs/development-pt-coalesce-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/PT-COALESCE-DEV-contract.md",
@@ -281,7 +281,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PT-COALESCE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/PT-COALESCE-DEV.native.json",

@@ -4,8 +4,8 @@ Implement the explicitly authorized user-block cancellation recovery described i
 
 # Investigation topics
 
-- 先取重写API和异常时序再判断原文丢失
-- 界定用户块恢复和持久文件保证
+- Obtain the rewrite API and exception timeline before diagnosing loss of original text.
+- Define recovery guarantees for the user block and the persistent file.
 
 # Supplied business material: materials/cancellation-symptom.md
 

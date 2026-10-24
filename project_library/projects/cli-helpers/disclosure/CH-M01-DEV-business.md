@@ -4,7 +4,7 @@ Repair the complete per-call top-level option isolation contract for built-in an
 
 # Investigation topics
 
-- 定位跨实例缺值选项污染
+- Diagnose leakage of missing-value options across instances.
 
 # Supplied business material: materials/option-leak.py
 

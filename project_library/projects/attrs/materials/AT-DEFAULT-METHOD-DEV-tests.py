@@ -1,4 +1,4 @@
-"""公开继承动态默认值回归。"""
+"Public regression tests for AT-DEFAULT-METHOD-DEV; the complete business contract is in materials/AT-DEFAULT-METHOD-DEV-contract.md."
 import attrs
 import pytest
 

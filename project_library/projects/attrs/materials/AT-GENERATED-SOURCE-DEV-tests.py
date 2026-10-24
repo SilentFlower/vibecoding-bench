@@ -1,4 +1,4 @@
-"""公开生成源码检查回归。"""
+"Public regression tests for AT-GENERATED-SOURCE-DEV; the complete business contract is in materials/AT-GENERATED-SOURCE-DEV-contract.md."
 import linecache
 import attrs
 import pytest

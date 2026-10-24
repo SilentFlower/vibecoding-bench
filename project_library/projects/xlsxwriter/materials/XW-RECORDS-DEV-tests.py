@@ -1,4 +1,4 @@
-"""公开类型记录实际XLSX回归。"""
+"Public regression tests for XW-RECORDS-DEV; the complete business contract is in materials/XW-RECORDS-DEV-contract.md."
 from io import BytesIO
 from zipfile import ZipFile
 import xml.etree.ElementTree as ET

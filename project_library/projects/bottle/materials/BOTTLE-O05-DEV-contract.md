@@ -1,5 +1,12 @@
-# 原子或排他发布上传文件并恢复输入位置
+# Engineering contract: BOTTLE-O05-DEV
 
-上传先在同目录私有临时文件完成复制，再原子替换或排他发布。读取、写入和发布失败均保持旧目标，恢复输入位置并清理本次临时文件；目录目标和空上传可用，旧save不变，不声称断电持久。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add FileUpload.save_atomic(destination, *, overwrite=False, chunk_size=65536) for real path/directory targets. Complete copying in a private same-directory temporary file before publication; overwrite=True atomically replaces, False uses exclusive publication that cannot overwrite a competitor. Restore original input cursor on success and read/write/replace failures, preserve existing destination bytes on failures, clean only owned temporary files and validate positive chunk sizes. Leave existing save/stream behavior unchanged and do not claim crash durability.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_bottle_o05_dev.py and concise English compatibility documentation at library/docs/development-bottle-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bottle.py
+- library/test/test_development_bottle_o05_dev.py
+- library/docs/development-bottle-o05-dev.md

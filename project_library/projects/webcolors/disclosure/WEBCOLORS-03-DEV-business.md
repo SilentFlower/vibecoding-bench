@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线05：新增独立RGBA模块，四通道明确为0..255整数字节，四/八位hex无损往返，透明像素隐藏RGB保留。旧RGB及HTML simple合同不扩展；转RGB仅允许不透明，不暗选背景。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add webcolors.rgba with immutable validated RGBA(red,green,blue,alpha=255), exact 4/8-digit hex_to_rgba, lossless 8-digit rgba_to_hex, rgb_to_rgba and opaque-only rgba_to_rgb. All channels are integer bytes 0..255 (bool/float rejected); zero-alpha hidden RGB is retained. Do not alter legacy RGB or HTML simple-color functions to accept/drop alpha. Reject malformed lengths, suffixes and whitespace; do not clamp silently or use a white background implicitly. Provide complete source implementation, public roundtrip/error tests and English compatibility documentation.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_webcolors_03_dev.py, and English compatibility documentation at library/docs/development-webcolors-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/webcolors/rgba.py
+- library/tests/test_development_webcolors_03_dev.py
+- library/docs/development-webcolors-03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

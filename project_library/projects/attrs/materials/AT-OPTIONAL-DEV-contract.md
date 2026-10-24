@@ -1,5 +1,12 @@
-# 让可选转换器兼容未求值的字符串注解
+# Engineering contract: AT-OPTIONAL-DEV
 
-数据模型启用延迟注解后，可选转换器不能在实际转换前就因字符串注解崩溃。修复optional的参数及返回注解包装，未知前向类型不求值，不修改原函数注解，保留Converter实例／字段参数、内置转换和None旁路。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix attr.converters.optional for first-parameter and return annotations stored as strings, including unknown forward references. Build a valid optional annotation representation without evaluating arbitrary annotation text or changing the original converter annotations. Preserve actual-type annotations, unannotated/builtin callables, None bypass and Converter takes_self/takes_field forwarding. The wrapped converter must still execute normally for non-None values.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_at_optional_dev.py and concise English compatibility documentation at library/docs/development-at-optional-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/attr/converters.py
+- library/development_tests/test_development_at_optional_dev.py
+- library/docs/development-at-optional-dev.md

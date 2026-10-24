@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-报表需要按列展示金额、状态等业务值。先沿用原数据归一化，再用显式回调转换，分隔线及缺失的稀疏单元格不调用回调。业务行号稳定、输入不变，最后仍走原渲染选项，不引入全局注册表。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement tabulate.formatters.tabulate_with_formatters(data,headers=(),*,formatters=(),**options). Reuse pinned normalization, then apply callable(value,data_row_index,column_index) or None per column before rendering through tabulate. Do not call formatters on separator rows or absent ragged cells; row indices count business rows only. Preserve original data, propagate callback errors, validate callbacks and excess columns, support keys/firstrow headers and original options including disable_numparse. Do not add a global formatter registry or alter tabulate signature.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_formatters_dev.py and concise English compatibility documentation at library/docs/development-tb-formatters-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tabulate/formatters.py
+- library/development_tests/test_development_tb_formatters_dev.py
+- library/docs/development-tb-formatters-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

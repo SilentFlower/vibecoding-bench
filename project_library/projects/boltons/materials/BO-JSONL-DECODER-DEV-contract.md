@@ -1,5 +1,12 @@
-# 为逐行JSON读取注入本次解码器并保持反向和错误策略
+# Engineering contract: BO-JSONL-DECODER-DEV
 
-逐行记录读取需要选择金额精度和对象处理方式。注入本次解码器，空行不调用，返回原结果对象，继续沿用反向读取、定位及跳过错误策略，不改全局JSON模块或关闭调用者流。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add keyword-only loads=None to JSONLIterator, selecting json.loads by default or a validated explicit callable. Call it once per nonblank candidate line, preserve exact returned object, reverse/rel_seek behavior and existing ignore_errors handling for decoder exceptions. Do not mutate global json.loads, preload the file, or close caller-owned streams. Validate decoder before reading or seeking; support Decimal parse_float and object_pairs_hook through caller-provided decoder functions.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_jsonl_decoder_dev.py and concise English compatibility documentation at library/docs/development-bo-jsonl-decoder-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/boltons/jsonutils.py
+- library/development_tests/test_development_bo_jsonl_decoder_dev.py
+- library/docs/development-bo-jsonl-decoder-dev.md

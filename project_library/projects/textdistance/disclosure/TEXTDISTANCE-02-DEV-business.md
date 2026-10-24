@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线02：统一LCSSeq/LCSStr准备、递归与结果重建，词返回词列表，qgram保留tuple单元，普通字符/列表/tuple保持首输入表示。只准备一次，支持不可hash token，长度与归一化按单元计算；跨200分支和多序列均覆盖，继承已交付的自定义谓词。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Repair LCSSeq and LCSStr preparation/reconstruction for qval=None words, qval>1 qgrams and qval=1 ordinary str/list/tuple inputs. Prepare exactly once; recursive multi-input LCSSeq must not retokenize prepared units. Strings at qval=1 retain str results; words/qgrams return lists of original units; ordinary list/tuple preserve first-input representation and unhashable tokens work. Empty/single/multi-input and the 200-element branch boundary follow the same contract. similarity and normalized maximum count prepared units, never concatenated character lengths. Preserve the previously delivered custom-predicate LCSSeq behavior and old character results/tie rules. This is one complete sequence-unit repair across both algorithms, not separate micro-goals for each branch.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_textdistance_02_dev.py, and English compatibility documentation at library/docs/development-textdistance-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/textdistance/algorithms/sequence_based.py
+- library/tests/test_development_textdistance_02_dev.py
+- library/docs/development-textdistance-02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

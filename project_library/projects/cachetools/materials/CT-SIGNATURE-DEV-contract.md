@@ -1,5 +1,12 @@
-# 按真实函数签名规范缓存键并隔离共享命名空间
+# Engineering contract: CT-SIGNATURE-DEV
 
-共享缓存中，同一函数的等价调用需要同键，不同函数默认隔离。按真实签名绑定并补默认值，保留可变位置参数顺序、规范关键字顺序，忽略receiver或共享命名空间必须显式指定。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add cachetools.keys.signature_key(func,*,typed=False,namespace=None,ignore=()), returning a key callable. Use signature.bind/apply_defaults so equivalent positional/keyword/default calls share a key, include variadic positional order and sorted variadic keywords, and optionally top-level value types (including variadic item types). Default namespace is function identity; allow explicit shared hashable namespace and explicit known ignored parameter names. Preserve binding errors and reject unhashable values without stringifying them. Do not mutate kwargs, execute the wrapped function or change existing key functions.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_signature_dev.py and concise English compatibility documentation at library/docs/development-ct-signature-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/cachetools/keys.py
+- library/development_tests/test_development_ct_signature_dev.py
+- library/docs/development-ct-signature-dev.md

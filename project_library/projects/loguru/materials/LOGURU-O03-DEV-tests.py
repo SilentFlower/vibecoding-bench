@@ -1,15 +1,15 @@
-"""局部静默策略在真实记录路径生效，不改变全局模块activation。"""
+"Public regression tests for LOGURU-O03-DEV; the complete business contract is in materials/LOGURU-O03-DEV-contract.md."
 from copy import deepcopy
 from loguru import logger
 import asyncio
 import pytest
 
 def clean():
-    """创建独立logger及真实输出列表。@return logger/messages。"""
+    "Support the public regression through clean."
     logger.remove();log=deepcopy(logger);log.remove();out=[];log.add(out.append,format='{level}:{message}');return log,out
 
 def test_threshold_nested_and_exception_restore_actual_output():
-    """阈值包含边界，嵌套只收紧，异常后完整恢复。@return None。"""
+    "Verify threshold nested and exception restore actual output."
     log,out=clean()
     with log.silence('INFO'):
         log.info('hidden');log.warning('visible')
@@ -19,7 +19,7 @@ def test_threshold_nested_and_exception_restore_actual_output():
     log.info('restored');assert ''.join(out)=='WARNING:visible\nCRITICAL:critical\nINFO:restored\n';log.remove()
 
 def test_async_siblings_and_new_threads_keep_contextvar_boundaries():
-    """兄弟协程/新线程不被另一个上下文静默；子协程继承当前上下文。@return None。"""
+    "Verify async siblings and new threads keep contextvar boundaries."
     import threading
     log,out=clean()
     async def run():
@@ -37,7 +37,7 @@ def test_async_siblings_and_new_threads_keep_contextvar_boundaries():
     assert ''.join(out)=='INFO:sibling\nINFO:thread\n';log.remove()
 
 def test_module_match_logger_core_isolation_and_invalid_config():
-    """模块点边界与logger核心隔离，参数错误在进入前拒绝。@return None。"""
+    "Verify module match logger core isolation and invalid config."
     log,out=clean();other,other_out=clean()
     with log.silence('INFO',module=__name__):log.info('hidden');other.info('other')
     with log.silence('INFO',module='not-this-module'):log.info('visible')

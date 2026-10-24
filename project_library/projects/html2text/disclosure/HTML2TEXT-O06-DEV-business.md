@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线19：新增显式不可变Options及from_options真实构造路径，拒绝拼错/类型/宽度/图片互斥/换行组合；副本及多实例隔离，原动态属性/out/baseurl保持，本项只交付严格API不冒充CLI。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add public immutable Options.from_mapping with declared body_width and common link/image/wrapping switches, and HTML2Text.from_options(options, *, out=None, baseurl="") integrated through the actual constructor/property conversion path. Reject unknown keys, nonbool switches, bool/noninteger/negative widths, conflicting image rendering modes and single_line_break with nonzero width in this explicit strict mode. Options detach input, expose independent as_dict copies and are reusable across independent converters. Preserve ordinary construction/dynamic property assignments, default byte output, custom out and baseurl. This task covers API strict configuration; do not claim unimplemented CLI integration or globally forbid legacy combinations.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_html2text_o06_dev.py and concise English compatibility documentation at library/docs/development-html2text-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/html2text/__init__.py
+- library/test/test_development_html2text_o06_dev.py
+- library/docs/development-html2text-o06-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

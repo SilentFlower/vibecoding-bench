@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-按真实Accept质量值与通配规则选择JSON表示，缺省与明确拒绝要区分。支持厂商JSON且保留候选优先级，全部不可接受返回406，正文、类型、长度和Vary保持一致。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement werkzeug.negotiated_json.json_response(value,request,*,offers=("application/json",),status=200). Validate unique offered application/json or application/*+json media types, use actual request.accept_mimetypes.best_match for quality/specificity/wildcards, preserve offered order on ties and default first only when Accept is absent. Unacceptable including q=0 raises 406. Encode finite UTF8 JSON preserving false/null/Unicode, set selected Content-Type, exact length and Vary: Accept. Do not equate vendor JSON with plain JSON without an actual matching offer or silently emit a disallowed representation.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_negotiate_dev.py and concise English compatibility documentation at library/docs/development-wz-negotiate-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/werkzeug/negotiated_json.py
+- library/development_tests/test_development_wz_negotiate_dev.py
+- library/docs/development-wz-negotiate-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

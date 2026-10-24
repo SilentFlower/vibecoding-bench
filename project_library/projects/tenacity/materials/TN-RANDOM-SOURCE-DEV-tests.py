@@ -1,4 +1,4 @@
-"""公开显式随机源等待回归。"""
+"Public regression tests for TN-RANDOM-SOURCE-DEV; the complete business contract is in materials/TN-RANDOM-SOURCE-DEV-contract.md."
 import random
 import pytest
 from types import SimpleNamespace

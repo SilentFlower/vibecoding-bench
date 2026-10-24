@@ -1,3 +1,13 @@
-# 公开超链接编辑正确维护外部关系与内部跳转
+# Engineering contract: PYTHON-DOCX-04-DEV
 
-路线04：公开add_hyperlink与地址/fragment/text/remove编辑，真实OOXML/OPC关系支持外链和内部跳转；文本继承首run格式，共享关系按修改前引用计数安全清理，地址不联网。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add Paragraph.add_hyperlink(text,address="",fragment="",style=None) and Hyperlink address/fragment/text setters plus remove(). Build real OOXML runs/relationships, support external URI and internal bookmark links without fetching addresses. Text replacement retains first-run formatting, removes extra text runs only; unchanged other paragraph content. Validate strings and nonempty target before adding side effects. Editing/removing drops an old relationship only according to its BEFORE-change reference count, retaining shared links and deduplicated targets. Save/reopen external URL/fragment/internal targets and formatting; no automatic bookmark creation or Word page rendering.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_docx_04_dev.py, and English compatibility documentation at library/docs/development-python-docx-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/docx/text/paragraph.py
+- library/src/docx/text/hyperlink.py
+- library/tests/test_development_python_docx_04_dev.py
+- library/docs/development-python-docx-04-dev.md

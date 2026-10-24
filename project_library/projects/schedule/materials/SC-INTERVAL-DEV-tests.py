@@ -1,4 +1,4 @@
-"""公开调度间隔校验回归。"""
+"Public regression tests for SC-INTERVAL-DEV; the complete business contract is in materials/SC-INTERVAL-DEV-contract.md."
 import datetime
 import pytest
 import schedule

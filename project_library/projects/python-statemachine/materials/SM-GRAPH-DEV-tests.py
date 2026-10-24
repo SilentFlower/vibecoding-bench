@@ -1,4 +1,4 @@
-"""公开真实状态声明路径规划回归。"""
+"Public regression tests for SM-GRAPH-DEV; the complete business contract is in materials/SM-GRAPH-DEV-contract.md."
 import pytest
 from statemachine.transition_graph import TransitionGraph
 from statemachine import StateMachine,State

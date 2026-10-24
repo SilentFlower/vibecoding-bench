@@ -1,14 +1,14 @@
 from cachetools import cachedmethod
 
 class Catalog:
-    """复现类入口与实例入口的调用差异。"""
+    """Reproduce the difference between class access and instance access."""
     def __init__(self):
-        """创建独立缓存。@return None。"""
+        """Create an independent cache. @return None."""
         self.cache = {}
 
     @cachedmethod(lambda obj: obj.cache)
     def quote(self, sku):
-        """返回业务参数。@param sku 商品。@return 商品。"""
+        """Return the business argument. @param sku Product identifier. @return Product identifier."""
         return sku
 
 catalog = Catalog()

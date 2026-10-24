@@ -4,16 +4,16 @@ Fix this segmented environment decoding issue for dictionary union values in the
 
 # Investigation topics
 
-- 定位字典联合值未解码原因并给出不改库的临时办法
+- Diagnose why dictionary union values are not decoded and suggest a workaround without modifying the library.
 
 # Supplied business material: materials/union-model.py
 
-"""字典联合值的公开最小复现。"""
+"""Public minimal reproduction for dictionary values in a union."""
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class UnionValue(BaseSettings):
-    """读取商品字符串或字符串列表配置。@param config 商品配置字典。"""
+    """Read product configuration containing a string or a list of strings. @param config Product configuration dictionary."""
     model_config = SettingsConfigDict(env_prefix='APP_', env_nested_delimiter='__',
         env_file=None, cli_parse_args=False)
     config: dict[str, list[str] | str] = {}

@@ -1,4 +1,4 @@
-"""公开标签嵌套Schema回归。"""
+"Public regression tests for MM-UNION-DEV; the complete business contract is in materials/MM-UNION-DEV-contract.md."
 import pytest
 from marshmallow import Schema,fields,ValidationError
 from marshmallow.discriminated import DiscriminatedNested

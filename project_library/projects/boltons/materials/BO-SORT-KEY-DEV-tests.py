@@ -1,4 +1,4 @@
-"""公开异构排序单次业务键回归。"""
+"Public regression tests for BO-SORT-KEY-DEV; the complete business contract is in materials/BO-SORT-KEY-DEV-contract.md."
 import pytest
 from boltons.iterutils import untyped_sorted
 

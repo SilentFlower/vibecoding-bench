@@ -1,5 +1,12 @@
-# 让代码指令原生caption与真实高亮块具名关联并发布语义HTML
+# Engineering contract: DOCUTILS-O03-DEV
 
-对应路线19：code新增caption，原tag_code/高亮/行号不变，真实figure首literal次caption且name归figure，可引用并发布figure/figcaption；空标题拒绝、无caption路径保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend CodeBlock with caption option, using the original tag_code language/highlight/number-lines path and wrapping captioned output in an actual code-figure figure whose first child is literal_block and second is inline-parsed caption. Attach name/id to the figure for real references and preserve source/line; HTML5 naturally emits figure/figcaption and code escaping. Caption-free nodes/output remain unchanged. Reject empty captions through directive option validation and preserve Unicode/multiline title text and original lexer error policy; do not replace code contents with raw HTML or a rubric.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o03_dev.py and concise English compatibility documentation at library/docs/development-docutils-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/docutils/docutils/parsers/rst/directives/body.py
+- library/tests/test_development_docutils_o03_dev.py
+- library/docs/development-docutils-o03-dev.md

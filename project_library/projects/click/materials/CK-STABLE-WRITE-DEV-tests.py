@@ -1,4 +1,4 @@
-"""公开内容稳定的原子输出回归。"""
+"Public regression tests for CK-STABLE-WRITE-DEV; the complete business contract is in materials/CK-STABLE-WRITE-DEV-contract.md."
 import pytest
 import click
 from click.testing import CliRunner

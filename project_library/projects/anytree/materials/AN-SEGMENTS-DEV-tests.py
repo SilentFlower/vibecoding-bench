@@ -1,4 +1,4 @@
-"""公开字面路径段回归。"""
+"Public regression tests for AN-SEGMENTS-DEV; the complete business contract is in materials/AN-SEGMENTS-DEV-contract.md."
 import pytest
 from anytree import Node, Resolver, ChildResolverError, ResolverError
 

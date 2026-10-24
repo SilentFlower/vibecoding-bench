@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线05：新增显式启用的URI自动链接扩展，按实例白名单支持SSH/URN等完整URI，属性交由真实serializer转义，显示文本不二次行内解析。危险协议配置拒绝、代码内不展开、普通HTML及原链接兼容；不是整文HTML清洗器。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add opt-in markdown.extensions.uri_autolink with UriAutolinkExtension(schemes=(http,https,ssh,urn)). Match complete angle-bracket URI syntax before raw-HTML handling but after code/escapes, use per-instance case-insensitive validated scheme allowlists, and build ElementTree anchor attributes/AtomicString text through the real serializer. Forbid javascript/vbscript/data even if requested; unsupported schemes do not become links, ordinary HTML/email/standard autolinks keep existing semantics, and code spans/blocks never expand. No global lexer mutation or network access. Clearly state this policy controls new autolinks only and does not sanitize Markdown raw HTML as a whole.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_03_dev.py, and English compatibility documentation at library/docs/development-python-markdown-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/markdown/extensions/uri_autolink.py
+- library/tests/test_development_python_markdown_03_dev.py
+- library/docs/development-python-markdown-03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

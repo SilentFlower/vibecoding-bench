@@ -1,4 +1,4 @@
-"""公开编译查询选项绑定回归。"""
+"Public regression tests for JM-BOUND-DEV; the complete business contract is in materials/JM-BOUND-DEV-contract.md."
 from collections import OrderedDict
 from jmespath import Options
 from jmespath.bound import BoundExpression

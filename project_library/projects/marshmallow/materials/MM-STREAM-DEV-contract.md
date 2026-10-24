@@ -1,5 +1,13 @@
-# 实现逐记录Schema导入并收集标准化错误和部分成功值
+# Engineering contract: MM-STREAM-DEV
 
-使用真实Schema逐条导入，正确运行钩子与未知字段策略，错误可原样抛出或收集后继续。收集结果复用已实现的错误定位接口，保留独立部分成功数据，不把整个输入物化。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement marshmallow.streaming.iterload(schema,records,*,errors="raise",partial=None,unknown=None) and Schema.iterload with frozen LoadResult(index,status,data,errors,valid_data). Validate options before consuming data, remain lazy, and call actual schema.load(many=False) per record so hooks/custom loads, partial and unknown policies work even for Schema(many=True). Raise retains original ValidationError; collect continues after invalid rows and reuses completed error_paths.flatten_errors, detaches valid_data and never stores raw input or exception objects. Non-validation exceptions must propagate; no global schema options or hook bypasses.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_stream_dev.py and concise English compatibility documentation at library/docs/development-mm-stream-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/marshmallow/streaming.py
+- library/src/marshmallow/schema.py
+- library/development_tests/test_development_mm_stream_dev.py
+- library/docs/development-mm-stream-dev.md

@@ -79,7 +79,7 @@
           "id": "JINJA-O02-DEV",
           "kind": "modify",
           "goal": "让宏和捕获帧中的无上下文include真正写入当前输出",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix CodeGenerator.visit_Include synchronous without-context handling so buffered macro/set/filter frames append real included events via simple_write, instead of making the macro return a generator representation. Preserve top-level streaming, actual without-context isolation, nested macros, ignore missing, autoescape and existing async parity. Do not silently switch to with context or reevaluate include arguments; demonstrate concrete rendered output through actual compilation/render/generate paths.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-jinja-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix CodeGenerator.visit_Include synchronous without-context handling so buffered macro/set/filter frames append real included events via simple_write, instead of making the macro return a generator representation. Preserve top-level streaming, actual without-context isolation, nested macros, ignore missing, autoescape and existing async parity. Do not silently switch to with context or reevaluate include arguments; demonstrate concrete rendered output through actual compilation/render/generate paths.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o02_dev.py and concise English compatibility documentation at library/docs/development-jinja-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/JINJA-O02-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/JINJA-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/JINJA-O02-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "JINJA-O03-DEV",
           "kind": "modify",
           "goal": "让负底数幂的生成代码与常量折叠真实一致",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix binary Python generation for Pow so the entire Jinja AST left operand is grouped even when a negative Const is generated. Dynamic and constant/optimized/nonoptimized negative-base powers must agree for multiple bases and odd/even/zero/negative exponents. Preserve documented Jinja left-associative power chains (2**3**2=64), actual variable operands and sandbox intercepted-binop callback semantics. Do not merely special-case -1, change parser associativity or broadly alter unrelated generated binary expressions.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-jinja-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix binary Python generation for Pow so the entire Jinja AST left operand is grouped even when a negative Const is generated. Dynamic and constant/optimized/nonoptimized negative-base powers must agree for multiple bases and odd/even/zero/negative exponents. Preserve documented Jinja left-associative power chains (2**3**2=64), actual variable operands and sandbox intercepted-binop callback semantics. Do not merely special-case -1, change parser associativity or broadly alter unrelated generated binary expressions.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o03_dev.py and concise English compatibility documentation at library/docs/development-jinja-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/JINJA-O03-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/JINJA-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/JINJA-O03-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "JINJA-O04-DEV",
           "kind": "modify",
           "goal": "让真实模板流按标准PathLike协议写出且保持流所有权",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual TemplateStream.dump to recognize str/bytes/os.PathLike via os.fspath before opening owned binary files, keeping default UTF-8 and explicit encoding/errors. Never coerce arbitrary objects with str. Preserve buffered/unbuffered streamed output, existing file-like writelines/write behavior and caller-owned stream lifetime; owned files close on write/encode failure. Reject bad __fspath__ return types through standard semantics and prove Unicode byte parity with string paths.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-jinja-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual TemplateStream.dump to recognize str/bytes/os.PathLike via os.fspath before opening owned binary files, keeping default UTF-8 and explicit encoding/errors. Never coerce arbitrary objects with str. Preserve buffered/unbuffered streamed output, existing file-like writelines/write behavior and caller-owned stream lifetime; owned files close on write/encode failure. Reject bad __fspath__ return types through standard semantics and prove Unicode byte parity with string paths.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o04_dev.py and concise English compatibility documentation at library/docs/development-jinja-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/JINJA-O04-DEV-contract.md",
@@ -188,7 +188,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/JINJA-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/JINJA-O04-DEV.native.json",
@@ -220,7 +220,7 @@
           "id": "JINJA-O05-DEV",
           "kind": "modify",
           "goal": "让宏导入按有序模板候选回退且保留真实错误",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual compiler common import path for import/from to use Environment.get_or_select_template, preserving existing cache/module/context behavior. Accept static or dynamic ordered candidates, select first existing template and expose TemplatesNotFound for empty/all missing; an existing selected template syntax error or missing requested macro must never be swallowed as a reason to choose another candidate. Preserve string imports, aliasing, with/without context and asynchronous module handling through the actual render APIs.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-jinja-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual compiler common import path for import/from to use Environment.get_or_select_template, preserving existing cache/module/context behavior. Accept static or dynamic ordered candidates, select first existing template and expose TemplatesNotFound for empty/all missing; an existing selected template syntax error or missing requested macro must never be swallowed as a reason to choose another candidate. Preserve string imports, aliasing, with/without context and asynchronous module handling through the actual render APIs.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o05_dev.py and concise English compatibility documentation at library/docs/development-jinja-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/JINJA-O05-DEV-contract.md",
@@ -235,7 +235,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/JINJA-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/JINJA-O05-DEV.native.json",
@@ -267,7 +267,7 @@
           "id": "JINJA-O06-DEV",
           "kind": "modify",
           "goal": "从真实Traversable资源树编译渲染并有界枚举模板",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd jinja2.loaders.ResourcesLoader(BaseLoader) accepting an explicit Traversable root, encoding, reload=\"content\"|\"immutable\" and nonnegative inventory budgets. Read real resource text through the protocol and reuse BaseLoader compilation/inheritance/cache; support filesystem Path and zipfile.Path without fspath coercion. Validate template components against traversal/absolute/backslash/NUL names, additionally resolve/confine filesystem Path symlinks, and return sorted inventory without silently truncating beyond depth/count budgets. content rechecks source instead of pretending generic resources have mtime; immutable explicitly caches. Preserve existing FileSystem/Package loaders, propagate encoding/resource errors and state that a supplied abstract resource implementation is trusted rather than a universal OS sandbox.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-jinja-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd jinja2.loaders.ResourcesLoader(BaseLoader) accepting an explicit Traversable root, encoding, reload=\"content\"|\"immutable\" and nonnegative inventory budgets. Read real resource text through the protocol and reuse BaseLoader compilation/inheritance/cache; support filesystem Path and zipfile.Path without fspath coercion. Validate template components against traversal/absolute/backslash/NUL names, additionally resolve/confine filesystem Path symlinks, and return sorted inventory without silently truncating beyond depth/count budgets. content rechecks source instead of pretending generic resources have mtime; immutable explicitly caches. Preserve existing FileSystem/Package loaders, propagate encoding/resource errors and state that a supplied abstract resource implementation is trusted rather than a universal OS sandbox.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o06_dev.py and concise English compatibility documentation at library/docs/development-jinja-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/JINJA-O06-DEV-contract.md",
@@ -282,7 +282,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/JINJA-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/JINJA-O06-DEV.native.json",

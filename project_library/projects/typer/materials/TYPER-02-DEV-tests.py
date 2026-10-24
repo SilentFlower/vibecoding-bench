@@ -1,11 +1,11 @@
-"""真实商品CLI导入供应商CSV并保留原product/export。"""
+"Public regression tests for TYPER-02-DEV; the complete business contract is in materials/TYPER-02-DEV-contract.md."
 import csv,json,tempfile
 from pathlib import Path
 from typer.testing import CliRunner
 import shop
 
 def test_import_csv_unicode_quoted_fields_order_empty_and_existing_commands():
-    """含逗号/换行名称按CSV规则读取，不手工split。@return None。"""
+    "Verify import csv unicode quoted fields order empty and existing commands."
     runner=CliRunner()
     with tempfile.TemporaryDirectory() as directory:
         base=Path(directory);source=base/'in.csv';out=base/'out.json'
@@ -18,7 +18,7 @@ def test_import_csv_unicode_quoted_fields_order_empty_and_existing_commands():
         source.write_text('sku,name,quantity\n');empty=base/'empty';assert runner.invoke(shop.app,['import-csv',str(source),'--output',str(empty)]).exit_code==0 and json.loads(empty.read_text())==[]
 
 def test_invalid_headers_quantities_duplicates_and_overwrite_leave_no_partial():
-    """校验全部行再发布，已有输出不覆盖。@return None。"""
+    "Verify invalid headers quantities duplicates and overwrite leave no partial."
     runner=CliRunner()
     with tempfile.TemporaryDirectory() as directory:
         base=Path(directory);source=base/'in.csv';out=base/'out'

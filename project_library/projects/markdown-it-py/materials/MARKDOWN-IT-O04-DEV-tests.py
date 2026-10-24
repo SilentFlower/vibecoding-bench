@@ -1,10 +1,10 @@
-"""实际CLI显式严格解码与替换，默认输出保留原ignore兼容。"""
+"Public regression tests for MARKDOWN-IT-O04-DEV; the complete business contract is in materials/MARKDOWN-IT-O04-DEV-contract.md."
 from markdown_it.cli.parse import main,convert_file,convert_stdin
 from io import TextIOWrapper,BytesIO
 import pytest
 
 def test_explicit_strict_file_failure_has_source_position_and_no_document(tmp_path,capsys):
-    """显式strict对坏字节失败，反馈位置且不输出该文档。@return None。"""
+    "Verify explicit strict file failure has source position and no document."
     path=tmp_path/'bad.md';path.write_bytes(b'secret-before\xffafter')
     with pytest.raises(SystemExit) as error:main(['--encoding-errors','strict',str(path)])
     output=capsys.readouterr()
@@ -12,7 +12,7 @@ def test_explicit_strict_file_failure_has_source_position_and_no_document(tmp_pa
     assert 'secret-before' not in output.err and 'after' not in output.err
 
 def test_explicit_replace_ignore_and_valid_unicode_remain_available(tmp_path,capsys):
-    """显式replace/ignore语义不同，合法中文默认不变。@return None。"""
+    "Verify explicit replace ignore and valid unicode remain available."
     path=tmp_path/'input.md';path.write_bytes(b'before\xffafter')
     assert main([str(path)])==0
     assert capsys.readouterr().out=='<p>beforeafter</p>\n'
@@ -23,7 +23,7 @@ def test_explicit_replace_ignore_and_valid_unicode_remain_available(tmp_path,cap
     path.write_text('# 你好',encoding='utf8');main([str(path)]);assert '<h1>你好</h1>' in capsys.readouterr().out
 
 def test_raw_stdin_uses_same_policy_and_invalid_policy_is_rejected(monkeypatch,capsys):
-    """stdin读真实buffer后按同一策略解码，不依赖终端预设errors。@return None。"""
+    "Verify raw stdin uses same policy and invalid policy is rejected."
     import sys
     monkeypatch.setattr(sys,'stdin',TextIOWrapper(BytesIO(b'a\xffb'),encoding='utf8',errors='ignore'))
     with pytest.raises(SystemExit):convert_stdin(errors='strict')

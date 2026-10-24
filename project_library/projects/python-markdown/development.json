@@ -32,7 +32,7 @@
           "id": "PYTHON-MARKDOWN-01-DEV",
           "kind": "modify",
           "goal": "扩展配置实例隔离且嵌套容器不污染类默认与调用方",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Extension configuration ownership: class-level or inherited config is a template, clone built-in dict/list/tuple/set/frozenset containers per instance before kwargs, and clone mutable values accepted by setConfig. Keep within-instance alias relationships, callback/opaque business-object identity, descriptions, existing bool/None parsing and unknown-key errors. Do not blindly deepcopy arbitrary callable objects; explicitly reject cyclic built-in configuration containers rather than recurse forever. Instance-level self.config built by existing extensions remains supported and ordinary Markdown output is unchanged. This is a complete extension lifecycle repair with real inherited/custom-extension checks.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_01_dev.py, and Chinese compatibility documentation at library/docs/development-python-markdown-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Extension configuration ownership: class-level or inherited config is a template, clone built-in dict/list/tuple/set/frozenset containers per instance before kwargs, and clone mutable values accepted by setConfig. Keep within-instance alias relationships, callback/opaque business-object identity, descriptions, existing bool/None parsing and unknown-key errors. Do not blindly deepcopy arbitrary callable objects; explicitly reject cyclic built-in configuration containers rather than recurse forever. Instance-level self.config built by existing extensions remains supported and ordinary Markdown output is unchanged. This is a complete extension lifecycle repair with real inherited/custom-extension checks.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_01_dev.py, and English compatibility documentation at library/docs/development-python-markdown-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-MARKDOWN-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-MARKDOWN-01-DEV.rubric.json",
             "native": "verification/PYTHON-MARKDOWN-01-DEV.native.json",
             "public_native": "verification/PYTHON-MARKDOWN-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PYTHON-MARKDOWN-02-DEV",
           "kind": "modify",
           "goal": "目录显式排除指定标题且保留正文、锚点与子节",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend toc with opt-in unlisted_attribute=\"\" (disabled default) and remove_unlisted_attribute=True. When enabled, presence of that exact heading attribute excludes only that heading from toc/toc_tokens, regardless of attribute value, preserving its real heading/id/body, anchor/permalink generation and descendant sections. Excluded parents do not prune child directory entries; surviving headings are nested by their real levels. Attribute removal is explicit and does not confuse data-toc-label or depth selection. Preserve default output and existing attr_list ordering, multiple markers, Unicode labels and reset behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_02_dev.py, and Chinese compatibility documentation at library/docs/development-python-markdown-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend toc with opt-in unlisted_attribute=\"\" (disabled default) and remove_unlisted_attribute=True. When enabled, presence of that exact heading attribute excludes only that heading from toc/toc_tokens, regardless of attribute value, preserving its real heading/id/body, anchor/permalink generation and descendant sections. Excluded parents do not prune child directory entries; surviving headings are nested by their real levels. Attribute removal is explicit and does not confuse data-toc-label or depth selection. Preserve default output and existing attr_list ordering, multiple markers, Unicode labels and reset behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_02_dev.py, and English compatibility documentation at library/docs/development-python-markdown-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-MARKDOWN-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-MARKDOWN-02-DEV.rubric.json",
             "native": "verification/PYTHON-MARKDOWN-02-DEV.native.json",
             "public_native": "verification/PYTHON-MARKDOWN-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "PYTHON-MARKDOWN-03-DEV",
           "kind": "modify",
           "goal": "知识文档显式允许SSH与URN等URI自动链接策略",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd opt-in markdown.extensions.uri_autolink with UriAutolinkExtension(schemes=(http,https,ssh,urn)). Match complete angle-bracket URI syntax before raw-HTML handling but after code/escapes, use per-instance case-insensitive validated scheme allowlists, and build ElementTree anchor attributes/AtomicString text through the real serializer. Forbid javascript/vbscript/data even if requested; unsupported schemes do not become links, ordinary HTML/email/standard autolinks keep existing semantics, and code spans/blocks never expand. No global lexer mutation or network access. Clearly state this policy controls new autolinks only and does not sanitize Markdown raw HTML as a whole.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_03_dev.py, and Chinese compatibility documentation at library/docs/development-python-markdown-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd opt-in markdown.extensions.uri_autolink with UriAutolinkExtension(schemes=(http,https,ssh,urn)). Match complete angle-bracket URI syntax before raw-HTML handling but after code/escapes, use per-instance case-insensitive validated scheme allowlists, and build ElementTree anchor attributes/AtomicString text through the real serializer. Forbid javascript/vbscript/data even if requested; unsupported schemes do not become links, ordinary HTML/email/standard autolinks keep existing semantics, and code spans/blocks never expand. No global lexer mutation or network access. Clearly state this policy controls new autolinks only and does not sanitize Markdown raw HTML as a whole.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_03_dev.py, and English compatibility documentation at library/docs/development-python-markdown-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-MARKDOWN-03-DEV-contract.md",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-MARKDOWN-03-DEV.rubric.json",
             "native": "verification/PYTHON-MARKDOWN-03-DEV.native.json",
             "public_native": "verification/PYTHON-MARKDOWN-03-DEV.public.native.json",
@@ -173,7 +173,7 @@
           "id": "PYTHON-MARKDOWN-04-DEV",
           "kind": "modify",
           "goal": "围栏代码块可选择同字符更长结束围栏且保持原默认",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend fenced_code with closing_fence=\"exact\" default and opt-in \"at_least\". At-least mode accepts a standalone closing fence of the same character at least as long as the opening run, keeps shorter runs inside code, rejects mixed-character/nonstandalone closers and supports backticks/tildes, language/attrs/highlight metadata and normal escaping. Scope regex/configuration per processor instance so one conversion cannot change later default output. Unknown mode rejects. Preserve all legacy exact-mode fixtures, including the intentional historical behavior, and avoid converting container/indentation semantics not included in this delivery.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_04_dev.py, and Chinese compatibility documentation at library/docs/development-python-markdown-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend fenced_code with closing_fence=\"exact\" default and opt-in \"at_least\". At-least mode accepts a standalone closing fence of the same character at least as long as the opening run, keeps shorter runs inside code, rejects mixed-character/nonstandalone closers and supports backticks/tildes, language/attrs/highlight metadata and normal escaping. Scope regex/configuration per processor instance so one conversion cannot change later default output. Unknown mode rejects. Preserve all legacy exact-mode fixtures, including the intentional historical behavior, and avoid converting container/indentation semantics not included in this delivery.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_04_dev.py, and English compatibility documentation at library/docs/development-python-markdown-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-MARKDOWN-04-DEV-contract.md",
@@ -191,7 +191,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-MARKDOWN-04-DEV.rubric.json",
             "native": "verification/PYTHON-MARKDOWN-04-DEV.native.json",
             "public_native": "verification/PYTHON-MARKDOWN-04-DEV.public.native.json",
@@ -220,7 +220,7 @@
           "id": "PYTHON-MARKDOWN-05-DEV",
           "kind": "modify",
           "goal": "文档转换返回绑定本轮的HTML、目录、元数据和引用结果快照",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd markdown.results.convert_document(text,extensions=(),extension_configs=None,**options) and frozen ConversionResult(html,toc,toc_tokens,metadata,references). Use a fresh real Markdown instance for each decoded-text call and capture actual extension-produced fields with deep copied result containers. Without extensions return explicit empty fields. Later documents or caller mutation of returned containers cannot change earlier/later result snapshots; opaque extension objects retain their normal documented lifecycle and are not falsely claimed clonable. Preserve existing markdown()/Markdown.convert APIs, registered extension behavior, output-format options and actual reference tuples. No invented source-position/diagnostic data or model calls.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_05_dev.py, and Chinese compatibility documentation at library/docs/development-python-markdown-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd markdown.results.convert_document(text,extensions=(),extension_configs=None,**options) and frozen ConversionResult(html,toc,toc_tokens,metadata,references). Use a fresh real Markdown instance for each decoded-text call and capture actual extension-produced fields with deep copied result containers. Without extensions return explicit empty fields. Later documents or caller mutation of returned containers cannot change earlier/later result snapshots; opaque extension objects retain their normal documented lifecycle and are not falsely claimed clonable. Preserve existing markdown()/Markdown.convert APIs, registered extension behavior, output-format options and actual reference tuples. No invented source-position/diagnostic data or model calls.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_05_dev.py, and English compatibility documentation at library/docs/development-python-markdown-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-MARKDOWN-05-DEV-contract.md",
@@ -238,7 +238,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-MARKDOWN-05-DEV.rubric.json",
             "native": "verification/PYTHON-MARKDOWN-05-DEV.native.json",
             "public_native": "verification/PYTHON-MARKDOWN-05-DEV.public.native.json",
@@ -267,7 +267,7 @@
           "id": "PYTHON-MARKDOWN-06-DEV",
           "kind": "modify",
           "goal": "文件文档转换明确PathLike、双向编码与流所有权并安全提交",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd markdown.documents.convert_file(input,output=None,input_encoding=\"utf-8\",output_encoding=\"utf-8\",close_input=False,**options), building on the earlier real ConversionResult API. Accept string/PathLike paths, standard text/binary input streams from the current cursor and standard text/binary output streams; decode/encode once with independent explicit encodings. Keep caller streams open unless close_input is explicitly true, never close output or retry a failed write with another type. Owned path IO closes itself; return the actual structured result. Prepare encoding before touching output paths, use same-directory temporary flush/fsync+replace, preserve existing mode, reject symlink/nonregular output and clean temporary files. Read/convert/encoding/replace failures remain explicit and keep old output bytes before replacement. Existing file APIs are unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_06_dev.py, and Chinese compatibility documentation at library/docs/development-python-markdown-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd markdown.documents.convert_file(input,output=None,input_encoding=\"utf-8\",output_encoding=\"utf-8\",close_input=False,**options), building on the earlier real ConversionResult API. Accept string/PathLike paths, standard text/binary input streams from the current cursor and standard text/binary output streams; decode/encode once with independent explicit encodings. Keep caller streams open unless close_input is explicitly true, never close output or retry a failed write with another type. Owned path IO closes itself; return the actual structured result. Prepare encoding before touching output paths, use same-directory temporary flush/fsync+replace, preserve existing mode, reject symlink/nonregular output and clean temporary files. Read/convert/encoding/replace failures remain explicit and keep old output bytes before replacement. Existing file APIs are unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_markdown_06_dev.py, and English compatibility documentation at library/docs/development-python-markdown-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "PYTHON-MARKDOWN-05-DEV",
@@ -290,7 +290,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-MARKDOWN-06-DEV.rubric.json",
             "native": "verification/PYTHON-MARKDOWN-06-DEV.native.json",
             "public_native": "verification/PYTHON-MARKDOWN-06-DEV.public.native.json",

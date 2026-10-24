@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-同一重试工厂可以装饰多个同步或异步目标。每个事件只执行一次默认日志及用户回调；用户处理器在工厂创建时快照一次，一次性生成器可复用，不修改调用者列表。已创建目标、异常对象、日志级别和禁用日志行为保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Repair reuse of the same on_exception or on_predicate decorator factory: each wrapped target must receive exactly one configured default backoff/giveup log and each user callback exactly once per event. Snapshot user handler iterables once per factory (including generators), do not mutate caller lists, and keep previously wrapped targets stable. Preserve normal success, exception identities, logger=None, custom levels and synchronous/asynchronous behavior. Do not suppress logging globally.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bf_reuse_dev.py and concise English compatibility documentation at library/docs/development-bf-reuse-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/backoff/_decorator.py
+- library/tests/test_development_bf_reuse_dev.py
+- library/docs/development-bf-reuse-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

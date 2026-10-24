@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-大缓存的主动维护需要限制单次清理工作量。为TTL expire增加显式上限，保持原到期顺序和加权计量，多次清理可完成全部过期项；默认自动清理行为及活跃条目不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Extend TTLCache.expire(time=None,*,limit=None) with a validated nonnegative nonboolean integer limit. Return/remove at most that many expired pairs in original expiry order; zero removes nothing and None preserves exact legacy full cleanup. Repeated bounded calls must eventually remove all expired items without corrupting linked-list/LRU/weighted-size accounting or touching live entries. Invalid limits fail before timer sampling or mutation. Ordinary len/set/popitem still invoke default full expiry.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_expire_limit_dev.py and concise English compatibility documentation at library/docs/development-ct-expire-limit-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/cachetools/__init__.py
+- library/development_tests/test_development_ct_expire_limit_dev.py
+- library/docs/development-ct-expire-limit-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

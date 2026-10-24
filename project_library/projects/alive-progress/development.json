@@ -76,7 +76,7 @@
           "id": "AP-FORMAT-DEV",
           "kind": "modify",
           "goal": "启动渲染前验证嵌套格式字段和转换符",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix configuration._format_input_factory to validate nested format-spec fields and conversions before the progress renderer starts. Permit only the existing allowed field names and conversions None/s/r/a at every parsed level, reject malformed braces, attribute/index traversal, unknown nested names and nested replacement depth beyond Formatter supported nesting. Preserve literal/escaped braces, valid dynamic width references and all existing bool/nonstring handling; return existing ERROR sentinel for invalid formats rather than deferring failures to a background render.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_format_dev.py and concise Chinese compatibility documentation at library/docs/development-ap-format-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix configuration._format_input_factory to validate nested format-spec fields and conversions before the progress renderer starts. Permit only the existing allowed field names and conversions None/s/r/a at every parsed level, reject malformed braces, attribute/index traversal, unknown nested names and nested replacement depth beyond Formatter supported nesting. Preserve literal/escaped braces, valid dynamic width references and all existing bool/nonstring handling; return existing ERROR sentinel for invalid formats rather than deferring failures to a background render.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_format_dev.py and concise English compatibility documentation at library/docs/development-ap-format-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AP-FORMAT-DEV-contract.md",
@@ -91,7 +91,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AP-FORMAT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AP-FORMAT-DEV.native.json",
@@ -123,7 +123,7 @@
           "id": "AP-PROTOCOL-DEV",
           "kind": "modify",
           "goal": "让未启动进度迭代器正确响应未知属性和协议探测",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix unstarted __AliveBarIteratorAdapter.__getattr__: unknown/private/protocol names raise AttributeError so hasattr/getattr(default)/iterable inspection work; known public handle controls retain the original UserWarning before iteration. Do not start/consume the source or create a progress bar while probing. After start, delegation and read-only/setter semantics remain unchanged. Resolve known names from the actual handle class dictionary, not a duplicated hand-maintained field list.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_protocol_dev.py and concise Chinese compatibility documentation at library/docs/development-ap-protocol-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix unstarted __AliveBarIteratorAdapter.__getattr__: unknown/private/protocol names raise AttributeError so hasattr/getattr(default)/iterable inspection work; known public handle controls retain the original UserWarning before iteration. Do not start/consume the source or create a progress bar while probing. After start, delegation and read-only/setter semantics remain unchanged. Resolve known names from the actual handle class dictionary, not a duplicated hand-maintained field list.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_protocol_dev.py and concise English compatibility documentation at library/docs/development-ap-protocol-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AP-PROTOCOL-DEV-contract.md",
@@ -138,7 +138,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AP-PROTOCOL-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AP-PROTOCOL-DEV.native.json",
@@ -170,7 +170,7 @@
           "id": "AP-SNAPSHOT-DEV",
           "kind": "modify",
           "goal": "读取无终端副作用的不可变原始进度快照",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd public bar_handle.snapshot() returning frozen ProgressSnapshot(count,processed,total,percent,elapsed,rate,manual,active). Read actual current counters and last sampled raw elapsed/rate values without formatting strings, flushing, updating smoothing/timers or rendering. Unknown totals use None and percent None unless manual mode; preserve skipped count vs processed distinction. Snapshots are independent immutable values, work during pause and after finish, and active reflects actual live handle state. Preserve all old handle controls, manual/unknown modes and receipts.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_snapshot_dev.py and concise Chinese compatibility documentation at library/docs/development-ap-snapshot-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd public bar_handle.snapshot() returning frozen ProgressSnapshot(count,processed,total,percent,elapsed,rate,manual,active). Read actual current counters and last sampled raw elapsed/rate values without formatting strings, flushing, updating smoothing/timers or rendering. Unknown totals use None and percent None unless manual mode; preserve skipped count vs processed distinction. Snapshots are independent immutable values, work during pause and after finish, and active reflects actual live handle state. Preserve all old handle controls, manual/unknown modes and receipts.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_snapshot_dev.py and concise English compatibility documentation at library/docs/development-ap-snapshot-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AP-SNAPSHOT-DEV-contract.md",
@@ -186,7 +186,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AP-SNAPSHOT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AP-SNAPSHOT-DEV.native.json",
@@ -218,7 +218,7 @@
           "id": "AP-ASYNC-DEV",
           "kind": "modify",
           "goal": "直接消费异步输入并按完整生命周期跟踪进度",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement alive_progress.asyncio.alive_async_it(source,total=None,*,finalize=None,**bar_options) as a native async iterator using the real alive_bar handle and completed snapshots. Yield original items in order without prefetching, increment only when the consumer resumes past a yielded item, and invoke an explicit sync or awaitable finalizer exactly once only after normal exhaustion, including empty input/falsey callables. Early aclose, cancellation and source errors propagate/clean progress context without success finalization. Reject manual mode and invalid callbacks before reading the source; caller owns the source and rendering remains configured through original bar options.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_async_dev.py and concise Chinese compatibility documentation at library/docs/development-ap-async-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement alive_progress.asyncio.alive_async_it(source,total=None,*,finalize=None,**bar_options) as a native async iterator using the real alive_bar handle and completed snapshots. Yield original items in order without prefetching, increment only when the consumer resumes past a yielded item, and invoke an explicit sync or awaitable finalizer exactly once only after normal exhaustion, including empty input/falsey callables. Early aclose, cancellation and source errors propagate/clean progress context without success finalization. Reject manual mode and invalid callbacks before reading the source; caller owns the source and rendering remains configured through original bar options.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_async_dev.py and concise English compatibility documentation at library/docs/development-ap-async-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "AP-SNAPSHOT-DEV",
@@ -238,7 +238,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AP-ASYNC-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AP-ASYNC-DEV.native.json",
@@ -270,7 +270,7 @@
           "id": "AP-WEIGHTED-DEV",
           "kind": "modify",
           "goal": "按每项实际工作量确认进度并保持惰性和准确收尾",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement alive_progress.weighted.alive_weighted_it(source,weight,*,total=None,finalize=None,**bar_options). Use real alive_bar and snapshots; evaluate weight exactly once per consumed item before yielding, require nonnegative nonboolean integer (zero allowed), and acknowledge that weight only when iteration resumes. Keep item identity/order and explicit total-work units, without inspecting or summing the whole source. Falsey weight/finalizer callables work; only normal exhaustion finalizes once, not early close or source/weight failure. Reject manual mode and preserve original alive_it.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_weighted_dev.py and concise Chinese compatibility documentation at library/docs/development-ap-weighted-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement alive_progress.weighted.alive_weighted_it(source,weight,*,total=None,finalize=None,**bar_options). Use real alive_bar and snapshots; evaluate weight exactly once per consumed item before yielding, require nonnegative nonboolean integer (zero allowed), and acknowledge that weight only when iteration resumes. Keep item identity/order and explicit total-work units, without inspecting or summing the whole source. Falsey weight/finalizer callables work; only normal exhaustion finalizes once, not early close or source/weight failure. Reject manual mode and preserve original alive_it.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_weighted_dev.py and concise English compatibility documentation at library/docs/development-ap-weighted-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "AP-SNAPSHOT-DEV",
@@ -290,7 +290,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AP-WEIGHTED-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AP-WEIGHTED-DEV.native.json",

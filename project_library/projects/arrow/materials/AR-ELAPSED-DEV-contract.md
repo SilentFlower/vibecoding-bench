@@ -1,5 +1,12 @@
-# 跨夏令时沿真实时间线计算时差和平移
+# Engineering contract: AR-ELAPSED-DEV
 
-夏令时回拨附近，墙钟差与实际经过秒数不同。新增elapsed和shift_elapsed，沿UTC时间线运算后返回原时区和正确fold；只接受固定时长单位，不把月份或年份当固定秒数，保留原减法和日历shift语义。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Arrow.elapsed(other) returning self-minus-other timedelta on the UTC timeline, and Arrow.shift_elapsed(**units) returning a new Arrow in the original zone/fold. Other must be Arrow or aware datetime; reject naive values. Fixed elapsed units are weeks/days/hours/minutes/seconds/microseconds with finite int/float values excluding booleans; reject calendar months/years and unknown units. Preserve wall-time subtraction and calendar shift unchanged. Retain exact microseconds, negative shifts, subclass construction and natural datetime overflow behavior across DST gaps/folds.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_elapsed_dev.py and concise English compatibility documentation at library/docs/development-ar-elapsed-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/arrow/arrow.py
+- library/development_tests/test_development_ar_elapsed_dev.py
+- library/docs/development-ar-elapsed-dev.md

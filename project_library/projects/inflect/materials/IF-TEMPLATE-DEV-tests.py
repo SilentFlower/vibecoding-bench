@@ -1,4 +1,4 @@
-"""公开受限业务报表模板回归。"""
+"Public regression tests for IF-TEMPLATE-DEV; the complete business contract is in materials/IF-TEMPLATE-DEV-contract.md."
 import pytest
 from inflect import engine
 from inflect.templates import ReportTemplate

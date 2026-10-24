@@ -1,8 +1,8 @@
-"""长时间本地诊断有界留存，计数和快照可查。"""
+"Public regression tests for STRUCTLOG-05-DEV; the complete business contract is in materials/STRUCTLOG-05-DEV-contract.md."
 from structlog.testing import CapturingLogger,CapturingLoggerFactory
 
 def test_oldest_or_newest_retention_total_and_dropped():
-    """保留策略明确，默认仍无限list。@return None。"""
+    "Verify oldest or newest retention total and dropped."
     for policy,expected in (('drop_oldest',[2,3]),('reject_new',[0,1])):
         logger=CapturingLogger(2,overflow=policy)
         for index in range(4):logger.info(index)
@@ -13,7 +13,7 @@ def test_oldest_or_newest_retention_total_and_dropped():
     assert len(logger.calls)==4 and logger.dropped==0
 
 def test_zero_capacity_factory_reuse_and_snapshot_independence():
-    """快照不被后续记录或kwargs修改覆盖，嵌套身份政策明确。@return None。"""
+    "Verify zero capacity factory reuse and snapshot independence."
     factory=CapturingLoggerFactory(1);logger=factory();assert factory('name') is logger
     logger.info('first',key='old');snapshot=logger.snapshot();logger.info('second',key='new')
     assert snapshot[0].args==('first',) and snapshot[0].kwargs=={'key':'old'}

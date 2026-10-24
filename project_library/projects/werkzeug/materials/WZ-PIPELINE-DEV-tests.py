@@ -1,4 +1,4 @@
-"""公开API中间件端到端真实WSGI回归。"""
+"Public regression tests for WZ-PIPELINE-DEV; the complete business contract is in materials/WZ-PIPELINE-DEV-contract.md."
 import pytest
 from werkzeug.wrappers import Request,Response
 from werkzeug.test import Client,EnvironBuilder

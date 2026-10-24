@@ -1,9 +1,9 @@
-"""切点分区不自动归并，端点所有权明确。"""
+"Public regression tests for PT-SPLIT-DEV; the complete business contract is in materials/PT-SPLIT-DEV-contract.md."
 import portion as P
 
 
 def test_right_owned_partition():
-    """会议窗口按两个切点拆成三个不交叠分区。@return None。"""
+    "Verify right owned partition."
     original = P.closedopen(9, 13)
     parts = original.split([12, 10, 10])
     assert parts == (P.closedopen(9, 10), P.closedopen(10, 12), P.closedopen(12, 13))
@@ -12,12 +12,12 @@ def test_right_owned_partition():
 
 
 def test_left_ownership_and_open_bounds():
-    """左归属不丢掉开边界。@return None。"""
+    "Verify left ownership and open bounds."
     assert P.open(0, 3).split([1], ownership='left') == (P.openclosed(0, 1), P.open(1, 3))
 
 
 def test_disjoint_empty_and_singleton():
-    """域外切点忽略，空集与单点保持。@return None。"""
+    "Verify disjoint empty and singleton."
     original = P.closed(0, 1) | P.closed(3, 4)
     assert original.split([-1, 2, 5]) == (P.closed(0, 1), P.closed(3, 4))
     assert P.empty().split([0]) == ()

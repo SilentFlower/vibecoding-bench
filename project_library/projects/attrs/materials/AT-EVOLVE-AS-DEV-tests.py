@@ -1,4 +1,4 @@
-"""公开跨模型演化回归。"""
+"Public regression tests for AT-EVOLVE-AS-DEV; the complete business contract is in materials/AT-EVOLVE-AS-DEV-contract.md."
 import attrs
 import pytest
 from attrs.evolution import evolve_as

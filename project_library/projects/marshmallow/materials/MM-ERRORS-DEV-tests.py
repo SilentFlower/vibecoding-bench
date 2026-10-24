@@ -1,4 +1,4 @@
-"""公开结构化错误响应回归。"""
+"Public regression tests for MM-ERRORS-DEV; the complete business contract is in materials/MM-ERRORS-DEV-contract.md."
 from marshmallow import ValidationError
 from marshmallow.error_paths import flatten_errors,problem
 

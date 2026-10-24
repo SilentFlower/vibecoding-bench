@@ -1,5 +1,12 @@
-# 提供嵌套安全且精确撤销的临时配置覆盖
+# Engineering contract: CF-OVERRIDE-DEV
 
-临时覆盖退出时只撤销自己插入的来源，保留原来源身份、嵌套覆盖及上下文内其他来源改动。输入深拷贝避免外部变化渗入，异常退出同样恢复，不承诺线程隔离。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement confuse.scopes.temporary_override(root,value), a synchronous context manager for RootView and mapping dict inputs. Deep-copy input, insert one independent ConfigSource at highest priority and yield it. On normal or exceptional exit remove only that exact source identity, preserving preexisting source identities/order, unrelated additions/removals and nested scopes even when dictionaries compare equal. Do not reset the whole source list or redactions and do not claim concurrent isolation.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_cf_override_dev.py and concise English compatibility documentation at library/docs/development-cf-override-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/confuse/scopes.py
+- library/development_tests/test_development_cf_override_dev.py
+- library/docs/development-cf-override-dev.md

@@ -1,5 +1,12 @@
-# 组合真实表映射、参数绑定与结果边界准备报表查询
+# Engineering contract: SG-REPORT-DEV
 
-完整报表准备流程真正复用表映射、参数绑定和行数限制。输出可执行SQL与实际引用元数据，保留包装前的投影名称及原参数名；方言显式选择，未绑定参数和未命中映射不能静默通过。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement sqlglot.report.prepare_report(query,*,values=None,tables=None,max_rows=None,offset=0,read=None,write=None) returning frozen PreparedReport(sql,tables,output_columns,parameters). Compose completed inspection/remap/bind/bounds APIs: parse once, require every supplied table mapping to match, bind every named parameter strictly, capture output projection names before optional outer limit and inspect final actual physical tables. Retain original unique parameter names and compile to requested dialect. No unresolved named placeholders or silent extras, offset requires bounds. Preserve supplied AST and do not execute SQL or fabricate schema/lineage.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_report_dev.py and concise English compatibility documentation at library/docs/development-sg-report-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/sqlglot/report.py
+- library/development_tests/test_development_sg_report_dev.py
+- library/docs/development-sg-report-dev.md

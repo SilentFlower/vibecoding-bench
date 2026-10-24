@@ -1,4 +1,4 @@
-"""公开分层配置与来源回归。"""
+"Public regression tests for DE-LAYERS-DEV; the complete business contract is in materials/DE-LAYERS-DEV-contract.md."
 import os
 import pytest
 from dotenv.layers import load_layers

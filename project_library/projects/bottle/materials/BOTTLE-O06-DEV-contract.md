@@ -1,5 +1,12 @@
-# 输出不执行回调且不泄漏配置的真实路由清单
+# Engineering contract: BOTTLE-O06-DEV
 
-在已交付前缀克隆上输出真实路由清单，明确旧合并外部owner及前缀副本当前owner。按注册顺序提供规则、方法、名字、过滤器和插件名称，不执行回调或暴露配置/闭包，不用对象地址作标识。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Build on delivered prefix cloning and add Bottle.inspect_routes() returning stable registration-order JSON metadata for actual rule/method/name/current-or-external owner, safe callback name, dynamic filter names and route-specific plugin names. Correctly explain legacy external owners and prefixed target-owned clones. Introspection must never execute callbacks, apply plugins, expose configuration/closure values or use address-bearing repr. Handle callable instances and unnamed/empty routes while preserving registration and dispatch.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_bottle_o06_dev.py and concise English compatibility documentation at library/docs/development-bottle-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bottle.py
+- library/test/test_development_bottle_o06_dev.py
+- library/docs/development-bottle-o06-dev.md

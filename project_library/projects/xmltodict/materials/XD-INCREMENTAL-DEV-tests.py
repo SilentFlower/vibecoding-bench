@@ -1,4 +1,4 @@
-"""公开增量解析生命周期回归。"""
+"Public regression tests for XD-INCREMENTAL-DEV; the complete business contract is in materials/XD-INCREMENTAL-DEV-contract.md."
 import pytest
 import xmltodict
 from xml.parsers.expat import ExpatError

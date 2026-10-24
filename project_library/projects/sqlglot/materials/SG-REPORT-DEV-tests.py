@@ -1,4 +1,4 @@
-"""公开报表准备端到端真实执行回归。"""
+"Public regression tests for SG-REPORT-DEV; the complete business contract is in materials/SG-REPORT-DEV-contract.md."
 import sqlite3
 import pytest
 from sqlglot import parse_one

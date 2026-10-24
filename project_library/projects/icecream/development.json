@@ -32,7 +32,7 @@
           "id": "ICECREAM-O01-DEV",
           "kind": "modify",
           "goal": "调试展开实参时保留全部值且不重新求值来源",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual IceCreamDebugger._formatArgs so ast.Starred expansion never truncates calculated values via zip. Preserve reliably identifiable ordinary prefix/suffix expressions; label indeterminate expanded middle values explicitly by index without guessing source lengths or reevaluating/reiterating expressions/generators. Support multiple/empty expansions, ordinary args between stars, no-source fallback and single/multiple passthrough object identity. Keep ordinary nonstar source/literal formatting unchanged and ensure every calculated argument appears once in output.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-icecream-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix actual IceCreamDebugger._formatArgs so ast.Starred expansion never truncates calculated values via zip. Preserve reliably identifiable ordinary prefix/suffix expressions; label indeterminate expanded middle values explicitly by index without guessing source lengths or reevaluating/reiterating expressions/generators. Support multiple/empty expansions, ordinary args between stars, no-source fallback and single/multiple passthrough object identity. Keep ordinary nonstar source/literal formatting unchanged and ensure every calculated argument appears once in output.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o01_dev.py and concise English compatibility documentation at library/docs/development-icecream-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/ICECREAM-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/ICECREAM-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/ICECREAM-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "ICECREAM-O02-DEV",
           "kind": "modify",
           "goal": "让同一计时器安全嵌套并按执行上下文隔离状态",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual Timer context use with immutable context-local entry stacks and thread/task ownership, preserving sequential reuse and _enter_time compatibility after final exit. Same timer nested contexts must independently report full durations; child tasks inheriting a ContextVar must not close a parent-owned entry. Pop state before time/output callbacks, reject missing/repeated/cross-owner exit, preserve original business exception if ordinary output cleanup fails while propagating standalone output failure. Disabled output still cleans timing state. Do not change normal anonymous duration text or claim shared mutable private compatibility fields are the operational timing state.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-icecream-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual Timer context use with immutable context-local entry stacks and thread/task ownership, preserving sequential reuse and _enter_time compatibility after final exit. Same timer nested contexts must independently report full durations; child tasks inheriting a ContextVar must not close a parent-owned entry. Pop state before time/output callbacks, reject missing/repeated/cross-owner exit, preserve original business exception if ordinary output cleanup fails while propagating standalone output failure. Disabled output still cleans timing state. Do not change normal anonymous duration text or claim shared mutable private compatibility fields are the operational timing state.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o02_dev.py and concise English compatibility documentation at library/docs/development-icecream-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/ICECREAM-O02-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/ICECREAM-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/ICECREAM-O02-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "ICECREAM-O03-DEV",
           "kind": "modify",
           "goal": "让异步计时真正覆盖await执行及取消异常收口",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Timer.__call__ for inspect.iscoroutinefunction only, using the accepted context/ownership timing stack. Start on actual await execution, await the original coroutine and output only after completion/failure/cancellation, preserving value, metadata and original exception. Same timer recursive/interleaved tasks must remain isolated; disabled output still awaits/cleans exactly once. Keep existing synchronous decorator behavior and explicitly exclude async generators or ordinary functions returning an Awaitable rather than silently changing their semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-icecream-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Timer.__call__ for inspect.iscoroutinefunction only, using the accepted context/ownership timing stack. Start on actual await execution, await the original coroutine and output only after completion/failure/cancellation, preserving value, metadata and original exception. Same timer recursive/interleaved tasks must remain isolated; disabled output still awaits/cleans exactly once. Keep existing synchronous decorator behavior and explicitly exclude async generators or ordinary functions returning an Awaitable rather than silently changing their semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o03_dev.py and concise English compatibility documentation at library/docs/development-icecream-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "ICECREAM-O02-DEV",
@@ -146,7 +146,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/ICECREAM-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/ICECREAM-O03-DEV.native.json",
@@ -178,7 +178,7 @@
           "id": "ICECREAM-O04-DEV",
           "kind": "modify",
           "goal": "在整体生效前验证真实调试器配置并拒绝半更新",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nValidate real IceCreamDebugger constructor/configureOutput declarations before mutating any field or auto-swapping builtin color output. Prefix must be text/callable, formatting/output callbacks callable, flags actual bool and lineWrapWidth positive non-bool int. Preserve Sentinel.absent, empty prefixes, valid callbacks and existing builtin noColor output swap rules. Never execute a prefix/formatter during validation or pretend to know its eventual return type; callback execution failures remain runtime failures. Invalid combinations, unknown kwargs or no-arg configure must leave all previous fields identical, including prefix and outputFunction.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-icecream-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nValidate real IceCreamDebugger constructor/configureOutput declarations before mutating any field or auto-swapping builtin color output. Prefix must be text/callable, formatting/output callbacks callable, flags actual bool and lineWrapWidth positive non-bool int. Preserve Sentinel.absent, empty prefixes, valid callbacks and existing builtin noColor output swap rules. Never execute a prefix/formatter during validation or pretend to know its eventual return type; callback execution failures remain runtime failures. Invalid combinations, unknown kwargs or no-arg configure must leave all previous fields identical, including prefix and outputFunction.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o04_dev.py and concise English compatibility documentation at library/docs/development-icecream-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/ICECREAM-O04-DEV-contract.md",
@@ -193,7 +193,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/ICECREAM-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/ICECREAM-O04-DEV.native.json",
@@ -225,7 +225,7 @@
           "id": "ICECREAM-O05-DEV",
           "kind": "modify",
           "goal": "以标准日志级别门禁集成真实调试格式及用户来源",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd icecream.logging_adapter.LoggingDebugger(logger,level=logging.DEBUG,**IceCreamDebugger_kwargs) using existing Logger only. Check enabled and logger.isEnabledFor before prefix/repr/source-formatting work, use the actual IceCream _format against the original caller frame, create a real makeRecord with caller file/line/function and pass to logger.handle. Preserve original None/single-object/multiple-argument identity return, inherited formatting/disable semantics, no handlers/services/global logging config. Release retained frame references; propagate handler/format failures according to normal logging behavior and prove disabled levels never evaluate dangerous repr.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-icecream-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd icecream.logging_adapter.LoggingDebugger(logger,level=logging.DEBUG,**IceCreamDebugger_kwargs) using existing Logger only. Check enabled and logger.isEnabledFor before prefix/repr/source-formatting work, use the actual IceCream _format against the original caller frame, create a real makeRecord with caller file/line/function and pass to logger.handle. Preserve original None/single-object/multiple-argument identity return, inherited formatting/disable semantics, no handlers/services/global logging config. Release retained frame references; propagate handler/format failures according to normal logging behavior and prove disabled levels never evaluate dangerous repr.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o05_dev.py and concise English compatibility documentation at library/docs/development-icecream-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/ICECREAM-O05-DEV-contract.md",
@@ -240,7 +240,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/ICECREAM-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/ICECREAM-O05-DEV.native.json",
@@ -272,7 +272,7 @@
           "id": "ICECREAM-O06-DEV",
           "kind": "modify",
           "goal": "以归属句柄管理可撤销builtin安装和嵌套恢复",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd icecream.builtins.managed_install(name=\"ic\",debugger=None) and already-installed BuiltinInstallation handle/context, leaving original install/uninstall unchanged. Record previous value and ownership tokens, restore/remove only when the current binding still belongs to this installation, and leave foreign replacements untouched. Support same/different debugger nested installs, idempotent and out-of-order close without resurrecting closed ancestors, exception cleanup and rejection of closed reentry/invalid identifiers/keywords/wrong debugger. Never scan other builtins; all verification uses synthetic names, not print or production globals.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-icecream-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd icecream.builtins.managed_install(name=\"ic\",debugger=None) and already-installed BuiltinInstallation handle/context, leaving original install/uninstall unchanged. Record previous value and ownership tokens, restore/remove only when the current binding still belongs to this installation, and leave foreign replacements untouched. Support same/different debugger nested installs, idempotent and out-of-order close without resurrecting closed ancestors, exception cleanup and rejection of closed reentry/invalid identifiers/keywords/wrong debugger. Never scan other builtins; all verification uses synthetic names, not print or production globals.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_icecream_o06_dev.py and concise English compatibility documentation at library/docs/development-icecream-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/ICECREAM-O06-DEV-contract.md",
@@ -287,7 +287,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/ICECREAM-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/ICECREAM-O06-DEV.native.json",

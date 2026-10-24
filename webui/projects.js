@@ -1,7 +1,8 @@
 /** 新 Projects：围绕账号 Pi、真实终端与工作记录组织界面。 */
 window.ProjectsUI = (() => {
   let api, prefix, source, accountId = null, agents = [], catalog = [], accounts = [], cursor = 0;
-  let revision = 0, selection = 0, timeline = [], scheduleClock = null;
+  let revision = 0, selection = 0, scheduleClock = null, recordPages = {};
+  let screenWorkId = null, screenEventId = 0;
   const pendingActions = new Map();
   const $ = selector => document.querySelector(selector);
   const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
@@ -57,6 +58,12 @@ window.ProjectsUI = (() => {
     scheduleClock = setInterval(paintSchedule, 1000);
     $('#projects-tab-terminal').onclick = () => selectTab('terminal');
     $('#projects-tab-events').onclick = () => selectTab('events');
+    for (const kind of ['events', 'history']) {
+      for (const direction of ['previous', 'next', 'latest']) {
+        $(`#projects-${kind}-${direction}`).onclick = () => perform(() => loadPage(kind, direction));
+      }
+      $(`#projects-${kind}-new`).onclick = () => perform(() => loadPage(kind, 'latest'));
+    }
     document.querySelectorAll('[data-pi-action]').forEach(button => {
       button.onclick = () => runAction(button.dataset.piAction);
     });
@@ -86,7 +93,17 @@ window.ProjectsUI = (() => {
     source?.close(); source = null;
     clearInterval(scheduleClock); scheduleClock = null;
     pendingActions.clear();
-    cursor = 0; timeline = []; accountId = null;
+    cursor = 0; accountId = null; screenWorkId = null; screenEventId = 0;
+    resetRecords();
+  }
+
+  /**
+   * 为当前账号独立保存已读分页，浏览旧页时暂存新记录。
+   * @return {void}
+   */
+  function resetRecords() {
+    recordPages = Object.fromEntries([['events', 20], ['history', 10]].map(([kind, size]) =>
+      [kind, {size, pages: [], index: 0, loading: false, pending: new Set(), incoming: []}]));
   }
 
   /**
@@ -164,46 +181,56 @@ window.ProjectsUI = (() => {
   async function selectAccount(id) {
     const request = ++selection;
     source?.close(); source = null;
-    accountId = id || null; cursor = 0; timeline = [];
+    accountId = id || null; cursor = 0; resetRecords();
+    screenWorkId = null; screenEventId = 0;
     const agent = agents.find(item => item.account_id === accountId);
     const form = $('#projects-agent-form');
     form.elements.instructions.value = agent?.instructions || '';
     form.elements.budget_minutes.value = (agent?.budget_sec || 3600) / 60;
     fillSchedule();
-    paintCatalog(agent?.project_keys || []); paintState(); paintEvents();
-    $('#projects-screen').textContent = '等待 Pi 观察 Claude Code 终端。';
+    paintCatalog(agent?.project_keys || []); paintState(); paintRecords('events'); paintRecords('history');
+    paintScreen();
     if (!accountId) return;
     const selected = accountId, current = revision;
-    await perform(async () => {
-      const [history] = await Promise.all([api(`/projects/agents/${selected}/work`), loadReconciliation()]);
+    try {
+      const [snapshot, history] = await Promise.all([api(`/projects/agents/${selected}/snapshot`),
+        api(`/projects/agents/${selected}/work/page?limit=10`), loadReconciliation()]);
       if (current !== revision || selected !== accountId || request !== selection) return;
-      paintHistory(history);
-      source = new EventSource(`${prefix}/api/projects/stream?account_id=${selected}`);
+      updateAgents(snapshot.state); cursor = snapshot.cursor;
+      recordPages.events.pages = [snapshot.events]; recordPages.history.pages = [history];
+      paintState(); paintRecords('events'); paintRecords('history');
+      paintScreen(snapshot.observation);
+      source = new EventSource(`${prefix}/api/projects/stream?account_id=${selected}&after=${cursor}`);
       source.addEventListener('update', event => {
         if (current !== revision || selected !== accountId || request !== selection) return;
         try {
           const payload = JSON.parse(event.data);
           updateAgents(payload.state);
+          paintScreen();
+          const observations = [], interactions = [];
           for (const item of payload.events) {
             if (item.id <= cursor) continue;
             cursor = item.id;
-            if (item.kind === 'observation') $('#projects-screen').textContent = item.payload.screen || '终端已释放，原会话保留。';
-            else if (item.kind !== 'usage') timeline.push(item);
+            if (item.kind === 'observation') observations.push(item);
+            else if (item.kind !== 'usage') interactions.push(item);
           }
-          timeline = timeline.slice(-80);
-          paintState(); paintEvents();
-          if (payload.events.some(item => ['verification', 'input_unknown', 'reconciled'].includes(item.kind))) {
-            api(`/projects/agents/${selected}/work`).then(rows => {
-              if (current === revision && selected === accountId) paintHistory(rows);
-            }).catch(error => feedback(error.message));
+          receiveRecords('events', interactions);
+          paintScreen(observations.reverse().find(item => item.work_id === screenWorkId));
+          const work = agents.find(item => item.account_id === accountId)?.work;
+          if (work) receiveRecords('history', [work]);
+          paintState();
+          if (payload.events.some(item => ['input_unknown', 'reconciled'].includes(item.kind))) {
             loadReconciliation().catch(error => feedback(error.message));
           }
         } catch { feedback('Pi 事件流暂不可用，请刷新核对状态'); }
       });
       source.onerror = () => {
-        if (current === revision && selected === accountId) feedback('连接中断，正在重新连接；Claude 会话仍保留。');
+        if (current === revision && selected === accountId && request === selection)
+          feedback('连接中断，正在重新连接；Claude 会话仍保留。');
       };
-    });
+    } catch (error) {
+      if (current === revision && selected === accountId && request === selection) feedback(error.message, 'error');
+    }
   }
 
   /**
@@ -441,7 +468,124 @@ window.ProjectsUI = (() => {
         ? {start: '正在启动…', pause: '正在暂停…', stop: '正在停止…'}[pending.action]
         : {start: '启动 / 恢复 Pi', pause: '暂停', stop: '停止当前目标'}[button.dataset.piAction];
     });
-    paintSchedule();
+    paintSchedule(); paintScreen();
+  }
+
+  /**
+   * 终端只接受当前目标的最新观察，切换目标时立即清除上一目标画面。
+   * @param {object|null|undefined} observation 可选的最新终端事件。
+   * @return {void}
+   */
+  function paintScreen(observation) {
+    const work = agents.find(item => item.account_id === accountId)?.work;
+    const workId = work?.id || null;
+    if (workId !== screenWorkId || !screenEventId) {
+      screenWorkId = workId; screenEventId = 0;
+      $('#projects-screen').textContent = workId ? '等待当前目标的终端观察。' : '尚无工程目标。';
+      $('#projects-screen-status').textContent = workId
+        ? `${work.project_key} · ${work.objective_id} · 等待最新画面` : '选择账号后查看当前目标的最新画面。';
+    }
+    if (!observation || observation.work_id !== workId || observation.id <= screenEventId) return;
+    screenEventId = observation.id;
+    $('#projects-screen').textContent = observation.payload.screen || '终端已释放，原会话保留。';
+    $('#projects-screen-status').textContent = `${work.project_key} · ${work.objective_id} · 最近观察 ${new Date(observation.created_at * 1000).toLocaleString('zh-CN', {hour12: false})}`;
+  }
+
+  /**
+   * 接收实时记录；旧页保持位置，新记录通过提示返回最新页。
+   * @param {string} kind 交互或工程记录。
+   * @param {Array<object>} items 已确认的增量记录。
+   * @return {void}
+   */
+  function receiveRecords(kind, items) {
+    if (!items.length) return;
+    const record = recordPages[kind];
+    if (record.loading) { record.incoming.push(...items); return; }
+    if (record.index > 0) {
+      for (const item of items) {
+        let found = false;
+        for (const page of record.pages) {
+          const index = page.items.findIndex(previous => previous.id === item.id);
+          if (index >= 0) { page.items[index] = item; found = true; }
+        }
+        if (!found) record.pending.add(item.id);
+      }
+    } else {
+      const page = record.pages[0] || {items: [], next_before: null};
+      const merged = Array.from(new Map([...page.items, ...items].map(item => [item.id, item])).values());
+      merged.sort(kind === 'events' ? (left, right) => right.id - left.id
+        : (left, right) => right.created_at - left.created_at || right.id.localeCompare(left.id));
+      const visible = merged.slice(0, record.size), more = page.next_before !== null || merged.length > record.size;
+      record.pages = [{items: visible, next_before: more && visible.length ? visible[visible.length - 1].id : null}];
+      record.pending.clear();
+    }
+    paintRecords(kind);
+  }
+
+  /**
+   * 使用稳定游标翻页，账号切换后丢弃旧请求；新数据不挤动正在阅读的旧页。
+   * @param {string} kind 交互或工程记录。
+   * @param {string} direction 上一页、下一页或返回最新。
+   * @return {Promise<void>} 当前页已更新。
+   */
+  async function loadPage(kind, direction) {
+    const record = recordPages[kind];
+    if (!accountId || record.loading) return;
+    let target = direction === 'next' ? record.index + 1 : direction === 'previous' ? record.index - 1 : 0;
+    if (target < 0) return;
+    if (target === 0 && record.pending.size) direction = 'latest';
+    if (direction !== 'latest' && record.pages[target]) {
+      record.index = target; paintRecords(kind, true); return;
+    }
+    const before = direction === 'next' ? record.pages[record.index]?.next_before : null;
+    if (direction === 'next' && before == null) return;
+    const current = revision, selected = accountId, chosen = selection;
+    const active = () => current === revision && selected === accountId && chosen === selection && recordPages[kind] === record;
+    record.loading = true; record.incoming = []; paintPagination(kind);
+    try {
+      const path = kind === 'events' ? 'events' : 'work';
+      const page = await api(`/projects/agents/${selected}/${path}/page?limit=${record.size}${before == null ? '' : '&before=' + encodeURIComponent(before)}`);
+      if (!active()) return;
+      if (direction === 'latest') { record.pages = [page]; record.index = 0; record.pending.clear(); }
+      else { record.pages[target] = page; record.index = target; }
+      paintRecords(kind, true);
+    } finally {
+      if (active()) {
+        record.loading = false;
+        const incoming = record.incoming; record.incoming = [];
+        receiveRecords(kind, incoming); paintPagination(kind);
+      }
+    }
+  }
+
+  /**
+   * 更新分页控件，明确最新排序、页大小和新记录数量。
+   * @param {string} kind 交互或工程记录。
+   * @return {void}
+   */
+  function paintPagination(kind) {
+    const record = recordPages[kind], page = record.pages[record.index];
+    $(`#projects-${kind}-page`).textContent = `${record.loading ? '加载中 · ' : ''}第 ${record.index + 1} 页 · 每页 ${record.size} 条 · 最新在前`;
+    $(`#projects-${kind}-previous`).disabled = record.loading || record.index === 0;
+    $(`#projects-${kind}-next`).disabled = record.loading || page?.next_before == null;
+    $(`#projects-${kind}-latest`).disabled = record.loading || record.index === 0 && !record.pending.size;
+    const notice = $(`#projects-${kind}-new`);
+    notice.classList.toggle('hidden', !record.pending.size); notice.disabled = record.loading;
+    notice.textContent = `有 ${record.pending.size} 条新${kind === 'events' ? '交互' : '工程记录'}，查看最新`;
+  }
+
+  /**
+   * 显示当前页，实时插入时保留阅读位置；主动翻页时从页首开始。
+   * @param {string} kind 交互或工程记录。
+   * @param {boolean} resetScroll 是否回到当前页顶部。
+   * @return {void}
+   */
+  function paintRecords(kind, resetScroll = false) {
+    const element = $(`#projects-${kind}`), top = element.scrollTop, height = element.scrollHeight;
+    if (kind === 'events') paintEvents();
+    else paintHistory(recordPages.history.pages[recordPages.history.index]?.items || []);
+    paintPagination(kind);
+    element.scrollTop = resetScroll ? 0 : top > 40 ? top + Math.max(0, element.scrollHeight - height) : top;
   }
 
   /**
@@ -450,10 +594,10 @@ window.ProjectsUI = (() => {
    */
   function paintEvents() {
     const element = $('#projects-events');
-    const follow = element.scrollHeight - element.scrollTop - element.clientHeight < 40;
     const labels = {pi: 'Pi', input: '发送到 Claude', started: '原生会话', error: '异常',
-      verification: '独立验收', input_unknown: '输入待核对', reconciled: '人工核对', recovery: '模型恢复', manual_retry: '人工重试'};
-    element.innerHTML = timeline.map(item => {
+      verification: '独立验收', input_unknown: '输入待核对', reconciled: '人工核对', recovery: '模型恢复', manual_retry: '人工重试',
+      guide_loaded: '业务指南'};
+    element.innerHTML = (recordPages.events.pages[recordPages.events.index]?.items || []).map(item => {
       const payload = item.payload;
       let message = payload.text || payload.message;
       if (item.kind === 'recovery') {
@@ -464,10 +608,10 @@ window.ProjectsUI = (() => {
           scheduled: '已安排自动恢复，原会话和预算已保留。', exhausted: '自动恢复已用尽，请人工检查。',
           paused: '自动恢复已暂停，原会话已保留。'}[payload.phase] || '正在恢复模型，原会话已保留。';
       } else if (item.kind === 'manual_retry') message ||= '已人工确认重试，继续原目标和原会话。';
-      return `<li><small class="muted">${escape(new Date(item.created_at * 1000).toLocaleTimeString())} · ${escape(labels[item.kind] || item.kind)}</small><pre>${escape(message || JSON.stringify(payload, null, 2))}</pre></li>`;
+      else if (item.kind === 'guide_loaded') message = '本轮已将保存的追加业务指南与默认指南一起交给 Pi。';
+      return `<li data-event-id="${escape(item.id)}"><small class="muted">${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))} · ${escape(labels[item.kind] || item.kind)}</small><pre>${escape(message || JSON.stringify(payload, null, 2))}</pre></li>`;
     }).join('')
       || '<li class="hint">启动后在这里查看 Pi 的判断、实际输入和验收结果。</li>';
-    if (follow) element.scrollTop = element.scrollHeight;
   }
 
   /**
@@ -476,7 +620,7 @@ window.ProjectsUI = (() => {
    * @return {void}
    */
   function paintHistory(rows) {
-    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}</span><span>${escape(names[item.status] || item.status)}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
+    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small></span><span>${escape(names[item.status] || item.status)}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
     document.querySelectorAll('[data-work]').forEach(button => {
       button.onclick = () => perform(async () => {
         const current = revision, selected = accountId;

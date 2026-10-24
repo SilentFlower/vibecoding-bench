@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线07：明确UTF8/UTF8-SIG/ASCII/Latin1字节导入，BOM和多字节/Tab坐标可回溯原字节，原语法不改；解码错误与语法错误分开，其他编码明确拒绝不冒称支持。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add pyparsing.byte_input.parse_bytes(expression,data,*,encoding,parse_all=False), immutable ByteParseResult(results,text,byte_offsets), and ByteParseError(error,byte_offset). Require bytes and explicit supported codec UTF8/UTF8-SIG/ASCII/Latin1, reject other/stateful encodings rather than guess. Map every character boundary and EOF to original bytes including BOM. Use top-level grammar copy with tabs preserved; original grammar policy stays unchanged. Propagate strict UnicodeDecodeError, wrap only real ParseBaseException with exact original byte offset, retain original exception and results.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_02_dev.py, and English compatibility documentation at library/docs/development-pyparsing-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/pyparsing/byte_input.py
+- library/tests/test_development_pyparsing_02_dev.py
+- library/docs/development-pyparsing-02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

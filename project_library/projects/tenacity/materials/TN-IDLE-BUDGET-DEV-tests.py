@@ -1,4 +1,4 @@
-"""公开累计等待预算回归。"""
+"Public regression tests for TN-IDLE-BUDGET-DEV; the complete business contract is in materials/TN-IDLE-BUDGET-DEV-contract.md."
 import asyncio
 from datetime import timedelta
 from types import SimpleNamespace

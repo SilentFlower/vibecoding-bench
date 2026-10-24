@@ -4,9 +4,9 @@ Implement the complete public falsey-key contract for redundant, including group
 
 # Investigation topics
 
-- 解释唯一项与首个重复项报告
-- 用已有key选择业务重复规则
-- 定位falsey归一化函数被忽略
+- Explain reporting of unique items and the first duplicate.
+- Select business duplicate rules using the existing key parameter.
+- Diagnose why a falsey normalizer is ignored.
 
 # Supplied business material: materials/redundancy.py
 
@@ -18,13 +18,13 @@ print(redundant(values, key=str.lower))
 print(redundant(values, key=str.lower, groups=True))
 
 class CaseKey:
-    """自身真值为False的合法业务归一化函数。"""
+    """A valid business normalizer whose own truth value is False."""
     def __call__(self, value):
-        """返回业务键。@param value 原值。@return 小写值。"""
+        """Return the business key. @param value Original value. @return Lowercase value."""
         return value.lower()
 
     def __bool__(self):
-        """模拟falsey对象。@return False。"""
+        """Represent a falsey object. @return False."""
         return False
 
 print(redundant(values, key=CaseKey()))

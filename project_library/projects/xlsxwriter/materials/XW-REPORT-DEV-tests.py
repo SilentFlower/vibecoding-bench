@@ -1,4 +1,4 @@
-"""公开自动分表报表端到端回归。"""
+"Public regression tests for XW-REPORT-DEV; the complete business contract is in materials/XW-REPORT-DEV-contract.md."
 from zipfile import ZipFile
 import xml.etree.ElementTree as ET
 import pytest

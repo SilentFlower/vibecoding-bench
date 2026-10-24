@@ -32,7 +32,7 @@
           "id": "PYTHON-PPTX-01-DEV",
           "kind": "modify",
           "goal": "演示主题RGB颜色严格校验六位ASCII输入而不静默误色",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair RGBColor.from_string to accept exactly six ASCII hexadecimal characters, case-insensitive, otherwise clear ValueError including wrong type. Preserve legal channel values and six-character uppercase serialization; reject 5/7 length, whitespace, #/0x, Unicode digit lookalikes and nonhex. No CSS shorthand support or changes to RGBColor numeric constructor.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_01_dev.py, and Chinese compatibility documentation at library/docs/development-python-pptx-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair RGBColor.from_string to accept exactly six ASCII hexadecimal characters, case-insensitive, otherwise clear ValueError including wrong type. Preserve legal channel values and six-character uppercase serialization; reject 5/7 length, whitespace, #/0x, Unicode digit lookalikes and nonhex. No CSS shorthand support or changes to RGBColor numeric constructor.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_01_dev.py, and English compatibility documentation at library/docs/development-python-pptx-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-PPTX-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-PPTX-01-DEV.rubric.json",
             "native": "verification/PYTHON-PPTX-01-DEV.native.json",
             "public_native": "verification/PYTHON-PPTX-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PYTHON-PPTX-02-DEV",
           "kind": "modify",
           "goal": "演示页面公开设置切换效果与点击定时前进",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Slide.transition proxy with nonmutating configuration read, configure fade/push/wipe with XSD l/r/u/d directions, slow/med/fast speed, bool advance_on_click and optional unsignedInt advance_after_ms; clear explicitly removes transition. Validate entire update before mutation, insert p:transition before timing/extLst per pinned pml.xsd, preserve existing attrs/sound/extensions, refuse unknown existing effect replacement until explicit clear. Real PPTX XML/reopen proof; no autoplay execution, precise visual-effect duration or rendering claim.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_02_dev.py, and Chinese compatibility documentation at library/docs/development-python-pptx-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Slide.transition proxy with nonmutating configuration read, configure fade/push/wipe with XSD l/r/u/d directions, slow/med/fast speed, bool advance_on_click and optional unsignedInt advance_after_ms; clear explicitly removes transition. Validate entire update before mutation, insert p:transition before timing/extLst per pinned pml.xsd, preserve existing attrs/sound/extensions, refuse unknown existing effect replacement until explicit clear. Real PPTX XML/reopen proof; no autoplay execution, precise visual-effect duration or rendering claim.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_02_dev.py, and English compatibility documentation at library/docs/development-python-pptx-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-PPTX-02-DEV-contract.md",
@@ -98,7 +98,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-PPTX-02-DEV.rubric.json",
             "native": "verification/PYTHON-PPTX-02-DEV.native.json",
             "public_native": "verification/PYTHON-PPTX-02-DEV.public.native.json",
@@ -127,7 +127,7 @@
           "id": "PYTHON-PPTX-03-DEV",
           "kind": "modify",
           "goal": "形状无障碍替代说明与标题可独立编辑并保存",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd BaseShape.alternative_text/title backed by cNvPr descr/title for text boxes, pictures, groups and graphic frames through common nonvisual proxy. Exact str or None for absent, empty string explicit, None removes only own attribute, reject nonstrings before mutation. Preserve name/id, content/text, geometry, relationships and other unknown nonvisual data. Real PPTX save/reopen and XML escaping; decorative-extension flag is outside this precise alt/title delivery, no visual reader/rendering assertion.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_03_dev.py, and Chinese compatibility documentation at library/docs/development-python-pptx-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd BaseShape.alternative_text/title backed by cNvPr descr/title for text boxes, pictures, groups and graphic frames through common nonvisual proxy. Exact str or None for absent, empty string explicit, None removes only own attribute, reject nonstrings before mutation. Preserve name/id, content/text, geometry, relationships and other unknown nonvisual data. Real PPTX save/reopen and XML escaping; decorative-extension flag is outside this precise alt/title delivery, no visual reader/rendering assertion.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_03_dev.py, and English compatibility documentation at library/docs/development-python-pptx-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-PPTX-03-DEV-contract.md",
@@ -145,7 +145,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-PPTX-03-DEV.rubric.json",
             "native": "verification/PYTHON-PPTX-03-DEV.native.json",
             "public_native": "verification/PYTHON-PPTX-03-DEV.public.native.json",
@@ -174,7 +174,7 @@
           "id": "PYTHON-PPTX-04-DEV",
           "kind": "modify",
           "goal": "演示段落公开配置项目符号与真实自动编号方案",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd _Paragraph.bullet read and set_bullet(kind,character=\"•\",scheme=\"arabicPeriod\",start=1). kind character/number/none or None inheritance; single character, number scheme from pinned ST_TextAutonumberScheme and strict 1..32767 start. Validate before mutation; replace mutually exclusive buNone/buChar/buAutoNum/buBlip only, insert before tabLst/defRPr/extLst per XSD. Preserve text, level, font and other paragraph properties, read unsupported image bullet as unsupported without implicit mutation. Real saved/reopened OOXML, never prefix fake numbering text.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_04_dev.py, and Chinese compatibility documentation at library/docs/development-python-pptx-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd _Paragraph.bullet read and set_bullet(kind,character=\"•\",scheme=\"arabicPeriod\",start=1). kind character/number/none or None inheritance; single character, number scheme from pinned ST_TextAutonumberScheme and strict 1..32767 start. Validate before mutation; replace mutually exclusive buNone/buChar/buAutoNum/buBlip only, insert before tabLst/defRPr/extLst per XSD. Preserve text, level, font and other paragraph properties, read unsupported image bullet as unsupported without implicit mutation. Real saved/reopened OOXML, never prefix fake numbering text.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_04_dev.py, and English compatibility documentation at library/docs/development-python-pptx-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-PPTX-04-DEV-contract.md",
@@ -192,7 +192,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-PPTX-04-DEV.rubric.json",
             "native": "verification/PYTHON-PPTX-04-DEV.native.json",
             "public_native": "verification/PYTHON-PPTX-04-DEV.public.native.json",
@@ -221,7 +221,7 @@
           "id": "PYTHON-PPTX-05-DEV",
           "kind": "modify",
           "goal": "文本框公开配置真实文字流向并保留格式继承",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd TextFrame.text_direction str|None backed by bodyPr@vert with exactly pinned ST_TextVerticalType tokens. Support horizontal, vertical, vertical270, East Asian/Mongolian/WordArt modes as XML contracts; None removes direct attribute for inheritance, invalid input fails before mutation. Preserve text, shape rotation, margins/autofit/wrap and other bodyPr children/attrs. Real PPTX save/reopen proves metadata, not renderer glyph layout. Do not rotate shape to fake text direction.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_05_dev.py, and Chinese compatibility documentation at library/docs/development-python-pptx-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd TextFrame.text_direction str|None backed by bodyPr@vert with exactly pinned ST_TextVerticalType tokens. Support horizontal, vertical, vertical270, East Asian/Mongolian/WordArt modes as XML contracts; None removes direct attribute for inheritance, invalid input fails before mutation. Preserve text, shape rotation, margins/autofit/wrap and other bodyPr children/attrs. Real PPTX save/reopen proves metadata, not renderer glyph layout. Do not rotate shape to fake text direction.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_05_dev.py, and English compatibility documentation at library/docs/development-python-pptx-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-PPTX-05-DEV-contract.md",
@@ -239,7 +239,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-PPTX-05-DEV.rubric.json",
             "native": "verification/PYTHON-PPTX-05-DEV.native.json",
             "public_native": "verification/PYTHON-PPTX-05-DEV.public.native.json",
@@ -268,7 +268,7 @@
           "id": "PYTHON-PPTX-06-DEV",
           "kind": "modify",
           "goal": "多形状按实际边界对齐和等间隙分布且保持层级几何",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pptx.layout.align_shapes/distribute_shapes for unique same-parent nonrotated axis-aligned shapes. Align left/right/top/bottom/centers to collective bounding box, centers floor to EMU integer. Distribution stable by position, preserve outermost edges, subtract actual unequal sizes and use rational gaps with nearest-even integer rounding, reject negative available gap. Validate full batch before mutation and rollback coordinate setter failure; preserve dimensions, shape IDs/Z order/content/relationships and input order return. Reject cross-space/rotated cases rather than claiming visual bounding boxes; saved geometry/reopen proof.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_06_dev.py, and Chinese compatibility documentation at library/docs/development-python-pptx-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pptx.layout.align_shapes/distribute_shapes for unique same-parent nonrotated axis-aligned shapes. Align left/right/top/bottom/centers to collective bounding box, centers floor to EMU integer. Distribution stable by position, preserve outermost edges, subtract actual unequal sizes and use rational gaps with nearest-even integer rounding, reject negative available gap. Validate full batch before mutation and rollback coordinate setter failure; preserve dimensions, shape IDs/Z order/content/relationships and input order return. Reject cross-space/rotated cases rather than claiming visual bounding boxes; saved geometry/reopen proof.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_06_dev.py, and English compatibility documentation at library/docs/development-python-pptx-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-PPTX-06-DEV-contract.md",
@@ -286,7 +286,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-PPTX-06-DEV.rubric.json",
             "native": "verification/PYTHON-PPTX-06-DEV.native.json",
             "public_native": "verification/PYTHON-PPTX-06-DEV.public.native.json",

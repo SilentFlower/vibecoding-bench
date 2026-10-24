@@ -1,4 +1,4 @@
-"""公开换行空段落保留回归。"""
+"Public regression tests for TB-PARAGRAPHS-DEV; the complete business contract is in materials/TB-PARAGRAPHS-DEV-contract.md."
 from tabulate import tabulate,_wrap_text_to_colwidths
 
 def test_internal_blank_paragraphs_are_preserved():

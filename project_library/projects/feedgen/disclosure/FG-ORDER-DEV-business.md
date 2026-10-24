@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-按真实时刻而非时间字符串排序，时刻相同保持原序。缺失时间位置、含边界过滤和数量限制明确，返回保留元数据与扩展的独立快照，原订阅和条目不受后续修改影响。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement feedgen.ordering.sorted_feed(feed,*,by="updated",reverse=True,missing="last",since=None,limit=None) and reusable copy_feed(feed,entries). Compare actual updated/published instants across offsets, retain original order on ties, explicitly place or reject missing dates independent of reverse. Inclusive aware since excludes undated entries, nonnegative limit supports zero. Return deeply independent FeedGenerator preserving metadata/extensions/entry content; never reorder or mutate original feed. Reject naive boundaries and invalid modes before changing anything.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_order_dev.py and concise English compatibility documentation at library/docs/development-fg-order-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/feedgen/ordering.py
+- library/development_tests/test_development_fg_order_dev.py
+- library/docs/development-fg-order-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

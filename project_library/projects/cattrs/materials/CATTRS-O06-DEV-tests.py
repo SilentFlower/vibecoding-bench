@@ -1,4 +1,4 @@
-"""同一API可接单条记录或一组记录，仍走真实嵌套钩子。"""
+"Public regression tests for CATTRS-O06-DEV; the complete business contract is in materials/CATTRS-O06-DEV-contract.md."
 from dataclasses import dataclass
 from collections.abc import Sequence
 import pytest
@@ -6,11 +6,11 @@ from cattrs import Converter
 
 @dataclass
 class Product:
-    """真实产品记录。"""
+    "Public regression fixture: Product."
     quantity: int
 
 def test_mapping_and_sequence():
-    """字典结构成单条，列表结构成序列。@return None。"""
+    "Verify mapping and sequence."
     from cattrs.strategies.sequence_union import configure_sequence_union
     target = Sequence[Product] | Product
     converter = configure_sequence_union(Converter(), target)
@@ -18,7 +18,7 @@ def test_mapping_and_sequence():
     assert list(converter.structure([{'quantity': '3'}], target)) == [Product(3)]
 
 def test_empty_tuple_and_nested_hook():
-    """空序列及tuple可用，元素继续应用用户钩子。@return None。"""
+    "Verify empty tuple and nested hook."
     from cattrs.strategies.sequence_union import configure_sequence_union
     target = list[Product] | Product
     converter = Converter()
@@ -28,7 +28,7 @@ def test_empty_tuple_and_nested_hook():
     assert converter.structure(({'quantity': '1'},), target) == [Product(11)]
 
 def test_text_and_ambiguous_rejected():
-    """文本不当业务序列，多个序列分支拒绝。@return None。"""
+    "Verify text and ambiguous rejected."
     from cattrs.strategies.sequence_union import configure_sequence_union
     converter = configure_sequence_union(Converter(), list[Product] | Product)
     with pytest.raises(TypeError): converter.structure('not a record', list[Product] | Product)

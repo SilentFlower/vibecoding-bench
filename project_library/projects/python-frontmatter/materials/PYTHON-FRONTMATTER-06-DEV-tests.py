@@ -1,4 +1,4 @@
-"""文档转换完整落盘，错误与冲突不得留下半文件。"""
+"Public regression tests for PYTHON-FRONTMATTER-06-DEV; the complete business contract is in materials/PYTHON-FRONTMATTER-06-DEV-contract.md."
 import hashlib
 import stat
 import tempfile
@@ -10,11 +10,11 @@ from frontmatter.parsing import ParseError
 
 
 def test_atomic_unicode_update_and_mode():
-    """真实二进制读取、严格解析及同目录替换保持格式。@return None。"""
+    "Verify atomic unicode update and mode."
     with tempfile.TemporaryDirectory() as temporary:
         path=Path(temporary)/'doc.md';raw=' \n+++\ncontent="摘要"\n+++\n旧正文'.encode('utf-16-le');path.write_bytes(raw);path.chmod(0o640)
         def change(post):
-            """模拟一次业务编辑。@param post 文档。@return 更新文档。"""
+            "Support the public regression through change."
             post.content='新正文';post['version']=2;return post
         atomic_update(path,change,encoding='utf-16-le',expected_sha256=hashlib.sha256(raw).hexdigest())
         again=frontmatter.load(path,encoding='utf-16-le')
@@ -24,14 +24,14 @@ def test_atomic_unicode_update_and_mode():
 
 
 def test_conflict_transform_and_malformed_failures_preserve_input():
-    """乐观版本、转换失败及坏头部均不得覆盖源。@return None。"""
+    "Verify conflict transform and malformed failures preserve input."
     with tempfile.TemporaryDirectory() as temporary:
         path=Path(temporary)/'doc.md';raw=b'{"content":"meta"}\nbody';path.write_bytes(raw)
         with unittest.TestCase().assertRaises(UpdateConflict):atomic_update(path,lambda post:post,expected_sha256='0'*64)
         with unittest.TestCase().assertRaises(TypeError):atomic_update(path,lambda post:None)
         assert path.read_bytes()==raw
         def race(post):
-            """模拟转换期间外部编辑。@param post 原文档。@return 原文档。"""
+            "Support the public regression through race."
             path.write_bytes(b'external');return post
         with unittest.TestCase().assertRaises(UpdateConflict):atomic_update(path,race)
         assert path.read_bytes()==b'external'

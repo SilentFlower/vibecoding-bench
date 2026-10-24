@@ -1,3 +1,12 @@
-# 为重复自然排序提供可清空的有界LRU键缓存
+# Engineering contract: NATSORT-02-DEV
 
-路线13：显式LRU缓存复用昂贵的自然键计算，提供容量、统计、清空和异常重试；不可hash不伪造键，全局locale缓存明确拒绝避免过期语义。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add natsort.cached.cached_natsort_keygen(key=None, alg=ns.DEFAULT, maxsize=128). Each factory owns an independent bounded LRU and exposes cache_info/cache_clear; hashable values are type-separated, unhashable values bypass caching, and exceptions are not cached. Output must match the original configured natsort_keygen. Reject negative/noninteger capacities and active caching of global LOCALE strategies; maxsize=0 disables storage. Mutable external key policy requires explicit cache_clear or a new factory. Default natsort APIs remain unchanged.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_natsort_02_dev.py, and English compatibility documentation at library/docs/development-natsort-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/natsort/cached.py
+- library/tests/test_development_natsort_02_dev.py
+- library/docs/development-natsort-02-dev.md

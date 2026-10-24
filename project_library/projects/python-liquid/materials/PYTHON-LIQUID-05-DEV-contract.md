@@ -1,3 +1,12 @@
-# 报告模板源码包可离线移交并校验入口依赖与内容完整性
+# Engineering contract: PYTHON-LIQUID-05-DEV
 
-路线11：模板源码/显式入口/依赖全集作为规范JSON移交，SHA256核完整性、拒重复键/未知schema/缺入口；新DictLoader环境真实渲染，不pickle、不猜动态依赖完整性，源码快照只读。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add liquid.template_bundle.make_bundle/templates explicit source Mapping plus root entries, load_bundle and immutable TemplateBundle with fresh environment(). Canonical schema1 JSON stores only raw source strings, explicit roots and SHA256 of canonical payload; reject tampering, duplicate JSON keys, unknown schema/fields, bad source types, missing/duplicate roots. Preserve all supplied dependency sources and prove real render/include in a fresh DictLoader environment. No pickle/code objects, no automatic dynamic-dependency completeness claim, no plugin/environment identity guessing; caller supplies compatible explicit options and cannot replace bundle loader. Copy sources and expose readonly snapshot.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_liquid_05_dev.py, and English compatibility documentation at library/docs/development-python-liquid-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/liquid/template_bundle.py
+- library/tests/test_development_python_liquid_05_dev.py
+- library/docs/development-python-liquid-05-dev.md

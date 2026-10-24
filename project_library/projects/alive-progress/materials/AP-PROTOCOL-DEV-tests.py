@@ -1,4 +1,4 @@
-"""公开未启动迭代器属性协议回归。"""
+"Public regression tests for AP-PROTOCOL-DEV; the complete business contract is in materials/AP-PROTOCOL-DEV-contract.md."
 import pytest
 from alive_progress import alive_it
 

@@ -1,4 +1,4 @@
-"""公开运行中容量调整回归。"""
+"Public regression tests for CT-RESIZE-DEV; the complete business contract is in materials/CT-RESIZE-DEV-contract.md."
 import pytest
 from cachetools import LRUCache,FIFOCache,TTLCache
 

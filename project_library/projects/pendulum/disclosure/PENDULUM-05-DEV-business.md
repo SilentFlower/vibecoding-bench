@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线06：range增加遍历首尾closed与产出limit，正整数步长拒绝无进度；默认两端含、倒序和原锚点月底恢复保持，端点不溢出。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Extend Interval.range with keyword-only closed=both/left/right/neither and limit=None/nonnegative integer, where left/right refer to traversal start/end. Preserve default inclusive two-end behavior, inverse direction, absolute and ANCHORED accumulated-step month-end restoration. Require positive index-protocol amount and valid units; reject zero/negative progress and invalid policies. Stop at finite emitted limit, same endpoint correctly, and avoid endpoint overflow. Limit counts yielded points; no sleeping or unbounded verification.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pendulum_05_dev.py, and English compatibility documentation at library/docs/development-pendulum-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pendulum/interval.py
+- library/tests/test_development_pendulum_05_dev.py
+- library/docs/development-pendulum-05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

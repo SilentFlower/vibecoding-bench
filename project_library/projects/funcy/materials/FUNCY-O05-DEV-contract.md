@@ -1,5 +1,12 @@
-# 按真实业务键稳定关联两份记录且保留全部重复组合
+# Engineering contract: FUNCY-O05-DEV
 
-对应路线16：真实业务键关系连接保留重复键笛卡尔组合和稳定未匹配顺序，右侧一次物化左侧惰性，None存在性明确，不混淆原集合join。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add funcy.relations.join_by(left,right,left_key,right_key=None,*,how="inner") and frozen JoinPair(left,right,left_present,right_present). Use exact string fields or real Funcy make_func index/callable selectors, materialize right once then lazily consume left, producing every duplicate-key Cartesian pair in left/right order. Support inner/left/full and append unmatched right rows in original order. None is a legal key/record distinguished from absence by presence flags, unhashable keys and callback/input errors propagate. Never mutate/merge record fields or silently overwrite duplicates; state right-side memory cost and leave existing collection join/group_by untouched.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o05_dev.py and concise English compatibility documentation at library/docs/development-funcy-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/funcy/relations.py
+- library/tests/test_development_funcy_o05_dev.py
+- library/docs/development-funcy-o05-dev.md

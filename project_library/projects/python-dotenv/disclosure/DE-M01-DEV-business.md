@@ -4,7 +4,7 @@ Preserve the original text and newline bytes of every non-target parsed record w
 
 # Investigation topics
 
-- 从实际字节定位非目标换行变化
+- Locate changes to unrelated newlines by inspecting the actual bytes.
 
 # Supplied business material: materials/newline-reproduction.md
 

@@ -1,5 +1,16 @@
-# 业务确认
+# Business scope and confirmation
 
-在已交付product/export商品应用上新增完整供应商CSV导入，三列可换序、BOM/引用多行中文、严格数量/唯一sku；全部验证后独占原子发布新JSON，不改输入/不覆盖输出。共享业务存储只服务后续完整库存工作流，不改Typer库。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Extend the already delivered app/shop.py product/export application with real import-csv SOURCE --output NEW_JSON. Require exactly sku/name/quantity CSV headers in any order; UTF8/BOM, normal CSV quoted commas/newlines and Unicode supported, integer ASCII nonnegative quantity and unique nonempty sku/name. Validate all rows before publishing canonical three-field JSON in input order; header-only emits []. Preserve original input, refuse existing/symlink/same-path output, use same-directory completed temp+exclusive link so no partial/overwrite race. Add reusable app/inventory_store.py and command-module registration to support subsequent real business commands without replacing delivered product/export. Do not modify Typer library or dependency environment.
+
+Deliver real implementation, original-failing public tests at app/development_tests/test_development_typer_02_dev.py, and English compatibility documentation at app/docs/development-typer-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- app/shop.py
+- app/inventory_store.py
+- app/inventory_import.py
+- app/development_tests/test_development_typer_02_dev.py
+- app/docs/development-typer-02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

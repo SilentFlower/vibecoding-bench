@@ -1,4 +1,4 @@
-"""显式本地pyproject路径支持用户目录而不改变搜索规则。"""
+"Public regression tests for PYDANTIC-SETTINGS-04-DEV; the complete business contract is in materials/PYDANTIC-SETTINGS-04-DEV-contract.md."
 import os
 import tempfile
 from pathlib import Path
@@ -6,7 +6,7 @@ from unittest.mock import patch
 from pydantic_settings import BaseSettings,PyprojectTomlConfigSettingsSource
 
 def test_explicit_home_path_loads_same_file_as_absolute_path():
-    """HOME只在用例内替换，真实TOML来源读取。@return None。"""
+    "Verify explicit home path loads same file as absolute path."
     class Config(BaseSettings):quantity:int=1
     with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{'HOME':directory}):
         path=Path(directory)/'pyproject.toml';path.write_text('[tool.pydantic-settings]\nquantity=7\n')
@@ -16,7 +16,7 @@ def test_explicit_home_path_loads_same_file_as_absolute_path():
         assert short.toml_file_path==path.resolve()
 
 def test_unicode_home_missing_path_and_relative_path_keep_policy():
-    """缺文件仍空来源，普通相对路径仍相对当前目录。@return None。"""
+    "Verify unicode home missing path and relative path keep policy."
     class Config(BaseSettings):quantity:int=1
     with tempfile.TemporaryDirectory() as directory:
         home=Path(directory)/'用户';home.mkdir()

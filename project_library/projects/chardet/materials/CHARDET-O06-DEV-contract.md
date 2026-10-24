@@ -1,5 +1,12 @@
-# 用显式或实际检测codec严格转换完整字节载荷
+# Engineering contract: CHARDET-O06-DEV
 
-按显式源codec或真实检测标签全文严格解码并重新编码，绝不替换丢字。返回独立字节、规范codec、原检测事实和验证字节数，BOM由目标codec明确决定；空自动检测、坏源字节和目标不可表示均失败，输入保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement chardet.transcode.transcode_bytes(data, target_encoding, *, source_encoding=None). Use the explicit source codec or actual detection result, require a supported codec and strict full-payload decoding/encoding with no replacement or character loss. Return independent output bytes, canonical source/target names, original detection facts when used and validated byte count. Target codec explicitly controls BOM, empty auto-detection must request a source, unrepresentable target text and malformed source bytes fail, and input buffers remain unchanged. Do not imply autodetected semantic accuracy.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o06_dev.py and concise English compatibility documentation at library/docs/development-chardet-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/chardet/transcode.py
+- library/tests/test_development_chardet_o06_dev.py
+- library/docs/development-chardet-o06-dev.md

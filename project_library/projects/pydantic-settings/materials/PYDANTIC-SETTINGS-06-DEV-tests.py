@@ -1,4 +1,4 @@
-"""命名可选模型别名下的分段环境值按真实子字段类型解码。"""
+"Public regression tests for PYDANTIC-SETTINGS-06-DEV; the complete business contract is in materials/PYDANTIC-SETTINGS-06-DEV-contract.md."
 import os
 import unittest
 from typing import Annotated
@@ -8,7 +8,7 @@ from pydantic import BaseModel,ValidationError
 from pydantic_settings import BaseSettings,SettingsConfigDict
 
 def test_optional_named_model_alias_decodes_nested_list_and_plain_text():
-    """模型别名不能把values留成原始JSON字符串。@return None。"""
+    "Verify optional named model alias decodes nested list and plain text."
     class Inner(BaseModel):
         values:list[int]
         label:str='plain'
@@ -23,7 +23,7 @@ def test_optional_named_model_alias_decodes_nested_list_and_plain_text():
         with unittest.TestCase().assertRaises(ValidationError):Config()
 
 def test_alias_of_annotated_alias_and_whole_json_keep_policy():
-    """多层包装归一不能丢模型类型，整个JSON仍走原路径。@return None。"""
+    "Verify alias of annotated alias and whole json keep policy."
     class Inner(BaseModel):values:list[str]
     Direct=TypeAliasType('Direct',Annotated[Inner,'business'])
     Wrapped=TypeAliasType('Wrapped',Direct|None)

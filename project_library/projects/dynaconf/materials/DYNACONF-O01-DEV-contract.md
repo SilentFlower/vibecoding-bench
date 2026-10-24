@@ -1,5 +1,12 @@
-# 在真实文件加载前整体验证文本路径协议并拒绝非法参数
+# Engineering contract: DYNACONF-O01-DEV
 
-对应路线01：load_file先整体验证str/文本PathLike/list/tuple并fspath规范化，非法参数任何silent都TypeError；None/空/模块名/glob旧可选路径保持，不任意str对象。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix Settings.load_file input normalization: allow None/str/text os.PathLike and finite list/tuple of those, normalize via os.fspath and validate the complete sequence before any loading. Reject modules/dicts/numbers/bytes/bad __fspath__ return values with TypeError regardless of silent. Preserve string module names, comma-list/glob and PathLike real-file behavior plus optional None/empty/no-match semantics. Do not stringify arbitrary objects into pretend paths, mutate input sequences or modify the general ensure_a_list contract across unrelated APIs.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o01_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/dynaconf/base.py
+- library/tests/test_development_dynaconf_o01_dev.py
+- library/docs/development-dynaconf-o01-dev.md

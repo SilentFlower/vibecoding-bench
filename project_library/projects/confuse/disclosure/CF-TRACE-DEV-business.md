@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-来源追踪必须运行真实解析流程，返回有序不可变元数据，默认不包含配置值。显式包含值时复用快照冻结与相对敏感字段规则，不把字典首命中误称为唯一合并来源。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement confuse.trace.trace_sources(view,*,include_values=False,redact=True) returning immutable SourceTrace records in actual view.resolve order. Records contain filename/default/base_for_paths, kind of resolved value, zero-based priority, is_first and optional value. Missing views produce an empty tuple; first means first resolution, not sole contributor to merged dictionaries. Default mode must not expose values. Included values use the completed snapshot freeze logic and relative redactions including sequences, remain detached, and reject unsupported/cyclic structures. No file reads or source mutations.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_cf_trace_dev.py and concise English compatibility documentation at library/docs/development-cf-trace-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/confuse/trace.py
+- library/development_tests/test_development_cf_trace_dev.py
+- library/docs/development-cf-trace-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

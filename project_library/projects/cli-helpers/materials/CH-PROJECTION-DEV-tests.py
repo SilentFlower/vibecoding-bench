@@ -1,4 +1,4 @@
-"""公开查询列投影回归。"""
+"Public regression tests for CH-PROJECTION-DEV; the complete business contract is in materials/CH-PROJECTION-DEV-contract.md."
 import json
 import pytest
 from cli_helpers.tabular_output.projection import select_columns

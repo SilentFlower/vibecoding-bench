@@ -1,3 +1,12 @@
-# 附加过滤与校验规则组合保持调用方列表所有权
+# Engineering contract: WTFORMS-01-DEV
 
-路线20：同根所有权修复同时覆盖extra_filters与extra_validators，组合前复制实际使用的序列，不往调用方列表追加inline；extra在前、inline在后，回调身份不变，重复构造/处理/验证不累积。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair both BaseForm.process extra_filters and Form.validate extra_validators as one caller-ownership bug family. Before appending an inline rule, copy only that used field sequence; do not mutate caller lists, deep-copy callable objects, reorder explicit-extra before inline, or eagerly consume unrelated unused extra-field generators. Support list/tuple sequences, repeat construction/process/validate, inheritance and real error propagation. Each inline runs once per current processing/validation cycle. Preserve all original field/validator semantics and leave already-correct default behavior unchanged.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_wtforms_01_dev.py, and English compatibility documentation at library/docs/development-wtforms-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/wtforms/form.py
+- library/tests/test_development_wtforms_01_dev.py
+- library/docs/development-wtforms-01-dev.md

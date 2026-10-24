@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线05：独立canonical_cache先signature.bind/apply_defaults，位置/命名/默认及kwargs顺序规范化；typed明确区分类型，自定义BoundArguments业务键可提ID，默认不深hash可变对象，签名错误先拒绝。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add independent wrapt.canonical_cache.canonical_cache(maxsize=128,typed=False,key_func=None). inspect.signature.bind/apply_defaults before key creation so equivalent positional/keyword/explicit-default calls share, varargs remain ordered and varkw keys sort deterministically. typed mode includes direct bound value types. Custom key_func receives BoundArguments after signature validation and may extract id from unhashable dict; collisions are explicit caller policy. Default unhashable values fail, never deepcopy/serialize arbitrary inputs. Bounded LRU, cache_info/clear, exception propagation and ordinary metadata/descriptor binding; synchronous RLock serializes. Existing lru_cache key behavior unchanged.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_wrapt_05_dev.py, and English compatibility documentation at library/docs/development-wrapt-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/wrapt/canonical_cache.py
+- library/tests/test_development_wrapt_05_dev.py
+- library/docs/development-wrapt-05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

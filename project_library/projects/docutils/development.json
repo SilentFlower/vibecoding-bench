@@ -35,7 +35,7 @@
           "id": "DOCUTILS-O01-DEV",
           "kind": "modify",
           "goal": "让真实CLI组件加载失败返回非零且诊断只写stderr",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix docutils.__main__.main ImportError handling so missing reader/parser/writer reports failure on stderr, exits nonzero and emits no stdout document/help hint or target artifact. Preserve explicit --traceback reraising with stack and normal successful HTML publication/exit. Do not swallow failures as success, change valid component selection or broadly catch arbitrary developer exceptions. Demonstrate actual python -m docutils subprocess behavior with isolated config.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-docutils-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix docutils.__main__.main ImportError handling so missing reader/parser/writer reports failure on stderr, exits nonzero and emits no stdout document/help hint or target artifact. Preserve explicit --traceback reraising with stack and normal successful HTML publication/exit. Do not swallow failures as success, change valid component selection or broadly catch arbitrary developer exceptions. Demonstrate actual python -m docutils subprocess behavior with isolated config.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o01_dev.py and concise English compatibility documentation at library/docs/development-docutils-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DOCUTILS-O01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DOCUTILS-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DOCUTILS-O01-DEV.native.json",
@@ -82,7 +82,7 @@
           "id": "DOCUTILS-O02-DEV",
           "kind": "modify",
           "goal": "为RST提供真实表格节点及CSV边界的显式分段列表指令",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd registered segmented-list RST directive with required pipe-CSV columns option, optional inline-formatted title, class/name and pipe-CSV content rows. Parse through real Directive/state.inline_text into table/tgroup/colspec/thead/tbody/row/entry nodes and actual HTML writer output. Preserve quoted pipes, empty cells, Unicode/inline markup and ordinary non-directive colon paragraphs. Reject absent/empty headings, malformed CSV or inconsistent row widths with real directive diagnostics and no half table. Do not implement as raw HTML/text substitution or change existing table/list-table syntax.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-docutils-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd registered segmented-list RST directive with required pipe-CSV columns option, optional inline-formatted title, class/name and pipe-CSV content rows. Parse through real Directive/state.inline_text into table/tgroup/colspec/thead/tbody/row/entry nodes and actual HTML writer output. Preserve quoted pipes, empty cells, Unicode/inline markup and ordinary non-directive colon paragraphs. Reject absent/empty headings, malformed CSV or inconsistent row widths with real directive diagnostics and no half table. Do not implement as raw HTML/text substitution or change existing table/list-table syntax.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o02_dev.py and concise English compatibility documentation at library/docs/development-docutils-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DOCUTILS-O02-DEV-contract.md",
@@ -99,7 +99,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DOCUTILS-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DOCUTILS-O02-DEV.native.json",
@@ -131,7 +131,7 @@
           "id": "DOCUTILS-O03-DEV",
           "kind": "modify",
           "goal": "让代码指令原生caption与真实高亮块具名关联并发布语义HTML",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend CodeBlock with caption option, using the original tag_code language/highlight/number-lines path and wrapping captioned output in an actual code-figure figure whose first child is literal_block and second is inline-parsed caption. Attach name/id to the figure for real references and preserve source/line; HTML5 naturally emits figure/figcaption and code escaping. Caption-free nodes/output remain unchanged. Reject empty captions through directive option validation and preserve Unicode/multiline title text and original lexer error policy; do not replace code contents with raw HTML or a rubric.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-docutils-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend CodeBlock with caption option, using the original tag_code language/highlight/number-lines path and wrapping captioned output in an actual code-figure figure whose first child is literal_block and second is inline-parsed caption. Attach name/id to the figure for real references and preserve source/line; HTML5 naturally emits figure/figcaption and code escaping. Caption-free nodes/output remain unchanged. Reject empty captions through directive option validation and preserve Unicode/multiline title text and original lexer error policy; do not replace code contents with raw HTML or a rubric.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o03_dev.py and concise English compatibility documentation at library/docs/development-docutils-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DOCUTILS-O03-DEV-contract.md",
@@ -146,7 +146,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DOCUTILS-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DOCUTILS-O03-DEV.native.json",
@@ -178,7 +178,7 @@
           "id": "DOCUTILS-O04-DEV",
           "kind": "modify",
           "goal": "把显式可折叠提示发布为真实details summary并保留非HTML内容",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend BaseAdmonition directives with collapsible/expanded flags, rejecting expanded without collapsible. Preserve actual admonition/title/body nodes and existing localized specific-admonition transforms. HTML5 writer emits native details/summary, optional open, original inline formatting/escaping and correct nested pairs without JS; ordinary prompts remain on the original aside path. Other writers keep full visible text. Do not remove collapsed body, duplicate titles, mutate global visitor behavior or treat input raw HTML as trusted output.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-docutils-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend BaseAdmonition directives with collapsible/expanded flags, rejecting expanded without collapsible. Preserve actual admonition/title/body nodes and existing localized specific-admonition transforms. HTML5 writer emits native details/summary, optional open, original inline formatting/escaping and correct nested pairs without JS; ordinary prompts remain on the original aside path. Other writers keep full visible text. Do not remove collapsed body, duplicate titles, mutate global visitor behavior or treat input raw HTML as trusted output.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o04_dev.py and concise English compatibility documentation at library/docs/development-docutils-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DOCUTILS-O04-DEV-contract.md",
@@ -194,7 +194,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DOCUTILS-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DOCUTILS-O04-DEV.native.json",
@@ -226,7 +226,7 @@
           "id": "DOCUTILS-O05-DEV",
           "kind": "modify",
           "goal": "给真实doctree提供白名单版本化JSON writer及受约束重建",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd actual json Writer and doctree_json to_data/from_data/dumps/loads schema 1 for the declared supported standard node whitelist, preserving node type/rawsource/source/line/JSON attributes/child order/Unicode and rebuilding actual id/name maps. Real published JSON must round-trip into real Docutils nodes and publish through HTML with reference ids intact. Never pickle, deserialize arbitrary classes or serialize settings/reporter objects. Reject unknown schemas/nodes/extra shapes, invalid source/line/attributes, opaque/nonfinite values, duplicate ids, shared/cyclic nodes and explicit depth/node-budget overflow. Unsupported standard/custom nodes must fail explicitly rather than silently losing information; old XML/pseudoxml remain unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-docutils-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd actual json Writer and doctree_json to_data/from_data/dumps/loads schema 1 for the declared supported standard node whitelist, preserving node type/rawsource/source/line/JSON attributes/child order/Unicode and rebuilding actual id/name maps. Real published JSON must round-trip into real Docutils nodes and publish through HTML with reference ids intact. Never pickle, deserialize arbitrary classes or serialize settings/reporter objects. Reject unknown schemas/nodes/extra shapes, invalid source/line/attributes, opaque/nonfinite values, duplicate ids, shared/cyclic nodes and explicit depth/node-budget overflow. Unsupported standard/custom nodes must fail explicitly rather than silently losing information; old XML/pseudoxml remain unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o05_dev.py and concise English compatibility documentation at library/docs/development-docutils-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DOCUTILS-O05-DEV-contract.md",
@@ -242,7 +242,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DOCUTILS-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DOCUTILS-O05-DEV.native.json",
@@ -274,7 +274,7 @@
           "id": "DOCUTILS-O06-DEV",
           "kind": "modify",
           "goal": "按实际章节ID复制真实文档片段并显式处理外部脚注引用闭包",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd public fragments.extract_section(document,section_id,*,external=\"error\"|\"include_notes\") selecting one exact real section id into a new document, preserving source/line, nested structure and internal refid/name maps without modifying the old tree. Selected section becomes top level structurally; actual HTML publication must work. Default rejects references outside selection. include_notes appends only referenced external footnote/citation closure and filters backrefs to included ids; external section/unknown targets still error rather than silently including arbitrary chapters. Missing/duplicate IDs and invalid policies fail explicitly. Do not slice rendered HTML, guess titles, fake URLs or claim unimplemented CLI support.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-docutils-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd public fragments.extract_section(document,section_id,*,external=\"error\"|\"include_notes\") selecting one exact real section id into a new document, preserving source/line, nested structure and internal refid/name maps without modifying the old tree. Selected section becomes top level structurally; actual HTML publication must work. Default rejects references outside selection. include_notes appends only referenced external footnote/citation closure and filters backrefs to included ids; external section/unknown targets still error rather than silently including arbitrary chapters. Missing/duplicate IDs and invalid policies fail explicitly. Do not slice rendered HTML, guess titles, fake URLs or claim unimplemented CLI support.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o06_dev.py and concise English compatibility documentation at library/docs/development-docutils-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DOCUTILS-O06-DEV-contract.md",
@@ -289,7 +289,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DOCUTILS-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DOCUTILS-O06-DEV.native.json",

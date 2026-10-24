@@ -1,4 +1,4 @@
-"""公开词形引擎隔离回归。"""
+"Public regression tests for IF-SCOPES-DEV; the complete business contract is in materials/IF-SCOPES-DEV-contract.md."
 import pytest
 from inflect import engine
 from inflect.scopes import clone,temporary_options

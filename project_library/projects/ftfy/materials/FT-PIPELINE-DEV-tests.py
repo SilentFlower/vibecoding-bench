@@ -1,4 +1,4 @@
-"""公开结构化文本导入端到端回归。"""
+"Public regression tests for FT-PIPELINE-DEV; the complete business contract is in materials/FT-PIPELINE-DEV-contract.md."
 import pytest
 from ftfy import TextFixerConfig,apply_plan
 from ftfy.pipeline import TextRepairPipeline

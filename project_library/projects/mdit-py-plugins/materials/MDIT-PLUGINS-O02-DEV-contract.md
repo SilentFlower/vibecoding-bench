@@ -1,5 +1,12 @@
-# 让闭合元素的连续属性块按实际开放Token累计class
+# Engineering contract: MDIT-PLUGINS-O02-DEV
 
-对应路线06：定位opening后读取class，链接/单Token按声明拼接，span按既有规范化语义保留首次class；后写id/key覆盖，白名单及嵌套/相邻隔离保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix _attr_inline_rule class accumulation after link_close/span_close by resolving the matching opening Token before reading existing class. Link/image/code class blocks concatenate in declaration order without deduplication; spans preserve existing canonical repeated-attribute behavior by retaining each class word at its first position. Later id and other keys override normally. Keep single-token handling, nested inline content, neighbor isolation and allowed filtering. Do not globally concatenate nonclass attributes or mutate the closing Token instead of the rendered target.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o02_dev.py and concise English compatibility documentation at library/docs/development-mdit-plugins-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/mdit_py_plugins/attrs/index.py
+- library/tests/test_development_mdit_plugins_o02_dev.py
+- library/docs/development-mdit-plugins-o02-dev.md

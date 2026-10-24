@@ -1,15 +1,15 @@
-"""具名章节提取真实树并处理脚注闭包，不切HTML字符串。"""
+"Public regression tests for DOCUTILS-O06-DEV; the complete business contract is in materials/DOCUTILS-O06-DEV-contract.md."
 from docutils.core import publish_doctree,publish_from_doctree
 from docutils import nodes
 import io
 import pytest
 
 def build(source):
-    """保留章节结构与来源的真实解析。@return document。"""
+    "Support the public regression through build."
     return publish_doctree(source,source_path='source.rst',settings_overrides={'warning_stream':io.StringIO(),'halt_level':6,'report_level':5,'doctitle_xform':False})
 
 def test_selected_second_section_internal_refs_source_and_old_tree_are_preserved():
-    """第二节提取后没有首节正文，内部引用仍有效且源行保持。@return None。"""
+    "Verify selected second section internal refs source and old tree are preserved."
     from docutils.fragments import extract_section
     document=build('First\n=====\n\nFirst body.\n\nSecond\n======\n\n.. _local:\n\nSecond **body** and local_.\n');before=document.pformat()
     original=[node for node in document.findall(nodes.section) if 'second' in node['ids']][0]
@@ -19,7 +19,7 @@ def test_selected_second_section_internal_refs_source_and_old_tree_are_preserved
     html=publish_from_doctree(extracted,writer='html5').decode('utf8');assert 'Second' in html and 'First body' not in html
 
 def test_external_footnote_is_rejected_or_included_with_closed_backrefs():
-    """外部脚注必须明确选政策，包含后每条refid及backref都能在新树找到。@return None。"""
+    "Verify external footnote is rejected or included with closed backrefs."
     from docutils.fragments import extract_section
     document=build('.. [1] Shared note.\n\nSection\n=======\n\nUse [1]_.\n')
     with pytest.raises(ValueError):extract_section(document,'section')
@@ -30,7 +30,7 @@ def test_external_footnote_is_rejected_or_included_with_closed_backrefs():
         assert all(identifier in extracted.ids for identifier in node.get('backrefs',[]))
 
 def test_missing_duplicate_id_external_section_and_invalid_policy_do_not_mutate():
-    """不猜未知目标，不默默把整章外部依赖并入，失败原树保持。@return None。"""
+    "Verify missing duplicate id external section and invalid policy do not mutate."
     from docutils.fragments import extract_section
     document=build('First\n=====\n\nFirst body.\n\nSecond\n======\n\nSee First_.\n');before=document.pformat()
     with pytest.raises(KeyError):extract_section(document,'missing')

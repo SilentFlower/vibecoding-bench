@@ -1,4 +1,4 @@
-"""公开可变参数完整类型验证回归。"""
+"Public regression tests for JM-VARIADIC-DEV; the complete business contract is in materials/JM-VARIADIC-DEV-contract.md."
 import pytest
 import jmespath
 from jmespath import functions

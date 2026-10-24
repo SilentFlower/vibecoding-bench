@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-只读捕获实际活动配置、状态值和结构允许事件，不运行守卫、回调或隐式激活。JSON兼容值深层冻结，结构候选不能误称为守卫已通过，原模型与监听器保持原样。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement statemachine.snapshots.snapshot(machine), freeze(value) and frozen StateSnapshot(states,values,allowed_events). Capture actual StateChart.configuration order, state IDs and JSON-compatible values, stable-deduplicate actual allowed_events. Deep-freeze standard containers, reject cycles/nonfinite/unsupported values. Do not run enabled_events/guards, callbacks, sends or implicit async initial activation; an unactivated configuration stays as actually observed. Clarify structural allowed events do not promise guards pass. Preserve original model/configuration/listeners.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_snapshot_dev.py and concise English compatibility documentation at library/docs/development-sm-snapshot-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/statemachine/snapshots.py
+- library/development_tests/test_development_sm_snapshot_dev.py
+- library/docs/development-sm-snapshot-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

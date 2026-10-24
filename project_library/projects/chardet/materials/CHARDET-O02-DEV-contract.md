@@ -1,5 +1,12 @@
-# 区分检测编码身份与Python规范codec可用性
+# Engineering contract: CHARDET-O02-DEV
 
-保留真实原始标签、置信度与语言，另外报告Python codec规范名和可用状态。特殊UCS4身份不可误标标准UTF32；命名模式显式选择，空/未匹配区别于不支持codec，原detect默认保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement chardet.details.detect_details(data, *, names="legacy") retaining actual raw encoding/confidence/language while reporting canonical Python codec and availability. Explicit names="python" may select the canonical codec only when supported; unusual UCS4 labels must retain their identity and report unsupported status instead of being relabelled UTF32. Distinguish empty/no-match, snapshot mutable bytearray input and reject invalid policies/types without changing detect defaults.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o02_dev.py and concise English compatibility documentation at library/docs/development-chardet-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/chardet/details.py
+- library/tests/test_development_chardet_o02_dev.py
+- library/docs/development-chardet-o02-dev.md

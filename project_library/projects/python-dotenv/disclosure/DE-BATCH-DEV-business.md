@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-配置编辑器一次提交多项更新和删除，只进行一次原子替换。先校验并序列化全部输入，保留非目标原始字节，去掉目标重复定义，缺失项按顺序追加，正确转义多行、反斜杠与引号，继续保留文件权限和失败清理。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement dotenv.editing.update_keys(path, updates, *, remove=(), encoding="utf-8", follow_symlinks=False). Validate and serialize the complete mapping/removal list before opening rewrite; reject malformed keys, NUL/nonstring values and conflicting update/delete keys. Reuse rewrite for one atomic replacement, preserve every non-target parsed record and newline byte, update first target occurrence and remove duplicate target definitions, remove all requested-key occurrences, append missing updates in mapping order with a needed separator, and return (updated_keys_tuple, removed_keys_tuple). Single-quote escaping must roundtrip backslashes, quotes and multiline values. Preserve mode, symlink option and failure cleanup.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_de_batch_dev.py and concise English compatibility documentation at library/docs/development-de-batch-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/dotenv/editing.py
+- library/development_tests/test_development_de_batch_dev.py
+- library/docs/development-de-batch-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

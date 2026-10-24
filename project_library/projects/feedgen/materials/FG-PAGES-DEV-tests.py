@@ -1,4 +1,4 @@
-"""公开订阅分页与真实导航回归。"""
+"Public regression tests for FG-PAGES-DEV; the complete business contract is in materials/FG-PAGES-DEV-contract.md."
 from urllib.parse import urlsplit,parse_qs
 import pytest
 from feedgen.feed import FeedGenerator

@@ -1,5 +1,12 @@
-# 为字符串字段加入验证前Unicode标准化策略
+# Engineering contract: MM-NORMALIZE-DEV
 
-标准化必须发生在原字段验证器之前，按裁边、大小写折叠和Unicode形式顺序执行。保留原生缺失、空值、默认值、别名和序列化行为，不全局改变String。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement marshmallow.normalized.NormalizedString as a String field with keyword form="NFC" (NFC/NFD/NFKC/NFKD/None), strip=True and casefold=False, preserving standard field kwargs. Deserialize using the real String conversion, optionally strip then casefold then normalize before normal Field validators and post-load hooks. Preserve allow_none/missing/default/data_key/required behavior, original bytes validation, dump behavior and other String fields. Reject invalid policies at construction and retain independent per-schema field copies.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_normalize_dev.py and concise English compatibility documentation at library/docs/development-mm-normalize-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/marshmallow/normalized.py
+- library/development_tests/test_development_mm_normalize_dev.py
+- library/docs/development-mm-normalize-dev.md

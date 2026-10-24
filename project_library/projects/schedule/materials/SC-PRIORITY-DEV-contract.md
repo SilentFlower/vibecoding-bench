@@ -1,5 +1,12 @@
-# 让同时到期任务按显式优先级稳定执行
+# Engineering contract: SC-PRIORITY-DEV
 
-多个任务同时到期时，允许关键任务优先，同优先级仍保留注册顺序；更早的截止时间始终优先。只改变到期集合排序，取消、异常、快照及run_all语义继续兼容。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Job.set_priority(priority) accepting nonboolean integers, returning self. Scheduler.run_pending must order due jobs first by existing next_run, then descending explicit priority (default zero), then stable registration order for ties. Earlier due times always win over priority. Preserve due-set snapshot, CancelJob semantics, exception propagation, Job.__lt__, run_all order and behavior of unconfigured jobs.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_priority_dev.py and concise English compatibility documentation at library/docs/development-sc-priority-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/schedule/__init__.py
+- library/development_tests/test_development_sc_priority_dev.py
+- library/docs/development-sc-priority-dev.md

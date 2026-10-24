@@ -1,16 +1,16 @@
-"""计划时间窗批量取出保持索引与重复次数。"""
+"Public regression tests for SORTEDCONTAINERS-05-DEV; the complete business contract is in materials/SORTEDCONTAINERS-05-DEV-contract.md."
 from operator import neg
 from sortedcontainers import SortedList,SortedSet,SortedDict
 
 def test_halfopen_ranges_all_container_families_and_remaining_indexes():
-    """只删除区间内条目，集合和映射同步索引。@return None。"""
+    "Verify halfopen ranges all container families and remaining indexes."
     for source in (SortedList([1,2,3,4,5]),SortedSet([1,2,3,4,5]),SortedDict({x:str(x) for x in range(1,6)})):
         result=source.pop_range(2,4,inclusive=(True,False))
         assert result==([(2,'2'),(3,'3')] if isinstance(source,dict) else [2,3])
         assert list(source)==[1,4,5];source._check()
 
 def test_duplicates_unbounded_empty_and_reverse_key():
-    """reverse只改变返回顺序，反向key仍使用其排序边界。@return None。"""
+    "Verify duplicates unbounded empty and reverse key."
     source=SortedList([1,2,2,3,4]);source._reset(4)
     assert source.pop_range(2,3,reverse=True)==[3,2,2] and list(source)==[1,4]
     assert source.pop_range(8,2)==[];source._check()

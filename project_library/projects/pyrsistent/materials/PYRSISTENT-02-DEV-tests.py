@@ -1,4 +1,4 @@
-"""相同单元类型的不同不变量不能共享同一动态序列类。"""
+"Public regression tests for PYRSISTENT-02-DEV; the complete business contract is in materials/PYRSISTENT-02-DEV-contract.md."
 import operator
 import pickle
 import unittest
@@ -7,14 +7,14 @@ from pyrsistent import PClass,pvector_field,pset_field,InvariantException
 
 
 def test_vector_and_set_policy_identity_isolation_in_both_orders():
-    """正数与负数规则按声明各自生效。@return None。"""
+    "Verify vector and set policy identity isolation in both orders."
     for factory in (pvector_field,pset_field):
         positive=lambda value:(value>0,'positive');negative=lambda value:(value<0,'negative')
         class Positive(PClass):
-            """正数业务字段。"""
+            "Public regression fixture: Positive."
             values=factory(int,item_invariant=positive)
         class Negative(PClass):
-            """负数业务字段。"""
+            "Public regression fixture: Negative."
             values=factory(int,item_invariant=negative)
         assert list(Positive(values=[1]).values)==[1] and list(Negative(values=[-1]).values)==[-1]
         with unittest.TestCase().assertRaises(InvariantException):Positive(values=[-1])
@@ -23,7 +23,7 @@ def test_vector_and_set_policy_identity_isolation_in_both_orders():
 
 
 def test_pickle_retains_policy_and_ambiguous_old_payload_rejects():
-    """新pickle携带真实可pickle政策，旧缺失政策不得误套默认类。@return None。"""
+    "Verify pickle retains policy and ambiguous old payload rejects."
     from pyrsistent import CheckedPVector
     from pyrsistent._field_common import _restore_seq_field_pickle
     policy=partial(operator.getitem,{2:(True,None),3:(True,None),-1:(False,'negative')})

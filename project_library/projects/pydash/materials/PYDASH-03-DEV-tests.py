@@ -1,18 +1,18 @@
-"""映射排序不修改来源，重复比较值保持输入顺序。"""
+"Public regression tests for PYDASH-03-DEV; the complete business contract is in materials/PYDASH-03-DEV-contract.md."
 from types import MappingProxyType
 import pydash
 
 def test_key_and_value_sort_preserve_mapping_and_ties():
-    """按客户键与金额排序是两种明确语义。@return None。"""
+    "Verify key and value sort preserve mapping and ties."
     source={'b':2,'a':1,'c':2};snapshot=list(source.items())
     assert list(pydash.sort_dict_by_keys(source))==['a','b','c']
     assert list(pydash.sort_dict_by_values(source,reverse=True))==['b','c','a']
     assert list(source.items())==snapshot
 
 def test_custom_mapping_falsey_key_and_transform():
-    """Falsey函数仍需应用，不以truthiness跳过。@return None。"""
+    "Verify custom mapping falsey key and transform."
     class Key:
-        """按字符串长度排序。"""
+        "Public regression fixture: Key."
         def __bool__(self):return False
         def __call__(self,value):return len(value)
     source=MappingProxyType({'long':3,'x':2,'xx':1})

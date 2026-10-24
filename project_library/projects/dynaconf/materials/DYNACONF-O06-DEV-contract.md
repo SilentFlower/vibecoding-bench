@@ -1,5 +1,12 @@
-# 为真实配置CLI提供可重复大小写无关glob筛选且保持存储不变
+# Engineering contract: DYNACONF-O06-DEV
 
-对应路线20：真实list新增可重复--match，按顶层规范键大小写无关glob并集，env/loader后独立筛选并一致用于JSON/文本/文件；空集合法、与key冲突明确且不改存储。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend actual dynaconf list CLI with repeatable --match glob patterns over top-level canonical key names, case-insensitive union without duplicates. Apply after existing env/loader selection on a detached dictionary and consistently to text/JSON/output-file views; empty matches return valid empty data, not a fake missing-key failure. Reject combining --match with old --key explicitly while preserving legacy no-pattern/single-key behavior. Use fnmatch semantics, never arbitrary eval/regex rewriting, and do not mutate settings or loader history during filtering.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o06_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/dynaconf/cli.py
+- library/tests/test_development_dynaconf_o06_dev.py
+- library/docs/development-dynaconf-o06-dev.md

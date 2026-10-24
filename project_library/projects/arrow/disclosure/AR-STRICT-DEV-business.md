@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-表单导入需要明确的整串格式校验，不能把前后杂文也作为成功。新增parse_strict及工厂strict开关，默认提取行为不变；可选精确token位宽，保留本地化、格式列表、数值星期、空白归一与日历有效性，非法模式组合明确报错。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add DateTimeParser.parse_strict(text, format_or_list, normalize_whitespace=False, *, exact_width=False) and arrow.get(text, format_or_list, strict=True, exact_width=False). Strict matching consumes the whole normalized input with valid calendar values; old parse/get extraction defaults remain unchanged. Optional exact width requires single digit M/D/H/h/m/s, three day-of-year digits and the declared fractional S count; literals are not tokens. Keep token/localization semantics including corrected numeric weekdays, format-list fallback and timezone parsing. Reject nonboolean switches, literal-only formats and exact_width without strict mode; factory strict mode requires explicit formats.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_strict_dev.py and concise English compatibility documentation at library/docs/development-ar-strict-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/arrow/parser.py
+- library/arrow/factory.py
+- library/development_tests/test_development_ar_strict_dev.py
+- library/docs/development-ar-strict-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

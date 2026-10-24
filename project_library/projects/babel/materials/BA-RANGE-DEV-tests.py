@@ -1,4 +1,4 @@
-"""公开区域化数值区间回归。"""
+"Public regression tests for BA-RANGE-DEV; the complete business contract is in materials/BA-RANGE-DEV-contract.md."
 from decimal import Decimal
 import pytest
 from babel import Locale

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-给单个真实转换器配置成对Decimal钩子，以字符串保持金额精度、指数及负零。拒绝二进制float、bool和坏文本，NaN/Infinity必须明确允许；嵌套记录可经既有JSON往返，其他实例和后注册用户钩子保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement cattrs.strategies.decimal.configure_decimal(converter, *, allow_special=False) using paired actual structure/unstructure hooks. Decimal values travel as exact strings through existing JSON/YAML converters, preserving precision, exponent and negative-zero text without float conversion. Accept explicit strings/integers/Decimal, reject bool/float/invalid text, default reject nonfinite values with an explicit opt-in policy. Configure only the supplied converter and preserve later user-hook precedence and nested records.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o02_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/cattrs/strategies/decimal.py
+- library/tests/test_development_cattrs_o02_dev.py
+- library/docs/development-cattrs-o02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

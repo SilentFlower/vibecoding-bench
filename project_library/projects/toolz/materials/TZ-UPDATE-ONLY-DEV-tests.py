@@ -1,10 +1,10 @@
-"""仅更新模式不能创建缺失路径或触发不必要回调。"""
+"Public regression tests for TZ-UPDATE-ONLY-DEV; the complete business contract is in materials/TZ-UPDATE-ONLY-DEV-contract.md."
 import pytest
 from toolz import update_in
 
 
 def test_missing_never_calls_function():
-    """缺失叶子或祖先均返回未修改副本。@return None。"""
+    "Verify missing never calls function."
     original = {'a': {'b': 1}}
     calls = []
     for path in (['a', 'missing'], ['missing', 'b']):
@@ -14,14 +14,14 @@ def test_missing_never_calls_function():
 
 
 def test_none_is_existing_and_curried():
-    """None是存在值，curried入口继承策略。@return None。"""
+    "Verify none is existing and curried."
     from toolz.curried import update_in as curried
     assert update_in({'a': None}, ['a'], lambda value: value is None, create=False) == {'a': True}
     assert curried({'a': 1}, ['a'])(lambda value: value + 1, create=False) == {'a': 2}
 
 
 def test_default_upsert_and_error():
-    """默认创建语义不变，空的仅更新路径拒绝。@return None。"""
+    "Verify default upsert and error."
     assert update_in({}, ['a', 'b'], lambda value: value + 1, default=0) == {'a': {'b': 1}}
     with pytest.raises(ValueError):
         update_in({}, [], lambda value: value, create=False)

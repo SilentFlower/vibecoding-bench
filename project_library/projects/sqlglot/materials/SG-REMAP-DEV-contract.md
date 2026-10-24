@@ -1,5 +1,12 @@
-# 精确重映射物理表并保持别名和限定列可执行
+# Engineering contract: SG-REMAP-DEV
 
-表映射只作用于真实物理表，精确匹配限定名并把新名称作为标识符数据引用。保留原别名，无别名时补原名以保持列引用可执行，修复对应库前缀，不误改CTE、文本或注释。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement sqlglot.report_remap.remap_tables(query,mapping,*,dialect=None,require_all=False). Reuse completed physical scope inspection; keys/values are exact (catalog,database,name) string tuples with optional empty prefixes. Quote replacement identifiers as data, never parse them as SQL. Rewrite physical named tables only, leaving CTE aliases and bodies/comments/literals otherwise compatible. Preserve existing aliases; for unaliased tables add original name as alias and repair matching scoped db/catalog-qualified columns to it. Keep table hints/other attributes. Reject malformed names and optional unused keys, return independent AST and retain source links. Do not string-replace SQL.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_remap_dev.py and concise English compatibility documentation at library/docs/development-sg-remap-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/sqlglot/report_remap.py
+- library/development_tests/test_development_sg_remap_dev.py
+- library/docs/development-sg-remap-dev.md

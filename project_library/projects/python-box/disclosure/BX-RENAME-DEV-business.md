@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-rename_key在原插入位置改名字面键，子Box与列表保持原引用、配置和转换结果，并更新安全属性索引。缺原键、已有目标、保留属性、别名冲突或冻结状态均在修改前拒绝；普通赋值规则不改。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add mutating Box.rename_key(old, new) returning self. Rename a literal existing key at exactly its original insertion position, preserve value/sub-Box identity and configuration without recasting or reconversion, and update safe-attribute lookup. Reject missing old keys, existing targets, protected attributes, safe-alias collisions and frozen mutation before changing any data; old==new is an unchanged success for mutable boxes. Preserve integer keys and ordinary assignment semantics.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_bx_rename_dev.py and concise English compatibility documentation at library/docs/development-bx-rename-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/box/box.py
+- library/test/test_development_bx_rename_dev.py
+- library/docs/development-bx-rename-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

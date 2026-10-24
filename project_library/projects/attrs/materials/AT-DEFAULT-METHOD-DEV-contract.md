@@ -1,5 +1,12 @@
-# 按模型继承关系动态派发默认值方法
+# Engineering contract: AT-DEFAULT-METHOD-DEV
 
-继承模型需要在子类中重写默认值逻辑，同时保留原Factory固定callable语义。新增Factory.from_method显式模式，按当前实例MRO派发，拒绝静态／类方法及property，显式传值不调用工厂，方法错误原样传递。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Factory.from_method(method_name) as an explicit opt-in default factory. Resolve the current instance class MRO at initialization and call the winning bound instance method, allowing subclasses to override it. Validate a nonempty identifier name; reject staticmethod/classmethod/property or unbound/nonmethod values without executing them. Propagate missing methods and method exceptions. Preserve ordinary Factory callable binding, takes_self behavior, explicit supplied field values and default decorators. Do not make arbitrary generated factory closures pickleable.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_at_default_method_dev.py and concise English compatibility documentation at library/docs/development-at-default-method-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/attr/_make.py
+- library/development_tests/test_development_at_default_method_dev.py
+- library/docs/development-at-default-method-dev.md

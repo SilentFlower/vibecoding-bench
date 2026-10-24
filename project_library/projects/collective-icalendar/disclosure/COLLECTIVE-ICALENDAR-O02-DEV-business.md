@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-新增继承到Calendar/LazyCalendar的from_ical_strict显式入口。先用完整展开文本栈验证BEGIN/END：孤立、错配、跨层及EOF未闭合均拒绝，错配说明实际与预期名字；校验必须先于模型解析及任何时区缓存。支持文本、字节、只读一次的Path、多顶层返回和子类解析器；共享私有边界校验后委托原cls.from_ical。仅检查组件边界，不冒充完整RFC属性校验。原from_ical签名及容错、未知组件和延迟解析保持，不硬编码损坏fixture或默认强制严格。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add Component.from_ical_strict(st, multiple=False), inherited by Calendar and LazyCalendar, as an explicit strict component-boundary parsing API. Before constructing any parser/model or caching any timezone, inspect all unfolded BEGIN/END markers with a textual stack: reject orphan END, case-insensitive name mismatch, cross-layer closure, and unfinished BEGIN at EOF. Include actual and expected names in mismatch errors. Accept str, bytes and Path (read once), valid nested and unknown X components, and preserve the multiple return contract plus subclass parser dispatch. Use a shared private ComponentIcalParser boundary validator and then the existing cls.from_ical path. This checks structural component boundaries, not every RFC property. Preserve the original from_ical signature and permissive behavior, all frozen tests, custom factories and lazy parsing; do not hardcode old malformed fixtures or make strictness the default.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o02_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/icalendar/parser/ical/component.py
+- library/src/icalendar/cal/component.py
+- library/tests/test_development_collective_icalendar_o02_dev.py
+- library/docs/development-collective-icalendar-o02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

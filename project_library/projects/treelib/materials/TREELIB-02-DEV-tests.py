@@ -1,17 +1,17 @@
-"""节点重命名不得覆盖兄弟或先移除再遇到非法标识。"""
+"Public regression tests for TREELIB-02-DEV; the complete business contract is in materials/TREELIB-02-DEV-contract.md."
 import unittest
 from treelib import Tree
 from treelib.exceptions import DuplicatedNodeIdError
 
 
 def build():
-    """建立真实带子节点的分类。@return 树。"""
+    "Support the public regression through build."
     tree=Tree();tree.create_node('Root','r');tree.create_node('A','a',parent='r');tree.create_node('B','b',parent='r');tree.create_node('Leaf','leaf',parent='a')
     return tree
 
 
 def test_collision_and_unhashable_leave_whole_structure_unchanged():
-    """冲突与不可哈希标识保留索引、对象和双向指针。@return None。"""
+    "Verify collision and unhashable leave whole structure unchanged."
     tree=build();before=tree.to_json(with_identifier=True);node=tree['a']
     for value in ('b',[],None):
         with unittest.TestCase().assertRaises((ValueError,DuplicatedNodeIdError)):tree.update_node('a',identifier=value,tag='changed')
@@ -19,7 +19,7 @@ def test_collision_and_unhashable_leave_whole_structure_unchanged():
 
 
 def test_rename_root_children_and_shared_view_rejection():
-    """合法根/子级改名完整更新，多树共享明确拒绝。@return None。"""
+    "Verify rename root children and shared view rejection."
     tree=build();tree.update_node('a',identifier='new',tag='New')
     assert tree.parent('leaf').identifier=='new' and [node.identifier for node in tree.children('r')]==['new','b']
     tree.update_node('r',identifier='root')

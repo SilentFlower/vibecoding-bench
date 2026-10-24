@@ -1,5 +1,12 @@
-# 修复JSON修改日期字段判断并保留正式时间与UTC解析事实
+# Engineering contract: FEEDPARSER-O01-DEV
 
-对应路线01：正式date_modified检测/读取一致且优先，旧date_updated仅显式回退；原字符串与UTC保留，缺修改日期不写假updated、非法日期parsed为None。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix JSONParser.parse_entry date_modified detection/value consistency through actual feedparser.parse. Preserve the original date string and UTC parsed tuple, prefer correct date_modified when both spellings exist and explicitly support legacy date_updated only as fallback without KeyError. Missing modified dates must not create real updated keys from published aliases; invalid strings remain raw with parsed None. Do not replace published or merely rely on FeedParserDict compatibility fallback to claim a modified date exists.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o01_dev.py and concise English compatibility documentation at library/docs/development-feedparser-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/feedparser/parsers/json.py
+- library/tests/test_development_feedparser_o01_dev.py
+- library/docs/development-feedparser-o01-dev.md

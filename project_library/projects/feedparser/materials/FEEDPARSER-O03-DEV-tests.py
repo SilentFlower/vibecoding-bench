@@ -1,14 +1,14 @@
-"""两个真实解析调用有独立日期注册集，不触碰全局处理器。"""
+"Public regression tests for FEEDPARSER-O03-DEV; the complete business contract is in materials/FEEDPARSER-O03-DEV-contract.md."
 import feedparser,io
 from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 def parse(value,registry=None):
-    """实际RSS内存解析，日期来自真实pubDate。@return 条目。"""
+    "Support the public regression through parse."
     return feedparser.parse(io.StringIO('<rss version="2.0"><channel><title>T</title><item><title>I</title><pubDate>'+value+'</pubDate></item></channel></rss>'),date_handlers=registry).entries[0]
 
 def test_registry_interleaving_and_real_xml_and_json_calls_stay_local():
-    """各自私有格式只在自己的调用生效，内建日期仍可回退。@return None。"""
+    "Verify registry interleaving and real xml and json calls stay local."
     from feedparser import DateHandlerRegistry
     a=DateHandlerRegistry([lambda text:(2026,1,2,3,4,5,4,2,0) if text=='private-a' else None])
     b=DateHandlerRegistry([lambda text:(2025,2,3,4,5,6,0,34,0) if text=='private-b' else None])
@@ -17,7 +17,7 @@ def test_registry_interleaving_and_real_xml_and_json_calls_stay_local():
     assert parse('Fri, 02 Jan 2026 00:00:00 GMT',a).published_parsed[:3]==(2026,1,2)
 
 def test_bad_returns_failures_duplicates_and_registry_immutability():
-    """坏处理器继续下一个，不重复调用同一函数，也不接受错误九元组。@return None。"""
+    "Verify bad returns failures duplicates and registry immutability."
     from feedparser import DateHandlerRegistry
     calls=[]
     def broken(text):calls.append('broken');raise ValueError('mismatch')
@@ -29,7 +29,7 @@ def test_bad_returns_failures_duplicates_and_registry_immutability():
     with pytest.raises(TypeError):DateHandlerRegistry([42])
 
 def test_concurrent_registry_calls_and_error_reset_do_not_share_state():
-    """并发线程各得自身日期，错误调用后默认解析不记住私有处理器。@return None。"""
+    "Verify concurrent registry calls and error reset do not share state."
     from feedparser import DateHandlerRegistry
     def work(year):
         registry=DateHandlerRegistry([lambda text:(year,1,1,0,0,0,0,1,0)],include_builtin=False)

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线11：显式figure分组使每图、图说明及组前后正文按真实段落呈现；alt不替换、嵌套多图保序，ignore/alt等图片选项仍生效，EOF清理默认保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add figure_mode="legacy"|"group" to actual figure/figcaption/image processing. Group mode creates readable paragraph boundaries around the group, each image and each caption, preserving source order, original alt text, inline caption formatting, multiple/nested figures, caption-only/empty cases and neighboring body text. Existing ignore_images/images_to_alt/images-as-HTML behavior remains authoritative; never replace alt with caption or drop captions when images are disabled. Reset grouping depth at finish including unclosed EOF, retain default compatibility and reject unknown figure strategies.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_html2text_o03_dev.py and concise English compatibility documentation at library/docs/development-html2text-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/html2text/__init__.py
+- library/test/test_development_html2text_o03_dev.py
+- library/docs/development-html2text-o03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

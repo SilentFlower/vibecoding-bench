@@ -1,5 +1,12 @@
-# 让CLI显示复用真实全天事件的排他结束语义
+# Engineering contract: COLLECTIVE-ICALENDAR-O01-DEV
 
-CLI复用Event.start/end/duration，DATE全天缺省结束为次日且持续一天；普通定时事件仍可零时长。显式结束和时长、浮动及带时区显示保持，非法组合沿真实模型校验，不硬编码日期。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Repair cli.view to use Event.start/end/duration rather than deriving a separate zero-length default. An all-day DATE DTSTART with no DTEND/DURATION has the model-defined exclusive next-day end and one-day duration; timed events without end remain zero-length. Preserve explicit DTEND/DURATION, floating/aware display rules and model validation of illegal combinations. Do not hardcode dates or change the Event model to fit CLI output.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o01_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/icalendar/cli.py
+- library/tests/test_development_collective_icalendar_o01_dev.py
+- library/docs/development-collective-icalendar-o01-dev.md

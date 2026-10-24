@@ -32,7 +32,7 @@
           "id": "PYTHON-DATEUTIL-01-DEV",
           "kind": "modify",
           "goal": "日历规则与VTIMEZONE规范接收空格和HTAB折行",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair RFC unfolding in rrulestr(unfold=True)/compatible and tzical so both SP and HTAB continuation prefixes join the preceding content line, removing exactly one prefix character. Preserve existing default non-unfold rules, blank-line policy and value whitespace; do not strip all content. Verify actual recurrence instances and offset of a folded VTIMEZONE. No external calendars, network or zone service.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_01_dev.py, and Chinese compatibility documentation at library/docs/development-python-dateutil-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair RFC unfolding in rrulestr(unfold=True)/compatible and tzical so both SP and HTAB continuation prefixes join the preceding content line, removing exactly one prefix character. Preserve existing default non-unfold rules, blank-line policy and value whitespace; do not strip all content. Verify actual recurrence instances and offset of a folded VTIMEZONE. No external calendars, network or zone service.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_01_dev.py, and English compatibility documentation at library/docs/development-python-dateutil-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DATEUTIL-01-DEV-contract.md",
@@ -51,7 +51,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DATEUTIL-01-DEV.rubric.json",
             "native": "verification/PYTHON-DATEUTIL-01-DEV.native.json",
             "public_native": "verification/PYTHON-DATEUTIL-01-DEV.public.native.json",
@@ -80,7 +80,7 @@
           "id": "PYTHON-DATEUTIL-02-DEV",
           "kind": "modify",
           "goal": "重复日历BYDAY的普通与序数条件按规范并集选日",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair rrule day filtering so ordinary and ordinal weekdays in the SAME BYDAY list form a union before intersecting with BYMONTH/BYMONTHDAY/BYYEARDAY etc. Preserve pure ordinary/pure ordinal rules, negative ordinals, MONTHLY/YEARLY with BYMONTH, COUNT/UNTIL/BYSETPOS and cached/noncached results. Use actual meeting sequences across months/years, not merely an internal mask. No hardcoded dates or change to other BY attribute conjunction.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_02_dev.py, and Chinese compatibility documentation at library/docs/development-python-dateutil-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair rrule day filtering so ordinary and ordinal weekdays in the SAME BYDAY list form a union before intersecting with BYMONTH/BYMONTHDAY/BYYEARDAY etc. Preserve pure ordinary/pure ordinal rules, negative ordinals, MONTHLY/YEARLY with BYMONTH, COUNT/UNTIL/BYSETPOS and cached/noncached results. Use actual meeting sequences across months/years, not merely an internal mask. No hardcoded dates or change to other BY attribute conjunction.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_02_dev.py, and English compatibility documentation at library/docs/development-python-dateutil-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DATEUTIL-02-DEV-contract.md",
@@ -98,7 +98,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DATEUTIL-02-DEV.rubric.json",
             "native": "verification/PYTHON-DATEUTIL-02-DEV.native.json",
             "public_native": "verification/PYTHON-DATEUTIL-02-DEV.public.native.json",
@@ -127,7 +127,7 @@
           "id": "PYTHON-DATEUTIL-03-DEV",
           "kind": "modify",
           "goal": "日期导入拒绝非法时区小时分钟而不静默归一化",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nValidate numeric timezone hour/minute components before computing offsets in ordinary dateutil.parser.parse. Reject hours outside 0..23 and minutes outside 0..59 using existing ParserError failure protocol even with ignoretz; support HH/HHMM/HH:MM both signs and preserve valid extremes/tzinfos. Do not change existing UTC/GMT reversed-sign semantics or normalize invalid minute inputs into other legal times. Valid returned datetimes must support utcoffset/isoformat.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_03_dev.py, and Chinese compatibility documentation at library/docs/development-python-dateutil-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nValidate numeric timezone hour/minute components before computing offsets in ordinary dateutil.parser.parse. Reject hours outside 0..23 and minutes outside 0..59 using existing ParserError failure protocol even with ignoretz; support HH/HHMM/HH:MM both signs and preserve valid extremes/tzinfos. Do not change existing UTC/GMT reversed-sign semantics or normalize invalid minute inputs into other legal times. Valid returned datetimes must support utcoffset/isoformat.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_03_dev.py, and English compatibility documentation at library/docs/development-python-dateutil-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DATEUTIL-03-DEV-contract.md",
@@ -145,7 +145,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DATEUTIL-03-DEV.rubric.json",
             "native": "verification/PYTHON-DATEUTIL-03-DEV.native.json",
             "public_native": "verification/PYTHON-DATEUTIL-03-DEV.public.native.json",
@@ -174,7 +174,7 @@
           "id": "PYTHON-DATEUTIL-04-DEV",
           "kind": "modify",
           "goal": "ISO周日期拒绝不存在的第53周且保留有效跨年",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair isoparser._calculate_weekdate to verify the calculated date actually belongs to requested ISO year/week, rejecting invalid W53 rather than rolling into next ISO year. Keep valid 53-week years and Gregorian-boundary dates, basic/extended syntax, default weekday, date bounds and existing day/week validation. Do not blanket-reject week 53 or compare Gregorian year in place of ISO year.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_04_dev.py, and Chinese compatibility documentation at library/docs/development-python-dateutil-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair isoparser._calculate_weekdate to verify the calculated date actually belongs to requested ISO year/week, rejecting invalid W53 rather than rolling into next ISO year. Keep valid 53-week years and Gregorian-boundary dates, basic/extended syntax, default weekday, date bounds and existing day/week validation. Do not blanket-reject week 53 or compare Gregorian year in place of ISO year.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_04_dev.py, and English compatibility documentation at library/docs/development-python-dateutil-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DATEUTIL-04-DEV-contract.md",
@@ -192,7 +192,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DATEUTIL-04-DEV.rubric.json",
             "native": "verification/PYTHON-DATEUTIL-04-DEV.native.json",
             "public_native": "verification/PYTHON-DATEUTIL-04-DEV.public.native.json",
@@ -221,7 +221,7 @@
           "id": "PYTHON-DATEUTIL-05-DEV",
           "kind": "modify",
           "goal": "VTIMEZONE安全忽略X扩展且保留必需字段严格校验",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAllow case-insensitive X- extension properties at VTIMEZONE and STANDARD/DAYLIGHT component levels in tzical, ignoring their content as nonexecuting metadata. Preserve existing transition/offset/recurrence behavior, required TZID/DTSTART/offset checks, malformed BEGIN/END and unknown NON-X standard property errors. Parameters and repeated X properties are harmless; do not fetch TZURL/X URLs, import code or relax validation for ordinary properties.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_05_dev.py, and Chinese compatibility documentation at library/docs/development-python-dateutil-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAllow case-insensitive X- extension properties at VTIMEZONE and STANDARD/DAYLIGHT component levels in tzical, ignoring their content as nonexecuting metadata. Preserve existing transition/offset/recurrence behavior, required TZID/DTSTART/offset checks, malformed BEGIN/END and unknown NON-X standard property errors. Parameters and repeated X properties are harmless; do not fetch TZURL/X URLs, import code or relax validation for ordinary properties.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_05_dev.py, and English compatibility documentation at library/docs/development-python-dateutil-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DATEUTIL-05-DEV-contract.md",
@@ -239,7 +239,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DATEUTIL-05-DEV.rubric.json",
             "native": "verification/PYTHON-DATEUTIL-05-DEV.native.json",
             "public_native": "verification/PYTHON-DATEUTIL-05-DEV.public.native.json",
@@ -268,7 +268,7 @@
           "id": "PYTHON-DATEUTIL-06-DEV",
           "kind": "modify",
           "goal": "缓存复发规则与规则集可持久化并重建独立运行状态",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nImplement versioned pickle state for rrulebase covering rrule and rruleset with cache=True/False. Serialize only definition and cache policy, reconstruct independent locks/iterators, and restart cache computation rather than promising active iterator position. Preserve include/exclude rules/dates, timezone definitions and query results after empty/partial/full cache, deepcopy and legacy uncached dict states. Reject unknown state versions; never load untrusted external pickle. Old original tests/control files remain unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_06_dev.py, and Chinese compatibility documentation at library/docs/development-python-dateutil-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nImplement versioned pickle state for rrulebase covering rrule and rruleset with cache=True/False. Serialize only definition and cache policy, reconstruct independent locks/iterators, and restart cache computation rather than promising active iterator position. Preserve include/exclude rules/dates, timezone definitions and query results after empty/partial/full cache, deepcopy and legacy uncached dict states. Reject unknown state versions; never load untrusted external pickle. Old original tests/control files remain unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_dateutil_06_dev.py, and English compatibility documentation at library/docs/development-python-dateutil-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DATEUTIL-06-DEV-contract.md",
@@ -286,7 +286,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DATEUTIL-06-DEV.rubric.json",
             "native": "verification/PYTHON-DATEUTIL-06-DEV.native.json",
             "public_native": "verification/PYTHON-DATEUTIL-06-DEV.public.native.json",

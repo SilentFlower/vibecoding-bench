@@ -4,8 +4,8 @@ Make update_multiple apply a finite one-shot iterable of update rules to all mat
 
 # Investigation topics
 
-- 解释多规则顺序和重复返回文档 ID
-- 定位一次性规则流只更新第一单的原因
+- Explain the order of multiple rules and duplicate document IDs in the result.
+- Diagnose why a one-shot rule stream updates only the first document.
 
 # Supplied business material: materials/rule-order.py
 
@@ -34,7 +34,7 @@ from tinydb.storages import MemoryStorage
 
 
 def load_rules():
-    """枚举本次有限配置规则。@return 规则迭代器。"""
+    """Enumerate this finite set of configuration rules. @return Rule iterator."""
     yield ({'done': True}, Query().qty > 0)
 
 

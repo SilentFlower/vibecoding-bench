@@ -1,11 +1,11 @@
-"""真实加权最短路径，不能用单位距离乘统一系数。"""
+"Public regression tests for TEXTDISTANCE-04-DEV; the complete business contract is in materials/TEXTDISTANCE-04-DEV-contract.md."
 import unittest
 import textdistance
 from textdistance.weighted import WeightedLevenshtein
 
 
 def test_asymmetric_zero_and_callable_costs():
-    """插入删除有方向，贵替换可被删插路径取代。@return None。"""
+    "Verify asymmetric zero and callable costs."
     algorithm=WeightedLevenshtein(insertion=2,deletion=5,substitution=9)
     assert algorithm('','ab')==4 and algorithm('ab','')==10
     assert algorithm('a','b')==7
@@ -15,7 +15,7 @@ def test_asymmetric_zero_and_callable_costs():
 
 
 def test_units_predicate_and_invalid_costs():
-    """复用真实qval准备，坏回调成本明确拒绝。@return None。"""
+    "Verify units predicate and invalid costs."
     assert WeightedLevenshtein(qval=None)('one two','one three')==1
     assert WeightedLevenshtein(test_func=lambda a,b:a.casefold()==b.casefold())('A','a')==0
     for cost in (-1,float('nan'),float('inf'),True):

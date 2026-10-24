@@ -1,3 +1,12 @@
-# 配置状态递归合并采用明确冲突策略并保持持久校验与原分支
+# Engineering contract: PYRSISTENT-06-DEV
 
-路线19：递归map合并按默认替换/完整路径报错/显式回调处理叶子冲突，真实evolver保留校验类型和未变分支；右侧pairs复用前置update。新普通容器冻结而已有持久类型不降级，异常不改旧状态，不默认拼接序列或宣称并发事务。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add pyrsistent.merge.deep_merge(left,right,conflict="replace",max_depth=32) and MergeConflict.path. left is a PMap and right accepts mapping or pairs through the earlier delivered update capability. Merge mapping/mapping branches recursively, leaf conflicts replace by default, raise with full tuple path or call an explicit (path,old,new) resolver. Equal/unmodified values share existing branches; new builtin containers are frozen with strict=False to preserve already-persistent checked types. Use actual evolvers, preserve CheckedPMap validation, reject unsupported policy/depth and surface type/source/callback failures without changing left. Do not claim automatic concatenation of sequences, arbitrary object deepcopy or a concurrent transaction. Cyclic/unrepresentable new builtin containers fail explicitly.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_06_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/pyrsistent/merge.py
+- library/tests/test_development_pyrsistent_06_dev.py
+- library/docs/development-pyrsistent-06-dev.md

@@ -1,5 +1,16 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线12：显式segmented-list复用真实RST行内与table节点，必需columns、竖线CSV/引号/空格及中文可发布；非法行宽/引号/标题真实诊断，不改普通冒号/旧表格语法。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add registered segmented-list RST directive with required pipe-CSV columns option, optional inline-formatted title, class/name and pipe-CSV content rows. Parse through real Directive/state.inline_text into table/tgroup/colspec/thead/tbody/row/entry nodes and actual HTML writer output. Preserve quoted pipes, empty cells, Unicode/inline markup and ordinary non-directive colon paragraphs. Reject absent/empty headings, malformed CSV or inconsistent row widths with real directive diagnostics and no half table. Do not implement as raw HTML/text substitution or change existing table/list-table syntax.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_docutils_o02_dev.py and concise English compatibility documentation at library/docs/development-docutils-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/docutils/docutils/parsers/rst/directives/segmented.py
+- library/docutils/docutils/parsers/rst/directives/__init__.py
+- library/docutils/docutils/parsers/rst/languages/en.py
+- library/tests/test_development_docutils_o02_dev.py
+- library/docs/development-docutils-o02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

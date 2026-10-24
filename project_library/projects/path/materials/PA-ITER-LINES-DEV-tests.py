@@ -1,4 +1,4 @@
-"""公开流式文本行读取回归。"""
+"Public regression tests for PA-ITER-LINES-DEV; the complete business contract is in materials/PA-ITER-LINES-DEV-contract.md."
 from path import Path
 import pytest
 

@@ -1,8 +1,8 @@
-"""同优先级任务可显式抢前或保持到达顺序。"""
+"Public regression tests for SORTEDCONTAINERS-01-DEV; the complete business contract is in materials/SORTEDCONTAINERS-01-DEV-contract.md."
 from sortedcontainers import SortedList,SortedKeyList
 
 def test_equal_key_left_right_preserve_payload_identity():
-    """同排序键不等值记录按调用端选择排队。@return None。"""
+    "Verify equal key left right preserve payload identity."
     first={'priority':2,'id':'first'};second={'priority':2,'id':'second'};urgent={'priority':2,'id':'urgent'}
     values=SortedKeyList([first],key=lambda item:item['priority'])
     values.add_right(second);values.add_left(urgent)
@@ -10,7 +10,7 @@ def test_equal_key_left_right_preserve_payload_identity():
     assert values[0] is urgent;values._check()
 
 def test_cross_blocks_empty_and_natural_values():
-    """跨块左边界正确，所有内部索引保持同步。@return None。"""
+    "Verify cross blocks empty and natural values."
     values=SortedKeyList(key=lambda item:item[0]);values._reset(4)
     for index in range(40):values.add_right((1,index))
     values.add_left((1,-1));values.add_right((1,40))

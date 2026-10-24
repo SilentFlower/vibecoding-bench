@@ -1,4 +1,4 @@
-"""公开分隔行自定义索引回归。"""
+"Public regression tests for TB-INDEX-DEV; the complete business contract is in materials/TB-INDEX-DEV-contract.md."
 import pytest
 from tabulate import tabulate,SEPARATING_LINE
 

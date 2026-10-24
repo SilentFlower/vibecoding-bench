@@ -1,10 +1,10 @@
-"""真实PathLike应作为路径，流所有权保持。"""
+"Public regression tests for BOTTLE-O01-DEV; the complete business contract is in materials/BOTTLE-O01-DEV-contract.md."
 import io
 from pathlib import Path
 import bottle
 
 def test_upload_path_and_stream(tmp_path):
-    """路径和目录上传实际保存，外部流不关闭。@param tmp_path 临时目录。@return None。"""
+    "Verify upload path and stream."
     upload = bottle.FileUpload(io.BytesIO(b'hello'), 'file', 'name.txt')
     upload.save(tmp_path / 'target.txt')
     assert (tmp_path / 'target.txt').read_bytes() == b'hello'
@@ -13,24 +13,24 @@ def test_upload_path_and_stream(tmp_path):
     assert output.getvalue() == b'hello' and not output.closed
 
 def test_template_pathlike_lookup(tmp_path):
-    """模板名和单目录PathLike真实渲染。@param tmp_path 临时目录。@return None。"""
+    "Verify template pathlike lookup."
     (tmp_path / 'view.tpl').write_text('Hello {{name}}', encoding='utf-8')
     template = bottle.SimpleTemplate(name=Path('view'), lookup=tmp_path)
     assert template.render(name='world') == 'Hello world'
 
 def test_custom_fspath_and_invalid(tmp_path):
-    """遵守__fspath__协议，不用str伪造路径。@param tmp_path 临时目录。@return None。"""
+    "Verify custom fspath and invalid."
     import pytest
     class Location:
-        """自定义真实路径。"""
+        "Public regression fixture: Location."
         def __fspath__(self):
-            """返回本次目标。@return 字符串路径。"""
+            "Support the public regression through __fspath__."
             return str(tmp_path / 'custom.txt')
     bottle.FileUpload(io.BytesIO(b'x'), 'file', 'x').save(Location())
     assert (tmp_path / 'custom.txt').read_bytes() == b'x'
     class Invalid:
-        """错误路径协议。"""
+        "Public regression fixture: Invalid."
         def __fspath__(self):
-            """故意返回非法类型。@return int。"""
+            "Support the public regression through __fspath__."
             return 7
     with pytest.raises(TypeError): bottle.FileUpload(io.BytesIO(b'x'), 'file', 'x').save(Invalid())

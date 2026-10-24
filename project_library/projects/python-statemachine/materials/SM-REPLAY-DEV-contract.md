@@ -1,5 +1,12 @@
-# 在明确工厂的新实例中重放事件日志并核对真实配置
+# Engineering contract: SM-REPLAY-DEV
 
-日志先完整验证，再由明确工厂创建新机器并执行真实事件。逐条核对前后配置、值和成功状态，发现偏离即停止；不能从日志类名动态导入或绕过回调伪造状态。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement statemachine.replay.replay(factory,document,*,verify=True,max_records=10000) returning frozen ReplayResult(machine,results). Fully validate completed JSON journal before calling factory; never import a class name from data. Run each EventCall through completed MachineRunner on the new factory instance and preserve native callback execution. Verify before/after states and values plus passed/error status per index, reject divergence before next event; verify=False returns actual results explicitly. Handle empty journals and expected disallowed events. Do not mutate journal data or claim external callback side effects are rolled back.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_replay_dev.py and concise English compatibility documentation at library/docs/development-sm-replay-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/statemachine/replay.py
+- library/development_tests/test_development_sm_replay_dev.py
+- library/docs/development-sm-replay-dev.md

@@ -1,4 +1,4 @@
-"""公开命名查询集逐项状态回归。"""
+"Public regression tests for JM-QUERYSET-DEV; the complete business contract is in materials/JM-QUERYSET-DEV-contract.md."
 import pytest
 from jmespath.queries import QuerySet
 from jmespath.exceptions import JMESPathError

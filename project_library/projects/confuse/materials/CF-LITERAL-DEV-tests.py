@@ -1,4 +1,4 @@
-"""公开严格常量模板回归。"""
+"Public regression tests for CF-LITERAL-DEV; the complete business contract is in materials/CF-LITERAL-DEV-contract.md."
 import pytest
 from confuse import RootView,ConfigSource,ConfigValueError,NotFoundError
 from confuse.literal import Literal

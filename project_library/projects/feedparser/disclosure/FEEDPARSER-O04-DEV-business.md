@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线09：实际id可靠优先，无id按明确真实字段/可选NFC生成稳定摘要并标推断；不写假id、不读别名、不删追踪参数，缺数据/非法配置明确拒绝。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add feedparser.records.entry_identity for actual parsed entry mappings. Prefer a nonempty native string id with reliable=True; otherwise compute deterministic SHA256 from explicit selected actual fields with configurable NFC string normalization, canonical JSON and reliable=False/source=fields metadata. Never inject an id, read compatibility alias fallbacks as real facts, strip tracking parameters or identify entries merely by similar titles. Reject missing usable data, duplicate/invalid field names, nonstring native ids and unsupported/nonfinite JSON values explicitly. Preserve inputs, distinguish equal titles with different links and document fallback collision/stability scope.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o04_dev.py and concise English compatibility documentation at library/docs/development-feedparser-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/feedparser/records.py
+- library/tests/test_development_feedparser_o04_dev.py
+- library/docs/development-feedparser-o04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

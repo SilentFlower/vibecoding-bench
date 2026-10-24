@@ -1,10 +1,10 @@
-"""默认工厂只在所有来源缺失时执行一次。"""
+"Public regression tests for DC-FACTORY-DEV; the complete business contract is in materials/DC-FACTORY-DEV-contract.md."
 import pytest
 from decouple import Config, RepositoryEmpty
 
 
 def test_factory_late_cast(monkeypatch):
-    """环境存在或空值时均不执行工厂。@param monkeypatch 环境隔离。@return None。"""
+    "Verify factory late cast."
     config = Config(RepositoryEmpty())
     calls = []
     factory = lambda: calls.append(1) or '8'
@@ -17,7 +17,7 @@ def test_factory_late_cast(monkeypatch):
 
 
 def test_factory_conflict_and_callable_default():
-    """旧可调用default仍是值，双重默认政策拒绝。@return None。"""
+    "Verify factory conflict and callable default."
     config = Config(RepositoryEmpty())
     value = lambda: 1
     assert config('DEVELOPMENT_MISSING', default=value) is value
@@ -26,10 +26,10 @@ def test_factory_conflict_and_callable_default():
 
 
 def test_factory_recursion_and_none():
-    """递归不无限执行，None是合法后备值。@return None。"""
+    "Verify factory recursion and none."
     config = Config(RepositoryEmpty())
     def recursive():
-        """重入相同键。@return 不返回。"""
+        "Support the public regression through recursive."
         return config('DEVELOPMENT_RECURSIVE', default_factory=recursive)
     with pytest.raises(ValueError):
         config('DEVELOPMENT_RECURSIVE', default_factory=recursive)

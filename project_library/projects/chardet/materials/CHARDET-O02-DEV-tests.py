@@ -1,8 +1,8 @@
-"""检测身份和Python解码能力不能混为一谈。"""
+"Public regression tests for CHARDET-O02-DEV; the complete business contract is in materials/CHARDET-O02-DEV-contract.md."
 import codecs
 
 def test_legacy_and_python_names():
-    """真实UTF8 BOM标签保留且可选规范名。@return None。"""
+    "Verify legacy and python names."
     from chardet.details import detect_details
     data = codecs.BOM_UTF8 + b'hello'
     legacy = detect_details(data)
@@ -11,7 +11,7 @@ def test_legacy_and_python_names():
     assert canonical['encoding'] == 'utf-8-sig' and canonical['codec_available']
 
 def test_unusual_ucs4_is_not_mislabelled():
-    """不支持的UCS4字节序不能假装标准UTF32。@return None。"""
+    "Verify unusual ucs4 is not mislabelled."
     from chardet.details import detect_details
     result = detect_details(b'\xfe\xff\x00\x00payload', names='python')
     assert result['raw_encoding'] == 'X-ISO-10646-UCS-4-3412'
@@ -19,7 +19,7 @@ def test_unusual_ucs4_is_not_mislabelled():
     assert result['status'] == 'unsupported-codec'
 
 def test_empty_and_invalid_policy():
-    """空输入和无效命名政策明确。@return None。"""
+    "Verify empty and invalid policy."
     import pytest
     from chardet.details import detect_details
     assert detect_details(b'')['status'] == 'empty-or-no-match'

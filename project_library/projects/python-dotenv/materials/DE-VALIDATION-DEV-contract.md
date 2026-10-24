@@ -1,5 +1,12 @@
-# 严格接入配置并在写环境前校验完整文件
+# Engineering contract: DE-VALIDATION-DEV
 
-部署前需要严格验证完整配置，收集语法、重复键和必填问题，保留原始起始行，不把密钥写进异常。返回只读值与来源，不自动插值、不改变原宽松API，不写进程环境。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement dotenv.validation.parse_config(text, *, required=(), duplicates="error") returning immutable ParsedConfig(values, lines), using the pinned parser and its actual original line numbers. Collect syntax, duplicate and missing/value-less required-key issues into ConfigValidationError.issues tuples (code,key,line), in source order then required order; errors must not include secret values. Empty assigned values satisfy required. duplicates="last" preserves last definition and its line. Do not interpolate, touch os.environ, print secret content, or change permissive dotenv_values behavior.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_de_validation_dev.py and concise English compatibility documentation at library/docs/development-de-validation-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/dotenv/validation.py
+- library/development_tests/test_development_de_validation_dev.py
+- library/docs/development-de-validation-dev.md

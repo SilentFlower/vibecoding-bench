@@ -1,5 +1,12 @@
-# 将HTTP领域异常转换为保留协议头的独立问题JSON响应
+# Engineering contract: WZ-PROBLEM-DEV
 
-真实HTTP异常输出独立问题JSON，保留Allow、认证、重试与重复Cookie等协议头。不能修改异常自带的原响应，扩展不能覆盖标准成员，输出类型和长度必须与实际正文一致。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement werkzeug.problems.problem_response(error,*,type="about:blank",instance=None,extensions=None) for real HTTPException. Create a NEW Response with actual error status, type/title/status/detail and optional instance/extensions, UTF8 finite JSON, application/problem+json and exact content length. Retain original protocol headers including duplicate Set-Cookie, Allow, WWW-Authenticate and Retry-After; replace only representation headers appropriately. Do not mutate a response supplied inside the exception. Reject reserved extension collisions/non-string keys and non-error status. Do not turn unrelated Python exceptions into successful HTTP responses.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_problem_dev.py and concise English compatibility documentation at library/docs/development-wz-problem-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/werkzeug/problems.py
+- library/development_tests/test_development_wz_problem_dev.py
+- library/docs/development-wz-problem-dev.md

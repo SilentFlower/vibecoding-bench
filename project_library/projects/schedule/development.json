@@ -122,7 +122,7 @@
           "id": "SC-INTERVAL-DEV",
           "kind": "modify",
           "goal": "在注册或计算前拒绝无效间隔并防止调度死循环",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nValidate Job interval as a positive finite nonboolean int/float at construction and revalidate before _schedule_next_run, because existing public attributes can be mutated. Raise ScheduleValueError before registering a callback or entering the next-run advancement loop for zero/negative/nonfinite/invalid types. Keep positive fractional fixed intervals working and original integer random intervals; reject noninteger random bounds clearly rather than delegating them to randint. Preserve deadline, timezone and weekday logic.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_interval_dev.py and concise Chinese compatibility documentation at library/docs/development-sc-interval-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nValidate Job interval as a positive finite nonboolean int/float at construction and revalidate before _schedule_next_run, because existing public attributes can be mutated. Raise ScheduleValueError before registering a callback or entering the next-run advancement loop for zero/negative/nonfinite/invalid types. Keep positive fractional fixed intervals working and original integer random intervals; reject noninteger random bounds clearly rather than delegating them to randint. Preserve deadline, timezone and weekday logic.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_interval_dev.py and concise English compatibility documentation at library/docs/development-sc-interval-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/SC-INTERVAL-DEV-contract.md",
@@ -137,7 +137,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SC-INTERVAL-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SC-INTERVAL-DEV.native.json",
@@ -169,7 +169,7 @@
           "id": "SC-WEEKDAYS-DEV",
           "kind": "modify",
           "goal": "按每日时间和显式星期集合选择下一次运行",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Job.on_weekdays(*weekdays) for every(1).day(s) jobs, accepting nonempty integer weekdays 0..6 (Monday=0), deduplicating them and returning self. Integrate selection into _schedule_next_run in its configured timezone before existing UTC correction, preserving .at clock and strict-future scheduling. Revalidate eligibility if job attributes change; reject other intervals/units/start_day and invalid weekday values. Do not alter legacy .monday/.weeks or unconstrained daily schedules.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_weekdays_dev.py and concise Chinese compatibility documentation at library/docs/development-sc-weekdays-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Job.on_weekdays(*weekdays) for every(1).day(s) jobs, accepting nonempty integer weekdays 0..6 (Monday=0), deduplicating them and returning self. Integrate selection into _schedule_next_run in its configured timezone before existing UTC correction, preserving .at clock and strict-future scheduling. Revalidate eligibility if job attributes change; reject other intervals/units/start_day and invalid weekday values. Do not alter legacy .monday/.weeks or unconstrained daily schedules.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_weekdays_dev.py and concise English compatibility documentation at library/docs/development-sc-weekdays-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/SC-WEEKDAYS-DEV-contract.md",
@@ -184,7 +184,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SC-WEEKDAYS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SC-WEEKDAYS-DEV.native.json",
@@ -216,7 +216,7 @@
           "id": "SC-PRIORITY-DEV",
           "kind": "modify",
           "goal": "让同时到期任务按显式优先级稳定执行",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Job.set_priority(priority) accepting nonboolean integers, returning self. Scheduler.run_pending must order due jobs first by existing next_run, then descending explicit priority (default zero), then stable registration order for ties. Earlier due times always win over priority. Preserve due-set snapshot, CancelJob semantics, exception propagation, Job.__lt__, run_all order and behavior of unconfigured jobs.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_priority_dev.py and concise Chinese compatibility documentation at library/docs/development-sc-priority-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Job.set_priority(priority) accepting nonboolean integers, returning self. Scheduler.run_pending must order due jobs first by existing next_run, then descending explicit priority (default zero), then stable registration order for ties. Earlier due times always win over priority. Preserve due-set snapshot, CancelJob semantics, exception propagation, Job.__lt__, run_all order and behavior of unconfigured jobs.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_priority_dev.py and concise English compatibility documentation at library/docs/development-sc-priority-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/SC-PRIORITY-DEV-contract.md",
@@ -231,7 +231,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SC-PRIORITY-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SC-PRIORITY-DEV.native.json",
@@ -263,7 +263,7 @@
           "id": "SC-ERROR-POLICY-DEV",
           "kind": "modify",
           "goal": "对显式选中的任务按连续失败次数取消调度",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement schedule.policies.with_error_policy(job, *, max_failures=3, on_error=None) for configured jobs. Preserve its bound callback arguments and return the original Job. Suppress Exception from that callback only, increment job.consecutive_failures, notify optional (original_exception,count) once, and return CancelJob when consecutive failures reach the positive integer limit; otherwise let normal Job.run reschedule once. Success resets the count and preserves return/CancelJob. Do not catch BaseException, suppress handler errors, double-wrap a job, retry immediately, or change unwrapped jobs exception behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_error_policy_dev.py and concise Chinese compatibility documentation at library/docs/development-sc-error-policy-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement schedule.policies.with_error_policy(job, *, max_failures=3, on_error=None) for configured jobs. Preserve its bound callback arguments and return the original Job. Suppress Exception from that callback only, increment job.consecutive_failures, notify optional (original_exception,count) once, and return CancelJob when consecutive failures reach the positive integer limit; otherwise let normal Job.run reschedule once. Success resets the count and preserves return/CancelJob. Do not catch BaseException, suppress handler errors, double-wrap a job, retry immediately, or change unwrapped jobs exception behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_error_policy_dev.py and concise English compatibility documentation at library/docs/development-sc-error-policy-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/SC-ERROR-POLICY-DEV-contract.md",
@@ -278,7 +278,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SC-ERROR-POLICY-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SC-ERROR-POLICY-DEV.native.json",

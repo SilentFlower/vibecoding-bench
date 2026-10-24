@@ -1,5 +1,12 @@
-# 按带权语言偏好选择实际可用区域
+# Engineering contract: BA-PREFERENCES-DEV
 
-应用发布多语言后，按用户带权偏好选择实际可用包，保持同权顺序和原区域拼写。明确禁用的语言不能被通配符选回，复用原别名与语言回退，输入长度及权重语法有明确限制。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add babel.core.negotiate_locale_preferences(header, available, *, sep="_", aliases=LOCALE_ALIASES). Parse bounded comma-separated language ranges and optional q values 0..1 with at most three decimals. Select descending quality, stable header order; reuse pinned negotiate_locale matching/aliases for each nonwildcard candidate and return spelling from available. Explicit q=0 language/prefix exclusions must apply before wildcard selection; wildcard picks first nonexcluded available. Reject malformed parameters, quality, headers over 8192 characters or 100 ranges. Materialize available once and preserve the old negotiator.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_preferences_dev.py and concise English compatibility documentation at library/docs/development-ba-preferences-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/babel/core.py
+- library/development_tests/test_development_ba_preferences_dev.py
+- library/docs/development-ba-preferences-dev.md

@@ -1,4 +1,4 @@
-"""公开销量加权分析回归。"""
+"Public regression tests for AG-WEIGHTED-DEV; the complete business contract is in materials/AG-WEIGHTED-DEV-contract.md."
 from decimal import Decimal
 import agate
 import pytest

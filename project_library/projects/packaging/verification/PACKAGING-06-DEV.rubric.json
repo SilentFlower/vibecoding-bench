@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": 2,
+  "version": 3,
   "task_id": "PACKAGING-06-DEV",
   "source_commit": "1a62a26afe0f4881593e31bed4f7753bd1c8fe27",
   "criteria": [
@@ -12,10 +12,10 @@
     },
     {
       "id": "workflow",
-      "requirement": "调查真实源码、说明调用路径并澄清业务，获得方案确认后实施；交付真实工程改动、原版失败的公开回归和中文兼容说明；独立失败返工，不以问答或文档单独计数。",
+      "requirement": "Investigate the real source, explain the call path and clarify the business requirements before obtaining plan approval and implementing. Deliver real engineering changes, public regression tests that fail on the original version, and English compatibility documentation. Repair independently reported failures; questions, answers and documentation do not count as separate completed objectives.",
       "evidence": [],
       "allow_candidate_evidence": true
     }
   ],
-  "comparison": "按实际业务和冻结边界接受等价实现，不按参考补丁文本评分。"
+  "comparison": "Accept equivalent implementations according to actual business behavior and the frozen scope; do not grade by matching the reference patch text."
 }

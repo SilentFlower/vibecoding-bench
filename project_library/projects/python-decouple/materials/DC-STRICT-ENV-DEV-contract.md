@@ -1,5 +1,12 @@
-# 为ENV文件提供不泄漏值的严格解析诊断
+# Engineering contract: DC-STRICT-ENV-DEV
 
-在已交付BOM读取边界上增加显式strict模式，保留UTF-8首BOM及内部标记。坏行、空键和重复键给出真实文件路径及物理行号，错误不回显原行或值。合法空值、首等号分割、引用、编码和文件系统错误保持；默认宽容跳过及末值覆盖不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend the already delivered BOM-aware RepositoryEnv with keyword-only strict=False. Strict mode rejects non-comment/nonblank lines without equals, empty trimmed keys and duplicate trimmed keys, with source path and physical one-based line number but no raw line or values in the diagnostic. Preserve UTF-8 BOM handling and embedded U+FEFF, empty values, splitting at the first equals, existing quotation handling, encoding errors and OS errors. Default tolerant skipping/last-value behavior remains unchanged; do not read unrelated files or execute shell syntax.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_dc_strict_env_dev.py and concise English compatibility documentation at library/docs/development-dc-strict-env-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/decouple.py
+- library/tests/test_development_dc_strict_env_dev.py
+- library/docs/development-dc-strict-env-dev.md

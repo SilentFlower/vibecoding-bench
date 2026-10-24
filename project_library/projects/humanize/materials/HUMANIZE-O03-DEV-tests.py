@@ -1,9 +1,9 @@
-"""列表可显式选择区域连接规则，默认英语原字节保持。"""
+"Public regression tests for HUMANIZE-O03-DEV; the complete business contract is in materials/HUMANIZE-O03-DEV-contract.md."
 import humanize
 from humanize import i18n
 import pytest
 def catalog(root,word):
-    """构造合成GNU消息目录，供实际gettext读取。@return 根路径。"""
+    "Support the public regression through catalog."
     import struct
     entries={'':'Content-Type: text/plain; charset=UTF-8\nLanguage: xx\nPlural-Forms: nplurals=2; plural=(n != 1);\n','one':word,'%s and %s':'%s et %s'}
     pairs=sorted((key.encode(),value.encode()) for key,value in entries.items());count=len(pairs)
@@ -17,13 +17,13 @@ def catalog(root,word):
     return root
 
 def test_existing_default_and_cardinality_generator():
-    """零至多项和一次性生成器完整处理。@return None。"""
+    "Verify existing default and cardinality generator."
     assert humanize.natural_list([])=='' and humanize.natural_list([1])=='1'
     assert humanize.natural_list((str(i) for i in range(3)))=='0, 1 and 2'
     assert humanize.natural_list(['a','b'])=='a and b'
 
 def test_actual_catalog_pattern_and_serial_override(tmp_path):
-    """复用原目录已有的双项连接pattern，不写死翻译。@return None。"""
+    "Verify actual catalog pattern and serial override."
     try:
         i18n.activate('xx',catalog(tmp_path,'uno'))
         assert humanize.natural_list(['a','b','c'],localized=True)=='a, b et c'
@@ -32,7 +32,7 @@ def test_actual_catalog_pattern_and_serial_override(tmp_path):
     finally:i18n.deactivate()
 
 def test_custom_percent_conjunction_unicode_and_validation():
-    """自定义连接词作为字面值，不能被当百分号格式。@return None。"""
+    "Verify custom percent conjunction unicode and validation."
     assert humanize.natural_list(['杭州','北京'],conjunction='或%')=='杭州 或% 北京'
     with pytest.raises(ValueError):humanize.natural_list(['a','b'],conjunction='')
     with pytest.raises(TypeError):humanize.natural_list(['a','b'],localized=1)

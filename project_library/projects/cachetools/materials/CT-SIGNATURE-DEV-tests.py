@@ -1,4 +1,4 @@
-"""公开函数签名缓存键回归。"""
+"Public regression tests for CT-SIGNATURE-DEV; the complete business contract is in materials/CT-SIGNATURE-DEV-contract.md."
 import pytest
 from cachetools import cached,LRUCache
 from cachetools.keys import signature_key

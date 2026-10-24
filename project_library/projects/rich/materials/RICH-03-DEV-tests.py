@@ -1,10 +1,10 @@
-"""字符负索引和正索引返回同一富文本样式。"""
+"Public regression tests for RICH-03-DEV; the complete business contract is in materials/RICH-03-DEV-contract.md."
 import unittest
 from rich.text import Text,Span
 
 
 def test_negative_index_preserves_overlapping_spans_and_base_style():
-    """相同字符的正负索引样式、位置与原输入一致。@return None。"""
+    "Verify negative index preserves overlapping spans and base style."
     text=Text('hello',style='bold',spans=[Span(1,5,'red'),Span(3,5,'underline')])
     negative=text[-1];positive=text[4]
     assert negative.plain==positive.plain=='o' and negative.spans==positive.spans
@@ -13,7 +13,7 @@ def test_negative_index_preserves_overlapping_spans_and_base_style():
 
 
 def test_boundaries_unicode_and_source_not_modified():
-    """-len合法，越界不钳制，空串仍IndexError。@return None。"""
+    "Verify boundaries unicode and source not modified."
     text=Text('中文',style='italic');before=text.copy()
     assert text[-2].plain=='中' and text[-1].plain=='文'
     for offset in (-3,2):

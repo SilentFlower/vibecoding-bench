@@ -1,5 +1,13 @@
-# 以任务区域上下文隔离异步报表并可靠恢复嵌套选择
+# Engineering contract: HUMANIZE-O02-DEV
 
-对应路线09，实际复用已交付源隔离目录加载：ContextVar保存翻译和分隔符，异步交错与嵌套恢复确定；旧线程activate在显式scope内被遮盖，不污染别任务。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add humanize.context.locale_scope(locale,path=None) / LocaleScope using ContextVar, the accepted source-aware real catalog loader and context-local translation plus decimal/thousands separators. Deterministically interleaved asyncio tasks must keep distinct same-locale catalogs; nested default-English scopes override thread state and restore outer state on exceptions/cancellation. Do not mutate global/other-task thread selections; legacy activate/deactivate remains thread-local and is hidden while an explicit scope is active. Reject active same-instance reentry, load failures leave context unchanged and permit sequential reuse after exit.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_humanize_o02_dev.py and concise English compatibility documentation at library/docs/development-humanize-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/humanize/i18n.py
+- library/src/humanize/context.py
+- library/tests/test_development_humanize_o02_dev.py
+- library/docs/development-humanize-o02-dev.md

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线08：未知标签存TaggedValue(tag/种类/安全值)，标量原文及递归/共享别名保真，明确dumper读回；python/object/apply也只是惰性数据，不导入执行，默认safe拒绝保持。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add yaml.tagged TaggedValue plus PreservingLoader/Dumper and load_preserving/dump_preserving. Unknown scalar keeps exact scalar text, unknown sequence/mapping safely constructs contents; preserve tag and node kind, recursive/shared alias identity via generator construction and representer. Unknown Python object/apply tags remain inert TaggedValue, never import/call targets. Existing known SafeLoader typing/default unknown-tag rejection unchanged; complex tagged keys with unhashable payload remain unsupported safe key errors. No global class registration changes.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pyyaml_04_dev.py, and English compatibility documentation at library/docs/development-pyyaml-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/lib/yaml/tagged.py
+- library/tests/test_development_pyyaml_04_dev.py
+- library/docs/development-pyyaml-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,5 +1,12 @@
-# 让墙钟截断正确区分日期时长和具体时间
+# Engineering contract: DEEPDIFF-O02-DEV
 
-对应路线02：日期无时分秒、timedelta是时长，均不能套用墙钟replace；保留真实类型及原datetime/time时区截断，Diff/Hash与嵌套边界一致。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix actual datetime_normalize temporal capability dispatch: plain date/subclasses retain date identity/value and timedelta remains a duration, neither receiving invalid hour/minute/second replace fields for any truncate setting. datetime/time continue existing truncation/timezone normalization. Do not promote date to datetime or suppress real type changes. Prove every accepted precision, nested DeepDiff, mixed date/datetime types, duration differences and DeepHash consistency, preserving all old datetime behavior.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o02_dev.py and concise English compatibility documentation at library/docs/development-deepdiff-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/deepdiff/helper.py
+- library/tests/test_development_deepdiff_o02_dev.py
+- library/docs/development-deepdiff-o02-dev.md

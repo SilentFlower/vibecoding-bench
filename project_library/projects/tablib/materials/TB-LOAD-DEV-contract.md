@@ -1,5 +1,12 @@
-# 组合外部字段合同、真实字典导入与类型转换流程
+# Engineering contract: TB-LOAD-DEV
 
-把外部键别名、缺失和多余字段规则接入真实Dataset字典导入，再组合类型转换。输出列序明确，后续记录键序变化不能错位，保留零值、空文本和None，结构错误不返回半成品。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement tablib.loading.load_records(records,columns,*,aliases=None,missing="raise",extra="raise",converters=None,errors="raise",title=None) returning completed ConversionResult. Output column order is explicit; aliases map output names to unique external keys. Validate missing raise/none and extra raise/ignore, consume mapping records once and detach values. Use actual Dataset.dict loading with canonical header prototype while retaining each later mapping order, requiring completed alignment repair; remove prototype before output. Compose actual convert_columns, preserve false/zero/empty/None, support empty input, fail without partial output and never mutate incoming records.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_load_dev.py and concise English compatibility documentation at library/docs/development-tb-load-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/tablib/loading.py
+- library/development_tests/test_development_tb_load_dev.py
+- library/docs/development-tb-load-dev.md

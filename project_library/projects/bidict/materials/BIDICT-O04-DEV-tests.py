@@ -1,8 +1,8 @@
-"""关系补丁必须保留前置条件、循环换值和顺序。"""
+"Public regression tests for BIDICT-O04-DEV; the complete business contract is in materials/BIDICT-O04-DEV-contract.md."
 from bidict import bidict, OrderedBidict
 
 def test_diff_apply_reverse_order():
-    """新增删除与顺序可逆。@return None。"""
+    "Verify diff apply reverse order."
     from bidict.relation_patch import relation_diff, apply_relation_patch
     before = OrderedBidict([('a', 1), ('b', 2)])
     after = OrderedBidict([('c', 3), ('a', 4)])
@@ -12,14 +12,14 @@ def test_diff_apply_reverse_order():
     assert list(apply_relation_patch(output, patch, reverse=True).items()) == list(before.items())
 
 def test_cycle_reassignment():
-    """最终唯一的循环交换不可丢掉任一键。@return None。"""
+    "Verify cycle reassignment."
     from bidict.relation_patch import relation_diff, apply_relation_patch
     before, after = bidict(a=1, b=2), bidict(a=2, b=1)
     assert apply_relation_patch(before, relation_diff(before, after)) == after
     assert before == {'a': 1, 'b': 2}
 
 def test_stale_precondition_rejected():
-    """源关系已变时拒绝应用且原表不变。@return None。"""
+    "Verify stale precondition rejected."
     import pytest
     from bidict.relation_patch import relation_diff, apply_relation_patch
     source = bidict(a=1)

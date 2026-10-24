@@ -1,4 +1,4 @@
-"""公开列表业务唯一性回归。"""
+"Public regression tests for MM-UNIQUE-DEV; the complete business contract is in materials/MM-UNIQUE-DEV-contract.md."
 import pytest
 from marshmallow import Schema,fields,ValidationError
 from marshmallow.unique import UniqueList

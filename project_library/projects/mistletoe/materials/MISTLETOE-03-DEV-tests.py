@@ -1,11 +1,11 @@
-"""没有可见标题时仍返回可安全渲染的空目录。"""
+"Public regression tests for MISTLETOE-03-DEV; the complete business contract is in materials/MISTLETOE-03-DEV-contract.md."
 from mistletoe import Document
 from mistletoe.block_token import List
 from mistletoe.contrib.toc_renderer import TocRenderer
 
 
 def test_no_headings_and_empty_document():
-    """普通段落和空文档不会引发IndexError。@return None。"""
+    "Verify no headings and empty document."
     for text in ('','paragraph\n'):
         with TocRenderer() as renderer:
             renderer.render(Document(text))
@@ -15,7 +15,7 @@ def test_no_headings_and_empty_document():
 
 
 def test_all_filtered_and_nonempty():
-    """过滤全部和有效目录均使用原列表语义。@return None。"""
+    "Verify all filtered and nonempty."
     with TocRenderer(depth=1) as renderer:
         renderer.render(Document('# Title\n## Hidden\n'))
         assert renderer.render(renderer.toc)==''

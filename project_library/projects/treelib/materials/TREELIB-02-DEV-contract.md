@@ -1,3 +1,12 @@
-# 分类节点安全改名不覆盖现有节点且失败保持原结构
+# Engineering contract: TREELIB-02-DEV
 
-路线01：改名前先检查None、哈希及重复标识，成功时保持Node身份并同步索引、根与双向关系。多树共享无法安全改名时明确拒绝；属性校验或指针更新失败恢复全部结构和属性容器，不承诺撤销data外部副作用。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair Tree.update_node identifier updates: preflight hashability/None/collisions before mutating anything, preserve object identity and update index/root/parent successors/child predecessors consistently. Same identifier is a no-op for identity while other attributes may update. Reject renaming a node shared across multiple tree contexts rather than corrupt another view. If a property setter or relationship update fails, restore all node attribute containers, index and current-tree pointers; do not claim to reverse arbitrary external side effects or mutate/copy user data internals. Preserve existing ordinary tag/data updates and node subclass behavior. Duplicate IDs may use existing DuplicatedNodeIdError; other invalid identities fail clearly.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_treelib_02_dev.py, and English compatibility documentation at library/docs/development-treelib-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/treelib/tree.py
+- library/tests/test_development_treelib_02_dev.py
+- library/docs/development-treelib-02-dev.md

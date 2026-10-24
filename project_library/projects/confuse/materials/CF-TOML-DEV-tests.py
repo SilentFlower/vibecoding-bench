@@ -1,4 +1,4 @@
-"""公开TOML来源实际文件回归。"""
+"Public regression tests for CF-TOML-DEV; the complete business contract is in materials/CF-TOML-DEV-contract.md."
 from datetime import date
 import pytest
 from confuse import Configuration,ConfigReadError

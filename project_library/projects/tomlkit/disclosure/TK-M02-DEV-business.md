@@ -4,7 +4,7 @@ Fix inline-table rendering after deleting the last leaf of a dotted child. Delet
 
 # Investigation topics
 
-- 删除 inline 配置的最后子字段后，为什么出现两个逗号，甚至空父表消失？
+- Determine why deleting the final child field of an inline table produces two commas or removes an empty parent table.
 
 # Supplied business material: materials/inline-delete-reproducer.py
 

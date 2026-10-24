@@ -1,4 +1,4 @@
-"""公开按列业务格式化回归。"""
+"Public regression tests for TB-FORMATTERS-DEV; the complete business contract is in materials/TB-FORMATTERS-DEV-contract.md."
 import pytest
 from tabulate import tabulate,SEPARATING_LINE
 from tabulate.formatters import tabulate_with_formatters

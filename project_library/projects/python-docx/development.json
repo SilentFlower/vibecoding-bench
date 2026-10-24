@@ -32,7 +32,7 @@
           "id": "PYTHON-DOCX-01-DEV",
           "kind": "modify",
           "goal": "空核心日期文档可正常读取且保持合法日期解析",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair CT_CoreProperties._datetime_of_element for existing date element with None/empty/whitespace text: return None like a missing/invalid date, without broad exception swallowing. Cover created/modified/lastPrinted through a real saved/reopened DOCX. Keep legal W3CDTF year/date/time/offset parsing and existing invalid-string policy unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_01_dev.py, and Chinese compatibility documentation at library/docs/development-python-docx-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair CT_CoreProperties._datetime_of_element for existing date element with None/empty/whitespace text: return None like a missing/invalid date, without broad exception swallowing. Cover created/modified/lastPrinted through a real saved/reopened DOCX. Keep legal W3CDTF year/date/time/offset parsing and existing invalid-string policy unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_01_dev.py, and English compatibility documentation at library/docs/development-python-docx-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DOCX-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DOCX-01-DEV.rubric.json",
             "native": "verification/PYTHON-DOCX-01-DEV.native.json",
             "public_native": "verification/PYTHON-DOCX-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PYTHON-DOCX-02-DEV",
           "kind": "modify",
           "goal": "写入aware核心时间先归一UTC且保留原秒精度政策",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair _set_element_datetime to convert aware datetime to UTC before writing existing Z format. Preserve the instant for positive/negative/nonhour offsets and day boundary; naive input keeps existing assumed-UTC wall value without querying host timezone. Apply created/modified/lastPrinted, retain existing whole-second precision and type validation. Prove actual docProps/core.xml and reopened values, no changes to legal reader behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_02_dev.py, and Chinese compatibility documentation at library/docs/development-python-docx-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair _set_element_datetime to convert aware datetime to UTC before writing existing Z format. Preserve the instant for positive/negative/nonhour offsets and day boundary; naive input keeps existing assumed-UTC wall value without querying host timezone. Apply created/modified/lastPrinted, retain existing whole-second precision and type validation. Prove actual docProps/core.xml and reopened values, no changes to legal reader behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_02_dev.py, and English compatibility documentation at library/docs/development-python-docx-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DOCX-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DOCX-02-DEV.rubric.json",
             "native": "verification/PYTHON-DOCX-02-DEV.native.json",
             "public_native": "verification/PYTHON-DOCX-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "PYTHON-DOCX-03-DEV",
           "kind": "modify",
           "goal": "批注创建前校验主文档归属与完整范围顺序避免悬挂引用",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nValidate Document.add_comment supplied Run or nonempty Run iterable BEFORE creating comments/relationships/markers. Every provided Run belongs to current main document part and XML tree; reject foreign/header/footer/detached/unsupported textbox story, reverse/duplicate/non-Run/empty ranges. Preserve single Run and ordered cross-paragraph first/last range semantics (unprovided intervening runs naturally included), author/initials. Failures leave both documents and comments part absent/unmodified, no only-after-allocation check.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_03_dev.py, and Chinese compatibility documentation at library/docs/development-python-docx-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nValidate Document.add_comment supplied Run or nonempty Run iterable BEFORE creating comments/relationships/markers. Every provided Run belongs to current main document part and XML tree; reject foreign/header/footer/detached/unsupported textbox story, reverse/duplicate/non-Run/empty ranges. Preserve single Run and ordered cross-paragraph first/last range semantics (unprovided intervening runs naturally included), author/initials. Failures leave both documents and comments part absent/unmodified, no only-after-allocation check.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_03_dev.py, and English compatibility documentation at library/docs/development-python-docx-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DOCX-03-DEV-contract.md",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DOCX-03-DEV.rubric.json",
             "native": "verification/PYTHON-DOCX-03-DEV.native.json",
             "public_native": "verification/PYTHON-DOCX-03-DEV.public.native.json",
@@ -173,7 +173,7 @@
           "id": "PYTHON-DOCX-04-DEV",
           "kind": "modify",
           "goal": "公开超链接编辑正确维护外部关系与内部跳转",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Paragraph.add_hyperlink(text,address=\"\",fragment=\"\",style=None) and Hyperlink address/fragment/text setters plus remove(). Build real OOXML runs/relationships, support external URI and internal bookmark links without fetching addresses. Text replacement retains first-run formatting, removes extra text runs only; unchanged other paragraph content. Validate strings and nonempty target before adding side effects. Editing/removing drops an old relationship only according to its BEFORE-change reference count, retaining shared links and deduplicated targets. Save/reopen external URL/fragment/internal targets and formatting; no automatic bookmark creation or Word page rendering.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_04_dev.py, and Chinese compatibility documentation at library/docs/development-python-docx-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd Paragraph.add_hyperlink(text,address=\"\",fragment=\"\",style=None) and Hyperlink address/fragment/text setters plus remove(). Build real OOXML runs/relationships, support external URI and internal bookmark links without fetching addresses. Text replacement retains first-run formatting, removes extra text runs only; unchanged other paragraph content. Validate strings and nonempty target before adding side effects. Editing/removing drops an old relationship only according to its BEFORE-change reference count, retaining shared links and deduplicated targets. Save/reopen external URL/fragment/internal targets and formatting; no automatic bookmark creation or Word page rendering.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_04_dev.py, and English compatibility documentation at library/docs/development-python-docx-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DOCX-04-DEV-contract.md",
@@ -192,7 +192,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DOCX-04-DEV.rubric.json",
             "native": "verification/PYTHON-DOCX-04-DEV.native.json",
             "public_native": "verification/PYTHON-DOCX-04-DEV.public.native.json",
@@ -221,7 +221,7 @@
           "id": "PYTHON-DOCX-05-DEV",
           "kind": "modify",
           "goal": "长报告表格公开设置重复表头与三态跨页拆行政策",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd _Row.repeat_header and allow_split_across_pages tri-state bool|None properties backed by correctly ordered trPr tblHeader/cantSplit OOXML declarations. None removes direct property/inherits, False remains explicit and cantSplit inverse is correct. Validate before mutation, preserve unrelated height/grid/merge/style settings, support nested/empty rows and roundtrip. Repeated-header placement remains caller responsibility (Word requires leading contiguous rows); do not claim pagination count/rendering enforcement.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_05_dev.py, and Chinese compatibility documentation at library/docs/development-python-docx-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd _Row.repeat_header and allow_split_across_pages tri-state bool|None properties backed by correctly ordered trPr tblHeader/cantSplit OOXML declarations. None removes direct property/inherits, False remains explicit and cantSplit inverse is correct. Validate before mutation, preserve unrelated height/grid/merge/style settings, support nested/empty rows and roundtrip. Repeated-header placement remains caller responsibility (Word requires leading contiguous rows); do not claim pagination count/rendering enforcement.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_05_dev.py, and English compatibility documentation at library/docs/development-python-docx-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DOCX-05-DEV-contract.md",
@@ -240,7 +240,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DOCX-05-DEV.rubric.json",
             "native": "verification/PYTHON-DOCX-05-DEV.native.json",
             "public_native": "verification/PYTHON-DOCX-05-DEV.public.native.json",
@@ -269,7 +269,7 @@
           "id": "PYTHON-DOCX-06-DEV",
           "kind": "modify",
           "goal": "图片无障碍说明与标题通过公开接口安全往返",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd InlineShape.alternative_text and title backed by wp:docPr descr/title. Expose exact str or None when absent, empty str is explicit metadata, None removes only own attribute, reject nonstring before mutation. Preserve drawing ID/name, relationship, shape dimensions, image bytes and unrelated/unknown attributes. Real local PNG to saved/reopened DOCX proves independent metadata and XML escaping; no visual rendering claims, network or generated image dependency.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_06_dev.py, and Chinese compatibility documentation at library/docs/development-python-docx-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd InlineShape.alternative_text and title backed by wp:docPr descr/title. Expose exact str or None when absent, empty str is explicit metadata, None removes only own attribute, reject nonstring before mutation. Preserve drawing ID/name, relationship, shape dimensions, image bytes and unrelated/unknown attributes. Real local PNG to saved/reopened DOCX proves independent metadata and XML escaping; no visual rendering claims, network or generated image dependency.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_python_docx_06_dev.py, and English compatibility documentation at library/docs/development-python-docx-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYTHON-DOCX-06-DEV-contract.md",
@@ -287,7 +287,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYTHON-DOCX-06-DEV.rubric.json",
             "native": "verification/PYTHON-DOCX-06-DEV.native.json",
             "public_native": "verification/PYTHON-DOCX-06-DEV.public.native.json",

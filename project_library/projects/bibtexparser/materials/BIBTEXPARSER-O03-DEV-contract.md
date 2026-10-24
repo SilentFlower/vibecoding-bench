@@ -1,5 +1,12 @@
-# 仅对明确数字页码范围执行可追溯规范化
+# Engineering contract: BIBTEXPARSER-O03-DEV
 
-仅规范完整可识别的升序数字页码范围，支持多范围及Unicode横线，保留数字原文和首次来源。电子页码、单页、罗马页、倒序和混杂未知格式整体保持；不改标题或默认解析栈。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement bibtexparser.pages.NormalizePages as an opt-in non-mutating BlockMiddleware. Normalize complete ascending numeric page ranges separated by commas from hyphen/en-dash/em-dash to BibTeX double hyphens, preserving digit text and first original_pages metadata. Leave electronic/single/Roman/decimal/descending or mixed unknown formats wholly unchanged. Modify only pages, preserve other fields and default stacks, and remain idempotent.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o03_dev.py and concise English compatibility documentation at library/docs/development-bibtexparser-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bibtexparser/pages.py
+- library/tests/test_development_bibtexparser_o03_dev.py
+- library/docs/development-bibtexparser-o03-dev.md

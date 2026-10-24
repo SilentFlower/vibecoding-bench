@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-路线13：Row公开repeat_header/allow_split_across_pages三态，正确tblHeader/cantSplit顺序与反向语义；None才继承，保原其他格式，Word要求连续首行由调用方负责，不计算页数。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add _Row.repeat_header and allow_split_across_pages tri-state bool|None properties backed by correctly ordered trPr tblHeader/cantSplit OOXML declarations. None removes direct property/inherits, False remains explicit and cantSplit inverse is correct. Validate before mutation, preserve unrelated height/grid/merge/style settings, support nested/empty rows and roundtrip. Repeated-header placement remains caller responsibility (Word requires leading contiguous rows); do not claim pagination count/rendering enforcement.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_docx_05_dev.py, and English compatibility documentation at library/docs/development-python-docx-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/docx/table.py
+- library/src/docx/oxml/table.py
+- library/tests/test_development_python_docx_05_dev.py
+- library/docs/development-python-docx-05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

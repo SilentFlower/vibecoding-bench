@@ -1,4 +1,4 @@
-"""公开最终查询边界真实执行回归。"""
+"Public regression tests for SG-BOUNDS-DEV; the complete business contract is in materials/SG-BOUNDS-DEV-contract.md."
 import sqlite3
 import pytest
 from sqlglot import parse_one

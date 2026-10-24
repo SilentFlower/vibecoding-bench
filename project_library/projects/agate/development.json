@@ -77,7 +77,7 @@
           "id": "AG-REFERENCE-DEV",
           "kind": "modify",
           "goal": "让相对日期导入采用可复现的参考时刻",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd optional reference_datetime=None to Date and DateTime constructors. When supplied, it must be a naive datetime; reject dates, strings and aware datetimes with TypeError before parsing. Use this fixed wall-clock anchor for natural-language relative date parsing. Preserve explicit format and ISO handling, timezone parameter behavior, null handling and old defaults (Date uses ZERO_DT, DateTime captures today at midnight). Keep the anchor across pickle round trips and preserve old Date pickle states.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_reference_dev.py and concise Chinese compatibility documentation at library/docs/development-ag-reference-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd optional reference_datetime=None to Date and DateTime constructors. When supplied, it must be a naive datetime; reject dates, strings and aware datetimes with TypeError before parsing. Use this fixed wall-clock anchor for natural-language relative date parsing. Preserve explicit format and ISO handling, timezone parameter behavior, null handling and old defaults (Date uses ZERO_DT, DateTime captures today at midnight). Keep the anchor across pickle round trips and preserve old Date pickle states.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_reference_dev.py and concise English compatibility documentation at library/docs/development-ag-reference-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AG-REFERENCE-DEV-contract.md",
@@ -93,7 +93,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AG-REFERENCE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AG-REFERENCE-DEV.native.json",
@@ -125,7 +125,7 @@
           "id": "AG-SCHEMA-DEV",
           "kind": "modify",
           "goal": "为订单导入交付只读结构化数据约束校验",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd exported Schema(columns) and SchemaValidationError. A columns mapping declares nullable/unique booleans, inclusive min/max and finite choices. Validate a real Table without mutation, returning deterministic zero-based row/column/code records in row then configured-column order; never include actual values. Nulls bypass other checks, nullable defaults True, unique ignores nulls, and duplicate reports start at the second equal value. validate(table, strict=False, max_errors=None) supports an exact positive integer error cap and strict errors with an errors tuple. Copy caller rules, reject unknown/invalid rules, reversed bounds, invalid strict/caps and missing table columns before scanning.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_schema_dev.py and concise Chinese compatibility documentation at library/docs/development-ag-schema-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd exported Schema(columns) and SchemaValidationError. A columns mapping declares nullable/unique booleans, inclusive min/max and finite choices. Validate a real Table without mutation, returning deterministic zero-based row/column/code records in row then configured-column order; never include actual values. Nulls bypass other checks, nullable defaults True, unique ignores nulls, and duplicate reports start at the second equal value. validate(table, strict=False, max_errors=None) supports an exact positive integer error cap and strict errors with an errors tuple. Copy caller rules, reject unknown/invalid rules, reversed bounds, invalid strict/caps and missing table columns before scanning.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_schema_dev.py and concise English compatibility documentation at library/docs/development-ag-schema-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AG-SCHEMA-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AG-SCHEMA-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AG-SCHEMA-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "AG-DURATION-DEV",
           "kind": "modify",
           "goal": "让耗时分析支持精确中位数和百分位",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Median and Percentiles to TimeDelta columns while preserving the existing CDF rank rule and Number behavior. Return timedelta values and report a TimeDelta aggregate type for Median. Ignore nulls using the existing warning policy, return None values for empty data, and compute duration midpoints without overflow at timedelta extremes or floating-point loss. Fractional microseconds round to nearest even. Preserve original source tests and Quantiles behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_duration_dev.py and concise Chinese compatibility documentation at library/docs/development-ag-duration-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Median and Percentiles to TimeDelta columns while preserving the existing CDF rank rule and Number behavior. Return timedelta values and report a TimeDelta aggregate type for Median. Ignore nulls using the existing warning policy, return None values for empty data, and compute duration midpoints without overflow at timedelta extremes or floating-point loss. Fractional microseconds round to nearest even. Preserve original source tests and Quantiles behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_duration_dev.py and concise English compatibility documentation at library/docs/development-ag-duration-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AG-DURATION-DEV-contract.md",
@@ -189,7 +189,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AG-DURATION-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AG-DURATION-DEV.native.json",
@@ -221,7 +221,7 @@
           "id": "AG-WEIGHTED-DEV",
           "kind": "modify",
           "goal": "按数量权重交付精确的均值与总体方差",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd exported WeightedMean(value_column, weight_column) and WeightedVariance(value_column, weight_column) aggregations. Both columns must use Number. Operate on same-row pairs, skip a pair if either member is null, reject negative or nonfinite weights and nonfinite values, preserve Decimal arithmetic, and return None for no positive total weight. WeightedVariance is population variance, sum(w*(x-mean)**2)/sum(w), not a sample estimator. Support TableSet aggregation and preserve all existing aggregations.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_weighted_dev.py and concise Chinese compatibility documentation at library/docs/development-ag-weighted-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd exported WeightedMean(value_column, weight_column) and WeightedVariance(value_column, weight_column) aggregations. Both columns must use Number. Operate on same-row pairs, skip a pair if either member is null, reject negative or nonfinite weights and nonfinite values, preserve Decimal arithmetic, and return None for no positive total weight. WeightedVariance is population variance, sum(w*(x-mean)**2)/sum(w), not a sample estimator. Support TableSet aggregation and preserve all existing aggregations.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_weighted_dev.py and concise English compatibility documentation at library/docs/development-ag-weighted-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AG-WEIGHTED-DEV-contract.md",
@@ -237,7 +237,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AG-WEIGHTED-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AG-WEIGHTED-DEV.native.json",
@@ -269,7 +269,7 @@
           "id": "AG-SHIFT-DEV",
           "kind": "modify",
           "goal": "按客户顺序计算前笔与后笔记录",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd exported Lag and Lead Computation classes with (column_name, offset=1, default=None, partition_by=None). Use existing row order, including interleaved partitions, without sorting or mutating the table. Offset must be a nonnegative non-bool integer; zero copies the original column. partition_by accepts a column name or finite unique list/tuple of column names. Validate names and cast the boundary default with the original DataType; return a column of that same type and original length. Nulls remain positional values and oversized offsets fill the default. Preserve existing Change and other computations.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_shift_dev.py and concise Chinese compatibility documentation at library/docs/development-ag-shift-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd exported Lag and Lead Computation classes with (column_name, offset=1, default=None, partition_by=None). Use existing row order, including interleaved partitions, without sorting or mutating the table. Offset must be a nonnegative non-bool integer; zero copies the original column. partition_by accepts a column name or finite unique list/tuple of column names. Validate names and cast the boundary default with the original DataType; return a column of that same type and original length. Nulls remain positional values and oversized offsets fill the default. Preserve existing Change and other computations.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_shift_dev.py and concise English compatibility documentation at library/docs/development-ag-shift-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AG-SHIFT-DEV-contract.md",
@@ -285,7 +285,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AG-SHIFT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AG-SHIFT-DEV.native.json",

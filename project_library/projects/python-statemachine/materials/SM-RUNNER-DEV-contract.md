@@ -1,5 +1,12 @@
-# 为真实同步状态机提供惰性事件执行与前后状态记录
+# Engineering contract: SM-RUNNER-DEV
 
-真实同步事件按输入顺序惰性执行，记录前后配置和回调结果。只收集原生不允许转换错误，其他回调或来源故障不能吞掉；即时批量不能暗中混入延迟调度字段。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement statemachine.runner.EventCall, EventResult, normalize_call and MachineRunner(machine) with dispatch(call,*,index=0,errors="raise") and run(calls,*,errors="raise"). Invoke actual send with detached positional/keyword callback arguments; reject empty calls and delay/send_id/internal controls in immediate batches. Reuse completed snapshots before/after actual execution, retain real callback result, collect only TransitionNotAllowed as error records and continue when requested. Programming/callback/source exceptions propagate. Stay lazy and sequential, preserve original native transition semantics and do not claim rollback of external callback side effects; async uses separate runner.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sm_runner_dev.py and concise English compatibility documentation at library/docs/development-sm-runner-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/statemachine/runner.py
+- library/development_tests/test_development_sm_runner_dev.py
+- library/docs/development-sm-runner-dev.md

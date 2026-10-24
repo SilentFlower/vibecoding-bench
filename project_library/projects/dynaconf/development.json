@@ -39,7 +39,7 @@
           "id": "DYNACONF-O01-DEV",
           "kind": "modify",
           "goal": "在真实文件加载前整体验证文本路径协议并拒绝非法参数",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix Settings.load_file input normalization: allow None/str/text os.PathLike and finite list/tuple of those, normalize via os.fspath and validate the complete sequence before any loading. Reject modules/dicts/numbers/bytes/bad __fspath__ return values with TypeError regardless of silent. Preserve string module names, comma-list/glob and PathLike real-file behavior plus optional None/empty/no-match semantics. Do not stringify arbitrary objects into pretend paths, mutate input sequences or modify the general ensure_a_list contract across unrelated APIs.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-dynaconf-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix Settings.load_file input normalization: allow None/str/text os.PathLike and finite list/tuple of those, normalize via os.fspath and validate the complete sequence before any loading. Reject modules/dicts/numbers/bytes/bad __fspath__ return values with TypeError regardless of silent. Preserve string module names, comma-list/glob and PathLike real-file behavior plus optional None/empty/no-match semantics. Do not stringify arbitrary objects into pretend paths, mutate input sequences or modify the general ensure_a_list contract across unrelated APIs.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o01_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DYNACONF-O01-DEV-contract.md",
@@ -54,7 +54,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DYNACONF-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DYNACONF-O01-DEV.native.json",
@@ -86,7 +86,7 @@
           "id": "DYNACONF-O02-DEV",
           "kind": "modify",
           "goal": "修复复用条件Validator跨环境与并发实例的继承状态泄漏",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix Validator.validate when-environment inheritance as call-local evaluation context, never persisting an inferred env list onto shared self.when. Respect explicit child envs, nested when/and/or and only_current_env while retaining normal validation behavior. A descriptor first used by disabled dev must still reject negative PORT when enabled prod is checked, exactly as a fresh descriptor would. Concurrent/nested instances must not leak environments or require deepcopy of arbitrary user predicates; reset context on every failure/return.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-dynaconf-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix Validator.validate when-environment inheritance as call-local evaluation context, never persisting an inferred env list onto shared self.when. Respect explicit child envs, nested when/and/or and only_current_env while retaining normal validation behavior. A descriptor first used by disabled dev must still reject negative PORT when enabled prod is checked, exactly as a fresh descriptor would. Concurrent/nested instances must not leak environments or require deepcopy of arbitrary user predicates; reset context on every failure/return.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o02_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DYNACONF-O02-DEV-contract.md",
@@ -101,7 +101,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DYNACONF-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DYNACONF-O02-DEV.native.json",
@@ -133,7 +133,7 @@
           "id": "DYNACONF-O03-DEV",
           "kind": "modify",
           "goal": "让真实批量更新先取得顶层输入快照且不污染调用者映射",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix Settings.update to copy its top-level mapping/standard dict-constructor input before merging kwargs, preserving kwargs precedence and all actual parsing/validation paths. Ordinary and read-only mappings, empty mappings and iterable pairs work; successful or validation-failed updates never add/overwrite keys in caller input. Do not introduce arbitrary deepcopy, silently promise nested ownership/transaction rollback, change settings partial-update semantics or bypass validators.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-dynaconf-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix Settings.update to copy its top-level mapping/standard dict-constructor input before merging kwargs, preserving kwargs precedence and all actual parsing/validation paths. Ordinary and read-only mappings, empty mappings and iterable pairs work; successful or validation-failed updates never add/overwrite keys in caller input. Do not introduce arbitrary deepcopy, silently promise nested ownership/transaction rollback, change settings partial-update semantics or bypass validators.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o03_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DYNACONF-O03-DEV-contract.md",
@@ -148,7 +148,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DYNACONF-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DYNACONF-O03-DEV.native.json",
@@ -180,7 +180,7 @@
           "id": "DYNACONF-O04-DEV",
           "kind": "modify",
           "goal": "让无扩展名配置显式选择已启用的真实JSONTOMLYAML加载器",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend validated Settings.load_file with format=None|json|toml|yaml and thread it into settings_loader. Explicit mode overrides suffix discovery and skips Python-module guessing, using whitelisted existing readers through real BaseLoader with actual file paths/source metadata, environment/key filtering, merge/validation/hooks contracts. Reject unknown or disabled core loaders; syntax errors stay visible under existing semantics. Default extension discovery remains unchanged; do not copy files to fake suffixes, import arbitrary format strings or treat a filename as serialized config text.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-dynaconf-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend validated Settings.load_file with format=None|json|toml|yaml and thread it into settings_loader. Explicit mode overrides suffix discovery and skips Python-module guessing, using whitelisted existing readers through real BaseLoader with actual file paths/source metadata, environment/key filtering, merge/validation/hooks contracts. Reject unknown or disabled core loaders; syntax errors stay visible under existing semantics. Default extension discovery remains unchanged; do not copy files to fake suffixes, import arbitrary format strings or treat a filename as serialized config text.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o04_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "DYNACONF-O01-DEV",
@@ -201,7 +201,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DYNACONF-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DYNACONF-O04-DEV.native.json",
@@ -233,7 +233,7 @@
           "id": "DYNACONF-O05-DEV",
           "kind": "modify",
           "goal": "把JSONliteral或本地值解析器限制到当前实例的真实加载路径",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Settings.set_value_parser(parser=None,*,errors=\"raise\") selecting JSON, ast.literal_eval, a local callable or default TOML for this instance only, integrated at actual _parse_conf_data for tomlfy=True unmarked strings including env_loader. Existing explicit @str/@int/@json/@merge/lazy tokens keep priority; nonstrings/non-tomlfy values stay unchanged. Validate profile/error policies before writing config. Raise or retain original string only for declared parse ValueError/SyntaxError; propagate programming failures. Show actual JSON null/array differences versus an independent default instance and allow resetting None without modifying global converters.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-dynaconf-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Settings.set_value_parser(parser=None,*,errors=\"raise\") selecting JSON, ast.literal_eval, a local callable or default TOML for this instance only, integrated at actual _parse_conf_data for tomlfy=True unmarked strings including env_loader. Existing explicit @str/@int/@json/@merge/lazy tokens keep priority; nonstrings/non-tomlfy values stay unchanged. Validate profile/error policies before writing config. Raise or retain original string only for declared parse ValueError/SyntaxError; propagate programming failures. Show actual JSON null/array differences versus an independent default instance and allow resetting None without modifying global converters.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o05_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DYNACONF-O05-DEV-contract.md",
@@ -249,7 +249,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DYNACONF-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DYNACONF-O05-DEV.native.json",
@@ -281,7 +281,7 @@
           "id": "DYNACONF-O06-DEV",
           "kind": "modify",
           "goal": "为真实配置CLI提供可重复大小写无关glob筛选且保持存储不变",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual dynaconf list CLI with repeatable --match glob patterns over top-level canonical key names, case-insensitive union without duplicates. Apply after existing env/loader selection on a detached dictionary and consistently to text/JSON/output-file views; empty matches return valid empty data, not a fake missing-key failure. Reject combining --match with old --key explicitly while preserving legacy no-pattern/single-key behavior. Use fnmatch semantics, never arbitrary eval/regex rewriting, and do not mutate settings or loader history during filtering.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-dynaconf-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend actual dynaconf list CLI with repeatable --match glob patterns over top-level canonical key names, case-insensitive union without duplicates. Apply after existing env/loader selection on a detached dictionary and consistently to text/JSON/output-file views; empty matches return valid empty data, not a fake missing-key failure. Reject combining --match with old --key explicitly while preserving legacy no-pattern/single-key behavior. Use fnmatch semantics, never arbitrary eval/regex rewriting, and do not mutate settings or loader history during filtering.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o06_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/DYNACONF-O06-DEV-contract.md",
@@ -296,7 +296,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/DYNACONF-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/DYNACONF-O06-DEV.native.json",

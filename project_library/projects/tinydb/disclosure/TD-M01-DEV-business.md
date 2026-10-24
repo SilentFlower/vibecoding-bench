@@ -4,8 +4,8 @@ Fix the nested fragment query-cache collision demonstrated here. Queries with th
 
 # Investigation topics
 
-- 先补材料，再辨别共享缓存文档的正常约定
-- 定位不同嵌套字段 fragment 查询的缓存串用
+- Obtain the missing materials, then identify the expected conventions for shared cached documents.
+- Diagnose cache collisions between fragment queries on different nested fields.
 
 # Supplied business material: materials/tags-report.md
 

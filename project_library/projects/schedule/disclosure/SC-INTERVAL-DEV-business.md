@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-非法间隔可能让注册进入无限循环。创建及计算前明确拒绝零、负数、非有限值和布尔值，保留正小数固定间隔和原整数随机区间，不改变合法时区与截止时间计算。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Validate Job interval as a positive finite nonboolean int/float at construction and revalidate before _schedule_next_run, because existing public attributes can be mutated. Raise ScheduleValueError before registering a callback or entering the next-run advancement loop for zero/negative/nonfinite/invalid types. Keep positive fractional fixed intervals working and original integer random intervals; reject noninteger random bounds clearly rather than delegating them to randint. Preserve deadline, timezone and weekday logic.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_interval_dev.py and concise English compatibility documentation at library/docs/development-sc-interval-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/schedule/__init__.py
+- library/development_tests/test_development_sc_interval_dev.py
+- library/docs/development-sc-interval-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

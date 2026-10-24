@@ -1,5 +1,12 @@
-# 让实际表格caption成为独立可读段落且不污染首行表头
+# Engineering contract: HTML2TEXT-O02-DEV
 
-对应路线08：显式caption段落模式保留真实强调/链接并与首行表头分离，重复/空标题、bypass/ignore模式明确，默认及无caption表保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add table_caption_mode="legacy"|"paragraph" to real HTML2Text table conversion, defaulting to compatibility. Paragraph mode separates each nonempty caption from surrounding content and the actual table header/data while preserving existing inline emphasis/link conversion, repeated/empty captions and normal header separator generation. Keep bypass_tables/ignore_tables semantics with readable captions, ordinary caption-free tables and default output unchanged; reject unknown strategy when a caption is encountered. Do not duplicate caption text, rewrite the header as a title or alter original regression fixtures.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_html2text_o02_dev.py and concise English compatibility documentation at library/docs/development-html2text-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/html2text/__init__.py
+- library/test/test_development_html2text_o02_dev.py
+- library/docs/development-html2text-o02-dev.md

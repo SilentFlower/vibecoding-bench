@@ -1,5 +1,12 @@
-# 在表格导出时显式保留、转义或拒绝公式型文本
+# Engineering contract: CH-FORMULA-DEV
 
-电子表格导出由调用者明确选择公式型文本策略，支持保留、前置单引号或拒绝，表头同样处理。数值负数保持数值，错误只报行列不泄漏内容，惰性消费且本次策略不影响下一次导出。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add spreadsheet_formula_policy(data,headers,formula_policy="preserve",**kwargs) preprocessor. Treat string cells/headers whose leading-whitespace-trimmed text begins =,+,-,@ as formula-like. Preserve default; escape prefixes one apostrophe to the exact original string; error raises with only one-based data row/column (header row zero), without exposing contents. Keep numeric negatives/nonstrings unchanged, operate lazily without mutating inputs and integrate through real CSV formatter preprocessors. Per-call policy must not leak to subsequent exports. Do not claim sanitization for every spreadsheet engine or rollback lines already consumed before a later error.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_formula_dev.py and concise English compatibility documentation at library/docs/development-ch-formula-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cli_helpers/tabular_output/preprocessors.py
+- library/development_tests/test_development_ch_formula_dev.py
+- library/docs/development-ch-formula-dev.md

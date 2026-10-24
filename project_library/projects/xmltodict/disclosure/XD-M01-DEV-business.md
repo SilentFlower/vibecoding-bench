@@ -4,7 +4,7 @@ Implement the complete public synchronous Iterator enhancement. Preserve the exa
 
 # Investigation topics
 
-- 定位普通分块迭代器的输入分派差异
+- Diagnose input dispatch for an ordinary chunk iterator.
 
 # Supplied business material: materials/chunk-input.py
 

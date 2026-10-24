@@ -1,4 +1,4 @@
-"""临时插件正常、异常及部分注册失败都不会遗留本轮对象。"""
+"Public regression tests for PLUGGY-05-DEV; the complete business contract is in materials/PLUGGY-05-DEV-contract.md."
 import unittest
 from pluggy import PluginManager,HookspecMarker,HookimplMarker
 from pluggy.scoped import temporary_plugins
@@ -6,7 +6,7 @@ spec=HookspecMarker('app');impl=HookimplMarker('app')
 
 
 class EqualPlugin:
-    """同值但不同身份的真实插件。"""
+    "Public regression fixture: EqualPlugin."
     __hash__=None
     def __eq__(self,other):return True
     @impl
@@ -14,7 +14,7 @@ class EqualPlugin:
 
 
 def test_scope_keeps_existing_equal_plugins_and_cleans_on_error():
-    """依赖前置身份修复，不误删既有相等对象。@return None。"""
+    "Verify scope keeps existing equal plugins and cleans on error."
     class Specs:
         @spec
         def value(self):pass
@@ -27,7 +27,7 @@ def test_scope_keeps_existing_equal_plugins_and_cleans_on_error():
 
 
 def test_preflight_and_partial_historic_failure_cleanup():
-    """冲突先拒绝；失败的本轮重放注册也清理。@return None。"""
+    "Verify preflight and partial historic failure cleanup."
     class Specs:
         @spec(historic=True)
         def event(self):pass

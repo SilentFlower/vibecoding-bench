@@ -1,11 +1,11 @@
-"""图片说明和标题使用真实wp:docPr，无需视觉猜测。"""
+"Public regression tests for PYTHON-DOCX-06-DEV; the complete business contract is in materials/PYTHON-DOCX-06-DEV-contract.md."
 from io import BytesIO
 from pathlib import Path
 from zipfile import ZipFile
 from docx import Document
 
 def test_inline_picture_accessibility_survives_docx_roundtrip():
-    """保图片关系、尺寸和未知属性，仅编辑对应说明。@return None。"""
+    "Verify inline picture accessibility survives docx roundtrip."
     document=Document();picture=document.add_picture(str(Path(__file__).resolve().parent/'test_files'/'python-icon.png'))
     width,height=picture.width,picture.height
     picture.alternative_text='中文说明 & details';picture.title='Figure 1'
@@ -14,7 +14,7 @@ def test_inline_picture_accessibility_survives_docx_roundtrip():
     assert restored.width==width and restored.height==height
 
 def test_empty_is_explicit_none_removes_and_other_metadata_stays():
-    """未设置与故意空说明可区分，不改绘图id/name。@return None。"""
+    "Verify empty is explicit none removes and other metadata stays."
     document=Document();picture=document.add_picture(str(Path(__file__).resolve().parent/'test_files'/'python-icon.png'))
     original=picture._inline.docPr.get('name')
     assert picture.alternative_text is None

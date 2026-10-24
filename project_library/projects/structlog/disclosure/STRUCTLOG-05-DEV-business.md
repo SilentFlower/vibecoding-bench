@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线18：CapturingLogger/Factory可选容量与保旧/保新政策，默认无限list/工厂复用保持；total/dropped和外层独立快照清楚，零容量明确、不虚构并发保证。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Extend CapturingLogger/Factory optional capacity=None with overflow drop_oldest/reject_new. Preserve default unlimited calls list and repr, all dynamic methods and one cached logger per factory. Nonnegative strict integer capacity, zero records nothing, total counts every call and dropped counts each unretained/evicted call. Snapshot returns tuple with copied kwargs containers but shared nested business objects. No concurrent producer guarantees or silently changing stats when caller manually edits calls.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_structlog_05_dev.py, and English compatibility documentation at library/docs/development-structlog-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/structlog/testing.py
+- library/tests/test_development_structlog_05_dev.py
+- library/docs/development-structlog-05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

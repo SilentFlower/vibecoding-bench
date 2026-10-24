@@ -1,4 +1,4 @@
-"""公开请求标识真实WSGI生命周期回归。"""
+"Public regression tests for WZ-REQUEST-ID-DEV; the complete business contract is in materials/WZ-REQUEST-ID-DEV-contract.md."
 import pytest
 from werkzeug.wrappers import Response
 from werkzeug.test import Client,EnvironBuilder

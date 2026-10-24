@@ -1,5 +1,14 @@
-# 给真实单次订阅解析提供隔离不可变日期处理器注册集
+# Engineering contract: FEEDPARSER-O03-DEV
 
-对应路线07：不可变DateHandlerRegistry按调用ContextVar作用真实日期路径，退出恢复；自定义去重/九元组校验/失败继续，内建冻结回退、全局默认与并发隔离保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add public immutable DateHandlerRegistry(handlers=(), include_builtin=True) and parse(..., date_handlers=registry). Apply through actual shared _parse_date paths with ContextVar scoping/reset on every exit, preserving default global registerDateHandler behavior and built-in order. Freeze/deduplicate custom handler identities, accept only nine nonbool integer tuple/list returns, skip mismatches/declared custom failures and continue to later handlers; never catch BaseException cancellation. Interleaved/concurrent/nested parsing must not leak registries. Use real RSS/JSON date parsing, not a separate unused date utility or global list swapping.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_feedparser_o03_dev.py and concise English compatibility documentation at library/docs/development-feedparser-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/feedparser/datetimes/__init__.py
+- library/feedparser/api.py
+- library/feedparser/__init__.py
+- library/tests/test_development_feedparser_o03_dev.py
+- library/docs/development-feedparser-o03-dev.md

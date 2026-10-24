@@ -1,5 +1,12 @@
-# 交付按共同基线判定冲突的完整三方JSON合并
+# Engineering contract: DEEPDIFF-O05-DEV
 
-对应路线10，实际复用已交付JSON树验证和DeepDiff判等：共同基线识别不相交/相同修改与删除，冲突保留base并报告三方存在性及快照，数组明确原子。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Build deepdiff.merge3.merge3(base,left,right,*,arrays="atomic") on the accepted JSON-tree validation and DeepDiff equality. Return Merge3Result(value,conflicts,complete) recursively combining disjoint dict edits, equal edits, additions and deletions. Explicitly distinguish absent from null. Preserve base at unresolved conflicts with exact component path and independent present/value snapshots for all three sides, never automatically choose left/right. Arrays are atomic business values, so index shifts or divergent arrays conflict; no speculative positional merge. Validate JSON/cycles, reject other array policies and preserve all inputs.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o05_dev.py and concise English compatibility documentation at library/docs/development-deepdiff-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/deepdiff/merge3.py
+- library/tests/test_development_deepdiff_o05_dev.py
+- library/docs/development-deepdiff-o05-dev.md

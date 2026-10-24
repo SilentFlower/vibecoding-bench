@@ -1,4 +1,4 @@
-"""公开树事件流回归。"""
+"Public regression tests for AN-EVENTS-DEV; the complete business contract is in materials/AN-EVENTS-DEV-contract.md."
 from anytree import Node, EventIter, PreOrderIter
 
 def tree():

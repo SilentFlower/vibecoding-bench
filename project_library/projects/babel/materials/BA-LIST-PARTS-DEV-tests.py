@@ -1,4 +1,4 @@
-"""公开列表分段交付回归。"""
+"Public regression tests for BA-LIST-PARTS-DEV; the complete business contract is in materials/BA-LIST-PARTS-DEV-contract.md."
 import pytest
 from babel.lists import format_list, format_list_to_parts
 

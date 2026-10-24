@@ -1,18 +1,18 @@
-"""组合inline规则不得追加到调用方持有的列表。"""
+"Public regression tests for WTFORMS-01-DEV; the complete business contract is in materials/WTFORMS-01-DEV-contract.md."
 from wtforms import Form,StringField
 
 
 def test_shared_filter_and_validator_lists_stay_owned_by_caller():
-    """多次构造与验证，每轮inline恰好一次且外部列表不增长。@return None。"""
+    "Verify shared filter and validator lists stay owned by caller."
     calls=[]
     class Product(Form):
-        """真实带inline规则的商品表单。"""
+        "Public regression fixture: Product."
         value=StringField()
         def filter_value(self,value):
-            """追加本轮展示值。@param value 原值。@return 修改值。"""
+            "Support the public regression through filter_value."
             calls.append('filter');return value+'!'
         def validate_value(self,field):
-            """记录一次真实inline校验。@param field 字段。@return None。"""
+            "Support the public regression through validate_value."
             calls.append('inline')
     filters={'value':[]};validators={'value':[]}
     for index in range(2):
@@ -22,16 +22,16 @@ def test_shared_filter_and_validator_lists_stay_owned_by_caller():
 
 
 def test_tuple_sequences_order_and_callable_identity():
-    """元组附加规则同样可组合，extra在inline前且不复制callable。@return None。"""
+    "Verify tuple sequences order and callable identity."
     calls=[]
     def extra(form,field):
-        """本轮附加规则。@param form 表单。@param field 字段。@return None。"""
+        "Support the public regression through extra."
         calls.append('extra')
     class Product(Form):
-        """有继承式inline协议的表单。"""
+        "Public regression fixture: Product."
         value=StringField()
         def validate_value(self,field):
-            """inline在最后执行。@param field 字段。@return None。"""
+            "Support the public regression through validate_value."
             calls.append('inline')
     given={'value':(extra,)}
     assert Product(data={'value':'x'}).validate(extra_validators=given)

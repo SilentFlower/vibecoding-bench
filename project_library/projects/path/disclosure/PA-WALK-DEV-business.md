@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-文件批处理明确选择遍历深度、排除范围、排序及是否跟随目录链接。排除项不进入子树，跟随时按真实目录身份防环，继续返回Path子类及原错误策略，目录句柄及时关闭，旧walk保持兼容。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add Path.walk_controlled(*,follow_symlinks=False,max_depth=None,exclude=(),stable=False,errors="strict"). Yield Path descendants in depth-first preorder, root depth=0; exclude relative POSIX fnmatch patterns before yielding or descending, optionally sort names per directory. Default yields links without following directory links; opted-in following tracks directory (device,inode) identities to prevent cycles/repeated subtree traversal. Respect original error handler resolution and caller Path subclass; close scandir handles, validate policies, preserve legacy walk and do not follow links implicitly.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_walk_dev.py and concise English compatibility documentation at library/docs/development-pa-walk-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/path/__init__.py
+- library/development_tests/test_development_pa_walk_dev.py
+- library/docs/development-pa-walk-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

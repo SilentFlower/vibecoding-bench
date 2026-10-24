@@ -32,7 +32,7 @@
           "id": "PETL-01-DEV",
           "kind": "modify",
           "goal": "显式按出现次序拼接重复字段且保留默认兼容政策",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit cat(..., duplicate_fields=\"occurrence\") policy using (field name, occurrence number); default duplicate_fields=\"first\" preserves ALL original frozen duplicate-first behavior. The opt-in policy must implement preserving every value for a single table and N-source union headers with maximum occurrence counts in stable discovery order. Explicit output header occurrence order, short rows, missing markers, empty sources and normal unique-field alignment remain correct. Build mapping once per source, do not silently select first occurrence for all duplicates or discard repeated columns.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_01_dev.py, and Chinese compatibility documentation at library/docs/development-petl-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit cat(..., duplicate_fields=\"occurrence\") policy using (field name, occurrence number); default duplicate_fields=\"first\" preserves ALL original frozen duplicate-first behavior. The opt-in policy must implement preserving every value for a single table and N-source union headers with maximum occurrence counts in stable discovery order. Explicit output header occurrence order, short rows, missing markers, empty sources and normal unique-field alignment remain correct. Build mapping once per source, do not silently select first occurrence for all duplicates or discard repeated columns.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_01_dev.py, and English compatibility documentation at library/docs/development-petl-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PETL-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PETL-01-DEV.rubric.json",
             "native": "verification/PETL-01-DEV.native.json",
             "public_native": "verification/PETL-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PETL-02-DEV",
           "kind": "modify",
           "goal": "数量转换一次生成业务结果和不含原值的结构化问题表",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd top-level/Table.convert_report(table,converters,errorvalue=None), eagerly consume source exactly once and return immutable replayable (table,issues) tuples. Validate converter callables and unique existing field names; retain header/order/other fields. Each failed field (including short-row access) gets replacement and ordered 1-based data row/field/error_type issue, never raw value or exception message. Report multiple errors per row, preserve successful conversions and support empty/one-shot sources. Existing lazy convert failure defaults remain unchanged; explicit snapshot memory semantics, not a streaming claim.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_02_dev.py, and Chinese compatibility documentation at library/docs/development-petl-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd top-level/Table.convert_report(table,converters,errorvalue=None), eagerly consume source exactly once and return immutable replayable (table,issues) tuples. Validate converter callables and unique existing field names; retain header/order/other fields. Each failed field (including short-row access) gets replacement and ordered 1-based data row/field/error_type issue, never raw value or exception message. Report multiple errors per row, preserve successful conversions and support empty/one-shot sources. Existing lazy convert failure defaults remain unchanged; explicit snapshot memory semantics, not a streaming claim.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_02_dev.py, and English compatibility documentation at library/docs/development-petl-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PETL-02-DEV-contract.md",
@@ -98,7 +98,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PETL-02-DEV.rubric.json",
             "native": "verification/PETL-02-DEV.native.json",
             "public_native": "verification/PETL-02-DEV.public.native.json",
@@ -127,7 +127,7 @@
           "id": "PETL-03-DEV",
           "kind": "modify",
           "goal": "透视报表按复合行维度准确分组和聚合",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend pivot f1 from one field to a nonempty list/tuple of fields, emitting all row dimension headers and full composite row keys. Sort by every row field then column dimension, group correctly, aggregate duplicate combinations and preserve missing cells/column ordering. Keep scalar f1 output unchanged and presorted/nonpresorted equivalence; support header-only input. Do not stringify or collapse composite identities, reuse existing aggregation and two-pass source semantics.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_03_dev.py, and Chinese compatibility documentation at library/docs/development-petl-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend pivot f1 from one field to a nonempty list/tuple of fields, emitting all row dimension headers and full composite row keys. Sort by every row field then column dimension, group correctly, aggregate duplicate combinations and preserve missing cells/column ordering. Keep scalar f1 output unchanged and presorted/nonpresorted equivalence; support header-only input. Do not stringify or collapse composite identities, reuse existing aggregation and two-pass source semantics.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_03_dev.py, and English compatibility documentation at library/docs/development-petl-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PETL-03-DEV-contract.md",
@@ -145,7 +145,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PETL-03-DEV.rubric.json",
             "native": "verification/PETL-03-DEV.native.json",
             "public_native": "verification/PETL-03-DEV.public.native.json",
@@ -174,7 +174,7 @@
           "id": "PETL-04-DEV",
           "kind": "modify",
           "goal": "多源笛卡尔报表用明确业务前缀并拒绝字段碰撞",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd crossjoin prefixes sequence for all N sources, frozen at view creation. Each str is exact prefix, None means no prefix, field names converted as existing numbered mode. Length/type mismatch, simultaneous truthy prefix and prefixes or output-header collision must raise clearly before data emission. Preserve old prefix boolean, Cartesian source/row ordering, missing short-row filling and header-only empty-source behavior. Do not silently ignore prefixes or change ordinary unprefixed duplicate-header compatibility.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_04_dev.py, and Chinese compatibility documentation at library/docs/development-petl-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd crossjoin prefixes sequence for all N sources, frozen at view creation. Each str is exact prefix, None means no prefix, field names converted as existing numbered mode. Length/type mismatch, simultaneous truthy prefix and prefixes or output-header collision must raise clearly before data emission. Preserve old prefix boolean, Cartesian source/row ordering, missing short-row filling and header-only empty-source behavior. Do not silently ignore prefixes or change ordinary unprefixed duplicate-header compatibility.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_04_dev.py, and English compatibility documentation at library/docs/development-petl-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PETL-04-DEV-contract.md",
@@ -192,7 +192,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PETL-04-DEV.rubric.json",
             "native": "verification/PETL-04-DEV.native.json",
             "public_native": "verification/PETL-04-DEV.public.native.json",
@@ -221,7 +221,7 @@
           "id": "PETL-05-DEV",
           "kind": "modify",
           "goal": "字段相等筛选可显式双侧归一化且保留原始数据",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend selecteq/Table.selecteq/eq with optional key=None. Default strict equality unchanged; supplied callable normalizes both comparison target and each field, including falsey callable objects. Return original headers/rows/payloads, support complement and existing missing/error behavior, propagate callback exceptions instead of arbitrary string conversion. Target normalization once when creating view, source remains lazily iterated; no implicit lower/casefold or None conversion.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_05_dev.py, and Chinese compatibility documentation at library/docs/development-petl-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend selecteq/Table.selecteq/eq with optional key=None. Default strict equality unchanged; supplied callable normalizes both comparison target and each field, including falsey callable objects. Return original headers/rows/payloads, support complement and existing missing/error behavior, propagate callback exceptions instead of arbitrary string conversion. Target normalization once when creating view, source remains lazily iterated; no implicit lower/casefold or None conversion.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_05_dev.py, and English compatibility documentation at library/docs/development-petl-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PETL-05-DEV-contract.md",
@@ -239,7 +239,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PETL-05-DEV.rubric.json",
             "native": "verification/PETL-05-DEV.native.json",
             "public_native": "verification/PETL-05-DEV.public.native.json",
@@ -268,7 +268,7 @@
           "id": "PETL-06-DEV",
           "kind": "modify",
           "goal": "XML报表内置样式正确转义数据属性与表头",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair toxml built-in tag/name/attribute styles to escape text versus attribute quotes exactly once; independent ElementTree parsing must recover original &, angle brackets, both quotes and Unicode. Escape displayed header text while retain original format field lookup; validate XML names for built-in structural paths/name-keys/attribute-keys and reject prohibited control characters. Keep custom raw format templates/prologue/epilogue explicitly raw and existing valid layout/None string behavior. Validation during streaming may leave partial target on bad later data; no atomic-write promise. Do not alter original tests.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_06_dev.py, and Chinese compatibility documentation at library/docs/development-petl-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair toxml built-in tag/name/attribute styles to escape text versus attribute quotes exactly once; independent ElementTree parsing must recover original &, angle brackets, both quotes and Unicode. Escape displayed header text while retain original format field lookup; validate XML names for built-in structural paths/name-keys/attribute-keys and reject prohibited control characters. Keep custom raw format templates/prologue/epilogue explicitly raw and existing valid layout/None string behavior. Validation during streaming may leave partial target on bad later data; no atomic-write promise. Do not alter original tests.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_petl_06_dev.py, and English compatibility documentation at library/docs/development-petl-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PETL-06-DEV-contract.md",
@@ -286,7 +286,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PETL-06-DEV.rubric.json",
             "native": "verification/PETL-06-DEV.native.json",
             "public_native": "verification/PETL-06-DEV.public.native.json",

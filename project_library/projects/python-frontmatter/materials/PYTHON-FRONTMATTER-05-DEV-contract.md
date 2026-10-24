@@ -1,3 +1,12 @@
-# 标准二进制文档流按显式编码可靠读取与往返输出
+# Engineering contract: PYTHON-FRONTMATTER-05-DEV
 
-路线05：二进制流在格式识别前按显式编码解码，导出按标准二进制流类型一次编码；文本流仍写str，路径encoding兼容。保留当前游标及调用方流所有权，不捕获TypeError重试而造成重复写入。真实往返覆盖先前TOML/JSON和保留键能力。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair load() for standard binary streams by decoding before format detection, using the requested encoding from the current cursor. Extend dump() to io.BufferedIOBase/io.RawIOBase including BytesIO and real wb files, encoding exactly once; text streams receive str and paths retain their existing explicit encoding behavior. Do not catch TypeError to retry writes; do not rewind, truncate or close caller-owned streams. Decode/encode/write errors propagate. Roundtrip leading-blank TOML, compact JSON and reserved business metadata from prior deliveries without losing the handler or Unicode content.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_frontmatter_05_dev.py, and English compatibility documentation at library/docs/development-python-frontmatter-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/frontmatter/__init__.py
+- library/tests/test_development_python_frontmatter_05_dev.py
+- library/docs/development-python-frontmatter-05-dev.md

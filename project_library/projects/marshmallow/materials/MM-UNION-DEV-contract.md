@@ -1,5 +1,12 @@
-# 实现外部标签分派的嵌套Schema双向转换
+# Engineering contract: MM-UNION-DEV
 
-根据外部标签选择真实Schema执行双向转换，标签不误报为子Schema未知字段。保留嵌套错误、未知字段规则和部分加载语义，拒绝未知类型或占用保留标签的输出。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement marshmallow.discriminated.DiscriminatedNested(discriminator,schemas,**kwargs) as a Field. schemas is a nonempty mapping of nonempty string tags to real Schema instances. Select by external discriminator, remove that tag before selected schema.load/dump(many=False), then restore it; do not mutate input. Preserve selected nested errors/unknown policy and partial propagation. Missing or unknown tags produce structured ValidationError at the tag. Schema outputs must be mappings not occupying the external tag; allow_none and normal field lifecycle still work. Do not guess schema variants.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_union_dev.py and concise English compatibility documentation at library/docs/development-mm-union-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/marshmallow/discriminated.py
+- library/development_tests/test_development_mm_union_dev.py
+- library/docs/development-mm-union-dev.md

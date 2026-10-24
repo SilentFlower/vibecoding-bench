@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-新增get_path/set_path/delete_path，路径必须是非空str/int分段序列。字面点括号、整数键、字符串键及负列表索引均无歧义；读取不创建默认节点，写入只允许已有父结构并保留转换、recast与冻结保护。缺失可显式返回None，类型错误不能被默认值掩盖。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add Box.get_path(path, default=NO_DEFAULT), set_path(path, value) and delete_path(path) for explicit nonempty str/int segment iterables. Distinguish integer and string keys, literal dots/brackets and list indices including negatives. Reads must not invoke box_dots parsing or create default nodes; writes require existing parents, preserve Box value conversion/recast and frozen guards, and do not create arbitrary intermediate containers. Support explicit default=None only for missing keys/indexes, propagate scalar/type errors and keep existing dotted APIs unchanged.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_bx_path_dev.py and concise English compatibility documentation at library/docs/development-bx-path-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/box/box.py
+- library/test/test_development_bx_path_dev.py
+- library/docs/development-bx-path-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

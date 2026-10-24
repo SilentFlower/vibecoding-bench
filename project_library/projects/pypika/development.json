@@ -32,7 +32,7 @@
           "id": "PYPIKA-01-DEV",
           "kind": "modify",
           "goal": "时间报表的负微秒Interval在各方言中保留真实符号",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair the standalone MICROSECOND interval branch to apply the sign already recorded by Interval.__init__. Negative arbitrarily large integer microseconds must serialize consistently across supported dialect templates, repeatably without mutation. Keep positive, zero, mixed-unit, week and quarter policies unchanged; do not invent mixed-sign normalization. SQL dialect claims concern text generation only.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_01_dev.py, and Chinese compatibility documentation at library/docs/development-pypika-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair the standalone MICROSECOND interval branch to apply the sign already recorded by Interval.__init__. Negative arbitrarily large integer microseconds must serialize consistently across supported dialect templates, repeatably without mutation. Keep positive, zero, mixed-unit, week and quarter policies unchanged; do not invent mixed-sign normalization. SQL dialect claims concern text generation only.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_01_dev.py, and English compatibility documentation at library/docs/development-pypika-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPIKA-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPIKA-01-DEV.rubric.json",
             "native": "verification/PYPIKA-01-DEV.native.json",
             "public_native": "verification/PYPIKA-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PYPIKA-02-DEV",
           "kind": "modify",
           "goal": "EXISTS与NOT EXISTS报表投影保持别名并隔离条件上下文",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair ExistsCriterion.get_sql so with_alias=True uses existing format_alias_sql on the OUTER EXISTS expression. Do not forward outer projection alias intent to the contained query. Preserve EXISTS/NOT EXISTS quoting, inner query alias isolation, existing negate behavior and unaliased WHERE semantics. Demonstrate executable SQLite projection column identity, including spaces in an alias; no external database.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_02_dev.py, and Chinese compatibility documentation at library/docs/development-pypika-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair ExistsCriterion.get_sql so with_alias=True uses existing format_alias_sql on the OUTER EXISTS expression. Do not forward outer projection alias intent to the contained query. Preserve EXISTS/NOT EXISTS quoting, inner query alias isolation, existing negate behavior and unaliased WHERE semantics. Demonstrate executable SQLite projection column identity, including spaces in an alias; no external database.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_02_dev.py, and English compatibility documentation at library/docs/development-pypika-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPIKA-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPIKA-02-DEV.rubric.json",
             "native": "verification/PYPIKA-02-DEV.native.json",
             "public_native": "verification/PYPIKA-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "PYPIKA-03-DEV",
           "kind": "modify",
           "goal": "未完成PostgreSQL语句保持空串且不生成孤立后缀",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nPreserve QueryBuilder empty-string contract in PostgreSQLQueryBuilder: when base serialization is empty return before ON CONFLICT, conflict action or RETURNING. Cover update without assignments and insert without values/select with suffix combinations. A copied builder completed later must produce correct full SQL; repeated get_sql is pure. Preserve complete-query suffixes and existing invalid complete conflict errors. No PostgreSQL execution claim.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_03_dev.py, and Chinese compatibility documentation at library/docs/development-pypika-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nPreserve QueryBuilder empty-string contract in PostgreSQLQueryBuilder: when base serialization is empty return before ON CONFLICT, conflict action or RETURNING. Cover update without assignments and insert without values/select with suffix combinations. A copied builder completed later must produce correct full SQL; repeated get_sql is pure. Preserve complete-query suffixes and existing invalid complete conflict errors. No PostgreSQL execution claim.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_03_dev.py, and English compatibility documentation at library/docs/development-pypika-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPIKA-03-DEV-contract.md",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPIKA-03-DEV.rubric.json",
             "native": "verification/PYPIKA-03-DEV.native.json",
             "public_native": "verification/PYPIKA-03-DEV.public.native.json",
@@ -173,7 +173,7 @@
           "id": "PYPIKA-04-DEV",
           "kind": "modify",
           "goal": "CTE驱动的DELETE保留定义并删除准确业务集合",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair DELETE serialization to include accumulated ordered WITH definitions before DELETE as SELECT/INSERT/UPDATE do. Preserve subquery rendering, WHERE, PostgreSQL USING/RETURNING and unchanged no-CTE queries. Verify real selected-row deletion on in-memory SQLite and SQL text for PG; never connect external databases or claim server-specific engine/lock integration.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_04_dev.py, and Chinese compatibility documentation at library/docs/development-pypika-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair DELETE serialization to include accumulated ordered WITH definitions before DELETE as SELECT/INSERT/UPDATE do. Preserve subquery rendering, WHERE, PostgreSQL USING/RETURNING and unchanged no-CTE queries. Verify real selected-row deletion on in-memory SQLite and SQL text for PG; never connect external databases or claim server-specific engine/lock integration.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_04_dev.py, and English compatibility documentation at library/docs/development-pypika-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPIKA-04-DEV-contract.md",
@@ -191,7 +191,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPIKA-04-DEV.rubric.json",
             "native": "verification/PYPIKA-04-DEV.native.json",
             "public_native": "verification/PYPIKA-04-DEV.public.native.json",
@@ -220,7 +220,7 @@
           "id": "PYPIKA-05-DEV",
           "kind": "modify",
           "goal": "嵌套函数与聚合过滤共享真实参数绑定上下文",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Function.get_sql/get_function_sql so caller serialization context, particularly parameter collectors, reaches each argument and nested function while preserving namespace, dialect, quote, schema and alias semantics. Normalize explicitly controlled with_alias/subquery options to prevent duplicate keyword errors. Preserve get_special_params_sql extension behavior, aggregate FILTER collection order and plain literals. Demonstrate real bound SQLite execution and ordered Qmark/Named collections; never interpolate bound user values.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_05_dev.py, and Chinese compatibility documentation at library/docs/development-pypika-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Function.get_sql/get_function_sql so caller serialization context, particularly parameter collectors, reaches each argument and nested function while preserving namespace, dialect, quote, schema and alias semantics. Normalize explicitly controlled with_alias/subquery options to prevent duplicate keyword errors. Preserve get_special_params_sql extension behavior, aggregate FILTER collection order and plain literals. Demonstrate real bound SQLite execution and ordered Qmark/Named collections; never interpolate bound user values.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_05_dev.py, and English compatibility documentation at library/docs/development-pypika-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPIKA-05-DEV-contract.md",
@@ -238,7 +238,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPIKA-05-DEV.rubric.json",
             "native": "verification/PYPIKA-05-DEV.native.json",
             "public_native": "verification/PYPIKA-05-DEV.public.native.json",
@@ -267,7 +267,7 @@
           "id": "PYPIKA-06-DEV",
           "kind": "modify",
           "goal": "复合布尔表达式的NULL判定保持SQL三值逻辑与优先级",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair NullCriterion/NotNullCriterion for a ComplexCriterion operand: serialize the entire AND/OR operand bracketed before IS NULL/IS NOT NULL, using AST types rather than SQL substring searches. Preserve ordinary fields, aliases, namespace/quote context, table replacement, nested and external AND/OR grouping. Verify TRUE/FALSE/UNKNOWN rows through actual in-memory SQLite execution without negating or rewriting predicate intent.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_06_dev.py, and Chinese compatibility documentation at library/docs/development-pypika-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair NullCriterion/NotNullCriterion for a ComplexCriterion operand: serialize the entire AND/OR operand bracketed before IS NULL/IS NOT NULL, using AST types rather than SQL substring searches. Preserve ordinary fields, aliases, namespace/quote context, table replacement, nested and external AND/OR grouping. Verify TRUE/FALSE/UNKNOWN rows through actual in-memory SQLite execution without negating or rewriting predicate intent.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pypika_06_dev.py, and English compatibility documentation at library/docs/development-pypika-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPIKA-06-DEV-contract.md",
@@ -285,7 +285,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPIKA-06-DEV.rubric.json",
             "native": "verification/PYPIKA-06-DEV.native.json",
             "public_native": "verification/PYPIKA-06-DEV.public.native.json",

@@ -1,16 +1,16 @@
-"""finite约束是显式数值域政策，保留默认number行为。"""
+"Public regression tests for CERBERUS-O02-DEV; the complete business contract is in materials/CERBERUS-O02-DEV-contract.md."
 from decimal import Decimal
 from cerberus import Validator, TypeDefinition
 
 def test_finite_float_matrix():
-    """NaN与双向Infinity拒绝，普通值可用。@return None。"""
+    "Verify finite float matrix."
     validator = Validator({'value': {'type': 'number', 'finite': True}})
     assert validator.validate({'value': 0})
     for value in (float('nan'), float('inf'), -float('inf')):
         assert not validator.validate({'value': value})
 
 def test_decimal_custom_type():
-    """Decimal不经float降精度或范围转换。@return None。"""
+    "Verify decimal custom type."
     class DecimalValidator(Validator):
         types_mapping = Validator.types_mapping.copy()
         types_mapping['decimal'] = TypeDefinition('decimal', (Decimal,), ())
@@ -19,7 +19,7 @@ def test_decimal_custom_type():
     assert not validator.validate({'value': Decimal('NaN')})
 
 def test_disabled_and_schema_validation():
-    """未启用finite的原行为保持，规则参数严格为bool。@return None。"""
+    "Verify disabled and schema validation."
     import pytest
     from cerberus import SchemaError
     assert Validator({'value': {'type': 'number'}}).validate({'value': float('nan')})

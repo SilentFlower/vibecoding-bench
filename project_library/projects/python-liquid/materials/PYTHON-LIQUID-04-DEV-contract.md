@@ -1,3 +1,12 @@
-# 按业务记录身份独立渲染报告并隔离失败与上下文
+# Engineering contract: PYTHON-LIQUID-04-DEV
 
-路线16：每记录(id,Mapping)用独立真实RenderContext，有序同步/异步拉取，Liquid失败可记录或fail-fast；取消/普通用户异常传播，提前关闭不执行后项，明确串行不冒称并发。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add liquid.record_rendering.render_records and async-generator render_records_async over lazy (id,Mapping) records, returning immutable RenderedRecord(id,status,output,error-type). Use real BoundTemplate.render/render_async each time so assigns/cycle state does not leak across records. Preserve input order and identity; reject duplicate ids; continue mode records LiquidError without data/error-message leakage, fail-fast rethrows. Ordinary user exceptions and cancellation propagate. Keep work strictly pull-driven with no prefetch/unbounded tasks; closing after one item never executes later records. Both APIs are serial by explicit contract, no concurrency claim.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_liquid_04_dev.py, and English compatibility documentation at library/docs/development-python-liquid-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/liquid/record_rendering.py
+- library/tests/test_development_python_liquid_04_dev.py
+- library/docs/development-python-liquid-04-dev.md

@@ -1,5 +1,12 @@
-# 为真实翻译器注册实例隔离的受控伪类插件
+# Engineering contract: CSSSELECT-O04-DEV
 
-对应路线19：在真实translator上提供本实例插件，区分静态/函数形态、数量和返回类型，函数接收真实解析节点；禁止覆盖内置，版本能力声明稳定。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement cssselect.extensions.PluginTranslator and HTMLPluginTranslator using an instance-local registry without replacing existing subclass mechanisms. register_pseudo(name, callback, *, functional=False,min_args=0,max_args=None,version="1") validates literal names, arity, callable/version, refuses duplicates or builtin static/function names, and returns self. Static callbacks receive actual XPathExpr; functions additionally receive the real Function/Token node. Validate invocation form, arity and XPathExpr return type. Preserve normal XML/HTML/XHTML behavior and native callbacks/errors; expose deterministic extension_fingerprint capability/version declarations and ensure registry isolation.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o04_dev.py and concise English compatibility documentation at library/docs/development-cssselect-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cssselect/extensions.py
+- library/tests/test_development_cssselect_o04_dev.py
+- library/docs/development-cssselect-o04-dev.md

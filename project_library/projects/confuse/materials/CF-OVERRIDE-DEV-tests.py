@@ -1,4 +1,4 @@
-"""公开临时覆盖生命周期回归。"""
+"Public regression tests for CF-OVERRIDE-DEV; the complete business contract is in materials/CF-OVERRIDE-DEV-contract.md."
 import pytest
 from confuse import RootView,ConfigSource
 from confuse.scopes import temporary_override

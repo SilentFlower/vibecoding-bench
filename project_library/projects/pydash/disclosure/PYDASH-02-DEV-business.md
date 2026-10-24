@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线02：仅None表示未提供通知；falsey callable仍验证并按每次失败调用，回调自身错误不重试，原次数/休眠/异常政策保持。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Use None exclusively for an omitted retry on_exception callback. Validate every non-None value as callable, determine its accepted arguments even when falsey, and invoke after each retryable exception including the final attempt. Support callable objects with false __bool__ or __len__, zero-arg callbacks and final original exceptions. Do not retry callback exceptions, change sleeps/counts, or catch non-retryable exceptions.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pydash_02_dev.py, and English compatibility documentation at library/docs/development-pydash-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pydash/utilities.py
+- library/tests/test_development_pydash_02_dev.py
+- library/docs/development-pydash-02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

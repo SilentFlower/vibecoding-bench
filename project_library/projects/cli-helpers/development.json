@@ -77,7 +77,7 @@
           "id": "CH-JSON-HEADERS-DEV",
           "kind": "modify",
           "goal": "明确处理JSON对象导出中的重复列名",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend existing JSONL adapter with duplicate_headers=\"last\"|\"error\"|\"suffix\" via formatter kwargs. Default last preserves old output; error rejects duplicate names before consuming a row; suffix creates deterministic collision-free names _2,_3,... while reserving every original name so real columns such as a_2 are not overwritten. Materialize one-shot headers once, keep row width validation and both unicode modes, preserve input header sequence and per-call formatter defaults. Explicit policies require text names.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_json_headers_dev.py and concise Chinese compatibility documentation at library/docs/development-ch-json-headers-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend existing JSONL adapter with duplicate_headers=\"last\"|\"error\"|\"suffix\" via formatter kwargs. Default last preserves old output; error rejects duplicate names before consuming a row; suffix creates deterministic collision-free names _2,_3,... while reserving every original name so real columns such as a_2 are not overwritten. Materialize one-shot headers once, keep row width validation and both unicode modes, preserve input header sequence and per-call formatter defaults. Explicit policies require text names.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_json_headers_dev.py and concise English compatibility documentation at library/docs/development-ch-json-headers-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CH-JSON-HEADERS-DEV-contract.md",
@@ -92,7 +92,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CH-JSON-HEADERS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CH-JSON-HEADERS-DEV.native.json",
@@ -124,7 +124,7 @@
           "id": "CH-JSON-PRECISION-DEV",
           "kind": "modify",
           "goal": "为JSON导出提供无损Decimal文本与严格有限数策略",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend JSONL adapter with decimal_policy=\"float\"|\"string\" and strict_json=False. Keep old defaults. String policy encodes every Decimal (including nested ones) as exact decimal text preserving scale; strict mode rejects nonfinite Decimal and float values anywhere, including string-policy Decimal NaN. Use per-call encoder settings without changing global JSON encoder state, preserve ordinary strings, large integers, unicode modes and input values, and reject invalid policy arguments before reading rows.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_json_precision_dev.py and concise Chinese compatibility documentation at library/docs/development-ch-json-precision-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend JSONL adapter with decimal_policy=\"float\"|\"string\" and strict_json=False. Keep old defaults. String policy encodes every Decimal (including nested ones) as exact decimal text preserving scale; strict mode rejects nonfinite Decimal and float values anywhere, including string-policy Decimal NaN. Use per-call encoder settings without changing global JSON encoder state, preserve ordinary strings, large integers, unicode modes and input values, and reject invalid policy arguments before reading rows.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_json_precision_dev.py and concise English compatibility documentation at library/docs/development-ch-json-precision-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CH-JSON-PRECISION-DEV-contract.md",
@@ -139,7 +139,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CH-JSON-PRECISION-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CH-JSON-PRECISION-DEV.native.json",
@@ -171,7 +171,7 @@
           "id": "CH-STREAM-DEV",
           "kind": "modify",
           "goal": "直接逐行导出查询结果而不缓存全部数据",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd TabularOutputFormatter.stream_output(data,headers,format_name=None,preprocessors=(),column_types=None,**kwargs) for registered CSV/TSV/JSONL formats only. Require explicit column types matching finite materialized headers to avoid whole-result inference; run the same registered/extra preprocessors lazily and return the original adapter iterator without list(data). Copy format defaults per call, preserve row errors/cancellation and Unicode/newline conventions, reject layout/table formats and invalid metadata before consuming a data row. Existing format_output remains unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_stream_dev.py and concise Chinese compatibility documentation at library/docs/development-ch-stream-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd TabularOutputFormatter.stream_output(data,headers,format_name=None,preprocessors=(),column_types=None,**kwargs) for registered CSV/TSV/JSONL formats only. Require explicit column types matching finite materialized headers to avoid whole-result inference; run the same registered/extra preprocessors lazily and return the original adapter iterator without list(data). Copy format defaults per call, preserve row errors/cancellation and Unicode/newline conventions, reject layout/table formats and invalid metadata before consuming a data row. Existing format_output remains unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_stream_dev.py and concise English compatibility documentation at library/docs/development-ch-stream-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CH-STREAM-DEV-contract.md",
@@ -186,7 +186,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CH-STREAM-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CH-STREAM-DEV.native.json",
@@ -218,7 +218,7 @@
           "id": "CH-PROJECTION-DEV",
           "kind": "modify",
           "goal": "按列名或索引惰性选择并重排查询结果",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cli_helpers.tabular_output.projection.select_columns(data,headers,selection) returning (lazy_rows,projected_headers). Materialize finite headers once and validate ordered integer indices or unique string column names before row consumption. Preserve duplicate selected positions and exact raw values; reject ambiguous/missing names, bool/negative/out-of-range indices and malformed row widths with one-based row number. Do not mutate or stringify inputs. Project before the existing formatter so its type inference applies to the selected/reordered columns; verify JSON and delimited pipeline integration.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_projection_dev.py and concise Chinese compatibility documentation at library/docs/development-ch-projection-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cli_helpers.tabular_output.projection.select_columns(data,headers,selection) returning (lazy_rows,projected_headers). Materialize finite headers once and validate ordered integer indices or unique string column names before row consumption. Preserve duplicate selected positions and exact raw values; reject ambiguous/missing names, bool/negative/out-of-range indices and malformed row widths with one-based row number. Do not mutate or stringify inputs. Project before the existing formatter so its type inference applies to the selected/reordered columns; verify JSON and delimited pipeline integration.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_projection_dev.py and concise English compatibility documentation at library/docs/development-ch-projection-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CH-PROJECTION-DEV-contract.md",
@@ -233,7 +233,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CH-PROJECTION-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CH-PROJECTION-DEV.native.json",
@@ -265,7 +265,7 @@
           "id": "CH-FORMULA-DEV",
           "kind": "modify",
           "goal": "在表格导出时显式保留、转义或拒绝公式型文本",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd spreadsheet_formula_policy(data,headers,formula_policy=\"preserve\",**kwargs) preprocessor. Treat string cells/headers whose leading-whitespace-trimmed text begins =,+,-,@ as formula-like. Preserve default; escape prefixes one apostrophe to the exact original string; error raises with only one-based data row/column (header row zero), without exposing contents. Keep numeric negatives/nonstrings unchanged, operate lazily without mutating inputs and integrate through real CSV formatter preprocessors. Per-call policy must not leak to subsequent exports. Do not claim sanitization for every spreadsheet engine or rollback lines already consumed before a later error.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_formula_dev.py and concise Chinese compatibility documentation at library/docs/development-ch-formula-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd spreadsheet_formula_policy(data,headers,formula_policy=\"preserve\",**kwargs) preprocessor. Treat string cells/headers whose leading-whitespace-trimmed text begins =,+,-,@ as formula-like. Preserve default; escape prefixes one apostrophe to the exact original string; error raises with only one-based data row/column (header row zero), without exposing contents. Keep numeric negatives/nonstrings unchanged, operate lazily without mutating inputs and integrate through real CSV formatter preprocessors. Per-call policy must not leak to subsequent exports. Do not claim sanitization for every spreadsheet engine or rollback lines already consumed before a later error.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_formula_dev.py and concise English compatibility documentation at library/docs/development-ch-formula-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "CH-M01-DEV",
@@ -285,7 +285,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CH-FORMULA-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CH-FORMULA-DEV.native.json",

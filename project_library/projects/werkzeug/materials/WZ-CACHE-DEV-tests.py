@@ -1,4 +1,4 @@
-"""公开条件JSON真实WSGI回归。"""
+"Public regression tests for WZ-CACHE-DEV; the complete business contract is in materials/WZ-CACHE-DEV-contract.md."
 import pytest
 from werkzeug.wrappers import Request,Response
 from werkzeug.test import Client

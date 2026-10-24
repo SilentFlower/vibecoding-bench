@@ -1,4 +1,4 @@
-"""公开惰性文档查询流回归。"""
+"Public regression tests for JM-ITER-DEV; the complete business contract is in materials/JM-ITER-DEV-contract.md."
 import pytest
 from jmespath.streaming import iter_search
 from jmespath.exceptions import JMESPathError

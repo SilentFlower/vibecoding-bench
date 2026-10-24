@@ -1,4 +1,4 @@
-"""公开命名参数真实SQL执行回归。"""
+"Public regression tests for SG-BIND-DEV; the complete business contract is in materials/SG-BIND-DEV-contract.md."
 import sqlite3
 from decimal import Decimal
 import pytest

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-Config.get增加显式default_factory，仅环境与仓库都缺键时调用一次，再按原规则转换。空值和None不算缺失；普通可调用default仍是值。双默认和非可调用工厂拒绝，同键递归有界且错误后释放守卫，工厂自身异常保持原对象。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add explicit keyword-only default_factory=undefined to Config.get and its call shortcut. Invoke a callable factory exactly once only when neither environment nor repository contains the key, then apply the normal cast/bool rules. Empty and None source values are present, not missing. Reject simultaneous default/default_factory and noncallable factories, bound recursive lookup of the same missing key with a safe ValueError, clear the recursion guard even after errors, and preserve the identity of factory exceptions. Existing callable default values must remain ordinary values.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_dc_factory_dev.py and concise English compatibility documentation at library/docs/development-dc-factory-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/decouple.py
+- library/tests/test_development_dc_factory_dev.py
+- library/docs/development-dc-factory-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

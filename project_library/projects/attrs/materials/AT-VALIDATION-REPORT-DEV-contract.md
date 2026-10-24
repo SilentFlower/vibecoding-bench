@@ -1,5 +1,13 @@
-# 一次工程交付完整的多字段验证报告能力
+# Engineering contract: AT-VALIDATION-REPORT-DEV
 
-表单批量导入需要一次返回所有独立字段问题，而不是反复提交。新增validate_all和结构化报告／聚合异常，保留字段顺序、原Attribute和原异常，每个字段仅调用一次；组合与深层validator内部仍按原fail-fast处理，不重复消费生成器，默认validate不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add validate_all(instance, *, raise_errors=False), ValidationIssue and MultiValidationError under attr.validation and attrs.validation. Report the first original Exception from each independent validated field in declaration order, retaining the real Attribute object, real field name and exception object. Invoke each field validator once and preserve its existing and_/or_/optional/deep fail-fast and one-pass semantics; do not reinterpret nested paths or replay validators. Continue other independent fields, catch Exception only, honor the shared validation disable switch, and optionally raise a MultiValidationError with an issues tuple. Do not mutate fields or replace ordinary attrs.validate fail-fast behavior.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_at_validation_report_dev.py and concise English compatibility documentation at library/docs/development-at-validation-report-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/attr/validation.py
+- library/src/attrs/validation.py
+- library/development_tests/test_development_at_validation_report_dev.py
+- library/docs/development-at-validation-report-dev.md

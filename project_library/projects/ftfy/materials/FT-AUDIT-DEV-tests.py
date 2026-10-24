@@ -1,4 +1,4 @@
-"""公开真实文本修复审计回归。"""
+"Public regression tests for FT-AUDIT-DEV; the complete business contract is in materials/FT-AUDIT-DEV-contract.md."
 import hashlib
 from dataclasses import FrozenInstanceError
 import pytest

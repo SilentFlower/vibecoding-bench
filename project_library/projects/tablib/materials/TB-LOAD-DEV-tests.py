@@ -1,4 +1,4 @@
-"""公开真实表格导入端到端回归。"""
+"Public regression tests for TB-LOAD-DEV; the complete business contract is in materials/TB-LOAD-DEV-contract.md."
 from decimal import Decimal
 import pytest
 from tablib.loading import load_records

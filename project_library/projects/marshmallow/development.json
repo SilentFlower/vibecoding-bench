@@ -76,7 +76,7 @@
           "id": "MM-NORMALIZE-DEV",
           "kind": "modify",
           "goal": "为字符串字段加入验证前Unicode标准化策略",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.normalized.NormalizedString as a String field with keyword form=\"NFC\" (NFC/NFD/NFKC/NFKD/None), strip=True and casefold=False, preserving standard field kwargs. Deserialize using the real String conversion, optionally strip then casefold then normalize before normal Field validators and post-load hooks. Preserve allow_none/missing/default/data_key/required behavior, original bytes validation, dump behavior and other String fields. Reject invalid policies at construction and retain independent per-schema field copies.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_normalize_dev.py and concise Chinese compatibility documentation at library/docs/development-mm-normalize-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.normalized.NormalizedString as a String field with keyword form=\"NFC\" (NFC/NFD/NFKC/NFKD/None), strip=True and casefold=False, preserving standard field kwargs. Deserialize using the real String conversion, optionally strip then casefold then normalize before normal Field validators and post-load hooks. Preserve allow_none/missing/default/data_key/required behavior, original bytes validation, dump behavior and other String fields. Reject invalid policies at construction and retain independent per-schema field copies.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_normalize_dev.py and concise English compatibility documentation at library/docs/development-mm-normalize-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/MM-NORMALIZE-DEV-contract.md",
@@ -91,7 +91,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MM-NORMALIZE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/MM-NORMALIZE-DEV.native.json",
@@ -123,7 +123,7 @@
           "id": "MM-UNIQUE-DEV",
           "kind": "modify",
           "goal": "为已转换的列表元素提供带索引错误的唯一性字段",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.unique.UniqueList(inner,*,key=None,**kwargs) as a true List field. Run normal inner deserialization first, then uniqueness on resulting values or a callable projection. Support unhashable keys without stringification; bool differs from numeric values. Report every later duplicate at its input index with first-occurrence context, preserve valid_data and native inner errors/required/allow_none. Keep standard serialization. Repeated schema instances must not share bound inner fields or per-call observations.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_unique_dev.py and concise Chinese compatibility documentation at library/docs/development-mm-unique-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.unique.UniqueList(inner,*,key=None,**kwargs) as a true List field. Run normal inner deserialization first, then uniqueness on resulting values or a callable projection. Support unhashable keys without stringification; bool differs from numeric values. Report every later duplicate at its input index with first-occurrence context, preserve valid_data and native inner errors/required/allow_none. Keep standard serialization. Repeated schema instances must not share bound inner fields or per-call observations.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_unique_dev.py and concise English compatibility documentation at library/docs/development-mm-unique-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/MM-UNIQUE-DEV-contract.md",
@@ -138,7 +138,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MM-UNIQUE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/MM-UNIQUE-DEV.native.json",
@@ -170,7 +170,7 @@
           "id": "MM-UNION-DEV",
           "kind": "modify",
           "goal": "实现外部标签分派的嵌套Schema双向转换",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.discriminated.DiscriminatedNested(discriminator,schemas,**kwargs) as a Field. schemas is a nonempty mapping of nonempty string tags to real Schema instances. Select by external discriminator, remove that tag before selected schema.load/dump(many=False), then restore it; do not mutate input. Preserve selected nested errors/unknown policy and partial propagation. Missing or unknown tags produce structured ValidationError at the tag. Schema outputs must be mappings not occupying the external tag; allow_none and normal field lifecycle still work. Do not guess schema variants.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_union_dev.py and concise Chinese compatibility documentation at library/docs/development-mm-union-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.discriminated.DiscriminatedNested(discriminator,schemas,**kwargs) as a Field. schemas is a nonempty mapping of nonempty string tags to real Schema instances. Select by external discriminator, remove that tag before selected schema.load/dump(many=False), then restore it; do not mutate input. Preserve selected nested errors/unknown policy and partial propagation. Missing or unknown tags produce structured ValidationError at the tag. Schema outputs must be mappings not occupying the external tag; allow_none and normal field lifecycle still work. Do not guess schema variants.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_union_dev.py and concise English compatibility documentation at library/docs/development-mm-union-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/MM-UNION-DEV-contract.md",
@@ -185,7 +185,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MM-UNION-DEV.rubric.json",
             "semantic": true,
             "native": "verification/MM-UNION-DEV.native.json",
@@ -217,7 +217,7 @@
           "id": "MM-ERRORS-DEV",
           "kind": "modify",
           "goal": "将原生嵌套校验错误转换成无输入泄露的定位响应",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.error_paths.flatten_errors(error) and problem(error,*,status=422,title=...). Accept real ValidationError using normalized_messages or native dict/list/string message trees; return frozen ErrorItem(pointer,messages tuple) leaves in original traversal order. Encode JSON Pointer escaping including integer array keys, retain _schema explicitly and all messages, handle root/empty errors and reject cycles/unsupported leaves. problem returns a detached status/title/errors mapping only, never exception data/valid_data or traceback. Preserve original errors and support custom field_name normalization.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_errors_dev.py and concise Chinese compatibility documentation at library/docs/development-mm-errors-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.error_paths.flatten_errors(error) and problem(error,*,status=422,title=...). Accept real ValidationError using normalized_messages or native dict/list/string message trees; return frozen ErrorItem(pointer,messages tuple) leaves in original traversal order. Encode JSON Pointer escaping including integer array keys, retain _schema explicitly and all messages, handle root/empty errors and reject cycles/unsupported leaves. problem returns a detached status/title/errors mapping only, never exception data/valid_data or traceback. Preserve original errors and support custom field_name normalization.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_errors_dev.py and concise English compatibility documentation at library/docs/development-mm-errors-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/MM-ERRORS-DEV-contract.md",
@@ -232,7 +232,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MM-ERRORS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/MM-ERRORS-DEV.native.json",
@@ -264,7 +264,7 @@
           "id": "MM-STREAM-DEV",
           "kind": "modify",
           "goal": "实现逐记录Schema导入并收集标准化错误和部分成功值",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.streaming.iterload(schema,records,*,errors=\"raise\",partial=None,unknown=None) and Schema.iterload with frozen LoadResult(index,status,data,errors,valid_data). Validate options before consuming data, remain lazy, and call actual schema.load(many=False) per record so hooks/custom loads, partial and unknown policies work even for Schema(many=True). Raise retains original ValidationError; collect continues after invalid rows and reuses completed error_paths.flatten_errors, detaches valid_data and never stores raw input or exception objects. Non-validation exceptions must propagate; no global schema options or hook bypasses.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_stream_dev.py and concise Chinese compatibility documentation at library/docs/development-mm-stream-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement marshmallow.streaming.iterload(schema,records,*,errors=\"raise\",partial=None,unknown=None) and Schema.iterload with frozen LoadResult(index,status,data,errors,valid_data). Validate options before consuming data, remain lazy, and call actual schema.load(many=False) per record so hooks/custom loads, partial and unknown policies work even for Schema(many=True). Raise retains original ValidationError; collect continues after invalid rows and reuses completed error_paths.flatten_errors, detaches valid_data and never stores raw input or exception objects. Non-validation exceptions must propagate; no global schema options or hook bypasses.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_mm_stream_dev.py and concise English compatibility documentation at library/docs/development-mm-stream-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "MM-ERRORS-DEV",
@@ -285,7 +285,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MM-STREAM-DEV.rubric.json",
             "semantic": true,
             "native": "verification/MM-STREAM-DEV.native.json",

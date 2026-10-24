@@ -1,4 +1,4 @@
-"""公开多字段验证报告回归。"""
+"Public regression tests for AT-VALIDATION-REPORT-DEV; the complete business contract is in materials/AT-VALIDATION-REPORT-DEV-contract.md."
 import attrs
 import pytest
 from attrs.validation import validate_all, MultiValidationError

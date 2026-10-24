@@ -32,7 +32,7 @@
           "id": "NATSORT-01-DEV",
           "kind": "modify",
           "goal": "CLI整数范围与排除筛选保留大整数精度",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair the actual Natsort CLI numeric filtering: default int/i mode must preserve arbitrary-size integer tokens and exact decimal thresholds through argument parsing, inclusive range/reverse-range and exclusion comparisons. Do not round thresholds or tokens to float; fractional boundaries compare without truncation. Float/f/real/r retain existing float semantics. Invalid or nonfinite integer thresholds fail clearly. Preserve sorting, sign/exponent policy, Unicode token recognition and ordinary CLI behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_01_dev.py, and Chinese compatibility documentation at library/docs/development-natsort-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair the actual Natsort CLI numeric filtering: default int/i mode must preserve arbitrary-size integer tokens and exact decimal thresholds through argument parsing, inclusive range/reverse-range and exclusion comparisons. Do not round thresholds or tokens to float; fractional boundaries compare without truncation. Float/f/real/r retain existing float semantics. Invalid or nonfinite integer thresholds fail clearly. Preserve sorting, sign/exponent policy, Unicode token recognition and ordinary CLI behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_01_dev.py, and English compatibility documentation at library/docs/development-natsort-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/NATSORT-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/NATSORT-01-DEV.rubric.json",
             "native": "verification/NATSORT-01-DEV.native.json",
             "public_native": "verification/NATSORT-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "NATSORT-02-DEV",
           "kind": "modify",
           "goal": "为重复自然排序提供可清空的有界LRU键缓存",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd natsort.cached.cached_natsort_keygen(key=None, alg=ns.DEFAULT, maxsize=128). Each factory owns an independent bounded LRU and exposes cache_info/cache_clear; hashable values are type-separated, unhashable values bypass caching, and exceptions are not cached. Output must match the original configured natsort_keygen. Reject negative/noninteger capacities and active caching of global LOCALE strategies; maxsize=0 disables storage. Mutable external key policy requires explicit cache_clear or a new factory. Default natsort APIs remain unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_02_dev.py, and Chinese compatibility documentation at library/docs/development-natsort-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd natsort.cached.cached_natsort_keygen(key=None, alg=ns.DEFAULT, maxsize=128). Each factory owns an independent bounded LRU and exposes cache_info/cache_clear; hashable values are type-separated, unhashable values bypass caching, and exceptions are not cached. Output must match the original configured natsort_keygen. Reject negative/noninteger capacities and active caching of global LOCALE strategies; maxsize=0 disables storage. Mutable external key policy requires explicit cache_clear or a new factory. Default natsort APIs remain unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_02_dev.py, and English compatibility documentation at library/docs/development-natsort-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/NATSORT-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/NATSORT-02-DEV.rubric.json",
             "native": "verification/NATSORT-02-DEV.native.json",
             "public_native": "verification/NATSORT-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "NATSORT-03-DEV",
           "kind": "modify",
           "goal": "单次输入的稳定自然序前K与原索引选择",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd natsort.topk.natural_topk(iterable,count,*,key=None,alg=ns.DEFAULT,reverse=False,indices=False). Results equal the corresponding stable natsorted prefix, including equal-key stability in reverse order and original-index output. Consume a one-shot stream once with O(K) selection storage, not a full input list; count=0 must not touch input. Reject negative/noninteger count, support counts larger than input, preserve key exceptions and original algorithms. Do not claim fewer input reads or change natsorted.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_03_dev.py, and Chinese compatibility documentation at library/docs/development-natsort-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd natsort.topk.natural_topk(iterable,count,*,key=None,alg=ns.DEFAULT,reverse=False,indices=False). Results equal the corresponding stable natsorted prefix, including equal-key stability in reverse order and original-index output. Consume a one-shot stream once with O(K) selection storage, not a full input list; count=0 must not touch input. Reject negative/noninteger count, support counts larger than input, preserve key exceptions and original algorithms. Do not claim fewer input reads or change natsorted.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_03_dev.py, and English compatibility documentation at library/docs/development-natsort-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/NATSORT-03-DEV-contract.md",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/NATSORT-03-DEV.rubric.json",
             "native": "verification/NATSORT-03-DEV.native.json",
             "public_native": "verification/NATSORT-03-DEV.public.native.json",
@@ -173,7 +173,7 @@
           "id": "NATSORT-04-DEV",
           "kind": "modify",
           "goal": "按原生自然策略稳定惰性归并有序记录流",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd natsort.merge.merge_sorted(*iterables,key=None,alg=ns.DEFAULT,reverse=False,strict=True). Lazily merge already naturally ordered streams with original rows preserved, equal keys stable by stream then local order, one natural-key calculation per consumed row, and optional monotonicity validation matching reverse. Empty/infinite streams and early close must not cause eager reads; caller owns original streams. Reject disorder rather than silently sorting it; propagate callbacks and source errors.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_04_dev.py, and Chinese compatibility documentation at library/docs/development-natsort-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd natsort.merge.merge_sorted(*iterables,key=None,alg=ns.DEFAULT,reverse=False,strict=True). Lazily merge already naturally ordered streams with original rows preserved, equal keys stable by stream then local order, one natural-key calculation per consumed row, and optional monotonicity validation matching reverse. Empty/infinite streams and early close must not cause eager reads; caller owns original streams. Reject disorder rather than silently sorting it; propagate callbacks and source errors.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_04_dev.py, and English compatibility documentation at library/docs/development-natsort-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/NATSORT-04-DEV-contract.md",
@@ -191,7 +191,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/NATSORT-04-DEV.rubric.json",
             "native": "verification/NATSORT-04-DEV.native.json",
             "public_native": "verification/NATSORT-04-DEV.public.native.json",
@@ -220,7 +220,7 @@
           "id": "NATSORT-05-DEV",
           "kind": "modify",
           "goal": "为已有自然有序数据建立等价键范围与排名索引",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd natsort.search.NaturalSortedIndex(iterable,*,key=None,alg=ns.DEFAULT,reverse=False). Snapshot original record order and precomputed natural keys, reject unordered input without sorting, support rank(value,side), count(value), and between(start,stop,include_start,include_stop) with None for unbounded ranges. Query values are already extracted fields; results preserve original records and input direction. Equal natural keys and reverse indexes need correct binary boundaries. Locale changes invalidate locale indexes; caller rebuilds after record/key-policy mutation. Do not change ordinary natsort.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_05_dev.py, and Chinese compatibility documentation at library/docs/development-natsort-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd natsort.search.NaturalSortedIndex(iterable,*,key=None,alg=ns.DEFAULT,reverse=False). Snapshot original record order and precomputed natural keys, reject unordered input without sorting, support rank(value,side), count(value), and between(start,stop,include_start,include_stop) with None for unbounded ranges. Query values are already extracted fields; results preserve original records and input direction. Equal natural keys and reverse indexes need correct binary boundaries. Locale changes invalidate locale indexes; caller rebuilds after record/key-policy mutation. Do not change ordinary natsort.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_05_dev.py, and English compatibility documentation at library/docs/development-natsort-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/NATSORT-05-DEV-contract.md",
@@ -238,7 +238,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/NATSORT-05-DEV.rubric.json",
             "native": "verification/NATSORT-05-DEV.native.json",
             "public_native": "verification/NATSORT-05-DEV.public.native.json",
@@ -267,7 +267,7 @@
           "id": "NATSORT-06-DEV",
           "kind": "modify",
           "goal": "多列记录自然排序支持独立方向与缺失政策",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd immutable natsort.records.FieldSortSpec(key,alg=ns.DEFAULT,reverse=False,missing=\"last\") and multisorted(iterable,fields). Fields are ordered highest priority first; each uses its own existing natsort algorithm and direction. Keep stable ties and full original records, consume a one-shot input once and never mutate caller lists. Treat None as missing with explicit first/last/error positions independent of reverse; reject invalid/empty specs and propagate getter errors. Default nested-key and natsorted behavior remain unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_06_dev.py, and Chinese compatibility documentation at library/docs/development-natsort-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd immutable natsort.records.FieldSortSpec(key,alg=ns.DEFAULT,reverse=False,missing=\"last\") and multisorted(iterable,fields). Fields are ordered highest priority first; each uses its own existing natsort algorithm and direction. Keep stable ties and full original records, consume a one-shot input once and never mutate caller lists. Treat None as missing with explicit first/last/error positions independent of reverse; reject invalid/empty specs and propagate getter errors. Default nested-key and natsorted behavior remain unchanged.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_natsort_06_dev.py, and English compatibility documentation at library/docs/development-natsort-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/NATSORT-06-DEV-contract.md",
@@ -285,7 +285,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/NATSORT-06-DEV.rubric.json",
             "native": "verification/NATSORT-06-DEV.native.json",
             "public_native": "verification/NATSORT-06-DEV.public.native.json",

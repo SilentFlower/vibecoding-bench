@@ -36,7 +36,7 @@
           "id": "MISTLETOE-01-DEV",
           "kind": "modify",
           "goal": "标题节点保存独立原始内容并保持AST导出兼容",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Heading.content so every ATX heading retains its own raw inline source after later headings or documents are parsed. Preserve empty/enclosed headings, children, instance assignment, HTML output and the existing AST/repr schema. Separate parser scratch state from per-node content; do not change frozen tests or serialize an extra Heading content field.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_01_dev.py, and Chinese compatibility documentation at library/docs/development-mistletoe-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair Heading.content so every ATX heading retains its own raw inline source after later headings or documents are parsed. Preserve empty/enclosed headings, children, instance assignment, HTML output and the existing AST/repr schema. Separate parser scratch state from per-node content; do not change frozen tests or serialize an extra Heading content field.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_01_dev.py, and English compatibility documentation at library/docs/development-mistletoe-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MISTLETOE-01-DEV-contract.md",
@@ -54,7 +54,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MISTLETOE-01-DEV.rubric.json",
             "native": "verification/MISTLETOE-01-DEV.native.json",
             "public_native": "verification/MISTLETOE-01-DEV.public.native.json",
@@ -83,7 +83,7 @@
           "id": "MISTLETOE-02-DEV",
           "kind": "modify",
           "goal": "基础渲染器安全输出叶节点与真实换行",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair BaseRenderer leaf handling: children=None must not be iterated, content-bearing leaves retain their content, thematic breaks may yield empty text, and soft/hard LineBreak renders a newline. Preserve code text and subclass overrides. Do not blanket-catch child-render errors or change HtmlRenderer output.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_02_dev.py, and Chinese compatibility documentation at library/docs/development-mistletoe-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair BaseRenderer leaf handling: children=None must not be iterated, content-bearing leaves retain their content, thematic breaks may yield empty text, and soft/hard LineBreak renders a newline. Preserve code text and subclass overrides. Do not blanket-catch child-render errors or change HtmlRenderer output.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_02_dev.py, and English compatibility documentation at library/docs/development-mistletoe-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MISTLETOE-02-DEV-contract.md",
@@ -101,7 +101,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MISTLETOE-02-DEV.rubric.json",
             "native": "verification/MISTLETOE-02-DEV.native.json",
             "public_native": "verification/MISTLETOE-02-DEV.public.native.json",
@@ -130,7 +130,7 @@
           "id": "MISTLETOE-03-DEV",
           "kind": "modify",
           "goal": "空文档和全部过滤时提供可渲染的空目录",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair TocRenderer.toc for empty documents and fully filtered headings. Return a real empty block_token.List whose rendering in TocRenderer is empty, with stable repeated access. Preserve nonempty heading hierarchy and filtering, and make empty List construction safe without changing ordinary list parsing.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_03_dev.py, and Chinese compatibility documentation at library/docs/development-mistletoe-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair TocRenderer.toc for empty documents and fully filtered headings. Return a real empty block_token.List whose rendering in TocRenderer is empty, with stable repeated access. Preserve nonempty heading hierarchy and filtering, and make empty List construction safe without changing ordinary list parsing.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_03_dev.py, and English compatibility documentation at library/docs/development-mistletoe-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MISTLETOE-03-DEV-contract.md",
@@ -149,7 +149,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MISTLETOE-03-DEV.rubric.json",
             "native": "verification/MISTLETOE-03-DEV.native.json",
             "public_native": "verification/MISTLETOE-03-DEV.public.native.json",
@@ -178,7 +178,7 @@
           "id": "MISTLETOE-04-DEV",
           "kind": "modify",
           "goal": "目录过滤配置按实例快照并支持一次性迭代器",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair TocRenderer filter_conds ownership. None/default creates a fresh list per renderer; explicit iterables, including generators, are materialized once in order without mutating caller lists. Later caller changes and one renderer edits cannot affect other instances. Preserve filter short-circuit order and propagate callback exceptions.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_04_dev.py, and Chinese compatibility documentation at library/docs/development-mistletoe-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair TocRenderer filter_conds ownership. None/default creates a fresh list per renderer; explicit iterables, including generators, are materialized once in order without mutating caller lists. Later caller changes and one renderer edits cannot affect other instances. Preserve filter short-circuit order and propagate callback exceptions.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_04_dev.py, and English compatibility documentation at library/docs/development-mistletoe-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MISTLETOE-04-DEV-contract.md",
@@ -196,7 +196,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MISTLETOE-04-DEV.rubric.json",
             "native": "verification/MISTLETOE-04-DEV.native.json",
             "public_native": "verification/MISTLETOE-04-DEV.public.native.json",
@@ -225,7 +225,7 @@
           "id": "MISTLETOE-05-DEV",
           "kind": "modify",
           "goal": "命令行显式stdin文件模式可用于真实UTF8管道",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit filename \"-\" support to the existing CLI: read stdin as exactly one complete Markdown document, emit UTF-8 renderer output without interactive banner/prompts, and exit normally at EOF including empty input. Allow one stdin entry among ordinary files in argument order; reject repeated \"-\" before conversion. Preserve no-filename interactive mode, file opening errors, custom renderers and normal file output.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_05_dev.py, and Chinese compatibility documentation at library/docs/development-mistletoe-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit filename \"-\" support to the existing CLI: read stdin as exactly one complete Markdown document, emit UTF-8 renderer output without interactive banner/prompts, and exit normally at EOF including empty input. Allow one stdin entry among ordinary files in argument order; reject repeated \"-\" before conversion. Preserve no-filename interactive mode, file opening errors, custom renderers and normal file output.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_05_dev.py, and English compatibility documentation at library/docs/development-mistletoe-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MISTLETOE-05-DEV-contract.md",
@@ -243,7 +243,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MISTLETOE-05-DEV.rubric.json",
             "native": "verification/MISTLETOE-05-DEV.native.json",
             "public_native": "verification/MISTLETOE-05-DEV.public.native.json",
@@ -272,7 +272,7 @@
           "id": "MISTLETOE-06-DEV",
           "kind": "modify",
           "goal": "LaTeX文本转义完整保留字面反斜线与波浪",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair LaTeXRenderer.render_raw_text text-mode escaping for literal backslash and tilde using a single pass that does not re-escape generated braces or control sequences. Preserve existing escapes for dollar, hash, braces, ampersand, underscore, percent and caret, Unicode text, and escape=False for code/math paths. Do not change URL/image escaping or claim TeX compilation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_06_dev.py, and Chinese compatibility documentation at library/docs/development-mistletoe-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair LaTeXRenderer.render_raw_text text-mode escaping for literal backslash and tilde using a single pass that does not re-escape generated braces or control sequences. Preserve existing escapes for dollar, hash, braces, ampersand, underscore, percent and caret, Unicode text, and escape=False for code/math paths. Do not change URL/image escaping or claim TeX compilation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_06_dev.py, and English compatibility documentation at library/docs/development-mistletoe-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/MISTLETOE-06-DEV-contract.md",
@@ -290,7 +290,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/MISTLETOE-06-DEV.rubric.json",
             "native": "verification/MISTLETOE-06-DEV.native.json",
             "public_native": "verification/MISTLETOE-06-DEV.public.native.json",

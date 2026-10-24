@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-新增明确总预算的二进制流检测，不发read(-1)，短读继续、零预算不读取。实际候选附读字节、EOF和预算耗尽事实，前缀不冒称全文；位置恢复和调用者流所有权保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement charset_normalizer.streams.from_stream(stream, *, max_bytes, read_size=65536, preserve_position=True, **options). Never read(-1), retain at most the explicit nonnegative budget, handle short reads and report actual read_bytes/eof/budget_exhausted with real from_bytes matches. Restore seekable caller positions even on errors and never close caller streams; nonseekable preservation/text reads/invalid bounds fail clearly. Zero budget must not read, and a limited prefix must not be represented as whole-source validation.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o02_dev.py and concise English compatibility documentation at library/docs/development-charset-normalizer-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/charset_normalizer/streams.py
+- library/tests/test_development_charset_normalizer_o02_dev.py
+- library/docs/development-charset-normalizer-o02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

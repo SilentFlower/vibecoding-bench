@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线06：在规范键缓存上定点失效，完全复用读取绑定/default/自定义键；只删指定业务身份、保其他热数据与统计，同计算锁串行，无用全清冒充定点；不同self隔离。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Extend delivered canonical_cache with cache_invalidate(*args,**kwargs) using the SAME make_key/signature/default/custom-key path as reads. Return True only when existing entry deleted; missing returns False, invalid call/key errors propagate. Preserve all unrelated entries and hit/miss statistics, per-method-self identity and custom business IDs. Run invalidation under same computation RLock so a completed call cannot later silently refill invalidated value; explicitly no cancellation of already-running user code. Do not call cache_clear internally or reset all stats. Keep existing default/cache_clear behavior.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_wrapt_06_dev.py, and English compatibility documentation at library/docs/development-wrapt-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/wrapt/canonical_cache.py
+- library/tests/test_development_wrapt_06_dev.py
+- library/docs/development-wrapt-06-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

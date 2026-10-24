@@ -1,5 +1,12 @@
-# 为业务名称分配符合Excel约束的唯一工作表
+# Engineering contract: XW-SHEET-NAMES-DEV
 
-业务名称先清理Excel禁用字符与边界引号，再按真实已用工作表分配唯一名称。长度限制和序号后缀协同处理，不覆盖或重命名已有工作表，处理保留名和大小写冲突。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement xlsxwriter.sheet_names.add_named_worksheet(workbook,desired). Sanitize Excel forbidden characters/control chars, trim whitespace and leading/trailing apostrophes, provide fallback Sheet, avoid reserved History and limit to 31 Unicode codepoints. Compare against actual workbook.worksheets names case-insensitively with casefold, allocate stable " (2)" suffixes while re-truncating base. Return the actual new worksheet and never rename/overwrite existing sheets. Handle long names, all-invalid names, repeated collisions and inputs differing only by case.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_xw_sheet_names_dev.py and concise English compatibility documentation at library/docs/development-xw-sheet-names-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/xlsxwriter/sheet_names.py
+- library/development_tests/test_development_xw_sheet_names_dev.py
+- library/docs/development-xw-sheet-names-dev.md

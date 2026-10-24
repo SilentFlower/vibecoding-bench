@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-订单从基础模型升级为带配送字段的目标模型时，需保留公共字段并按目标alias初始化。新增evolve_as，显式变更优先，目标转换／默认工厂／验证照常执行，不搬运init=False隐藏状态，不修改原实例，原evolve保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add evolve_as(instance, target_class, **changes) in attr.evolution and attrs.evolution. Copy common init=True fields by their real attribute names into the target initialization aliases, with explicit target-alias changes winning. Use the target standard constructor so its converters, defaults/factories, validators and post-init execute normally. Do not copy init=False hidden state, mutate the source or deep-copy existing payloads. Reject unknown target aliases, alias conflicts, non-attrs types and unrelated targets with no common init fields; leave missing required arguments and target validation errors explicit. Preserve ordinary attrs.evolve.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_at_evolve_as_dev.py and concise English compatibility documentation at library/docs/development-at-evolve-as-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/attr/evolution.py
+- library/src/attrs/evolution.py
+- library/development_tests/test_development_at_evolve_as_dev.py
+- library/docs/development-at-evolve-as-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

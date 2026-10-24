@@ -1,4 +1,4 @@
-"""公开slots树导出回归。"""
+"Public regression tests for AN-SLOTS-DEV; the complete business contract is in materials/AN-SLOTS-DEV-contract.md."
 import pytest
 from anytree import LightNodeMixin, AnyNode
 from anytree.exporter import DictExporter

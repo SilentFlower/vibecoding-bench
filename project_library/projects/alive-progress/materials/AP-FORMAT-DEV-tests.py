@@ -1,4 +1,4 @@
-"""公开进度格式完整结构验证回归。"""
+"Public regression tests for AP-FORMAT-DEV; the complete business contract is in materials/AP-FORMAT-DEV-contract.md."
 from alive_progress.core.configuration import _format_input_factory,ERROR
 
 def test_unknown_nested_fields_are_rejected():

@@ -1,10 +1,10 @@
-"""复用converter时每次覆盖只影响本次实际分派。"""
+"Public regression tests for MARKDOWNIFY-O06-DEV; the complete business contract is in materials/MARKDOWNIFY-O06-DEV-contract.md."
 from markdownify import MarkdownConverter
 from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 def test_previously_cached_converter_never_leaks_options_or_binding():
-    """已绑定转换缓存必须丢弃，否则本次strip仍会调用旧strong。@return None。"""
+    "Verify previously cached converter never leaks options or binding."
     converter=MarkdownConverter()
     assert converter.convert('<strong>A</strong>')=='**A**'
     before=converter.convert_fn_cache.copy()
@@ -14,10 +14,10 @@ def test_previously_cached_converter_never_leaks_options_or_binding():
     assert converter.convert_fn_cache==before and converter.options['strip'] is None
 
 def test_custom_constructor_and_nested_container_isolation():
-    """带必要构造参数的子类仍可用，回调身份保留而本次容器写入不泄漏。@return None。"""
+    "Verify custom constructor and nested container isolation."
     callback=lambda el:'plain'
     class Custom(MarkdownConverter):
-        """真正自定义的转换器，不能用无参构造重建。"""
+        "Public regression fixture: Custom."
         def __init__(self,required,**options):
             self.required=required;super().__init__(**options)
         def convert_p(self,el,text,parent_tags):
@@ -31,7 +31,7 @@ def test_custom_constructor_and_nested_container_isolation():
     assert converter.options['prefix']=='base:'
 
 def test_parallel_calls_exceptions_and_parser_options_are_isolated():
-    """并行调用和失败不写基础配置，也接受原有parser字符串简写。@return None。"""
+    "Verify parallel calls exceptions and parser options are isolated."
     converter=MarkdownConverter()
     def convert(symbol):return converter.convert_with_options('<em>x</em>',strong_em_symbol=symbol,bs4_options='html.parser')
     with ThreadPoolExecutor(max_workers=4) as pool:assert list(pool.map(convert,['*','_','*','_']))==['*x*','_x_','*x*','_x_']

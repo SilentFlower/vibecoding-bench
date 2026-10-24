@@ -77,7 +77,7 @@
           "id": "AT-OPTIONAL-DEV",
           "kind": "modify",
           "goal": "让可选转换器兼容未求值的字符串注解",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix attr.converters.optional for first-parameter and return annotations stored as strings, including unknown forward references. Build a valid optional annotation representation without evaluating arbitrary annotation text or changing the original converter annotations. Preserve actual-type annotations, unannotated/builtin callables, None bypass and Converter takes_self/takes_field forwarding. The wrapped converter must still execute normally for non-None values.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_optional_dev.py and concise Chinese compatibility documentation at library/docs/development-at-optional-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix attr.converters.optional for first-parameter and return annotations stored as strings, including unknown forward references. Build a valid optional annotation representation without evaluating arbitrary annotation text or changing the original converter annotations. Preserve actual-type annotations, unannotated/builtin callables, None bypass and Converter takes_self/takes_field forwarding. The wrapped converter must still execute normally for non-None values.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_optional_dev.py and concise English compatibility documentation at library/docs/development-at-optional-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AT-OPTIONAL-DEV-contract.md",
@@ -92,7 +92,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AT-OPTIONAL-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AT-OPTIONAL-DEV.native.json",
@@ -124,7 +124,7 @@
           "id": "AT-DEFAULT-METHOD-DEV",
           "kind": "modify",
           "goal": "按模型继承关系动态派发默认值方法",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Factory.from_method(method_name) as an explicit opt-in default factory. Resolve the current instance class MRO at initialization and call the winning bound instance method, allowing subclasses to override it. Validate a nonempty identifier name; reject staticmethod/classmethod/property or unbound/nonmethod values without executing them. Propagate missing methods and method exceptions. Preserve ordinary Factory callable binding, takes_self behavior, explicit supplied field values and default decorators. Do not make arbitrary generated factory closures pickleable.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_default_method_dev.py and concise Chinese compatibility documentation at library/docs/development-at-default-method-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Factory.from_method(method_name) as an explicit opt-in default factory. Resolve the current instance class MRO at initialization and call the winning bound instance method, allowing subclasses to override it. Validate a nonempty identifier name; reject staticmethod/classmethod/property or unbound/nonmethod values without executing them. Propagate missing methods and method exceptions. Preserve ordinary Factory callable binding, takes_self behavior, explicit supplied field values and default decorators. Do not make arbitrary generated factory closures pickleable.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_default_method_dev.py and concise English compatibility documentation at library/docs/development-at-default-method-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AT-DEFAULT-METHOD-DEV-contract.md",
@@ -139,7 +139,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AT-DEFAULT-METHOD-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AT-DEFAULT-METHOD-DEV.native.json",
@@ -171,7 +171,7 @@
           "id": "AT-EVOLVE-AS-DEV",
           "kind": "modify",
           "goal": "保留字段和目标别名将订单演化为下一阶段模型",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd evolve_as(instance, target_class, **changes) in attr.evolution and attrs.evolution. Copy common init=True fields by their real attribute names into the target initialization aliases, with explicit target-alias changes winning. Use the target standard constructor so its converters, defaults/factories, validators and post-init execute normally. Do not copy init=False hidden state, mutate the source or deep-copy existing payloads. Reject unknown target aliases, alias conflicts, non-attrs types and unrelated targets with no common init fields; leave missing required arguments and target validation errors explicit. Preserve ordinary attrs.evolve.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_evolve_as_dev.py and concise Chinese compatibility documentation at library/docs/development-at-evolve-as-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd evolve_as(instance, target_class, **changes) in attr.evolution and attrs.evolution. Copy common init=True fields by their real attribute names into the target initialization aliases, with explicit target-alias changes winning. Use the target standard constructor so its converters, defaults/factories, validators and post-init execute normally. Do not copy init=False hidden state, mutate the source or deep-copy existing payloads. Reject unknown target aliases, alias conflicts, non-attrs types and unrelated targets with no common init fields; leave missing required arguments and target validation errors explicit. Preserve ordinary attrs.evolve.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_evolve_as_dev.py and concise English compatibility documentation at library/docs/development-at-evolve-as-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AT-EVOLVE-AS-DEV-contract.md",
@@ -187,7 +187,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AT-EVOLVE-AS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AT-EVOLVE-AS-DEV.native.json",
@@ -219,7 +219,7 @@
           "id": "AT-VALIDATION-REPORT-DEV",
           "kind": "modify",
           "goal": "一次工程交付完整的多字段验证报告能力",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd validate_all(instance, *, raise_errors=False), ValidationIssue and MultiValidationError under attr.validation and attrs.validation. Report the first original Exception from each independent validated field in declaration order, retaining the real Attribute object, real field name and exception object. Invoke each field validator once and preserve its existing and_/or_/optional/deep fail-fast and one-pass semantics; do not reinterpret nested paths or replay validators. Continue other independent fields, catch Exception only, honor the shared validation disable switch, and optionally raise a MultiValidationError with an issues tuple. Do not mutate fields or replace ordinary attrs.validate fail-fast behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_validation_report_dev.py and concise Chinese compatibility documentation at library/docs/development-at-validation-report-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd validate_all(instance, *, raise_errors=False), ValidationIssue and MultiValidationError under attr.validation and attrs.validation. Report the first original Exception from each independent validated field in declaration order, retaining the real Attribute object, real field name and exception object. Invoke each field validator once and preserve its existing and_/or_/optional/deep fail-fast and one-pass semantics; do not reinterpret nested paths or replay validators. Continue other independent fields, catch Exception only, honor the shared validation disable switch, and optionally raise a MultiValidationError with an issues tuple. Do not mutate fields or replace ordinary attrs.validate fail-fast behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_validation_report_dev.py and concise English compatibility documentation at library/docs/development-at-validation-report-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AT-VALIDATION-REPORT-DEV-contract.md",
@@ -235,7 +235,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AT-VALIDATION-REPORT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AT-VALIDATION-REPORT-DEV.native.json",
@@ -267,7 +267,7 @@
           "id": "AT-GENERATED-SOURCE-DEV",
           "kind": "modify",
           "goal": "为模型转换顺序排查交付只读生成源码检查API",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd generated_sources(cls, names=None) under attr.introspection and attrs.introspection. Inspect actual current class/MRO descriptors without invoking properties or methods. Default to methods with existing attrs-generated code filenames; explicit finite unique method names also report custom/missing entries. Return nested read-only metadata generated/status/source/filename/owner, obtaining real generated source through inspect/linecache. If source is absent report unavailable; if a method is replaced report its current custom status, never stale generated source. Do not synthesize a whole class or export closure values; ordinary fields/inspect remain unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_generated_source_dev.py and concise Chinese compatibility documentation at library/docs/development-at-generated-source-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd generated_sources(cls, names=None) under attr.introspection and attrs.introspection. Inspect actual current class/MRO descriptors without invoking properties or methods. Default to methods with existing attrs-generated code filenames; explicit finite unique method names also report custom/missing entries. Return nested read-only metadata generated/status/source/filename/owner, obtaining real generated source through inspect/linecache. If source is absent report unavailable; if a method is replaced report its current custom status, never stale generated source. Do not synthesize a whole class or export closure values; ordinary fields/inspect remain unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_at_generated_source_dev.py and concise English compatibility documentation at library/docs/development-at-generated-source-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AT-GENERATED-SOURCE-DEV-contract.md",
@@ -283,7 +283,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AT-GENERATED-SOURCE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AT-GENERATED-SOURCE-DEV.native.json",

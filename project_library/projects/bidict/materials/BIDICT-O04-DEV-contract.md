@@ -1,5 +1,12 @@
-# 生成并应用有前置关系和顺序的可逆补丁
+# Engineering contract: BIDICT-O04-DEV
 
-生成带完整前后关系、顺序和操作事实的版本化补丁。应用前校验当前关系及顺序，最终状态唯一后返回同类副本，支持循环换值、增删及反向恢复。过期或非法补丁不改变输入，不执行操作字符串。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement bidict.relation_patch.relation_diff(before, after) and apply_relation_patch(mapping, patch, *, reverse=False). Produce versioned explicit add/remove/reassign facts with ordered full pre/post relations; apply only when the complete expected current relation/order matches. Validate final key/value uniqueness and return a new same-type relation, allowing cyclic value swaps, additions/removals and exact reverse restoration. Preserve original inputs on stale conditions, malformed schema or invalid final relations; never execute operation strings.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o04_dev.py and concise English compatibility documentation at library/docs/development-bidict-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bidict/relation_patch.py
+- library/tests/test_development_bidict_o04_dev.py
+- library/docs/development-bidict-o04-dev.md

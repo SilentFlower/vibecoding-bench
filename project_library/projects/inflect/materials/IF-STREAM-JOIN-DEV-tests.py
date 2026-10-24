@@ -1,4 +1,4 @@
-"""公开英语列表文本流回归。"""
+"Public regression tests for IF-STREAM-JOIN-DEV; the complete business contract is in materials/IF-STREAM-JOIN-DEV-contract.md."
 import pytest
 from inflect.streams import iter_join
 

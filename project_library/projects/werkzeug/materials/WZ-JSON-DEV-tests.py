@@ -1,4 +1,4 @@
-"""公开真实请求流严格JSON回归。"""
+"Public regression tests for WZ-JSON-DEV; the complete business contract is in materials/WZ-JSON-DEV-contract.md."
 from io import BytesIO
 import pytest
 from werkzeug.wrappers import Request

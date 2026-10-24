@@ -1,10 +1,10 @@
-"""重命名配置键保持顺序、子对象和安全属性映射。"""
+"Public regression tests for BX-RENAME-DEV; the complete business contract is in materials/BX-RENAME-DEV-contract.md."
 import pytest
 from box import Box, BoxError
 
 
 def test_order_and_identity():
-    """原位置改名且不重新转换子Box。@return None。"""
+    "Verify order and identity."
     value = Box({'before': 1, 'old name': {'port': 3}, 'after': 2})
     child = value['old name']
     assert value.rename_key('old name', 'new name') is value
@@ -15,7 +15,7 @@ def test_order_and_identity():
 
 
 def test_collision_atomic():
-    """冲突或保留键失败时原对象完全不动。@return None。"""
+    "Verify collision atomic."
     value = Box({'a': 1, 'b c': 2})
     before = value.to_dict()
     for target in ['b c', 'b-c', 'to_dict']:
@@ -25,7 +25,7 @@ def test_collision_atomic():
 
 
 def test_integer_and_frozen():
-    """整数键可改名，冻结对象拒绝。@return None。"""
+    "Verify integer and frozen."
     value = Box({2: 'value'})
     value.rename_key(2, 4)
     assert value[4] == 'value'

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-逐行数据流保留物理行号，空行计数但忽略，错误可抛出或收集后继续。复用严格解析与稳定编码，单行预算在解析前生效；逐记录完整编码再写入，不预读整份数据。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement simplejson.lines.iterloads(lines,*,errors="raise",use_decimal=False,max_chars=None), iterdumps(records), dump(records,stream) and frozen LineResult(line,status,value,error). Inputs are physical text/UTF-8 byte lines, optional BOM only on first line, blank lines ignored but counted. Validate options before consuming data. Reuse strict_loads duplicate/finite policy; collect returns a result per nonblank or invalid line and keeps later records, raise reports the physical line. Bound character size before parsing. Output uses stable_dumps, exactly one LF per record, validates each full record before its write, stays lazy and does not buffer all records. Detect short writes.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sj_lines_dev.py and concise English compatibility documentation at library/docs/development-sj-lines-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/simplejson/lines.py
+- library/development_tests/test_development_sj_lines_dev.py
+- library/docs/development-sj-lines-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

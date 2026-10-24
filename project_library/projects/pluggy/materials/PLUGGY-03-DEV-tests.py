@@ -1,11 +1,11 @@
-"""插件是对象身份，不能被用户__eq__重定义注册关系。"""
+"Public regression tests for PLUGGY-03-DEV; the complete business contract is in materials/PLUGGY-03-DEV-contract.md."
 import unittest
 from pluggy import PluginManager,HookspecMarker,HookimplMarker
 spec=HookspecMarker('app');impl=HookimplMarker('app')
 
 
 class EqualPlugin:
-    """相同业务值但独立实例。"""
+    "Public regression fixture: EqualPlugin."
     __hash__=None
     def __eq__(self,other):return True
     @impl
@@ -13,7 +13,7 @@ class EqualPlugin:
 
 
 def test_equal_instances_register_lookup_unregister_independently():
-    """两个相等且不可hash对象使用不同名字仍可管理。@return None。"""
+    "Verify equal instances register lookup unregister independently."
     class Specs:
         @spec
         def value(self):pass
@@ -26,7 +26,7 @@ def test_equal_instances_register_lookup_unregister_independently():
 
 
 def test_identity_subset_and_throwing_equality_never_execute_eq():
-    """子集及重复同对象校验都用is，不吞用户eq异常。@return None。"""
+    "Verify identity subset and throwing equality never execute eq."
     class Dangerous(EqualPlugin):
         def __eq__(self,other):raise AssertionError('不应比较插件值')
     class Specs:

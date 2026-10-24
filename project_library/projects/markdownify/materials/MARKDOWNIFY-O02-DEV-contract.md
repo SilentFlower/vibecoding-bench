@@ -1,5 +1,12 @@
-# 把HTML直接任务勾选框转换为真实GFM任务列表
+# Engineering contract: MARKDOWNIFY-O02-DEV
 
-对应路线06：显式task_lists开关，只认li首个直接checkbox；按checked属性存在取值，空任务、嵌套及有序列表保留，默认不变且不误认后续/后代输入。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add opt-in task_lists conversion in actual convert_li. A task checkbox is exclusively the first direct non-whitespace/non-comment content node, an input whose type is case-insensitive checkbox; checked attribute presence means checked regardless of attribute text. Emit [x]/[ ] after existing unordered or ordered bullet, retaining empty tasks, nested list ownership and multiline indentation. Default conversion remains unchanged. Never infer parent tasks from descendant labels/lists or later inputs, and never interpret other input types as checkboxes.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_markdownify_o02_dev.py and concise English compatibility documentation at library/docs/development-markdownify-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/markdownify/__init__.py
+- library/tests/test_development_markdownify_o02_dev.py
+- library/docs/development-markdownify-o02-dev.md

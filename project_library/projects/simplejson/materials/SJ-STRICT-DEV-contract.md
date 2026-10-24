@@ -1,5 +1,12 @@
-# 提供拒绝重复键与非有限数的严格JSON解码入口
+# Engineering contract: SJ-STRICT-DEV
 
-严格交换入口逐层拒绝重复键，转义后同名也算重复；拒绝非有限数及浮点溢出。可显式保留十进制精度，沿用真实解析器和旧接口默认行为。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement simplejson.strict.strict_loads(document,*,use_decimal=False) using the real decoder. Reject duplicate object keys at every depth after escape decoding, NaN/Infinity and finite-text numbers that overflow binary float. use_decimal=True preserves exact finite Decimal values and integer behavior. Accept normal UTF-8 bytes and text, preserve native JSON syntax errors and do not change existing loads defaults or globally toggle decoder engines.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sj_strict_dev.py and concise English compatibility documentation at library/docs/development-sj-strict-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/simplejson/strict.py
+- library/development_tests/test_development_sj_strict_dev.py
+- library/docs/development-sj-strict-dev.md

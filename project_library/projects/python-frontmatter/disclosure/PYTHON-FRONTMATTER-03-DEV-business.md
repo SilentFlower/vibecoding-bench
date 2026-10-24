@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线03：JSON头部按真实对象语法结束，支持紧凑、空对象、嵌套及字符串花括号，正文里的JSON不被消费；保持处理器与保留键元数据。坏JSON沿既有解码异常报告，不将内部闭括号当外层边界。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Replace JSON-handler line-delimiter splitting with real JSON-object boundary recognition. Accept compact, empty, pretty and nested objects, escaped braces/quotes, non-ASCII metadata and a body that itself contains braces or JSON-looking lines. Consume exactly the first complete object and preserve the trailing body. Keep actual JSONHandler attachment, reserved business metadata, existing JSON serialization options and malformed-JSON exceptions. Non-object arbitrary prose remains ordinary content; no YAML/TOML behavior regression.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_frontmatter_03_dev.py, and English compatibility documentation at library/docs/development-python-frontmatter-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/frontmatter/default_handlers.py
+- library/tests/test_development_python_frontmatter_03_dev.py
+- library/docs/development-python-frontmatter-03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,11 +1,11 @@
-"""无字典实例可以真正缓存且外置条目不保活self。"""
+"Public regression tests for WRAPT-02-DEV; the complete business contract is in materials/WRAPT-02-DEV-contract.md."
 import gc
 import weakref
 import unittest
 from wrapt.weak_cache import weak_method_cache
 
 def test_slotted_unhashable_instances_are_isolated_and_released():
-    """id身份不依赖hash/equality，原方法无强引用存入缓存。@return None。"""
+    "Verify slotted unhashable instances are isolated and released."
     class Item:
         __slots__=('factor','calls','__weakref__')
         __hash__=None
@@ -20,7 +20,7 @@ def test_slotted_unhashable_instances_are_isolated_and_released():
     Item.value.cache_clear(second);second.value(4);assert second.calls==2
 
 def test_nonweakrefable_objects_reject_and_exceptions_are_not_cached():
-    """无法弱引用明确失败，不退化为泄漏强存储。@return None。"""
+    "Verify nonweakrefable objects reject and exceptions are not cached."
     class NoWeak:
         __slots__=()
         @weak_method_cache()

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线09：真实Scope协议接入ContextVar，必须本线程/任务显式进入，嵌套恢复及异步交错隔离，继承缓存不视为子任务所有；构造失败不缓存。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add ContextScope(Scope), contextscope decorator and enter() context using an instance-owned ContextVar plus thread/task ownership. Actual Injector.get of a bound class reuses one successful instance within its explicit active scope, nested enter gets fresh instances then restores outer tokens, and exit/failure/cancellation removes scope state. Concurrent asyncio tasks each explicitly enter and remain isolated; inherited parent context in a child task is not implicitly owned and must reject get until entering. Failed providers never populate cache. Preserve NoScope/Singleton/ThreadLocal semantics and do not implicitly close unmanaged resources or use a global mutable task cache.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_injector_o04_dev.py and concise English compatibility documentation at library/docs/development-injector-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/injector/__init__.py
+- library/tests/test_development_injector_o04_dev.py
+- library/docs/development-injector-o04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

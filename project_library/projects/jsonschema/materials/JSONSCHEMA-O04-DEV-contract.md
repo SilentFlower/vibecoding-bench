@@ -1,5 +1,12 @@
-# 把受控正则编译异常映射为保留cause的格式验证错误
+# Engineering contract: JSONSCHEMA-O04-DEV
 
-对应路线04：只扩展内建regex声明的编译失败族，FormatError/ValidationError保留cause；正常/空/非字符串语义保持，自定义编程错误和取消不吞。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend only the builtin regex format registration to catch declared regular-expression compilation failures: re.error, ValueError for incompatible inline flags, RecursionError for bounded deeply nested patterns and OverflowError for repeat limits. FormatChecker.check must produce FormatError retaining cause and real format validation must yield ValidationError instead of leaking those failures. Preserve empty/valid patterns and nonstring JSON Schema format semantics. Never catch arbitrary BaseException or broaden unrelated custom checker programming-error handling.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_jsonschema_o04_dev.py and concise English compatibility documentation at library/docs/development-jsonschema-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/jsonschema/_format.py
+- library/tests/test_development_jsonschema_o04_dev.py
+- library/docs/development-jsonschema-o04-dev.md

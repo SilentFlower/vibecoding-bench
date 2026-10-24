@@ -1,5 +1,12 @@
-# 按每项实际工作量确认进度并保持惰性和准确收尾
+# Engineering contract: AP-WEIGHTED-DEV
 
-每条记录的处理量不同时，按显式权重而非记录数推进。每项只计算一次，继续消费才确认完成，总量用真实工作单位，零权重合法；不提前扫描全输入，异常或提前关闭不执行成功收尾。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement alive_progress.weighted.alive_weighted_it(source,weight,*,total=None,finalize=None,**bar_options). Use real alive_bar and snapshots; evaluate weight exactly once per consumed item before yielding, require nonnegative nonboolean integer (zero allowed), and acknowledge that weight only when iteration resumes. Keep item identity/order and explicit total-work units, without inspecting or summing the whole source. Falsey weight/finalizer callables work; only normal exhaustion finalizes once, not early close or source/weight failure. Reject manual mode and preserve original alive_it.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ap_weighted_dev.py and concise English compatibility documentation at library/docs/development-ap-weighted-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/alive_progress/weighted.py
+- library/development_tests/test_development_ap_weighted_dev.py
+- library/docs/development-ap-weighted-dev.md

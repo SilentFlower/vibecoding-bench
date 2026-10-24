@@ -1,9 +1,9 @@
-"""结果真实来自本次转换的HTML、目录、元数据及引用。"""
+"Public regression tests for PYTHON-MARKDOWN-05-DEV; the complete business contract is in materials/PYTHON-MARKDOWN-05-DEV-contract.md."
 from markdown.results import convert_document
 
 
 def test_actual_metadata_toc_and_reference_snapshot():
-    """不凭输入标题拼装结果，使用真实扩展输出。@return None。"""
+    "Verify actual metadata toc and reference snapshot."
     result=convert_document('title: 中文\n\n# Heading\n\n[link][ref]\n\n[ref]: https://example.com "Title"',extensions=['markdown.extensions.meta','markdown.extensions.toc'])
     assert '<h1 id="heading">Heading</h1>' in result.html
     assert result.metadata=={'title':['中文']} and result.toc_tokens[0]['id']=='heading'
@@ -11,7 +11,7 @@ def test_actual_metadata_toc_and_reference_snapshot():
 
 
 def test_result_defaults_and_later_calls_are_independent():
-    """无扩展字段明确为空，修改快照不会污染其他文档。@return None。"""
+    "Verify result defaults and later calls are independent."
     first=convert_document('# One',extensions=['markdown.extensions.toc']);first.toc_tokens[0]['name']='changed'
     second=convert_document('# Two',extensions=['markdown.extensions.toc'])
     assert second.toc_tokens[0]['name']=='Two'

@@ -32,7 +32,7 @@
           "id": "CONFIGOBJ-O01-DEV",
           "kind": "modify",
           "goal": "深复制仍保留原始插值表达式与配置图",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix deepcopy(Section/ConfigObj) to copy raw stored values rather than interpolated items. Preserve same concrete types, raw expressions, nested list expressions, comments/default metadata and internal parent/main graph links using the deepcopy memo. Cached interpolation engines must bind to the cloned sections. Copies must independently recalculate after root/nested changes; creating a copy must not trigger interpolation loops. Preserve the explicit evaluated semantics of Section.dict(), ordinary retrieval and existing pickle behavior.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-configobj-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nFix deepcopy(Section/ConfigObj) to copy raw stored values rather than interpolated items. Preserve same concrete types, raw expressions, nested list expressions, comments/default metadata and internal parent/main graph links using the deepcopy memo. Cached interpolation engines must bind to the cloned sections. Copies must independently recalculate after root/nested changes; creating a copy must not trigger interpolation loops. Preserve the explicit evaluated semantics of Section.dict(), ordinary retrieval and existing pickle behavior.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o01_dev.py and concise English compatibility documentation at library/docs/development-configobj-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CONFIGOBJ-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGOBJ-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGOBJ-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "CONFIGOBJ-O02-DEV",
           "kind": "modify",
           "goal": "递归合并时保留新增节注释且解除源对象共享",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Section.merge(indict, *, comments=\"incoming\") so Section inputs retain raw interpolations, key/section comments and inline comments while cloning incoming data and rebinding newly inserted sections to the target main/parent/depth. Default incoming metadata wins; comments=\"existing\" retains metadata of preexisting names; repeated merges do not accumulate duplicate comments. Plain dict inputs have no comment metadata and preserve existing comments. Keep recursive value overwrite behavior, reject invalid policies and never mutate or attach source Section objects.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-configobj-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend Section.merge(indict, *, comments=\"incoming\") so Section inputs retain raw interpolations, key/section comments and inline comments while cloning incoming data and rebinding newly inserted sections to the target main/parent/depth. Default incoming metadata wins; comments=\"existing\" retains metadata of preexisting names; repeated merges do not accumulate duplicate comments. Plain dict inputs have no comment metadata and preserve existing comments. Keep recursive value overwrite behavior, reject invalid policies and never mutate or attach source Section objects.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o02_dev.py and concise English compatibility documentation at library/docs/development-configobj-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "CONFIGOBJ-O01-DEV",
@@ -99,7 +99,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGOBJ-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGOBJ-O02-DEV.native.json",
@@ -131,7 +131,7 @@
           "id": "CONFIGOBJ-O03-DEV",
           "kind": "modify",
           "goal": "把真实编码配置完整写入后原子发布",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ConfigObj.write_atomic(filename=None), preserving ordinary write/outfile behavior. Serialize a raw-preserving clone through the real ConfigObj writer before opening any temporary file; use a unique same-directory temporary, preserve existing permission bits or use 0600 for a new file, close before os.replace and clean only the operation temp on failure. Default to self.filename, support PathLike, reject missing destination and symlink targets, return the absolute destination. Serialization/encoding/replace errors must preserve old bytes and original in-memory metadata. Do not promise power-loss durability or cross-file atomicity.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-configobj-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ConfigObj.write_atomic(filename=None), preserving ordinary write/outfile behavior. Serialize a raw-preserving clone through the real ConfigObj writer before opening any temporary file; use a unique same-directory temporary, preserve existing permission bits or use 0600 for a new file, close before os.replace and clean only the operation temp on failure. Default to self.filename, support PathLike, reject missing destination and symlink targets, return the absolute destination. Serialization/encoding/replace errors must preserve old bytes and original in-memory metadata. Do not promise power-loss durability or cross-file atomicity.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o03_dev.py and concise English compatibility documentation at library/docs/development-configobj-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "CONFIGOBJ-O01-DEV",
@@ -151,7 +151,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGOBJ-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGOBJ-O03-DEV.native.json",
@@ -183,7 +183,7 @@
           "id": "CONFIGOBJ-O04-DEV",
           "kind": "modify",
           "goal": "组合标量归一化与逐元素真实类型验证",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRegister typed_list(item_check=\"string\", force=True, min=None, max=None) in Validator using the same instance registered checks. Accept list/tuple or, only when force is true, one scalar; never split a string into characters. Normalize force from schema true/false, enforce lengths, convert every element with Validator.check, return a fresh list and keep input unchanged. Add VdtListItemError with zero-based index and original cause, excluding the original value from its message. Preserve custom check behavior and all existing force_list/int_list/None checks; a real ConfigObj configspec must use this validator.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-configobj-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRegister typed_list(item_check=\"string\", force=True, min=None, max=None) in Validator using the same instance registered checks. Accept list/tuple or, only when force is true, one scalar; never split a string into characters. Normalize force from schema true/false, enforce lengths, convert every element with Validator.check, return a fresh list and keep input unchanged. Add VdtListItemError with zero-based index and original cause, excluding the original value from its message. Preserve custom check behavior and all existing force_list/int_list/None checks; a real ConfigObj configspec must use this validator.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o04_dev.py and concise English compatibility documentation at library/docs/development-configobj-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CONFIGOBJ-O04-DEV-contract.md",
@@ -198,7 +198,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGOBJ-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGOBJ-O04-DEV.native.json",
@@ -230,7 +230,7 @@
           "id": "CONFIGOBJ-O05-DEV",
           "kind": "modify",
           "goal": "提供不泄露原值且形状固定的真实校验报告",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ConfigObj.validate_report(validator, *, apply=False) using actual validate(preserve_errors=True) and flatten_errors. Always return JSON-safe valid:boolean, issues:[{path:list,kind:string}], changed_paths, defaulted_paths and applied. valid must only accept the literal successful True result, never a truthy failure dict. Report complete nested paths and error class/missing markers without error messages or configuration values. Default dry mode validates a raw-preserving clone and leaves source values/comments/options unchanged; explicit apply=True uses existing validation conversion behavior. Record type conversions and applied default paths, keeping validate API unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-configobj-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ConfigObj.validate_report(validator, *, apply=False) using actual validate(preserve_errors=True) and flatten_errors. Always return JSON-safe valid:boolean, issues:[{path:list,kind:string}], changed_paths, defaulted_paths and applied. valid must only accept the literal successful True result, never a truthy failure dict. Report complete nested paths and error class/missing markers without error messages or configuration values. Default dry mode validates a raw-preserving clone and leaves source values/comments/options unchanged; explicit apply=True uses existing validation conversion behavior. Record type conversions and applied default paths, keeping validate API unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o05_dev.py and concise English compatibility documentation at library/docs/development-configobj-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "CONFIGOBJ-O01-DEV",
@@ -250,7 +250,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGOBJ-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGOBJ-O05-DEV.native.json",
@@ -282,7 +282,7 @@
           "id": "CONFIGOBJ-O06-DEV",
           "kind": "modify",
           "goal": "重载真实配置并验证成功后才接管旧树",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ConfigObj.validated_reload(validator) using the actual original filename/options/configspec and the accepted fixed validation report. Build an independent candidate from disk, force missing-file failure without creating a file, revalidate actual types/defaults, return valid=false without touching the old tree on validation errors and propagate IO/parse/callback exceptions. Only successful validation replaces all values and metadata, retaining the caller root identity and reconnecting parent/main/depth plus cached interpolation engines. Keep original options and ordinary reload behavior; never cache implicit validator state.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-configobj-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd ConfigObj.validated_reload(validator) using the actual original filename/options/configspec and the accepted fixed validation report. Build an independent candidate from disk, force missing-file failure without creating a file, revalidate actual types/defaults, return valid=false without touching the old tree on validation errors and propagate IO/parse/callback exceptions. Only successful validation replaces all values and metadata, retaining the caller root identity and reconnecting parent/main/depth plus cached interpolation engines. Keep original options and ordinary reload behavior; never cache implicit validator state.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o06_dev.py and concise English compatibility documentation at library/docs/development-configobj-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "CONFIGOBJ-O05-DEV",
@@ -302,7 +302,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CONFIGOBJ-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CONFIGOBJ-O06-DEV.native.json",

@@ -1,4 +1,4 @@
-"""公开命名空间压缩冲突回归。"""
+"Public regression tests for XD-NAMESPACE-COLLISION-DEV; the complete business contract is in materials/XD-NAMESPACE-COLLISION-DEV-contract.md."
 import pytest
 import xmltodict
 

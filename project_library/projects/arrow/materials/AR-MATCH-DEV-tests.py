@@ -1,4 +1,4 @@
-"""公开带原文位置的解析报告回归。"""
+"Public regression tests for AR-MATCH-DEV; the complete business contract is in materials/AR-MATCH-DEV-contract.md."
 from dataclasses import FrozenInstanceError
 from datetime import datetime
 import pytest

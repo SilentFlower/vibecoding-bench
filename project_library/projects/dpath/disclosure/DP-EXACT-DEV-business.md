@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-含斜线、星号或整数字典键的配置应通过原始类型路径精确读取，不经过通配或字符串转换。空路径返回根对象，缺失默认值显式，列表只接受非负整数，读取不能触发defaultdict创建键。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement dpath.exact.get_exact(root,segments,default=marker). Paths are finite component iterables, never plain strings; mapping keys retain actual hashable types and punctuation, list indices are nonnegative int excluding bool. Empty path returns root identity. Missing key/index returns an explicit default or raises original error, while invalid traversal/type errors propagate. Do not interpret glob characters, coerce "1" to integer, trigger defaultdict creation, or mutate input; preserve old dpath.get.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_exact_dev.py and concise English compatibility documentation at library/docs/development-dp-exact-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/dpath/exact.py
+- library/development_tests/test_development_dp_exact_dev.py
+- library/docs/development-dp-exact-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,5 +1,12 @@
-# 一次顺序读取计算多种固定长度文件摘要
+# Engineering contract: PA-MULTI-HASH-DEV
 
-发布校验清单需要多种摘要时只顺序读文件一次，每块同时更新所有算法，保留算法顺序和可选原始字节结果。读前校验参数，空文件及读失败时资源关闭正确，不改变原摘要方法。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Path.read_hashes(algorithms,*,chunk_size=8192,hex=True), returning insertion-ordered algorithm->digest mapping. Materialize/deduplicate algorithm names, validate fixed-size hash objects and positive integer chunk size before opening, read one stream once and update every digest for each bounded chunk. Support empty/binary/large files and raw digest output, close stream on read errors and propagate them. Reject empty algorithms, bool sizes, unknown hashes and XOFs requiring a length; preserve old hash APIs.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_multi_hash_dev.py and concise English compatibility documentation at library/docs/development-pa-multi-hash-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/path/__init__.py
+- library/development_tests/test_development_pa_multi_hash_dev.py
+- library/docs/development-pa-multi-hash-dev.md

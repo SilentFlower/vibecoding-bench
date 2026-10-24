@@ -4,7 +4,7 @@ Fix in-place repetition for Array in the supplied reproducer. The same Array obj
 
 # Investigation topics
 
-- 配置数组乘二后内存是四项，为什么写出来还是两项？
+- Determine why multiplying a configuration array by two produces four items in memory but serializes only two.
 
 # Supplied business material: materials/array-reproducer.py
 

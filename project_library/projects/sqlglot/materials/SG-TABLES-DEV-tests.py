@@ -1,4 +1,4 @@
-"""公开真实SQL物理表识别回归。"""
+"Public regression tests for SG-TABLES-DEV; the complete business contract is in materials/SG-TABLES-DEV-contract.md."
 import pytest
 from sqlglot import parse_one
 from sqlglot.report_inspection import inspect_tables

@@ -32,7 +32,7 @@
           "id": "LOGURU-O01-DEV",
           "kind": "modify",
           "goal": "读取不可变handler配置快照且不执行任何业务sink行为",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Logger.handler_snapshot() returning an id-sorted tuple of immutable detached scalar mappings: id, sink_type (actual adapter class), level, formatter static/callable, filter none/callable, enqueue, serialize and stopped. Capture under the existing core lock for consistent concurrent add/remove views. Never expose core/handler/sink/callback objects, call their business methods or repr, or mutate configuration while inspecting it. Old snapshots remain stable after removal. Keep existing repr/add/remove semantics and demonstrate multiple actual sink types and concurrent configuration reads.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-loguru-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Logger.handler_snapshot() returning an id-sorted tuple of immutable detached scalar mappings: id, sink_type (actual adapter class), level, formatter static/callable, filter none/callable, enqueue, serialize and stopped. Capture under the existing core lock for consistent concurrent add/remove views. Never expose core/handler/sink/callback objects, call their business methods or repr, or mutate configuration while inspecting it. Old snapshots remain stable after removal. Keep existing repr/add/remove semantics and demonstrate multiple actual sink types and concurrent configuration reads.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o01_dev.py and concise English compatibility documentation at library/docs/development-loguru-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/LOGURU-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/LOGURU-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/LOGURU-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "LOGURU-O02-DEV",
           "kind": "modify",
           "goal": "为真实sink提供可嵌套且异常安全的自动移除作用域",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Logger.sink_context(sink, **add_options) yielding the actual new handler id and removing only that handler on every exit, including BaseException, using existing queue/file/coroutine remove/stop ownership semantics. Nested contexts and external early removal are supported; caller streams remain open as add/remove already promise. Normal cleanup failure propagates. If body and cleanup both fail, preserve the original body exception and emit a RuntimeWarning for cleanup; do not silence body failures or delete unrelated handlers. Existing queued records finish through normal remove before exit.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-loguru-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Logger.sink_context(sink, **add_options) yielding the actual new handler id and removing only that handler on every exit, including BaseException, using existing queue/file/coroutine remove/stop ownership semantics. Nested contexts and external early removal are supported; caller streams remain open as add/remove already promise. Normal cleanup failure propagates. If body and cleanup both fail, preserve the original body exception and emit a RuntimeWarning for cleanup; do not silence body failures or delete unrelated handlers. Existing queued records finish through normal remove before exit.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o02_dev.py and concise English compatibility documentation at library/docs/development-loguru-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/LOGURU-O02-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/LOGURU-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/LOGURU-O02-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "LOGURU-O03-DEV",
           "kind": "modify",
           "goal": "在真实记录路径实现任务局部阈值及模块静默",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Logger.silence(level=\"INFO\", *, module=None) using the existing ContextVar compatibility layer. Suppress matching records whose severity is <= threshold before message formatting, with string level or nonbool nonnegative integer; module None covers all, a string covers itself/dot-separated descendants. Scope rules to the same shared Logger core (bound loggers included), combine nested scopes additively and reset on every exit. Preserve global enable/disable and normal sink filters. Async siblings/new threads stay independent while created child tasks inherit context; do not mutate global activation to emulate local silence.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-loguru-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Logger.silence(level=\"INFO\", *, module=None) using the existing ContextVar compatibility layer. Suppress matching records whose severity is <= threshold before message formatting, with string level or nonbool nonnegative integer; module None covers all, a string covers itself/dot-separated descendants. Scope rules to the same shared Logger core (bound loggers included), combine nested scopes additively and reset on every exit. Preserve global enable/disable and normal sink filters. Async siblings/new threads stay independent while created child tasks inherit context; do not mutate global activation to emulate local silence.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o03_dev.py and concise English compatibility documentation at library/docs/development-loguru-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/LOGURU-O03-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/LOGURU-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/LOGURU-O03-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "LOGURU-O04-DEV",
           "kind": "modify",
           "goal": "为每个真实sink提供隔离record的一次序列化回调",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd optional serializer(record_snapshot, formatted_text) to Logger.add and real Handler emission, independently per sink and before enqueue. Require callable or None and reject simultaneous serialize=True; default boolean JSON output remains unchanged. Pass a deep detached supported record graph (traceback may be retained read-only), preserving other sinks/original nested extra/record attrs against callback mutation; unsupported deepcopy values fail under existing catch policy. Require a string result with callback-owned terminators, invoke exactly once per emitted handler record on the producer thread, and keep catch=False exception propagation and queue completion. Never route custom encoding through a replacement fake sink.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-loguru-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd optional serializer(record_snapshot, formatted_text) to Logger.add and real Handler emission, independently per sink and before enqueue. Require callable or None and reject simultaneous serialize=True; default boolean JSON output remains unchanged. Pass a deep detached supported record graph (traceback may be retained read-only), preserving other sinks/original nested extra/record attrs against callback mutation; unsupported deepcopy values fail under existing catch policy. Require a string result with callback-owned terminators, invoke exactly once per emitted handler record on the producer thread, and keep catch=False exception propagation and queue completion. Never route custom encoding through a replacement fake sink.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o04_dev.py and concise English compatibility documentation at library/docs/development-loguru-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/LOGURU-O04-DEV-contract.md",
@@ -189,7 +189,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/LOGURU-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/LOGURU-O04-DEV.native.json",
@@ -221,7 +221,7 @@
           "id": "LOGURU-O05-DEV",
           "kind": "modify",
           "goal": "为实际模块名记录提供不冲突的可配置前缀缩写格式",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nIntroduce string-compatible RecordName for non-None actual caller module names and explicit format spec short:N (positive decimal count of full trailing segments), optionally followed by | and a normal string format spec. Abbreviate preceding dotted segments to first Unicode characters, preserving empty segments, full stored value, JSON, pickle and all old standard str formats including numeric width. Integrate real Logger formatting, preserve None caller metadata unchanged, reject invalid new specs and avoid adding a replacement truncated record field or silently redefining {name:2}.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-loguru-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nIntroduce string-compatible RecordName for non-None actual caller module names and explicit format spec short:N (positive decimal count of full trailing segments), optionally followed by | and a normal string format spec. Abbreviate preceding dotted segments to first Unicode characters, preserving empty segments, full stored value, JSON, pickle and all old standard str formats including numeric width. Integrate real Logger formatting, preserve None caller metadata unchanged, reject invalid new specs and avoid adding a replacement truncated record field or silently redefining {name:2}.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o05_dev.py and concise English compatibility documentation at library/docs/development-loguru-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/LOGURU-O05-DEV-contract.md",
@@ -237,7 +237,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/LOGURU-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/LOGURU-O05-DEV.native.json",
@@ -269,7 +269,7 @@
           "id": "LOGURU-O06-DEV",
           "kind": "modify",
           "goal": "让逐参数惰性值只在真实占位读取时按事件计算一次",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExpose loguru.LazyValue(zero_argument_callable) and integrate event-local wrappers into actual Logger argument formatting. Mix ordinary and wrapped positional/keyword values; only actually accessed placeholders evaluate, preserving standard format specs,!s,!r,attribute/index access and color formatting. Repeated references/aliases and multiple sinks share one result per event, but later events compute anew; level/activation short-circuit stays before evaluation. Captured kwargs publish evaluated values or an explicit <unevaluated LazyValue> marker so serialize=True never forces unused computation. Keep opt(lazy=True) old all-callable semantics and propagate computation errors. Top-level argument wrappers are supported; do not silently recurse into arbitrary business containers.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-loguru-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExpose loguru.LazyValue(zero_argument_callable) and integrate event-local wrappers into actual Logger argument formatting. Mix ordinary and wrapped positional/keyword values; only actually accessed placeholders evaluate, preserving standard format specs,!s,!r,attribute/index access and color formatting. Repeated references/aliases and multiple sinks share one result per event, but later events compute anew; level/activation short-circuit stays before evaluation. Captured kwargs publish evaluated values or an explicit <unevaluated LazyValue> marker so serialize=True never forces unused computation. Keep opt(lazy=True) old all-callable semantics and propagate computation errors. Top-level argument wrappers are supported; do not silently recurse into arbitrary business containers.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o06_dev.py and concise English compatibility documentation at library/docs/development-loguru-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/LOGURU-O06-DEV-contract.md",
@@ -285,7 +285,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/LOGURU-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/LOGURU-O06-DEV.native.json",

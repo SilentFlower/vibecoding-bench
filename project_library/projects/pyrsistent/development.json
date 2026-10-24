@@ -32,7 +32,7 @@
           "id": "PYRSISTENT-01-DEV",
           "kind": "modify",
           "goal": "嵌套校验映射与可选字段完整传递额外属性导入策略",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair CheckedPMap.create recursive key/value construction and optional pmap_field factory to forward the already-declared ignore_extra policy. Existing correctly typed instances remain reused, default False still rejects unknown record fields, and non-extra type/invariant failures propagate. Preserve _factory_fields signature compatibility for optional factories without forcing ignore_extra onto ordinary user factories outside the checked-type protocol. Validate multiple map/record/class levels and optional None, not only a single shallow example.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_01_dev.py, and Chinese compatibility documentation at library/docs/development-pyrsistent-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair CheckedPMap.create recursive key/value construction and optional pmap_field factory to forward the already-declared ignore_extra policy. Existing correctly typed instances remain reused, default False still rejects unknown record fields, and non-extra type/invariant failures propagate. Preserve _factory_fields signature compatibility for optional factories without forcing ignore_extra onto ordinary user factories outside the checked-type protocol. Validate multiple map/record/class levels and optional None, not only a single shallow example.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_01_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYRSISTENT-01-DEV-contract.md",
@@ -51,7 +51,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYRSISTENT-01-DEV.rubric.json",
             "native": "verification/PYRSISTENT-01-DEV.native.json",
             "public_native": "verification/PYRSISTENT-01-DEV.public.native.json",
@@ -80,7 +80,7 @@
           "id": "PYRSISTENT-02-DEV",
           "kind": "modify",
           "goal": "自动序列字段按不变量身份隔离并显式恢复序列化政策",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair _make_seq_field_type caching so CheckedPVector/CheckedPSet same item_type but different item_invariant identity never reuse an incompatible class; same callable identity reuses safely including unhashable callable objects, without equality/hash assumptions on the policy. New generated-type pickle reductions carry the actual pickleable invariant or an explicit None default marker and reconstruct under that exact policy. Lambdas/closures retain standard pickle limitations and must fail clearly rather than substitute another rule. Legacy three-argument payloads lack enough policy information: reject with a clear trusted-model migration instruction; an explicit fourth policy/default marker supports deliberate restoration. Preserve ordinary default-field pickle roundtrips and class names without silently decoding old ambiguous data under a wrong invariant.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_02_dev.py, and Chinese compatibility documentation at library/docs/development-pyrsistent-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair _make_seq_field_type caching so CheckedPVector/CheckedPSet same item_type but different item_invariant identity never reuse an incompatible class; same callable identity reuses safely including unhashable callable objects, without equality/hash assumptions on the policy. New generated-type pickle reductions carry the actual pickleable invariant or an explicit None default marker and reconstruct under that exact policy. Lambdas/closures retain standard pickle limitations and must fail clearly rather than substitute another rule. Legacy three-argument payloads lack enough policy information: reject with a clear trusted-model migration instruction; an explicit fourth policy/default marker supports deliberate restoration. Preserve ordinary default-field pickle roundtrips and class names without silently decoding old ambiguous data under a wrong invariant.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_02_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYRSISTENT-02-DEV-contract.md",
@@ -98,7 +98,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYRSISTENT-02-DEV.rubric.json",
             "native": "verification/PYRSISTENT-02-DEV.native.json",
             "public_native": "verification/PYRSISTENT-02-DEV.public.native.json",
@@ -127,7 +127,7 @@
           "id": "PYRSISTENT-03-DEV",
           "kind": "modify",
           "goal": "有界持久队列完整遵守序列切片及零容量边界",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair the PDeque bounded-sequence contract: normalize slices with slice.indices, match list values for empty/extreme/negative/full-length/reversed/zero-step cases, retain structural pop-based sharing for unit steps and original tuple fallback for other steps. maxlen=0 construction consumes input but stores no elements and both-end append/extend remain empty. Preserve capacity through slicing/reverse/remove/pickle-derived queues and leave the original immutable queue unchanged; retain existing negative-maxlen checks and positive truncation rules. Do not confuse pop negative-count opposite-end semantics with slice normalization.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_03_dev.py, and Chinese compatibility documentation at library/docs/development-pyrsistent-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair the PDeque bounded-sequence contract: normalize slices with slice.indices, match list values for empty/extreme/negative/full-length/reversed/zero-step cases, retain structural pop-based sharing for unit steps and original tuple fallback for other steps. maxlen=0 construction consumes input but stores no elements and both-end append/extend remain empty. Preserve capacity through slicing/reverse/remove/pickle-derived queues and leave the original immutable queue unchanged; retain existing negative-maxlen checks and positive truncation rules. Do not confuse pop negative-count opposite-end semantics with slice normalization.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_03_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYRSISTENT-03-DEV-contract.md",
@@ -145,7 +145,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYRSISTENT-03-DEV.rubric.json",
             "native": "verification/PYRSISTENT-03-DEV.native.json",
             "public_native": "verification/PYRSISTENT-03-DEV.public.native.json",
@@ -174,7 +174,7 @@
           "id": "PYRSISTENT-04-DEV",
           "kind": "modify",
           "goal": "嵌套受校验容器序列化完整传递调用格式",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair default CheckedPMap key/value serializers and checked sequence default serializers to pass the actual format argument into nested CheckedType.serialize(format). A record field serializer must observe the same format whether direct, in a map, in a vector/set or through multiple levels. Preserve explicit __serializer__ authority and default format=None output; do not override caller policy, mutate records or claim arbitrary serialized dictionary keys become hashable. Incompatible key serialization remains an explicit normal error. Test actual nested values and custom serializers, not only mocked forwarding.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_04_dev.py, and Chinese compatibility documentation at library/docs/development-pyrsistent-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair default CheckedPMap key/value serializers and checked sequence default serializers to pass the actual format argument into nested CheckedType.serialize(format). A record field serializer must observe the same format whether direct, in a map, in a vector/set or through multiple levels. Preserve explicit __serializer__ authority and default format=None output; do not override caller policy, mutate records or claim arbitrary serialized dictionary keys become hashable. Incompatible key serialization remains an explicit normal error. Test actual nested values and custom serializers, not only mocked forwarding.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_04_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYRSISTENT-04-DEV-contract.md",
@@ -192,7 +192,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYRSISTENT-04-DEV.rubric.json",
             "native": "verification/PYRSISTENT-04-DEV.native.json",
             "public_native": "verification/PYRSISTENT-04-DEV.public.native.json",
@@ -221,7 +221,7 @@
           "id": "PYRSISTENT-05-DEV",
           "kind": "modify",
           "goal": "持久映射批量更新接受有序键值对流并保留冲突合并语义",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend real PMap.update/update_with input adaptation from mapping-only .items() to mappings OR single-pass (key,value) iterables. Preserve multi-source left-to-right order, duplicate-pair last-write or update_fn fold semantics, persistent original ownership and CheckedPMap evolver checks. Consume generators once, propagate malformed pair/source/callback/type failures and never return a partially updated original. Keep pmap constructor and existing union API unchanged because they already support their documented roles; this goal specifically implements missing update input capability.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_05_dev.py, and Chinese compatibility documentation at library/docs/development-pyrsistent-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend real PMap.update/update_with input adaptation from mapping-only .items() to mappings OR single-pass (key,value) iterables. Preserve multi-source left-to-right order, duplicate-pair last-write or update_fn fold semantics, persistent original ownership and CheckedPMap evolver checks. Consume generators once, propagate malformed pair/source/callback/type failures and never return a partially updated original. Keep pmap constructor and existing union API unchanged because they already support their documented roles; this goal specifically implements missing update input capability.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_05_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYRSISTENT-05-DEV-contract.md",
@@ -239,7 +239,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYRSISTENT-05-DEV.rubric.json",
             "native": "verification/PYRSISTENT-05-DEV.native.json",
             "public_native": "verification/PYRSISTENT-05-DEV.public.native.json",
@@ -268,7 +268,7 @@
           "id": "PYRSISTENT-06-DEV",
           "kind": "modify",
           "goal": "配置状态递归合并采用明确冲突策略并保持持久校验与原分支",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyrsistent.merge.deep_merge(left,right,conflict=\"replace\",max_depth=32) and MergeConflict.path. left is a PMap and right accepts mapping or pairs through the earlier delivered update capability. Merge mapping/mapping branches recursively, leaf conflicts replace by default, raise with full tuple path or call an explicit (path,old,new) resolver. Equal/unmodified values share existing branches; new builtin containers are frozen with strict=False to preserve already-persistent checked types. Use actual evolvers, preserve CheckedPMap validation, reject unsupported policy/depth and surface type/source/callback failures without changing left. Do not claim automatic concatenation of sequences, arbitrary object deepcopy or a concurrent transaction. Cyclic/unrepresentable new builtin containers fail explicitly.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_06_dev.py, and Chinese compatibility documentation at library/docs/development-pyrsistent-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyrsistent.merge.deep_merge(left,right,conflict=\"replace\",max_depth=32) and MergeConflict.path. left is a PMap and right accepts mapping or pairs through the earlier delivered update capability. Merge mapping/mapping branches recursively, leaf conflicts replace by default, raise with full tuple path or call an explicit (path,old,new) resolver. Equal/unmodified values share existing branches; new builtin containers are frozen with strict=False to preserve already-persistent checked types. Use actual evolvers, preserve CheckedPMap validation, reject unsupported policy/depth and surface type/source/callback failures without changing left. Do not claim automatic concatenation of sequences, arbitrary object deepcopy or a concurrent transaction. Cyclic/unrepresentable new builtin containers fail explicitly.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_06_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "PYRSISTENT-05-DEV",
@@ -291,7 +291,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYRSISTENT-06-DEV.rubric.json",
             "native": "verification/PYRSISTENT-06-DEV.native.json",
             "public_native": "verification/PYRSISTENT-06-DEV.public.native.json",

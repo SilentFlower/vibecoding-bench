@@ -1,4 +1,4 @@
-"""公开有界无载荷尝试历史回归。"""
+"Public regression tests for TN-HISTORY-DEV; the complete business contract is in materials/TN-HISTORY-DEV-contract.md."
 import asyncio
 import pytest
 from tenacity import Retrying,AsyncRetrying,stop_after_attempt

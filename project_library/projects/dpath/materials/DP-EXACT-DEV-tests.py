@@ -1,4 +1,4 @@
-"""公开保留键类型的字面路径回归。"""
+"Public regression tests for DP-EXACT-DEV; the complete business contract is in materials/DP-EXACT-DEV-contract.md."
 from collections import defaultdict
 import pytest
 from dpath.exact import get_exact

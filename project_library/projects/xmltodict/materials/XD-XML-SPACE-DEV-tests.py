@@ -1,4 +1,4 @@
-"""公开xml:space局部空白回归。"""
+"Public regression tests for XD-XML-SPACE-DEV; the complete business contract is in materials/XD-XML-SPACE-DEV-contract.md."
 import xmltodict
 
 def test_preserve_inherits_and_default_restores_original_policy():

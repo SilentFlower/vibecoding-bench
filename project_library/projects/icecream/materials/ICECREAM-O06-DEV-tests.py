@@ -1,11 +1,11 @@
-"""只在合成builtin名上验证归属恢复，不触碰print等真实内置功能。"""
+"Public regression tests for ICECREAM-O06-DEV; the complete business contract is in materials/ICECREAM-O06-DEV-contract.md."
 import builtins
 from icecream import IceCreamDebugger
 import pytest
 NAME='_bench_managed_icecream'
 
 def test_restore_existing_and_remove_missing_on_exception(monkeypatch):
-    """旧值恢复，不存在名字最终移除，异常仍传播。@return None。"""
+    "Verify restore existing and remove missing on exception."
     from icecream.builtins import managed_install
     old=object();monkeypatch.setattr(builtins,NAME,old,raising=False)
     debug=IceCreamDebugger()
@@ -17,7 +17,7 @@ def test_restore_existing_and_remove_missing_on_exception(monkeypatch):
     assert not hasattr(builtins,NAME)
 
 def test_same_debugger_nested_out_of_order_close(monkeypatch):
-    """同一debugger也以安装token区分归属，乱序关闭不复活旧层。@return None。"""
+    "Verify same debugger nested out of order close."
     from icecream.builtins import managed_install
     old=object();monkeypatch.setattr(builtins,NAME,old,raising=False);debug=IceCreamDebugger()
     outer=managed_install(NAME,debug);inner=managed_install(NAME,debug)
@@ -25,7 +25,7 @@ def test_same_debugger_nested_out_of_order_close(monkeypatch):
     inner.close();assert getattr(builtins,NAME) is old
 
 def test_foreign_replacement_and_invalid_names(monkeypatch):
-    """另一组件中途替换的值不被撤销，非法名不写入。@return None。"""
+    "Verify foreign replacement and invalid names."
     from icecream.builtins import managed_install
     monkeypatch.delattr(builtins,NAME,raising=False);handle=managed_install(NAME);foreign=object();setattr(builtins,NAME,foreign)
     handle.close();assert getattr(builtins,NAME) is foreign

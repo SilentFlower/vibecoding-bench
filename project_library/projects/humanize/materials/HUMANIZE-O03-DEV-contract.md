@@ -1,5 +1,12 @@
-# 统一交付区域化列表连接与显式连接词逗号政策
+# Engineering contract: HUMANIZE-O03-DEV
 
-对应路线13：一项交付完整列表能力，0/1/2/多项及生成器统一处理；可显式复用真实区域pattern、覆盖字面连接词和serial comma，默认英语保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend actual natural_list(items,*,conjunction=None,serial_comma=False,localized=False) preserving byte-for-byte default English output. Consume/stringify a one-shot iterable once, correctly handle 0/1/2/many items. localized=True uses the existing real translated "%s and %s" catalog pattern; custom literal nonempty conjunction overrides it without percent-string interpretation. serial_comma is explicit for 3+ items only, with strict boolean options and Unicode/empty-string item preservation. Do not split translations/commas/connection words into separate objectives or change current activated language automatically.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_humanize_o03_dev.py and concise English compatibility documentation at library/docs/development-humanize-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/humanize/lists.py
+- library/tests/test_development_humanize_o03_dev.py
+- library/docs/development-humanize-o03-dev.md

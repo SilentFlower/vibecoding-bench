@@ -18,12 +18,12 @@ app = typer.Typer(add_completion=False)
 
 @app.callback()
 def root():
-    """提供商品工具命令组。@return None。"""
+    """Provide the product command group. @return None."""
 
 
 @app.command()
 def product(name: str, quantity: Annotated[int, typer.Option(min=0)] = 1):
-    """显示商品数量。@param name 名称。@param quantity 数量。@return None。"""
+    """Display the product quantity. @param name Product name. @param quantity Product quantity. @return None."""
     typer.echo(f"{name}:{quantity}")
 
 

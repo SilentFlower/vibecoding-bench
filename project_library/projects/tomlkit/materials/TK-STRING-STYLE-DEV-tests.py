@@ -1,4 +1,4 @@
-"""公开字符串保留风格回归。"""
+"Public regression tests for TK-STRING-STYLE-DEV; the complete business contract is in materials/TK-STRING-STYLE-DEV-contract.md."
 import pytest
 import tomlkit
 from tomlkit.exceptions import InvalidStringError

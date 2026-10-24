@@ -1,4 +1,4 @@
-"""公开同步事件执行回归。"""
+"Public regression tests for SM-RUNNER-DEV; the complete business contract is in materials/SM-RUNNER-DEV-contract.md."
 import pytest
 from statemachine.runner import MachineRunner,EventCall
 from statemachine.exceptions import TransitionNotAllowed

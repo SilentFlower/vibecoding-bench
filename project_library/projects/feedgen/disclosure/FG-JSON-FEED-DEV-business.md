@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-真实订阅对象新增JSON Feed 1.1导出，明确支持标题、正文、链接、作者、日期及附件。文本与HTML分别映射，长度零不能丢失，缺少必要内容或不支持的正文类型明确拒绝，不猜测扩展。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement feedgen.json_feed.json_feed(feed) and json_feed_str(feed,*,pretty=False), following https://www.jsonfeed.org/version/1.1/ for supported fields: version/title/items, alternate/self/next links, description/language/icons/authors; item unique ID/title, inline text or HTML content, plain summary fallback, URL, aware published/modified dates, authors and enclosure attachments with MIME type/optional nonnegative byte size including zero. Require valid title/content/IDs and reject unsupported external/XHTML bodies rather than silently losing them. Return independent JSON data and UTF8 bytes, do not mutate source or invent extension mappings.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_json_feed_dev.py and concise English compatibility documentation at library/docs/development-fg-json-feed-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/feedgen/json_feed.py
+- library/development_tests/test_development_fg_json_feed_dev.py
+- library/docs/development-fg-json-feed-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

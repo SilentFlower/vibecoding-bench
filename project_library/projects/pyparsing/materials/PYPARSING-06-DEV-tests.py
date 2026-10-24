@@ -1,10 +1,10 @@
-"""一条坏记录不吞其他有效记录，引号中的分隔符不是同步点。"""
+"Public regression tests for PYPARSING-06-DEV; the complete business contract is in materials/PYPARSING-06-DEV-contract.md."
 import unittest
 import pyparsing as pp
 from pyparsing.recovery import parse_recovering
 
 def test_quoted_separator_multiline_record_and_bad_middle_recovery():
-    """真实每记录语法解析，成功/失败坐标都保留。@return None。"""
+    "Verify quoted separator multiline record and bad middle recovery."
     grammar=pp.Word(pp.alphas)+pp.Suppress('=')+pp.QuotedString('"',esc_char='\\',multiline=True)
     text='a="one;two";bad;\nb="line\nvalue";'
     value=parse_recovering(grammar,text)
@@ -13,7 +13,7 @@ def test_quoted_separator_multiline_record_and_bad_middle_recovery():
     assert value.errors[0].offset>=value.errors[0].start
 
 def test_consecutive_bad_eof_empty_and_fatal_policy():
-    """连续错误都有记录，未闭合引号不错误切出内部伪记录。@return None。"""
+    "Verify consecutive bad eof empty and fatal policy."
     grammar=pp.Literal('ok')
     value=parse_recovering(grammar,';bad;;ok;worse;')
     assert len(value.records)==1 and len(value.errors)==2

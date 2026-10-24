@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-金额导出可显式选择Decimal精确文本，保留精度与尾零；严格JSON模式拒绝任意层级的非有限数。编码器设置仅对本次调用生效，旧默认浮点行为及整数、Unicode输出继续兼容。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Extend JSONL adapter with decimal_policy="float"|"string" and strict_json=False. Keep old defaults. String policy encodes every Decimal (including nested ones) as exact decimal text preserving scale; strict mode rejects nonfinite Decimal and float values anywhere, including string-policy Decimal NaN. Use per-call encoder settings without changing global JSON encoder state, preserve ordinary strings, large integers, unicode modes and input values, and reject invalid policy arguments before reading rows.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ch_json_precision_dev.py and concise English compatibility documentation at library/docs/development-ch-json-precision-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cli_helpers/tabular_output/json_output_adapter.py
+- library/development_tests/test_development_ch_json_precision_dev.py
+- library/docs/development-ch-json-precision-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

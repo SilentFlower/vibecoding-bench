@@ -1,4 +1,4 @@
-"""公开原始进度快照回归。"""
+"Public regression tests for AP-SNAPSHOT-DEV; the complete business contract is in materials/AP-SNAPSHOT-DEV-contract.md."
 from io import StringIO
 import pytest
 from alive_progress import alive_bar

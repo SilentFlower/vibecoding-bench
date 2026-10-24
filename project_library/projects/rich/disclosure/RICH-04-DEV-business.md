@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线05：原本会被Text移除的指定C0先在ANSI识别前规范，避免ESC被伪装成正文，正常SGR及OSC8-ST保持真实样式。未识别/截断段不留原始ESC，未支持尾缀可字面保留；不是任意终端协议清洗器。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Repair Rich ANSI decoding by removing only the designated ignorable C0 characters already stripped from plain Text (NUL..BS, VT/FF, SO..SUB, FS..US) before recognizing escape sequences; preserve TAB/LF/CR handling. SGR sequences with such bytes after ESC or within parameters decode into actual styles. Unrecognized/truncated sequences never leave a raw ESC in emitted plain fragments; unsupported suffix text may remain literal. Preserve standard SGR/OSC8-ST links, colors and decoder style state. Document this limited parser policy rather than claim a complete arbitrary terminal-protocol sanitizer; do not reinterpret or execute terminal controls beyond existing supported sequences.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_rich_04_dev.py, and English compatibility documentation at library/docs/development-rich-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/rich/ansi.py
+- library/tests/test_development_rich_04_dev.py
+- library/docs/development-rich-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,3 +1,12 @@
-# 标题节点保存独立原始内容并保持AST导出兼容
+# Engineering contract: MISTLETOE-01-DEV
 
-路线01：将解析器临时状态与实例原内容分开；连续文档、多级标题、空标题、闭合井号和实例赋值均正确。原有AST、repr及HTML结构保持兼容。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair Heading.content so every ATX heading retains its own raw inline source after later headings or documents are parsed. Preserve empty/enclosed headings, children, instance assignment, HTML output and the existing AST/repr schema. Separate parser scratch state from per-node content; do not change frozen tests or serialize an extra Heading content field.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_mistletoe_01_dev.py, and English compatibility documentation at library/docs/development-mistletoe-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/mistletoe/block_token.py
+- library/tests/test_development_mistletoe_01_dev.py
+- library/docs/development-mistletoe-01-dev.md

@@ -1,10 +1,10 @@
-"""异常退出只处理未提交队列，不承诺撤销此前批次。"""
+"Public regression tests for DATASET-O06-DEV; the complete business contract is in materials/DATASET-O06-DEV-contract.md."
 import dataset
 from dataset.chunked import ChunkedInsert,ChunkedUpdate
 import pytest
 
 def test_discard_only_pending_and_original_error_preserved():
-    """已满批次保留，异常时尾部不写且应用异常不变。@return None。"""
+    "Verify discard only pending and original error preserved."
     db=dataset.connect('sqlite://');t=db['items']
     with pytest.raises(RuntimeError,match='application'):
         with ChunkedInsert(t,chunksize=2,on_error='discard') as writer:
@@ -13,7 +13,7 @@ def test_discard_only_pending_and_original_error_preserved():
     assert writer.queue==[] and writer.fields==set();db.close()
 
 def test_default_flush_and_normal_discard_mode_completion():
-    """默认异常仍flush兼容，discard只在异常时生效。@return None。"""
+    "Verify default flush and normal discard mode completion."
     db=dataset.connect('sqlite://');t=db['items']
     with pytest.raises(RuntimeError):
         with ChunkedInsert(t) as writer:writer.insert({'n':1});raise RuntimeError('app')
@@ -21,7 +21,7 @@ def test_default_flush_and_normal_discard_mode_completion():
     assert t.count()==2;db.close()
 
 def test_update_discard_callback_and_transaction_rollback():
-    """丢弃不调用callback，外层事务仍可回滚已刷批次。@return None。"""
+    "Verify update discard callback and transaction rollback."
     db=dataset.connect('sqlite://');t=db['items'];t.insert({'key':'a','n':1});calls=[]
     with pytest.raises(RuntimeError):
         with ChunkedUpdate(t,['key'],on_error='discard',callback=lambda rows:calls.append(rows)) as writer:

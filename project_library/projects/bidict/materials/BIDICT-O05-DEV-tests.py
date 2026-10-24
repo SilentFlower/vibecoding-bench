@@ -1,9 +1,9 @@
-"""记录codec保留tuple键与有序反查，拒绝重复或未知格式。"""
+"Public regression tests for BIDICT-O05-DEV; the complete business contract is in materials/BIDICT-O05-DEV-contract.md."
 import json
 from bidict import bidict, OrderedBidict
 
 def test_json_tuple_roundtrip():
-    """标准JSON往返保留显式类型codec与关系顺序。@return None。"""
+    "Verify json tuple roundtrip."
     from bidict.records import to_records, from_records
     source = OrderedBidict([(('a', 1), 2), (('b', 3), 4)])
     encoded = to_records(source, encode_key=list, encode_value=str)
@@ -11,14 +11,14 @@ def test_json_tuple_roundtrip():
     assert list(output.items()) == list(source.items()) and output.inverse[4] == ('b', 3)
 
 def test_duplicate_after_decode():
-    """转换后键或值重复不能被构造器静默覆盖。@return None。"""
+    "Verify duplicate after decode."
     import pytest
     from bidict.records import from_records
     document = {'schema': 1, 'codec': 'explicit-v1', 'pairs': [['1', 'a'], ['01', 'b']]}
     with pytest.raises(ValueError): from_records(document, decode_key=int, decode_value=str)
 
 def test_schema_and_codec():
-    """未知schema和codec明确拒绝。@return None。"""
+    "Verify schema and codec."
     import pytest
     from bidict.records import from_records
     for document in [{'schema': 2, 'codec': 'explicit-v1', 'pairs': []}, {'schema': 1, 'codec': 'unknown', 'pairs': []}]:

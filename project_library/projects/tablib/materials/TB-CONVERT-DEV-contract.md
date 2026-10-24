@@ -1,5 +1,12 @@
-# 按列执行业务类型转换并保留可定位单元格错误
+# Engineering contract: TB-CONVERT-DEV
 
-按真实列顺序进行业务类型转换，转换器拿到独立单元格副本。错误定位到行和表头，收集模式保留失败单元格原值并继续，其余异常不能被静默吞掉。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement tablib.conversion.convert_columns(dataset,converters,*,errors="raise") returning frozen ConversionResult(dataset,errors) and CellError(row,column,error_type,message). Use completed schema/copy semantics and actual raw cells in deterministic row then header order. Converters receive independent cell copies so mutation or late failures cannot affect source. Raise mode wraps ValueError/TypeError/OverflowError with row/name context; collect keeps original failed cell copy and continues while successful conversions survive. Preserve title/tags, reject unknown/noncallable columns and invalid strategies, propagate unrelated programming exceptions and store no traceback.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_convert_dev.py and concise English compatibility documentation at library/docs/development-tb-convert-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/tablib/conversion.py
+- library/development_tests/test_development_tb_convert_dev.py
+- library/docs/development-tb-convert-dev.md

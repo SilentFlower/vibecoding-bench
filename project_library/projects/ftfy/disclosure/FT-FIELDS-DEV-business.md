@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-以明确字典键和数组下标选择需要修复的文本字段，点号是普通键内容。未选字段、键名和None保留，任何晚期失败都不修改原记录；支持明确缺失策略与根文本路径。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement ftfy.structured.fix_fields(value,paths,config=None,*,missing="raise"), read_path and normalize_paths. Paths are explicit tuples/lists of string dict keys and nonnegative integer list indices, never dotted-string guesses; support empty root path and stable deduplication. Repair only selected text through actual fix_text, retain None and all nonselected data/keys. Return deep-copied result and leave original unchanged on any late failure. Missing keys/indices may raise or skip, type mismatches/nontext leaves always fail. Preserve caller config and original container structures.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ft_fields_dev.py and concise English compatibility documentation at library/docs/development-ft-fields-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/ftfy/structured.py
+- library/development_tests/test_development_ft_fields_dev.py
+- library/docs/development-ft-fields-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

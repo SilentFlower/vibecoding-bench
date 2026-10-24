@@ -1,4 +1,4 @@
-"""公开批量名词规则事务回归。"""
+"Public regression tests for IF-RULES-DEV; the complete business contract is in materials/IF-RULES-DEV-contract.md."
 import pytest
 from inflect import engine
 from inflect.rules import define_nouns

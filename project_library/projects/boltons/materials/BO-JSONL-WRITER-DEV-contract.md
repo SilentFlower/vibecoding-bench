@@ -1,5 +1,12 @@
-# 逐条完整序列化JSONL并支持文本或二进制输出
+# Engineering contract: BO-JSONL-WRITER-DEV
 
-清理后的记录需要原生逐行写出：每条完整序列化并校验后一次提交，明确文本／二进制编码，拒绝自定义序列化器注入多行，失败不计成功记录，不缓存整批或关闭调用者流。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add jsonutils.JSONLWriter(stream,*,binary=False,encoding="utf-8",dumps=None), write(value), write_many(iterable), flush() and successful count. Serialize and validate one complete JSON text before writing exactly one LF-terminated record; reject physical CR/LF, nonstring or invalid custom serializer results without writing that record. Binary mode encodes first; preserve caller stream ownership and lazy consumption, detect reported short writes, propagate serialization/I/O errors and keep prior successful records/count. No whole-batch rollback or silent stream closure.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_jsonl_writer_dev.py and concise English compatibility documentation at library/docs/development-bo-jsonl-writer-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/boltons/jsonutils.py
+- library/development_tests/test_development_bo_jsonl_writer_dev.py
+- library/docs/development-bo-jsonl-writer-dev.md

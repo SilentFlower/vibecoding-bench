@@ -1,4 +1,4 @@
-"""公开严格配置接入回归。"""
+"Public regression tests for DE-VALIDATION-DEV; the complete business contract is in materials/DE-VALIDATION-DEV-contract.md."
 import pytest
 from dotenv.validation import parse_config, ConfigValidationError
 

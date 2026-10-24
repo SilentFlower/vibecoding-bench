@@ -1,11 +1,11 @@
-"""显式模块名缩写格式保留原record数据及标准字符串格式。"""
+"Public regression tests for LOGURU-O05-DEV; the complete business contract is in materials/LOGURU-O05-DEV-contract.md."
 from copy import deepcopy
 from loguru import logger
 import json
 import pytest
 
 def test_record_name_explicit_short_format_and_standard_width():
-    """真实记录对象仍是原名字符串，新格式不挪用旧数字宽度。@return None。"""
+    "Verify record name explicit short format and standard width."
     from loguru._recattrs import RecordName
     value=RecordName('application.backend.catalog.service')
     assert value=='application.backend.catalog.service' and isinstance(value,str)
@@ -14,7 +14,7 @@ def test_record_name_explicit_short_format_and_standard_width():
     assert format(value,'40')==format(str(value),'40') and format(value,'short:1|>20')==format('a.b.c.service','>20')
 
 def test_actual_logger_formatting_and_json_keep_full_name():
-    """通过真实调用者模块记录进入formatter，JSON仍为完整原名称。@return None。"""
+    "Verify actual logger formatting and json keep full name."
     logger.remove();log=deepcopy(logger);log.remove();text=[];encoded=[]
     log.add(text.append,format='{name:short:1}:{message}',catch=False)
     log.add(encoded.append,serialize=True,format='{message}')
@@ -24,7 +24,7 @@ def test_actual_logger_formatting_and_json_keep_full_name():
     log.remove()
 
 def test_unicode_empty_segments_pickle_and_invalid_specs():
-    """Unicode按段首字符，空段保留，记录可pickle且非法策略明确拒绝。@return None。"""
+    "Verify unicode empty segments pickle and invalid specs."
     import pickle
     from loguru._recattrs import RecordName
     value=RecordName('应用..业务.服务')

@@ -1,4 +1,4 @@
-"""公开自定义时区时间戳回归。"""
+"Public regression tests for BO-TIMESTAMP-DEV; the complete business contract is in materials/BO-TIMESTAMP-DEV-contract.md."
 from datetime import datetime,tzinfo,timedelta,timezone
 import pytest
 from boltons.timeutils import dt_to_timestamp

@@ -1,4 +1,4 @@
-"""公开原子文本文件实际回归。"""
+"Public regression tests for FT-ATOMIC-FILE-DEV; the complete business contract is in materials/FT-ATOMIC-FILE-DEV-contract.md."
 import pytest
 from ftfy.atomic import fix_file_atomic
 

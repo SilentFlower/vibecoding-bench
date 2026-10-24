@@ -1,10 +1,10 @@
-"""ConfigBox严格类型转换显式启用，默认保持宽松。"""
+"Public regression tests for BX-STRICT-CAST-DEV; the complete business contract is in materials/BX-STRICT-CAST-DEV-contract.md."
 import pytest
 from box import ConfigBox
 
 
 def test_strict_boolean_and_default_none():
-    """未知布尔词拒绝，缺值可显式返回None。@return None。"""
+    "Verify strict boolean and default none."
     value = ConfigBox(known=' YES ', unknown='maybe', zero='0')
     assert value.bool('known', strict=True) is True
     assert value.bool('zero', strict=True) is False
@@ -15,7 +15,7 @@ def test_strict_boolean_and_default_none():
 
 
 def test_strict_numeric_boundaries():
-    """禁止bool整数和非有限浮点，合法字符串照常。@return None。"""
+    "Verify strict numeric boundaries."
     value = ConfigBox(port='8080', flag=True, nan='nan', inf='inf')
     assert value.int('port', strict=True) == 8080
     with pytest.raises(ValueError):
@@ -26,7 +26,7 @@ def test_strict_numeric_boundaries():
 
 
 def test_strict_list_and_safe_error():
-    """列表逐项转换，错误消息不回显秘密输入。@return None。"""
+    "Verify strict list and safe error."
     value = ConfigBox(rows='1,2,3', secret='private-secret')
     assert value.list('rows', mod=int, strict=True) == [1, 2, 3]
     with pytest.raises(ValueError) as result:

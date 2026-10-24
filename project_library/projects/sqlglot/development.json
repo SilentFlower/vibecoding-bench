@@ -77,7 +77,7 @@
           "id": "SG-TABLES-DEV",
           "kind": "modify",
           "goal": "通过真实SQL作用域区分物理表与CTE并保留引用元数据",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report_inspection.query_copy, physical_nodes and inspect_tables(query,*,dialect=None) returning frozen TableReference(catalog,database,name,alias,quoted,scope) occurrences. Parse exactly one Query or copy supplied Query; reject empty/multiple/nonquery input. Use actual traverse_scope to exclude CTE references (including shadowing), retain physical tables inside CTE bodies, nested subqueries, self joins and SEMI/ANTI RHS. Preserve exact identifier case and catalog/db/name quote flags, scope traversal order and input AST/parent links. Ignore table functions/dynamic names rather than labeling them physical tables. Do not use regex table extraction or schema guesses.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_tables_dev.py and concise Chinese compatibility documentation at library/docs/development-sg-tables-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report_inspection.query_copy, physical_nodes and inspect_tables(query,*,dialect=None) returning frozen TableReference(catalog,database,name,alias,quoted,scope) occurrences. Parse exactly one Query or copy supplied Query; reject empty/multiple/nonquery input. Use actual traverse_scope to exclude CTE references (including shadowing), retain physical tables inside CTE bodies, nested subqueries, self joins and SEMI/ANTI RHS. Preserve exact identifier case and catalog/db/name quote flags, scope traversal order and input AST/parent links. Ignore table functions/dynamic names rather than labeling them physical tables. Do not use regex table extraction or schema guesses.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_tables_dev.py and concise English compatibility documentation at library/docs/development-sg-tables-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/SG-TABLES-DEV-contract.md",
@@ -92,7 +92,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SG-TABLES-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SG-TABLES-DEV.native.json",
@@ -124,7 +124,7 @@
           "id": "SG-REMAP-DEV",
           "kind": "modify",
           "goal": "精确重映射物理表并保持别名和限定列可执行",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report_remap.remap_tables(query,mapping,*,dialect=None,require_all=False). Reuse completed physical scope inspection; keys/values are exact (catalog,database,name) string tuples with optional empty prefixes. Quote replacement identifiers as data, never parse them as SQL. Rewrite physical named tables only, leaving CTE aliases and bodies/comments/literals otherwise compatible. Preserve existing aliases; for unaliased tables add original name as alias and repair matching scoped db/catalog-qualified columns to it. Keep table hints/other attributes. Reject malformed names and optional unused keys, return independent AST and retain source links. Do not string-replace SQL.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_remap_dev.py and concise Chinese compatibility documentation at library/docs/development-sg-remap-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report_remap.remap_tables(query,mapping,*,dialect=None,require_all=False). Reuse completed physical scope inspection; keys/values are exact (catalog,database,name) string tuples with optional empty prefixes. Quote replacement identifiers as data, never parse them as SQL. Rewrite physical named tables only, leaving CTE aliases and bodies/comments/literals otherwise compatible. Preserve existing aliases; for unaliased tables add original name as alias and repair matching scoped db/catalog-qualified columns to it. Keep table hints/other attributes. Reject malformed names and optional unused keys, return independent AST and retain source links. Do not string-replace SQL.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_remap_dev.py and concise English compatibility documentation at library/docs/development-sg-remap-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "SG-TABLES-DEV",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SG-REMAP-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SG-REMAP-DEV.native.json",
@@ -176,7 +176,7 @@
           "id": "SG-BIND-DEV",
           "kind": "modify",
           "goal": "基于真实AST绑定命名参数并拒绝SQL表达式注入",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report_binding.parameter_names(tree) and bind_parameters(query,values,*,strict=True,dialect=None) on completed single-query copies. Replace named Placeholder nodes with real exp literal conversions, repeated uses get independent nodes; literals/comments/identifiers containing colon text stay unchanged. Support None/bool/int/finite float/finite Decimal/str/bytes/date/time/datetime and recursive lists, reject nonfinite/cyclic/unsupported objects and SQL Expr values. Missing parameters always fail; strict rejects extras, nonstrict ignores unused values. Reject positional placeholders explicitly and preserve original AST parents. Never parse parameter text as SQL.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_bind_dev.py and concise Chinese compatibility documentation at library/docs/development-sg-bind-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report_binding.parameter_names(tree) and bind_parameters(query,values,*,strict=True,dialect=None) on completed single-query copies. Replace named Placeholder nodes with real exp literal conversions, repeated uses get independent nodes; literals/comments/identifiers containing colon text stay unchanged. Support None/bool/int/finite float/finite Decimal/str/bytes/date/time/datetime and recursive lists, reject nonfinite/cyclic/unsupported objects and SQL Expr values. Missing parameters always fail; strict rejects extras, nonstrict ignores unused values. Reject positional placeholders explicitly and preserve original AST parents. Never parse parameter text as SQL.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_bind_dev.py and concise English compatibility documentation at library/docs/development-sg-bind-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "SG-TABLES-DEV",
@@ -196,7 +196,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SG-BIND-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SG-BIND-DEV.native.json",
@@ -228,7 +228,7 @@
           "id": "SG-BOUNDS-DEV",
           "kind": "modify",
           "goal": "对最终查询结果施加独立行数边界而保留内部LIMIT语义",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report_bounds.bounded_query(query,max_rows,*,offset=0,dialect=None) using completed single-query copying and real AST builders. Wrap original query as an aliased subquery and apply outer limit/offset; never overwrite existing inner LIMIT/OFFSET/order/CTEs or apply limit independently to each UNION branch. Accept zero limit, reject negative/noninteger/bool values, preserve original AST and compile through requested output dialect. This bounds final row count, does not execute SQL or guarantee implicit order across dialects.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_bounds_dev.py and concise Chinese compatibility documentation at library/docs/development-sg-bounds-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report_bounds.bounded_query(query,max_rows,*,offset=0,dialect=None) using completed single-query copying and real AST builders. Wrap original query as an aliased subquery and apply outer limit/offset; never overwrite existing inner LIMIT/OFFSET/order/CTEs or apply limit independently to each UNION branch. Accept zero limit, reject negative/noninteger/bool values, preserve original AST and compile through requested output dialect. This bounds final row count, does not execute SQL or guarantee implicit order across dialects.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_bounds_dev.py and concise English compatibility documentation at library/docs/development-sg-bounds-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "SG-TABLES-DEV",
@@ -248,7 +248,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SG-BOUNDS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SG-BOUNDS-DEV.native.json",
@@ -280,7 +280,7 @@
           "id": "SG-REPORT-DEV",
           "kind": "modify",
           "goal": "组合真实表映射、参数绑定与结果边界准备报表查询",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report.prepare_report(query,*,values=None,tables=None,max_rows=None,offset=0,read=None,write=None) returning frozen PreparedReport(sql,tables,output_columns,parameters). Compose completed inspection/remap/bind/bounds APIs: parse once, require every supplied table mapping to match, bind every named parameter strictly, capture output projection names before optional outer limit and inspect final actual physical tables. Retain original unique parameter names and compile to requested dialect. No unresolved named placeholders or silent extras, offset requires bounds. Preserve supplied AST and do not execute SQL or fabricate schema/lineage.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_report_dev.py and concise Chinese compatibility documentation at library/docs/development-sg-report-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement sqlglot.report.prepare_report(query,*,values=None,tables=None,max_rows=None,offset=0,read=None,write=None) returning frozen PreparedReport(sql,tables,output_columns,parameters). Compose completed inspection/remap/bind/bounds APIs: parse once, require every supplied table mapping to match, bind every named parameter strictly, capture output projection names before optional outer limit and inspect final actual physical tables. Retain original unique parameter names and compile to requested dialect. No unresolved named placeholders or silent extras, offset requires bounds. Preserve supplied AST and do not execute SQL or fabricate schema/lineage.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_sg_report_dev.py and concise English compatibility documentation at library/docs/development-sg-report-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "SG-TABLES-DEV",
@@ -312,7 +312,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SG-REPORT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/SG-REPORT-DEV.native.json",

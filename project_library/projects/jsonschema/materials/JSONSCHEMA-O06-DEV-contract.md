@@ -1,5 +1,12 @@
-# 显式组合内建格式与业务约束且保持短路及异常cause
+# Engineering contract: JSONSCHEMA-O06-DEV
 
-对应路线12：当前FormatChecker显式组合已有格式与业务检查，all/any按序短路、声明异常cause保留，未声明错误传播；原checks覆盖和其他实例/全局登记不改。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add FormatChecker.compose(format, checker, *, mode="all", raises=()) for an existing registered format on this instance only, returning self. Combine the captured prior checker and new callable in order with all/any short circuit, preserving declared input-exception causes in FormatError and propagating undeclared programming errors. Keep original checks decorator overwrite semantics and independent/global checker registries unchanged. Reject unknown formats, invalid mode/callable/raises before mutation. Exercise actual builtin date syntax plus business conditions through FormatChecker and a real JSON Schema format keyword; no global monkeypatch or duplicated fake validation.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_jsonschema_o06_dev.py and concise English compatibility documentation at library/docs/development-jsonschema-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/jsonschema/_format.py
+- library/tests/test_development_jsonschema_o06_dev.py
+- library/docs/development-jsonschema-o06-dev.md

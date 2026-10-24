@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线19：用真实validate/flatten_errors构建固定JSON报告，正确判定失败字典，记录嵌套路径、转换和默认值但不泄露值；默认只验证克隆。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add ConfigObj.validate_report(validator, *, apply=False) using actual validate(preserve_errors=True) and flatten_errors. Always return JSON-safe valid:boolean, issues:[{path:list,kind:string}], changed_paths, defaulted_paths and applied. valid must only accept the literal successful True result, never a truthy failure dict. Report complete nested paths and error class/missing markers without error messages or configuration values. Default dry mode validates a raw-preserving clone and leaves source values/comments/options unchanged; explicit apply=True uses existing validation conversion behavior. Record type conversions and applied default paths, keeping validate API unchanged.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o05_dev.py and concise English compatibility documentation at library/docs/development-configobj-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/configobj/__init__.py
+- library/tests/test_development_configobj_o05_dev.py
+- library/docs/development-configobj-o05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

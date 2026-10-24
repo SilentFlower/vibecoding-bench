@@ -4,7 +4,7 @@ Repair the complete supplied tuple/list layout contract. Cover rowalign and maxh
 
 # Investigation topics
 
-- 定位tuple排版参数与list的差异
+- Diagnose the difference between tuple and list formatting parameters.
 
 # Supplied business material: materials/tuple-layout.py
 

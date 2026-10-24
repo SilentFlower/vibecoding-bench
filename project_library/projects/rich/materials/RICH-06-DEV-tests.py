@@ -1,17 +1,17 @@
-"""单个Text的排版不会被无内容的分隔符模板覆盖。"""
+"Public regression tests for RICH-06-DEV; the complete business contract is in materials/RICH-06-DEV-contract.md."
 import io
 from rich.console import Console
 from rich.text import Text
 
 
 def render(text,**kwargs):
-    """通过真实Console流水线收集文本。@param text 富文本。@param kwargs print参数。@return 输出。"""
+    "Support the public regression through render."
     stream=io.StringIO();Console(file=stream,width=20,force_terminal=False,color_system=None).print(text,**kwargs)
     return stream.getvalue()
 
 
 def test_single_text_self_justify_and_explicit_override():
-    """内置center等价显式center，显式left仍优先。@return None。"""
+    "Verify single text self justify and explicit override."
     own=Text('hi',justify='center')
     assert render(own)==render(Text('hi'),justify='center')
     assert render(own,justify='left')==render(Text('hi'),justify='left')
@@ -19,7 +19,7 @@ def test_single_text_self_justify_and_explicit_override():
 
 
 def test_overflow_no_wrap_end_and_plain_string_compatibility():
-    """不修改输入排版，end属于本轮print而非源对象。@return None。"""
+    "Verify overflow no wrap end and plain string compatibility."
     own=Text('a'*30,overflow='ellipsis',no_wrap=True,end='source')
     output=render(own,end='')
     assert len(output)<=20 and output.endswith('…')

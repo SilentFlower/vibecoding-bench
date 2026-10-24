@@ -1,9 +1,9 @@
-"""复制保留原始插值表达式、图连接和元数据。"""
+"Public regression tests for CONFIGOBJ-O01-DEV; the complete business contract is in materials/CONFIGOBJ-O01-DEV-contract.md."
 from copy import deepcopy
 from configobj import ConfigObj
 
 def test_copy_recalculates_without_freezing_expression():
-    """复制后修改变量会重新计算，原对象不变。@return None。"""
+    "Verify copy recalculates without freezing expression."
     source=ConfigObj(['foo=bar','baz=%(foo)s.txt'])
     assert source['baz']=='bar.txt'
     clone=deepcopy(source);clone['foo']='new'
@@ -11,7 +11,7 @@ def test_copy_recalculates_without_freezing_expression():
     assert dict.__getitem__(clone,'baz')=='%(foo)s.txt'
 
 def test_nested_parents_lists_and_comments():
-    """嵌套父指针及列表原值都归复制树。@return None。"""
+    "Verify nested parents lists and comments."
     source=ConfigObj(['root=base','# child','[section]','values=%(root)s, x'])
     clone=deepcopy(source);clone['root']='next'
     assert clone['section']['values']==['next','x']
@@ -19,7 +19,7 @@ def test_nested_parents_lists_and_comments():
     clone.comments['section'].append('changed');assert source.comments['section']==['# child']
 
 def test_copy_cycle_error_and_explicit_dict_semantics():
-    """循环只在读取时报原错误，dict仍为求值快照。@return None。"""
+    "Verify copy cycle error and explicit dict semantics."
     import pytest
     from configobj import InterpolationLoopError
     source=ConfigObj(['a=%(a)s']);clone=deepcopy(source)

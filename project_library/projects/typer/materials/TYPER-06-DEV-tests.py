@@ -1,11 +1,11 @@
-"""低库存报告真实筛选零/阈值边界并保持CSV字段内容。"""
+"Public regression tests for TYPER-06-DEV; the complete business contract is in materials/TYPER-06-DEV-contract.md."
 import csv,io,json,tempfile
 from pathlib import Path
 from typer.testing import CliRunner
 import shop
 
 def test_threshold_zero_boundary_stable_ties_unicode_and_multiline_csv():
-    """按数量升序，同数量保原目录顺序，中文/逗号/换行引用保真。@return None。"""
+    "Verify threshold zero boundary stable ties unicode and multiline csv."
     with tempfile.TemporaryDirectory() as directory:
         base=Path(directory);source=base/'catalog';out=base/'report'
         values=[{'sku':'a','name':'茶,\n雪','quantity':2},{'sku':'b','name':'B','quantity':0},{'sku':'c','name':'C','quantity':2},{'sku':'d','name':'D','quantity':3}];source.write_text(json.dumps(values));before=source.read_bytes()
@@ -15,7 +15,7 @@ def test_threshold_zero_boundary_stable_ties_unicode_and_multiline_csv():
         assert json.loads(result.stdout)=={'selected':3,'total_quantity':4,'threshold':2} and source.read_bytes()==before
 
 def test_empty_selection_header_invalid_threshold_and_output_collision():
-    """无结果仍可交付带表头报告，负阈值及覆盖不执行写入。@return None。"""
+    "Verify empty selection header invalid threshold and output collision."
     with tempfile.TemporaryDirectory() as directory:
         base=Path(directory);source=base/'catalog';out=base/'report';source.write_text('[{"sku":"x","name":"X","quantity":4}]');runner=CliRunner()
         assert runner.invoke(shop.app,['low-stock',str(source),'--threshold','0','--output',str(out)]).exit_code==0

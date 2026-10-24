@@ -32,7 +32,7 @@
           "id": "CHARDET-O01-DEV",
           "kind": "modify",
           "goal": "让分块BOM识别与整份输入一致且不丢前缀",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair UniversalDetector startup to buffer only incomplete possible BOM prefixes until a complete UTF8/16/32 or unusual UCS4 BOM can be distinguished, then use existing detection semantics. Handle UTF16-vs-UTF32 prefix overlap, arbitrary byte/empty chunks, near-prefix mismatches, EOF partial prefixes and reset reuse without losing or duplicating bytes. Ordinary non-BOM input must start probing immediately; preserve original labels, confidence, all probers and frozen upstream tests.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-chardet-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair UniversalDetector startup to buffer only incomplete possible BOM prefixes until a complete UTF8/16/32 or unusual UCS4 BOM can be distinguished, then use existing detection semantics. Handle UTF16-vs-UTF32 prefix overlap, arbitrary byte/empty chunks, near-prefix mismatches, EOF partial prefixes and reset reuse without losing or duplicating bytes. Ordinary non-BOM input must start probing immediately; preserve original labels, confidence, all probers and frozen upstream tests.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o01_dev.py and concise English compatibility documentation at library/docs/development-chardet-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CHARDET-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CHARDET-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CHARDET-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "CHARDET-O02-DEV",
           "kind": "modify",
           "goal": "区分检测编码身份与Python规范codec可用性",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.details.detect_details(data, *, names=\"legacy\") retaining actual raw encoding/confidence/language while reporting canonical Python codec and availability. Explicit names=\"python\" may select the canonical codec only when supported; unusual UCS4 labels must retain their identity and report unsupported status instead of being relabelled UTF32. Distinguish empty/no-match, snapshot mutable bytearray input and reject invalid policies/types without changing detect defaults.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-chardet-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.details.detect_details(data, *, names=\"legacy\") retaining actual raw encoding/confidence/language while reporting canonical Python codec and availability. Explicit names=\"python\" may select the canonical codec only when supported; unusual UCS4 labels must retain their identity and report unsupported status instead of being relabelled UTF32. Distinguish empty/no-match, snapshot mutable bytearray input and reject invalid policies/types without changing detect defaults.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o02_dev.py and concise English compatibility documentation at library/docs/development-chardet-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CHARDET-O02-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CHARDET-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CHARDET-O02-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "CHARDET-O03-DEV",
           "kind": "modify",
           "goal": "有界检测文件并保留调用者流位置与覆盖事实",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.files.detect_file(source, *, preserve_position=True, chunk_size=65536, max_bytes=None) on the delivered split-BOM detector. Support text/PathLike paths and caller-owned binary streams, short reads and exact nonnegative byte budgets without lookahead. Restore seekable caller positions on success/failure, never close caller streams, close owned files, and report actual read_bytes/eof/budget_exhausted without claiming an inspected prefix validates the whole file. Zero budget performs no reads; nonseekable preserving mode and text reads fail explicitly.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-chardet-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.files.detect_file(source, *, preserve_position=True, chunk_size=65536, max_bytes=None) on the delivered split-BOM detector. Support text/PathLike paths and caller-owned binary streams, short reads and exact nonnegative byte budgets without lookahead. Restore seekable caller positions on success/failure, never close caller streams, close owned files, and report actual read_bytes/eof/budget_exhausted without claiming an inspected prefix validates the whole file. Zero budget performs no reads; nonseekable preserving mode and text reads fail explicitly.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o03_dev.py and concise English compatibility documentation at library/docs/development-chardet-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "CHARDET-O01-DEV",
@@ -146,7 +146,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CHARDET-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CHARDET-O03-DEV.native.json",
@@ -178,7 +178,7 @@
           "id": "CHARDET-O04-DEV",
           "kind": "modify",
           "goal": "逐条检测带标识记录并隔离局部失败",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.batch.detect_many(records, *, on_error=\"continue\", should_rename_legacy=False). Lazily process (id, bytes/bytearray) pairs with fresh real detect calls, preserve index/order/duplicate identifiers and local error facts, and provide continue/stop/raise policies. A failed record has no successful result, stop/close must not consume the tail, upstream generator errors propagate and raw bytes must not be misinterpreted as an iterable batch. Preserve standard detection/fallback facts.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-chardet-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.batch.detect_many(records, *, on_error=\"continue\", should_rename_legacy=False). Lazily process (id, bytes/bytearray) pairs with fresh real detect calls, preserve index/order/duplicate identifiers and local error facts, and provide continue/stop/raise policies. A failed record has no successful result, stop/close must not consume the tail, upstream generator errors propagate and raw bytes must not be misinterpreted as an iterable batch. Preserve standard detection/fallback facts.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o04_dev.py and concise English compatibility documentation at library/docs/development-chardet-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CHARDET-O04-DEV-contract.md",
@@ -193,7 +193,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CHARDET-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CHARDET-O04-DEV.native.json",
@@ -225,7 +225,7 @@
           "id": "CHARDET-O05-DEV",
           "kind": "modify",
           "goal": "对真实候选执行全文解码及业务验收后再选择",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.validated.detect_validated(data, *, validator=None). Snapshot bytes, obtain real detect_all candidates, stable-sort confidence, deduplicate supported codec aliases and strictly decode the entire payload for every candidate before an optional (text, candidate) callback. Return selected original facts and per-candidate accepted/business-rejected/decode-error/unsupported-codec statuses without returning full text. All-rejected/empty/unsupported results must not claim whole validation; callback errors propagate and confidence is never fabricated or represented as an accuracy guarantee.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-chardet-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.validated.detect_validated(data, *, validator=None). Snapshot bytes, obtain real detect_all candidates, stable-sort confidence, deduplicate supported codec aliases and strictly decode the entire payload for every candidate before an optional (text, candidate) callback. Return selected original facts and per-candidate accepted/business-rejected/decode-error/unsupported-codec statuses without returning full text. All-rejected/empty/unsupported results must not claim whole validation; callback errors propagate and confidence is never fabricated or represented as an accuracy guarantee.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o05_dev.py and concise English compatibility documentation at library/docs/development-chardet-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CHARDET-O05-DEV-contract.md",
@@ -240,7 +240,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CHARDET-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CHARDET-O05-DEV.native.json",
@@ -272,7 +272,7 @@
           "id": "CHARDET-O06-DEV",
           "kind": "modify",
           "goal": "用显式或实际检测codec严格转换完整字节载荷",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.transcode.transcode_bytes(data, target_encoding, *, source_encoding=None). Use the explicit source codec or actual detection result, require a supported codec and strict full-payload decoding/encoding with no replacement or character loss. Return independent output bytes, canonical source/target names, original detection facts when used and validated byte count. Target codec explicitly controls BOM, empty auto-detection must request a source, unrepresentable target text and malformed source bytes fail, and input buffers remain unchanged. Do not imply autodetected semantic accuracy.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-chardet-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement chardet.transcode.transcode_bytes(data, target_encoding, *, source_encoding=None). Use the explicit source codec or actual detection result, require a supported codec and strict full-payload decoding/encoding with no replacement or character loss. Return independent output bytes, canonical source/target names, original detection facts when used and validated byte count. Target codec explicitly controls BOM, empty auto-detection must request a source, unrepresentable target text and malformed source bytes fail, and input buffers remain unchanged. Do not imply autodetected semantic accuracy.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o06_dev.py and concise English compatibility documentation at library/docs/development-chardet-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CHARDET-O06-DEV-contract.md",
@@ -287,7 +287,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CHARDET-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CHARDET-O06-DEV.native.json",

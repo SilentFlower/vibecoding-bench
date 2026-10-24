@@ -1,5 +1,12 @@
-# 让类级非注入声明准确作用于dataclass及继承构造
+# Engineering contract: INJECTOR-O02-DEV
 
-对应路线05：类级noninjectable准确存储到最终构造，支持装饰器顺序和dataclass，继承时不污染基类；手动必填值缺失应失败而非自动填零。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix noninjectable applied to classes by validating/storing exclusions on the final __init__, preserving original class identity and both inject/noninjectable decorator orders. Handle kw-only/frozen dataclasses and merged multiple exclusions. When restricting an inherited constructor, create a subclass-local metadata wrapper instead of mutating the shared base method. Preserve function/method behavior, get_bindings exclusion, explicit additional_kwargs priority and UnknownArgument for nonexistent parameters; missing manual values must fail rather than auto-inject int zero.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_injector_o02_dev.py and concise English compatibility documentation at library/docs/development-injector-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/injector/__init__.py
+- library/tests/test_development_injector_o02_dev.py
+- library/docs/development-injector-o02-dev.md

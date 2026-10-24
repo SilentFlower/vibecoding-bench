@@ -1,4 +1,4 @@
-"""公开同时到期优先级回归。"""
+"Public regression tests for SC-PRIORITY-DEV; the complete business contract is in materials/SC-PRIORITY-DEV-contract.md."
 import datetime
 import pytest
 import schedule

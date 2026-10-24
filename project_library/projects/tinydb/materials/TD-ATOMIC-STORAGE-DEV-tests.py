@@ -1,4 +1,4 @@
-"""公开原子JSON存储回归。"""
+"Public regression tests for TD-ATOMIC-STORAGE-DEV; the complete business contract is in materials/TD-ATOMIC-STORAGE-DEV-contract.md."
 import pytest
 from tinydb import TinyDB
 from tinydb.atomic import AtomicJSONStorage

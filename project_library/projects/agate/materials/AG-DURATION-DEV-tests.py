@@ -1,4 +1,4 @@
-"""公开耗时统计回归。"""
+"Public regression tests for AG-DURATION-DEV; the complete business contract is in materials/AG-DURATION-DEV-contract.md."
 from datetime import timedelta
 from decimal import Decimal
 import warnings

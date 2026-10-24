@@ -1,4 +1,4 @@
-"""公开JSONL完整记录写入回归。"""
+"Public regression tests for BO-JSONL-WRITER-DEV; the complete business contract is in materials/BO-JSONL-WRITER-DEV-contract.md."
 from io import StringIO,BytesIO
 import json
 import pytest

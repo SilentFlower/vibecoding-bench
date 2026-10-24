@@ -3,7 +3,7 @@ from tinydb.storages import MemoryStorage
 
 
 def load_rules():
-    """枚举本次有限配置规则。@return 规则迭代器。"""
+    """Enumerate this finite set of configuration rules. @return Rule iterator."""
     yield ({'done': True}, Query().qty > 0)
 
 

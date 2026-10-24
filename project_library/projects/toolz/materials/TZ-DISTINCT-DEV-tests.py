@@ -1,22 +1,22 @@
-"""无长度可重读数据源应单次扫描判重。"""
+"Public regression tests for TZ-DISTINCT-DEV; the complete business contract is in materials/TZ-DISTINCT-DEV-contract.md."
 import pytest
 from toolz import isdistinct
 
 
 class Reiterable:
-    """不提供长度的可重复业务查询。"""
+    "Public regression fixture: Reiterable."
     def __init__(self, values):
-        """保存数据。@param values 数据。@return None。"""
+        "Support the public regression through __init__."
         self.values = values
         self.reads = 0
     def __iter__(self):
-        """每次只返回一个流。@return 迭代器。"""
+        "Support the public regression through __iter__."
         self.reads += 1
         return iter(self.values)
 
 
 def test_reiterable_unique_and_duplicate():
-    """无长度源支持唯一和重复结果且不重读。@return None。"""
+    "Verify reiterable unique and duplicate."
     for values, expected in [([1, 2, 3], True), ([1, 2, 1], False), ([], True)]:
         source = Reiterable(values)
         assert isdistinct(source) is expected
@@ -24,11 +24,11 @@ def test_reiterable_unique_and_duplicate():
 
 
 def test_short_circuit():
-    """发现首个重复后不访问故障尾部。@return None。"""
+    "Verify short circuit."
     class Stream:
-        """包含不可达故障尾部的数据源。"""
+        "Public regression fixture: Stream."
         def __iter__(self):
-            """产生两个重复值。@return 迭代器。"""
+            "Support the public regression through __iter__."
             yield 1
             yield 1
             raise RuntimeError('must not read')
@@ -36,11 +36,11 @@ def test_short_circuit():
 
 
 def test_real_length_error_propagates():
-    """真实长度实现错误不被当作缺少长度。@return None。"""
+    "Verify real length error propagates."
     class Broken(Reiterable):
-        """具有故障长度函数的数据源。"""
+        "Public regression fixture: Broken."
         def __len__(self):
-            """失败。@return 不返回。"""
+            "Support the public regression through __len__."
             raise TypeError('length body')
     with pytest.raises(TypeError, match='length body'):
         isdistinct(Broken([1]))

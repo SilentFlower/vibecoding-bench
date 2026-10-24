@@ -1,4 +1,4 @@
-"""公开业务数量短语回归。"""
+"Public regression tests for IF-COUNTED-DEV; the complete business contract is in materials/IF-COUNTED-DEV-contract.md."
 import pytest
 from inflect import engine
 from inflect.counted import counted

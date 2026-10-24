@@ -1,11 +1,11 @@
-"""订单履约实际扣减库存，重复SKU聚合且全体通过才发布。"""
+"Public regression tests for TYPER-04-DEV; the complete business contract is in materials/TYPER-04-DEV-contract.md."
 import json,tempfile
 from pathlib import Path
 from typer.testing import CliRunner
 import shop
 
 def test_repeated_sku_aggregate_and_complete_receipt_keep_catalog_order():
-    """订单顺序不改变原目录顺序，同sku不能只检查第一行。@return None。"""
+    "Verify repeated sku aggregate and complete receipt keep catalog order."
     with tempfile.TemporaryDirectory() as directory:
         base=Path(directory);source=base/'catalog';orders=base/'orders';out=base/'out'
         source.write_text('[{"sku":"a","name":"A","quantity":8},{"sku":"b","name":"B","quantity":4}]');before=source.read_bytes()
@@ -15,7 +15,7 @@ def test_repeated_sku_aggregate_and_complete_receipt_keep_catalog_order():
         assert json.loads(result.stdout)['items']==[{'sku':'b','fulfilled':1,'before':4,'after':3},{'sku':'a','fulfilled':5,'before':8,'after':3}] and source.read_bytes()==before
 
 def test_insufficient_aggregate_unknown_bool_zero_and_empty_batch_policy():
-    """坏订单不写任何部分结果，空批次明确完整复制。@return None。"""
+    "Verify insufficient aggregate unknown bool zero and empty batch policy."
     with tempfile.TemporaryDirectory() as directory:
         base=Path(directory);source=base/'catalog';orders=base/'orders';source.write_text('[{"sku":"a","name":"A","quantity":2}]');runner=CliRunner()
         for n,raw in enumerate(([{'sku':'a','quantity':2},{'sku':'a','quantity':1}],[{'sku':'x','quantity':1}],[{'sku':'a','quantity':True}],[{'sku':'a','quantity':0}])):

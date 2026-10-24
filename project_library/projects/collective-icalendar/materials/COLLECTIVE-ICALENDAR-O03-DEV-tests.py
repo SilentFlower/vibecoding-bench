@@ -1,9 +1,9 @@
-"""更新参与状态时不能丢CN、ROLE、RSVP与委派参数。"""
+"Public regression tests for COLLECTIVE-ICALENDAR-O03-DEV; the complete business contract is in materials/COLLECTIVE-ICALENDAR-O03-DEV-contract.md."
 from icalendar import Event
 from icalendar.prop.cal_address import vCalAddress
 
 def test_partial_update_preserves_parameters():
-    """只改PARTSTAT，原组件及其他参数保持。@return None。"""
+    "Verify partial update preserves parameters."
     from icalendar.attendee_update import upsert_attendee
     event = Event()
     attendee = vCalAddress('mailto:user@example.test', params={'CN': 'User', 'ROLE': 'REQ-PARTICIPANT', 'RSVP': 'TRUE'})
@@ -13,7 +13,7 @@ def test_partial_update_preserves_parameters():
     assert result.attendees[0].params['PARTSTAT'] == 'ACCEPTED' and 'PARTSTAT' not in event.attendees[0].params
 
 def test_add_remove_and_case_policy():
-    """URI scheme匹配但本地地址部分不擅自折叠。@return None。"""
+    "Verify add remove and case policy."
     from icalendar.attendee_update import upsert_attendee, remove_attendee
     event = upsert_attendee(Event(), 'mailto:User@example.test', parameters={'CN': 'U'})
     result = upsert_attendee(event, 'mailto:user@example.test')
@@ -21,7 +21,7 @@ def test_add_remove_and_case_policy():
     assert len(remove_attendee(result, 'MAILTO:user@example.test').attendees) == 1
 
 def test_duplicate_policy_and_parameter_delete():
-    """重复必须显式all，参数None可单独删除。@return None。"""
+    "Verify duplicate policy and parameter delete."
     import pytest
     from icalendar.attendee_update import upsert_attendee
     event = Event()

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-整组主项、例外、RDATE/EXDATE和UNTIL按同一明确策略平移，保留UID、文本、时长、时区定义及元数据。墙钟和UTC跨度区别明确，DST不存在/歧义和DATE精度有预检；相对提醒保持，绝对提醒仅显式移动，原日历不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement icalendar.schedule_shift.shift_schedule(calendar, delta, *, mode="wall", ambiguous="error", shift_absolute_alarms=False). Return a deep copy shifting VEVENT/VTODO DTSTART/DTEND/DUE/RECURRENCE-ID, RDATE/EXDATE periods and RRULE UNTIL consistently across masters/overrides, preserving UID/text/duration and leaving timezone definitions/metadata unchanged. Explicit wall-vs-UTC semantics must handle DST gaps/ambiguity, floating times and integral-day DATE precision. Relative alarms stay relative; absolute triggers move only on opt-in. Invalid inputs must not alter original objects.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o05_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/icalendar/schedule_shift.py
+- library/tests/test_development_collective_icalendar_o05_dev.py
+- library/docs/development-collective-icalendar-o05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

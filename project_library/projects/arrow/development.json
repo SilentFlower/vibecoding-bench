@@ -77,7 +77,7 @@
           "id": "AR-WEEKDAY-DEV",
           "kind": "modify",
           "goal": "让数字星期解析与格式化和命名星期一致",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement the d parsing token as ISO weekday 1 through 7, converting to the same zero-based day_of_week used by ddd/dddd. Preserve existing first matching weekday in the epoch, selected year/month and complete-date precedence rules. Reject zero/eight and unsupported extra width rather than silently returning Monday. Keep named weekdays, formatting, locale behavior and all other tokens unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_weekday_dev.py and concise Chinese compatibility documentation at library/docs/development-ar-weekday-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement the d parsing token as ISO weekday 1 through 7, converting to the same zero-based day_of_week used by ddd/dddd. Preserve existing first matching weekday in the epoch, selected year/month and complete-date precedence rules. Reject zero/eight and unsupported extra width rather than silently returning Monday. Keep named weekdays, formatting, locale behavior and all other tokens unchanged.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_weekday_dev.py and concise English compatibility documentation at library/docs/development-ar-weekday-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AR-WEEKDAY-DEV-contract.md",
@@ -92,7 +92,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AR-WEEKDAY-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AR-WEEKDAY-DEV.native.json",
@@ -124,7 +124,7 @@
           "id": "AR-STRICT-DEV",
           "kind": "modify",
           "goal": "为表单时间导入交付显式完整格式与位宽校验",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd DateTimeParser.parse_strict(text, format_or_list, normalize_whitespace=False, *, exact_width=False) and arrow.get(text, format_or_list, strict=True, exact_width=False). Strict matching consumes the whole normalized input with valid calendar values; old parse/get extraction defaults remain unchanged. Optional exact width requires single digit M/D/H/h/m/s, three day-of-year digits and the declared fractional S count; literals are not tokens. Keep token/localization semantics including corrected numeric weekdays, format-list fallback and timezone parsing. Reject nonboolean switches, literal-only formats and exact_width without strict mode; factory strict mode requires explicit formats.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_strict_dev.py and concise Chinese compatibility documentation at library/docs/development-ar-strict-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd DateTimeParser.parse_strict(text, format_or_list, normalize_whitespace=False, *, exact_width=False) and arrow.get(text, format_or_list, strict=True, exact_width=False). Strict matching consumes the whole normalized input with valid calendar values; old parse/get extraction defaults remain unchanged. Optional exact width requires single digit M/D/H/h/m/s, three day-of-year digits and the declared fractional S count; literals are not tokens. Keep token/localization semantics including corrected numeric weekdays, format-list fallback and timezone parsing. Reject nonboolean switches, literal-only formats and exact_width without strict mode; factory strict mode requires explicit formats.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_strict_dev.py and concise English compatibility documentation at library/docs/development-ar-strict-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "AR-M01-DEV",
@@ -149,7 +149,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AR-STRICT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AR-STRICT-DEV.native.json",
@@ -181,7 +181,7 @@
           "id": "AR-MATCH-DEV",
           "kind": "modify",
           "goal": "为离线日志导入交付原文位置完整的时间解析报告",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd DateTimeParser.parse_match(text, format_or_list, normalize_whitespace=False) returning immutable ParsedDateTimeMatch with value datetime, selected format, original span/matched/prefix/suffix and a separate normalized_span. Select the earliest calendar-valid match across formats, breaking equal-position ties by format order; skip invalid dates and empty/literal-only matches. Preserve raw Unicode and whitespace exactly. If whitespace is normalized for matching, map every matched normalized character back to its original span rather than pretending normalized indices refer to raw input. Use the complete strict token parser and preserve old parse return types and boundaries.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_match_dev.py and concise Chinese compatibility documentation at library/docs/development-ar-match-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd DateTimeParser.parse_match(text, format_or_list, normalize_whitespace=False) returning immutable ParsedDateTimeMatch with value datetime, selected format, original span/matched/prefix/suffix and a separate normalized_span. Select the earliest calendar-valid match across formats, breaking equal-position ties by format order; skip invalid dates and empty/literal-only matches. Preserve raw Unicode and whitespace exactly. If whitespace is normalized for matching, map every matched normalized character back to its original span rather than pretending normalized indices refer to raw input. Use the complete strict token parser and preserve old parse return types and boundaries.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_match_dev.py and concise English compatibility documentation at library/docs/development-ar-match-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "AR-STRICT-DEV",
@@ -201,7 +201,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AR-MATCH-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AR-MATCH-DEV.native.json",
@@ -233,7 +233,7 @@
           "id": "AR-EXCEL-DEV",
           "kind": "modify",
           "goal": "为表格时间导入交付显式Excel日期系统双向转换",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Arrow.from_excel(serial, *, date_system, tzinfo=UTC) and Arrow.to_excel(*, date_system). Require string date_system 1900 or 1904 explicitly. Accept finite int/float/Decimal serials excluding booleans, preserve microsecond fractions with Decimal half-even rounding, and return Decimal serials. 1900 serial 0=1899-12-31, 59=1900-02-28, 61=1900-03-01; reject the fictitious [60,61) day and rounding into it. 1904 serial 0=1904-01-01. Negative serials map before the chosen epoch. Interpret values as wall-clock dates in the requested zone, preserve real datetime bounds and existing Unix timestamp get behavior; never guess the date system.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_excel_dev.py and concise Chinese compatibility documentation at library/docs/development-ar-excel-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Arrow.from_excel(serial, *, date_system, tzinfo=UTC) and Arrow.to_excel(*, date_system). Require string date_system 1900 or 1904 explicitly. Accept finite int/float/Decimal serials excluding booleans, preserve microsecond fractions with Decimal half-even rounding, and return Decimal serials. 1900 serial 0=1899-12-31, 59=1900-02-28, 61=1900-03-01; reject the fictitious [60,61) day and rounding into it. 1904 serial 0=1904-01-01. Negative serials map before the chosen epoch. Interpret values as wall-clock dates in the requested zone, preserve real datetime bounds and existing Unix timestamp get behavior; never guess the date system.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_excel_dev.py and concise English compatibility documentation at library/docs/development-ar-excel-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AR-EXCEL-DEV-contract.md",
@@ -248,7 +248,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AR-EXCEL-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AR-EXCEL-DEV.native.json",
@@ -280,7 +280,7 @@
           "id": "AR-ELAPSED-DEV",
           "kind": "modify",
           "goal": "跨夏令时沿真实时间线计算时差和平移",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Arrow.elapsed(other) returning self-minus-other timedelta on the UTC timeline, and Arrow.shift_elapsed(**units) returning a new Arrow in the original zone/fold. Other must be Arrow or aware datetime; reject naive values. Fixed elapsed units are weeks/days/hours/minutes/seconds/microseconds with finite int/float values excluding booleans; reject calendar months/years and unknown units. Preserve wall-time subtraction and calendar shift unchanged. Retain exact microseconds, negative shifts, subclass construction and natural datetime overflow behavior across DST gaps/folds.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_elapsed_dev.py and concise Chinese compatibility documentation at library/docs/development-ar-elapsed-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Arrow.elapsed(other) returning self-minus-other timedelta on the UTC timeline, and Arrow.shift_elapsed(**units) returning a new Arrow in the original zone/fold. Other must be Arrow or aware datetime; reject naive values. Fixed elapsed units are weeks/days/hours/minutes/seconds/microseconds with finite int/float values excluding booleans; reject calendar months/years and unknown units. Preserve wall-time subtraction and calendar shift unchanged. Retain exact microseconds, negative shifts, subclass construction and natural datetime overflow behavior across DST gaps/folds.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ar_elapsed_dev.py and concise English compatibility documentation at library/docs/development-ar-elapsed-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/AR-ELAPSED-DEV-contract.md",
@@ -295,7 +295,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/AR-ELAPSED-DEV.rubric.json",
             "semantic": true,
             "native": "verification/AR-ELAPSED-DEV.native.json",

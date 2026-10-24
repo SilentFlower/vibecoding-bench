@@ -1,4 +1,4 @@
-"""公开实际来源追踪回归。"""
+"Public regression tests for CF-TRACE-DEV; the complete business contract is in materials/CF-TRACE-DEV-contract.md."
 from confuse import RootView,ConfigSource
 from confuse.trace import trace_sources
 

@@ -1,4 +1,4 @@
-"""严格选项可定位拼写错误，默认宽容及CLI元参数兼容。"""
+"Public regression tests for SQLPARSE-06-DEV; the complete business contract is in materials/SQLPARSE-06-DEV-contract.md."
 import contextlib
 import io
 import tempfile
@@ -9,7 +9,7 @@ from sqlparse.exceptions import SQLParseError
 
 
 def test_strict_unknown_key_suggestion_and_supported_manifest():
-    """包括值None的未知键也拒绝，提示真实近似键。@return None。"""
+    "Verify strict unknown key suggestion and supported manifest."
     with unittest.TestCase().assertRaises(SQLParseError) as raised:sqlparse.format('select 1',strict_options=True,keyword_cases='upper')
     assert 'keyword_cases' in str(raised.exception) and 'keyword_case' in str(raised.exception)
     with unittest.TestCase().assertRaises(SQLParseError):sqlparse.format('select 1',strict_options=True,typo=None)
@@ -18,7 +18,7 @@ def test_strict_unknown_key_suggestion_and_supported_manifest():
 
 
 def test_default_compatibility_and_cli_metadata():
-    """旧宽容调用保持；CLI自己的filename/outfile不误判为formatter错误。@return None。"""
+    "Verify default compatibility and cli metadata."
     assert sqlparse.format('select 1',keyword_cases='upper')=='select 1'
     with tempfile.TemporaryDirectory() as temporary:
         path=Path(temporary)/'query.sql';path.write_text('select 1')

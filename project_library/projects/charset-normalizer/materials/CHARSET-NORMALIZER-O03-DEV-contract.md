@@ -1,5 +1,12 @@
-# 显式控制转码损失和BOM并复用声明头重写
+# Engineering contract: CHARSET-NORMALIZER-O03-DEV
 
-新转码入口默认严格不丢字，replace/ignore显式报告不可表示码点，不能把原文问号算损失。明确UTF8/16/32 BOM策略，复用既有声明头更新；旧output默认及缓存独立保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add CharsetMatch.transcode(encoding="utf_8", *, errors="strict", bom="codec") returning output bytes and unencodable codepoint count. Strict must fail on unrepresentable characters; replace/ignore explicitly report losses without counting literal question marks. Support codec/strip/add BOM policy for UTF8/16/32 and reject adding unsupported BOMs. Reuse current encoding-declaration rewriting, preserve empty input and keep old output default/cache behavior independent from the new strategy.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o03_dev.py and concise English compatibility documentation at library/docs/development-charset-normalizer-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/charset_normalizer/models.py
+- library/tests/test_development_charset_normalizer_o03_dev.py
+- library/docs/development-charset-normalizer-o03-dev.md

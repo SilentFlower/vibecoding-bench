@@ -4,7 +4,7 @@ Implement the complete public empty-document CLI contract, including actual -o f
 
 # Investigation topics
 
-- 定位空文档和未提供输入的混淆
+- Diagnose confusion between an empty document and missing input.
 
 # Supplied business material: materials/empty-cases.md
 

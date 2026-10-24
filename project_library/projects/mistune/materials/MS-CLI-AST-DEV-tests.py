@@ -1,4 +1,4 @@
-"""公开CLI AST结构化交付回归。"""
+"Public regression tests for MS-CLI-AST-DEV; the complete business contract is in materials/MS-CLI-AST-DEV-contract.md."
 import json
 import subprocess
 import sys

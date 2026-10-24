@@ -1,10 +1,10 @@
-"""同locale不同真实目录不串缓存，重读及失败原子保持。"""
+"Public regression tests for HUMANIZE-O01-DEV; the complete business contract is in materials/HUMANIZE-O01-DEV-contract.md."
 from pathlib import Path
 import humanize
 from humanize import i18n
 import pytest
 def catalog(root,word):
-    """构造合成GNU消息目录，供实际gettext读取。@return 根路径。"""
+    "Support the public regression through catalog."
     import struct
     entries={'':'Content-Type: text/plain; charset=UTF-8\nLanguage: xx\nPlural-Forms: nplurals=2; plural=(n != 1);\n','one':word,'%s and %s':'%s et %s'}
     pairs=sorted((key.encode(),value.encode()) for key,value in entries.items());count=len(pairs)
@@ -18,7 +18,7 @@ def catalog(root,word):
     return root
 
 def test_two_real_catalog_sources_and_canonical_alias(tmp_path,monkeypatch):
-    """同名locale不同来源使用实际不同GNU消息。@return None。"""
+    "Verify two real catalog sources and canonical alias."
     first=catalog(tmp_path/'one','uno');second=catalog(tmp_path/'two','dos')
     try:
         a=i18n.activate('xx',first);assert humanize.apnumber(1)=='uno'
@@ -28,7 +28,7 @@ def test_two_real_catalog_sources_and_canonical_alias(tmp_path,monkeypatch):
     finally:i18n.deactivate()
 
 def test_reload_only_current_source_and_failed_load_keeps_active(tmp_path):
-    """当前目录重载不清空另一目录，失败不会激活半份配置。@return None。"""
+    "Verify reload only current source and failed load keeps active."
     first=catalog(tmp_path/'one','uno');second=catalog(tmp_path/'two','dos')
     try:
         a=i18n.activate('xx',first);b=i18n.activate('xx',second)
@@ -39,7 +39,7 @@ def test_reload_only_current_source_and_failed_load_keeps_active(tmp_path):
     finally:i18n.deactivate()
 
 def test_default_injected_catalog_and_english_reset(tmp_path,monkeypatch):
-    """原默认目录注入兼容，显式其他目录不继承它。@return None。"""
+    "Verify default injected catalog and english reset."
     import gettext
     with (catalog(tmp_path/'one','uno')/'xx'/'LC_MESSAGES'/'humanize.mo').open('rb') as stream:translation=gettext.GNUTranslations(stream)
     monkeypatch.setitem(i18n._TRANSLATIONS,'xx',translation)

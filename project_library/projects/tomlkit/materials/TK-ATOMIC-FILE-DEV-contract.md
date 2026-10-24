@@ -1,5 +1,12 @@
-# 带陈旧版本检查原子保存格式化TOML文件
+# Engineering contract: TK-ATOMIC-FILE-DEV
 
-编辑器读取时保存原字节版本，提交前校验陈旧内容并原子替换，避免序列化和替换失败损坏旧文件。保留模式和格式，临时文件始终清理；该机制不是跨进程加锁事务。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement tomlkit.files.load_with_digest(path) returning (UTF8 parsed_document,raw_bytes_sha256), and atomic_save(document,path,*,expected_digest=None) returning the new digest. Validate serialized TOML before I/O, check optional original digest before temp creation and before replacement, reject stale files with StaleDocumentError, preserve mode or choose 0600 for new files, flush/fsync a same-directory temporary then os.replace and clean failures. Reject symlinks and preserve old bytes on validation, staleness or replacement failure. Do not claim cross-process compare-and-swap locking or directory-fsync crash durability; ordinary parse/dump APIs stay unchanged.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_atomic_file_dev.py and concise English compatibility documentation at library/docs/development-tk-atomic-file-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tomlkit/files.py
+- library/development_tests/test_development_tk_atomic_file_dev.py
+- library/docs/development-tk-atomic-file-dev.md

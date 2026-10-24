@@ -1,3 +1,12 @@
-# 只读语法图检查定位确定风险且不执行解析动作
+# Engineering contract: PYPARSING-01-DEV
 
-路线01：只读遍历语法图，报告未定义Forward、明确Empty重复及无动作字面量遮蔽；按首次节点路径稳定定位，循环/共享安全，不执行解析动作，不把动态语法猜成确定错误。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add pyparsing.grammar_tools.lint_grammar returning immutable GrammarIssue(code,path,node_type,message) entries. Traverse real ParserElement.recurse graph once by identity, safely handling shared nodes and Forward cycles. Report undefined Forward, repetition of explicit Empty, and literal alternatives shadowed by earlier literal prefixes in MatchFirst without parse actions. Do not parse, execute user actions/conditions, mutate grammar, stringify cyclic nodes or claim exhaustive lint of custom/dynamic expressions. Preserve existing validate/parse behavior.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_01_dev.py, and English compatibility documentation at library/docs/development-pyparsing-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/pyparsing/grammar_tools.py
+- library/tests/test_development_pyparsing_01_dev.py
+- library/docs/development-pyparsing-01-dev.md

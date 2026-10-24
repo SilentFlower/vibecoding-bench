@@ -1,4 +1,4 @@
-"""公开实际工作表命名回归。"""
+"Public regression tests for XW-SHEET-NAMES-DEV; the complete business contract is in materials/XW-SHEET-NAMES-DEV-contract.md."
 from io import BytesIO
 from xlsxwriter import Workbook
 from xlsxwriter.sheet_names import add_named_worksheet

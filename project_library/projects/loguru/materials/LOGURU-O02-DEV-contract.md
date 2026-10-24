@@ -1,5 +1,12 @@
-# 为真实sink提供可嵌套且异常安全的自动移除作用域
+# Engineering contract: LOGURU-O02-DEV
 
-对应路线03：作用域进入真实add、退出仅remove本次id，嵌套/提前移除/异常/队列按原关闭协议；调用方流保留，双失败保留业务异常并报告清理故障。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Logger.sink_context(sink, **add_options) yielding the actual new handler id and removing only that handler on every exit, including BaseException, using existing queue/file/coroutine remove/stop ownership semantics. Nested contexts and external early removal are supported; caller streams remain open as add/remove already promise. Normal cleanup failure propagates. If body and cleanup both fail, preserve the original body exception and emit a RuntimeWarning for cleanup; do not silence body failures or delete unrelated handlers. Existing queued records finish through normal remove before exit.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o02_dev.py and concise English compatibility documentation at library/docs/development-loguru-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/loguru/_logger.py
+- library/tests/test_development_loguru_o02_dev.py
+- library/docs/development-loguru-o02-dev.md

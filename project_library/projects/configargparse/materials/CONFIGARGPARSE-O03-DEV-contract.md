@@ -1,5 +1,12 @@
-# 让每次参数解析产出隔离的结果与来源快照
+# Engineering contract: CONFIGARGPARSE-O03-DEV
 
-对应路线15：真实解析后深复制结果及无Action的来源记录，访问也隔离；重复解析、可变默认、调用者修改和后续失败均不能污染先前交付结果。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement ArgumentParser.parse_result with the existing parse_known_args inputs and a public ParseResult. Return actual parsed Namespace, ordered unknown tuple and source records identifying dest/value without retaining argparse.Action objects. Snapshot deeply at completion and return independent namespace/source accessor copies, including mutable defaults, append lists and custom Namespace attributes. Reusing the parser, changing defaults, mutating caller namespace/accessor values or a later failed parse must not change the earlier result. Keep parse_args and get_source_to_settings_dict behavior unchanged.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o03_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/configargparse.py
+- library/tests/test_development_configargparse_o03_dev.py
+- library/docs/development-configargparse-o03-dev.md

@@ -1,5 +1,12 @@
-# 显式继承书目交叉引用并记录来源
+# Engineering contract: BIBTEXPARSER-O01-DEV
 
-显式中间件按父子依赖补齐缺失字段，论文子项继承booktitle但保留自身title和显式空值。记录来源，多级引用、缺父政策、大小写键与环都有确定结果；默认解析栈和原Library不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement bibtexparser.crossref.ResolveCrossrefMiddleware(missing="error") as a non-mutating LibraryMiddleware. Resolve nested case-sensitive crossref dependencies, inherit only missing fields, map parent title to booktitle for inproceedings/incollection and preserve explicit child values including empty strings. Record inherited field sources in parser metadata, reject cycles and failed/duplicate blocks, and allow explicit missing="ignore". Keep the default parse stack unchanged and preserve source object isolation.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bibtexparser_o01_dev.py and concise English compatibility documentation at library/docs/development-bibtexparser-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bibtexparser/crossref.py
+- library/tests/test_development_bibtexparser_o01_dev.py
+- library/docs/development-bibtexparser-o01-dev.md

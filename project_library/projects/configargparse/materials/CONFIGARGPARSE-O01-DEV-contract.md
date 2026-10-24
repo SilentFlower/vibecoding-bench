@@ -1,5 +1,12 @@
-# 对单个配置输入实施可诊断重复键政策
+# Engineering contract: CONFIGARGPARSE-O01-DEV
 
-对应路线01：给真实默认解析器增加同文件重复键策略，使用物理行号和源标签定位，不打印值；区分大小写并保持默认最后值、跨文件正常覆盖与原语法。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement DefaultConfigFileParser(*, duplicates="last") with last/warn/error for exact case-sensitive keys within one parsed stream. Keep the old last-value policy by default. Warn/error diagnostics identify the source and first/current 1-based physical lines without values. Blank/comment lines count; repeated lists are whole-value replacement. Parsing separate streams never shares duplicate state; normal cross-file precedence and CLI override stay unchanged. Reject unknown policies and preserve all existing syntax and serialization.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o01_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/configargparse.py
+- library/tests/test_development_configargparse_o01_dev.py
+- library/docs/development-configargparse-o01-dev.md

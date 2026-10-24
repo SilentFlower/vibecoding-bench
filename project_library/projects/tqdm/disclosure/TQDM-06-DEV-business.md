@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线17：内建envwrap对实际bool/Optional[bool]注解、bool默认和显式types回退采用明确真假文字，空/未知值报含参数名错误；直接调用仍优先，字符串False仍字符串，其余类型推断和可选外部provider不改。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Repair built-in utils.envwrap boolean inference for actual bool/Optional[bool] annotations, bool defaults and explicit types fallback. Parse case-insensitive stripped true/false/1/0/yes/no/on/off, reject unknown/empty text clearly with parameter name and preserve direct-call argument precedence. Do not turn string-typed "False" into bool, change int/float/union inference or evaluate symbolic annotations as code. Keep environment-name prefixes/app precedence and external optional envwrap provider delegation untouched; this delivery targets the pinned built-in provider. Validate with isolated patched synthetic env keys only, no real credential/config changes.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_tqdm_06_dev.py, and English compatibility documentation at library/docs/development-tqdm-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/tqdm/utils.py
+- library/tests/test_development_tqdm_06_dev.py
+- library/docs/development-tqdm-06-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

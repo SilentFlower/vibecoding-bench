@@ -1,11 +1,11 @@
-"""候选检索保持真实身份与稳定并列，分数方向明确。"""
+"Public regression tests for TEXTDISTANCE-06-DEV; the complete business contract is in materials/TEXTDISTANCE-06-DEV-contract.md."
 import unittest
 import textdistance
 from textdistance.retrieval import extract
 
 
 def test_distance_similarity_duplicate_identity_and_ties():
-    """不比较不可排序ID，不把重复值静默去重。@return None。"""
+    "Verify distance similarity duplicate identity and ties."
     choices=[({'id':1},'cot'),({'id':2},'cat'),({'id':3},'cut'),({'id':4},'cot')]
     result=extract('cat',iter(choices),textdistance.Levenshtein(external=False),k=3,threshold=1)
     assert [item.index for item in result]==[1,0,2]
@@ -14,9 +14,9 @@ def test_distance_similarity_duplicate_identity_and_ties():
 
 
 def test_no_consumption_zero_budget_and_bad_score():
-    """零K不消费，预算不足及坏评分不能变成部分成功。@return None。"""
+    "Verify no consumption zero budget and bad score."
     def forbidden():
-        """模拟不应消费的数据源。@return 不返回。"""
+        "Support the public regression through forbidden."
         raise AssertionError('不应消费')
         yield None
     assert extract('a',forbidden(),lambda a,b:0,k=0)==[]

@@ -1,9 +1,9 @@
-"""解析快照保护同parser多次调用与调用者修改。"""
+"Public regression tests for CONFIGARGPARSE-O03-DEV; the complete business contract is in materials/CONFIGARGPARSE-O03-DEV-contract.md."
 import json
 import configargparse as c
 
 def test_two_parses_do_not_replace_first():
-    """命名空间、来源与未知项按次隔离。@return None。"""
+    "Verify two parses do not replace first."
     p=c.ArgumentParser();p.add('--tag',action='append',env_var='TAGS')
     first=p.parse_result(['--unknown'],config_file_contents='tag=[a,b]',env_vars={})
     p.parse_args(['--tag','next'],env_vars={})
@@ -12,7 +12,7 @@ def test_two_parses_do_not_replace_first():
     assert 'Action' not in json.dumps(first.sources)
 
 def test_accessors_and_caller_namespace_copied():
-    """输入和每次访问都不共享可变列表。@return None。"""
+    "Verify accessors and caller namespace copied."
     import argparse
     p=c.ArgumentParser();p.add('--tag',action='append')
     namespace=argparse.Namespace(extra=['original'])
@@ -22,7 +22,7 @@ def test_accessors_and_caller_namespace_copied():
     sources=result.sources;sources.clear();assert result.sources
 
 def test_failed_later_parse_keeps_snapshot():
-    """后次类型错误不会破坏前次快照。@return None。"""
+    "Verify failed later parse keeps snapshot."
     import pytest
     p=c.ArgumentParser();p.add('--port',type=int,env_var='PORT')
     result=p.parse_result([],env_vars={'PORT':'9'})

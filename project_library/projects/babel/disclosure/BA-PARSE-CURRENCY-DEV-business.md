@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-金额表单必须指定币种后才解析，支持区域标准／会计负数和编号系统；严格模式要求金额规范精度。不能全局删币种字符、猜测符号币种或吞掉尾部垃圾，不影响旧parse_decimal。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add babel.numbers.parse_currency(string, currency, locale=None, *, strict=True, numbering_system="latn") returning Decimal. Currency is mandatory and validated; support the pinned locale standard/accounting positive and negative affixes with either its actual symbol or ISO code, and its grouping/decimal/numbering symbols. Reject wrong currency, missing currency markers, trailing junk, embedded signs, unbalanced parentheses and nonfinite amounts. Strict mode requires canonical format_currency rendering at currency precision. Do not guess currencies from ambiguous symbols, silently remove interior characters or modify parse_decimal.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_parse_currency_dev.py and concise English compatibility documentation at library/docs/development-ba-parse-currency-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/babel/numbers.py
+- library/development_tests/test_development_ba_parse_currency_dev.py
+- library/docs/development-ba-parse-currency-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

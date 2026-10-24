@@ -4,7 +4,7 @@ Implement only the explicitly authorized callback repair and public regressions 
 
 # Investigation topics
 
-- 核对完成标注缺失的完整复现
+- Review the complete reproduction for missing completion annotations.
 
 # Supplied business material: materials/finalize-repair.md
 

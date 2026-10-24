@@ -1,4 +1,4 @@
-"""整个异常链与ExceptionGroup按对象身份有界提取。"""
+"Public regression tests for RICH-02-DEV; the complete business contract is in materials/RICH-02-DEV-contract.md."
 import json
 import subprocess
 import sys
@@ -6,16 +6,16 @@ from rich.traceback import Traceback
 
 
 def test_cycle_is_extracted_once_under_hard_test_timeout():
-    """子进程超时保护原版循环缺陷，参考实现两对象各一次。@return None。"""
+    "Verify cycle is extracted once under hard test timeout."
     script="from rich.traceback import Traceback; a=ValueError('a'); b=TypeError('b'); a.__cause__=b; b.__cause__=a; result=Traceback.extract(type(a),a,None); print(len(result.stacks))"
     result=subprocess.run([sys.executable,'-c',script],capture_output=True,text=True,timeout=2,check=True)
     assert result.stdout.strip()=='2'
 
 
 def test_unhashable_shared_exception_and_per_object_notes():
-    """不能靠异常hash或文本去重，notes绑定实际节点。@return None。"""
+    "Verify unhashable shared exception and per object notes."
     class UnhashableError(Exception):
-        """显式不可hash的合法异常子类。"""
+        "Public regression fixture: UnhashableError."
         __hash__=None
     a=UnhashableError('same');b=UnhashableError('same');a.add_note('A');b.add_note('B');a.__cause__=b
     result=Traceback.extract(type(a),a,None)

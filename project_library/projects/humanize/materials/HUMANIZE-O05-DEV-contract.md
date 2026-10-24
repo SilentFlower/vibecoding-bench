@@ -1,5 +1,12 @@
-# 按真实公历端点表达整年月和无漂移剩余间隔
+# Engineering contract: HUMANIZE-O05-DEV
 
-对应路线17：独立公历端点间隔，直接月锚点截断避免月底链漂移，保留方向及墙钟日秒微秒余量；翻译与precisedelta复用，原平均月长时长API保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add humanize.calendar.calendar_interval(start,end) and frozen CalendarInterval(sign,years,months,days,seconds,microseconds) with localized text(). Require both date or both datetime endpoints, reject awareness mismatch, convert aware end into start timezone and define wall-clock Gregorian remainder. Find complete months by direct clamp-to-month-end from the earlier endpoint, never iterative month drift; derive complete years/months, retain second/microsecond remainder, normalize reverse interval magnitude with explicit sign and zero. Reuse real translation/precisedelta while keeping naturaldelta approximate duration semantics unchanged; prove leap days, Jan31, partial months, reverse and timezone endpoints.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_humanize_o05_dev.py and concise English compatibility documentation at library/docs/development-humanize-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/humanize/calendar.py
+- library/tests/test_development_humanize_o05_dev.py
+- library/docs/development-humanize-o05-dev.md

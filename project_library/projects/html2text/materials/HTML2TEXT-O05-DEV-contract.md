@@ -1,5 +1,12 @@
-# 以明确可见正文模式略去template及HTML隐藏子树并清理状态
+# Engineering contract: HTML2TEXT-O05-DEV
 
-对应路线20：真实tag/data副作用前略去template和hidden整棵子树，布尔存在含false、void/嵌套/祖先闭合明确；统计本次区域且EOF不泄漏quiet状态，默认/CSS不猜。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add visible_content=False and a per-handle hidden_regions count integrated before actual tag/data side effects. In opt-in mode omit entire template or HTML hidden-attribute subtrees (attribute presence including hidden="false"), including nested formatting/resources; handle void hidden elements without hiding following siblings and recover matching ancestor closes without corrupting existing quiet/head/style/script accounting. Unclosed hidden EOF hides the remainder of only that document and state resets before reuse. Default text remains unchanged, do not infer CSS/script visibility or claim sanitization; counts report top-level omitted regions.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_html2text_o05_dev.py and concise English compatibility documentation at library/docs/development-html2text-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/html2text/__init__.py
+- library/test/test_development_html2text_o05_dev.py
+- library/docs/development-html2text-o05-dev.md

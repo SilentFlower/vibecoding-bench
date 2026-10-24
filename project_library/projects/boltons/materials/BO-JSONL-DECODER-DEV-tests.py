@@ -1,4 +1,4 @@
-"""公开JSONL自定义解码器回归。"""
+"Public regression tests for BO-JSONL-DECODER-DEV; the complete business contract is in materials/BO-JSONL-DECODER-DEV-contract.md."
 from io import StringIO,BytesIO
 from decimal import Decimal
 import json

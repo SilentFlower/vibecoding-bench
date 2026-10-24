@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-可变参数函数的后续参数也必须满足声明类型，不能让错误值进入函数体后才产生Python异常。保留固定前缀、数组子类型、数量检查及无类型约束，返回标准JMESPath类型错误。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Fix Functions._type_check so every actual variadic argument uses the final signature rule after the fixed prefix. Preserve arity validation, array subtype checking, untyped variadic rules and custom function dispatch. Invalid later values must raise JMESPathTypeError before calling the function body, with actual function/type context; do not rely on uncontrolled Python exceptions from merge or custom functions. Fixed-arity behavior and all language semantics remain compatible.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_jm_variadic_dev.py and concise English compatibility documentation at library/docs/development-jm-variadic-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/jmespath/functions.py
+- library/development_tests/test_development_jm_variadic_dev.py
+- library/docs/development-jm-variadic-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

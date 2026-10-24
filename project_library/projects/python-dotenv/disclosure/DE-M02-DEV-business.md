@@ -4,7 +4,7 @@ Make set_key raise ValueError for a key containing CR or LF before opening rewri
 
 # Investigation topics
 
-- 定位跨行键写入与解析不一致
+- Diagnose the mismatch between writing and parsing multiline keys.
 
 # Supplied business material: materials/key-reproduction.md
 

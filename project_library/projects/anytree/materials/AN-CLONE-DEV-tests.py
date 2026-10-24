@@ -1,4 +1,4 @@
-"""公开可编辑子树克隆回归。"""
+"Public regression tests for AN-CLONE-DEV; the complete business contract is in materials/AN-CLONE-DEV-contract.md."
 from copy import deepcopy
 import pytest
 from anytree import Node, AnyNode

@@ -1,14 +1,14 @@
-"""临时sink拥有严格作用域，只关闭自己的资源。"""
+"Public regression tests for LOGURU-O02-DEV; the complete business contract is in materials/LOGURU-O02-DEV-contract.md."
 from copy import deepcopy
 from loguru import logger
 import pytest
 
 def clean():
-    """取得独立logger。@return Logger。"""
+    "Support the public regression through clean."
     logger.remove();log=deepcopy(logger);log.remove();return log
 
 def test_scope_only_removes_owned_sink_and_nested_exits():
-    """外部sink持续收取，嵌套只关闭自己的id。@return None。"""
+    "Verify scope only removes owned sink and nested exits."
     log=clean();outer=[];first=[];second=[];log.add(outer.append,format='{message}')
     with log.sink_context(first.append,format='{message}') as identifier:
         log.info('one')
@@ -21,7 +21,7 @@ def test_scope_only_removes_owned_sink_and_nested_exits():
     log.remove()
 
 def test_exception_early_remove_and_caller_owned_stream():
-    """业务异常不丢，外部提前移除可重复退出，调用方流仍可用。@return None。"""
+    "Verify exception early remove and caller owned stream."
     import io
     log=clean();stream=io.StringIO();error=LookupError('body')
     with pytest.raises(LookupError) as caught:
@@ -30,13 +30,13 @@ def test_exception_early_remove_and_caller_owned_stream():
     assert caught.value is error and not stream.closed and stream.getvalue()=='inside\n'
 
 def test_queued_records_finish_and_cleanup_failure_does_not_mask_body():
-    """原队列关闭协议完成已有记录；stop故障不能掩盖原业务异常。@return None。"""
+    "Verify queued records finish and cleanup failure does not mask body."
     log=clean();messages=[]
     with log.sink_context(messages.append,format='{message}',enqueue=True):
         log.info('a');log.info('b')
     assert ''.join(messages)=='a\nb\n'
     class Broken:
-        """可受控失败的真实流协议。"""
+        "Public regression fixture: Broken."
         def write(self,message):pass
         def stop(self):raise RuntimeError('close failed')
     error=ValueError('body')

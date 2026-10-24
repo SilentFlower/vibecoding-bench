@@ -1,4 +1,4 @@
-"""公开显式币种金额输入回归。"""
+"Public regression tests for BA-PARSE-CURRENCY-DEV; the complete business contract is in materials/BA-PARSE-CURRENCY-DEV-contract.md."
 from decimal import Decimal
 import pytest
 from babel.numbers import parse_currency, format_currency, NumberFormatError

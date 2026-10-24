@@ -32,7 +32,7 @@
           "id": "COLLECTIVE-ICALENDAR-O01-DEV",
           "kind": "modify",
           "goal": "让CLI显示复用真实全天事件的排他结束语义",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair cli.view to use Event.start/end/duration rather than deriving a separate zero-length default. An all-day DATE DTSTART with no DTEND/DURATION has the model-defined exclusive next-day end and one-day duration; timed events without end remain zero-length. Preserve explicit DTEND/DURATION, floating/aware display rules and model validation of illegal combinations. Do not hardcode dates or change the Event model to fit CLI output.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-collective-icalendar-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair cli.view to use Event.start/end/duration rather than deriving a separate zero-length default. An all-day DATE DTSTART with no DTEND/DURATION has the model-defined exclusive next-day end and one-day duration; timed events without end remain zero-length. Preserve explicit DTEND/DURATION, floating/aware display rules and model validation of illegal combinations. Do not hardcode dates or change the Event model to fit CLI output.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o01_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/COLLECTIVE-ICALENDAR-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/COLLECTIVE-ICALENDAR-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/COLLECTIVE-ICALENDAR-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "COLLECTIVE-ICALENDAR-O03-DEV",
           "kind": "modify",
           "goal": "按CAL-ADDRESS部分更新参会者并保留参数",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement icalendar.attendee_update.upsert_attendee/remove_attendee on real component/vCalAddress objects, returning isolated same-class copies. Match URI scheme case-insensitively and preserve the remaining URI exactly, update only supplied parameters (None removes), retain CN/ROLE/RSVP/delegation lists and unrelated attendees. Explicit duplicate error/all and strict missing-remove policies must work; reject malformed addresses, never modify the source or claim all URI parts are case-insensitive.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-collective-icalendar-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement icalendar.attendee_update.upsert_attendee/remove_attendee on real component/vCalAddress objects, returning isolated same-class copies. Match URI scheme case-insensitively and preserve the remaining URI exactly, update only supplied parameters (None removes), retain CN/ROLE/RSVP/delegation lists and unrelated attendees. Explicit duplicate error/all and strict missing-remove policies must work; reject malformed addresses, never modify the source or claim all URI parts are case-insensitive.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o03_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/COLLECTIVE-ICALENDAR-O03-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/COLLECTIVE-ICALENDAR-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/COLLECTIVE-ICALENDAR-O03-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "COLLECTIVE-ICALENDAR-O04-DEV",
           "kind": "modify",
           "goal": "一致转换Todo完成重开取消状态及进度",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement icalendar.todo_transition.transition_todo for actual Todo objects with complete/reopen/cancel actions, returning an isolated same-class copy. Completion requires an explicit aware timestamp normalized to UTC and 100 percent; reopen clears COMPLETED and uses 0..99 progress/NEEDS-ACTION or IN-PROCESS; cancel clears completion and uses CANCELLED/zero. Validate progress and timestamps before publication, preserve UID/start/due and by-default SEQUENCE/DTSTAMP, offer explicit sequence bump/stamp, and never read a wall clock or send invitations.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-collective-icalendar-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement icalendar.todo_transition.transition_todo for actual Todo objects with complete/reopen/cancel actions, returning an isolated same-class copy. Completion requires an explicit aware timestamp normalized to UTC and 100 percent; reopen clears COMPLETED and uses 0..99 progress/NEEDS-ACTION or IN-PROCESS; cancel clears completion and uses CANCELLED/zero. Validate progress and timestamps before publication, preserve UID/start/due and by-default SEQUENCE/DTSTAMP, offer explicit sequence bump/stamp, and never read a wall clock or send invitations.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o04_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/COLLECTIVE-ICALENDAR-O04-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/COLLECTIVE-ICALENDAR-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/COLLECTIVE-ICALENDAR-O04-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "COLLECTIVE-ICALENDAR-O05-DEV",
           "kind": "modify",
           "goal": "按墙钟或绝对策略一致平移完整日程系列",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement icalendar.schedule_shift.shift_schedule(calendar, delta, *, mode=\"wall\", ambiguous=\"error\", shift_absolute_alarms=False). Return a deep copy shifting VEVENT/VTODO DTSTART/DTEND/DUE/RECURRENCE-ID, RDATE/EXDATE periods and RRULE UNTIL consistently across masters/overrides, preserving UID/text/duration and leaving timezone definitions/metadata unchanged. Explicit wall-vs-UTC semantics must handle DST gaps/ambiguity, floating times and integral-day DATE precision. Relative alarms stay relative; absolute triggers move only on opt-in. Invalid inputs must not alter original objects.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-collective-icalendar-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement icalendar.schedule_shift.shift_schedule(calendar, delta, *, mode=\"wall\", ambiguous=\"error\", shift_absolute_alarms=False). Return a deep copy shifting VEVENT/VTODO DTSTART/DTEND/DUE/RECURRENCE-ID, RDATE/EXDATE periods and RRULE UNTIL consistently across masters/overrides, preserving UID/text/duration and leaving timezone definitions/metadata unchanged. Explicit wall-vs-UTC semantics must handle DST gaps/ambiguity, floating times and integral-day DATE precision. Relative alarms stay relative; absolute triggers move only on opt-in. Invalid inputs must not alter original objects.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o05_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/COLLECTIVE-ICALENDAR-O05-DEV-contract.md",
@@ -188,7 +188,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/COLLECTIVE-ICALENDAR-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/COLLECTIVE-ICALENDAR-O05-DEV.native.json",
@@ -220,7 +220,7 @@
           "id": "COLLECTIVE-ICALENDAR-O06-DEV",
           "kind": "modify",
           "goal": "生成带规范版本和忽略政策的日历语义摘要",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement icalendar.fingerprint.calendar_fingerprint with declared schema/profile/algorithm/ignore fields. Canonicalize via actual sorted property/parameter serialization plus order-independent child-component multisets, preserving duplicates, DATE-vs-floating-vs-aware values, unknown extensions and repeated-property value order. Default include all fields; allow only explicit DTSTAMP/CREATED/LAST-MODIFIED omission, reject unsupported profiles/depth budgets and business-field omission. Same permitted folding/property/component reorder must hash equally, real summary/start/extension changes differently, and input objects must remain unchanged. Do not claim a bare hash of existing sorted serialization is a new semantic profile.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-collective-icalendar-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement icalendar.fingerprint.calendar_fingerprint with declared schema/profile/algorithm/ignore fields. Canonicalize via actual sorted property/parameter serialization plus order-independent child-component multisets, preserving duplicates, DATE-vs-floating-vs-aware values, unknown extensions and repeated-property value order. Default include all fields; allow only explicit DTSTAMP/CREATED/LAST-MODIFIED omission, reject unsupported profiles/depth budgets and business-field omission. Same permitted folding/property/component reorder must hash equally, real summary/start/extension changes differently, and input objects must remain unchanged. Do not claim a bare hash of existing sorted serialization is a new semantic profile.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o06_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/COLLECTIVE-ICALENDAR-O06-DEV-contract.md",
@@ -235,7 +235,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/COLLECTIVE-ICALENDAR-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/COLLECTIVE-ICALENDAR-O06-DEV.native.json",
@@ -267,7 +267,7 @@
           "id": "COLLECTIVE-ICALENDAR-O02-DEV",
           "kind": "modify",
           "goal": "提供显式严格组件边界解析并保持旧入口兼容",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Component.from_ical_strict(st, multiple=False), inherited by Calendar and LazyCalendar, as an explicit strict component-boundary parsing API. Before constructing any parser/model or caching any timezone, inspect all unfolded BEGIN/END markers with a textual stack: reject orphan END, case-insensitive name mismatch, cross-layer closure, and unfinished BEGIN at EOF. Include actual and expected names in mismatch errors. Accept str, bytes and Path (read once), valid nested and unknown X components, and preserve the multiple return contract plus subclass parser dispatch. Use a shared private ComponentIcalParser boundary validator and then the existing cls.from_ical path. This checks structural component boundaries, not every RFC property. Preserve the original from_ical signature and permissive behavior, all frozen tests, custom factories and lazy parsing; do not hardcode old malformed fixtures or make strictness the default.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-collective-icalendar-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Component.from_ical_strict(st, multiple=False), inherited by Calendar and LazyCalendar, as an explicit strict component-boundary parsing API. Before constructing any parser/model or caching any timezone, inspect all unfolded BEGIN/END markers with a textual stack: reject orphan END, case-insensitive name mismatch, cross-layer closure, and unfinished BEGIN at EOF. Include actual and expected names in mismatch errors. Accept str, bytes and Path (read once), valid nested and unknown X components, and preserve the multiple return contract plus subclass parser dispatch. Use a shared private ComponentIcalParser boundary validator and then the existing cls.from_ical path. This checks structural component boundaries, not every RFC property. Preserve the original from_ical signature and permissive behavior, all frozen tests, custom factories and lazy parsing; do not hardcode old malformed fixtures or make strictness the default.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_collective_icalendar_o02_dev.py and concise English compatibility documentation at library/docs/development-collective-icalendar-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/COLLECTIVE-ICALENDAR-O02-DEV-contract.md",
@@ -283,7 +283,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/COLLECTIVE-ICALENDAR-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/COLLECTIVE-ICALENDAR-O02-DEV.native.json",

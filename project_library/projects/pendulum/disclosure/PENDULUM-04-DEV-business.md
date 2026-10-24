@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线05：Duration reducer保存完整日历声明及原属性，所有协议/浅深拷贝保同一锚点运算；AbsoluteDuration规范重建并保状态，Interval自身端点reducer和旧读取不变。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add explicit Duration pickle reducers preserving original _signature (years/months/weeks/days and fixed components) and object state, reconstructing actual Duration/AbsoluteDuration class. Support all standard pickle protocols, shallow/deepcopy, negatives/zero/microseconds and identical anchor arithmetic; use normalized AbsoluteDuration definition when it has no signature and restore its state. Keep Interval own endpoint reducers and legacy timedelta-style loads untouched. Never load untrusted pickle or change year/month approximate totals.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pendulum_04_dev.py, and English compatibility documentation at library/docs/development-pendulum-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pendulum/duration.py
+- library/tests/test_development_pendulum_04_dev.py
+- library/docs/development-pendulum-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

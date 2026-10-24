@@ -4,7 +4,7 @@ Evaluate deeply nested built-in wait_combine trees without relying on Python rec
 
 # Investigation topics
 
-- 解释深组合栈溢出及不能直接展平的原因
+- Explain stack overflow in deeply composed strategies and why flattening them directly is unsafe.
 
 # Supplied business material: materials/combine-reproducer.py
 

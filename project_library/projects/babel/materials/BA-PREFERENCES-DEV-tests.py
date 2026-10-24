@@ -1,4 +1,4 @@
-"""公开带权语言协商回归。"""
+"Public regression tests for BA-PREFERENCES-DEV; the complete business contract is in materials/BA-PREFERENCES-DEV-contract.md."
 import pytest
 from babel.core import negotiate_locale_preferences
 

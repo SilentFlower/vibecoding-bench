@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-订单导入后需要显式校验必填、唯一、范围和币种枚举，输出不带业务值的位置与错误码。新增Schema及严格异常，不改变原导入或数据；配置复制、空值规则、稳定顺序、缺列、上限和无效约束必须清楚，全部作为一个数据质量能力交付。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add exported Schema(columns) and SchemaValidationError. A columns mapping declares nullable/unique booleans, inclusive min/max and finite choices. Validate a real Table without mutation, returning deterministic zero-based row/column/code records in row then configured-column order; never include actual values. Nulls bypass other checks, nullable defaults True, unique ignores nulls, and duplicate reports start at the second equal value. validate(table, strict=False, max_errors=None) supports an exact positive integer error cap and strict errors with an errors tuple. Copy caller rules, reject unknown/invalid rules, reversed bounds, invalid strict/caps and missing table columns before scanning.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_schema_dev.py and concise English compatibility documentation at library/docs/development-ag-schema-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/agate/schema.py
+- library/agate/__init__.py
+- library/development_tests/test_development_ag_schema_dev.py
+- library/docs/development-ag-schema-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

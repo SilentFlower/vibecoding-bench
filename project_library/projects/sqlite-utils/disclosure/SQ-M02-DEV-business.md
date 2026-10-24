@@ -4,8 +4,8 @@ Fix Table.convert so each call uses the supplied callable, including consecutive
 
 # Investigation topics
 
-- 规划保留原列的选择性标准化试点
-- 诊断连续转换串用旧同名回调
+- Plan a selective normalization pilot that preserves the original columns.
+- Diagnose reuse of a stale callback with the same name across successive conversions.
 
 # Supplied business material: materials/normalization-policy.md
 

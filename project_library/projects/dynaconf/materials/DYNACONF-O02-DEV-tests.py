@@ -1,22 +1,22 @@
-"""共享条件Validator不能把第一个实例环境记到后续实例。"""
+"Public regression tests for DYNACONF-O02-DEV; the complete business contract is in materials/DYNACONF-O02-DEV-contract.md."
 from dynaconf import Dynaconf,Validator
 from dynaconf.validator import ValidationError
 from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 def settings(env,enabled,port):
-    """创建真实启用环境的实例。@return Dynaconf。"""
+    "Support the public regression through settings."
     return Dynaconf(environments=True,env=env,ENABLED=enabled,PORT=port)
 
 def test_reused_when_matches_fresh_validator_across_dev_prod():
-    """dev条件跳过后prod负值仍必须拒绝，when.envs保持未声明。@return None。"""
+    "Verify reused when matches fresh validator across dev prod."
     condition=Validator('ENABLED',eq=True);validator=Validator('PORT',gt=0,when=condition)
     validator.validate(settings('dev',False,-1));assert condition.envs is None
     with pytest.raises(ValidationError):validator.validate(settings('prod',True,-1))
     assert condition.envs is None and validator.envs is None
 
 def test_nested_combined_conditions_and_explicit_env_remain_local():
-    """嵌套when及and/or组合不永久改子条件，显式env仍尊重。@return None。"""
+    "Verify nested combined conditions and explicit env remain local."
     nested=Validator('ENABLED',eq=True,when=Validator('MODE',eq='active'))
     validator=Validator('PORT',gt=0,when=nested)
     dev=settings('dev',False,-1);dev.set('MODE','active');validator.validate(dev)
@@ -27,7 +27,7 @@ def test_nested_combined_conditions_and_explicit_env_remain_local():
     with pytest.raises(ValidationError):combined.validate(prod,only_current_env=True)
 
 def test_concurrent_instances_and_exception_exit_do_not_leak_environment():
-    """线程共享同一描述器只继承各自调用上下文。@return None。"""
+    "Verify concurrent instances and exception exit do not leak environment."
     condition=Validator('ENABLED',eq=True);validator=Validator('PORT',gt=0,when=condition)
     def run(index):
         current=settings('env'+str(index),index%2==1,-1)

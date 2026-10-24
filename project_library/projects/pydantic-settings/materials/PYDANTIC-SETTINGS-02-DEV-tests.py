@@ -1,10 +1,10 @@
-"""CLI前缀和禁用alias组合按真实字段名解析。"""
+"Public regression tests for PYDANTIC-SETTINGS-02-DEV; the complete business contract is in materials/PYDANTIC-SETTINGS-02-DEV-contract.md."
 import unittest
 from pydantic import Field
 from pydantic_settings import BaseSettings,CliApp,SettingsConfigDict,SettingsError
 
 def test_prefixed_name_only_keeps_aliased_and_plain_values():
-    """前缀不可让禁用的alias再次影响内部dest。@return None。"""
+    "Verify prefixed name only keeps aliased and plain values."
     class Config(BaseSettings):
         model_config=SettingsConfigDict(cli_prefix='app',validate_by_alias=False)
         apple:str=Field('default',alias='pomo')
@@ -14,7 +14,7 @@ def test_prefixed_name_only_keeps_aliased_and_plain_values():
     with unittest.TestCase().assertRaises(SettingsError):CliApp.run(Config,cli_args=['--app.pomo','bad'],cli_exit_on_error=False)
 
 def test_no_prefix_and_enabled_alias_keep_existing_policy():
-    """正常alias模式与无前缀模式保持。@return None。"""
+    "Verify no prefix and enabled alias keep existing policy."
     class Plain(BaseSettings):
         model_config=SettingsConfigDict(validate_by_alias=False)
         apple:str=Field('default',alias='pomo')

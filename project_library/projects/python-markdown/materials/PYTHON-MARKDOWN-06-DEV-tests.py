@@ -1,4 +1,4 @@
-"""路径、文本/二进制流显式编码并保留调用方所有权。"""
+"Public regression tests for PYTHON-MARKDOWN-06-DEV; the complete business contract is in materials/PYTHON-MARKDOWN-06-DEV-contract.md."
 import io
 import tempfile
 import unittest
@@ -7,7 +7,7 @@ from markdown.documents import convert_file
 
 
 def test_pathlike_input_output_and_independent_encodings():
-    """真正读取Path并从UTF16文档写UTF8 HTML，返回结构化目录。@return None。"""
+    "Verify pathlike input output and independent encodings."
     with tempfile.TemporaryDirectory() as temporary:
         source=Path(temporary)/'input.md';output=Path(temporary)/'output.html'
         source.write_bytes('# 中文'.encode('utf-16-le'))
@@ -16,7 +16,7 @@ def test_pathlike_input_output_and_independent_encodings():
 
 
 def test_stream_cursor_ownership_and_encoding_failure_preserves_file():
-    """流不倒带、不关闭，显式close输入可选，失败不截断旧输出。@return None。"""
+    "Verify stream cursor ownership and encoding failure preserves file."
     stream=io.BytesIO(b'ignored# Title');stream.seek(7);output=io.BytesIO()
     result=convert_file(stream,output,output_encoding='utf-16-le')
     assert output.getvalue().decode('utf-16-le')==result.html and not stream.closed and not output.closed

@@ -1,4 +1,4 @@
-"""公开展示现有字符串输出与缺少分段API的功能差距。"""
+"""Public demonstration of the gap between existing string output and the missing parts API."""
 from datetime import datetime
 from babel import dates
 value = datetime(2024,4,3,15,30)

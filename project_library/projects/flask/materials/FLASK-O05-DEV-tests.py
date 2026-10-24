@@ -1,14 +1,14 @@
-"""NDJSON真实响应逐项委托当前应用provider且正确关闭源。"""
+"Public regression tests for FLASK-O05-DEV; the complete business contract is in materials/FLASK-O05-DEV-contract.md."
 from flask import Flask,request
 from flask.json.provider import DefaultJSONProvider
 import json
 import pytest
 
 def test_actual_response_is_lazy_one_json_per_line_and_current_provider():
-    """首chunk之前不物化整个数组，定制编码真实进入每项响应。@return None。"""
+    "Verify actual response is lazy one json per line and current provider."
     app=Flask(__name__);calls=[]
     class Provider(DefaultJSONProvider):
-        """真实应用JSONProvider扩展。"""
+        "Public regression fixture: Provider."
         def dumps(self,obj,**kwargs):calls.append(obj);return super().dumps({'wrapped':obj},**kwargs)
     app.json=Provider(app);consumed=[]
     def values():
@@ -19,7 +19,7 @@ def test_actual_response_is_lazy_one_json_per_line_and_current_provider():
     iterator.close();response.close()
 
 def test_request_context_and_early_close_run_source_finally_once():
-    """视图返回后真实stream_with_context保留request，提前关闭执行finally。@return None。"""
+    "Verify request context and early close run source finally once."
     app=Flask(__name__);events=[]
     @app.get('/items/<value>')
     def view(value):
@@ -33,10 +33,10 @@ def test_request_context_and_early_close_run_source_finally_once():
     response.close();assert events==['closed']
 
 def test_empty_unstarted_close_and_late_encoding_failure_have_explicit_lifetime():
-    """空流正确，未启动可关闭源，后续编码失败不会假称成功文档。@return None。"""
+    "Verify empty unstarted close and late encoding failure have explicit lifetime."
     app=Flask(__name__);assert app.json.stream([]).get_data()==b''
     class Source:
-        """能够记录未消费关闭的真实Iterator。"""
+        "Public regression fixture: Source."
         def __init__(self):self.closed=0
         def __iter__(self):return self
         def __next__(self):return 1

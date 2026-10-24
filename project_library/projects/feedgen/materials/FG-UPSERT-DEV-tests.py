@@ -1,4 +1,4 @@
-"""公开真实订阅条目更新回归。"""
+"Public regression tests for FG-UPSERT-DEV; the complete business contract is in materials/FG-UPSERT-DEV-contract.md."
 import pytest
 from feedgen.feed import FeedGenerator
 from feedgen.entry import FeedEntry

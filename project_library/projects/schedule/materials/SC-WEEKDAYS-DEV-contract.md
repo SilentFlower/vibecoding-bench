@@ -1,5 +1,12 @@
-# 按每日时间和显式星期集合选择下一次运行
+# Engineering contract: SC-WEEKDAYS-DEV
 
-日常任务可限定工作日或选定星期，同时沿用每日时间及原时区校正。星期集合只支持每一日任务，返回严格未来的合法日期，拒绝不明确的多日间隔组合，保留旧每周API。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Job.on_weekdays(*weekdays) for every(1).day(s) jobs, accepting nonempty integer weekdays 0..6 (Monday=0), deduplicating them and returning self. Integrate selection into _schedule_next_run in its configured timezone before existing UTC correction, preserving .at clock and strict-future scheduling. Revalidate eligibility if job attributes change; reject other intervals/units/start_day and invalid weekday values. Do not alter legacy .monday/.weeks or unconstrained daily schedules.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_sc_weekdays_dev.py and concise English compatibility documentation at library/docs/development-sc-weekdays-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/schedule/__init__.py
+- library/development_tests/test_development_sc_weekdays_dev.py
+- library/docs/development-sc-weekdays-dev.md

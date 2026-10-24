@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线11：新资源工厂作用域覆盖真实同步/生成器/协程/异步生成器执行期，提前close/aclose与抑制策略保持，每次独立资源，原wrap_with不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add funcy.scoped.wrap_with_factory(factory) without changing wrap_with(ctx). Create fresh no-arg managers per execution; normal sync calls use sync context, generators enter on first consumption and retain resource through yield/throw/close, coroutine and async-generator wrappers accept sync or async managers. Async generator aclose must close the wrapped generator before leaving the manager. Preserve original enter/exit failures, manager suppression policy, function metadata, original exception and cancellation cleanup. Prove repeated calls never reuse one-shot managers and resources remain open only during actual execution.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_funcy_o03_dev.py and concise English compatibility documentation at library/docs/development-funcy-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/funcy/scoped.py
+- library/tests/test_development_funcy_o03_dev.py
+- library/docs/development-funcy-o03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

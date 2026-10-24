@@ -1,5 +1,12 @@
-# 提供不改变LRU热度或LFU频次的只读查看
+# Engineering contract: CT-PEEK-DEV
 
-监控面板查看缓存不能把条目变成热点。新增只读peek，尊重时间缓存的过期可见性，不触发缺失加载或清理，不改变LRU顺序、LFU频次及容量计量。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Cache.peek(key,default=marker), returning a live value without invoking subclass __getitem__, __missing__, recency/frequency updates or expiry cleanup. Use each cache existing membership semantics, so TTL/TLRU expired entries behave missing; explicit defaults including None are returned, otherwise raise KeyError. Support all built-in cache policies, weighted sizes and custom __missing__ subclasses. Preserve ordinary get/item access behavior and all internal policy accounting.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_peek_dev.py and concise English compatibility documentation at library/docs/development-ct-peek-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/cachetools/__init__.py
+- library/development_tests/test_development_ct_peek_dev.py
+- library/docs/development-ct-peek-dev.md

@@ -1,5 +1,12 @@
-# 让真实批量更新先取得顶层输入快照且不污染调用者映射
+# Engineering contract: DYNACONF-O03-DEV
 
-对应路线03：update先创建顶层字典快照再并kwargs，优先级及解析/校验保持；普通/只读/空映射与键值迭代可用，失败也不写原顶层，不冒充深拷贝或事务。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix Settings.update to copy its top-level mapping/standard dict-constructor input before merging kwargs, preserving kwargs precedence and all actual parsing/validation paths. Ordinary and read-only mappings, empty mappings and iterable pairs work; successful or validation-failed updates never add/overwrite keys in caller input. Do not introduce arbitrary deepcopy, silently promise nested ownership/transaction rollback, change settings partial-update semantics or bypass validators.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_dynaconf_o03_dev.py and concise English compatibility documentation at library/docs/development-dynaconf-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/dynaconf/base.py
+- library/tests/test_development_dynaconf_o03_dev.py
+- library/docs/development-dynaconf-o03-dev.md

@@ -1,4 +1,4 @@
-"""公开文档ID分页回归。"""
+"Public regression tests for TD-PAGE-DEV; the complete business contract is in materials/TD-PAGE-DEV-contract.md."
 import pytest
 from tinydb import TinyDB, Query
 from tinydb.storages import MemoryStorage

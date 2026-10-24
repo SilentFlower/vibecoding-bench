@@ -1,11 +1,11 @@
-"""前导空白文档的识别、读取及导出格式一致。"""
+"Public regression tests for PYTHON-FRONTMATTER-02-DEV; the complete business contract is in materials/PYTHON-FRONTMATTER-02-DEV-contract.md."
 import io
 import frontmatter
 from frontmatter.default_handlers import TOMLHandler, YAMLHandler
 
 
 def test_leading_toml_preserves_handler_and_business_keys():
-    """前导空行不得导致TOML被默认YAML导出。@return None。"""
+    "Verify leading toml preserves handler and business keys."
     text=' \r\n\t\n+++\ncontent="摘要"\nhandler="业务处理"\ntitle="中文"\n+++\n正文'
     assert frontmatter.checks(text)
     post=frontmatter.loads(text)
@@ -16,7 +16,7 @@ def test_leading_toml_preserves_handler_and_business_keys():
 
 
 def test_check_load_and_explicit_handler_agree():
-    """文本流及显式处理器继续可用。@return None。"""
+    "Verify check load and explicit handler agree."
     text='\n  \n---\nname: value\n---\nBody'
     assert frontmatter.check(io.StringIO(text))
     assert isinstance(frontmatter.load(io.StringIO(text)).handler,YAMLHandler)

@@ -1,5 +1,12 @@
-# 交付显式策略的独立JSON树组合深合并
+# Engineering contract: DEEPDIFF-O04-DEV
 
-对应路线09：独立JSON树组合合并，词典递归、列表替换/追加及叶冲突明确；真实DeepDiff判等，保留来源并拒绝循环/非JSON边界，不改变Delta。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement deepdiff.merge.deep_merge(left,right,*,lists="replace",conflicts="right"), MergeConflict(path), validate_json_tree and actual-DeepDiff-based json_equal. Recursively union dict keys preserving left then right order; lists explicitly replace or append with duplicate preservation; conflicting leaves/types choose right/left or raise at exact tuple path. Preserve bool-vs-int and None semantics, input independence, reject nonstring dict keys, unsupported objects, nonfinite floats and cycles while allowing acyclic shared references. Do not change Delta or merge arbitrary object attributes; prove native Delta still performs target replacement.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_deepdiff_o04_dev.py and concise English compatibility documentation at library/docs/development-deepdiff-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/deepdiff/merge.py
+- library/tests/test_development_deepdiff_o04_dev.py
+- library/docs/development-deepdiff-o04-dev.md

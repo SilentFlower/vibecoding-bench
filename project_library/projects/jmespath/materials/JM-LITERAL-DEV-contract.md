@@ -1,5 +1,12 @@
-# 隔离编译表达式的可变JSON字面量结果
+# Engineering contract: JM-LITERAL-DEV
 
-编译表达式中的对象或数组常量不能被一次结果修改污染后续查询。仅对字面量求值做深层隔离，保留输入字段本来的引用语义和编译缓存，不靠清缓存或复制整份输入绕过。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix TreeInterpreter.visit_literal so mutable JSON literal results cannot mutate the cached parsed expression or later searches. Deeply detach object/array literal nodes on each evaluation, including literals nested in multi-select/projections and custom functions. Preserve scalar literal values, input field identity semantics, parser cache use and existing equality/type rules. Do not deepcopy every input document or purge compilation caches as a workaround.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_jm_literal_dev.py and concise English compatibility documentation at library/docs/development-jm-literal-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/jmespath/visitor.py
+- library/development_tests/test_development_jm_literal_dev.py
+- library/docs/development-jm-literal-dev.md

@@ -1,5 +1,12 @@
-# 按带时区时间稳定排序并生成独立订阅快照
+# Engineering contract: FG-ORDER-DEV
 
-按真实时刻而非时间字符串排序，时刻相同保持原序。缺失时间位置、含边界过滤和数量限制明确，返回保留元数据与扩展的独立快照，原订阅和条目不受后续修改影响。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement feedgen.ordering.sorted_feed(feed,*,by="updated",reverse=True,missing="last",since=None,limit=None) and reusable copy_feed(feed,entries). Compare actual updated/published instants across offsets, retain original order on ties, explicitly place or reject missing dates independent of reverse. Inclusive aware since excludes undated entries, nonnegative limit supports zero. Return deeply independent FeedGenerator preserving metadata/extensions/entry content; never reorder or mutate original feed. Reject naive boundaries and invalid modes before changing anything.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_order_dev.py and concise English compatibility documentation at library/docs/development-fg-order-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/feedgen/ordering.py
+- library/development_tests/test_development_fg_order_dev.py
+- library/docs/development-fg-order-dev.md

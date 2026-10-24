@@ -4,7 +4,7 @@ Fix Scheduler.run_all so delay_seconds is applied only between jobs in the curre
 
 # Investigation topics
 
-- 定位批量执行最后一次多余等待
+- Locate the unnecessary final wait during batch execution.
 
 # Supplied business material: materials/run-all-trace.json
 

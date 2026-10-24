@@ -102,10 +102,30 @@ def projects_router(service) -> APIRouter:
         """分页读取事件。:param account_id: 账号。:param after: 事件游标。:return: 事件列表。"""
         return owner().events(account_id, after)
 
+    @router.get('/agents/{account_id}/snapshot')
+    def snapshot(account_id: int) -> dict:
+        """读取当前终端及订阅起点。:param account_id: 账号。:return: 当前工作快照与交互首页。"""
+        return owner().snapshot(account_id)
+
+    @router.get('/agents/{account_id}/events/page')
+    def event_page(account_id: int, before: int | None = Query(None, ge=1, le=9223372036854775807),
+                   limit: int = Query(20, ge=1, le=100)) -> dict:
+        """倒序分页读取交互。:param account_id: 账号。:param before: 独占事件上界。:param limit: 每页条数。:return: 交互分页。"""
+        return owner().event_page(account_id, before, limit)
+
     @router.get('/agents/{account_id}/work')
     def history(account_id: int) -> list[dict]:
         """读取账号工作历史。:param account_id: 账号。:return: 最近工作的公开摘要。"""
         return owner().history(account_id)
+
+    @router.get('/agents/{account_id}/work/page')
+    def work_page(account_id: int, before: str | None = Query(None, min_length=1, max_length=128),
+                  limit: int = Query(10, ge=1, le=100)) -> dict:
+        """分页读取工程交付。:param account_id: 账号。:param before: 同账号上一页末项。:param limit: 每页条数。:return: 工程分页。"""
+        try:
+            return owner().work_page(account_id, before, limit)
+        except ValueError:
+            raise HTTPException(404, '工程分页游标不存在') from None
 
     @router.get('/agents/{account_id}/actions')
     def actions(account_id: int) -> list[dict]:

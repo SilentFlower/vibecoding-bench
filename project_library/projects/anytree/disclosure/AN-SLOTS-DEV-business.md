@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-轻量分类节点没有__dict__，需要显式声明导出字段，不能遍历所有property产生业务副作用。DictExporter增加attribute_provider，支持映射或键值序列，仍应用原过滤、深度和子级策略；结构字段永不作为业务属性输出，普通导出行为保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add optional attribute_provider=None to DictExporter. A callable receives each visited node and returns a mapping or finite key/value iterable. Use only explicitly supplied fields, then apply existing attriter/dictcls; never enumerate arbitrary slots or properties. Exclude parent/children and NodeMixin/LightNodeMixin structural private fields from provider results. Require string attribute keys, propagate provider errors, preserve maxlevel/childiter and ordinary __dict__ export. Support LightNodeMixin-only slots nodes and normal DictImporter round trips without hidden structure leakage.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_an_slots_dev.py and concise English compatibility documentation at library/docs/development-an-slots-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/anytree/exporter/dictexporter.py
+- library/development_tests/test_development_an_slots_dev.py
+- library/docs/development-an-slots-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

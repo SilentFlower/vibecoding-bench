@@ -1,11 +1,11 @@
-"""课程/教室合法组合用真实Constraint协议执行。"""
+"Public regression tests for PYTHON-CONSTRAINT-04-DEV; the complete business contract is in materials/PYTHON-CONSTRAINT-04-DEV-contract.md."
 import unittest
 from constraint import Problem
 from constraint.tables import AllowedTuples,ForbiddenTuples
 
 
 def test_allowed_table_snapshot_and_forbidden_complement():
-    """输入表随后变化不污染规则，前向检查不漏合法组合。@return None。"""
+    "Verify allowed table snapshot and forbidden complement."
     rows=[('A',1),('B',2)]
     allowed=AllowedTuples(rows);rows.append(('A',2))
     problem=Problem();problem.addVariable('course',['A','B']);problem.addVariable('room',[1,2]);problem.addConstraint(allowed,['course','room'])
@@ -15,7 +15,7 @@ def test_allowed_table_snapshot_and_forbidden_complement():
 
 
 def test_unary_preprocessing_and_bad_shape_do_not_mutate_model():
-    """前置独立域能力确保多次查询后声明域保持。@return None。"""
+    "Verify unary preprocessing and bad shape do not mutate model."
     problem=Problem();problem.addVariable('x',[1,2,3]);problem.addConstraint(AllowedTuples([(2,)]),['x'])
     assert problem.getSolutions()==[{'x':2}] and list(problem._variables['x'])==[1,2,3]
     with unittest.TestCase().assertRaises(ValueError):AllowedTuples([(1,2),(3,)])

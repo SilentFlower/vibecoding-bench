@@ -1,4 +1,4 @@
-"""公开惰性流式查询导出回归。"""
+"Public regression tests for CH-STREAM-DEV; the complete business contract is in materials/CH-STREAM-DEV-contract.md."
 import json
 import pytest
 from cli_helpers.tabular_output import TabularOutputFormatter

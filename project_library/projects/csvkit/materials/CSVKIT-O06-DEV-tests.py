@@ -1,9 +1,9 @@
-"""真实单遍查找保留重复列身份与有界样本。"""
+"Public regression tests for CSVKIT-O06-DEV; the complete business contract is in materials/CSVKIT-O06-DEV-contract.md."
 import json
 from io import StringIO
 
 def test_single_pass_counts_bounded_samples_and_duplicates():
-    """重复列名按下标区分，迭代器只遍历一次。@return None。"""
+    "Verify single pass counts bounded samples and duplicates."
     from csvkit.utilities.csvfind import find_columns
     source=iter([['x','x'],['x','no'],['x']])
     report=find_columns(source,['same','same'],[0,1],value='x',sample_size=1)
@@ -11,14 +11,14 @@ def test_single_pass_counts_bounded_samples_and_duplicates():
     assert [r['sample_rows'] for r in report['columns']]==[[1],[1]] and list(source)==[]
 
 def test_real_cli_json_logical_multiline_and_empty(tmp_path):
-    """实际utility按逻辑行号报告，多行字段不拆散。@return None。"""
+    "Verify real cli json logical multiline and empty."
     from csvkit.utilities.csvfind import CSVFind
     path=tmp_path/'data';path.write_text('a,b\n"hello\nworld",x\nx,x\n');out=StringIO()
     CSVFind(['--value','x','--json',str(path)],output_file=out).run()
     report=json.loads(out.getvalue());assert report['rows']==2 and report['columns'][1]['sample_rows']==[1,2]
 
 def test_empty_cells_short_rows_regex_and_budget():
-    """精确空值与短行沿用原过滤语义，正则可显式使用。@return None。"""
+    "Verify empty cells short rows regex and budget."
     from csvkit.utilities.csvfind import find_columns
     import pytest
     assert find_columns(iter([['a'],['b','']]),['a','b'],[1],value='',sample_size=0)['columns'][0]['count']==2

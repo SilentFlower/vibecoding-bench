@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-应用发布多语言后，按用户带权偏好选择实际可用包，保持同权顺序和原区域拼写。明确禁用的语言不能被通配符选回，复用原别名与语言回退，输入长度及权重语法有明确限制。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add babel.core.negotiate_locale_preferences(header, available, *, sep="_", aliases=LOCALE_ALIASES). Parse bounded comma-separated language ranges and optional q values 0..1 with at most three decimals. Select descending quality, stable header order; reuse pinned negotiate_locale matching/aliases for each nonwildcard candidate and return spelling from available. Explicit q=0 language/prefix exclusions must apply before wildcard selection; wildcard picks first nonexcluded available. Reject malformed parameters, quality, headers over 8192 characters or 100 ranges. Materialize available once and preserve the old negotiator.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_preferences_dev.py and concise English compatibility documentation at library/docs/development-ba-preferences-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/babel/core.py
+- library/development_tests/test_development_ba_preferences_dev.py
+- library/docs/development-ba-preferences-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

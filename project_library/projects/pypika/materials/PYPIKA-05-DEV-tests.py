@@ -1,11 +1,11 @@
-"""函数共享真实参数绑定上下文，嵌套不重复关键字。"""
+"Public regression tests for PYPIKA-05-DEV; the complete business contract is in materials/PYPIKA-05-DEV-contract.md."
 import sqlite3
 from pypika import Query,Table,QmarkParameter,NamedParameter
 from pypika.terms import Function
 from pypika.functions import Coalesce,Sum
 
 def test_nested_functions_execute_with_ordered_real_bindings():
-    """真实执行参数列表，而不是只断言问号。@return None。"""
+    "Verify nested functions execute with ordered real bindings."
     parameter=QmarkParameter();query=Query.select(Coalesce(Function('ABS',-8),3).as_('value'))
     sql=query.get_sql(parameter=parameter)
     assert sql=='SELECT COALESCE(ABS(?),?) "value"' and parameter.get_parameters()==[-8,3]
@@ -13,7 +13,7 @@ def test_nested_functions_execute_with_ordered_real_bindings():
         assert connection.execute(sql,parameter.get_parameters()).fetchone()==(8,)
 
 def test_aggregate_filter_where_and_named_share_context():
-    """聚合、过滤和WHERE按真实遍历顺序绑定。@return None。"""
+    "Verify aggregate filter where and named share context."
     table=Table('items');parameter=QmarkParameter()
     query=Query.from_(table).select(Sum(Coalesce(table.value,5)).filter(table.kind=='live')).where(table.id>9)
     sql=query.get_sql(parameter=parameter)

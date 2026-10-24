@@ -1,4 +1,4 @@
-"""两项CLI布尔参数按明确真假解释而非bool(nonempty)。"""
+"Public regression tests for SQLPARSE-02-DEV; the complete business contract is in materials/SQLPARSE-02-DEV-contract.md."
 import contextlib
 import io
 import tempfile
@@ -9,7 +9,7 @@ from sqlparse.cli import create_parser,main
 
 
 def test_literals_switches_and_last_argument_wins():
-    """正反开关及兼容True/False文字都可预测。@return None。"""
+    "Verify literals switches and last argument wins."
     parser=create_parser()
     for option,field in (('--comma_first','comma_first'),('--compact','compact')):
         for value,expected in (('True',True),('false',False),('1',True),('0',False)):
@@ -20,7 +20,7 @@ def test_literals_switches_and_last_argument_wins():
 
 
 def test_actual_cli_uses_false_and_true_in_formatting():
-    """参数真正进入候选格式化流水线。@return None。"""
+    "Verify actual cli uses false and true in formatting."
     with tempfile.TemporaryDirectory() as temporary:
         path=Path(temporary)/'query.sql';text='select a,b,c from t';path.write_text(text)
         for value in ('False','True'):

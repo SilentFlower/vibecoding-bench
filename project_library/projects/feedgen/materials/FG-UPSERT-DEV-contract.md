@@ -1,5 +1,12 @@
-# 按永久ID批量更新订阅条目并保持已有位置
+# Engineering contract: FG-UPSERT-DEV
 
-按永久ID维护订阅，已有条目在原位置替换，新条目按输入顺序追加。完整验证后才提交，保留无关条目对象和订阅元数据，不凭标题猜测同一内容。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement feedgen.upsert.upsert_entries(feed,entries) and frozen UpsertResult(added,updated). Use actual FeedGenerator/FeedEntry APIs. Validate all existing/incoming entries have unique nonempty string IDs before mutation; invalid late input or generator failure preserves original entries. Replace matching IDs at their original position with supplied entry objects, append new IDs in incoming order, retain unrelated exact entry objects and metadata/extensions. Do not merge entries by title or destructively edit old entry fields. Empty input is valid; duplicate old IDs are explicit errors.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_fg_upsert_dev.py and concise English compatibility documentation at library/docs/development-fg-upsert-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/feedgen/upsert.py
+- library/development_tests/test_development_fg_upsert_dev.py
+- library/docs/development-fg-upsert-dev.md

@@ -1,5 +1,12 @@
-# 把真实编码配置完整写入后原子发布
+# Engineering contract: CONFIGOBJ-O03-DEV
 
-对应路线06：复用真实ConfigObj序列化但不污染原对象，完整写入同目录唯一临时文件后替换，保留模式并明确拒绝符号链接，失败清理可核。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add ConfigObj.write_atomic(filename=None), preserving ordinary write/outfile behavior. Serialize a raw-preserving clone through the real ConfigObj writer before opening any temporary file; use a unique same-directory temporary, preserve existing permission bits or use 0600 for a new file, close before os.replace and clean only the operation temp on failure. Default to self.filename, support PathLike, reject missing destination and symlink targets, return the absolute destination. Serialization/encoding/replace errors must preserve old bytes and original in-memory metadata. Do not promise power-loss durability or cross-file atomicity.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o03_dev.py and concise English compatibility documentation at library/docs/development-configobj-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/configobj/__init__.py
+- library/tests/test_development_configobj_o03_dev.py
+- library/docs/development-configobj-o03-dev.md

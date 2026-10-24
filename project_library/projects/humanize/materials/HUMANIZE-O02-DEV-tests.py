@@ -1,10 +1,10 @@
-"""区域上下文在同线程异步交错、嵌套和异常中隔离。"""
+"Public regression tests for HUMANIZE-O02-DEV; the complete business contract is in materials/HUMANIZE-O02-DEV-contract.md."
 import asyncio
 import humanize
 from humanize import i18n
 import pytest
 def catalog(root,word):
-    """构造合成GNU消息目录，供实际gettext读取。@return 根路径。"""
+    "Support the public regression through catalog."
     import struct
     entries={'':'Content-Type: text/plain; charset=UTF-8\nLanguage: xx\nPlural-Forms: nplurals=2; plural=(n != 1);\n','one':word,'%s and %s':'%s et %s'}
     pairs=sorted((key.encode(),value.encode()) for key,value in entries.items());count=len(pairs)
@@ -18,7 +18,7 @@ def catalog(root,word):
     return root
 
 def test_event_coordinated_tasks_do_not_share_context(tmp_path):
-    """两个任务确定交错后仍保留各自真实GNU翻译。@return None。"""
+    "Verify event coordinated tasks do not share context."
     from humanize.context import locale_scope
     first=catalog(tmp_path/'one','uno');second=catalog(tmp_path/'two','dos')
     async def run():
@@ -34,7 +34,7 @@ def test_event_coordinated_tasks_do_not_share_context(tmp_path):
     assert asyncio.run(run())==['uno','dos'] and humanize.apnumber(1)=='one'
 
 def test_nested_default_and_exception_restore(tmp_path):
-    """嵌套英语作用域覆盖已激活区域，异常退出恢复外层。@return None。"""
+    "Verify nested default and exception restore."
     from humanize.context import locale_scope
     root=catalog(tmp_path/'one','uno')
     with locale_scope('xx',root):
@@ -46,7 +46,7 @@ def test_nested_default_and_exception_restore(tmp_path):
     assert humanize.apnumber(1)=='one'
 
 def test_manual_thread_state_hidden_and_reentry(tmp_path):
-    """手工activate不污染当前scope，同实例重复进入拒绝。@return None。"""
+    "Verify manual thread state hidden and reentry."
     from humanize.context import locale_scope
     root=catalog(tmp_path/'one','uno');scope=locale_scope('xx',root)
     try:

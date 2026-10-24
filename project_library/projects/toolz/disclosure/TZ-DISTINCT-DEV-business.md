@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-无长度但可重复读取的数据源走一次流式判重，发现重复立即停止，不能多次打开查询或读取故障尾部。具有真实长度实现的源保持快速路径及原异常，不能宽泛吞掉TypeError；不可哈希数据仍明确失败。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Repair isdistinct for reiterable data sources that implement __iter__ but no length protocol. Scan once, stop at the first duplicate and preserve hashability/error semantics. Keep the existing sized-sequence fast path, propagate errors from a genuinely implemented __len__ or iterator, and do not read a second iterator or consume unreachable tails. Preserve iterators, lists, empty input and exported namespaces.
+
+Deliver meaningful original-failing public regression tests at library/toolz/tests/test_development_tz_distinct_dev.py and concise English compatibility documentation at library/docs/development-tz-distinct-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/toolz/itertoolz.py
+- library/toolz/tests/test_development_tz_distinct_dev.py
+- library/docs/development-tz-distinct-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

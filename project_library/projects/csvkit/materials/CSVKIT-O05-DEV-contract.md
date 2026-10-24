@@ -1,5 +1,13 @@
-# 在真实CSV管道中按精确原名一致重命名列
+# Engineering contract: CSVKIT-O05-DEV
 
-对应路线12：公共header映射与真实csvcut集成，原名选列不变，仅改输出表头；冲突默认拒绝或稳定后缀避开后续保留名，不改数据单元格。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement csvkit.headers.rename_columns(names,mapping,*,collision="error") and actual CSVCut --rename-columns-json / --rename-collision=error|suffix. Validate exact unique original source names, nonempty string targets and unknown mappings, apply against the full original header before projecting originally selected columns and change no cell values. Reject collisions by default; suffix mode preserves first occurrence and avoids all reserved eventual target names. Reject headerless rename before output, invalid JSON/shapes and ambiguous duplicate source names. Keep old cut/default headers, order and mapping inputs unchanged.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_csvkit_o05_dev.py and concise English compatibility documentation at library/docs/development-csvkit-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/csvkit/headers.py
+- library/csvkit/utilities/csvcut.py
+- library/tests/test_development_csvkit_o05_dev.py
+- library/docs/development-csvkit-o05-dev.md

@@ -1,4 +1,4 @@
-"""公开数字星期回归。"""
+"Public regression tests for AR-WEEKDAY-DEV; the complete business contract is in materials/AR-WEEKDAY-DEV-contract.md."
 import pytest
 import arrow
 from arrow.parser import DateTimeParser, ParserError

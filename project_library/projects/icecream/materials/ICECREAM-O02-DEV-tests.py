@@ -1,10 +1,10 @@
-"""同一Timer嵌套测完整区间，并按真实上下文管理状态。"""
+"Public regression tests for ICECREAM-O02-DEV; the complete business contract is in materials/ICECREAM-O02-DEV-contract.md."
 from icecream import IceCreamDebugger
 import icecream.icecream as module
 import pytest
 
 def test_reused_timer_nested_exact_durations(monkeypatch):
-    """内层退出后外层起点保持，兼容_enter_time清空。@return None。"""
+    "Verify reused timer nested exact durations."
     output=[];timer=IceCreamDebugger(outputFunction=output.append).timer;times=iter([0,1,3,5])
     monkeypatch.setattr(module.time,'perf_counter',lambda:next(times))
     with timer:
@@ -13,7 +13,7 @@ def test_reused_timer_nested_exact_durations(monkeypatch):
     with pytest.raises(RuntimeError):timer.__exit__(None,None,None)
 
 def test_exception_and_output_failure_do_not_leave_entry(monkeypatch):
-    """业务异常不被输出器遮蔽，记录总会先弹出。@return None。"""
+    "Verify exception and output failure do not leave entry."
     def broken(message):raise OSError('sink')
     timer=IceCreamDebugger(outputFunction=broken).timer
     with pytest.raises(ValueError,match='business'):
@@ -24,7 +24,7 @@ def test_exception_and_output_failure_do_not_leave_entry(monkeypatch):
     assert timer._enter_time is None
 
 def test_child_task_cannot_exit_parent_frame_and_disabled():
-    """继承ContextVar的子任务不拥有父进入记录。@return None。"""
+    "Verify child task cannot exit parent frame and disabled."
     import asyncio
     output=[];debug=IceCreamDebugger(outputFunction=output.append);timer=debug.timer
     async def run():

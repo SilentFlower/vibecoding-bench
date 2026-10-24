@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-发布配置分层合并需要明确数组是替换、追加还是去重，标量冲突可选拒绝。所有工作在独立副本完成，保留基础文档未触及注释和布局，输入节点不共享，最终文本重新解析通过。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement tomlkit.merging.merge_documents(base,overlay,*,arrays="replace",conflicts="replace"). Deep-copy base, recursively merge mapping children, and choose explicit replace/append/unique for arrays (including arrays of tables, using native value equality for uniqueness). Copy incoming mutable nodes, preserve unaffected base comments/layout and validate the final serialized TOML. conflicts="error" rejects differing scalar/type conflicts without changing either input. Reject unknown policies/nonmapping overlay; preserve existing parse/dumps behavior and do not infer merges from implicit global settings.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_merge_dev.py and concise English compatibility documentation at library/docs/development-tk-merge-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tomlkit/merging.py
+- library/development_tests/test_development_tk_merge_dev.py
+- library/docs/development-tk-merge-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

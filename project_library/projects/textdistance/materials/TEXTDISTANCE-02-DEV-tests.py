@@ -1,9 +1,9 @@
-"""词和qgram结果保持比较单元，不偷偷拼接成字符。"""
+"Public regression tests for TEXTDISTANCE-02-DEV; the complete business contract is in materials/TEXTDISTANCE-02-DEV-contract.md."
 import textdistance
 
 
 def test_word_and_qgram_result_and_normalized_units():
-    """两种算法统一返回准备后的单元列表。@return None。"""
+    "Verify word and qgram result and normalized units."
     for cls in (textdistance.LCSSeq,textdistance.LCSStr):
         assert cls(qval=None,external=False)('alpha beta gamma','other beta gamma')==['beta','gamma']
         assert cls(qval=2,external=False)('abcd','xbcdy')==[('b','c'),('c','d')]
@@ -12,7 +12,7 @@ def test_word_and_qgram_result_and_normalized_units():
 
 
 def test_long_path_and_unhashable_tokens():
-    """跨长短分支及不可hash token均按切片比较。@return None。"""
+    "Verify long path and unhashable tokens."
     for cls in (textdistance.LCSSeq,textdistance.LCSStr):
         assert cls(qval=2,external=False)('x'*205+'ab','zab')==[('a','b')]
         assert cls(external=False)([[1],[2],[3]],[[0],[2],[3]])==[[2],[3]]

@@ -1,4 +1,4 @@
-"""公开JSON Lines真实流回归。"""
+"Public regression tests for SJ-LINES-DEV; the complete business contract is in materials/SJ-LINES-DEV-contract.md."
 from io import StringIO
 import pytest
 from simplejson.lines import iterloads,iterdumps,dump

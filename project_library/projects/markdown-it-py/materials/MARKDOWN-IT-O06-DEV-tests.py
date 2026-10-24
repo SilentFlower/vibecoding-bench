@@ -1,11 +1,11 @@
-"""真实树编辑维护父链、兄弟及实际Token渲染结果。"""
+"Public regression tests for MARKDOWN-IT-O06-DEV; the complete business contract is in materials/MARKDOWN-IT-O06-DEV-contract.md."
 from markdown_it import MarkdownIt
 from markdown_it.tree import SyntaxTreeNode
 from markdown_it.token import Token
 import pytest
 
 def test_move_paragraph_between_containers_updates_render_and_siblings():
-    """一个节点只能有一个父节点，移动后原容器不再渲染该段。@return None。"""
+    "Verify move paragraph between containers updates render and siblings."
     md=MarkdownIt();tree=SyntaxTreeNode(md.parse('first\n\n> nested\n\nlast'))
     first,quote,last=tree.children;quote.append_child(last)
     assert last.parent is quote and tree.children==[first,quote] and quote.children[-1] is last
@@ -14,7 +14,7 @@ def test_move_paragraph_between_containers_updates_render_and_siblings():
     assert html=='<p>first</p>\n<blockquote>\n<p>nested</p>\n<p>last</p>\n</blockquote>\n'
 
 def test_inline_edits_replace_remove_and_same_parent_move_sync_tokens():
-    """行内children也必须同步原Token.children，而非仅改walk视图。@return None。"""
+    "Verify inline edits replace remove and same parent move sync tokens."
     md=MarkdownIt();tree=SyntaxTreeNode(md.parse('old'))
     inline=tree.children[0].children[0];old=inline.children[0]
     new=SyntaxTreeNode([Token('text','',0,content='new')],create_root=False)
@@ -25,7 +25,7 @@ def test_inline_edits_replace_remove_and_same_parent_move_sync_tokens():
     inline.remove_child(tail);assert tail.parent is None and md.renderer.render(tree.to_tokens(),md.options,{})=='<p>new</p>\n'
 
 def test_rejected_cycles_roots_and_invalid_indices_leave_tree_intact():
-    """先验证再移动，拒绝操作不能先把候选从原父节点拆走。@return None。"""
+    "Verify rejected cycles roots and invalid indices leave tree intact."
     md=MarkdownIt();tree=SyntaxTreeNode(md.parse('a\n\n> b'));paragraph,quote=tree.children;before=tree.to_tokens()
     with pytest.raises(ValueError):quote.append_child(tree)
     with pytest.raises(ValueError):quote.children[0].append_child(quote)

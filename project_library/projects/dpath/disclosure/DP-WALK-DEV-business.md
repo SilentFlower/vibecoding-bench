@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-配置检查需要无损的类型化路径，并明确祖先循环和资源上限。用非递归遍历处理深层数据，共享但不循环的对象保留两条路径，空容器仍可见，预算超限前停止而不改原数据。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement dpath.walking.walk_paths(root,*,include_containers=False,cycles="error",max_depth=None,max_nodes=None), yielding (tuple_path,original_value) in mapping/list source preorder. Root depth zero and node budget includes root/containers. Empty containers are leaves; optional nonempty containers are emitted too. Track active ancestors iteratively: PathCycleError.path identifies cycles or skip drops only cyclic edges, while shared acyclic objects appear under both paths. Reject invalid budgets, bound before yielding offending nodes, avoid Python recursion and preserve original path key types/input.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_walk_dev.py and concise English compatibility documentation at library/docs/development-dp-walk-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/dpath/walking.py
+- library/development_tests/test_development_dp_walk_dev.py
+- library/docs/development-dp-walk-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

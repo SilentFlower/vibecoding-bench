@@ -1,4 +1,4 @@
-"""公开子树库存聚合回归。"""
+"Public regression tests for AN-FOLD-DEV; the complete business contract is in materials/AN-FOLD-DEV-contract.md."
 import pytest
 from anytree import Node, NodeMixin, SymlinkNode
 from anytree.util import fold_subtree

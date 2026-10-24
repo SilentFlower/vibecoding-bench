@@ -1,15 +1,15 @@
-"""每sink真实序列化一次，在进入队列前取得隔离record。"""
+"Public regression tests for LOGURU-O04-DEV; the complete business contract is in materials/LOGURU-O04-DEV-contract.md."
 from copy import deepcopy
 from loguru import logger
 import json
 import pytest
 
 def clean():
-    """创建独立logger。@return Logger。"""
+    "Support the public regression through clean."
     logger.remove();log=deepcopy(logger);log.remove();return log
 
 def test_per_sink_callback_and_shared_record_are_isolated():
-    """一个sink定制JSON，另一sink仍有原始extra和格式。@return None。"""
+    "Verify per sink callback and shared record are isolated."
     log=clean();encoded=[];plain=[];calls=[]
     def serializer(record,text):
         calls.append(text);record['extra']['nested'].append('private');record['level'].name='changed'
@@ -22,7 +22,7 @@ def test_per_sink_callback_and_shared_record_are_isolated():
     log.remove()
 
 def test_queue_producer_callback_once_and_builtin_json_stays_same():
-    """回调在业务生产线程一次执行，原serialize=True仍走固定schema。@return None。"""
+    "Verify queue producer callback once and builtin json stays same."
     import threading
     log=clean();messages=[];threads=[]
     def serializer(record,text):threads.append(threading.get_ident());return 'custom:'+text
@@ -32,7 +32,7 @@ def test_queue_producer_callback_once_and_builtin_json_stays_same():
     assert json.loads(encoded[0])['record']['message']=='two';log.remove()
 
 def test_invalid_config_result_and_callback_failure_are_explicit():
-    """参数预检不注册半成品，catch=False传播回调/返回类型错误。@return None。"""
+    "Verify invalid config result and callback failure are explicit."
     log=clean()
     with pytest.raises(TypeError):log.add(lambda message:None,serializer=42)
     with pytest.raises(ValueError):log.add(lambda message:None,serialize=True,serializer=lambda record,text:text)

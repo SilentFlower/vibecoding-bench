@@ -32,7 +32,7 @@
           "id": "PLUGGY-01-DEV",
           "kind": "modify",
           "goal": "历史hook记录调用时参数映射浅快照且不复制业务对象",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair HookCaller.call_historic to apply specification defaults then shallow-copy the kwargs mapping before recording/executing. Deferred plugin replay observes call-time keys/values even if caller later replaces/clears the outer mapping. Nested mutable objects remain intentionally shared by identity; do not deepcopy user values or callbacks. Preserve custom Mapping input, empty mappings, defaults, result_callback behavior, existing call ordering and nonhistoric hooks.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_01_dev.py, and Chinese compatibility documentation at library/docs/development-pluggy-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair HookCaller.call_historic to apply specification defaults then shallow-copy the kwargs mapping before recording/executing. Deferred plugin replay observes call-time keys/values even if caller later replaces/clears the outer mapping. Nested mutable objects remain intentionally shared by identity; do not deepcopy user values or callbacks. Preserve custom Mapping input, empty mappings, defaults, result_callback behavior, existing call ordering and nonhistoric hooks.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_01_dev.py, and English compatibility documentation at library/docs/development-pluggy-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PLUGGY-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PLUGGY-01-DEV.rubric.json",
             "native": "verification/PLUGGY-01-DEV.native.json",
             "public_native": "verification/PLUGGY-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PLUGGY-02-DEV",
           "kind": "modify",
           "goal": "入口点分发记录只关联真实成功注册的插件与名称",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair entry-point loading to count and associate a distribution only after register actually returns the real registered plugin name. Introduce register_entrypoint(plugin,name,distribution) for the same verified commit path, supporting a subclass renaming or rejecting registration and the existing None-plugin policy. Never record an unloaded/rejected/blocked name, fabricate success from an unrelated already-registered object, or leave list_plugin_distributions raising KeyError. Preserve success order, metadata identity, existing load exceptions and normal unregister distribution cleanup. Tests patch metadata with local synthetic entry points, no actual discovery imports/network.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_02_dev.py, and Chinese compatibility documentation at library/docs/development-pluggy-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair entry-point loading to count and associate a distribution only after register actually returns the real registered plugin name. Introduce register_entrypoint(plugin,name,distribution) for the same verified commit path, supporting a subclass renaming or rejecting registration and the existing None-plugin policy. Never record an unloaded/rejected/blocked name, fabricate success from an unrelated already-registered object, or leave list_plugin_distributions raising KeyError. Preserve success order, metadata identity, existing load exceptions and normal unregister distribution cleanup. Tests patch metadata with local synthetic entry points, no actual discovery imports/network.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_02_dev.py, and English compatibility documentation at library/docs/development-pluggy-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PLUGGY-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PLUGGY-02-DEV.rubric.json",
             "native": "verification/PLUGGY-02-DEV.native.json",
             "public_native": "verification/PLUGGY-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "PLUGGY-03-DEV",
           "kind": "modify",
           "goal": "插件注册、查询、注销与hook子集统一按对象身份判断",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair registry ownership using object is identity across register/get_name/is_registered/HookCaller removal and subset filtering. Independent eq-equal/unhashable instances may register under distinct names; the exact same object still cannot register twice. User __eq__ must not run, raise, return arrays or decide None/block markers during these operations. Preserve subset input snapshot and remove only explicitly identical plugin instances, without set-based equality collapsing. Keep get_plugins() existing set/hashability API unchanged and document that separate boundary rather than overpromise it supports unhashable objects.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_03_dev.py, and Chinese compatibility documentation at library/docs/development-pluggy-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair registry ownership using object is identity across register/get_name/is_registered/HookCaller removal and subset filtering. Independent eq-equal/unhashable instances may register under distinct names; the exact same object still cannot register twice. User __eq__ must not run, raise, return arrays or decide None/block markers during these operations. Preserve subset input snapshot and remove only explicitly identical plugin instances, without set-based equality collapsing. Keep get_plugins() existing set/hashability API unchanged and document that separate boundary rather than overpromise it supports unhashable objects.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_03_dev.py, and English compatibility documentation at library/docs/development-pluggy-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PLUGGY-03-DEV-contract.md",
@@ -145,7 +145,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PLUGGY-03-DEV.rubric.json",
             "native": "verification/PLUGGY-03-DEV.native.json",
             "public_native": "verification/PLUGGY-03-DEV.public.native.json",
@@ -174,7 +174,7 @@
           "id": "PLUGGY-04-DEV",
           "kind": "modify",
           "goal": "历史hook显式限制与清理保留事件并稳定重放当前快照",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd HookCaller.set_history_limit(None|nonnegative int) and clear_history(predicate=None)->removed count, only for historic hooks. Default unlimited remains unchanged. Retain newest N events for future replay, limit zero still delivers live calls but stores none; predicate receives a shallow kwargs copy and must be side-effect free. Selector errors before commit leave history unchanged. Historic replay iterates a stable start snapshot so clear/append during replay affect future replays without skipping or infinite growth in the current replay. Subset callers share the original history policy. Preserve previously accepted call-time shallow snapshots and result callbacks; clearing never retracts external effects.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_04_dev.py, and Chinese compatibility documentation at library/docs/development-pluggy-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd HookCaller.set_history_limit(None|nonnegative int) and clear_history(predicate=None)->removed count, only for historic hooks. Default unlimited remains unchanged. Retain newest N events for future replay, limit zero still delivers live calls but stores none; predicate receives a shallow kwargs copy and must be side-effect free. Selector errors before commit leave history unchanged. Historic replay iterates a stable start snapshot so clear/append during replay affect future replays without skipping or infinite growth in the current replay. Subset callers share the original history policy. Preserve previously accepted call-time shallow snapshots and result callbacks; clearing never retracts external effects.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_04_dev.py, and English compatibility documentation at library/docs/development-pluggy-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "PLUGGY-01-DEV",
@@ -197,7 +197,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PLUGGY-04-DEV.rubric.json",
             "native": "verification/PLUGGY-04-DEV.native.json",
             "public_native": "verification/PLUGGY-04-DEV.public.native.json",
@@ -226,7 +226,7 @@
           "id": "PLUGGY-05-DEV",
           "kind": "modify",
           "goal": "临时插件集合按作用域注册并在失败后精确清理自有对象",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pluggy.scoped.temporary_plugins(manager,[(name,plugin),...]) context manager. Preflight all names/identities/blocked/existing conflicts before registration, preserve declared order and existing plugins, then remove only still-registered identical owned objects in reverse order on success/body error/partial historic registration failure. Respect manager-returned actual names via identity lookup, keep nested scopes independent and never remove an unrelated replacement subsequently installed under the same name. Reuse earlier identity repair for eq-equal/unhashable plugins. Roll back registrations/hooks/distribution associations via actual unregister semantics, not arbitrary external callback effects or all newly declared hookspecs.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_05_dev.py, and Chinese compatibility documentation at library/docs/development-pluggy-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pluggy.scoped.temporary_plugins(manager,[(name,plugin),...]) context manager. Preflight all names/identities/blocked/existing conflicts before registration, preserve declared order and existing plugins, then remove only still-registered identical owned objects in reverse order on success/body error/partial historic registration failure. Respect manager-returned actual names via identity lookup, keep nested scopes independent and never remove an unrelated replacement subsequently installed under the same name. Reuse earlier identity repair for eq-equal/unhashable plugins. Roll back registrations/hooks/distribution associations via actual unregister semantics, not arbitrary external callback effects or all newly declared hookspecs.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_05_dev.py, and English compatibility documentation at library/docs/development-pluggy-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "PLUGGY-03-DEV",
@@ -249,7 +249,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PLUGGY-05-DEV.rubric.json",
             "native": "verification/PLUGGY-05-DEV.native.json",
             "public_native": "verification/PLUGGY-05-DEV.public.native.json",
@@ -278,7 +278,7 @@
           "id": "PLUGGY-06-DEV",
           "kind": "modify",
           "goal": "入口点元数据先只读发现再精确选择加载并核环境变化",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pluggy.discovery EntryPointCandidate/DiscoveryReport, discover_entrypoints(group,name=None) and load_entrypoint(manager,candidate). Discovery reads actual metadata fields and reports per-distribution metadata errors separately, never ep.load or plugin execution. Explicit loading re-reads group/name/value/distribution/version, requires exactly one complete matching candidate and no metadata errors, rejects stale/ambiguous inventory before import, and loads only the selected entry. Existing/blocked names return None without import. Commit through the earlier register_entrypoint verified path so rejected/None/renamed plugins never corrupt dist associations. Preserve default existing load API, and do not claim metadata preview proves runtime behavior safe.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_06_dev.py, and Chinese compatibility documentation at library/docs/development-pluggy-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pluggy.discovery EntryPointCandidate/DiscoveryReport, discover_entrypoints(group,name=None) and load_entrypoint(manager,candidate). Discovery reads actual metadata fields and reports per-distribution metadata errors separately, never ep.load or plugin execution. Explicit loading re-reads group/name/value/distribution/version, requires exactly one complete matching candidate and no metadata errors, rejects stale/ambiguous inventory before import, and loads only the selected entry. Existing/blocked names return None without import. Commit through the earlier register_entrypoint verified path so rejected/None/renamed plugins never corrupt dist associations. Preserve default existing load API, and do not claim metadata preview proves runtime behavior safe.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pluggy_06_dev.py, and English compatibility documentation at library/docs/development-pluggy-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "PLUGGY-02-DEV",
@@ -301,7 +301,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PLUGGY-06-DEV.rubric.json",
             "native": "verification/PLUGGY-06-DEV.native.json",
             "public_native": "verification/PLUGGY-06-DEV.public.native.json",

@@ -32,7 +32,7 @@
           "id": "PYPARSING-01-DEV",
           "kind": "modify",
           "goal": "只读语法图检查定位确定风险且不执行解析动作",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.grammar_tools.lint_grammar returning immutable GrammarIssue(code,path,node_type,message) entries. Traverse real ParserElement.recurse graph once by identity, safely handling shared nodes and Forward cycles. Report undefined Forward, repetition of explicit Empty, and literal alternatives shadowed by earlier literal prefixes in MatchFirst without parse actions. Do not parse, execute user actions/conditions, mutate grammar, stringify cyclic nodes or claim exhaustive lint of custom/dynamic expressions. Preserve existing validate/parse behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_01_dev.py, and Chinese compatibility documentation at library/docs/development-pyparsing-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.grammar_tools.lint_grammar returning immutable GrammarIssue(code,path,node_type,message) entries. Traverse real ParserElement.recurse graph once by identity, safely handling shared nodes and Forward cycles. Report undefined Forward, repetition of explicit Empty, and literal alternatives shadowed by earlier literal prefixes in MatchFirst without parse actions. Do not parse, execute user actions/conditions, mutate grammar, stringify cyclic nodes or claim exhaustive lint of custom/dynamic expressions. Preserve existing validate/parse behavior.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_01_dev.py, and English compatibility documentation at library/docs/development-pyparsing-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPARSING-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPARSING-01-DEV.rubric.json",
             "native": "verification/PYPARSING-01-DEV.native.json",
             "public_native": "verification/PYPARSING-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "PYPARSING-02-DEV",
           "kind": "modify",
           "goal": "明确编码的字节导入同时提供正确字符与原字节坐标",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.byte_input.parse_bytes(expression,data,*,encoding,parse_all=False), immutable ByteParseResult(results,text,byte_offsets), and ByteParseError(error,byte_offset). Require bytes and explicit supported codec UTF8/UTF8-SIG/ASCII/Latin1, reject other/stateful encodings rather than guess. Map every character boundary and EOF to original bytes including BOM. Use top-level grammar copy with tabs preserved; original grammar policy stays unchanged. Propagate strict UnicodeDecodeError, wrap only real ParseBaseException with exact original byte offset, retain original exception and results.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_02_dev.py, and Chinese compatibility documentation at library/docs/development-pyparsing-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.byte_input.parse_bytes(expression,data,*,encoding,parse_all=False), immutable ByteParseResult(results,text,byte_offsets), and ByteParseError(error,byte_offset). Require bytes and explicit supported codec UTF8/UTF8-SIG/ASCII/Latin1, reject other/stateful encodings rather than guess. Map every character boundary and EOF to original bytes including BOM. Use top-level grammar copy with tabs preserved; original grammar policy stays unchanged. Propagate strict UnicodeDecodeError, wrap only real ParseBaseException with exact original byte offset, retain original exception and results.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_02_dev.py, and English compatibility documentation at library/docs/development-pyparsing-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPARSING-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPARSING-02-DEV.rubric.json",
             "native": "verification/PYPARSING-02-DEV.native.json",
             "public_native": "verification/PYPARSING-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "PYPARSING-03-DEV",
           "kind": "modify",
           "goal": "本地化金额按显式地区分组规则解析为精确Decimal",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.decimal_input.localized_decimal returning a real ParserElement that emits Decimal directly. Explicit decimal_separator, optional group_separator, positive group_size and optional nonnegative max_fraction define exact syntax; do not query host locale, use float or infer locales. Support ASCII digits, optional sign, ungrouped integers or strict first-short/subsequent-fixed groups, optional fractional part, Unicode grouping separator and precision. Invalid grouping/fraction/scientific syntax fails with normal parse_all semantics. Preserve existing pyparsing.common numbers.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_03_dev.py, and Chinese compatibility documentation at library/docs/development-pyparsing-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.decimal_input.localized_decimal returning a real ParserElement that emits Decimal directly. Explicit decimal_separator, optional group_separator, positive group_size and optional nonnegative max_fraction define exact syntax; do not query host locale, use float or infer locales. Support ASCII digits, optional sign, ungrouped integers or strict first-short/subsequent-fixed groups, optional fractional part, Unicode grouping separator and precision. Invalid grouping/fraction/scientific syntax fails with normal parse_all semantics. Preserve existing pyparsing.common numbers.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_03_dev.py, and English compatibility documentation at library/docs/development-pyparsing-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPARSING-03-DEV-contract.md",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPARSING-03-DEV.rubric.json",
             "native": "verification/PYPARSING-03-DEV.native.json",
             "public_native": "verification/PYPARSING-03-DEV.public.native.json",
@@ -173,7 +173,7 @@
           "id": "PYPARSING-04-DEV",
           "kind": "modify",
           "goal": "真实命名解析结果映射嵌套数据类且错误定位到字段",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit pyparsing.dataclass_results.to_dataclass(results,model,strict=True) and ResultMappingError(path). Consume real ParseResults named mappings or Mapping; support dataclass init fields, required/default/default_factory fields, nested dataclasses, list[T], optional/union and already correctly typed primitive values. No automatic scalar coercion or arbitrary type construction; bool must not populate int. Strict mode rejects extra keys, optional strict=False ignores only extras; missing/type errors report exact nested path. Cap recursion and preserve original ParseResults/mappings and existing as_dict/as_list semantics.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_04_dev.py, and Chinese compatibility documentation at library/docs/development-pyparsing-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd explicit pyparsing.dataclass_results.to_dataclass(results,model,strict=True) and ResultMappingError(path). Consume real ParseResults named mappings or Mapping; support dataclass init fields, required/default/default_factory fields, nested dataclasses, list[T], optional/union and already correctly typed primitive values. No automatic scalar coercion or arbitrary type construction; bool must not populate int. Strict mode rejects extra keys, optional strict=False ignores only extras; missing/type errors report exact nested path. Cap recursion and preserve original ParseResults/mappings and existing as_dict/as_list semantics.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_04_dev.py, and English compatibility documentation at library/docs/development-pyparsing-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPARSING-04-DEV-contract.md",
@@ -191,7 +191,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPARSING-04-DEV.rubric.json",
             "native": "verification/PYPARSING-04-DEV.native.json",
             "public_native": "verification/PYPARSING-04-DEV.public.native.json",
@@ -220,7 +220,7 @@
           "id": "PYPARSING-05-DEV",
           "kind": "modify",
           "goal": "解析错误提供稳定机器诊断且保持原异常文字",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.diagnostics.to_diagnostic(error) for real ParseBaseException only. Return fresh schema1 data with code parse-error/parse-fatal, clamped character offset/end_offset, one-based character line/column, EOF, exact original msg and optional parser node type. EOF span is zero-width; Unicode is character-counted, not bytes/display width. Keep expected=None rather than invent complete alternatives. Do not mutate exception, grammar or existing str/explain, and reject ordinary user action errors instead of misclassifying them as parser failures.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_05_dev.py, and Chinese compatibility documentation at library/docs/development-pyparsing-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.diagnostics.to_diagnostic(error) for real ParseBaseException only. Return fresh schema1 data with code parse-error/parse-fatal, clamped character offset/end_offset, one-based character line/column, EOF, exact original msg and optional parser node type. EOF span is zero-width; Unicode is character-counted, not bytes/display width. Keep expected=None rather than invent complete alternatives. Do not mutate exception, grammar or existing str/explain, and reject ordinary user action errors instead of misclassifying them as parser failures.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_05_dev.py, and English compatibility documentation at library/docs/development-pyparsing-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPARSING-05-DEV-contract.md",
@@ -238,7 +238,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPARSING-05-DEV.rubric.json",
             "native": "verification/PYPARSING-05-DEV.native.json",
             "public_native": "verification/PYPARSING-05-DEV.public.native.json",
@@ -267,7 +267,7 @@
           "id": "PYPARSING-06-DEV",
           "kind": "modify",
           "goal": "批次记录按明确同步边界恢复并保留真实错误与有效交付",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.recovery.parse_recovering(expression,text,separator=\";\",quote=\"\\\"\",escape=\"\\\\\") with immutable RecoveryResult, AcceptedRecord and RejectedRecord. Split only at explicit single-character separators outside quoted/escaped text, including multiline records. Parse each nonblank record completely using real grammar; retain successful ParseResults plus original absolute start/end and ordered failures with original ParseException and absolute offset. Skip blank records only; unclosed quoted tail remains one failed record rather than inventing internal boundaries. Propagate ParseFatalException and ordinary action exceptions, explicitly do not roll back action side effects. Preserve strict default parse_string and original keepTabs.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_06_dev.py, and Chinese compatibility documentation at library/docs/development-pyparsing-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd pyparsing.recovery.parse_recovering(expression,text,separator=\";\",quote=\"\\\"\",escape=\"\\\\\") with immutable RecoveryResult, AcceptedRecord and RejectedRecord. Split only at explicit single-character separators outside quoted/escaped text, including multiline records. Parse each nonblank record completely using real grammar; retain successful ParseResults plus original absolute start/end and ordered failures with original ParseException and absolute offset. Skip blank records only; unclosed quoted tail remains one failed record rather than inventing internal boundaries. Propagate ParseFatalException and ordinary action exceptions, explicitly do not roll back action side effects. Preserve strict default parse_string and original keepTabs.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_pyparsing_06_dev.py, and English compatibility documentation at library/docs/development-pyparsing-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/PYPARSING-06-DEV-contract.md",
@@ -285,7 +285,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/PYPARSING-06-DEV.rubric.json",
             "native": "verification/PYPARSING-06-DEV.native.json",
             "public_native": "verification/PYPARSING-06-DEV.public.native.json",

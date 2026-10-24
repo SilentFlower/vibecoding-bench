@@ -1,4 +1,4 @@
-"""公开真实状态配置快照回归。"""
+"Public regression tests for SM-SNAPSHOT-DEV; the complete business contract is in materials/SM-SNAPSHOT-DEV-contract.md."
 from dataclasses import FrozenInstanceError
 import pytest
 from statemachine.snapshots import snapshot,freeze

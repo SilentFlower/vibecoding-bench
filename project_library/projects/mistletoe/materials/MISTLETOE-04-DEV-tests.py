@@ -1,10 +1,10 @@
-"""目录过滤器由每个实例持有独立快照。"""
+"Public regression tests for MISTLETOE-04-DEV; the complete business contract is in materials/MISTLETOE-04-DEV-contract.md."
 from mistletoe import Document
 from mistletoe.contrib.toc_renderer import TocRenderer
 
 
 def test_default_instances_are_isolated():
-    """修改一个实例不会污染另一个文档。@return None。"""
+    "Verify default instances are isolated."
     with TocRenderer() as first, TocRenderer() as second:
         first.filter_conds.append(lambda value:True)
         assert second.filter_conds==[]
@@ -13,10 +13,10 @@ def test_default_instances_are_isolated():
 
 
 def test_external_iterables_snapshot_and_order():
-    """列表、元组及生成器均按顺序快照且不修改调用者。@return None。"""
+    "Verify external iterables snapshot and order."
     seen=[]
     def condition(value):
-        """记录调用次序。@param value 标题。@return 不过滤。"""
+        "Support the public regression through condition."
         seen.append(value)
         return False
     supplied=[condition]

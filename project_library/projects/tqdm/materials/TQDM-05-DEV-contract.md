@@ -1,3 +1,12 @@
-# 并发进度锁上下文在异常与嵌套退出后精确恢复
+# Engineering contract: TQDM-05-DEV
 
-路线14：ensure_lock用finally覆盖创建、选择和上下文异常，恢复原锁身份及自有/继承/缺失/明确None的属性所有权，嵌套逐层恢复，真实worker异常不遗留临时锁。只修生命周期，不宣称并发类配置隔离。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair contrib.concurrent.ensure_lock with finally restoration covering lock creation/subtype selection, normal exit and body/worker exceptions. Preserve exact original lock identity and whether _lock was owned, inherited, absent or explicitly None; a temporary class lock must not leak after failure. Nested contexts restore each prior level and thread_map/process_map continue using the same actual context manager. Keep normal worker error propagation, do not acquire unrelated locks or claim transaction/concurrent class-mutation isolation. Acceptance uses local locks and a one-thread failing worker, never external services.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_tqdm_05_dev.py, and English compatibility documentation at library/docs/development-tqdm-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/tqdm/contrib/concurrent.py
+- library/tests/test_development_tqdm_05_dev.py
+- library/docs/development-tqdm-05-dev.md

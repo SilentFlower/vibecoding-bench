@@ -32,7 +32,7 @@
           "id": "CERBERUS-O01-DEV",
           "kind": "modify",
           "goal": "先规划重命名终点再移动字段避免丢值",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair rename identity and combined rename/rename_handler normalization. rename to the same field must preserve its value; when both rules are present, apply the handler to the explicit rename target and move the original value only after the final name is resolved. Keep handler failure diagnostics and original value, caller input isolation and existing overwrite-target policy. Preserve standalone rename/handler, nested normalization and frozen upstream controls; do not silently drop fields or raise KeyError from an already removed old key.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-cerberus-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair rename identity and combined rename/rename_handler normalization. rename to the same field must preserve its value; when both rules are present, apply the handler to the explicit rename target and move the original value only after the final name is resolved. Keep handler failure diagnostics and original value, caller input isolation and existing overwrite-target policy. Preserve standalone rename/handler, nested normalization and frozen upstream controls; do not silently drop fields or raise KeyError from an already removed old key.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o01_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CERBERUS-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CERBERUS-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CERBERUS-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "CERBERUS-O02-DEV",
           "kind": "modify",
           "goal": "为浮点和Decimal增加显式有限数约束",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd the actual Validator finite boolean rule with schema-validated arguments and native error-tree integration. When enabled reject NaN/positive or negative Infinity and nonnumeric/bool values, support finite int/float and registered Decimal types without converting large Decimals through float, and work in nested records. finite=False and absent finite preserve existing number/min/max policies; do not alter global types or claim existing bool exclusion as a separate feature.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-cerberus-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd the actual Validator finite boolean rule with schema-validated arguments and native error-tree integration. When enabled reject NaN/positive or negative Infinity and nonnumeric/bool values, support finite int/float and registered Decimal types without converting large Decimals through float, and work in nested records. finite=False and absent finite preserve existing number/min/max policies; do not alter global types or claim existing bool exclusion as a separate feature.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o02_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CERBERUS-O02-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CERBERUS-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CERBERUS-O02-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "CERBERUS-O03-DEV",
           "kind": "modify",
           "goal": "对归一化后的兄弟及根字段声明比较约束",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd actual compare_to rule with schema-validated {field, operator, missing} using only lt/le/eq/ne/ge/gt. Resolve existing sibling/dotted/root ^ paths through the real lookup protocol after normalization, distinguish missing targets from existing None, default missing to error or explicitly ignore, and report failed/incomparable comparisons in native field error trees. Reject unknown operators at schema validation, never eval strings or alter dependencies/min/max semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-cerberus-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd actual compare_to rule with schema-validated {field, operator, missing} using only lt/le/eq/ne/ge/gt. Resolve existing sibling/dotted/root ^ paths through the real lookup protocol after normalization, distinguish missing targets from existing None, default missing to error or explicitly ignore, and report failed/incomparable comparisons in native field error trees. Reject unknown operators at schema validation, never eval strings or alter dependencies/min/max semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o03_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CERBERUS-O03-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CERBERUS-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CERBERUS-O03-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "CERBERUS-O04-DEV",
           "kind": "modify",
           "goal": "让缺失字段按归一化后的条件参与必需校验",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd actual required_if rule with schema-validated {field, equals}. Evaluate conditions at the real required-fields phase after normalization, even when the constrained field is absent; support existing sibling/dotted/root lookup, False/None conditions and defaulted discriminator fields. Reuse required/ignore_none_values/nullable semantics for presence, respect update=True and excludes handling, preserve type/ordinary dependencies behavior and report missing fields through native required errors.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-cerberus-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd actual required_if rule with schema-validated {field, equals}. Evaluate conditions at the real required-fields phase after normalization, even when the constrained field is absent; support existing sibling/dotted/root lookup, False/None conditions and defaulted discriminator fields. Reuse required/ignore_none_values/nullable semantics for presence, respect update=True and excludes handling, preserve type/ordinary dependencies behavior and report missing fields through native required errors.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o04_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CERBERUS-O04-DEV-contract.md",
@@ -188,7 +188,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CERBERUS-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CERBERUS-O04-DEV.native.json",
@@ -220,7 +220,7 @@
           "id": "CERBERUS-O05-DEV",
           "kind": "modify",
           "goal": "交付携带规范化文档和错误的独立校验结果",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Validator.validate_result(document, schema=None, *, update=False, normalize=True) and frozen-shell cerberus.result.ValidationResult(valid, document, errors, completed=True). Run actual validation and deep-copy normalized document plus the configured error_handler output so later calls and result-content mutations cannot overwrite validator/other results. Preserve validate/validated bool/None interfaces and normalization/update flags. Unexpected exceptions propagate without publishing a completed result; document that nested snapshot contents are editable and the validator is not made thread safe.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-cerberus-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Validator.validate_result(document, schema=None, *, update=False, normalize=True) and frozen-shell cerberus.result.ValidationResult(valid, document, errors, completed=True). Run actual validation and deep-copy normalized document plus the configured error_handler output so later calls and result-content mutations cannot overwrite validator/other results. Preserve validate/validated bool/None interfaces and normalization/update flags. Unexpected exceptions propagate without publishing a completed result; document that nested snapshot contents are editable and the validator is not made thread safe.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o05_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CERBERUS-O05-DEV-contract.md",
@@ -236,7 +236,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CERBERUS-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CERBERUS-O05-DEV.native.json",
@@ -268,7 +268,7 @@
           "id": "CERBERUS-O06-DEV",
           "kind": "modify",
           "goal": "按明确错误政策惰性校验有界业务记录流",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nBuild cerberus.stream.iter_validated on the delivered validate_result API. Consume one record at a time with independent Validator/schema/options, yield one-based index and independent complete results, and expose continue/stop/raise policies including safe ValidationStreamError. Treat nonmapping DocumentError records as failed results, allow custom validator factories, exact max_records without lookahead, zero consumption and early close. Preserve normal custom exceptions and never materialize the entire input stream or share mutable per-record defaults.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-cerberus-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nBuild cerberus.stream.iter_validated on the delivered validate_result API. Consume one record at a time with independent Validator/schema/options, yield one-based index and independent complete results, and expose continue/stop/raise policies including safe ValidationStreamError. Treat nonmapping DocumentError records as failed results, allow custom validator factories, exact max_records without lookahead, zero consumption and early close. Preserve normal custom exceptions and never materialize the entire input stream or share mutable per-record defaults.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o06_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "CERBERUS-O05-DEV",
@@ -288,7 +288,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CERBERUS-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CERBERUS-O06-DEV.native.json",

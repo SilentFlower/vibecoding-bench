@@ -1,5 +1,12 @@
-# 显式配置双向且严格的base64二进制传输
+# Engineering contract: CATTRS-O03-DEV
 
-给单个转换器配置双向base64，覆盖嵌套记录、空载荷及全部字节，可明确选择URL字母表。严格拒绝padding、字符和非ASCII错误，不猜格式、不改其他实例base85默认，后注册用户钩子仍优先。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement cattrs.strategies.base64.configure_base64(converter, *, urlsafe=False) with paired bytes hooks on the supplied real converter. Support nested existing JSON converters, empty/all-byte payloads and explicitly selected URL-safe alphabet. Strictly reject bad padding, non-ASCII and invalid characters, never guess formats or affect unconfigured base85 defaults. Later user hooks remain higher priority and non-string structure input fails clearly.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o03_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/cattrs/strategies/base64.py
+- library/tests/test_development_cattrs_o03_dev.py
+- library/docs/development-cattrs-o03-dev.md

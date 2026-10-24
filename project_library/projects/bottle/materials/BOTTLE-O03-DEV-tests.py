@@ -1,8 +1,8 @@
-"""前缀合并克隆规则并明确目标应用插件归属。"""
+"Public regression tests for BOTTLE-O03-DEV; the complete business contract is in materials/BOTTLE-O03-DEV-contract.md."
 import bottle
 
 def test_prefixed_clone_and_reverse_url():
-    """源规则不变，目标反向URL包含前缀。@return None。"""
+    "Verify prefixed clone and reverse url."
     child, target = bottle.Bottle(), bottle.Bottle()
     child.route('/item/<name>', name='item', callback=lambda name: name)
     target.merge(child, prefix='/v1/')
@@ -11,7 +11,7 @@ def test_prefixed_clone_and_reverse_url():
     assert target.get_url('item', name='x') == '/v1/item/x'
 
 def test_legacy_owner_and_plugins():
-    """旧merge保持owner，前缀副本保留路由专有插件列表。@return None。"""
+    "Verify legacy owner and plugins."
     child, legacy, target = bottle.Bottle(), bottle.Bottle(), bottle.Bottle()
     child.route('/x', callback=lambda: 'ok', apply=[lambda callback: callback])
     legacy.merge(child)
@@ -21,7 +21,7 @@ def test_legacy_owner_and_plugins():
     assert target.routes[0].plugins is not child.routes[0].plugins
 
 def test_invalid_and_conflicting_names():
-    """坏前缀和重名在添加前拒绝。@return None。"""
+    "Verify invalid and conflicting names."
     import pytest
     child, target = bottle.Bottle(), bottle.Bottle()
     child.route('/x', name='same', callback=lambda: 'child')

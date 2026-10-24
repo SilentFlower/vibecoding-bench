@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-按公共中间域组合两个双向映射，返回同类且可反查的新关系。严格缺项或显式交集策略可选择，保留左侧顺序、None、冻结和有序类型及输入；不改变union或putall。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement bidict.compose.compose(mapping, other, *, missing="error") for two BidirectionalMapping inputs. Compose A->B and B->C into a validated same-concrete-type A->C mapping, preserving left order and both sources. Missing intermediate keys either raise or explicitly select intersection with missing="ignore". Support inverse symmetry, None, empty/frozen/ordered inputs and reject invalid policies/non-bidirectional sources; do not change union or putall semantics.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o01_dev.py and concise English compatibility documentation at library/docs/development-bidict-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bidict/compose.py
+- library/tests/test_development_bidict_o01_dev.py
+- library/docs/development-bidict-o01-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

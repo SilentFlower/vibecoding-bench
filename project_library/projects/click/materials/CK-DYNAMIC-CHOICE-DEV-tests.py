@@ -1,4 +1,4 @@
-"""公开上下文动态选项回归。"""
+"Public regression tests for CK-DYNAMIC-CHOICE-DEV; the complete business contract is in materials/CK-DYNAMIC-CHOICE-DEV-contract.md."
 import click
 from click.testing import CliRunner
 from click.dynamic import DynamicChoice

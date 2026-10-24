@@ -1,5 +1,12 @@
-# 提供兼容默认输出的显式GFM任务空白与真实checkbox模式
+# Engineering contract: MDIT-PLUGINS-O04-DEV
 
-对应路线08：显式gfm_whitespace=True时checkbox与起始规则使用同一GFM空白集合，tab等真实任务得到正确input；严格布尔参数，默认False保留全部原输出及普通空格行为。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add tasklists_plugin(gfm_whitespace=False) as a strict boolean compatibility option. Default False must preserve the complete existing ordinary-space/tab/formfeed rendering bytes. When True, make_checkbox recognizes the same existing GFM whitespace set as starts_with_todo_markdown, including tab/vertical-tab/formfeed and repeated separators, and derives checked state from the matched space/x/X marker. Every recognized task gets exactly one actual input with matching state and original marker removal; preserve enabled/disabled and label modes. Do not broaden recognition to no-separator [x]text or non-GFM Unicode spaces, and do not merely add task CSS classes without a checkbox.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o04_dev.py and concise English compatibility documentation at library/docs/development-mdit-plugins-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/mdit_py_plugins/tasklists/__init__.py
+- library/tests/test_development_mdit_plugins_o04_dev.py
+- library/docs/development-mdit-plugins-o04-dev.md

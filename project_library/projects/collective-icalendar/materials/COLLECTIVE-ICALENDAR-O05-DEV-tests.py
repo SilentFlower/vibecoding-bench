@@ -1,10 +1,10 @@
-"""平移整组日程必须保留主项与例外的对应关系。"""
+"Public regression tests for COLLECTIVE-ICALENDAR-O05-DEV; the complete business contract is in materials/COLLECTIVE-ICALENDAR-O05-DEV-contract.md."
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from icalendar import Calendar, Event, Alarm
 
 def test_master_exception_and_recurrence_dates():
-    """主项、覆盖、RDATE/EXDATE和UNTIL一起移动。@return None。"""
+    "Verify master exception and recurrence dates."
     from icalendar.schedule_shift import shift_schedule
     calendar = Calendar()
     event = Event(); event.add('UID', 'series'); event.add('DTSTART', date(2026, 1, 1)); event.add('DTEND', date(2026, 1, 2))
@@ -19,14 +19,14 @@ def test_master_exception_and_recurrence_dates():
     assert event.decoded('DTSTART') == date(2026, 1, 1)
 
 def test_dst_wall_vs_absolute():
-    """DST跨越时墙钟日与24小时绝对偏移明确不同。@return None。"""
+    "Verify dst wall vs absolute."
     from icalendar.schedule_shift import shift_schedule
     event = Event(); event.add('DTSTART', datetime(2026, 3, 7, 12, tzinfo=ZoneInfo('America/New_York')))
     assert shift_schedule(event, timedelta(days=1), mode='wall').decoded('DTSTART').hour == 12
     assert shift_schedule(event, timedelta(days=1), mode='absolute').decoded('DTSTART').hour == 13
 
 def test_alarm_policy_and_date_rejection():
-    """绝对提醒必须显式移动，相对提醒及DATE精度保持。@return None。"""
+    "Verify alarm policy and date rejection."
     import pytest
     from icalendar.schedule_shift import shift_schedule
     event = Event(); event.add('DTSTART', datetime(2026, 1, 1, tzinfo=timezone.utc))

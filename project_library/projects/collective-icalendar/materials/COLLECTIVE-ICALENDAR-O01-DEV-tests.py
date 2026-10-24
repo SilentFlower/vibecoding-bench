@@ -1,9 +1,9 @@
-"""CLI实际显示必须与Event日期语义一致。"""
+"Public regression tests for COLLECTIVE-ICALENDAR-O01-DEV; the complete business contract is in materials/COLLECTIVE-ICALENDAR-O01-DEV-contract.md."
 from datetime import date, datetime, timedelta, timezone
 from icalendar import Event
 
 def test_all_day_default_end():
-    """仅DATE DTSTART的事件结束于次日且持续一天。@return None。"""
+    "Verify all day default end."
     from icalendar.cli import view
     event = Event()
     event.add('dtstart', date(2026, 10, 22))
@@ -12,14 +12,14 @@ def test_all_day_default_end():
     assert str(timedelta(days=1)) in rendered
 
 def test_timed_without_end_is_zero():
-    """普通时间事件不擅自加一天。@return None。"""
+    "Verify timed without end is zero."
     from icalendar.cli import view
     event = Event()
     event.add('dtstart', datetime(2026, 10, 22, 10, tzinfo=timezone.utc))
     assert '0:00:00' in view(event)
 
 def test_explicit_duration_and_invalid_combination():
-    """显式时长保持，非法DTEND+DURATION由真实模型拒绝。@return None。"""
+    "Verify explicit duration and invalid combination."
     import pytest
     from icalendar.cli import view
     event = Event()

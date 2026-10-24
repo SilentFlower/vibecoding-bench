@@ -1,4 +1,4 @@
-"""公开带版本检查原子文件保存回归。"""
+"Public regression tests for TK-ATOMIC-FILE-DEV; the complete business contract is in materials/TK-ATOMIC-FILE-DEV-contract.md."
 import pytest
 import tomlkit
 from tomlkit.files import load_with_digest,atomic_save,StaleDocumentError

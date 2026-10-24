@@ -1,4 +1,4 @@
-"""公开表映射真实SQL回归。"""
+"Public regression tests for SG-REMAP-DEV; the complete business contract is in materials/SG-REMAP-DEV-contract.md."
 import sqlite3
 import pytest
 from sqlglot import parse_one

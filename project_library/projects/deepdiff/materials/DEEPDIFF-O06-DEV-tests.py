@@ -1,10 +1,10 @@
-"""独立安全展示保留路径，并在序列化前遮蔽子树。"""
+"Public regression tests for DEEPDIFF-O06-DEV; the complete business contract is in materials/DEEPDIFF-O06-DEV-contract.md."
 from deepdiff import DeepDiff,Delta
 import json
 import pytest
 
 def test_changed_path_preserved_values_hidden_and_delta_unchanged():
-    """保留变化事实，不像exclude_paths删除差异。@return None。"""
+    "Verify changed path preserved values hidden and delta unchanged."
     from deepdiff.reporting import redacted_report
     a={'token':'secret-old','qty':1};b={'token':'secret-new','qty':2};diff=DeepDiff(a,b)
     report=redacted_report(diff,redact_paths=["root['token']"],left_label='api',right_label='device')
@@ -13,7 +13,7 @@ def test_changed_path_preserved_values_hidden_and_delta_unchanged():
     assert a+Delta(diff)==b and diff['values_changed']["root['token']"]['old_value']=='secret-old'
 
 def test_parent_wildcards_literal_star_and_coarse_subtree():
-    """父遮蔽、通配符及粗粒度父值内部均生效，字面星号不扩大。@return None。"""
+    "Verify parent wildcards literal star and coarse subtree."
     from deepdiff.reporting import redacted_report
     a={'users':[{'token':'one','name':'a'}],'*':'literal','keep':'plain'};b={'users':[{'token':'two','name':'b'}],'*':'next','keep':'later'}
     report=redacted_report(DeepDiff(a,b,view='tree'),redact_paths=["root['users'][*]['token']","root['*']"])
@@ -22,10 +22,10 @@ def test_parent_wildcards_literal_star_and_coarse_subtree():
     assert 'secret-before' not in json.dumps(report) and 'secret-after' not in json.dumps(report)
 
 def test_serialization_after_mask_and_bad_configuration():
-    """先遮蔽自定义对象，转换函数不会看到秘密。@return None。"""
+    "Verify serialization after mask and bad configuration."
     from deepdiff.reporting import redacted_report
     class Secret:
-        """仅用于type_changes原值保护。"""
+        "Public regression fixture: Secret."
     called=[];diff=DeepDiff({'x':Secret()},{'x':'new-secret'})
     result=redacted_report(diff,redact_paths=["root['x']"],default_mapping={Secret:lambda x:called.append(x) or 'leak'})
     assert called==[] and 'new-secret' not in json.dumps(result)

@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线03：实际可调用的词排列助手，明确距离取小/相似度取大及是否截短，预算在评分前预检，重复词只生成唯一排列。预算不足拒绝而非伪造最优；支持多文本、空文档与普通评分callable，不假设equality属性。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Repair textdistance.utils.words_combinations(f,*texts) for actual built-in distances and arbitrary numeric callables without assuming a nonexistent equality attribute. Add explicit direction distance/similarity, max_permutations positive call budget and truncate=False policy. Preserve full word counts by default; opt-in truncation is explicit. Generate unique permutations for duplicate words and preflight the whole Cartesian-product budget before any scoring; reject insufficient budgets rather than return a partial optimum. Empty documents have one empty permutation, no documents reject, bad direction/nonfinite/bool scores reject. Evaluate multi-document callables correctly, propagate their real errors and document factorial limits.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_textdistance_03_dev.py, and English compatibility documentation at library/docs/development-textdistance-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/textdistance/utils.py
+- library/tests/test_development_textdistance_03_dev.py
+- library/docs/development-textdistance-03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,3 +1,12 @@
-# 倒序日期窗口成员判断与实际覆盖及迭代方向一致
+# Engineering contract: PENDULUM-03-DEV
 
-路线04：成员覆盖使用两个端点的无向边界，端点均包含；保存的方向、invert、range及比较错误政策保持，倒序实际生成点都在区间内。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair Interval.__contains__ to use unordered endpoint coverage while retaining stored start/end, invert, absolute and range direction. Include both endpoints for forward/reverse/single-point intervals, exclude outside values; preserve existing date/datetime and aware/naive comparison exceptions. No conversion between incomparable types, no silent endpoint mutation or changes to duration signs.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pendulum_03_dev.py, and English compatibility documentation at library/docs/development-pendulum-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pendulum/interval.py
+- library/tests/test_development_pendulum_03_dev.py
+- library/docs/development-pendulum-03-dev.md

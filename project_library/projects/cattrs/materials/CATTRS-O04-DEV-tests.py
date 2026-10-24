@@ -1,10 +1,10 @@
-"""严格策略必须影响真实嵌套结构而非只包一层示例。"""
+"Public regression tests for CATTRS-O04-DEV; the complete business contract is in materials/CATTRS-O04-DEV-contract.md."
 from dataclasses import dataclass
 import pytest
 from cattrs import Converter
 
 def test_exact_primitives():
-    """字符串整数与bool整数不能误通过。@return None。"""
+    "Verify exact primitives."
     from cattrs.strategies.strict import configure_strict_primitives
     converter = configure_strict_primitives(Converter())
     for value in ('2', True):
@@ -13,12 +13,12 @@ def test_exact_primitives():
     assert Converter().structure('2', int) == 2
 
 def test_nested_path_and_float_policy():
-    """嵌套字段错误保持框架路径，浮点扩展明确。@return None。"""
+    "Verify nested path and float policy."
     from cattrs.strategies.strict import configure_strict_primitives
     from cattrs.v import transform_error
     @dataclass
     class Record:
-        """库存记录。"""
+        "Public regression fixture: Record."
         quantity: int
     converter = configure_strict_primitives(Converter())
     with pytest.raises(Exception) as result: converter.structure({'quantity': '3'}, Record)
@@ -26,10 +26,10 @@ def test_nested_path_and_float_policy():
     assert configure_strict_primitives(Converter(), allow_int_float=True).structure(3, float) == 3.0
 
 def test_nonfinite_and_subclass():
-    """非有限浮点和非精确子类的政策可证伪。@return None。"""
+    "Verify nonfinite and subclass."
     from cattrs.strategies.strict import configure_strict_primitives
     converter = configure_strict_primitives(Converter())
     with pytest.raises(ValueError): converter.structure(float('nan'), float)
     class Text(str):
-        """自定义文本子类。"""
+        "Public regression fixture: Text."
     with pytest.raises(TypeError): converter.structure(Text('x'), str)

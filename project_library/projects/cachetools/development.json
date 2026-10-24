@@ -77,7 +77,7 @@
           "id": "CT-SIGNATURE-DEV",
           "kind": "modify",
           "goal": "按真实函数签名规范缓存键并隔离共享命名空间",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cachetools.keys.signature_key(func,*,typed=False,namespace=None,ignore=()), returning a key callable. Use signature.bind/apply_defaults so equivalent positional/keyword/default calls share a key, include variadic positional order and sorted variadic keywords, and optionally top-level value types (including variadic item types). Default namespace is function identity; allow explicit shared hashable namespace and explicit known ignored parameter names. Preserve binding errors and reject unhashable values without stringifying them. Do not mutate kwargs, execute the wrapped function or change existing key functions.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_signature_dev.py and concise Chinese compatibility documentation at library/docs/development-ct-signature-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cachetools.keys.signature_key(func,*,typed=False,namespace=None,ignore=()), returning a key callable. Use signature.bind/apply_defaults so equivalent positional/keyword/default calls share a key, include variadic positional order and sorted variadic keywords, and optionally top-level value types (including variadic item types). Default namespace is function identity; allow explicit shared hashable namespace and explicit known ignored parameter names. Preserve binding errors and reject unhashable values without stringifying them. Do not mutate kwargs, execute the wrapped function or change existing key functions.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_signature_dev.py and concise English compatibility documentation at library/docs/development-ct-signature-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CT-SIGNATURE-DEV-contract.md",
@@ -92,7 +92,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CT-SIGNATURE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CT-SIGNATURE-DEV.native.json",
@@ -124,7 +124,7 @@
           "id": "CT-PEEK-DEV",
           "kind": "modify",
           "goal": "提供不改变LRU热度或LFU频次的只读查看",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Cache.peek(key,default=marker), returning a live value without invoking subclass __getitem__, __missing__, recency/frequency updates or expiry cleanup. Use each cache existing membership semantics, so TTL/TLRU expired entries behave missing; explicit defaults including None are returned, otherwise raise KeyError. Support all built-in cache policies, weighted sizes and custom __missing__ subclasses. Preserve ordinary get/item access behavior and all internal policy accounting.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_peek_dev.py and concise Chinese compatibility documentation at library/docs/development-ct-peek-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Cache.peek(key,default=marker), returning a live value without invoking subclass __getitem__, __missing__, recency/frequency updates or expiry cleanup. Use each cache existing membership semantics, so TTL/TLRU expired entries behave missing; explicit defaults including None are returned, otherwise raise KeyError. Support all built-in cache policies, weighted sizes and custom __missing__ subclasses. Preserve ordinary get/item access behavior and all internal policy accounting.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_peek_dev.py and concise English compatibility documentation at library/docs/development-ct-peek-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CT-PEEK-DEV-contract.md",
@@ -139,7 +139,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CT-PEEK-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CT-PEEK-DEV.native.json",
@@ -171,7 +171,7 @@
           "id": "CT-RESIZE-DEV",
           "kind": "modify",
           "goal": "运行中调整缓存容量并沿用各策略淘汰顺序",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Cache.resize(maxsize) for built-in policies. Validate a nonnegative real int/float excluding bool/NaN; allow positive infinity. Perform normal expiry cleanup for timed caches, then evict through their original popitem policy until currsize fits, update maxsize and return a tuple of capacity-evicted pairs (not expired pairs). Preserve weighted sizing, growth/no-op behavior, subsequent insertion semantics and zero capacity. Validation must happen before any cleanup or mutation; do not rebuild caches or reset policy history.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_resize_dev.py and concise Chinese compatibility documentation at library/docs/development-ct-resize-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd Cache.resize(maxsize) for built-in policies. Validate a nonnegative real int/float excluding bool/NaN; allow positive infinity. Perform normal expiry cleanup for timed caches, then evict through their original popitem policy until currsize fits, update maxsize and return a tuple of capacity-evicted pairs (not expired pairs). Preserve weighted sizing, growth/no-op behavior, subsequent insertion semantics and zero capacity. Validation must happen before any cleanup or mutation; do not rebuild caches or reset policy history.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_resize_dev.py and concise English compatibility documentation at library/docs/development-ct-resize-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CT-RESIZE-DEV-contract.md",
@@ -186,7 +186,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CT-RESIZE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CT-RESIZE-DEV.native.json",
@@ -218,7 +218,7 @@
           "id": "CT-REMAINING-DEV",
           "kind": "modify",
           "goal": "只读查询TTL剩余有效期并保留时间类型",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd TTLCache.remaining(key,*,time=None), returning expires-now using explicit time or one timer sample. Preserve timer arithmetic types including datetime/timedelta. Missing and expired/equal-boundary keys raise KeyError, with no physical expiry removal, value loading or LRU reordering. Do not extend expiry or alter __getitem__, ttl, pickle or capacity semantics; verify reads do not protect cold entries from eviction.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_remaining_dev.py and concise Chinese compatibility documentation at library/docs/development-ct-remaining-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd TTLCache.remaining(key,*,time=None), returning expires-now using explicit time or one timer sample. Preserve timer arithmetic types including datetime/timedelta. Missing and expired/equal-boundary keys raise KeyError, with no physical expiry removal, value loading or LRU reordering. Do not extend expiry or alter __getitem__, ttl, pickle or capacity semantics; verify reads do not protect cold entries from eviction.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_remaining_dev.py and concise English compatibility documentation at library/docs/development-ct-remaining-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CT-REMAINING-DEV-contract.md",
@@ -233,7 +233,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CT-REMAINING-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CT-REMAINING-DEV.native.json",
@@ -265,7 +265,7 @@
           "id": "CT-EXPIRE-LIMIT-DEV",
           "kind": "modify",
           "goal": "让单次TTL过期清理有明确工作上限",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend TTLCache.expire(time=None,*,limit=None) with a validated nonnegative nonboolean integer limit. Return/remove at most that many expired pairs in original expiry order; zero removes nothing and None preserves exact legacy full cleanup. Repeated bounded calls must eventually remove all expired items without corrupting linked-list/LRU/weighted-size accounting or touching live entries. Invalid limits fail before timer sampling or mutation. Ordinary len/set/popitem still invoke default full expiry.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_expire_limit_dev.py and concise Chinese compatibility documentation at library/docs/development-ct-expire-limit-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nExtend TTLCache.expire(time=None,*,limit=None) with a validated nonnegative nonboolean integer limit. Return/remove at most that many expired pairs in original expiry order; zero removes nothing and None preserves exact legacy full cleanup. Repeated bounded calls must eventually remove all expired items without corrupting linked-list/LRU/weighted-size accounting or touching live entries. Invalid limits fail before timer sampling or mutation. Ordinary len/set/popitem still invoke default full expiry.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ct_expire_limit_dev.py and concise English compatibility documentation at library/docs/development-ct-expire-limit-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CT-EXPIRE-LIMIT-DEV-contract.md",
@@ -280,7 +280,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CT-EXPIRE-LIMIT-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CT-EXPIRE-LIMIT-DEV.native.json",

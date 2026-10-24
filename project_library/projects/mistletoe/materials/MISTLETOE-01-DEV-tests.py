@@ -1,10 +1,10 @@
-"""标题内容属于自身实例，现有AST及repr结构兼容。"""
+"Public regression tests for MISTLETOE-01-DEV; the complete business contract is in materials/MISTLETOE-01-DEV-contract.md."
 from mistletoe import Document
 from mistletoe.ast_renderer import get_ast
 
 
 def test_multiple_and_later_documents():
-    """后续标题和文档不可回写已有节点。@return None。"""
+    "Verify multiple and later documents."
     first=Document('# First\n## *Second*\n### Third ###\n')
     assert [h.content for h in first.children]==['First','*Second*','Third']
     Document('# Later\n')
@@ -12,7 +12,7 @@ def test_multiple_and_later_documents():
 
 
 def test_empty_and_mutable_instance():
-    """空标题与显式实例修改均不污染其它标题。@return None。"""
+    "Verify empty and mutable instance."
     doc=Document('#\n## Content\n')
     assert doc.children[0].content==''
     doc.children[0].content='manual'
@@ -20,7 +20,7 @@ def test_empty_and_mutable_instance():
 
 
 def test_ast_and_repr_remain_compatible():
-    """修复不扩张原有Heading序列化字段。@return None。"""
+    "Verify ast and repr remain compatible."
     heading=Document('# Actual\n').children[0]
     assert 'content' not in get_ast(heading)
     assert 'with 1 child line_number=1 level=1' in repr(heading)

@@ -1,5 +1,12 @@
-# 让front matter点结束符正确终止且不污染元数据
+# Engineering contract: MDIT-PLUGINS-O05-DEV
 
-对应路线12：检查当前扫描行识别三点，结束符不入content且在EOF可关闭，map包含结束行、正文首行保留；原破折号及首行/未闭合策略不变。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix _front_matter_rule to check the current scanned line for the existing triple-dot terminator, consuming it exactly once while excluding it from token.content and including it in the half-open token.map. Closing at EOF, empty metadata and trailing horizontal whitespace must work and preserve the first body line. Keep existing dash delimiters, initial-document-only recognition, insufficient/open-without-close fallback and hidden/block/markup behavior. Four dots or noninitial blocks must not be silently accepted as metadata.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o05_dev.py and concise English compatibility documentation at library/docs/development-mdit-plugins-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/mdit_py_plugins/front_matter/index.py
+- library/tests/test_development_mdit_plugins_o05_dev.py
+- library/docs/development-mdit-plugins-o05-dev.md

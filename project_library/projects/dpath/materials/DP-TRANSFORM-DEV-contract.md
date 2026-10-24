@@ -1,5 +1,12 @@
-# 按类型化路径转换原有配置叶子并隔离原对象
+# Engineering contract: DP-TRANSFORM-DEV
 
-数据清理按原快照叶子和类型化路径转换，回调拿到独立值，新生成的内容不再次递归处理。任意后项或循环错误都不修改原配置，根叶子可整体替换，筛选及转换顺序明确。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement dpath.transforming.transform_existing(root,transform,*,predicate=None), using completed walk_paths and get_exact rather than glob strings. Evaluate only original snapshot leaves (including empty containers), pass typed tuple path and detached value to callbacks, write replacements into a deep-copied result and never revisit newly generated content. Predicate is optional; late callback or cycle errors propagate while original objects remain unchanged, including callback mutations of supplied values. Root-leaf replacement works; preserve shared-copy alias semantics and source traversal order.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_dp_transform_dev.py and concise English compatibility documentation at library/docs/development-dp-transform-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/dpath/transforming.py
+- library/development_tests/test_development_dp_transform_dev.py
+- library/docs/development-dp-transform-dev.md

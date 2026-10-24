@@ -78,7 +78,7 @@
           "id": "BA-LIST-PARTS-DEV",
           "kind": "modify",
           "goal": "为区域化列表保留原元素身份与连接文字",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.lists.format_list_to_parts(lst, style=\"standard\", locale=None). Return ordered dictionaries with type element/literal, exact value, and original input index or None. Concatenation must equal format_list for all supported CLDR styles, fallback styles and locales, including repeated/empty strings, braces and Unicode. Do not locate elements by searching formatted text or use collision-prone sentinels. Preserve input and format_list.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_list_parts_dev.py and concise Chinese compatibility documentation at library/docs/development-ba-list-parts-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.lists.format_list_to_parts(lst, style=\"standard\", locale=None). Return ordered dictionaries with type element/literal, exact value, and original input index or None. Concatenation must equal format_list for all supported CLDR styles, fallback styles and locales, including repeated/empty strings, braces and Unicode. Do not locate elements by searching formatted text or use collision-prone sentinels. Preserve input and format_list.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_list_parts_dev.py and concise English compatibility documentation at library/docs/development-ba-list-parts-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BA-LIST-PARTS-DEV-contract.md",
@@ -93,7 +93,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BA-LIST-PARTS-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BA-LIST-PARTS-DEV.native.json",
@@ -125,7 +125,7 @@
           "id": "BA-RANGE-DEV",
           "kind": "modify",
           "goal": "区域化数值与同币种金额区间展示",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.numbers.format_number_range(start, end, *, currency=None, locale=None, collapse=True, **options). Require finite ordered Decimal-compatible endpoints. Format complete endpoints using existing format_decimal or format_currency with its options and numbering system, and join using the locale interval fallback pattern. Collapse equal rendered endpoints only when requested; do not elide currency/signs or change the old formatters. Reject reversed/nonfinite ranges and unknown currency codes.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_range_dev.py and concise Chinese compatibility documentation at library/docs/development-ba-range-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.numbers.format_number_range(start, end, *, currency=None, locale=None, collapse=True, **options). Require finite ordered Decimal-compatible endpoints. Format complete endpoints using existing format_decimal or format_currency with its options and numbering system, and join using the locale interval fallback pattern. Collapse equal rendered endpoints only when requested; do not elide currency/signs or change the old formatters. Reject reversed/nonfinite ranges and unknown currency codes.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_range_dev.py and concise English compatibility documentation at library/docs/development-ba-range-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BA-RANGE-DEV-contract.md",
@@ -140,7 +140,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BA-RANGE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BA-RANGE-DEV.native.json",
@@ -172,7 +172,7 @@
           "id": "BA-PARSE-CURRENCY-DEV",
           "kind": "modify",
           "goal": "按显式币种解析本地金额及会计负数",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.numbers.parse_currency(string, currency, locale=None, *, strict=True, numbering_system=\"latn\") returning Decimal. Currency is mandatory and validated; support the pinned locale standard/accounting positive and negative affixes with either its actual symbol or ISO code, and its grouping/decimal/numbering symbols. Reject wrong currency, missing currency markers, trailing junk, embedded signs, unbalanced parentheses and nonfinite amounts. Strict mode requires canonical format_currency rendering at currency precision. Do not guess currencies from ambiguous symbols, silently remove interior characters or modify parse_decimal.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_parse_currency_dev.py and concise Chinese compatibility documentation at library/docs/development-ba-parse-currency-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.numbers.parse_currency(string, currency, locale=None, *, strict=True, numbering_system=\"latn\") returning Decimal. Currency is mandatory and validated; support the pinned locale standard/accounting positive and negative affixes with either its actual symbol or ISO code, and its grouping/decimal/numbering symbols. Reject wrong currency, missing currency markers, trailing junk, embedded signs, unbalanced parentheses and nonfinite amounts. Strict mode requires canonical format_currency rendering at currency precision. Do not guess currencies from ambiguous symbols, silently remove interior characters or modify parse_decimal.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_parse_currency_dev.py and concise English compatibility documentation at library/docs/development-ba-parse-currency-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BA-PARSE-CURRENCY-DEV-contract.md",
@@ -187,7 +187,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BA-PARSE-CURRENCY-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BA-PARSE-CURRENCY-DEV.native.json",
@@ -219,7 +219,7 @@
           "id": "BA-DURATION-DEV",
           "kind": "modify",
           "goal": "按固定单位分解并本地化多分量时长",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.dates.format_duration(delta, *, units=(\"day\",\"hour\",\"minute\",\"second\"), max_parts=None, length=\"long\", locale=None). Accept nonnegative finite seconds or timedelta, decompose by explicit strictly descending unique week/day/hour/minute/second units, preserve fractional remainder in the smallest unit, omit zero components and render zero in the smallest unit. Use existing format_unit pluralization and CLDR unit list styles, falling back to standard list style for incomplete unit list patterns. max_parts truncates nonzero components without rounding. Reject calendar months/years, invalid order, negative/nonfinite values and invalid part counts; preserve format_timedelta.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_duration_dev.py and concise Chinese compatibility documentation at library/docs/development-ba-duration-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.dates.format_duration(delta, *, units=(\"day\",\"hour\",\"minute\",\"second\"), max_parts=None, length=\"long\", locale=None). Accept nonnegative finite seconds or timedelta, decompose by explicit strictly descending unique week/day/hour/minute/second units, preserve fractional remainder in the smallest unit, omit zero components and render zero in the smallest unit. Use existing format_unit pluralization and CLDR unit list styles, falling back to standard list style for incomplete unit list patterns. max_parts truncates nonzero components without rounding. Reject calendar months/years, invalid order, negative/nonfinite values and invalid part counts; preserve format_timedelta.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_duration_dev.py and concise English compatibility documentation at library/docs/development-ba-duration-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BA-DURATION-DEV-contract.md",
@@ -234,7 +234,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BA-DURATION-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BA-DURATION-DEV.native.json",
@@ -266,7 +266,7 @@
           "id": "BA-PREFERENCES-DEV",
           "kind": "modify",
           "goal": "按带权语言偏好选择实际可用区域",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.core.negotiate_locale_preferences(header, available, *, sep=\"_\", aliases=LOCALE_ALIASES). Parse bounded comma-separated language ranges and optional q values 0..1 with at most three decimals. Select descending quality, stable header order; reuse pinned negotiate_locale matching/aliases for each nonwildcard candidate and return spelling from available. Explicit q=0 language/prefix exclusions must apply before wildcard selection; wildcard picks first nonexcluded available. Reject malformed parameters, quality, headers over 8192 characters or 100 ranges. Materialize available once and preserve the old negotiator.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_preferences_dev.py and concise Chinese compatibility documentation at library/docs/development-ba-preferences-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd babel.core.negotiate_locale_preferences(header, available, *, sep=\"_\", aliases=LOCALE_ALIASES). Parse bounded comma-separated language ranges and optional q values 0..1 with at most three decimals. Select descending quality, stable header order; reuse pinned negotiate_locale matching/aliases for each nonwildcard candidate and return spelling from available. Explicit q=0 language/prefix exclusions must apply before wildcard selection; wildcard picks first nonexcluded available. Reject malformed parameters, quality, headers over 8192 characters or 100 ranges. Materialize available once and preserve the old negotiator.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_ba_preferences_dev.py and concise English compatibility documentation at library/docs/development-ba-preferences-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/BA-PREFERENCES-DEV-contract.md",
@@ -281,7 +281,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/BA-PREFERENCES-DEV.rubric.json",
             "semantic": true,
             "native": "verification/BA-PREFERENCES-DEV.native.json",

@@ -1,4 +1,4 @@
-"""公开原子JSON补丁回归。"""
+"Public regression tests for SJ-PATCH-DEV; the complete business contract is in materials/SJ-PATCH-DEV-contract.md."
 import pytest
 from simplejson.patch import apply_patch
 

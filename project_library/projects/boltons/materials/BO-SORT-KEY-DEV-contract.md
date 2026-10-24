@@ -1,5 +1,12 @@
-# 异构排序为每个元素只求值一次业务键
+# Engineering contract: BO-SORT-KEY-DEV
 
-异构排序中的业务键可能昂贵或有调用副作用，必须每个输入出现只计算一次。保持稳定性、反向排序及原类型回退，相同对象重复出现仍按出现次数计算，返回原对象而非内部包装器。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix iterutils.untyped_sorted so a supplied key is evaluated exactly once per input occurrence before comparisons, matching sorted key semantics. Preserve heterogeneous-type fallback order, stable equal keys, reverse and falsey callable support; validate noncallable keys, propagate key/comparison errors and leave input unchanged. Do not cache by object identity or return wrappers instead of original objects.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_sort_key_dev.py and concise English compatibility documentation at library/docs/development-bo-sort-key-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/boltons/iterutils.py
+- library/development_tests/test_development_bo_sort_key_dev.py
+- library/docs/development-bo-sort-key-dev.md

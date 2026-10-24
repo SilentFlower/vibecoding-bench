@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线07：update/update_with接受mapping或单次pairs流，多来源与重复键按从左到右覆盖/冲突折叠；生成器只消费一次，异常不改变原持久映射，CheckedPMap校验仍真实执行。既有构造与union不重算新能力。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Extend real PMap.update/update_with input adaptation from mapping-only .items() to mappings OR single-pass (key,value) iterables. Preserve multi-source left-to-right order, duplicate-pair last-write or update_fn fold semantics, persistent original ownership and CheckedPMap evolver checks. Consume generators once, propagate malformed pair/source/callback/type failures and never return a partially updated original. Keep pmap constructor and existing union API unchanged because they already support their documented roles; this goal specifically implements missing update input capability.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pyrsistent_05_dev.py, and English compatibility documentation at library/docs/development-pyrsistent-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/pyrsistent/_pmap.py
+- library/tests/test_development_pyrsistent_05_dev.py
+- library/docs/development-pyrsistent-05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -4,7 +4,7 @@ Implement the complete public note-display enhancement for both base and usage e
 
 # Investigation topics
 
-- 定位CLI错误附注未显示的边界
+- Diagnose the boundaries where CLI error notes are omitted.
 
 # Supplied business material: materials/error-notes.py
 
@@ -13,7 +13,7 @@ from click.testing import CliRunner
 
 @click.command()
 def ship():
-    """抛出带本地补救信息的合成错误。@return None。"""
+    """Raise a synthetic error with local remediation notes. @return None."""
     error = click.ClickException("Order unavailable")
     error.add_note("Check local input")
     error.add_note("咖啡\nsecond line")

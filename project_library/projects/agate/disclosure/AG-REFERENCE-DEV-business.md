@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-历史订单导入需要固定“明天／下周”等相对文本的参考时刻，保证重跑和pickle后结果一致。新增reference_datetime仅接受无时区datetime；带时区参考、date和字符串明确拒绝。Date与DateTime各自原默认、格式优先级、空值和timezone参数保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add optional reference_datetime=None to Date and DateTime constructors. When supplied, it must be a naive datetime; reject dates, strings and aware datetimes with TypeError before parsing. Use this fixed wall-clock anchor for natural-language relative date parsing. Preserve explicit format and ISO handling, timezone parameter behavior, null handling and old defaults (Date uses ZERO_DT, DateTime captures today at midnight). Keep the anchor across pickle round trips and preserve old Date pickle states.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_reference_dev.py and concise English compatibility documentation at library/docs/development-ag-reference-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/agate/data_types/date.py
+- library/agate/data_types/date_time.py
+- library/development_tests/test_development_ag_reference_dev.py
+- library/docs/development-ag-reference-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,5 +1,12 @@
-# 让多链规则启停正确重放一次性迭代器且失败前不半修改
+# Engineering contract: MARKDOWN-IT-O02-DEV
 
-对应路线08：enable/disable先完整物化一次性Iterable，再给全部规则链及未知检测重放；迭代自身异常发生在修改之前，字符串/空输入/ignoreInvalid保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix actual MarkdownIt.enable/disable to fully materialize a nonstring Iterable once before dispatching names across all parser rule chains and missed-name detection. List/tuple/generator/one-shot iterators must produce identical active sets and rendering; unknown generator names still raise unless ignoreInvalid. If iteration itself raises after yielding a name, no rule chain may already be mutated. Preserve string, duplicate-name, empty input and existing rule-manager semantics; do not add pretend rules or special-case table alone.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_markdown_it_o02_dev.py and concise English compatibility documentation at library/docs/development-markdown-it-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/markdown_it/main.py
+- library/tests/test_development_markdown_it_o02_dev.py
+- library/docs/development-markdown-it-o02-dev.md

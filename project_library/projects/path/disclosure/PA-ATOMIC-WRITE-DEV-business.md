@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-文件批处理最后一步完整编码成功再原子发布，保留权限并清理失败临时文件。可选相同内容不触发时间变化，拒绝链接输出，原写入API继续兼容，不承诺并发CAS或父目录同步保证。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add Path.atomic_write(content,*,encoding="utf-8",if_changed=False). Validate and encode str/bytes before creating a same-directory temp, flush/fsync, retain old mode or use 0600 when new, replace atomically and clean failure paths. Reject symlinks; if_changed=True preserves inode/mtime/mode when bytes match and returns False, otherwise True. Serialization/replace failures preserve old bytes. Keep ordinary write methods unchanged and do not promise concurrent compare-and-swap or directory-fsync crash guarantees.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_atomic_write_dev.py and concise English compatibility documentation at library/docs/development-pa-atomic-write-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/path/__init__.py
+- library/development_tests/test_development_pa_atomic_write_dev.py
+- library/docs/development-pa-atomic-write-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,4 +1,4 @@
-"""公开稳定JSON编码回归。"""
+"Public regression tests for SJ-STABLE-DEV; the complete business contract is in materials/SJ-STABLE-DEV-contract.md."
 from decimal import Decimal
 import pytest
 from simplejson.stable import stable_dumps,stable_bytes

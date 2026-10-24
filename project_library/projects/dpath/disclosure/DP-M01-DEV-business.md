@@ -4,8 +4,8 @@ Implement only the explicitly authorized filtered-delete repair and public regre
 
 # Investigation topics
 
-- 区分已有路径批改和字面新建
-- 解释列表删除留空位及无匹配错误
+- Distinguish bulk updates to existing paths from literal path creation.
+- Explain holes left by list deletion and errors for unmatched paths.
 
 # Supplied business material: materials/write.md
 

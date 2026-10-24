@@ -1,5 +1,12 @@
-# 在真实记录路径实现任务局部阈值及模块静默
+# Engineering contract: LOGURU-O03-DEV
 
-对应路线04：ContextVar局部策略在真实格式化前按阈值/模块阻止记录，只影响同core；嵌套叠加、退出恢复，兄弟任务/线程隔离、子任务继承，全局activation不改。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Logger.silence(level="INFO", *, module=None) using the existing ContextVar compatibility layer. Suppress matching records whose severity is <= threshold before message formatting, with string level or nonbool nonnegative integer; module None covers all, a string covers itself/dot-separated descendants. Scope rules to the same shared Logger core (bound loggers included), combine nested scopes additively and reset on every exit. Preserve global enable/disable and normal sink filters. Async siblings/new threads stay independent while created child tasks inherit context; do not mutate global activation to emulate local silence.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_loguru_o03_dev.py and concise English compatibility documentation at library/docs/development-loguru-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/loguru/_logger.py
+- library/tests/test_development_loguru_o03_dev.py
+- library/docs/development-loguru-o03-dev.md

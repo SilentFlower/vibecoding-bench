@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-基于已交付完整结果API逐条校验流，每条使用独立Validator、schema和选项。保留编号，继续/停止/抛错政策明确，非映射形成失败结果；支持工厂和准确消费上限，零不读取，不物化全流或共享可变默认状态。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Build cerberus.stream.iter_validated on the delivered validate_result API. Consume one record at a time with independent Validator/schema/options, yield one-based index and independent complete results, and expose continue/stop/raise policies including safe ValidationStreamError. Treat nonmapping DocumentError records as failed results, allow custom validator factories, exact max_records without lookahead, zero consumption and early close. Preserve normal custom exceptions and never materialize the entire input stream or share mutable per-record defaults.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o06_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cerberus/stream.py
+- library/tests/test_development_cerberus_o06_dev.py
+- library/docs/development-cerberus-o06-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

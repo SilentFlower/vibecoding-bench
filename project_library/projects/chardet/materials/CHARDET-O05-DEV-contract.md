@@ -1,5 +1,12 @@
-# 对真实候选执行全文解码及业务验收后再选择
+# Engineering contract: CHARDET-O05-DEV
 
-对真实候选按置信度稳定排序，去重codec别名，先全文严格解码再执行业务回调。返回原始检测事实和各候选状态而不回显全文；全拒绝、空或不支持codec不能声称成功，缓冲快照与回调错误保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement chardet.validated.detect_validated(data, *, validator=None). Snapshot bytes, obtain real detect_all candidates, stable-sort confidence, deduplicate supported codec aliases and strictly decode the entire payload for every candidate before an optional (text, candidate) callback. Return selected original facts and per-candidate accepted/business-rejected/decode-error/unsupported-codec statuses without returning full text. All-rejected/empty/unsupported results must not claim whole validation; callback errors propagate and confidence is never fabricated or represented as an accuracy guarantee.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o05_dev.py and concise English compatibility documentation at library/docs/development-chardet-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/chardet/validated.py
+- library/tests/test_development_chardet_o05_dev.py
+- library/docs/development-chardet-o05-dev.md

@@ -1,8 +1,8 @@
-"""命名业务流水线真实执行选择器和适配器，失败位置准确。"""
+"Public regression tests for FUNCY-O06-DEV; the complete business contract is in materials/FUNCY-O06-DEV-contract.md."
 import pytest
 
 def test_three_real_stages_adapters_and_optional_report():
-    """解析、规范和验证按同一真实顺序执行。@return None。"""
+    "Verify three real stages adapters and optional report."
     from funcy.pipeline import Pipeline,Stage
     events=[]
     p=Pipeline([Stage('parse',lambda text:int(text),input_adapter=str.strip),Stage('scale',lambda value:value*2),Stage('check',lambda value:events.append(value) or value,output_adapter=str)])
@@ -10,7 +10,7 @@ def test_three_real_stages_adapters_and_optional_report():
     report=p.run('4',report=True);assert report.ok and report.value=='8' and [e['stage'] for e in report.events]==['parse','scale','check']
 
 def test_failure_context_cause_report_and_no_later_stage():
-    """默认抛携带cause的阶段错误，report模式不泄露异常值。@return None。"""
+    "Verify failure context cause report and no later stage."
     from funcy.pipeline import Pipeline,Stage,PipelineStageError
     original=ValueError('secret-input');calls=[]
     def fail(value):raise original
@@ -21,7 +21,7 @@ def test_failure_context_cause_report_and_no_later_stage():
     assert not report.ok and report.failed_stage=='bad' and report.events[0]['error_kind']=='ValueError'
 
 def test_empty_identity_selector_and_invalid_stage_config():
-    """空流水线为identity，原Funcy索引选择器可直接用。@return None。"""
+    "Verify empty identity selector and invalid stage config."
     from funcy.pipeline import Pipeline,Stage
     value=object();assert Pipeline([])(value) is value
     assert Pipeline([Stage('first',0)])([3,4])==3

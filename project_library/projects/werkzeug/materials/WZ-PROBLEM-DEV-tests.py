@@ -1,4 +1,4 @@
-"""公开问题响应真实HTTP回归。"""
+"Public regression tests for WZ-PROBLEM-DEV; the complete business contract is in materials/WZ-PROBLEM-DEV-contract.md."
 import pytest
 from werkzeug.exceptions import BadRequest,MethodNotAllowed,TooManyRequests
 from werkzeug.wrappers import Response

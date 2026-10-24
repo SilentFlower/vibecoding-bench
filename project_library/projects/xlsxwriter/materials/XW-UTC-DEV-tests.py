@@ -1,4 +1,4 @@
-"""公开UTC实际工作簿回归。"""
+"Public regression tests for XW-UTC-DEV; the complete business contract is in materials/XW-UTC-DEV-contract.md."
 from datetime import datetime,timezone,timedelta
 from io import BytesIO
 from zipfile import ZipFile

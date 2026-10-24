@@ -1,4 +1,4 @@
-"""公开不触碰热度的缓存读取回归。"""
+"Public regression tests for CT-PEEK-DEV; the complete business contract is in materials/CT-PEEK-DEV-contract.md."
 import pytest
 from cachetools import Cache,LRUCache,LFUCache,TTLCache
 

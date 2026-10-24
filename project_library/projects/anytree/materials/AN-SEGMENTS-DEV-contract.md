@@ -1,5 +1,12 @@
-# 按字面路径段可靠定位分类节点
+# Engineering contract: AN-SEGMENTS-DEV
 
-分类业务键可能包含斜杠、星号、空串和“..”，需要真正按字面段寻址。新增get_by_segments，保留大小写、pathattr、relax及首匹配规则；显式absolute模式要求首段根名，旧字符串get/glob导航保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Resolver.get_by_segments(node, segments, *, absolute=False). Segments are a finite iterable of strings, never a single string/bytes. Treat slash, empty strings, dots, dot-dot and wildcard text as literal child attribute values, preserving pathattr, ignorecase, relax and existing first-match rules. Relative empty segments return the start node. Absolute mode starts at node.root and requires an explicit root-name first segment. Preserve get/glob and their navigation rules.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_an_segments_dev.py and concise English compatibility documentation at library/docs/development-an-segments-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/anytree/resolver.py
+- library/development_tests/test_development_an_segments_dev.py
+- library/docs/development-an-segments-dev.md

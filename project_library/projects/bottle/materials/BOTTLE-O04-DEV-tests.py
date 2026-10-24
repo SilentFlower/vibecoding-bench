@@ -1,8 +1,8 @@
-"""响应编码setter保留媒体类型和无关参数。"""
+"Public regression tests for BOTTLE-O04-DEV; the complete business contract is in materials/BOTTLE-O04-DEV-contract.md."
 import bottle
 
 def test_charset_parameters():
-    """引用和大小写旧参数被替换且其他参数保持。@return None。"""
+    "Verify charset parameters."
     value = bottle.BaseResponse(headers={'Content-Type': 'text/plain; format=flowed; CHARSET="UTF-8"'})
     value.charset = 'latin-1'
     assert value.charset == 'latin-1'
@@ -10,14 +10,14 @@ def test_charset_parameters():
     assert value.content_type.lower().count('charset=') == 1
 
 def test_real_string_output_encoding():
-    """实际Bottle字符串输出遵守新编码。@return None。"""
+    "Verify real string output encoding."
     bottle.response.bind()
     bottle.response.content_type = 'text/plain'
     bottle.response.charset = 'latin-1'
     assert list(bottle.Bottle()._cast('é')) == [b'\xe9']
 
 def test_invalid_codec_does_not_mutate():
-    """坏编码在修改Header前失败。@return None。"""
+    "Verify invalid codec does not mutate."
     import pytest
     value = bottle.BaseResponse(headers={'Content-Type': 'text/plain; charset=utf-8'})
     before = value.content_type

@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-数据管线需要对响应耗时做中位数和百分位分析。沿用现有CDF分位规则、空值警告和Number行为；TimeDelta返回原时长类型。整数微秒中点按半偶舍入，极值不得因中间相加或相减溢出。包括分组Median、空表、负时长和微秒边界。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Extend Median and Percentiles to TimeDelta columns while preserving the existing CDF rank rule and Number behavior. Return timedelta values and report a TimeDelta aggregate type for Median. Ignore nulls using the existing warning policy, return None values for empty data, and compute duration midpoints without overflow at timedelta extremes or floating-point loss. Fractional microseconds round to nearest even. Preserve original source tests and Quantiles behavior.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_duration_dev.py and concise English compatibility documentation at library/docs/development-ag-duration-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/agate/aggregations/median.py
+- library/agate/aggregations/percentiles.py
+- library/development_tests/test_development_ag_duration_dev.py
+- library/docs/development-ag-duration-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

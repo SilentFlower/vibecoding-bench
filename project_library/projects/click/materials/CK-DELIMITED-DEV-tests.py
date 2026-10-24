@@ -1,4 +1,4 @@
-"""公开列表选项真实命令回归。"""
+"Public regression tests for CK-DELIMITED-DEV; the complete business contract is in materials/CK-DELIMITED-DEV-contract.md."
 import pytest
 import click
 from click.testing import CliRunner

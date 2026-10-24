@@ -1,4 +1,4 @@
-"""公开重复脚注定位与回链回归。"""
+"Public regression tests for MS-UNIQUE-FOOTNOTES-DEV; the complete business contract is in materials/MS-UNIQUE-FOOTNOTES-DEV-contract.md."
 from html.parser import HTMLParser
 import mistune
 from mistune.plugins.footnotes import footnotes

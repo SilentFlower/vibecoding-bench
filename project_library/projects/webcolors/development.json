@@ -32,7 +32,7 @@
           "id": "WEBCOLORS-01-DEV",
           "kind": "modify",
           "goal": "CSS4命名颜色在公开注册、枚举与双向转换中一致",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair the pinned CSS4 registry: export CSS4 at top level, use the actual CSS4 forward mapping and make names() default match existing conversion defaults (CSS4). rebeccapurple must work through names/name_to_hex/name_to_rgb/hex_to_name and the current HTML legacy named-color branch. Explicit older specifications remain unchanged and reject that name; canonical reverse aliases remain stable, returned names lists do not expose mutable internal state. Update inaccurate conversion default documentation, preserve the strict HTML simple-color API and the remaining legacy algorithm.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_01_dev.py, and Chinese compatibility documentation at library/docs/development-webcolors-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair the pinned CSS4 registry: export CSS4 at top level, use the actual CSS4 forward mapping and make names() default match existing conversion defaults (CSS4). rebeccapurple must work through names/name_to_hex/name_to_rgb/hex_to_name and the current HTML legacy named-color branch. Explicit older specifications remain unchanged and reject that name; canonical reverse aliases remain stable, returned names lists do not expose mutable internal state. Update inaccurate conversion default documentation, preserve the strict HTML simple-color API and the remaining legacy algorithm.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_01_dev.py, and English compatibility documentation at library/docs/development-webcolors-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/WEBCOLORS-01-DEV-contract.md",
@@ -53,7 +53,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WEBCOLORS-01-DEV.rubric.json",
             "native": "verification/WEBCOLORS-01-DEV.native.json",
             "public_native": "verification/WEBCOLORS-01-DEV.public.native.json",
@@ -82,7 +82,7 @@
           "id": "WEBCOLORS-02-DEV",
           "kind": "modify",
           "goal": "HTML旧式颜色解析保留非ASCII空白参与宽容算法",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nFix html5_parse_legacy_color to strip only ASCII space, TAB, LF, FF and CR, leaving NBSP, vertical tab and other Unicode whitespace for the existing legacy replacement/padding algorithm. Preserve named colors, short hex, BMP/non-BMP handling, 128-character truncation, transparent rejection and the separate strict HTML simple-color contract. NBSP-red-NBSP must produce (0,237,0), not silently become red. Whitespace-only input follows the existing legacy padding path. This is a real parser repair, not a generic trim helper.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_02_dev.py, and Chinese compatibility documentation at library/docs/development-webcolors-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nFix html5_parse_legacy_color to strip only ASCII space, TAB, LF, FF and CR, leaving NBSP, vertical tab and other Unicode whitespace for the existing legacy replacement/padding algorithm. Preserve named colors, short hex, BMP/non-BMP handling, 128-character truncation, transparent rejection and the separate strict HTML simple-color contract. NBSP-red-NBSP must produce (0,237,0), not silently become red. Whitespace-only input follows the existing legacy padding path. This is a real parser repair, not a generic trim helper.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_02_dev.py, and English compatibility documentation at library/docs/development-webcolors-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/WEBCOLORS-02-DEV-contract.md",
@@ -100,7 +100,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WEBCOLORS-02-DEV.rubric.json",
             "native": "verification/WEBCOLORS-02-DEV.native.json",
             "public_native": "verification/WEBCOLORS-02-DEV.public.native.json",
@@ -129,7 +129,7 @@
           "id": "WEBCOLORS-03-DEV",
           "kind": "modify",
           "goal": "主题资产通过显式RGBA模型无损保存透明度",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd webcolors.rgba with immutable validated RGBA(red,green,blue,alpha=255), exact 4/8-digit hex_to_rgba, lossless 8-digit rgba_to_hex, rgb_to_rgba and opaque-only rgba_to_rgb. All channels are integer bytes 0..255 (bool/float rejected); zero-alpha hidden RGB is retained. Do not alter legacy RGB or HTML simple-color functions to accept/drop alpha. Reject malformed lengths, suffixes and whitespace; do not clamp silently or use a white background implicitly. Provide complete source implementation, public roundtrip/error tests and Chinese compatibility documentation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_03_dev.py, and Chinese compatibility documentation at library/docs/development-webcolors-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd webcolors.rgba with immutable validated RGBA(red,green,blue,alpha=255), exact 4/8-digit hex_to_rgba, lossless 8-digit rgba_to_hex, rgb_to_rgba and opaque-only rgba_to_rgb. All channels are integer bytes 0..255 (bool/float rejected); zero-alpha hidden RGB is retained. Do not alter legacy RGB or HTML simple-color functions to accept/drop alpha. Reject malformed lengths, suffixes and whitespace; do not clamp silently or use a white background implicitly. Provide complete source implementation, public roundtrip/error tests and English compatibility documentation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_03_dev.py, and English compatibility documentation at library/docs/development-webcolors-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/WEBCOLORS-03-DEV-contract.md",
@@ -147,7 +147,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WEBCOLORS-03-DEV.rubric.json",
             "native": "verification/WEBCOLORS-03-DEV.native.json",
             "public_native": "verification/WEBCOLORS-03-DEV.public.native.json",
@@ -176,7 +176,7 @@
           "id": "WEBCOLORS-04-DEV",
           "kind": "modify",
           "goal": "主题配置直接解析并序列化声明范围的CSS颜色函数",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd webcolors.css_rgb.parse_css_rgb and serialize_css_rgb, using RGBA byte semantics from the prior goal. Support legacy rgb(r,g,b)/rgba(r,g,b,a) with all-number or all-percent channels and modern rgb()/rgba() three whitespace-separated channels with optional / alpha. Modern channels may mix numeric and percent; numeric exponent syntax is allowed if finite. Clamp RGB/alpha to their range then round to nearest byte with halves up. Reject mixed separators, partial suffixes, missing components, NaN/Inf, none, calc/var and unsupported expressions. Serializer uses stable modern syntax and roundtrips every alpha byte without loss. Keep existing name/hex/HTML parsers untouched and document the deliberately supported subset.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_04_dev.py, and Chinese compatibility documentation at library/docs/development-webcolors-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd webcolors.css_rgb.parse_css_rgb and serialize_css_rgb, using RGBA byte semantics from the prior goal. Support legacy rgb(r,g,b)/rgba(r,g,b,a) with all-number or all-percent channels and modern rgb()/rgba() three whitespace-separated channels with optional / alpha. Modern channels may mix numeric and percent; numeric exponent syntax is allowed if finite. Clamp RGB/alpha to their range then round to nearest byte with halves up. Reject mixed separators, partial suffixes, missing components, NaN/Inf, none, calc/var and unsupported expressions. Serializer uses stable modern syntax and roundtrips every alpha byte without loss. Keep existing name/hex/HTML parsers untouched and document the deliberately supported subset.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_04_dev.py, and English compatibility documentation at library/docs/development-webcolors-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "WEBCOLORS-03-DEV",
@@ -199,7 +199,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WEBCOLORS-04-DEV.rubric.json",
             "native": "verification/WEBCOLORS-04-DEV.native.json",
             "public_native": "verification/WEBCOLORS-04-DEV.public.native.json",
@@ -228,7 +228,7 @@
           "id": "WEBCOLORS-05-DEV",
           "kind": "modify",
           "goal": "主题检查计算真实相对亮度与显式背景对比度",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd webcolors.accessibility relative_luminance, contrast_ratio, meets_contrast and contrast_on. Implement the declared sRGB 0.04045 transfer breakpoint, weights .2126/.7152/.0722 and raw (Lmax+.05)/(Lmin+.05) ratio. Validate exact integer RGB channels; never silently clamp invalid measurements. Threshold 1..21 is explicit and finite; compare without rounding first. Ordinary luminance/ratio reject transparent RGBA. contrast_on accepts prior RGBA and an explicit opaque background, performs declared encoded-sRGB alpha compositing with nearest-byte half-up quantization and measures the resulting RGB; never guess a white background. Preserve legacy conversion and avoid claims that a color ratio certifies an entire UI.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_05_dev.py, and Chinese compatibility documentation at library/docs/development-webcolors-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd webcolors.accessibility relative_luminance, contrast_ratio, meets_contrast and contrast_on. Implement the declared sRGB 0.04045 transfer breakpoint, weights .2126/.7152/.0722 and raw (Lmax+.05)/(Lmin+.05) ratio. Validate exact integer RGB channels; never silently clamp invalid measurements. Threshold 1..21 is explicit and finite; compare without rounding first. Ordinary luminance/ratio reject transparent RGBA. contrast_on accepts prior RGBA and an explicit opaque background, performs declared encoded-sRGB alpha compositing with nearest-byte half-up quantization and measures the resulting RGB; never guess a white background. Preserve legacy conversion and avoid claims that a color ratio certifies an entire UI.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_05_dev.py, and English compatibility documentation at library/docs/development-webcolors-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [
             {
               "task_id": "WEBCOLORS-03-DEV",
@@ -251,7 +251,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WEBCOLORS-05-DEV.rubric.json",
             "native": "verification/WEBCOLORS-05-DEV.native.json",
             "public_native": "verification/WEBCOLORS-05-DEV.public.native.json",
@@ -280,7 +280,7 @@
           "id": "WEBCOLORS-06-DEV",
           "kind": "modify",
           "goal": "品牌主题色板不可变组合内建规范并明确处理名称冲突",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd webcolors.palette.Palette as an immutable Mapping of case-insensitive names to normalized RGB hex, with rgb(name), aliases(hex), to_dict(), stable sorted iteration, copied input/output ownership, and optional base_spec composition. conflict is error/brand/builtin; default collisions reject rather than silently alter standard colors. Reject empty/whitespace-padded names, case-only duplicates, invalid hex and unknown policy/spec. Independent palettes with the same primary name never interfere, and custom names are not registered in global CSS tables. Aliases return a stable immutable tuple and every query uses the actual candidate conversion functions. Preserve all old name/spec/reverse-alias contracts.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_06_dev.py, and Chinese compatibility documentation at library/docs/development-webcolors-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd webcolors.palette.Palette as an immutable Mapping of case-insensitive names to normalized RGB hex, with rgb(name), aliases(hex), to_dict(), stable sorted iteration, copied input/output ownership, and optional base_spec composition. conflict is error/brand/builtin; default collisions reject rather than silently alter standard colors. Reject empty/whitespace-padded names, case-only duplicates, invalid hex and unknown policy/spec. Independent palettes with the same primary name never interfere, and custom names are not registered in global CSS tables. Aliases return a stable immutable tuple and every query uses the actual candidate conversion functions. Preserve all old name/spec/reverse-alias contracts.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_webcolors_06_dev.py, and English compatibility documentation at library/docs/development-webcolors-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/WEBCOLORS-06-DEV-contract.md",
@@ -298,7 +298,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WEBCOLORS-06-DEV.rubric.json",
             "native": "verification/WEBCOLORS-06-DEV.native.json",
             "public_native": "verification/WEBCOLORS-06-DEV.public.native.json",

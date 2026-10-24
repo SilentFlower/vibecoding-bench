@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线01：区分省略start/stop与显式零，单界由零起，双界、反序、floating和链式语义保持。用底层精确边界而非随机概率验收。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Repair random omitted-bound detection with private sentinels so random(n) uses bounds 0,n including n=0/negative/float, random() stays 0..1, explicit stop keyword uses default start=0, and explicit reversed pairs still swap. Preserve floating selection, overload return types and existing chain runtime. Prove exact randint/uniform calls with local deterministic mocks; no probabilistic test.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_pydash_01_dev.py, and English compatibility documentation at library/docs/development-pydash-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pydash/utilities.py
+- library/tests/test_development_pydash_01_dev.py
+- library/docs/development-pydash-01-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

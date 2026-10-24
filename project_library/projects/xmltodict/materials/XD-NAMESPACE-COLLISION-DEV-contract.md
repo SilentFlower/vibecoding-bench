@@ -1,5 +1,12 @@
-# 显式拒绝命名空间压缩引起的元素或属性键冲突
+# Engineering contract: XD-NAMESPACE-COLLISION-DEV
 
-命名空间压缩可能把不同字段合并成同一键。提供显式error策略，在同父元素及单元素属性范围检查真实展开名，相同展开名重复仍按列表处理，不改变默认合并及用户postprocessor语义。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add parse handler option namespace_collision="merge"|"error". Preserve existing merge default; error rejects when different expanded element names under the same parent or distinct expanded attributes on one element collapse to one mapped dictionary key through namespaces. Repeated identical expanded names remain valid lists, and equal local keys under separate parents are independent. Check before postprocessor transformations; do not classify ordinary repeats or user postprocessor collisions as namespace collisions. Support item_depth streaming, inherited maps and prefix remapping without global state.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_xd_namespace_collision_dev.py and concise English compatibility documentation at library/docs/development-xd-namespace-collision-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/xmltodict.py
+- library/development_tests/test_development_xd_namespace_collision_dev.py
+- library/docs/development-xd-namespace-collision-dev.md

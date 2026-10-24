@@ -1,10 +1,10 @@
-"""资源作用域覆盖实际生成、异常和提前关闭。"""
+"Public regression tests for FUNCY-O03-DEV; the complete business contract is in materials/FUNCY-O03-DEV-contract.md."
 from contextlib import contextmanager,asynccontextmanager
 import asyncio
 import pytest
 
 def test_fresh_resources_and_lazy_generator_close():
-    """创建生成器不提前进入，close立即退出。@return None。"""
+    "Verify fresh resources and lazy generator close."
     from funcy.scoped import wrap_with_factory
     events=[]
     @contextmanager
@@ -20,7 +20,7 @@ def test_fresh_resources_and_lazy_generator_close():
     assert list(values())==[1,2] and events.count('enter')==2
 
 def test_manager_suppression_and_enter_failure():
-    """保留原manager抑制语义，enter失败不执行业务。@return None。"""
+    "Verify manager suppression and enter failure."
     from funcy.scoped import wrap_with_factory
     @contextmanager
     def suppress():
@@ -35,7 +35,7 @@ def test_manager_suppression_and_enter_failure():
     with pytest.raises(RuntimeError,match='enter'):never()
 
 def test_async_generator_close_and_coroutine_scope():
-    """异步生成器提前aclose先关闭业务体再退出manager。@return None。"""
+    "Verify async generator close and coroutine scope."
     from funcy.scoped import wrap_with_factory
     async def run():
         events=[]

@@ -1,5 +1,12 @@
-# 按文档ID稳定分页查询并隔离返回对象
+# Engineering contract: TD-PAGE-DEV
 
-订单列表使用文档ID游标分页，删除或追加后不靠偏移跳页。筛选和返回对象都与存储隔离，仅在还有匹配记录时返回下一游标，明确大小和游标边界，不承诺跨页快照。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Table.query_page(cond=None, *, limit=100, after=None) returning (documents,next_cursor). Integer document IDs are sorted ascending, after is exclusive, condition is optional and evaluated on detached Documents. Return at most limit rows; next_cursor is the last returned matching ID only if another match exists, otherwise None. Support sparse IDs, insert/remove between pages, MemoryStorage and JSONStorage. Deep-copy returned data so caller or predicate changes cannot mutate storage. Validate limit 1..1000 and nonnegative integer cursor, excluding booleans. This is keyset pagination, without snapshot/concurrent-writer guarantees.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_td_page_dev.py and concise English compatibility documentation at library/docs/development-td-page-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tinydb/table.py
+- library/development_tests/test_development_td_page_dev.py
+- library/docs/development-td-page-dev.md

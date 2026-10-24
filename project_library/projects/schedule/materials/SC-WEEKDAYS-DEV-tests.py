@@ -1,4 +1,4 @@
-"""公开星期集合调度回归。"""
+"Public regression tests for SC-WEEKDAYS-DEV; the complete business contract is in materials/SC-WEEKDAYS-DEV-contract.md."
 import datetime
 import pytest
 from unittest.mock import patch

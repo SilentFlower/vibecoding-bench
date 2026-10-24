@@ -1,5 +1,12 @@
-# 为随机等待策略注入独立随机源并保持旧默认行为
+# Engineering contract: TN-RANDOM-SOURCE-DEV
 
-重试压测需要可复现而互不干扰的随机等待。三个随机策略接受显式随机源，默认继续使用原模块，保留边界和溢出处理，不重置或消耗全局随机状态，组合策略仍兼容。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add keyword-only random_source=None to wait_random, wait_random_exponential and wait_exponential_jitter. None retains the existing random module and mockability; an explicit source supplies random() or uniform() as required. Validate the needed method, preserve bounds, exponential overflow handling, existing positional parameters and every old wait result formula. Independent random.Random sources must be reproducible without reseeding or consuming global random state. Composition must still work; do not add dependencies.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tn_random_source_dev.py and concise English compatibility documentation at library/docs/development-tn-random-source-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tenacity/wait.py
+- library/development_tests/test_development_tn_random_source_dev.py
+- library/docs/development-tn-random-source-dev.md

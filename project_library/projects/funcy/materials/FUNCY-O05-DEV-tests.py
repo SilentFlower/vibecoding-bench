@@ -1,8 +1,8 @@
-"""关系连接保留所有重复键组合及未匹配身份。"""
+"Public regression tests for FUNCY-O05-DEV; the complete business contract is in materials/FUNCY-O05-DEV-contract.md."
 import pytest
 
 def test_duplicate_keys_cartesian_match_and_stable_full_order():
-    """重复SKU不覆盖，full保留左右未匹配行。@return None。"""
+    "Verify duplicate keys cartesian match and stable full order."
     from funcy.relations import join_by
     left=[{'sku':'a','n':1},{'sku':'a','n':2},{'sku':'missing'}];right=[{'sku':'a','p':3},{'sku':'a','p':4},{'sku':'other'}]
     rows=list(join_by(left,right,'sku',how='full'))
@@ -10,7 +10,7 @@ def test_duplicate_keys_cartesian_match_and_stable_full_order():
     assert rows[4].left_present and not rows[4].right_present and not rows[5].left_present and rows[5].right['sku']=='other'
 
 def test_left_laziness_none_key_and_record_presence():
-    """右侧索引完成后左侧按需消费，合法None不等于缺项。@return None。"""
+    "Verify left laziness none key and record presence."
     from funcy.relations import join_by
     touched=[]
     def left():
@@ -20,7 +20,7 @@ def test_left_laziness_none_key_and_record_presence():
     assert next(rows).right_present is False
 
 def test_empty_keys_indices_and_source_failures():
-    """索引选择器复用Funcy协议，不可hash键明确失败。@return None。"""
+    "Verify empty keys indices and source failures."
     from funcy.relations import join_by
     assert list(join_by([],[],0))==[]
     assert list(join_by([(1,'x')],[(1,'y')],0))[0].right==(1,'y')

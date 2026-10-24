@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线05：平面Machine.preview_event仅读候选路径/规则描述，完全不resolve或执行prepare/guard；可运行性明确unknown，None/internal和reflexive保真，不虚构层级异步支持。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add Machine.preview_event(model,trigger) for core synchronous FLAT Machine, bound model required. Return current state, ordered candidate source/dest, stable ordinal and condition index/callback descriptor/target (unless false), callback descriptors and runnable="unknown". Do not resolve string callbacks, access callback properties, execute prepare/guards/before/after or change state. Unknown trigger returns no candidates. Preserve internal None/reflexive/wildcard-expanded paths. No hierarchical/parallel/async completeness promise or fabricated allowed=True.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_transitions_04_dev.py, and English compatibility documentation at library/docs/development-transitions-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/transitions/core.py
+- library/tests/test_development_transitions_04_dev.py
+- library/docs/development-transitions-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,5 +1,12 @@
-# 为重复脚注生成唯一引用锚点及全部返回链接
+# Engineering contract: MS-UNIQUE-FOOTNOTES-DEV
 
-一个脚注多次引用时，显式唯一模式给每次引用独立锚点，脚注尾部返回所有引用位置，仍只保留一条定义。每份文档重新计数，未知引用保持原文字，默认输出字节继续兼容。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Extend footnotes(md,*,unique_refs=False) with an explicit compatibility-preserving mode. Each occurrence of one defined footnote gets a unique fnref-N, fnref-N-2,... HTML id and the footnote item links back to all occurrences. Keep one note definition/order/index and expose occurrence metadata in opted-in AST tokens; unknown references remain literal. Reset counts per parsed document, preserve escaping and legacy default HTML/AST exactly, and verify document reuse plus interaction with directory extraction.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ms_unique_footnotes_dev.py and concise English compatibility documentation at library/docs/development-ms-unique-footnotes-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/mistune/plugins/footnotes.py
+- library/development_tests/test_development_ms_unique_footnotes_dev.py
+- library/docs/development-ms-unique-footnotes-dev.md

@@ -1,5 +1,12 @@
-# 根据实际UTC偏移判断自定义时区对象的时间语义
+# Engineering contract: BO-TIMESTAMP-DEV
 
-自定义时区对象的真假值不能代表时区感知状态。按实际utcoffset判断，保留无偏移时默认UTC的原约定，兼容负时间戳、微秒和fold差异，时区实现错误仍原样传播。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Fix timeutils.dt_to_timestamp to classify awareness by tzinfo is not None and dt.utcoffset() is not None, rather than tzinfo truthiness. Falsey tzinfo with a real offset must convert correctly; tzinfo objects returning None are naive and retain the existing implied-UTC convention. Preserve negative epochs, fractional seconds, fold-specific offsets and original offset errors; do not silently use host local timezone or alter datetime objects.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_bo_timestamp_dev.py and concise English compatibility documentation at library/docs/development-bo-timestamp-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/boltons/timeutils.py
+- library/development_tests/test_development_bo_timestamp_dev.py
+- library/docs/development-bo-timestamp-dev.md

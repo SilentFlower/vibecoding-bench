@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-路线08：每个事件输出[t-span,t]闭区间内完整事件tuple，重复时间按输入次序；缓存仅有效窗口，正跨度/非降序明确，不混入真实时钟。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add windowed_time(iterable,key,span) yielding a tuple of original events for each consumed event, inclusive interval [event_time-span,event_time]. Nondecreasing timestamp requirement, positive numeric/timedelta span, duplicates remain separate input-ordered events. Evict expired items before output, retain no full history, support sparse/empty/cross-day streams and propagate invalid order/arithmetic. Event time only, no clock or fake constant-memory claim when many events share span.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_more_itertools_03_dev.py, and English compatibility documentation at library/docs/development-more-itertools-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/more_itertools/more.py
+- library/more_itertools/_windowed_time.py
+- library/tests/test_development_more_itertools_03_dev.py
+- library/docs/development-more-itertools-03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

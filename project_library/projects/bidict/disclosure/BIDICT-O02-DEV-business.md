@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-组合键、值及业务谓词筛选真实关系，空选择与未指定条件区别明确。返回同类独立双向子映射并保持原相对顺序；严格缺失在回调前失败，一次性请求只读取一次，回调错误保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement bidict.select.select(mapping, *, keys=None, values=None, predicate=None, strict=False). Combine requested key/value/predicate filters, distinguish absent filters from empty selections, retain original relative order and concrete bidict/frozen/ordered/custom type and inverse behavior. One-shot filters are consumed once. Strict missing requests raise before callbacks, callbacks propagate normally and result backing must be independent of source mutation.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_bidict_o02_dev.py and concise English compatibility documentation at library/docs/development-bidict-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/bidict/select.py
+- library/tests/test_development_bidict_o02_dev.py
+- library/docs/development-bidict-o02-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

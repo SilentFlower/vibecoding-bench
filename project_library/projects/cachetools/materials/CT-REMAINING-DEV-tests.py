@@ -1,4 +1,4 @@
-"""公开TTL剩余有效期回归。"""
+"Public regression tests for CT-REMAINING-DEV; the complete business contract is in materials/CT-REMAINING-DEV-contract.md."
 from datetime import datetime,timedelta
 import pytest
 from cachetools import TTLCache

@@ -1,9 +1,9 @@
-"""字符串编译结果属于本次求解，不累积污染模型。"""
+"Public regression tests for PYTHON-CONSTRAINT-01-DEV; the complete business contract is in materials/PYTHON-CONSTRAINT-01-DEV-contract.md."
 from constraint import Problem,BacktrackingSolver,OptimizedBacktrackingSolver
 
 
 def test_repeated_mixed_constraints_do_not_accumulate():
-    """真实求解十次，显式用户约束仍保留而编译列表不长。@return None。"""
+    "Verify repeated mixed constraints do not accumulate."
     problem=Problem();problem.addVariables(['x','y'],[0,1,2]);problem.addConstraint('x != y')
     problem.addConstraint(lambda x,y:x+y>=2,['x','y'])
     expected={tuple(sorted(item.items())) for item in problem.getSolutions()}
@@ -14,7 +14,7 @@ def test_repeated_mixed_constraints_do_not_accumulate():
 
 
 def test_reset_clears_textual_rules_and_model_can_change():
-    """reset后旧字符串不能误作用到新变量。@return None。"""
+    "Verify reset clears textual rules and model can change."
     problem=Problem();problem.addVariables(['a','b'],[1,2]);problem.addConstraint('a < b')
     assert problem.getSolutions()==[{'a':1,'b':2}]
     problem.reset();problem.addVariable('new',[7])

@@ -6,7 +6,7 @@ Fix map(attribute="field", default=none) so missing fields produce the explicit 
 
 # Investigation topics
 
-- 解释 UserDict 查询值变成键字符的分派错误
+- Explain the dispatch error that turns UserDict lookup values into key characters.
 
 # Supplied business material: materials/S03/urlencode.md
 

@@ -1,5 +1,12 @@
-# 在格式保留副本上事务式实施配置路径编辑
+# Engineering contract: TK-EDITS-DEV
 
-配置界面一次提交多项路径编辑，在独立副本上依次测试、设置和删除；任何后项失败都不改变原文档。保留未触及格式与注释，区分字面键和数组索引，最终生成的TOML必须能重新解析。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement tomlkit.editing.apply_edits(document,operations), materializing a finite ordered sequence of set/delete/test records on a detached deep copy. Paths are nonempty sequences of literal string keys and nonnegative integer array indices, never dotted-string parsing. Set may explicitly create missing mapping parents, not arrays; array indices must exist. Test compares unwrapped value and exact Python type before continuing. A late invalid operation, path error or failed test must leave original text and objects unchanged. Preserve unaffected formatting/comments, serialize and reparse final candidate. Do not modify parser internals or promise file-system transactions.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tk_edits_dev.py and concise English compatibility documentation at library/docs/development-tk-edits-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tomlkit/editing.py
+- library/development_tests/test_development_tk_edits_dev.py
+- library/docs/development-tk-edits-dev.md

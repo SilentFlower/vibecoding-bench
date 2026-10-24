@@ -1,4 +1,4 @@
-"""公开可访问安全HTML报表回归。"""
+"Public regression tests for TB-ACCESSIBLE-HTML-DEV; the complete business contract is in materials/TB-ACCESSIBLE-HTML-DEV-contract.md."
 import pytest
 from html.parser import HTMLParser
 from tabulate.accessibility import accessible_html

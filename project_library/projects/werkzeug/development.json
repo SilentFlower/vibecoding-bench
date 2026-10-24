@@ -32,7 +32,7 @@
           "id": "WZ-JSON-DEV",
           "kind": "modify",
           "goal": "为真实请求流添加有字节预算的严格JSON读取入口",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.strict_json.read_json(request,*,max_bytes=1048576). Require actual JSON mimetype including application/*+json and UTF8 charset, enforce positive byte budget against declared and actual stream size using at most max_bytes+1 read. Respect Werkzeug WSGI stream termination rules. Decode UTF8, reject nested duplicate keys after escape decoding, nonfinite constants and float overflow; invalid syntax/encoding/empty input becomes BadRequest, unsupported media 415 and budget overflow 413. Return any valid JSON value including false/null. This consumes the stream; do not modify legacy get_json cache, globals, body limits or close caller-owned input.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_json_dev.py and concise Chinese compatibility documentation at library/docs/development-wz-json-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.strict_json.read_json(request,*,max_bytes=1048576). Require actual JSON mimetype including application/*+json and UTF8 charset, enforce positive byte budget against declared and actual stream size using at most max_bytes+1 read. Respect Werkzeug WSGI stream termination rules. Decode UTF8, reject nested duplicate keys after escape decoding, nonfinite constants and float overflow; invalid syntax/encoding/empty input becomes BadRequest, unsupported media 415 and budget overflow 413. Return any valid JSON value including false/null. This consumes the stream; do not modify legacy get_json cache, globals, body limits or close caller-owned input.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_json_dev.py and concise English compatibility documentation at library/docs/development-wz-json-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/WZ-JSON-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WZ-JSON-DEV.rubric.json",
             "semantic": true,
             "native": "verification/WZ-JSON-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "WZ-PROBLEM-DEV",
           "kind": "modify",
           "goal": "将HTTP领域异常转换为保留协议头的独立问题JSON响应",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.problems.problem_response(error,*,type=\"about:blank\",instance=None,extensions=None) for real HTTPException. Create a NEW Response with actual error status, type/title/status/detail and optional instance/extensions, UTF8 finite JSON, application/problem+json and exact content length. Retain original protocol headers including duplicate Set-Cookie, Allow, WWW-Authenticate and Retry-After; replace only representation headers appropriately. Do not mutate a response supplied inside the exception. Reject reserved extension collisions/non-string keys and non-error status. Do not turn unrelated Python exceptions into successful HTTP responses.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_problem_dev.py and concise Chinese compatibility documentation at library/docs/development-wz-problem-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.problems.problem_response(error,*,type=\"about:blank\",instance=None,extensions=None) for real HTTPException. Create a NEW Response with actual error status, type/title/status/detail and optional instance/extensions, UTF8 finite JSON, application/problem+json and exact content length. Retain original protocol headers including duplicate Set-Cookie, Allow, WWW-Authenticate and Retry-After; replace only representation headers appropriately. Do not mutate a response supplied inside the exception. Reject reserved extension collisions/non-string keys and non-error status. Do not turn unrelated Python exceptions into successful HTTP responses.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_problem_dev.py and concise English compatibility documentation at library/docs/development-wz-problem-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/WZ-PROBLEM-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WZ-PROBLEM-DEV.rubric.json",
             "semantic": true,
             "native": "verification/WZ-PROBLEM-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "WZ-NEGOTIATE-DEV",
           "kind": "modify",
           "goal": "按真实Accept权重协商JSON及厂商表示并设置Vary",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.negotiated_json.json_response(value,request,*,offers=(\"application/json\",),status=200). Validate unique offered application/json or application/*+json media types, use actual request.accept_mimetypes.best_match for quality/specificity/wildcards, preserve offered order on ties and default first only when Accept is absent. Unacceptable including q=0 raises 406. Encode finite UTF8 JSON preserving false/null/Unicode, set selected Content-Type, exact length and Vary: Accept. Do not equate vendor JSON with plain JSON without an actual matching offer or silently emit a disallowed representation.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_negotiate_dev.py and concise Chinese compatibility documentation at library/docs/development-wz-negotiate-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.negotiated_json.json_response(value,request,*,offers=(\"application/json\",),status=200). Validate unique offered application/json or application/*+json media types, use actual request.accept_mimetypes.best_match for quality/specificity/wildcards, preserve offered order on ties and default first only when Accept is absent. Unacceptable including q=0 raises 406. Encode finite UTF8 JSON preserving false/null/Unicode, set selected Content-Type, exact length and Vary: Accept. Do not equate vendor JSON with plain JSON without an actual matching offer or silently emit a disallowed representation.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_negotiate_dev.py and concise English compatibility documentation at library/docs/development-wz-negotiate-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/WZ-NEGOTIATE-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WZ-NEGOTIATE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/WZ-NEGOTIATE-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "WZ-CACHE-DEV",
           "kind": "modify",
           "goal": "将JSON内容协商接入真实ETag与条件GET和HEAD",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.conditional_json.cacheable_json(value,request,*,offers=(\"application/json\",),max_age=0) using completed negotiated_json.json_response. Permit GET/HEAD only, compute strong ETag from actual selected UTF8 representation bytes, set public/max-age and reuse real Response.apply_conditions for If-None-Match/If-Match ordering and native 304/412 behavior. Retain Vary Accept and normal HEAD wire semantics. Changed representation must change ETag, matching GET/HEAD response has no wire body. Validate nonnegative integer age, preserve request and avoid reimplementing ETag comparison with substrings.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_cache_dev.py and concise Chinese compatibility documentation at library/docs/development-wz-cache-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.conditional_json.cacheable_json(value,request,*,offers=(\"application/json\",),max_age=0) using completed negotiated_json.json_response. Permit GET/HEAD only, compute strong ETag from actual selected UTF8 representation bytes, set public/max-age and reuse real Response.apply_conditions for If-None-Match/If-Match ordering and native 304/412 behavior. Retain Vary Accept and normal HEAD wire semantics. Changed representation must change ETag, matching GET/HEAD response has no wire body. Validate nonnegative integer age, preserve request and avoid reimplementing ETag comparison with substrings.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_cache_dev.py and concise English compatibility documentation at library/docs/development-wz-cache-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "WZ-NEGOTIATE-DEV",
@@ -193,7 +193,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WZ-CACHE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/WZ-CACHE-DEV.native.json",
@@ -225,7 +225,7 @@
           "id": "WZ-REQUEST-ID-DEV",
           "kind": "modify",
           "goal": "实现保留WSGI流生命周期的请求标识中间件",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.request_id.RequestIdMiddleware(app,*,factory=None). Accept incoming X-Request-ID only when it matches ASCII [A-Za-z0-9][A-Za-z0-9._-]{0,63}, otherwise generate a UUID hex or injected factory value and validate it. Store werkzeug.request_id in environ and emit exactly one matching X-Request-ID response header, replacing application duplicates case-insensitively. Forward status, all other repeated headers, start_response exc_info and write return unchanged. Return original app iterable without pre-reading/wrapping so close and streaming/backpressure remain native. Propagate app errors; do not trust multiline header input or silently accept invalid factory results.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_request_id_dev.py and concise Chinese compatibility documentation at library/docs/development-wz-request-id-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.request_id.RequestIdMiddleware(app,*,factory=None). Accept incoming X-Request-ID only when it matches ASCII [A-Za-z0-9][A-Za-z0-9._-]{0,63}, otherwise generate a UUID hex or injected factory value and validate it. Store werkzeug.request_id in environ and emit exactly one matching X-Request-ID response header, replacing application duplicates case-insensitively. Forward status, all other repeated headers, start_response exc_info and write return unchanged. Return original app iterable without pre-reading/wrapping so close and streaming/backpressure remain native. Propagate app errors; do not trust multiline header input or silently accept invalid factory results.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_request_id_dev.py and concise English compatibility documentation at library/docs/development-wz-request-id-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/WZ-REQUEST-ID-DEV-contract.md",
@@ -240,7 +240,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WZ-REQUEST-ID-DEV.rubric.json",
             "semantic": true,
             "native": "verification/WZ-REQUEST-ID-DEV.native.json",
@@ -272,7 +272,7 @@
           "id": "WZ-PIPELINE-DEV",
           "kind": "modify",
           "goal": "组合真实异常响应和请求标识形成保持流语义的API中间件",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.problem_middleware.ProblemMiddleware(app) composing completed problem_response and optional validated werkzeug.request_id context. Convert only HTTPException raised during app call before successful start_response into actual problem JSON, retaining original status/protocol headers and request_id extension. Other Python exceptions, HTTPException after headers started and all iterable-time errors must propagate without sending a second response. Return success iterable unchanged. Verify the real stack RequestIdMiddleware(ProblemMiddleware(app)) with bounded strict JSON input: errors and successful negotiated responses share exact request ID and native close behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_pipeline_dev.py and concise Chinese compatibility documentation at library/docs/development-wz-pipeline-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement werkzeug.problem_middleware.ProblemMiddleware(app) composing completed problem_response and optional validated werkzeug.request_id context. Convert only HTTPException raised during app call before successful start_response into actual problem JSON, retaining original status/protocol headers and request_id extension. Other Python exceptions, HTTPException after headers started and all iterable-time errors must propagate without sending a second response. Return success iterable unchanged. Verify the real stack RequestIdMiddleware(ProblemMiddleware(app)) with bounded strict JSON input: errors and successful negotiated responses share exact request ID and native close behavior.\n\nDeliver meaningful original-failing public regression tests at library/development_tests/test_development_wz_pipeline_dev.py and concise English compatibility documentation at library/docs/development-wz-pipeline-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [
             {
               "task_id": "WZ-PROBLEM-DEV",
@@ -304,7 +304,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/WZ-PIPELINE-DEV.rubric.json",
             "semantic": true,
             "native": "verification/WZ-PIPELINE-DEV.native.json",

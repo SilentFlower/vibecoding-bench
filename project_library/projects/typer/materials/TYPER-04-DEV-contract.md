@@ -1,3 +1,12 @@
-# 本地订单履约汇总重复SKU后全单验证并交付库存与凭据
+# Engineering contract: TYPER-04-DEV
 
-完整订单履约先按首次出现顺序汇总重复sku，正整数/未知商品/合计库存全单检查；一次生成新清单并给真实前后量凭据，空批次复制，任何坏行/不足整批不交付。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add shop.py fulfill CATALOG ORDERS_JSON --output NEW_JSON. Orders is array of existing sku plus strict positive int quantity (bool forbidden); aggregate repeated sku in first-seen order, validate combined demand against real inventory before publishing one complete new catalog. Unknown sku/malformed line/underflow reject whole batch, no input mutation or partial output. Preserve catalog order and unaffected fields, empty batch explicitly copies catalog. Print structured aggregate fulfillment before/after receipt only after exclusive atomic publication; do not publish receipt on failure or silently fulfill partial demand. All earlier commands and original Typer remain.
+
+Deliver real implementation, original-failing public tests at app/development_tests/test_development_typer_04_dev.py, and English compatibility documentation at app/docs/development-typer-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- app/inventory_fulfill.py
+- app/development_tests/test_development_typer_04_dev.py
+- app/docs/development-typer-04-dev.md

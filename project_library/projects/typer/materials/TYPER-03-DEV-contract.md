@@ -1,3 +1,12 @@
-# 商品库存调账按明确SKU生成新清单并拒绝负库存或未知商品
+# Engineering contract: TYPER-03-DEV
 
-完整调账业务按已存在sku和有符号delta生成独立新清单，正负零变化/库存下限/未知商品明确；其他商品/原文件保持，成功后给前后量凭据，失败不写半成品或覆盖。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add real shop.py adjust SOURCE --sku SKU --delta SIGNED_INT --output NEW_JSON using delivered validated inventory store. Apply delta exactly once to existing unique sku, permit positive/negative/zero changes, reject underflow and unknown sku before any write. Preserve product order/name/other quantities and all input bytes. Publish complete new canonical catalog with original exclusive atomic-output policy, print structured sku/before/delta/after receipt only after success; invalid inputs/existing outputs nonzero without partial result. Keep product/export/import-csv and original Typer source/environment.
+
+Deliver real implementation, original-failing public tests at app/development_tests/test_development_typer_03_dev.py, and English compatibility documentation at app/docs/development-typer-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- app/inventory_adjust.py
+- app/development_tests/test_development_typer_03_dev.py
+- app/docs/development-typer-03-dev.md

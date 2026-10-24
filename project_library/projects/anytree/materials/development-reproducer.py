@@ -1,4 +1,4 @@
-"""公开复现JSON预览污染共享深度。"""
+"""Public reproduction of JSON preview depth leaking into shared exporter state."""
 from anytree import Node
 from anytree.exporter import DictExporter, JsonExporter
 root = Node('catalog')

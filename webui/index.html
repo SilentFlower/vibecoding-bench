@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261024-projects-manual-resume" />
+  <link rel="stylesheet" href="style.css?v=20261024-projects-feed" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -101,8 +101,11 @@
           <button id="projects-tab-terminal" type="button" role="tab" aria-controls="projects-terminal-panel" aria-selected="true">Claude Code 终端</button>
           <button id="projects-tab-events" type="button" role="tab" aria-controls="projects-events-panel" aria-selected="false">Pi 与 Claude 交互</button>
         </div>
-        <div id="projects-terminal-panel" role="tabpanel" aria-labelledby="projects-tab-terminal"><pre id="projects-screen" class="projects-screen">等待 Pi 观察 Claude Code 终端。</pre></div>
-        <div id="projects-events-panel" class="hidden" role="tabpanel" aria-labelledby="projects-tab-events"><ol id="projects-events" class="projects-events"></ol></div>
+        <div id="projects-terminal-panel" role="tabpanel" aria-labelledby="projects-tab-terminal"><p id="projects-screen-status" class="hint">选择账号后查看当前目标的最新画面。</p><pre id="projects-screen" class="projects-screen">等待 Pi 观察 Claude Code 终端。</pre></div>
+        <div id="projects-events-panel" class="hidden" role="tabpanel" aria-labelledby="projects-tab-events">
+          <div class="projects-pagination" aria-label="交互记录分页"><span id="projects-events-page" class="hint" role="status"></span><button id="projects-events-latest" type="button" class="btn btn-sm" disabled>最新一页</button><button id="projects-events-previous" type="button" class="btn btn-sm" disabled>上一页</button><button id="projects-events-next" type="button" class="btn btn-sm" disabled>下一页</button></div>
+          <button id="projects-events-new" type="button" class="btn btn-sm hidden"></button><ol id="projects-events" class="projects-events"></ol>
+        </div>
       </section>
       <div class="projects-settings">
         <details id="projects-agent-settings" class="batch-panel">
@@ -111,6 +114,7 @@
             <label><span class="lbl">本轮最长工作时间 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="60" required></label>
             <p class="hint">恢复接续原目标与会话；累计预算耗尽后需人工调整，定时运行不会清零。</p>
             <label><span class="lbl">给 Pi 的业务指南</span><textarea name="instructions" rows="4" maxlength="12000" placeholder="例如：先调查并讨论方案，确认后实施；优先完成一个目标，再换项目。"></textarea></label>
+            <p class="hint">可用中文补充业务指南，保存后的原文会交给 Pi；与 Claude Code 的自然语言交流使用英文。修改指南前请先暂停，保存后启动 / 恢复生效。</p>
             <label><span class="lbl">授权项目池</span><input id="projects-filter" type="search" placeholder="搜索项目研究"></label>
             <p class="hint" id="projects-research-count"></p>
             <div class="view-actions"><button class="btn btn-sm" type="button" id="projects-select-all" title="选择全部项目，包含当前搜索隐藏的项目">全选</button><button class="btn btn-sm" type="button" id="projects-clear-all" title="清空全部项目的选择">清空</button></div>
@@ -138,7 +142,10 @@
         </details>
       </div>
       <section class="projects-records">
-        <details class="batch-panel" open><summary>工程与交付记录</summary><div id="projects-history"></div></details>
+        <details class="batch-panel" open><summary>工程与交付记录</summary>
+          <div class="projects-pagination" aria-label="工程记录分页"><span id="projects-history-page" class="hint" role="status"></span><button id="projects-history-latest" type="button" class="btn btn-sm" disabled>最新一页</button><button id="projects-history-previous" type="button" class="btn btn-sm" disabled>上一页</button><button id="projects-history-next" type="button" class="btn btn-sm" disabled>下一页</button></div>
+          <button id="projects-history-new" type="button" class="btn btn-sm hidden"></button><div id="projects-history"></div>
+        </details>
         <details class="batch-panel" id="projects-delivery"><summary id="projects-delivery-title">冻结交付与源码</summary><div id="projects-submissions"></div><div id="projects-delivery-files"></div><pre class="projects-document" id="projects-delivery-preview"></pre></details>
       </section>
       <details id="projects-research" class="batch-panel"><summary id="projects-research-title">项目研究</summary><pre id="projects-research-body" class="projects-document"></pre></details>
@@ -804,7 +811,7 @@
     </div>
   </div>
 
-  <script src="projects.js?v=20261024-projects-self-heal"></script>
+  <script src="projects.js?v=20261024-projects-feed"></script>
   <script src="app.js?v=20261024-project-overview"></script>
 </body>
 </html>

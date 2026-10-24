@@ -1,4 +1,4 @@
-"""CLI选项或写入失败不能提前截断输入/输出文件。"""
+"Public regression tests for SQLPARSE-01-DEV; the complete business contract is in materials/SQLPARSE-01-DEV-contract.md."
 import contextlib
 import io
 import stat
@@ -9,7 +9,7 @@ from sqlparse.cli import main
 
 
 def test_bad_options_preserve_inplace_and_existing_outfile():
-    """无效indent_width保留所有既有字节。@return None。"""
+    "Verify bad options preserve inplace and existing outfile."
     with tempfile.TemporaryDirectory() as temporary:
         source=Path(temporary)/'input.sql';target=Path(temporary)/'out.sql'
         source.write_bytes(b'select 1;');target.write_bytes(b'prior output')
@@ -20,7 +20,7 @@ def test_bad_options_preserve_inplace_and_existing_outfile():
 
 
 def test_success_mode_and_replace_failure_cleanup():
-    """真实成功保持权限，替换失败不留下半文或临时文件。@return None。"""
+    "Verify success mode and replace failure cleanup."
     with tempfile.TemporaryDirectory() as temporary:
         path=Path(temporary)/'input.sql';path.write_text('select 1;');path.chmod(0o640)
         assert main([str(path),'--in-place','-k','upper'])==0 and path.read_text()=='SELECT 1;'

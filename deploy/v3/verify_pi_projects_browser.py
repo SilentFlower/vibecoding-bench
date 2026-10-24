@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import base64
+import hashlib
 import json
 import shutil
 import socket
@@ -65,6 +66,10 @@ async def verify(evidence: Path) -> dict:
     :return: 实际检查结果。
     """
     evidence.mkdir(parents=True, exist_ok=True)
+    started_at = time.time()
+    source_paths = ('webui/projects.js', 'webui/index.html', 'webui/style.css',
+        'orchestrator/projects.py', 'orchestrator/projects_api.py', 'deploy/v3/verify_pi_projects_browser.py')
+    source_sha256 = {relative: hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() for relative in source_paths}
     fixture = ProjectsAgentTests('test_pause_rejects_old_generation_before_any_terminal_write')
     fixture.setUp()
     fixture.pi = BrowserPi()
@@ -79,6 +84,30 @@ async def verify(evidence: Path) -> dict:
     materialize_snapshot(read_document(directory / 'snapshot.json'), fixture.root / 'projects/objects', directory / 'candidate')
     fixture.service._write("UPDATE projects_agents SET status='off' WHERE account_id=1")
     fixture.service.configure(2, ['other'])
+
+    def seed_history(identifier, created_at):
+        """添加不属于当前项目池的已完成历史，不改变真实交付和运行进度。
+
+        :param identifier: 合成历史工作 ID。
+        :param created_at: 早于真实交付的创建时间。
+        :return: 合成工作的完整记录。
+        """
+        historical = {**work, 'id': identifier, 'project_key': 'browser-history', 'status': 'passed',
+            'session_id': 'session-' + identifier, 'created_at': created_at, 'ended_at': created_at + 1,
+            'runtime_json': None, 'segment_started_at': None, 'work_sec': 0}
+        columns, placeholders = ','.join(historical), ','.join('?' for _ in historical)
+        fixture.service._write(f'INSERT INTO projects_work({columns}) VALUES({placeholders})', tuple(historical.values()))
+        return historical
+
+    historical_works = [seed_history(f'browser-history-{index:03}', work['created_at'] - 10 - index // 3)
+        for index in range(36)]
+    for index in range(450):
+        fixture.service._event(1, 'observation', {'screen': f'旧历史画面 {index}'}, historical_works[0]['id'])
+    for index in range(65):
+        fixture.service._event(1, 'pi', {'text': f'分页交互 {index:03}'}, work['id'])
+    latest_screen = '当前真实交付的最新终端画面'
+    fixture.service._event(1, 'observation', {'screen': latest_screen}, work['id'])
+    initial_cursor = fixture.service.snapshot(1)['cursor']
     public_gate = {'allowed': True, 'reason': 'allowed', 'retryable': False, 'retry_at': None,
         'message': None, 'window': {'enabled': False, 'allowed': True, 'timezone': 'Asia/Shanghai',
             'next_open_at': None, 'next_close_at': None},
@@ -90,7 +119,9 @@ async def verify(evidence: Path) -> dict:
     application = FastAPI()
     application.include_router(projects_router(lambda: fixture.service))
     requested_paths = []
+    stream_requests = []
     start_response = threading.Event()
+    drop_stream_once = threading.Event()
 
     @application.middleware('http')
     async def record_requests(request: Request, call_next):
@@ -101,9 +132,27 @@ async def verify(evidence: Path) -> dict:
         :return: 原请求响应。
         """
         requested_paths.append(request.url.path)
+        if request.url.path == '/api/projects/stream':
+            stream_requests.append({'query': dict(request.query_params), 'last_event_id': request.headers.get('last-event-id')})
         if request.method == 'POST' and request.url.path == '/api/projects/agents/1/start':
             await asyncio.to_thread(start_response.wait, 10)
-        return await call_next(request)
+        response = await call_next(request)
+        if request.url.path == '/api/projects/stream':
+            original_body = response.body_iterator
+
+            async def observed_body():
+                """只在隔离测试中结束一次已交付的更新，验证浏览器自动重连。:return: 原始 SSE 字节。"""
+                try:
+                    async for chunk in original_body:
+                        yield chunk
+                        if drop_stream_once.is_set() and b'event: update' in chunk:
+                            drop_stream_once.clear()
+                            return
+                finally:
+                    await original_body.aclose()
+
+            response.body_iterator = observed_body()
+        return response
 
     @application.get('/api/accounts')
     def accounts():
@@ -205,10 +254,68 @@ async def verify(evidence: Path) -> dict:
                 await rpc('Page.addScriptToEvaluateOnNewDocument', {'source': '''window.projectStreams=[];
                     const Original=window.EventSource;window.EventSource=class extends Original{
                     constructor(...args){super(...args);window.projectStreams.push(this)}
-                    close(){this.wasClosed=true;super.close()}};'''}, session)
+                    close(){this.wasClosed=true;super.close()}};
+                    window.projectScreens=[];addEventListener('DOMContentLoaded',()=>{
+                        const screen=document.querySelector('#projects-screen');
+                        if(screen)new MutationObserver(()=>window.projectScreens.push(screen.textContent)).observe(screen,{childList:true,subtree:true});
+                    });'''}, session)
                 await rpc('Page.navigate', {'url': f'http://127.0.0.1:{port}/#projects'}, session)
                 await until('document.querySelectorAll("[name=project_key]").length === 2')
                 await until('document.querySelector("#projects-progress-text").textContent.includes("1 / 1")')
+                await until('document.querySelector("#projects-screen").textContent === ' + json.dumps(latest_screen))
+                await until('window.projectStreams.some(value=>value.readyState===EventSource.OPEN)')
+                assert not await evaluate('window.projectScreens.some(text=>text.includes("旧历史画面"))')
+                assert stream_requests and stream_requests[0]['query'] == {'account_id': '1', 'after': str(initial_cursor)}
+                assert await evaluate('document.querySelectorAll("#projects-events li[data-event-id]").length === 20 && document.querySelectorAll("#projects-history [data-work]").length === 10')
+                assert await evaluate('(()=>{const ids=Array.from(document.querySelectorAll("#projects-events [data-event-id]"),value=>Number(value.dataset.eventId));return ids.every((id,index)=>!index || id<ids[index-1])})()')
+                assert await evaluate('document.querySelector("#projects-history [data-work]").dataset.work === ' + json.dumps(work['id']))
+
+                # 迟到的旧工程观察只属于历史，不能把当前终端换成其他会话。
+                before_operations = (len(fixture.terminal.started), len(fixture.terminal.sent), len(fixture.terminal.controls))
+                fixture.service._event(1, 'observation', {'screen': '迟到的旧工程终端'}, historical_works[0]['id'])
+                fixture.service._event(1, 'pi', {'text': '迟到观察已核对'}, work['id'])
+                await until('document.querySelector("#projects-events").textContent.includes("迟到观察已核对")')
+                assert await evaluate('document.querySelector("#projects-screen").textContent === ' + json.dumps(latest_screen))
+                await evaluate('window.firstEventPage=Array.from(document.querySelectorAll("#projects-events [data-event-id]"),value=>value.dataset.eventId);window.firstWorkPage=Array.from(document.querySelectorAll("#projects-history [data-work]"),value=>value.dataset.work);document.querySelector("#projects-tab-events").click();document.querySelector("#projects-events-next").click();document.querySelector("#projects-history-next").click();')
+                await until('document.querySelector("#projects-events-page").textContent.includes("第 2 页") && document.querySelector("#projects-history-page").textContent.includes("第 2 页")')
+                assert await evaluate('document.querySelectorAll("#projects-events [data-event-id]").length === 20 && document.querySelectorAll("#projects-history [data-work]").length === 10')
+                assert await evaluate('Array.from(document.querySelectorAll("#projects-events [data-event-id]")).every(value=>!window.firstEventPage.includes(value.dataset.eventId)) && Array.from(document.querySelectorAll("#projects-history [data-work]")).every(value=>!window.firstWorkPage.includes(value.dataset.work))')
+                await evaluate('window.oldEventPage=Array.from(document.querySelectorAll("#projects-events [data-event-id]"),value=>value.dataset.eventId);window.oldWorkPage=Array.from(document.querySelectorAll("#projects-history [data-work]"),value=>value.dataset.work);')
+                fixture.service._event(1, 'pi', {'text': '浏览旧页时的新交互'}, work['id'])
+                newer_work = seed_history('browser-newer-work', work['created_at'] - 0.5)
+                fixture.service._write('UPDATE projects_agents SET current_work_id=? WHERE account_id=1', (newer_work['id'],))
+                fixture.service._event(1, 'started', {'session_id': newer_work['session_id']}, newer_work['id'])
+                await until('!document.querySelector("#projects-events-new").classList.contains("hidden") && !document.querySelector("#projects-history-new").classList.contains("hidden")')
+                assert await evaluate('document.querySelector("#projects-events-page").textContent.includes("第 2 页") && document.querySelector("#projects-history-page").textContent.includes("第 2 页")')
+                assert await evaluate('JSON.stringify(Array.from(document.querySelectorAll("#projects-events [data-event-id]"),value=>value.dataset.eventId))===JSON.stringify(window.oldEventPage) && JSON.stringify(Array.from(document.querySelectorAll("#projects-history [data-work]"),value=>value.dataset.work))===JSON.stringify(window.oldWorkPage)')
+                assert await evaluate('document.querySelector("#projects-screen").textContent.includes("等待当前目标")')
+                await evaluate('document.querySelector("#projects-events-new").click();document.querySelector("#projects-history-new").click();')
+                await until('document.querySelector("#projects-events-page").textContent.includes("第 1 页") && document.querySelector("#projects-history-page").textContent.includes("第 1 页") && document.querySelector("#projects-events").textContent.includes("浏览旧页时的新交互")')
+                assert await evaluate('document.querySelector("#projects-events-new").classList.contains("hidden") && document.querySelector("#projects-history-new").classList.contains("hidden") && document.querySelector("#projects-events-previous").disabled && document.querySelector("#projects-history-previous").disabled')
+                assert await evaluate('Array.from(document.querySelectorAll("#projects-history [data-work]")).some(value=>value.dataset.work===' + json.dumps(newer_work['id']) + ')')
+                fixture.service._write('UPDATE projects_agents SET current_work_id=? WHERE account_id=1', (work['id'],))
+                fixture.service._event(1, 'observation', {'screen': latest_screen}, work['id'])
+                await until('document.querySelector("#projects-screen").textContent === ' + json.dumps(latest_screen))
+
+                # 原生 EventSource 收到服务端断开后必须用 Last-Event-ID 续接，而非从零回放。
+                stream_count = len(stream_requests)
+                drop_stream_once.set()
+                fixture.service._event(1, 'pi', {'text': '断线前最后一条交互'}, work['id'])
+                disconnect_id = fixture.service.event_page(1, limit=1)['items'][0]['id']
+                await until('document.querySelector("#projects-events").textContent.includes("断线前最后一条交互")')
+                for _ in range(100):
+                    if len(stream_requests) > stream_count:
+                        break
+                    await asyncio.sleep(0.1)
+                assert len(stream_requests) > stream_count, '浏览器没有自动重连 SSE'
+                assert stream_requests[-1]['last_event_id'] == str(disconnect_id)
+                fixture.service._event(1, 'pi', {'text': '重连后的最新交互'}, work['id'])
+                await until('document.querySelector("#projects-events").textContent.includes("重连后的最新交互")')
+                assert await evaluate('Array.from(document.querySelectorAll("#projects-events [data-event-id]")).filter(value=>value.dataset.eventId===' + json.dumps(str(disconnect_id)) + ').length === 1')
+                assert not await evaluate('window.projectScreens.some(text=>text.includes("旧历史画面") || text.includes("迟到的旧工程终端"))')
+                assert before_operations == (len(fixture.terminal.started), len(fixture.terminal.sent), len(fixture.terminal.controls))
+                assert not fixture.pi.entered.is_set(), '读取历史意外启动了 Pi'
+                await evaluate('document.querySelector("#projects-tab-terminal").click()')
                 assert await evaluate('document.querySelector("#projects-progress-bar").value === 100 && document.querySelector("#projects-budget").textContent === ""')
                 assert await evaluate('document.querySelector("#projects-account").getAttribute("form") === "projects-agent-form" && document.querySelector("#projects-account").closest("header") !== null')
                 assert await evaluate('Array.from(document.querySelectorAll(".projects-settings > details")).every(value => !value.open)')
@@ -362,11 +469,21 @@ async def verify(evidence: Path) -> dict:
                     assert not overflow, {'width': width, 'overflow': overflow}
                 await evaluate('location.hash="#topics"')
                 await until('window.projectStreams.length > 0 && window.projectStreams.every(value => value.wasClosed)')
+                assert before_operations == (len(fixture.terminal.started), len(fixture.terminal.sent), len(fixture.terminal.controls)), '切账号或翻页意外操作了原生终端'
                 assert not errors, errors
                 legacy_paths = ('/api/project-catalog', '/api/project-iteration-batches', '/api/project-instances',
                     '/api/project-step-attempts', '/api/project-iterations-stream')
                 assert not any(path.startswith(legacy_paths) for path in requested_paths), '新页面仍请求旧项目接口'
-        result = {'status': 'passed', 'checks': ['真实表单与SQLite保存', 'Pi启动暂停', 'SSE事件及切页关闭',
+        assert source_sha256 == {relative: hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+            for relative in source_paths}, '受测源码在验证期间发生变化，请重新验证'
+        result = {'status': 'passed', 'started_at': started_at, 'finished_at': time.time(), 'source_sha256': source_sha256,
+            'feed_fixture': {'historical_observations': 450, 'historical_works': len(historical_works),
+                'initial_cursor': initial_cursor, 'reconnected_last_event_id': str(disconnect_id)},
+            'checks': ['真实表单与SQLite保存', 'Pi启动暂停', 'SSE事件及切页关闭',
+            '450条旧终端观察不回放', '首次SSE从快照高水位订阅', '迟到旧工程画面不覆盖当前目标',
+            '交互20条最新倒序分页', '工程10条稳定分页及同时间排序', '浏览旧页新增记录不跳页且有提示',
+            '新记录提示返回最新页', '目标切换立即清除旧画面', 'SSE服务端断开后原生Last-Event-ID重连',
+            '页面读取及翻页不启动Pi或操作Claude终端', '切账号及快速重选不操作原生终端',
             '筛选时全选覆盖全部项目', '筛选时清空全部项目', '单选实时更新已选数量', '项目池保存重载回显',
             '自动计划默认关闭与间隔范围', '运行中启停自动计划不重建Pi', 'SSE保留未保存的计划输入',
             '计划切账号及重载回填', '人工暂停关闭自动计划',

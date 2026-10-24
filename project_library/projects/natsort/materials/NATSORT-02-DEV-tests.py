@@ -1,11 +1,11 @@
-"""缓存保持原生键语义，容量和不可hash回退可观测。"""
+"Public regression tests for NATSORT-02-DEV; the complete business contract is in materials/NATSORT-02-DEV-contract.md."
 import unittest
 from natsort import natsort_keygen, ns
 from natsort.cached import cached_natsort_keygen
 
 
 def test_hit_eviction_and_clear():
-    """LRU命中、淘汰和清空遵守容量。@return None。"""
+    "Verify hit eviction and clear."
     key=cached_natsort_keygen(maxsize=2)
     assert key('a10')==natsort_keygen()('a10')
     key('a10');key('b2');key('c3')
@@ -15,7 +15,7 @@ def test_hit_eviction_and_clear():
 
 
 def test_unhashable_and_policy_isolation():
-    """列表不缓存，不同算法的工厂不串结果。@return None。"""
+    "Verify unhashable and policy isolation."
     key=cached_natsort_keygen()
     value=['x2','x10'];before=key(value);value.append('x1')
     assert key(value)!=before
@@ -25,10 +25,10 @@ def test_unhashable_and_policy_isolation():
 
 
 def test_exception_is_not_cached():
-    """用户key异常保留且不会成为缓存值。@return None。"""
+    "Verify exception is not cached."
     seen=[]
     def extract(value):
-        """模拟首次失败。@param value 原输入。@return 原输入。"""
+        "Support the public regression through extract."
         seen.append(value)
         if len(seen)==1:raise RuntimeError('once')
         return value

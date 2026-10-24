@@ -1,4 +1,4 @@
-"""公开配置事务编辑回归。"""
+"Public regression tests for TK-EDITS-DEV; the complete business contract is in materials/TK-EDITS-DEV-contract.md."
 import pytest
 import tomlkit
 from tomlkit.editing import apply_edits

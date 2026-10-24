@@ -1,8 +1,8 @@
-"""未知CLI参数按原父子层级保留，不能都搬到末尾。"""
+"Public regression tests for PYDANTIC-SETTINGS-05-DEV; the complete business contract is in materials/PYDANTIC-SETTINGS-05-DEV-contract.md."
 from pydantic_settings import BaseSettings,CliApp,CliSubCommand,CliUnknownArgs
 
 def test_parent_and_child_unknowns_keep_ownership_after_roundtrip():
-    """真实解析先建立归属，序列化后再解析核每层。@return None。"""
+    "Verify parent and child unknowns keep ownership after roundtrip."
     class Child(BaseSettings):
         value:int=1
         unknown:CliUnknownArgs
@@ -17,7 +17,7 @@ def test_parent_and_child_unknowns_keep_ownership_after_roundtrip():
         assert copy==value
 
 def test_three_levels_and_child_end_marker_preserve_known_fields():
-    """多层unknown各留原层，叶子--仍在已知参数之后。@return None。"""
+    "Verify three levels and child end marker preserve known fields."
     class Leaf(BaseSettings):
         value:int=0
         unknown:CliUnknownArgs

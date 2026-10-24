@@ -1,5 +1,12 @@
-# 对归一化后的兄弟及根字段声明比较约束
+# Engineering contract: CERBERUS-O03-DEV
 
-原生compare_to规则使用受控比较操作符，在归一化后通过既有路径协议比较兄弟或根字段。缺目标与已有None区别明确，可显式忽略缺失；失败及不可比较值进入原生错误树，不执行表达式、不改dependencies。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add actual compare_to rule with schema-validated {field, operator, missing} using only lt/le/eq/ne/ge/gt. Resolve existing sibling/dotted/root ^ paths through the real lookup protocol after normalization, distinguish missing targets from existing None, default missing to error or explicitly ignore, and report failed/incomparable comparisons in native field error trees. Reject unknown operators at schema validation, never eval strings or alter dependencies/min/max semantics.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o03_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cerberus/validator.py
+- library/tests/test_development_cerberus_o03_dev.py
+- library/docs/development-cerberus-o03-dev.md

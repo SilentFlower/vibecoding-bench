@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线01：真实CLI先读取、校验、格式化和编码，再同目录临时文件fsync及原子替换；无效选项与格式化/写入失败保留既有输入输出字节，权限属主保持并清理临时文件。只处理显式本地文件，不执行SQL。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Repair actual sqlparse CLI file lifecycle: read input, validate formatter options and complete formatting/encoding before touching any output destination. For --in-place and explicit outfile use same-directory temporary bytes, flush/fsync and os.replace, preserve existing mode/owner and clean temporary files on pre-replace failure. Reject symlink/nonregular output. Invalid options, formatting exceptions, encoding and IO failures return nonzero without truncating old bytes; stdout remains caller-owned and stdin in-place stays forbidden. Continue other explicit files after one fails using current aggregate status. Preserve successful output text, ordinary parser flags, input encoding and existing diagnostic prefixes. Never execute SQL or contact a database.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_01_dev.py, and English compatibility documentation at library/docs/development-sqlparse-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/sqlparse/cli.py
+- library/tests/test_development_sqlparse_01_dev.py
+- library/docs/development-sqlparse-01-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

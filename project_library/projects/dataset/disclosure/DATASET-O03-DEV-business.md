@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线05：单条数据库UPDATE表达式原子增减，显式过滤、数值类型及NULL政策；两连接实际累加和事务回滚，不先读再写也不承诺超出数据库的精度。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement Table.increment(column,amount,filters,*,nulls="preserve") with one SQLAlchemy UPDATE expression, never read-modify-write. Require existing numeric SQLAlchemy column, finite int/float/Decimal excluding bool, explicit filters mapping, and nulls=preserve|zero. Zero/negative increments work; unmatched/nonexistent table returns zero, no schema creation. Return reliable database rowcount, preserve existing update/transaction behavior and reject unknown/non-numeric columns or invalid policies before DML. Prove two file-backed SQLite connections accumulate changes and an explicit database transaction rolls back failed work; document backend numeric range/precision limits.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_dataset_o03_dev.py and concise English compatibility documentation at library/docs/development-dataset-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/dataset/table.py
+- library/test/test_development_dataset_o03_dev.py
+- library/docs/development-dataset-o03-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

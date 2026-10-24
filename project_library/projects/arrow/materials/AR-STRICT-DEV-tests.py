@@ -1,4 +1,4 @@
-"""公开严格时间格式回归。"""
+"Public regression tests for AR-STRICT-DEV; the complete business contract is in materials/AR-STRICT-DEV-contract.md."
 from datetime import datetime
 import pytest
 import arrow

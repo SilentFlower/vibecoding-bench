@@ -1,4 +1,4 @@
-"""公开原子批量配置编辑回归。"""
+"Public regression tests for DE-BATCH-DEV; the complete business contract is in materials/DE-BATCH-DEV-contract.md."
 import os
 import pytest
 from dotenv import dotenv_values

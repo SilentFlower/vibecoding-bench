@@ -1,4 +1,4 @@
-"""持久化快照完整保存所有节点，不依赖expanded展示状态。"""
+"Public regression tests for TREELIB-03-DEV; the complete business contract is in materials/TREELIB-03-DEV-contract.md."
 import json
 import unittest
 from treelib import Tree
@@ -6,7 +6,7 @@ from treelib.snapshot import snapshot,restore
 
 
 def test_collapsed_duplicate_tag_order_and_data_roundtrip():
-    """同名兄弟、折叠后代及兄弟插入顺序全部保留。@return None。"""
+    "Verify collapsed duplicate tag order and data roundtrip."
     tree=Tree();tree.create_node('Root','r');tree.create_node('Same','b',parent='r',data={'x':[1]});tree.create_node('Same','a',parent='r');tree.create_node('Leaf','l',parent='b')
     tree['b'].expanded=False
     document=snapshot(tree);again=restore(json.loads(json.dumps(document)))
@@ -17,7 +17,7 @@ def test_collapsed_duplicate_tag_order_and_data_roundtrip():
 
 
 def test_empty_and_invalid_documents():
-    """空树明确编码，未知版本及缺失关系拒绝。@return None。"""
+    "Verify empty and invalid documents."
     assert snapshot(restore(snapshot(Tree())))=={'schema':1,'root':None,'nodes':[]}
     tree=Tree();tree.create_node('R','r');document=snapshot(tree)
     document['schema']=2

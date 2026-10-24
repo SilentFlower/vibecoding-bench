@@ -1,3 +1,12 @@
-# 最长公共子序列在动态规划与重建中一致遵守自定义相等谓词
+# Engineering contract: TEXTDISTANCE-01-DEV
 
-路线01：两输入LCS动态规划和重建统一使用现有test_func，返回首输入原字符，默认结果及既有并列选择保持。大小写不敏感和非传递逐对谓词均真实验收，不通过强制小写冒充任意谓词。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair LCSSeq two-input dynamic programming and reconstruction to honor the existing test_func contract, matching the multi-input path. Return matching units from the first input with their original spelling, preserve default == results and stable existing tie behavior, and do not replace arbitrary pairwise predicates with a lowercase/hash-key equivalence assumption. Custom predicates may be nontransitive; errors propagate. No optional backend may bypass the predicate. Deliver a complete repair with public original-failing checks and unchanged upstream tests.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_textdistance_01_dev.py, and English compatibility documentation at library/docs/development-textdistance-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/textdistance/algorithms/sequence_based.py
+- library/tests/test_development_textdistance_01_dev.py
+- library/docs/development-textdistance-01-dev.md

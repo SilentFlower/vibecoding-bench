@@ -1,9 +1,9 @@
-"""结果上下文提前退出、转换失败和资源异常均清理。"""
+"Public regression tests for DATASET-O04-DEV; the complete business contract is in materials/DATASET-O04-DEV-contract.md."
 import dataset
 import pytest
 
 def test_real_streamed_early_exit_leaves_database_usable():
-    """退出游标上下文不关闭共享Database。@return None。"""
+    "Verify real streamed early exit leaves database usable."
     db=dataset.connect('sqlite://');table=db['items'];table.insert_many([{'x':1},{'x':2}])
     with table.find(_streamed=True) as result:
         assert next(result)['x']==1;connection=result._conn;proxy=result.result_proxy
@@ -11,7 +11,7 @@ def test_real_streamed_early_exit_leaves_database_usable():
     result.close();assert list(result)==[];db.close()
 
 def test_conversion_error_releases_actual_result():
-    """row_type抛错也释放专用连接。@return None。"""
+    "Verify conversion error releases actual result."
     db=dataset.connect('sqlite://');table=db['items'];table.insert({'x':1})
     result=table.find(_streamed=True);connection=result._conn;proxy=result.result_proxy
     def fail(items):raise ValueError('conversion')
@@ -20,7 +20,7 @@ def test_conversion_error_releases_actual_result():
     assert connection.closed and proxy.closed;db.close()
 
 def test_cleanup_failure_preserves_original_and_is_idempotent():
-    """双资源均尝试关闭，原业务异常不能被清理错误遮蔽。@return None。"""
+    "Verify cleanup failure preserves original and is idempotent."
     from dataset.util import ResultIter
     class Proxy:
         calls=0

@@ -1,14 +1,14 @@
-"""pickle往返后保持Box子类及嵌套列表里的真实类型。"""
+"Public regression tests for BX-PICKLE-DEV; the complete business contract is in materials/BX-PICKLE-DEV-contract.md."
 import pickle
 from box import Box
 
 
 class ConfigSubclass(Box):
-    """实际业务配置子类。"""
+    "Public regression fixture: ConfigSubclass."
 
 
 def test_nested_subclasses_roundtrip():
-    """直接子节点和列表子节点都保持子类。@return None。"""
+    "Verify nested subclasses roundtrip."
     original = ConfigSubclass({'child': {'port': 9}, 'rows': [{'port': 10}]})
     for protocol in range(2, pickle.HIGHEST_PROTOCOL + 1):
         result = pickle.loads(pickle.dumps(original, protocol=protocol))
@@ -19,7 +19,7 @@ def test_nested_subclasses_roundtrip():
 
 
 def test_frozen_options_and_plain_box():
-    """冻结和默认节点选项不丢失，普通Box继续正常。@return None。"""
+    "Verify frozen options and plain box."
     original = ConfigSubclass({'child': {'port': 9}}, frozen_box=True, default_box=True)
     result = pickle.loads(pickle.dumps(original))
     assert type(result.child) is ConfigSubclass
@@ -29,7 +29,7 @@ def test_frozen_options_and_plain_box():
 
 
 def test_existing_shared_nodes():
-    """已经存在的共享引用不应在恢复时被重新转换拆开。@return None。"""
+    "Verify existing shared nodes."
     original = ConfigSubclass({'child': {'port': 9}})
     dict.__setitem__(original, 'alias', original.child)
     result = pickle.loads(pickle.dumps(original))

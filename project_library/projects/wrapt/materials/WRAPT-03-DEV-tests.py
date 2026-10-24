@@ -1,10 +1,10 @@
-"""重复await复用完成值，异常/取消与不同loop不串缓存。"""
+"Public regression tests for WRAPT-03-DEV; the complete business contract is in materials/WRAPT-03-DEV-contract.md."
 import asyncio
 import unittest
 from wrapt.async_cache import async_lru_cache
 
 def test_completed_values_repeat_await_and_event_loop_isolation():
-    """缓存的是结果，不是只能await一次的协程。@return None。"""
+    "Verify completed values repeat await and event loop isolation."
     calls=[]
     @async_lru_cache(maxsize=2)
     async def value(x):calls.append(x);await asyncio.sleep(0);return x*2
@@ -14,7 +14,7 @@ def test_completed_values_repeat_await_and_event_loop_isolation():
     asyncio.run(run());asyncio.run(run());assert calls==[2,2]
 
 def test_failure_cancellation_and_clear_during_compute_do_not_store():
-    """取消/失败不缓存，clear后迟到成功不回填。@return None。"""
+    "Verify failure cancellation and clear during compute do not store."
     async def run():
         started=asyncio.Event();release=asyncio.Event();calls=[]
         @async_lru_cache(maxsize=2)

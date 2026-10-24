@@ -1,9 +1,9 @@
-"""坏行旁路通知包含精确来源，只有请求前缀才处理。"""
+"Public regression tests for MORE-ITERTOOLS-01-DEV; the complete business contract is in materials/MORE-ITERTOOLS-01-DEV-contract.md."
 import unittest
 from more_itertools import map_except,filter_except
 
 def test_transform_and_filter_errors_are_each_reported_once():
-    """成功路径值/身份不变，错误位置为零起始输入索引。@return None。"""
+    "Verify transform and filter errors are each reported once."
     seen=[]
     rows=['1','bad','3',None]
     result=list(map_except(int,rows,ValueError,TypeError,on_error=lambda index,item,error:seen.append((index,item,type(error)))))
@@ -13,10 +13,10 @@ def test_transform_and_filter_errors_are_each_reported_once():
     assert seen==[1,3]
 
 def test_lazy_falsey_callback_and_callback_failure_not_swallowed():
-    """回调抛错不被同一except再次捕获，外部throw不冒充转换错。@return None。"""
+    "Verify lazy falsey callback and callback failure not swallowed."
     seen=[]
     class Callback:
-        """假值但可调用通知。"""
+        "Public regression fixture: Callback."
         def __bool__(self):return False
         def __call__(self,index,item,error):seen.append(index)
     values=map_except(int,['1','bad','2'],ValueError,on_error=Callback())

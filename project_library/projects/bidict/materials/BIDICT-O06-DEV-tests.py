@@ -1,8 +1,8 @@
-"""只读代理与既有冻结快照不同，必须保持实时双向关联。"""
+"Public regression tests for BIDICT-O06-DEV; the complete business contract is in materials/BIDICT-O06-DEV-contract.md."
 from bidict import bidict, OrderedBidict
 
 def test_live_pair_identity():
-    """源更新后两个方向均可读且inverse身份稳定。@return None。"""
+    "Verify live pair identity."
     from bidict.readonly import ReadOnlyBidictProxy
     source = bidict(a=1)
     proxy = ReadOnlyBidictProxy(source)
@@ -11,7 +11,7 @@ def test_live_pair_identity():
     assert proxy.inverse.inverse is proxy and proxy.inv is proxy.inverse
 
 def test_write_rejected_both_sides():
-    """代理和逆向代理都不允许赋值删除。@return None。"""
+    "Verify write rejected both sides."
     import pytest
     from bidict.readonly import ReadOnlyBidictProxy
     proxy = ReadOnlyBidictProxy(bidict(a=1))
@@ -20,7 +20,7 @@ def test_write_rejected_both_sides():
     with pytest.raises(TypeError): del proxy['a']
 
 def test_views_clear_and_snapshot():
-    """普通视图不泄漏写入，独立快照不随源clear。@return None。"""
+    "Verify views clear and snapshot."
     from bidict.readonly import ReadOnlyBidictProxy
     source = OrderedBidict([('b', 2), ('a', 1)])
     proxy = ReadOnlyBidictProxy(source)

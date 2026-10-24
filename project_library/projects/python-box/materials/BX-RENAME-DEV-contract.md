@@ -1,5 +1,12 @@
-# 在原位置原子重命名配置键并保持子对象
+# Engineering contract: BX-RENAME-DEV
 
-rename_key在原插入位置改名字面键，子Box与列表保持原引用、配置和转换结果，并更新安全属性索引。缺原键、已有目标、保留属性、别名冲突或冻结状态均在修改前拒绝；普通赋值规则不改。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add mutating Box.rename_key(old, new) returning self. Rename a literal existing key at exactly its original insertion position, preserve value/sub-Box identity and configuration without recasting or reconversion, and update safe-attribute lookup. Reject missing old keys, existing targets, protected attributes, safe-alias collisions and frozen mutation before changing any data; old==new is an unchanged success for mutable boxes. Preserve integer keys and ordinary assignment semantics.
+
+Deliver meaningful original-failing public regression tests at library/test/test_development_bx_rename_dev.py and concise English compatibility documentation at library/docs/development-bx-rename-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/box/box.py
+- library/test/test_development_bx_rename_dev.py
+- library/docs/development-bx-rename-dev.md

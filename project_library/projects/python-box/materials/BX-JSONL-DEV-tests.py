@@ -1,4 +1,4 @@
-"""JSONL逐记录编码和写入，不能先物化整条输入。"""
+"Public regression tests for BX-JSONL-DEV; the complete business contract is in materials/BX-JSONL-DEV-contract.md."
 import io
 import json
 import pytest
@@ -6,10 +6,10 @@ from box import BoxList
 
 
 def test_bounded_first_record():
-    """首条编码只读取首条输入，提前关闭不消费尾部。@return None。"""
+    "Verify bounded first record."
     seen = []
     def records():
-        """大流的可证伪模拟。@return 记录迭代器。"""
+        "Support the public regression through records."
         for number in range(100000):
             seen.append(number)
             yield {'id': number}
@@ -20,7 +20,7 @@ def test_bounded_first_record():
 
 
 def test_write_file_and_owned_stream(tmp_path):
-    """逐行原生读取一致，外部流继续可用。@param tmp_path 临时目录。@return None。"""
+    "Verify write file and owned stream."
     rows = BoxList([{'name': '中文\n行'}, {'value': None}])
     stream = io.StringIO()
     assert rows.write_jsonl(stream, ensure_ascii=False) == 2 and not stream.closed
@@ -31,7 +31,7 @@ def test_write_file_and_owned_stream(tmp_path):
 
 
 def test_safe_error_line_and_empty():
-    """坏记录指明行号，空表输出为空。@return None。"""
+    "Verify safe error line and empty."
     lines = BoxList.iter_jsonl_records([{'x': 1}, {'bad': object()}])
     next(lines)
     with pytest.raises(ValueError, match='2'):

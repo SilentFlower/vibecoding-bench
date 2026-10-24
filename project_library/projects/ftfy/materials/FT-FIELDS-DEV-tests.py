@@ -1,4 +1,4 @@
-"""公开结构化文本字段修复回归。"""
+"Public regression tests for FT-FIELDS-DEV; the complete business contract is in materials/FT-FIELDS-DEV-contract.md."
 import pytest
 from ftfy import TextFixerConfig
 from ftfy.structured import fix_fields

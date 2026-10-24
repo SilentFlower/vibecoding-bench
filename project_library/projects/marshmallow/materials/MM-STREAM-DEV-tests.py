@@ -1,4 +1,4 @@
-"""公开逐记录Schema导入回归。"""
+"Public regression tests for MM-STREAM-DEV; the complete business contract is in materials/MM-STREAM-DEV-contract.md."
 import pytest
 from marshmallow import Schema,fields,post_load,EXCLUDE,ValidationError
 

@@ -1,5 +1,12 @@
-# 提供带标题、列与行语义的安全HTML报表输出
+# Engineering contract: TB-ACCESSIBLE-HTML-DEV
 
-网页报表需要真实列、行标题语义及安全标题。新增固定安全HTML入口，输出scope、caption与可选id，保留对齐与数据转义，不能把业务字符串误当HTML标签，也不影响原html输出。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement tabulate.accessibility.accessible_html(data,headers=(),*,caption=None,table_id=None,row_headers=False,**options). Render via safe html format, add escaped caption/optional quoted id, scope=col to real column header th elements and optional scope=row to the first cell of each body row. Preserve other cells, alignment and data escaping; never convert escaped user markup into actual tags. Reject overriding tablefmt, nonboolean row_headers and invalid caption/id values before rendering. Keep old html/unsafehtml output unchanged and do not alter tabulate public signature.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_tb_accessible_html_dev.py and concise English compatibility documentation at library/docs/development-tb-accessible-html-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tabulate/accessibility.py
+- library/development_tests/test_development_tb_accessible_html_dev.py
+- library/docs/development-tb-accessible-html-dev.md

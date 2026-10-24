@@ -1,13 +1,13 @@
-"""失效真实作用域缓存，绑定和其他缓存身份保持。"""
+"Public regression tests for INJECTOR-O05-DEV; the complete business contract is in materials/INJECTOR-O05-DEV-contract.md."
 from injector import Injector,SingletonScope,ThreadLocalScope
 import threading
 
 def test_single_target_invalidation_preserves_other_and_bindings():
-    """下次get重建目标，无关singleton及旧引用仍有效。@return None。"""
+    "Verify single target invalidation preserves other and bindings."
     class A:
-        """首个服务。"""
+        "Public regression fixture: A."
     class B:
-        """无关服务。"""
+        "Public regression fixture: B."
     container=Injector(lambda b:(b.bind(A,scope=SingletonScope),b.bind(B,scope=SingletonScope)))
     first,other=container.get(A),container.get(B);scope=container.get(SingletonScope)
     assert scope.evict(A) is True and scope.evict(A) is False
@@ -15,9 +15,9 @@ def test_single_target_invalidation_preserves_other_and_bindings():
     assert container.binder.has_explicit_binding_for(A)
 
 def test_singleton_clear_count_and_old_references_not_closed():
-    """clear只移除缓存Provider，不伪装销毁外部业务实例。@return None。"""
+    "Verify singleton clear count and old references not closed."
     class Service:
-        """带显式close的业务对象。"""
+        "Public regression fixture: Service."
         def __init__(self):self.closed=False
         def close(self):self.closed=True
     container=Injector(lambda b:b.bind(Service,scope=SingletonScope));scope=container.get(SingletonScope);value=container.get(Service)
@@ -25,9 +25,9 @@ def test_singleton_clear_count_and_old_references_not_closed():
     scope.clear();assert scope.clear()==0
 
 def test_threadlocal_evict_clear_do_not_cross_thread():
-    """线程各自失效，另一线程对象保持原身份。@return None。"""
+    "Verify threadlocal evict clear do not cross thread."
     class Item:
-        """线程服务。"""
+        "Public regression fixture: Item."
     container=Injector(lambda b:b.bind(Item,scope=ThreadLocalScope));scope=container.get(ThreadLocalScope)
     first=container.get(Item);ready=threading.Event();release=threading.Event();result=[]
     def worker():

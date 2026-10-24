@@ -1,13 +1,13 @@
-"""ContextScope真实解析对象，在任务、嵌套和异常边界隔离。"""
+"Public regression tests for INJECTOR-O04-DEV; the complete business contract is in materials/INJECTOR-O04-DEV-contract.md."
 import asyncio
 from injector import Injector
 import pytest
 
 def test_explicit_reuse_nested_restore_and_fresh_next():
-    """每域内复用、嵌套独立、退出恢复外层。@return None。"""
+    "Verify explicit reuse nested restore and fresh next."
     from injector import ContextScope
     class Item:
-        """真实创建的作用域对象。"""
+        "Public regression fixture: Item."
     container=Injector(lambda b:b.bind(Item,scope=ContextScope));scope=container.get(ContextScope)
     with pytest.raises(RuntimeError):container.get(Item)
     with scope.enter():
@@ -17,10 +17,10 @@ def test_explicit_reuse_nested_restore_and_fresh_next():
     with scope.enter():assert container.get(Item) is not first
 
 def test_event_coordinated_async_tasks_and_inherited_state_rejected():
-    """交错任务各自缓存，未进入的子任务不能误用父缓存。@return None。"""
+    "Verify event coordinated async tasks and inherited state rejected."
     from injector import ContextScope
     class Item:
-        """独立任务对象。"""
+        "Public regression fixture: Item."
     container=Injector(lambda b:b.bind(Item,scope=ContextScope));scope=container.get(ContextScope)
     async def run():
         ready,release=asyncio.Event(),asyncio.Event()
@@ -39,7 +39,7 @@ def test_event_coordinated_async_tasks_and_inherited_state_rejected():
     asyncio.run(run())
 
 def test_exception_cleanup_and_provider_failure_not_cached():
-    """失败构造可重试，域异常退出不留下活动缓存。@return None。"""
+    "Verify exception cleanup and provider failure not cached."
     from injector import ContextScope
     calls=[]
     def provide():

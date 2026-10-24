@@ -1,15 +1,15 @@
-"""键值配置映射保留URL中的等号并检查重复键。"""
+"Public regression tests for DC-MAPPING-DEV; the complete business contract is in materials/DC-MAPPING-DEV-contract.md."
 import pytest
 from decouple import MappingCast
 
 
 def test_pairs_preserve_values():
-    """只分割首个等号，引号内部逗号不拆项。@return None。"""
+    "Verify pairs preserve values."
     assert MappingCast()('SQLite3=sqlite://:memory:,"URL=https://x/?a=b,c"') == {'SQLite3': 'sqlite://:memory:', 'URL': 'https://x/?a=b,c'}
 
 
 def test_casts_and_duplicate_policy():
-    """在键转换后检查重复，支持显式末项获胜。@return None。"""
+    "Verify casts and duplicate policy."
     assert MappingCast(key_cast=int, value_cast=int)('1=2,3=4') == {1: 2, 3: 4}
     with pytest.raises(ValueError):
         MappingCast(key_cast=int)('1=a,01=b')
@@ -17,7 +17,7 @@ def test_casts_and_duplicate_policy():
 
 
 def test_json_and_errors():
-    """JSON必须为对象，空键或无等号明确失败。@return None。"""
+    "Verify json and errors."
     assert MappingCast(format='json')('{"x": 2, "nested": {"a": true}}') == {'x': 2, 'nested': {'a': True}}
     for value in ['=x', 'missing']:
         with pytest.raises(ValueError):

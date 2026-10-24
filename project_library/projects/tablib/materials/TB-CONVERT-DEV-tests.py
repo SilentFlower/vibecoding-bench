@@ -1,4 +1,4 @@
-"""公开表格类型转换回归。"""
+"Public regression tests for TB-CONVERT-DEV; the complete business contract is in materials/TB-CONVERT-DEV-contract.md."
 from decimal import Decimal
 import pytest
 from tablib import Dataset

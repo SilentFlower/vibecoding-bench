@@ -1,4 +1,4 @@
-"""公开真实订阅文件发布回归。"""
+"Public regression tests for FG-PUBLISH-DEV; the complete business contract is in materials/FG-PUBLISH-DEV-contract.md."
 import hashlib
 import json
 import xml.etree.ElementTree as ET

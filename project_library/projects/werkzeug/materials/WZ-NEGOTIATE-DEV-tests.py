@@ -1,4 +1,4 @@
-"""公开JSON内容协商回归。"""
+"Public regression tests for WZ-NEGOTIATE-DEV; the complete business contract is in materials/WZ-NEGOTIATE-DEV-contract.md."
 import pytest
 from werkzeug.wrappers import Request
 from werkzeug.exceptions import NotAcceptable

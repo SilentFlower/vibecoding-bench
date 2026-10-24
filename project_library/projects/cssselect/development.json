@@ -33,7 +33,7 @@
           "id": "CSSSELECT-O01-DEV",
           "kind": "modify",
           "goal": "一次编译并复用不可变选择器组事实",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.compiled.compile_selector(css, *, mode=\"xml\", xhtml=False, prefix=\"descendant-or-self::\") returning frozen CompiledSelector with canonical tuple, per-branch specificity tuple, XPath, mode, xhtml and prefix. Parse the complete real selector group once, never split literal commas, use actual selector_to_xpath with pseudo-element rejection and retain original exceptions. Support XML/HTML/XHTML casing and explicit prefixes, reject invalid mode/type combinations. Store no mutable parse tree or bound document and add no lxml runtime dependency; callers can evaluate the same XPath against multiple actual trees.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.compiled.compile_selector(css, *, mode=\"xml\", xhtml=False, prefix=\"descendant-or-self::\") returning frozen CompiledSelector with canonical tuple, per-branch specificity tuple, XPath, mode, xhtml and prefix. Parse the complete real selector group once, never split literal commas, use actual selector_to_xpath with pseudo-element rejection and retain original exceptions. Support XML/HTML/XHTML casing and explicit prefixes, reject invalid mode/type combinations. Store no mutable parse tree or bound document and add no lxml runtime dependency; callers can evaluate the same XPath against multiple actual trees.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o01_dev.py and concise English compatibility documentation at library/docs/development-cssselect-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CSSSELECT-O01-DEV-contract.md",
@@ -48,7 +48,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CSSSELECT-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CSSSELECT-O01-DEV.native.json",
@@ -80,7 +80,7 @@
           "id": "CSSSELECT-O02-DEV",
           "kind": "modify",
           "goal": "保留业务标识并隔离批量选择器局部失败",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.batch.translate_many(records, *, translator=None, prefix=\"descendant-or-self::\", fail_fast=False) as a lazy ordered iterator of records {id,css,ok,xpath,error}. Each input is (id, complete CSS group), including duplicate IDs; never concatenate groups or split commas. Catch only actual SelectorSyntaxError/ExpressionError into parse/translate diagnostics without value-bearing messages; continue other records, with explicit fail-fast rethrow. Forward actual translator and prefix, consume only requested inputs, propagate upstream generator and programmer errors and support empty batches.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.batch.translate_many(records, *, translator=None, prefix=\"descendant-or-self::\", fail_fast=False) as a lazy ordered iterator of records {id,css,ok,xpath,error}. Each input is (id, complete CSS group), including duplicate IDs; never concatenate groups or split commas. Catch only actual SelectorSyntaxError/ExpressionError into parse/translate diagnostics without value-bearing messages; continue other records, with explicit fail-fast rethrow. Forward actual translator and prefix, consume only requested inputs, propagate upstream generator and programmer errors and support empty batches.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o02_dev.py and concise English compatibility documentation at library/docs/development-cssselect-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CSSSELECT-O02-DEV-contract.md",
@@ -95,7 +95,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CSSSELECT-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CSSSELECT-O02-DEV.native.json",
@@ -127,7 +127,7 @@
           "id": "CSSSELECT-O03-DEV",
           "kind": "modify",
           "goal": "提供模式隔离且可观测的有界选择器翻译缓存",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.cache.SelectorCache(capacity=128) with translate(css, *, mode=\"xml\", xhtml=False, prefix=...), stats(), clear(reset_stats=False). Cache actual builtin XML/HTML translation by complete CSS and every supported mode/XHTML/prefix field; no arbitrary custom translator sharing without fingerprint. Enforce positive non-bool capacity, true access-order LRU, isolated instances, fresh stats and lock-protected consistent concurrent access. Count failures as misses but never cache them. Preserve native parse/translation exceptions, old uncached APIs, and explicit clear/stat-reset semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.cache.SelectorCache(capacity=128) with translate(css, *, mode=\"xml\", xhtml=False, prefix=...), stats(), clear(reset_stats=False). Cache actual builtin XML/HTML translation by complete CSS and every supported mode/XHTML/prefix field; no arbitrary custom translator sharing without fingerprint. Enforce positive non-bool capacity, true access-order LRU, isolated instances, fresh stats and lock-protected consistent concurrent access. Count failures as misses but never cache them. Preserve native parse/translation exceptions, old uncached APIs, and explicit clear/stat-reset semantics.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o03_dev.py and concise English compatibility documentation at library/docs/development-cssselect-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CSSSELECT-O03-DEV-contract.md",
@@ -142,7 +142,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CSSSELECT-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CSSSELECT-O03-DEV.native.json",
@@ -174,7 +174,7 @@
           "id": "CSSSELECT-O04-DEV",
           "kind": "modify",
           "goal": "为真实翻译器注册实例隔离的受控伪类插件",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.extensions.PluginTranslator and HTMLPluginTranslator using an instance-local registry without replacing existing subclass mechanisms. register_pseudo(name, callback, *, functional=False,min_args=0,max_args=None,version=\"1\") validates literal names, arity, callable/version, refuses duplicates or builtin static/function names, and returns self. Static callbacks receive actual XPathExpr; functions additionally receive the real Function/Token node. Validate invocation form, arity and XPathExpr return type. Preserve normal XML/HTML/XHTML behavior and native callbacks/errors; expose deterministic extension_fingerprint capability/version declarations and ensure registry isolation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cssselect.extensions.PluginTranslator and HTMLPluginTranslator using an instance-local registry without replacing existing subclass mechanisms. register_pseudo(name, callback, *, functional=False,min_args=0,max_args=None,version=\"1\") validates literal names, arity, callable/version, refuses duplicates or builtin static/function names, and returns self. Static callbacks receive actual XPathExpr; functions additionally receive the real Function/Token node. Validate invocation form, arity and XPathExpr return type. Preserve normal XML/HTML/XHTML behavior and native callbacks/errors; expose deterministic extension_fingerprint capability/version declarations and ensure registry isolation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o04_dev.py and concise English compatibility documentation at library/docs/development-cssselect-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CSSSELECT-O04-DEV-contract.md",
@@ -189,7 +189,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CSSSELECT-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CSSSELECT-O04-DEV.native.json",
@@ -221,7 +221,7 @@
           "id": "CSSSELECT-O05-DEV",
           "kind": "modify",
           "goal": "按真实HTML资格完整区分必填与可选控件",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.formstates.FormStateTranslator(HTMLTranslator) supporting static :required and :optional. Eligible controls are select, textarea and input except hidden/range/color/button/submit/reset/image, with missing/unknown input type behaving as text and ASCII-insensitive type values. State is based on required attribute presence; disabled does not change this declaration state. The two states partition only eligible controls, not arbitrary nodes. Support unnamespaced HTML and XHTML namespace, excluding foreign same-name elements, and preserve all inherited translator APIs and GenericTranslator unsupported behavior.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.formstates.FormStateTranslator(HTMLTranslator) supporting static :required and :optional. Eligible controls are select, textarea and input except hidden/range/color/button/submit/reset/image, with missing/unknown input type behaving as text and ASCII-insensitive type values. State is based on required attribute presence; disabled does not change this declaration state. The two states partition only eligible controls, not arbitrary nodes. Support unnamespaced HTML and XHTML namespace, excluding foreign same-name elements, and preserve all inherited translator APIs and GenericTranslator unsupported behavior.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o05_dev.py and concise English compatibility documentation at library/docs/development-cssselect-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CSSSELECT-O05-DEV-contract.md",
@@ -236,7 +236,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CSSSELECT-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CSSSELECT-O05-DEV.native.json",
@@ -268,7 +268,7 @@
           "id": "CSSSELECT-O06-DEV",
           "kind": "modify",
           "goal": "按静态HTML编辑继承和表单状态生成互补选择器",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.editable.EditableStateTranslator supporting :read-write/:read-only as exact complements in the selected tree scope. Text-like input/textarea require no readonly/disabled and use the inherited static fieldset-disabled policy; exclude hidden/range/color/button/submit/reset/image/checkbox/radio/file inputs. Form controls never become editable merely from contenteditable ancestors. Other elements inherit the nearest valid contenteditable empty/true/plaintext-only/false declaration case-insensitively; invalid values inherit, false blocks. Support XHTML namespaced declarations, default read-only, preserve GenericTranslator rejection and document snapshot limitations (no scripts/designMode or improved fieldset approximation).\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-cssselect-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nAdd cssselect.editable.EditableStateTranslator supporting :read-write/:read-only as exact complements in the selected tree scope. Text-like input/textarea require no readonly/disabled and use the inherited static fieldset-disabled policy; exclude hidden/range/color/button/submit/reset/image/checkbox/radio/file inputs. Form controls never become editable merely from contenteditable ancestors. Other elements inherit the nearest valid contenteditable empty/true/plaintext-only/false declaration case-insensitively; invalid values inherit, false blocks. Support XHTML namespaced declarations, default read-only, preserve GenericTranslator rejection and document snapshot limitations (no scripts/designMode or improved fieldset approximation).\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cssselect_o06_dev.py and concise English compatibility documentation at library/docs/development-cssselect-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CSSSELECT-O06-DEV-contract.md",
@@ -283,7 +283,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CSSSELECT-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CSSSELECT-O06-DEV.native.json",

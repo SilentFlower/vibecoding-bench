@@ -1,4 +1,4 @@
-"""公开AST目录及嵌套标题回归。"""
+"Public regression tests for MS-AST-TOC-DEV; the complete business contract is in materials/MS-AST-TOC-DEV-contract.md."
 import mistune
 from mistune.toc import add_toc_hook
 

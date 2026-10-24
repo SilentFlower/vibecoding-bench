@@ -1,4 +1,4 @@
-"""公开表格字段投影回归。"""
+"Public regression tests for TB-PROJECT-DEV; the complete business contract is in materials/TB-PROJECT-DEV-contract.md."
 import pytest
 from tablib import Dataset
 from tablib.projection import select_columns

@@ -1,10 +1,10 @@
-"""编译后可在不同真实树求值，不暴露可变解析树。"""
+"Public regression tests for CSSSELECT-O01-DEV; the complete business contract is in materials/CSSSELECT-O01-DEV-contract.md."
 from lxml import etree
 import cssselect
 import pytest
 
 def test_group_specificity_and_two_trees():
-    """分支specificity保持各自值，XPath不绑定树。@return None。"""
+    "Verify group specificity and two trees."
     from cssselect.compiled import compile_selector
     result=compile_selector('p.item, #chosen')
     assert result.specificity==((0,1,1),(1,0,0)) and result.canonical==('p.item','#chosen')
@@ -13,7 +13,7 @@ def test_group_specificity_and_two_trees():
     assert result.xpath==cssselect.GenericTranslator().css_to_xpath('p.item, #chosen')
 
 def test_modes_and_prefix_do_not_mix():
-    """HTML大小写模式和作用域都是结果事实。@return None。"""
+    "Verify modes and prefix do not mix."
     from cssselect.compiled import compile_selector
     html=compile_selector('DIV',mode='html',prefix='self::')
     xml=compile_selector('DIV',prefix='self::')
@@ -21,7 +21,7 @@ def test_modes_and_prefix_do_not_mix():
     assert compile_selector('DIV',mode='html',xhtml=True).xpath.endswith('DIV')
 
 def test_immutable_and_native_errors():
-    """结果不可改写，伪元素和语法继续拒绝。@return None。"""
+    "Verify immutable and native errors."
     from dataclasses import FrozenInstanceError
     from cssselect.compiled import compile_selector
     with pytest.raises(FrozenInstanceError):compile_selector('p').xpath='changed'

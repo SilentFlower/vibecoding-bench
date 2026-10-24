@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线14：import/from复用真实get_or_select_template，候选按顺序回退；已选模板语法或缺宏错误不吞，普通字符串、缓存、上下文及异步module保持。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Extend actual compiler common import path for import/from to use Environment.get_or_select_template, preserving existing cache/module/context behavior. Accept static or dynamic ordered candidates, select first existing template and expose TemplatesNotFound for empty/all missing; an existing selected template syntax error or missing requested macro must never be swallowed as a reason to choose another candidate. Preserve string imports, aliasing, with/without context and asynchronous module handling through the actual render APIs.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_jinja_o05_dev.py and concise English compatibility documentation at library/docs/development-jinja-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/jinja2/compiler.py
+- library/tests/test_development_jinja_o05_dev.py
+- library/docs/development-jinja-o05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

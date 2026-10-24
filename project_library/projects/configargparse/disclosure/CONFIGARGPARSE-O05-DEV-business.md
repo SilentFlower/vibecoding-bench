@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线20：根据应用注册的扩展名一次分派真实解析器，未知格式只能显式fallback；不探测内容、不rewind、不动态导入，输出格式也必须显式。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Implement DispatchConfigFileParser(parsers, *, fallback=None, output_format=None) with an application-owned extension registry of ConfigFileParser instances/classes. Normalize suffix case, reject duplicate normalized extensions and invalid parser registrations. Dispatch once from stream.name without reading/rewinding/sniffing/importing; unknown or unnamed sources require explicit fallback. Propagate actual parse and optional dependency errors. Serialization requires an explicitly registered output_format and delegates to that parser. Preserve existing CompositeConfigParser and support nonseek streams.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_configargparse_o05_dev.py and concise English compatibility documentation at library/docs/development-configargparse-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/configargparse.py
+- library/tests/test_development_configargparse_o05_dev.py
+- library/docs/development-configargparse-o05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

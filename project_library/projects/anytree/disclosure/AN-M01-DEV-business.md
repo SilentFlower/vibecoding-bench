@@ -1,5 +1,5 @@
-# 业务交付与验收边界
+# Business delivery and verification boundaries
 
-JSON深度覆盖不污染共享字典导出器。用户需要真实实现与可复现公开测试，不能只交只读诊断或建议。
+JSON depth overrides must not mutate a shared dictionary exporter. Deliver a real implementation and reproducible public tests rather than read-only diagnosis or advice.
 
-实施前应先基于公开合同调查并确认方案；实施与失败修正连续保留在原会话。合同以 materials/development-contract.md 为准，不能读取或修改控制端隐藏验收。验收独立运行原版与参考候选，并复用已有冻结完整上游回归。
+Investigate the public contract and agree on a plan before editing. Keep implementation and failure fixes in the original conversation. Follow materials/development-contract.md; do not read or modify hidden controller verification. Verification independently runs the original and reference candidates and reuses the complete frozen upstream regression.

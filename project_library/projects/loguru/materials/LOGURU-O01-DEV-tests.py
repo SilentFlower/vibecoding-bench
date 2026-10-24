@@ -1,14 +1,14 @@
-"""管理界面通过真实不可变快照读取handler而不执行业务对象。"""
+"Public regression tests for LOGURU-O01-DEV; the complete business contract is in materials/LOGURU-O01-DEV-contract.md."
 from copy import deepcopy
 from loguru import logger
 import pytest
 
 def clean():
-    """创建独立真实logger，避免触碰全局sink。@return Logger。"""
+    "Support the public regression through clean."
     logger.remove();result=deepcopy(logger);result.remove();return result
 
 def test_ids_levels_types_and_detached_immutable_snapshot():
-    """两种sink按id排序，返回项不能修改核心配置。@return None。"""
+    "Verify ids levels types and detached immutable snapshot."
     import io
     log=clean();a=log.add(io.StringIO(),level='WARNING');b=log.add(lambda message:None,level='DEBUG',format=lambda record:'{message}')
     snapshot=log.handler_snapshot()
@@ -21,7 +21,7 @@ def test_ids_levels_types_and_detached_immutable_snapshot():
     log.remove()
 
 def test_snapshot_does_not_call_sink_filter_or_formatter():
-    """配置读取不触发业务write/filter/format或可变对象repr。@return None。"""
+    "Verify snapshot does not call sink filter or formatter."
     calls=[];log=clean()
     def sink(message):calls.append('sink')
     def filter_(record):calls.append('filter');return True
@@ -32,7 +32,7 @@ def test_snapshot_does_not_call_sink_filter_or_formatter():
     log.remove()
 
 def test_concurrent_add_remove_and_reads_are_consistent():
-    """并发替换配置只看到完整映射，每个快照内部id唯一有序。@return None。"""
+    "Verify concurrent add remove and reads are consistent."
     from concurrent.futures import ThreadPoolExecutor
     log=clean()
     def mutate(index):

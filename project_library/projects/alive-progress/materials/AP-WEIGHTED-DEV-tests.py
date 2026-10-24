@@ -1,4 +1,4 @@
-"""公开按项工作量进度回归。"""
+"Public regression tests for AP-WEIGHTED-DEV; the complete business contract is in materials/AP-WEIGHTED-DEV-contract.md."
 import pytest
 from alive_progress.weighted import alive_weighted_it
 

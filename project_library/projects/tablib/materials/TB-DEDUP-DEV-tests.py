@@ -1,4 +1,4 @@
-"""公开表格业务去重回归。"""
+"Public regression tests for TB-DEDUP-DEV; the complete business contract is in materials/TB-DEDUP-DEV-contract.md."
 import pytest
 from tablib import Dataset
 from tablib.dedup import deduplicate

@@ -1,8 +1,8 @@
-"""规则诊断明确有prepare/guard副作用，但不额外执行被短路项。"""
+"Public regression tests for TRANSITIONS-06-DEV; the complete business contract is in materials/TRANSITIONS-06-DEV-contract.md."
 from transitions import Machine
 
 def test_failed_condition_marks_remaining_skipped_without_transition_callbacks():
-    """False后面的规则不为显示而执行，状态保持。@return None。"""
+    "Verify failed condition marks remaining skipped without transition callbacks."
     seen=[]
     def prepare():seen.append('prepare')
     def false():seen.append('false');return False
@@ -14,7 +14,7 @@ def test_failed_condition_marks_remaining_skipped_without_transition_callbacks()
     assert seen==['prepare','false'] and machine.state=='draft'
 
 def test_unless_candidates_success_shortcircuits_and_errors_are_visible():
-    """候选命中后后续候选也不执行，unless反向规则真实判断。@return None。"""
+    "Verify unless candidates success shortcircuits and errors are visible."
     machine=Machine(states=['a','b','c'],initial='a',auto_transitions=False)
     machine.add_transition('go','a','b',unless=lambda:False)
     machine.add_transition('go','a','c',conditions=lambda:(_ for _ in ()).throw(AssertionError('must skip')))

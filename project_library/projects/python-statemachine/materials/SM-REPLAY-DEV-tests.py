@@ -1,4 +1,4 @@
-"""公开真实状态机日志重放端到端回归。"""
+"Public regression tests for SM-REPLAY-DEV; the complete business contract is in materials/SM-REPLAY-DEV-contract.md."
 import json
 import pytest
 from statemachine.runner import MachineRunner

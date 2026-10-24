@@ -1,4 +1,4 @@
-"""公开复现索引键异常和等值右列被错误省略。"""
+"""Public reproduction of join-key resolution errors and incorrectly omitted equal-valued right columns."""
 import agate
 left = agate.Table([('A','N')], ['id','zone'], [agate.Text(),agate.Text()])
 right = agate.Table([('A','N','ok')], ['key','area','label'], [agate.Text()]*3)

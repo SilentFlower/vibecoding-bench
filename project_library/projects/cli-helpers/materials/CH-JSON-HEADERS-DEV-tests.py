@@ -1,4 +1,4 @@
-"""公开重复JSON对象列名回归。"""
+"Public regression tests for CH-JSON-HEADERS-DEV; the complete business contract is in materials/CH-JSON-HEADERS-DEV-contract.md."
 import json
 import pytest
 from cli_helpers.tabular_output.json_output_adapter import adapter

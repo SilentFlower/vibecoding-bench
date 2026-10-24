@@ -1,8 +1,8 @@
-"""转换结果与问题表同一次消费，默认不泄露原值。"""
+"Public regression tests for PETL-02-DEV; the complete business contract is in materials/PETL-02-DEV-contract.md."
 import petl
 
 def test_mixed_numeric_fields_have_ordered_issues_without_raw_values():
-    """一行多字段失败分别记录来源行及类型。@return None。"""
+    "Verify mixed numeric fields have ordered issues without raw values."
     source=[['qty','price'],['2','3.5'],['private','bad']]
     table,issues=petl.convert_report(source,{'qty':int,'price':float})
     assert list(table)==[('qty','price'),(2,3.5),(None,None)]
@@ -10,7 +10,7 @@ def test_mixed_numeric_fields_have_ordered_issues_without_raw_values():
     assert 'private' not in repr(issues)
 
 def test_one_shot_source_replay_short_row_and_empty():
-    """返回值可重复读取，源不会因问题表再消费。@return None。"""
+    "Verify one shot source replay short row and empty."
     count=[]
     def source():
         for row in [('qty','other'),('3','x'),()]:count.append(1);yield row

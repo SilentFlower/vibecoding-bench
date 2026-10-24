@@ -1,9 +1,9 @@
-"""多链规则启停真正支持只能消费一次的Iterable。"""
+"Public regression tests for MARKDOWN-IT-O02-DEV; the complete business contract is in materials/MARKDOWN-IT-O02-DEV-contract.md."
 from markdown_it import MarkdownIt
 import pytest
 
 def test_generator_enables_block_inline_and_second_inline_chain():
-    """与list输入拥有相同活动集合及实际扩展渲染。@return None。"""
+    "Verify generator enables block inline and second inline chain."
     names=['table','strikethrough','emphasis']
     expected=MarkdownIt().enable(names)
     actual=MarkdownIt().enable(name for name in names)
@@ -12,7 +12,7 @@ def test_generator_enables_block_inline_and_second_inline_chain():
     assert actual.render(text)==expected.render(text) and '<s>gone</s>' in actual.render(text)
 
 def test_generator_disables_and_unknown_detection_is_not_consumed():
-    """disable也重放同一列表，未知项不能因迭代被耗尽而悄悄放行。@return None。"""
+    "Verify generator disables and unknown detection is not consumed."
     names=['heading','emphasis','image']
     actual=MarkdownIt().disable(iter(names));expected=MarkdownIt().disable(names)
     assert actual.get_active_rules()==expected.get_active_rules()
@@ -21,7 +21,7 @@ def test_generator_disables_and_unknown_detection_is_not_consumed():
     assert MarkdownIt().enable(iter(['not-a-rule']),ignoreInvalid=True)
 
 def test_iterating_failure_happens_before_any_rule_changes():
-    """中途抛异常的输入不能先修改core链再失败。@return None。"""
+    "Verify iterating failure happens before any rule changes."
     def broken():yield 'text_join';raise RuntimeError('input failed')
     md=MarkdownIt();before=md.get_active_rules()
     with pytest.raises(RuntimeError):md.disable(broken())

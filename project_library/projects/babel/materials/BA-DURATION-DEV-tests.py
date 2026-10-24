@@ -1,4 +1,4 @@
-"""公开多分量持续时间回归。"""
+"Public regression tests for BA-DURATION-DEV; the complete business contract is in materials/BA-DURATION-DEV-contract.md."
 from datetime import timedelta
 import pytest
 from babel.dates import format_duration

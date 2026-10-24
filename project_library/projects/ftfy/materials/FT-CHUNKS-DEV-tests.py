@@ -1,4 +1,4 @@
-"""公开分块文本修复回归。"""
+"Public regression tests for FT-CHUNKS-DEV; the complete business contract is in materials/FT-CHUNKS-DEV-contract.md."
 from io import StringIO
 import pytest
 from ftfy import fix_file,TextFixerConfig

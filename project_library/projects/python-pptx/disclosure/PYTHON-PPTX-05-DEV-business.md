@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线16：TextFrame.text_direction严格采用固定XSD全部方向，映射bodyPr@vert；None移除继承、非法值原子拒绝，形状旋转/正文/边距等不动，真实文件往返不冒认渲染。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add TextFrame.text_direction str|None backed by bodyPr@vert with exactly pinned ST_TextVerticalType tokens. Support horizontal, vertical, vertical270, East Asian/Mongolian/WordArt modes as XML contracts; None removes direct attribute for inheritance, invalid input fails before mutation. Preserve text, shape rotation, margins/autofit/wrap and other bodyPr children/attrs. Real PPTX save/reopen proves metadata, not renderer glyph layout. Do not rotate shape to fake text direction.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_05_dev.py, and English compatibility documentation at library/docs/development-python-pptx-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pptx/text/text.py
+- library/tests/test_development_python_pptx_05_dev.py
+- library/docs/development-python-pptx-05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

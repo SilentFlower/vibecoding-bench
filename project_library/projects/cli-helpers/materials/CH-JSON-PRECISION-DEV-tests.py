@@ -1,4 +1,4 @@
-"""公开JSON精度及有限数回归。"""
+"Public regression tests for CH-JSON-PRECISION-DEV; the complete business contract is in materials/CH-JSON-PRECISION-DEV-contract.md."
 from decimal import Decimal
 import json
 import pytest

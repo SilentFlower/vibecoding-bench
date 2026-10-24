@@ -1,4 +1,4 @@
-"""动态派生不修改父类，Meta、inline和字段顺序仍可用。"""
+"Public regression tests for WTFORMS-05-DEV; the complete business contract is in materials/WTFORMS-05-DEV-contract.md."
 import unittest
 from wtforms import Form,StringField,IntegerField
 from wtforms.validators import ValidationError
@@ -6,19 +6,19 @@ from wtforms.derive import derive_form
 
 
 class Product(Form):
-    """有业务校验及Meta的真实父类。"""
+    "Public regression fixture: Product."
     name=StringField();quantity=IntegerField()
     class Meta:
-        """保留项目Meta。"""
+        "Public regression fixture: Meta."
         csrf=False
         locale_marker='zh'
     def validate_name(self,field):
-        """继承inline必须生效。@param field 字段。@return None。"""
+        "Support the public regression through validate_name."
         if field.data=='bad':raise ValidationError('bad name')
 
 
 def test_parent_independence_inheritance_and_removal():
-    """两个派生类并存，父缓存及字段不污染。@return None。"""
+    "Verify parent independence inheritance and removal."
     before=[field.short_name for field in Product()]
     WithNote=derive_form(Product,'WithNote',{'note':StringField()})
     WithoutQuantity=derive_form(Product,'WithoutQuantity',{},remove=['quantity'])
@@ -29,7 +29,7 @@ def test_parent_independence_inheritance_and_removal():
 
 
 def test_override_requires_explicit_policy_and_conflicts_reject():
-    """覆盖与行为名称冲突不能悄悄改变父类。@return None。"""
+    "Verify override requires explicit policy and conflicts reject."
     with unittest.TestCase().assertRaises(ValueError):derive_form(Product,'Other',{'name':IntegerField()})
     Override=derive_form(Product,'Override',{'name':IntegerField()},replace=True)
     assert Override(data={'name':3}).name.data==3 and isinstance(Product().name,StringField)

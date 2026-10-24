@@ -1,4 +1,4 @@
-"""公开真实时间线运算回归。"""
+"Public regression tests for AR-ELAPSED-DEV; the complete business contract is in materials/AR-ELAPSED-DEV-contract.md."
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import pytest

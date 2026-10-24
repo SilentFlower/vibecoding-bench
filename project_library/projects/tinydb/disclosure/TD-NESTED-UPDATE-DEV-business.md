@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-订单嵌套字段编辑不能把同一可变对象共享给多条记录。实现显式路径的更新和删除、可选创建父映射，单条记录失败前保持原样，保留相邻字段及普通update缓存失效语义，不承诺整批事务。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add tinydb.operations.set_path(path,value,*,create=False) and delete_path(path,*,missing_ok=False), returning ordinary Table.update callbacks. Paths are finite nonempty string-key sequences with literal punctuation. Set deep-copies the supplied value when building the operation and separately per document; optionally create missing mapping parents. Delete preserves siblings and optionally tolerates missing keys. Nonmapping parents remain errors. Validate a complete candidate document before replacing that document contents so a failed callback leaves it unchanged; do not promise a transaction across all documents or modify old operations.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_td_nested_update_dev.py and concise English compatibility documentation at library/docs/development-td-nested-update-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/tinydb/operations.py
+- library/development_tests/test_development_td_nested_update_dev.py
+- library/docs/development-td-nested-update-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

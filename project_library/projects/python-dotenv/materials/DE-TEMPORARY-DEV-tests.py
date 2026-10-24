@@ -1,4 +1,4 @@
-"""公开临时进程环境回归。"""
+"Public regression tests for DE-TEMPORARY-DEV; the complete business contract is in materials/DE-TEMPORARY-DEV-contract.md."
 import os
 import pytest
 from dotenv.environment import temporary_environment

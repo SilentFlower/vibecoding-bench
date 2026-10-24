@@ -1,18 +1,18 @@
-"""归一化只用于比较，返回原始业务值与惰性表语义。"""
+"Public regression tests for PETL-05-DEV; the complete business contract is in materials/PETL-05-DEV-contract.md."
 import unittest
 import petl
 
 def test_casefold_target_and_rows_and_complement_keep_original_text():
-    """Unicode归一化不是lower近似，目标同样应用key。@return None。"""
+    "Verify casefold target and rows and complement keep original text."
     table=[['name','id'],['Straße',1],['STRASSE',2],['Other',3]]
     assert list(petl.selecteq(table,'name','strasse',key=str.casefold))==[('name','id'),('Straße',1),('STRASSE',2)]
     assert list(petl.wrap(table).selecteq('name','STRASSE',complement=True,key=str.casefold))==[('name','id'),('Other',3)]
     assert list(petl.selecteq(table,'name','strasse'))==[('name','id')]
 
 def test_none_falsey_key_and_callback_errors_are_explicit():
-    """不猜None或数值的归一化，回调自己负责明确政策。@return None。"""
+    "Verify none falsey key and callback errors are explicit."
     class Key:
-        """假值函数仍可作为归一化。"""
+        "Public regression fixture: Key."
         def __bool__(self):return False
         def __call__(self,value):return '' if value is None else str(value)
     table=[['value'],[None],[''],[3]]

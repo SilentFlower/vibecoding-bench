@@ -1,5 +1,12 @@
-# 重载真实配置并验证成功后才接管旧树
+# Engineering contract: CONFIGOBJ-O06-DEV
 
-对应路线20，依赖已交付独立报告：先用原路径/选项/规范建立新候选并真实验证，成功才整体接管并重连Section图；非法、缺文件和语法失败保持旧树。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add ConfigObj.validated_reload(validator) using the actual original filename/options/configspec and the accepted fixed validation report. Build an independent candidate from disk, force missing-file failure without creating a file, revalidate actual types/defaults, return valid=false without touching the old tree on validation errors and propagate IO/parse/callback exceptions. Only successful validation replaces all values and metadata, retaining the caller root identity and reconnecting parent/main/depth plus cached interpolation engines. Keep original options and ordinary reload behavior; never cache implicit validator state.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_configobj_o06_dev.py and concise English compatibility documentation at library/docs/development-configobj-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/configobj/__init__.py
+- library/tests/test_development_configobj_o06_dev.py
+- library/docs/development-configobj-o06-dev.md

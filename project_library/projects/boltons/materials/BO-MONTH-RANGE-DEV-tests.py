@@ -1,4 +1,4 @@
-"""公开月度日期序列回归。"""
+"Public regression tests for BO-MONTH-RANGE-DEV; the complete business contract is in materials/BO-MONTH-RANGE-DEV-contract.md."
 from datetime import date
 import pytest
 from boltons.timeutils import month_range

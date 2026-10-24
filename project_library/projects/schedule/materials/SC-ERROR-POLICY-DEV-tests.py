@@ -1,4 +1,4 @@
-"""公开连续失败取消策略回归。"""
+"Public regression tests for SC-ERROR-POLICY-DEV; the complete business contract is in materials/SC-ERROR-POLICY-DEV-contract.md."
 import pytest
 import schedule
 from schedule.policies import with_error_policy

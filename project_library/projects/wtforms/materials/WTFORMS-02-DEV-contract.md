@@ -1,3 +1,12 @@
-# 对象数据可选字段按真实非空值继续业务校验
+# Engineering contract: WTFORMS-02-DEV
 
-路线01：显式DataOptional在无请求时依据已处理对象值，0/False继续后续规则，None/空容器/按政策空白可跳过；转换失败不能被误清。明确空请求仍沿原Optional清错语义，旧Optional保持。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Add wtforms.data_optional.DataOptional as opt-in Optional subclass. When raw_data is present, keep original Optional request/explicit-empty semantics, including clearing earlier processing errors for a deliberately empty request. Without submitted raw_data, use processed field.data: None/empty selected containers/empty string or configured whitespace is optional; 0 and False are real values and continue validators. Never erase an object conversion error merely because resulting data is None. Preserve old Optional untouched and use original StopValidation/field_flags/validator order. Document empty-container and whitespace policies explicitly.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_wtforms_02_dev.py, and English compatibility documentation at library/docs/development-wtforms-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/wtforms/data_optional.py
+- library/tests/test_development_wtforms_02_dev.py
+- library/docs/development-wtforms-02-dev.md

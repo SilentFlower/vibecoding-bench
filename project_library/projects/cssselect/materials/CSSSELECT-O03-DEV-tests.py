@@ -1,16 +1,16 @@
-"""LRU命中、配置隔离和清空均通过实际翻译验证。"""
+"Public regression tests for CSSSELECT-O03-DEV; the complete business contract is in materials/CSSSELECT-O03-DEV-contract.md."
 import pytest
 import cssselect
 
 def test_lru_uses_access_order_and_capacity():
-    """重读保护热项，第三项淘汰最久未访问项。@return None。"""
+    "Verify lru uses access order and capacity."
     from cssselect.cache import SelectorCache
     c=SelectorCache(2);c.translate('a');c.translate('b');c.translate('a');c.translate('c')
     assert c.stats()=={'size':2,'capacity':2,'hits':1,'misses':3,'evictions':1}
     c.translate('b');assert c.stats()['misses']==4 and c.stats()['evictions']==2
 
 def test_configuration_and_failed_result_isolation():
-    """HTML/XML、XHTML和prefix各自独立，失败不缓存。@return None。"""
+    "Verify configuration and failed result isolation."
     from cssselect.cache import SelectorCache
     c=SelectorCache(9)
     assert c.translate('DIV')!=c.translate('DIV',mode='html')
@@ -21,7 +21,7 @@ def test_configuration_and_failed_result_isolation():
     assert c.stats()['size']==4 and c.stats()['misses']==6
 
 def test_clear_and_independent_instances():
-    """清空和统计副本不会影响其他实例。@return None。"""
+    "Verify clear and independent instances."
     from cssselect.cache import SelectorCache
     c=SelectorCache(1);d=SelectorCache(1);c.translate('p');c.clear()
     assert c.stats()['size']==0 and c.stats()['misses']==1 and d.stats()['misses']==0

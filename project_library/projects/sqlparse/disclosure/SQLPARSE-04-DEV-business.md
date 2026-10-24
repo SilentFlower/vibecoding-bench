@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线14：查询指纹按真实token类型清普通注释/间隔、规范关键字并替换字面量，保留标识符、占位符、操作及IN列表长度；可返回稳定摘要。字符串内注释符不误删，只用于形状统计，不宣称语义相等或生成可执行参数化SQL。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add sqlparse.fingerprint.fingerprint(text,encoding=None,digest=False,replace_constants=True) using real candidate lexer token types. Remove actual comments/whitespace, normalize keyword spelling/spacing and replace numeric/single-quoted/dollar-quoted literals with ?, optionally also NULL/TRUE/FALSE. Preserve identifiers including quoted names, operators, statement boundaries, existing named/positional placeholders and IN-list cardinality. Return deterministic canonical text or SHA256 of it. Do not treat comment markers inside strings as comments, do not connect to databases, and explicitly state this groups token shape rather than proving semantic equivalence or generating safe executable parameterized SQL.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_04_dev.py, and English compatibility documentation at library/docs/development-sqlparse-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/sqlparse/fingerprint.py
+- library/tests/test_development_sqlparse_04_dev.py
+- library/docs/development-sqlparse-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

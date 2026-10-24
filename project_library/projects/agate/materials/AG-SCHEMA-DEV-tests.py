@@ -1,4 +1,4 @@
-"""公开表级数据质量回归。"""
+"Public regression tests for AG-SCHEMA-DEV; the complete business contract is in materials/AG-SCHEMA-DEV-contract.md."
 import agate
 import pytest
 

@@ -1,5 +1,12 @@
-# 为浮点和Decimal增加显式有限数约束
+# Engineering contract: CERBERUS-O02-DEV
 
-原生Validator增加显式finite规则并接入错误树，拒绝非有限及非数值输入。支持整数、浮点及注册Decimal，不把大Decimal转float；嵌套可用，未启用规则时原number/min/max行为不改。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add the actual Validator finite boolean rule with schema-validated arguments and native error-tree integration. When enabled reject NaN/positive or negative Infinity and nonnumeric/bool values, support finite int/float and registered Decimal types without converting large Decimals through float, and work in nested records. finite=False and absent finite preserve existing number/min/max policies; do not alter global types or claim existing bool exclusion as a separate feature.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o02_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cerberus/validator.py
+- library/tests/test_development_cerberus_o02_dev.py
+- library/docs/development-cerberus-o02-dev.md

@@ -1,10 +1,10 @@
-"""严格ENV模式定位坏行且不暴露配置值。"""
+"Public regression tests for DC-STRICT-ENV-DEV; the complete business contract is in materials/DC-STRICT-ENV-DEV-contract.md."
 import pytest
 from decouple import RepositoryEnv
 
 
 def test_strict_rejects_malformed(tmp_path):
-    """坏行包含行号与路径，不回显敏感文本。@param tmp_path 临时目录。@return None。"""
+    "Verify strict rejects malformed."
     path = tmp_path / 'settings.env'
     path.write_text('# comment\nPRIVATE-NO-EQUALS\n', encoding='utf-8')
     with pytest.raises(ValueError) as result:
@@ -14,7 +14,7 @@ def test_strict_rejects_malformed(tmp_path):
 
 
 def test_strict_duplicate_and_empty(tmp_path):
-    """重复和空键不会默默覆盖。@param tmp_path 临时目录。@return None。"""
+    "Verify strict duplicate and empty."
     path = tmp_path / 'settings.env'
     for content in ['A=1\nA=2', '=empty']:
         path.write_text(content, encoding='utf-8')
@@ -23,7 +23,7 @@ def test_strict_duplicate_and_empty(tmp_path):
 
 
 def test_default_tolerant_and_valid_strict(tmp_path):
-    """默认宽容不变，严格模式读取合法空值及引用。@param tmp_path 临时目录。@return None。"""
+    "Verify default tolerant and valid strict."
     path = tmp_path / 'settings.env'
     path.write_text('BAD\nA=1\nA=2', encoding='utf-8')
     assert RepositoryEnv(str(path))['A'] == '2'

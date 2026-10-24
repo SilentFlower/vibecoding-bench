@@ -1,10 +1,10 @@
-"""阈内精确、阈外None，用户无需分配完整长矩阵。"""
+"Public regression tests for TEXTDISTANCE-05-DEV; the complete business contract is in materials/TEXTDISTANCE-05-DEV-contract.md."
 import unittest
 from textdistance.bounded import bounded_levenshtein
 
 
 def test_exact_boundary_zero_and_units():
-    """恰好阈值保留，长度差下界及词单元正确。@return None。"""
+    "Verify exact boundary zero and units."
     assert bounded_levenshtein('kitten','sitting',3)==3
     assert bounded_levenshtein('kitten','sitting',2) is None
     assert bounded_levenshtein('same','same',0)==0
@@ -14,9 +14,9 @@ def test_exact_boundary_zero_and_units():
 
 
 def test_length_gate_and_invalid_threshold():
-    """长度差无需调用相等谓词；坏阈值不能被当数字。@return None。"""
+    "Verify length gate and invalid threshold."
     def forbidden(a,b):
-        """下界已拒绝时不应比较。@param a 单元。@param b 单元。@return 不返回。"""
+        "Support the public regression through forbidden."
         raise AssertionError('不应执行')
     assert bounded_levenshtein('x'*100000,'',1,test_func=forbidden) is None
     for cutoff in (-1,True,0.5):

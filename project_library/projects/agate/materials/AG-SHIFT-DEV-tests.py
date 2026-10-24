@@ -1,4 +1,4 @@
-"""公开分组前后记录回归。"""
+"Public regression tests for AG-SHIFT-DEV; the complete business contract is in materials/AG-SHIFT-DEV-contract.md."
 from decimal import Decimal
 import agate
 import pytest

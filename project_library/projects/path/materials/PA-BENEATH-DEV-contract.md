@@ -1,5 +1,12 @@
-# 为工作区文件引用提供明确的词法相对路径约束
+# Engineering contract: PA-BENEATH-DEV
 
-批处理清单中的文件引用需要明确位于基目录内，正确处理点点、相邻目录同前缀和相同目录。只做词法约束并保留Path类型，不读取文件系统，也不把它当作符号链接安全边界。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add Path.relative_beneath(base), normalizing absolute lexical paths then requiring commonpath containment and returning relative Path of the caller class. Same path returns "."; sibling prefix collisions and normalized .. escapes reject with ValueError, including cross-drive errors from the path module. Do no filesystem reads, symlink resolution or existence checks. Preserve original relpath and clearly distinguish this lexical operation from a symlink-safe containment/security boundary.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_pa_beneath_dev.py and concise English compatibility documentation at library/docs/development-pa-beneath-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/path/__init__.py
+- library/development_tests/test_development_pa_beneath_dev.py
+- library/docs/development-pa-beneath-dev.md

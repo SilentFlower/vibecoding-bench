@@ -1,3 +1,12 @@
-# 流程编辑器按State与Enum对象列表精确删除迁移
+# Engineering contract: TRANSITIONS-02-DEV
 
-路线02：remove_transition对source/dest每个元素规范化State/Enum名称，混合列表精确删边、其他路径保留；最后事件解绑与通配/空选择原行为保持。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
+
+Repair remove_transition list normalization to inspect each source/dest element, accepting existing string/single State/Enum and mixed lists. Remove only selected edge combinations, preserve unrelated paths, wildcard/empty selections, and current final-event/model-method cleanup. Do not inspect container.name, silently remove all transitions, change unknown trigger error behavior or alter live transition execution.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_transitions_02_dev.py, and English compatibility documentation at library/docs/development-transitions-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/transitions/core.py
+- library/tests/test_development_transitions_02_dev.py
+- library/docs/development-transitions-02-dev.md

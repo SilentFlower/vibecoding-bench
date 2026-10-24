@@ -1,5 +1,15 @@
-# 业务确认
+# Business scope and confirmation
 
-新增完整校验结果外壳与规范化文档、错误深复制快照，后续调用和结果内部修改互不覆盖。实际validate参数和旧布尔接口保持，异常不发布假完成；快照内容可编辑，不声称实例线程安全。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add Validator.validate_result(document, schema=None, *, update=False, normalize=True) and frozen-shell cerberus.result.ValidationResult(valid, document, errors, completed=True). Run actual validation and deep-copy normalized document plus the configured error_handler output so later calls and result-content mutations cannot overwrite validator/other results. Preserve validate/validated bool/None interfaces and normalization/update flags. Unexpected exceptions propagate without publishing a completed result; document that nested snapshot contents are editable and the validator is not made thread safe.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_cerberus_o05_dev.py and concise English compatibility documentation at library/docs/development-cerberus-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/cerberus/validator.py
+- library/cerberus/result.py
+- library/tests/test_development_cerberus_o05_dev.py
+- library/docs/development-cerberus-o05-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

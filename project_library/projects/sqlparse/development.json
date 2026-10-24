@@ -32,7 +32,7 @@
           "id": "SQLPARSE-01-DEV",
           "kind": "modify",
           "goal": "SQL格式化CLI在失败时保留输入与输出并原子提交完整结果",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair actual sqlparse CLI file lifecycle: read input, validate formatter options and complete formatting/encoding before touching any output destination. For --in-place and explicit outfile use same-directory temporary bytes, flush/fsync and os.replace, preserve existing mode/owner and clean temporary files on pre-replace failure. Reject symlink/nonregular output. Invalid options, formatting exceptions, encoding and IO failures return nonzero without truncating old bytes; stdout remains caller-owned and stdin in-place stays forbidden. Continue other explicit files after one fails using current aggregate status. Preserve successful output text, ordinary parser flags, input encoding and existing diagnostic prefixes. Never execute SQL or contact a database.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_01_dev.py, and Chinese compatibility documentation at library/docs/development-sqlparse-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair actual sqlparse CLI file lifecycle: read input, validate formatter options and complete formatting/encoding before touching any output destination. For --in-place and explicit outfile use same-directory temporary bytes, flush/fsync and os.replace, preserve existing mode/owner and clean temporary files on pre-replace failure. Reject symlink/nonregular output. Invalid options, formatting exceptions, encoding and IO failures return nonzero without truncating old bytes; stdout remains caller-owned and stdin in-place stays forbidden. Continue other explicit files after one fails using current aggregate status. Preserve successful output text, ordinary parser flags, input encoding and existing diagnostic prefixes. Never execute SQL or contact a database.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_01_dev.py, and English compatibility documentation at library/docs/development-sqlparse-01-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/SQLPARSE-01-DEV-contract.md",
@@ -50,7 +50,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SQLPARSE-01-DEV.rubric.json",
             "native": "verification/SQLPARSE-01-DEV.native.json",
             "public_native": "verification/SQLPARSE-01-DEV.public.native.json",
@@ -79,7 +79,7 @@
           "id": "SQLPARSE-02-DEV",
           "kind": "modify",
           "goal": "格式化CLI布尔参数具备明确真值及正反开关",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair both comma_first and compact CLI options as one boolean parsing family. Preserve explicit True/False compatibility with case-insensitive true/false/1/0 only, support bare option as true and --no-comma-first/--no-compact as false, define repeated options as last-wins and reject empty/unknown literals with argparse usage error. Defaults remain false and Python formatter API semantics unchanged. Verify actual formatted output, not only argparse fields, and document that a filename should precede an optional-value boolean or follow -- to avoid optional argument ambiguity.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_02_dev.py, and Chinese compatibility documentation at library/docs/development-sqlparse-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nRepair both comma_first and compact CLI options as one boolean parsing family. Preserve explicit True/False compatibility with case-insensitive true/false/1/0 only, support bare option as true and --no-comma-first/--no-compact as false, define repeated options as last-wins and reject empty/unknown literals with argparse usage error. Defaults remain false and Python formatter API semantics unchanged. Verify actual formatted output, not only argparse fields, and document that a filename should precede an optional-value boolean or follow -- to avoid optional argument ambiguity.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_02_dev.py, and English compatibility documentation at library/docs/development-sqlparse-02-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/SQLPARSE-02-DEV-contract.md",
@@ -97,7 +97,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SQLPARSE-02-DEV.rubric.json",
             "native": "verification/SQLPARSE-02-DEV.native.json",
             "public_native": "verification/SQLPARSE-02-DEV.public.native.json",
@@ -126,7 +126,7 @@
           "id": "SQLPARSE-03-DEV",
           "kind": "modify",
           "goal": "SQL编辑器以旁路映射取得原子与分组token真实源范围",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sqlparse.sourcemap.SourceMap and immutable SourceSpan for opt-in original character offsets [start,end), one-based start/end line/column. Bind the actual candidate parse statements and all atomic/group tokens without changing default Token slots. Preserve every original character including whitespace/comments/CRLF, Unicode combining codepoints and multiple statement offsets; decoded bytes use explicit encoding and coordinates refer to decoded characters, not UTF-8 bytes or display graphemes. Exact source slicing must equal token/group text. Foreign tokens reject; any leaf value/type/identity/order mutation invalidates later lookups rather than silently reporting stale positions. Empty input is supported, and this tool never executes SQL.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_03_dev.py, and Chinese compatibility documentation at library/docs/development-sqlparse-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sqlparse.sourcemap.SourceMap and immutable SourceSpan for opt-in original character offsets [start,end), one-based start/end line/column. Bind the actual candidate parse statements and all atomic/group tokens without changing default Token slots. Preserve every original character including whitespace/comments/CRLF, Unicode combining codepoints and multiple statement offsets; decoded bytes use explicit encoding and coordinates refer to decoded characters, not UTF-8 bytes or display graphemes. Exact source slicing must equal token/group text. Foreign tokens reject; any leaf value/type/identity/order mutation invalidates later lookups rather than silently reporting stale positions. Empty input is supported, and this tool never executes SQL.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_03_dev.py, and English compatibility documentation at library/docs/development-sqlparse-03-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/SQLPARSE-03-DEV-contract.md",
@@ -144,7 +144,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SQLPARSE-03-DEV.rubric.json",
             "native": "verification/SQLPARSE-03-DEV.native.json",
             "public_native": "verification/SQLPARSE-03-DEV.public.native.json",
@@ -173,7 +173,7 @@
           "id": "SQLPARSE-04-DEV",
           "kind": "modify",
           "goal": "本地报表查询按非执行型形状指纹分组且保留业务身份边界",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sqlparse.fingerprint.fingerprint(text,encoding=None,digest=False,replace_constants=True) using real candidate lexer token types. Remove actual comments/whitespace, normalize keyword spelling/spacing and replace numeric/single-quoted/dollar-quoted literals with ?, optionally also NULL/TRUE/FALSE. Preserve identifiers including quoted names, operators, statement boundaries, existing named/positional placeholders and IN-list cardinality. Return deterministic canonical text or SHA256 of it. Do not treat comment markers inside strings as comments, do not connect to databases, and explicitly state this groups token shape rather than proving semantic equivalence or generating safe executable parameterized SQL.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_04_dev.py, and Chinese compatibility documentation at library/docs/development-sqlparse-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd sqlparse.fingerprint.fingerprint(text,encoding=None,digest=False,replace_constants=True) using real candidate lexer token types. Remove actual comments/whitespace, normalize keyword spelling/spacing and replace numeric/single-quoted/dollar-quoted literals with ?, optionally also NULL/TRUE/FALSE. Preserve identifiers including quoted names, operators, statement boundaries, existing named/positional placeholders and IN-list cardinality. Return deterministic canonical text or SHA256 of it. Do not treat comment markers inside strings as comments, do not connect to databases, and explicitly state this groups token shape rather than proving semantic equivalence or generating safe executable parameterized SQL.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_04_dev.py, and English compatibility documentation at library/docs/development-sqlparse-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/SQLPARSE-04-DEV-contract.md",
@@ -191,7 +191,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SQLPARSE-04-DEV.rubric.json",
             "native": "verification/SQLPARSE-04-DEV.native.json",
             "public_native": "verification/SQLPARSE-04-DEV.public.native.json",
@@ -220,7 +220,7 @@
           "id": "SQLPARSE-05-DEV",
           "kind": "modify",
           "goal": "Token匹配显式选择原文大小写策略且保持默认兼容",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend existing Token.match(ttype,values,regex=False,case_sensitive=None) with explicit strict bool or None policy. None preserves all legacy behavior (keyword normalized case-insensitive, names sensitive, exact token-type match). True compares original value exactly; False uses Unicode casefold for ordinary string matching. Regex uses original value with Python re.IGNORECASE only when explicitly insensitive, without casefolding regex patterns or altering their escapes; partial-match semantics stay. Support values generators, None/type mismatch, quoted tokens as explicitly chosen text and preserve token.value/normalized without mutation. Do not misreport the already-working default Keyword case matching as a bug.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_05_dev.py, and Chinese compatibility documentation at library/docs/development-sqlparse-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nExtend existing Token.match(ttype,values,regex=False,case_sensitive=None) with explicit strict bool or None policy. None preserves all legacy behavior (keyword normalized case-insensitive, names sensitive, exact token-type match). True compares original value exactly; False uses Unicode casefold for ordinary string matching. Regex uses original value with Python re.IGNORECASE only when explicitly insensitive, without casefolding regex patterns or altering their escapes; partial-match semantics stay. Support values generators, None/type mismatch, quoted tokens as explicitly chosen text and preserve token.value/normalized without mutation. Do not misreport the already-working default Keyword case matching as a bug.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_05_dev.py, and English compatibility documentation at library/docs/development-sqlparse-05-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/SQLPARSE-05-DEV-contract.md",
@@ -238,7 +238,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SQLPARSE-05-DEV.rubric.json",
             "native": "verification/SQLPARSE-05-DEV.native.json",
             "public_native": "verification/SQLPARSE-05-DEV.public.native.json",
@@ -267,7 +267,7 @@
           "id": "SQLPARSE-06-DEV",
           "kind": "modify",
           "goal": "格式化工具可选择严格选项校验并定位真实拼写错误",
-          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd immutable formatter.SUPPORTED_OPTIONS for actual supported input keys and validate_options(options,strict=False); expose opt-in sqlparse.format(...,strict_options=True). Strict mode rejects every unknown key including None values, lists all offenders and offers deterministic nearest real-key suggestions. Require a real bool strict flag and keep existing known-value/combination validation. Default remains compatible and tolerant of extras, including current CLI filename/outfile/inplace metadata; do not accidentally enable strict over vars(args). Internal computed indent_char is not a public input option. Do not add speculative filters or silently accept a registration key that has no real implementation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_06_dev.py, and Chinese compatibility documentation at library/docs/development-sqlparse-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
+          "prompt": "Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.\n\nAdd immutable formatter.SUPPORTED_OPTIONS for actual supported input keys and validate_options(options,strict=False); expose opt-in sqlparse.format(...,strict_options=True). Strict mode rejects every unknown key including None values, lists all offenders and offers deterministic nearest real-key suggestions. Require a real bool strict flag and keep existing known-value/combination validation. Default remains compatible and tolerant of extras, including current CLI filename/outfile/inplace metadata; do not accidentally enable strict over vars(args). Internal computed indent_char is not a public input option. Do not add speculative filters or silently accept a registration key that has no real implementation.\n\nDeliver real implementation, original-failing public tests at library/tests/test_development_sqlparse_06_dev.py, and English compatibility documentation at library/docs/development-sqlparse-06-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.",
           "requires": [],
           "materials": [
             "materials/SQLPARSE-06-DEV-contract.md",
@@ -286,7 +286,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/SQLPARSE-06-DEV.rubric.json",
             "native": "verification/SQLPARSE-06-DEV.native.json",
             "public_native": "verification/SQLPARSE-06-DEV.public.native.json",

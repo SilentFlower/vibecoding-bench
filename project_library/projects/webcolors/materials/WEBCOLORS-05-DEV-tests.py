@@ -1,4 +1,4 @@
-"""主题对比度使用真实sRGB公式和明确背景，不暗选白色。"""
+"Public regression tests for WEBCOLORS-05-DEV; the complete business contract is in materials/WEBCOLORS-05-DEV-contract.md."
 import math
 import unittest
 from webcolors.rgba import RGBA
@@ -6,7 +6,7 @@ from webcolors.accessibility import relative_luminance,contrast_ratio,meets_cont
 
 
 def test_luminance_ratio_and_unrounded_threshold():
-    """黑白21比1、对称及严格阈值比较。@return None。"""
+    "Verify luminance ratio and unrounded threshold."
     black,white=(0,0,0),(255,255,255)
     assert relative_luminance(black)==0 and relative_luminance(white)==1
     assert contrast_ratio(black,white)==contrast_ratio(white,black)==21
@@ -17,7 +17,7 @@ def test_luminance_ratio_and_unrounded_threshold():
 
 
 def test_transparency_and_invalid_data_are_explicit():
-    """透明色只有指定背景后才能参与比值。@return None。"""
+    "Verify transparency and invalid data are explicit."
     assert contrast_on(RGBA(255,0,0,0),(1,2,3))==1
     assert contrast_on(RGBA(0,0,0,255),(255,255,255))==21
     with unittest.TestCase().assertRaises(ValueError):relative_luminance(RGBA(0,0,0,128))

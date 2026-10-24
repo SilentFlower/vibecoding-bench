@@ -1,4 +1,4 @@
-"""公开的固定参考时刻回归。"""
+"Public regression tests for AG-REFERENCE-DEV; the complete business contract is in materials/AG-REFERENCE-DEV-contract.md."
 from datetime import date, datetime, timezone
 import pickle
 import pytest

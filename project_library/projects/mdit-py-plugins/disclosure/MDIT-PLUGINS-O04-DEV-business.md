@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-对应路线08：显式gfm_whitespace=True时checkbox与起始规则使用同一GFM空白集合，tab等真实任务得到正确input；严格布尔参数，默认False保留全部原输出及普通空格行为。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-方案确认后实施真实源码改动，公开样例不是全部验收边界。禁止修改原始测试、环境或独立验收器。
+Add tasklists_plugin(gfm_whitespace=False) as a strict boolean compatibility option. Default False must preserve the complete existing ordinary-space/tab/formfeed rendering bytes. When True, make_checkbox recognizes the same existing GFM whitespace set as starts_with_todo_markdown, including tab/vertical-tab/formfeed and repeated separators, and derives checked state from the matched space/x/X marker. Every recognized task gets exactly one actual input with matching state and original marker removal; preserve enabled/disabled and label modes. Do not broaden recognition to no-separator [x]text or non-GFM Unicode spaces, and do not merely add task CSS classes without a checkbox.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_mdit_plugins_o04_dev.py and concise English compatibility documentation at library/docs/development-mdit-plugins-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/mdit_py_plugins/tasklists/__init__.py
+- library/tests/test_development_mdit_plugins_o04_dev.py
+- library/docs/development-mdit-plugins-o04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

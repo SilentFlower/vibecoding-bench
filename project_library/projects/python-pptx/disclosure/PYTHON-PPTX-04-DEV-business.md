@@ -1,5 +1,14 @@
-# 业务确认
+# Business scope and confirmation
 
-路线15：Paragraph.bullet/set_bullet写互斥a:bu*，字符/完整固定XSD编号方案及1..32767起点，None继承、none显式取消；验证后按schema顺序提交，正文/层级/字体不动。
+Inspect the pinned real implementation and reproduction. Explain the call path, clarify requirements, propose a compatibility plan and wait for confirmation before editing. Then implement in the same workspace, run meaningful tests and repair independently reported failures. The entire investigation, confirmation, implementation and acceptance is ONE engineering objective.
 
-请先调查、澄清并确认方案再实施。公开样例不是全部验收边界；独立失败必须返工。
+Add _Paragraph.bullet read and set_bullet(kind,character="•",scheme="arabicPeriod",start=1). kind character/number/none or None inheritance; single character, number scheme from pinned ST_TextAutonumberScheme and strict 1..32767 start. Validate before mutation; replace mutually exclusive buNone/buChar/buAutoNum/buBlip only, insert before tabLst/defRPr/extLst per XSD. Preserve text, level, font and other paragraph properties, read unsupported image bullet as unsupported without implicit mutation. Real saved/reopened OOXML, never prefix fake numbering text.
+
+Deliver real implementation, original-failing public tests at library/tests/test_development_python_pptx_04_dev.py, and English compatibility documentation at library/docs/development-python-pptx-04-dev.md. Preserve frozen original tests, environment and test controls. Only modify authorized paths.
+
+Authorized paths:
+- library/src/pptx/text/text.py
+- library/tests/test_development_python_pptx_04_dev.py
+- library/docs/development-python-pptx-04-dev.md
+
+Public examples do not cover every acceptance boundary. Preserve the original tests, environment and independent verifier.

@@ -1,5 +1,12 @@
-# 有界检测文件并保留调用者流位置与覆盖事实
+# Engineering contract: CHARDET-O03-DEV
 
-基于已修复BOM核心有界读取文件或二进制流，支持短读与准确预算。成功失败均恢复调用者可seek位置且不关闭其流；仅报告实际读字节、EOF和预算耗尽，前缀不冒称全文验证。零预算不读取。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Implement chardet.files.detect_file(source, *, preserve_position=True, chunk_size=65536, max_bytes=None) on the delivered split-BOM detector. Support text/PathLike paths and caller-owned binary streams, short reads and exact nonnegative byte budgets without lookahead. Restore seekable caller positions on success/failure, never close caller streams, close owned files, and report actual read_bytes/eof/budget_exhausted without claiming an inspected prefix validates the whole file. Zero budget performs no reads; nonseekable preserving mode and text reads fail explicitly.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_chardet_o03_dev.py and concise English compatibility documentation at library/docs/development-chardet-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/chardet/files.py
+- library/tests/test_development_chardet_o03_dev.py
+- library/docs/development-chardet-o03-dev.md

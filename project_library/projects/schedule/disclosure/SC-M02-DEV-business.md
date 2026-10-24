@@ -4,7 +4,7 @@ Make repr safe for an unconfigured Job, including default interval one. Preserve
 
 # Investigation topics
 
-- 解释默认未配置任务的表示异常与正常对照
+- Explain the representation error for a default unconfigured job and compare it with normal behavior.
 
 # Supplied business material: materials/interactive.txt
 

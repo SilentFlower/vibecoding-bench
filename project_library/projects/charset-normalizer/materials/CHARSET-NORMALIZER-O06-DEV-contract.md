@@ -1,5 +1,12 @@
-# 严格检测编码完成后原子归一化本地文件
+# Engineering contract: CHARSET-NORMALIZER-O06-DEV
 
-基于严格转码，先有界读取、真实检测并完成编码，再同目录原子发布。支持原位或另存，保留已有权限、新文件私有，编码或发布失败保持原字节并只清理自有临时文件；默认检测API仍只读。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Build charset_normalizer.atomic.normalize_file_atomic on the delivered strict transcode API. Bound source reads, detect actual text, complete target encoding before touching destination and atomically publish a same-directory temporary file. Default in-place or explicit separate output, preserve existing target mode/new-file private mode, reject symlink paths and clean only owned temporary files on encoding/write/replace failures. Source and old target bytes must survive failures; report actual written bytes/loss count, keep default APIs read-only and do not claim directory crash durability.
+
+Deliver meaningful original-failing public regression tests at library/tests/test_development_charset_normalizer_o06_dev.py and concise English compatibility documentation at library/docs/development-charset-normalizer-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/src/charset_normalizer/atomic.py
+- library/tests/test_development_charset_normalizer_o06_dev.py
+- library/docs/development-charset-normalizer-o06-dev.md

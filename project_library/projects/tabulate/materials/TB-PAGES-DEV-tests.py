@@ -1,4 +1,4 @@
-"""公开惰性分页报表回归。"""
+"Public regression tests for TB-PAGES-DEV; the complete business contract is in materials/TB-PAGES-DEV-contract.md."
 import pytest
 from tabulate import tabulate,SEPARATING_LINE
 from tabulate.pages import iter_pages

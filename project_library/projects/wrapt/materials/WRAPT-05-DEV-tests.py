@@ -1,9 +1,9 @@
-"""按真实绑定签名规范参数，不按调用拼写重复缓存。"""
+"Public regression tests for WRAPT-05-DEV; the complete business contract is in materials/WRAPT-05-DEV-contract.md."
 import unittest
 from wrapt.canonical_cache import canonical_cache
 
 def test_equivalent_defaults_varargs_kwargs_and_typed_policy():
-    """位置/命名/显式默认等价，kwargs顺序也归一。@return None。"""
+    "Verify equivalent defaults varargs kwargs and typed policy."
     calls=[]
     @canonical_cache(maxsize=3)
     def value(x,y=2,*,z=3):calls.append(1);return x+y+z
@@ -13,7 +13,7 @@ def test_equivalent_defaults_varargs_kwargs_and_typed_policy():
     assert typed(1) is int and typed(True) is bool and typed.cache_info().misses==2
 
 def test_custom_business_key_supports_mapping_and_invalid_calls_still_reject():
-    """自定义键只看id；函数签名仍先验证，碰撞由业务负责。@return None。"""
+    "Verify custom business key supports mapping and invalid calls still reject."
     calls=[]
     @canonical_cache(key_func=lambda bound:bound.arguments['record']['id'])
     def value(record):calls.append(1);return record['name']

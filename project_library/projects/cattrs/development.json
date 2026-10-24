@@ -32,7 +32,7 @@
           "id": "CATTRS-O01-DEV",
           "kind": "modify",
           "goal": "按规范默认值区分真正必需的dataclass联合字段",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair union disambiguation so dataclass default_factory fields are treated as optional using the actual adapted field defaults, without invoking factories during discrimination. Truly ambiguous unions must raise TypeError independently of member order instead of selecting the class with the factory field. Preserve real required unique fields, ordinary defaults, attrs factories, Literal/renaming overrides and every frozen regression.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o01_dev.py and concise Chinese compatibility documentation at library/docs/development-cattrs-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nRepair union disambiguation so dataclass default_factory fields are treated as optional using the actual adapted field defaults, without invoking factories during discrimination. Truly ambiguous unions must raise TypeError independently of member order instead of selecting the class with the factory field. Preserve real required unique fields, ordinary defaults, attrs factories, Literal/renaming overrides and every frozen regression.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o01_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o01-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CATTRS-O01-DEV-contract.md",
@@ -47,7 +47,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CATTRS-O01-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CATTRS-O01-DEV.native.json",
@@ -79,7 +79,7 @@
           "id": "CATTRS-O02-DEV",
           "kind": "modify",
           "goal": "为真实转换器配置精确Decimal字符串传输",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.decimal.configure_decimal(converter, *, allow_special=False) using paired actual structure/unstructure hooks. Decimal values travel as exact strings through existing JSON/YAML converters, preserving precision, exponent and negative-zero text without float conversion. Accept explicit strings/integers/Decimal, reject bool/float/invalid text, default reject nonfinite values with an explicit opt-in policy. Configure only the supplied converter and preserve later user-hook precedence and nested records.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o02_dev.py and concise Chinese compatibility documentation at library/docs/development-cattrs-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.decimal.configure_decimal(converter, *, allow_special=False) using paired actual structure/unstructure hooks. Decimal values travel as exact strings through existing JSON/YAML converters, preserving precision, exponent and negative-zero text without float conversion. Accept explicit strings/integers/Decimal, reject bool/float/invalid text, default reject nonfinite values with an explicit opt-in policy. Configure only the supplied converter and preserve later user-hook precedence and nested records.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o02_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o02-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CATTRS-O02-DEV-contract.md",
@@ -94,7 +94,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CATTRS-O02-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CATTRS-O02-DEV.native.json",
@@ -126,7 +126,7 @@
           "id": "CATTRS-O03-DEV",
           "kind": "modify",
           "goal": "显式配置双向且严格的base64二进制传输",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.base64.configure_base64(converter, *, urlsafe=False) with paired bytes hooks on the supplied real converter. Support nested existing JSON converters, empty/all-byte payloads and explicitly selected URL-safe alphabet. Strictly reject bad padding, non-ASCII and invalid characters, never guess formats or affect unconfigured base85 defaults. Later user hooks remain higher priority and non-string structure input fails clearly.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o03_dev.py and concise Chinese compatibility documentation at library/docs/development-cattrs-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.base64.configure_base64(converter, *, urlsafe=False) with paired bytes hooks on the supplied real converter. Support nested existing JSON converters, empty/all-byte payloads and explicitly selected URL-safe alphabet. Strictly reject bad padding, non-ASCII and invalid characters, never guess formats or affect unconfigured base85 defaults. Later user hooks remain higher priority and non-string structure input fails clearly.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o03_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o03-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CATTRS-O03-DEV-contract.md",
@@ -141,7 +141,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CATTRS-O03-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CATTRS-O03-DEV.native.json",
@@ -173,7 +173,7 @@
           "id": "CATTRS-O04-DEV",
           "kind": "modify",
           "goal": "为原始类型配置精确且可组合的严格结构策略",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.strict.configure_strict_primitives(converter, *, allow_int_float=False, finite_float=True). Opt in exact bool/int/float/str/bytes input types without coercion, reject bool as int and primitive subclasses, explicitly control int-to-float and nonfinite float policy. Apply through actual registered hooks so nested containers/records retain cattrs validation paths. Keep unconfigured converters, unstructure behavior and later user-hook overrides intact.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o04_dev.py and concise Chinese compatibility documentation at library/docs/development-cattrs-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.strict.configure_strict_primitives(converter, *, allow_int_float=False, finite_float=True). Opt in exact bool/int/float/str/bytes input types without coercion, reject bool as int and primitive subclasses, explicitly control int-to-float and nonfinite float policy. Apply through actual registered hooks so nested containers/records retain cattrs validation paths. Keep unconfigured converters, unstructure behavior and later user-hook overrides intact.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o04_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o04-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CATTRS-O04-DEV-contract.md",
@@ -188,7 +188,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CATTRS-O04-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CATTRS-O04-DEV.native.json",
@@ -220,7 +220,7 @@
           "id": "CATTRS-O05-DEV",
           "kind": "modify",
           "goal": "为抽象PathLike字段指定不访问文件的文本策略",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.pathlike.configure_pathlike(converter, *, factory=Path) for PathLike and PathLike[str] annotations through actual predicate hooks. Unstructure using os.fspath and require str output, structure only str through an explicit factory returning text PathLike, reject byte paths/invalid factory returns without implicit decoding. Support nested JSON records and custom __fspath__, never touch the filesystem, and preserve concrete Path defaults and converter isolation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o05_dev.py and concise Chinese compatibility documentation at library/docs/development-cattrs-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.pathlike.configure_pathlike(converter, *, factory=Path) for PathLike and PathLike[str] annotations through actual predicate hooks. Unstructure using os.fspath and require str output, structure only str through an explicit factory returning text PathLike, reject byte paths/invalid factory returns without implicit decoding. Support nested JSON records and custom __fspath__, never touch the filesystem, and preserve concrete Path defaults and converter isolation.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o05_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o05-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CATTRS-O05-DEV-contract.md",
@@ -235,7 +235,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CATTRS-O05-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CATTRS-O05-DEV.native.json",
@@ -267,7 +267,7 @@
           "id": "CATTRS-O06-DEV",
           "kind": "modify",
           "goal": "按形状结构化单条记录或单序列联合",
-          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.sequence_union.configure_sequence_union(converter, union) as opt-in actual union-hook registration for exactly one list/tuple/Sequence branch and one attrs/dataclass/dict record branch. Mapping input selects the record, non-text Sequence selects the sequence, then delegate every nested conversion to current converter hooks. Support empty/tuple input and nested custom hooks, reject text/bytes/generators and ambiguous branch sets explicitly, and leave other union/default behavior unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o06_dev.py and concise Chinese compatibility documentation at library/docs/development-cattrs-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
+          "prompt": "Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:\n\nImplement cattrs.strategies.sequence_union.configure_sequence_union(converter, union) as opt-in actual union-hook registration for exactly one list/tuple/Sequence branch and one attrs/dataclass/dict record branch. Mapping input selects the record, non-text Sequence selects the sequence, then delegate every nested conversion to current converter hooks. Support empty/tuple input and nested custom hooks, reject text/bytes/generators and ambiguous branch sets explicitly, and leave other union/default behavior unchanged.\n\nDeliver meaningful original-failing public regression tests at library/tests/test_development_cattrs_o06_dev.py and concise English compatibility documentation at library/docs/development-cattrs-o06-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.",
           "requires": [],
           "materials": [
             "materials/CATTRS-O06-DEV-contract.md",
@@ -282,7 +282,7 @@
             "implemented"
           ],
           "evaluation": {
-            "version": 2,
+            "version": 3,
             "rubric": "verification/CATTRS-O06-DEV.rubric.json",
             "semantic": true,
             "native": "verification/CATTRS-O06-DEV.native.json",

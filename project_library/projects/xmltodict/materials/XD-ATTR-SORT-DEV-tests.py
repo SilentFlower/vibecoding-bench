@@ -1,4 +1,4 @@
-"""公开稳定XML属性输出回归。"""
+"Public regression tests for XD-ATTR-SORT-DEV; the complete business contract is in materials/XD-ATTR-SORT-DEV-contract.md."
 from io import StringIO
 import pytest
 import xmltodict

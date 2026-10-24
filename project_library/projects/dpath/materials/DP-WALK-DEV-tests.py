@@ -1,4 +1,4 @@
-"""公开有界类型化路径遍历回归。"""
+"Public regression tests for DP-WALK-DEV; the complete business contract is in materials/DP-WALK-DEV-contract.md."
 import pytest
 from dpath.walking import walk_paths,PathCycleError
 

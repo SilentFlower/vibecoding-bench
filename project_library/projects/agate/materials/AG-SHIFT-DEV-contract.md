@@ -1,5 +1,13 @@
-# 按客户顺序计算前笔与后笔记录
+# Engineering contract: AG-SHIFT-DEV
 
-客户订单需要取同客户前一笔和后一笔数值。Lag/Lead保持原行序与行数，支持交错分组、零／大位移和原列类型默认值；空值仍占一个位置，不排序、不跨组、不修改原表，不把现有Change的同一行语义改成跨行。
+Inspect the pinned real source and public reproduction, explain the actual call path, ask necessary clarification questions, propose a concrete compatibility plan and wait for my confirmation before editing. Then implement and validate in this same conversation and workspace. Fix any independently reported failures before delivery. The complete engineering contract is:
 
-请先阅读实际源码和公开复现，完成调查、澄清和兼容方案，获得确认后在同一工作区实现。失败时依据独立反馈返工；测试和说明不是单独目标。
+Add exported Lag and Lead Computation classes with (column_name, offset=1, default=None, partition_by=None). Use existing row order, including interleaved partitions, without sorting or mutating the table. Offset must be a nonnegative non-bool integer; zero copies the original column. partition_by accepts a column name or finite unique list/tuple of column names. Validate names and cast the boundary default with the original DataType; return a column of that same type and original length. Nulls remain positional values and oversized offsets fill the default. Preserve existing Change and other computations.
+
+Deliver meaningful original-failing public regression tests at library/development_tests/test_development_ag_shift_dev.py and concise English compatibility documentation at library/docs/development-ag-shift-dev.md. Preserve all frozen original tests, dependency metadata and test controls. Change only authorized paths.
+
+Authorized paths:
+- library/agate/computations/shift.py
+- library/agate/computations/__init__.py
+- library/development_tests/test_development_ag_shift_dev.py
+- library/docs/development-ag-shift-dev.md

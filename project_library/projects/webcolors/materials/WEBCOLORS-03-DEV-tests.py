@@ -1,11 +1,11 @@
-"""RGBA新增合同不能让既有RGB函数静默丢弃alpha。"""
+"Public regression tests for WEBCOLORS-03-DEV; the complete business contract is in materials/WEBCOLORS-03-DEV-contract.md."
 import unittest
 import webcolors
 from webcolors.rgba import RGBA, hex_to_rgba, rgba_to_hex, rgba_to_rgb, rgb_to_rgba
 
 
 def test_short_and_long_roundtrip_preserves_hidden_rgb():
-    """所有分量及透明像素中的RGB无损保留。@return None。"""
+    "Verify short and long roundtrip preserves hidden rgb."
     assert hex_to_rgba('#3698')==RGBA(51,102,153,136)
     assert rgba_to_hex(hex_to_rgba('#AbCd'))=='#aabbccdd'
     assert rgba_to_hex(hex_to_rgba('#ff000000'))=='#ff000000'
@@ -13,7 +13,7 @@ def test_short_and_long_roundtrip_preserves_hidden_rgb():
 
 
 def test_old_rgb_contract_and_invalid_rgba():
-    """透明转换必须显式，坏分量与尾换行拒绝。@return None。"""
+    "Verify old rgb contract and invalid rgba."
     for value in ('#3698','#33669980'):
         with unittest.TestCase().assertRaises(ValueError):webcolors.hex_to_rgb(value)
     for value in ('#abc','#abcdef','#abcd\n','abcd','#abcdefff!'):
