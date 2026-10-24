@@ -199,6 +199,8 @@ class AccountRuntime:
             raise ValueError("v3 每账号 CLI 并发必须为 1 或 2")
         self.lock = threading.RLock()
         self.environment_locks: dict[str, threading.RLock] = {}
+        self.credential_locks_guard = threading.Lock()
+        self.credential_locks: dict[str, threading.RLock] = {}
         self.capacity_lock = threading.RLock()
         self.heartbeat_pool = ThreadPoolExecutor(max_workers=self.limit * self.cli_limit + 1, thread_name_prefix="v3-lease")
         self.jobs: dict[str, dict] = {}
@@ -286,6 +288,11 @@ class AccountRuntime:
             if draft_path.exists() and _read_json(draft_path).get("phase") == "deleting":
                 raise ValueError("登录草稿正在清理，禁止唤醒或重建")
         return self.environment_lock(row["environment_id"])
+
+    def _credential_lock(self, account_name: str):
+        """取得独立的账号凭据发布锁，不进入环境锁或全局作业锁。:param account_name: 持久账号名。:return: 可重入发布锁。"""
+        with self.credential_locks_guard:
+            return self.credential_locks.setdefault(account_name, threading.RLock())
 
     @staticmethod
     def execution_token(container_id: str, source: str) -> str:
@@ -871,32 +878,35 @@ class AccountRuntime:
         :param take_ownership: 显式从原 cc2api 绑定接管本地刷新权
         :return: None
         """
-        profile = self.data / "profiles" / account["name"]
-        path = profile / ".credentials.json"
-        if not path.exists():
-            return
-        credentials = (self._local_credentials(row, account, take_ownership)
-            if account.get("cc2api_account_id") is None else _read_json(path))
-        home = self._root(row) / "home"
-        destination = home / ".claude" / ".credentials.json"
-        if account.get("cc2api_account_id") is not None:
-            credentials.get("claudeAiOauth", {}).pop("refreshToken", None)
-        atomic_json(destination, credentials)
-        os.chown(destination.parent, 1000, 1000, follow_symlinks=False)
-        os.chown(destination, 1000, 1000, follow_symlinks=False)
-        access = self._root(row) / "runtime" / "access" / ".credentials.json"
-        atomic_json(access, credentials)
-        if row.get("isolation_version") == ISOLATION_VERSION:
-            access.parent.chmod(0o750)
-            os.chown(access.parent, 0, 1000, follow_symlinks=False)
-            os.chown(access, 1000, 1000, follow_symlinks=False)
-            network_access = self._network_runtime(row) / "access" / ".credentials.json"
-            snapshot = json.loads(json.dumps(credentials))
-            snapshot.get("claudeAiOauth", {}).pop("refreshToken", None)
-            atomic_json(network_access, snapshot)
-        if not (home / ".claude.json").exists() and (profile / ".claude.json").exists():
-            shutil.copy2(profile / ".claude.json", home / ".claude.json")
-            os.chown(home / ".claude.json", 1000, 1000, follow_symlinks=False)
+        # 读取和全部副本发布必须串行；只锁原子替换会让迟到的旧快照覆盖刚同步的新 AT。
+        # 使用独立账号锁，避免后台 owner→发布与作业环境→发布之间产生反向锁序。
+        with self._credential_lock(account["name"]):
+            profile = self.data / "profiles" / account["name"]
+            path = profile / ".credentials.json"
+            if not path.exists():
+                return
+            credentials = (self._local_credentials(row, account, take_ownership)
+                if account.get("cc2api_account_id") is None else _read_json(path))
+            home = self._root(row) / "home"
+            destination = home / ".claude" / ".credentials.json"
+            if account.get("cc2api_account_id") is not None:
+                credentials.get("claudeAiOauth", {}).pop("refreshToken", None)
+            atomic_json(destination, credentials)
+            os.chown(destination.parent, 1000, 1000, follow_symlinks=False)
+            os.chown(destination, 1000, 1000, follow_symlinks=False)
+            access = self._root(row) / "runtime" / "access" / ".credentials.json"
+            atomic_json(access, credentials)
+            if row.get("isolation_version") == ISOLATION_VERSION:
+                access.parent.chmod(0o750)
+                os.chown(access.parent, 0, 1000, follow_symlinks=False)
+                os.chown(access, 1000, 1000, follow_symlinks=False)
+                network_access = self._network_runtime(row) / "access" / ".credentials.json"
+                snapshot = json.loads(json.dumps(credentials))
+                snapshot.get("claudeAiOauth", {}).pop("refreshToken", None)
+                atomic_json(network_access, snapshot)
+            if not (home / ".claude.json").exists() and (profile / ".claude.json").exists():
+                shutil.copy2(profile / ".claude.json", home / ".claude.json")
+                os.chown(home / ".claude.json", 1000, 1000, follow_symlinks=False)
 
     def transport(self, account: dict, version: str) -> dict:
         """返回只用于服务间调用的当前传输绑定。
