@@ -711,6 +711,32 @@ class ProjectsService:
         self._write('INSERT OR IGNORE INTO projects_events(account_id,work_id,kind,payload_json,event_key,created_at) '
             'VALUES(?,?,?,?,?,?)', (account_id, work_id, kind, canonical_json(payload).decode(), key, time.time()))
 
+    def _manual_retry_event(self, agent: dict, work: dict | None) -> dict | None:
+        """只识别原工作最近一次已确认的模型过滤故障。:param agent: 当前控制者。:param work: 原工作。:return: 可人工重试的错误事件或 None。"""
+        if (not work or work['status'] != 'blocked' or agent['status'] != 'blocked'
+                or work['runtime_json'] or work['segment_started_at'] is not None):
+            return None
+        event = self._one("SELECT * FROM projects_events WHERE account_id=? "
+            "AND kind IN ('error','started','manual_retry','gate_wait') ORDER BY id DESC LIMIT 1", (agent['account_id'],))
+        if not event or event['kind'] != 'error' or event['work_id'] != work['id']:
+            return None
+        payload = json.loads(event['payload_json'])
+        if payload.get('reason') != 'provider_content_filter':
+            return None
+        if payload.get('source') == 'operator_diagnosis':
+            original_id = payload.get('diagnostic_of_event_id')
+            if type(original_id) is not int or event['event_key'] != f'operator-diagnosis:provider-content-filter:event-{original_id}':
+                return None
+            original = self._one("SELECT * FROM projects_events WHERE account_id=? AND id<? "
+                "AND kind IN ('error','started','manual_retry','gate_wait') ORDER BY id DESC LIMIT 1",
+                (agent['account_id'], event['id']))
+            if (not original or original['id'] != original_id or original['kind'] != 'error'
+                    or original['work_id'] != work['id']):
+                return None
+        elif type(payload.get('generation')) is not int or payload['generation'] != work['generation']:
+            return None
+        return event
+
     def start(self, account_id: int, *, scheduled: bool = False, now: float | None = None) -> dict:
         """启动一个账号控制者，重复请求不产生第二个 Pi。
 
@@ -738,24 +764,54 @@ class ProjectsService:
                     "WHERE w.account_id=? AND a.status IN ('intent','unknown') LIMIT 1", (account_id,)):
                 raise ValueError('有未对账的终端输入，请先核对操作结果')
             current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
-            unavailable, message = self._eligibility(agent, current_work)
+            retry_event = self._manual_retry_event(agent, current_work) if not scheduled else None
+            # 人工重试只在内存中放行这一项故障，其他门禁失败时不能提前解除原工作阻塞。
+            eligible_work = {**current_work, 'status': 'paused'} if retry_event else current_work
+            unavailable, message = self._eligibility(agent, eligible_work)
             if unavailable:
                 if scheduled:
                     self._write('UPDATE projects_agents SET schedule_state=?,schedule_message=?,schedule_next_at=NULL WHERE account_id=?',
                         (unavailable, message, account_id))
                     return self.state(account_id)
                 raise ValueError(message)
+            if retry_event:
+                assets = self.catalog.for_work(current_work)
+                _, definition = assets.objective(current_work['project_key'], current_work['objective_id'])
+                if (current_work['project_key'] not in json.loads(agent['project_keys_json'])
+                        or definition != json.loads(current_work['definition_json'])):
+                    raise ValueError('原工作授权或冻结合同不符，保留现场等待人工核对')
             gate = self.admission(account, current_work)
             if not gate['allowed']:
-                self._wait_gate(agent, gate, now)
+                self._wait_gate(agent, {**gate, 'retryable': False} if retry_event else gate, now)
                 return self.state(account_id)
             configuration = self.provider()
             if not configuration or not self.pi.available():
                 raise ValueError('Pi 运行时或外接模型配置尚未就绪')
             generation = agent['generation'] + 1
-            self._write("UPDATE projects_agents SET generation=?,status='running',message=NULL,updated_at=?,schedule_next_at=NULL,"
-                "schedule_last_started_at=?,schedule_state=CASE WHEN schedule_enabled=1 THEN 'running' ELSE 'off' END WHERE account_id=?",
-                (generation, now, now, account_id))
+            with self.write_lock:
+                connection = self.database()
+                try:
+                    with connection:
+                        connection.execute('BEGIN IMMEDIATE')
+                        if retry_event:
+                            # 故障放行、人工审计和新代次必须一起提交，不能留下可被定时扫描接续的半状态。
+                            saved = connection.execute('SELECT * FROM projects_work WHERE id=?', (current_work['id'],)).fetchone()
+                            latest = connection.execute("SELECT id FROM projects_events WHERE account_id=? "
+                                "AND kind IN ('error','started','manual_retry','gate_wait') ORDER BY id DESC LIMIT 1", (account_id,)).fetchone()
+                            if not saved or dict(saved) != current_work or not latest or latest['id'] != retry_event['id']:
+                                raise ValueError('原工作或故障事实已变化，请重新核对后启动')
+                            connection.execute("UPDATE projects_work SET status='paused',message=? WHERE id=?",
+                                ('人工已确认重试原模型，保留原工作和会话', current_work['id']))
+                            connection.execute('INSERT INTO projects_events(account_id,work_id,kind,payload_json,created_at) VALUES(?,?,?,?,?)',
+                                (account_id, current_work['id'], 'manual_retry', canonical_json({'reason': 'provider_content_filter',
+                                    'error_event_id': retry_event['id'], 'generation': generation, 'source': 'manual_start'}).decode(), now))
+                        updated = connection.execute("UPDATE projects_agents SET generation=?,status='running',message=NULL,updated_at=?,schedule_next_at=NULL,"
+                            "schedule_last_started_at=?,schedule_state=CASE WHEN schedule_enabled=1 THEN 'running' ELSE 'off' END WHERE account_id=? AND generation=?",
+                            (generation, now, now, account_id, agent['generation']))
+                        if updated.rowcount != 1:
+                            raise ValueError('Pi 控制代次已变化，请重新核对后启动')
+                finally:
+                    connection.close()
             stop = threading.Event()
             thread = threading.Thread(target=self._run, args=(account_id, generation, configuration, stop), daemon=True)
             self.controllers[account_id] = (thread, stop)
@@ -767,6 +823,9 @@ class ProjectsService:
                 self.controller_identities.pop(account_id, None)
                 self._write("UPDATE projects_agents SET status='blocked',message=?,schedule_state='blocked',schedule_next_at=NULL WHERE account_id=?",
                     ('Pi 控制线程未能启动，请人工核对后重试', account_id))
+                if retry_event:
+                    self._write("UPDATE projects_work SET status='blocked' WHERE id=?", (current_work['id'],))
+                    self._event(account_id, 'error', {'message': 'Pi 控制线程未能启动，原模型尚未重试'}, current_work['id'])
                 raise
         return self.state(account_id)
 
@@ -967,6 +1026,7 @@ class ProjectsService:
             # 仅透传已定义枚举，避免将上游正文或任意字段写入公开事件。
             if value.get('reason') == 'provider_content_filter':
                 payload['reason'] = value['reason']
+                payload['generation'] = generation
             self._event(account_id, 'error', payload, work['id'] if work else None)
 
     def tool(self, account_id: int, generation: int, name: str, args: dict,

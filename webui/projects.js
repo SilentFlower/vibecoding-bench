@@ -12,11 +12,16 @@ window.ProjectsUI = (() => {
   /**
    * 在当前页面显示操作结果，页面切换后不再写入旧 DOM。
    * @param {string} message 用户可读消息。
+   * @param {string} kind 错误告警或普通状态。
    * @return {void}
    */
-  function feedback(message) {
+  function feedback(message, kind = 'status') {
     const element = $('#projects-feedback');
-    if (element) { element.textContent = message; element.classList.toggle('hidden', !message); }
+    if (!element) return;
+    element.dataset.kind = kind;
+    element.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    element.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
+    element.textContent = message; element.classList.toggle('hidden', !message);
   }
 
   /**
@@ -143,7 +148,8 @@ window.ProjectsUI = (() => {
         : action === 'pause' ? '已暂停，自动计划已关闭，原会话和工作区已保留。' : '当前目标已停止，现场和交付记录已保留。');
       await refreshView();
     } catch (error) {
-      if (current === revision && selected === accountId && chosen === selection) feedback(error.message);
+      if (current === revision && selected === accountId && chosen === selection)
+        feedback(`${action === 'start' ? '启动 / 恢复' : action === 'pause' ? '暂停' : '停止'}未完成：${error.message}`, 'error');
     } finally {
       if (pendingActions.get(selected) === pending) pendingActions.delete(selected);
       if (current === revision && selected === accountId && chosen === selection) paintState();
@@ -431,6 +437,9 @@ window.ProjectsUI = (() => {
     document.querySelectorAll('[data-pi-action]').forEach(button => {
       button.disabled = !agent || !!pending || (button.dataset.piAction === 'start' && agent.controller_active === true);
       button.setAttribute('aria-busy', String(!!pending));
+      button.textContent = pending?.action === button.dataset.piAction
+        ? {start: '正在启动…', pause: '正在暂停…', stop: '正在停止…'}[pending.action]
+        : {start: '启动 / 恢复 Pi', pause: '暂停', stop: '停止当前目标'}[button.dataset.piAction];
     });
     paintSchedule();
   }

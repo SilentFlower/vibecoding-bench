@@ -1659,7 +1659,8 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-account-picker { display: grid; gap: 5px; width: min(100%, 300px); color: var(--text-dim); }
 .projects-account-picker .lbl, .projects-summary-card > .lbl, .projects-overview-head > div > .lbl { color: var(--text-dim); font-size: 11px; letter-spacing: .08em; }
 .projects-account-picker select { width: 100%; min-width: 0; padding: 9px 12px; border: 1px solid var(--border-bright); background: var(--surface-2); color: var(--text); font: inherit; }
-.projects-feedback { padding: 10px 14px; border-left: 3px solid var(--amber); background: var(--surface-2); }
+.projects-feedback { margin: 14px 0; padding: 10px 14px; border-left: 3px solid var(--amber); background: var(--surface-2); }
+.projects-feedback[data-kind="error"] { border-left-color: var(--failed); color: var(--failed); font-weight: 600; }
 .projects-overview { margin-bottom: 18px; border-top: 2px solid var(--amber); }
 .projects-overview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .projects-overview-head > div, .projects-summary-card, .projects-quota { min-width: 0; }

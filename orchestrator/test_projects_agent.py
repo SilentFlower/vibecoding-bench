@@ -131,6 +131,21 @@ class ErrorPiFixture:
         return 'error'
 
 
+class ResumingPiFixture(PiFixture):
+    """只恢复一次原 Claude 工作，再等待人工停止的隔离控制者。"""
+
+    def __init__(self):
+        """创建恢复结果和调用记录。:return: None。"""
+        super().__init__()
+        self.calls, self.result = [], None
+
+    def run(self, configuration, tools, event, stop, timeout_sec):
+        """恢复原工作并等待取消。:param configuration: 配置。:param tools: 工具。:param event: 事件。:param stop: 取消。:param timeout_sec: 时限。:return: stopped。"""
+        self.calls.append((configuration, timeout_sec))
+        self.result = tools('claude_start', {'project_key': 'example', 'objective_id': 'feature'}, 'resume-original')
+        return super().run(configuration, tools, event, stop, timeout_sec)
+
+
 class ProjectsAgentTests(unittest.TestCase):
     """验证新架构独立于旧阶段脚本的业务及恢复行为。"""
 
@@ -173,6 +188,31 @@ class ProjectsAgentTests(unittest.TestCase):
     def start_work(self, account_id=1):
         """开启夹具工程。:param account_id: 账号。:return: 工具结果。"""
         return self.tool('claude_start', {'project_key': 'example', 'objective_id': 'feature'}, account_id=account_id)
+
+    def prepare_filter_blocked(self, account_id=1, operator=False):
+        """保留原会话和已耗预算，构造已确认过滤的现场。:param account_id: 账号。:param operator: 是否为旧事件的人工诊断。:return: 原工作、故障事件和 Pi 会话路径。"""
+        generation = self.activate(account_id)
+        self.service.configure(account_id, ['example'], budget_sec=1800)
+        result = self.start_work(account_id)
+        work = self.service._one('SELECT * FROM projects_work WHERE id=?', (result['work_id'],))
+        self.service._release(work, 'blocked')
+        self.service._write('UPDATE projects_work SET work_sec=? WHERE id=?', (165.04067087173462, work['id']))
+        session_file = self.root / 'projects/agents' / str(account_id) / 'original.jsonl'
+        session_file.parent.mkdir(parents=True)
+        session_file.write_text('{}\n')
+        self.service._pi_event(account_id, generation, {'type': 'ready', 'session_file': str(session_file)})
+        if operator:
+            self.service._event(account_id, 'error', {'message': '旧版通用模型错误'}, work['id'])
+            original_id = self.service.events(account_id)[-1]['id']
+            self.service._event(account_id, 'error', {'reason': 'provider_content_filter', 'source': 'operator_diagnosis',
+                'diagnostic_of_event_id': original_id}, work['id'], f'operator-diagnosis:provider-content-filter:event-{original_id}')
+            # 部署和 recover 只递增控制代次，原工作的执行代次与已核实错误仍保持绑定。
+            self.service._write('UPDATE projects_agents SET generation=generation+2 WHERE account_id=?', (account_id,))
+        else:
+            self.service._pi_event(account_id, generation, {'type': 'error', 'reason': 'provider_content_filter', 'message': '模型过滤'})
+        self.service.configure_schedule(account_id, True)
+        self.service._write("UPDATE projects_agents SET status='blocked',schedule_state='blocked',schedule_next_at=NULL WHERE account_id=?", (account_id,))
+        return self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],)), self.service.events(account_id)[-2], session_file
 
     def test_menu_and_multiline_input_use_actual_observation_and_never_replay(self):
         """菜单与中段粘贴正文无需固定回复匹配；重复调用不会重复发送。:return: None。"""
@@ -326,6 +366,7 @@ class ProjectsAgentTests(unittest.TestCase):
                 expected = {'message': '模型请求失败'}
                 if reason == 'provider_content_filter':
                     expected['reason'] = reason
+                    expected['generation'] = generation
                 self.assertEqual(expected, self.service.events(1)[-1]['payload'])
 
     def test_content_filter_blocks_run_and_schedule_without_reset_or_restart(self):
@@ -362,7 +403,7 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertIsNone(saved['segment_started_at'])
         self.assertEqual(1800, pi.calls[0][1])
         self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
-        self.assertEqual({'message': message, 'reason': 'provider_content_filter'},
+        self.assertEqual({'message': message, 'reason': 'provider_content_filter', 'generation': generation},
             self.service.events(1)[-1]['payload'])
 
         self.service.tick(time.time() + 86400)
@@ -391,6 +432,102 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual('blocked', agent['schedule_state'])
         self.assertIsNone(agent['schedule_next_at'])
         self.assertEqual({'message': '模型请求失败'}, self.service.events(1)[-1]['payload'])
+
+    def test_manual_start_retries_only_original_model_and_sessions_once(self):
+        """明确人工启动可恢复已核实故障，旧诊断跨服务代次仍使用原会话与累计预算。:return: None。"""
+        for account_id, operator in ((1, False), (2, True)):
+            with self.subTest(operator_diagnosis=operator):
+                work, error, session_file = self.prepare_filter_blocked(account_id, operator)
+                pi = ResumingPiFixture()
+                self.service.pi = pi
+                self.service.start(account_id)
+                self.assertTrue(pi.entered.wait(2))
+                self.service.start(account_id)
+                agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+                resumed = self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+                self.assertEqual('running', agent['status'])
+                self.assertEqual('running', pi.result['status'])
+                self.assertEqual(work['id'], pi.result['work_id'])
+                self.assertEqual(work['session_id'], pi.result['session_id'])
+                self.assertEqual(work['work_sec'], resumed['work_sec'])
+                self.assertEqual(1800, agent['budget_sec'])
+                self.assertEqual(1634, self.terminal.started[-1][1]['remaining_sec'])
+                self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
+                self.assertEqual(['test'], pi.calls[0][0]['models'])
+                self.assertEqual(1, len(pi.calls))
+                audit = [item for item in self.service.events(account_id) if item['kind'] == 'manual_retry']
+                self.assertEqual(1, len(audit))
+                self.assertEqual(error['id'], audit[0]['payload']['error_event_id'])
+                self.assertEqual([], self.terminal.sent)
+                controller = self.service.controllers[account_id][0]
+                self.service.pause(account_id)
+                controller.join(2)
+
+    def test_scheduled_start_cannot_release_a_confirmed_filter_block(self):
+        """开启计划和到点扫描都不能代替人工决定重试已过滤的原任务。:return: None。"""
+        work, _, _ = self.prepare_filter_blocked()
+        self.service.configure_schedule(1, True)
+        self.service.start(1, scheduled=True, now=time.time() + 1)
+        self.service.tick(time.time() + 86400)
+        self.assertFalse(self.pi.entered.is_set())
+        self.assertEqual('blocked', self.service._one('SELECT status FROM projects_work WHERE id=?', (work['id'],))['status'])
+        self.assertEqual([], [item for item in self.service.events(1) if item['kind'] == 'manual_retry'])
+
+    def test_manual_retry_does_not_bypass_other_blocking_facts(self):
+        """人工重试不解除未知输入、身份变化、预算耗尽、合同变化或更新故障。:return: None。"""
+        work, error, _ = self.prepare_filter_blocked()
+        original_account = self.service.account
+        original_payload = self.service._one('SELECT payload_json FROM projects_events WHERE id=?', (error['id'],))['payload_json']
+        last_event_id = self.service.events(1)[-1]['id']
+        for condition in ('unknown', 'identity', 'budget', 'contract', 'other_error', 'stale_generation', 'untrusted_diagnosis', 'newer_start'):
+            with self.subTest(condition=condition):
+                if condition == 'unknown':
+                    self.service._write("INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)",
+                        ('pending', work['id'], work['generation'], '{}', 'unknown', time.time()))
+                elif condition == 'identity':
+                    self.service.account = lambda account_id: {'id': account_id, 'cc2api_account_id': 99}
+                elif condition == 'budget':
+                    self.service._write('UPDATE projects_work SET work_sec=1800 WHERE id=?', (work['id'],))
+                elif condition == 'contract':
+                    self.service._write("UPDATE projects_work SET definition_json='{}' WHERE id=?", (work['id'],))
+                elif condition == 'other_error':
+                    self.service._event(1, 'error', {'message': '执行收口未确认'}, work['id'])
+                elif condition == 'stale_generation':
+                    payload = json.loads(original_payload)
+                    payload['generation'] += 1
+                    self.service._write('UPDATE projects_events SET payload_json=? WHERE id=?', (json.dumps(payload), error['id']))
+                elif condition == 'untrusted_diagnosis':
+                    self.service._event(1, 'error', {'reason': 'provider_content_filter', 'source': 'operator_diagnosis',
+                        'diagnostic_of_event_id': error['id']}, work['id'])
+                else:
+                    self.service._event(1, 'started', {'session_id': work['session_id']}, work['id'])
+                before = self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+                with self.assertRaises(ValueError):
+                    self.service.start(1)
+                self.assertEqual(before, self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],)))
+                self.assertFalse(self.pi.entered.is_set())
+                self.assertEqual([], [item for item in self.service.events(1) if item['kind'] == 'manual_retry'])
+                self.service.account = original_account
+                self.service._write('DELETE FROM projects_actions WHERE id=?', ('pending',))
+                self.service._write('DELETE FROM projects_events WHERE id>?', (last_event_id,))
+                self.service._write('UPDATE projects_events SET payload_json=? WHERE id=?', (original_payload, error['id']))
+                self.service._write('UPDATE projects_work SET work_sec=?,definition_json=? WHERE id=?',
+                    (work['work_sec'], work['definition_json'], work['id']))
+
+    def test_failed_manual_retry_admission_and_provider_leave_work_blocked(self):
+        """准入或模型配置不可用时不能提前修改原工作或发布重试审计。:return: None。"""
+        work, _, _ = self.prepare_filter_blocked()
+        self.allowed = False
+        self.service.start(1)
+        self.assertEqual(work, self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],)))
+        self.assertIsNone(self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at'])
+        self.allowed = True
+        self.service.provider = lambda: None
+        with self.assertRaisesRegex(ValueError, '尚未就绪'):
+            self.service.start(1)
+        self.assertEqual(work, self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],)))
+        self.assertEqual([], [item for item in self.service.events(1) if item['kind'] == 'manual_retry'])
+        self.assertFalse(self.pi.entered.is_set())
 
     def test_api_uses_strict_types_and_manual_reconcile_route_is_reachable(self):
         """接口拒绝布尔账号字段与未知字段，人工对账不会被动作路由遮挡。:return: None。"""
