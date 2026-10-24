@@ -363,8 +363,21 @@ window.ProjectsUI = (() => {
   function duration(seconds) {
     if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return '未采集';
     const value = Math.max(0, Math.floor(seconds));
-    return value >= 3600 ? `${Math.floor(value / 3600)} 小时 ${Math.floor(value % 3600 / 60)} 分`
+    return value >= 3600 ? `${Math.floor(value / 3600)} 小时 ${Math.floor(value % 3600 / 60)} 分 ${value % 60} 秒`
       : `${Math.floor(value / 60)} 分 ${value % 60} 秒`;
+  }
+
+  /**
+   * 展示任务累计执行用时，正在运行的当前目标使用服务端实时累计值。
+   * @param {object} work 已保存的任务摘要。
+   * @return {string} 带状态说明的执行用时。
+   */
+  function workDuration(work) {
+    const agent = agents.find(item => item.account_id === accountId);
+    const finished = ['passed', 'stopped'].includes(work.status);
+    const seconds = !finished && agent?.work?.id === work.id
+      ? agent.progress?.elapsed_work_sec ?? work.work_sec : work.work_sec;
+    return `${work.status === 'passed' ? '完成耗时' : '累计执行'} ${duration(seconds)}`;
   }
 
   /**
@@ -415,7 +428,8 @@ window.ProjectsUI = (() => {
       ? `<p class="projects-target-state">${unfinished ? escape(names[work.status] || work.status) : work.status === 'passed' ? '上一目标已验收通过' : '上一目标已停止'}</p><strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p>`
       : '<p class="hint">尚未开始工程目标，Pi 会从授权项目池选择。</p>';
     $('#projects-budget').textContent = unfinished
-      ? `当前目标累计 ${duration(progress?.elapsed_work_sec)} · 剩余预算 ${duration(progress?.remaining_work_sec)}` : '';
+      ? `当前目标累计 ${duration(progress?.elapsed_work_sec)} · 剩余预算 ${duration(progress?.remaining_work_sec)}`
+      : work ? workDuration(work) : '';
     const activity = agent?.activity;
     $('#projects-activity').textContent = activity?.text
       ? `${typeof activity.created_at === 'number' ? new Date(activity.created_at * 1000).toLocaleTimeString('zh-CN', {hour12: false}) + ' · ' : ''}${activity.text}` : '';
@@ -620,7 +634,7 @@ window.ProjectsUI = (() => {
    * @return {void}
    */
   function paintHistory(rows) {
-    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small></span><span>${escape(names[item.status] || item.status)}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
+    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small></span><span>${escape(names[item.status] || item.status)}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
     document.querySelectorAll('[data-work]').forEach(button => {
       button.onclick = () => perform(async () => {
         const current = revision, selected = accountId;
@@ -628,6 +642,7 @@ window.ProjectsUI = (() => {
         if (current !== revision || selected !== accountId) return;
         $('#projects-delivery').open = true;
         $('#projects-delivery-title').textContent = detail.work.goal;
+        $('#projects-delivery-duration').textContent = workDuration(detail.work);
         $('#projects-submissions').innerHTML = detail.submissions.map(item => `<button class="btn btn-sm" type="button" data-submission="${escape(item.id)}">${escape(names[item.status] || item.status)} · ${escape(new Date(item.created_at * 1000).toLocaleString())}</button>`).join(' ') || '<p class="hint">尚未提交独立验收。</p>';
         $('#projects-delivery-files').innerHTML = ''; $('#projects-delivery-preview').textContent = '';
         document.querySelectorAll('[data-submission]').forEach(submission => {

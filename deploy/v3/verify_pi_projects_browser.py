@@ -80,6 +80,11 @@ async def verify(evidence: Path) -> dict:
     (fixture.terminal.workspace(work) / 'library/app.py').write_text('VALUE = 2\n')
     fixture.verification = {'status': 'passed', 'feedback': ['合成工程独立验收通过']}
     submitted = fixture.tool('project_submit', {'summary': '浏览器成果夹具'})
+    completed_at = time.time()
+    # 墙钟跨两小时但实际只累计约七分钟，确认页面不会把暂停时间算进执行耗时。
+    fixture.service._write('UPDATE projects_work SET work_sec=?,created_at=?,started_at=?,ended_at=? WHERE id=?',
+        (418.9, completed_at - 7201, completed_at - 7200, completed_at, work['id']))
+    work = fixture.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
     directory = fixture.root / 'projects/submissions' / submitted['submission_id']
     materialize_snapshot(read_document(directory / 'snapshot.json'), fixture.root / 'projects/objects', directory / 'candidate')
     fixture.service._write("UPDATE projects_agents SET status='off' WHERE account_id=1")
@@ -101,6 +106,8 @@ async def verify(evidence: Path) -> dict:
 
     historical_works = [seed_history(f'browser-history-{index:03}', work['created_at'] - 10 - index // 3)
         for index in range(36)]
+    fixture.service._write('UPDATE projects_work SET work_sec=?,ended_at=? WHERE id=?',
+        (3661.9, completed_at - 2, historical_works[0]['id']))
     for index in range(450):
         fixture.service._event(1, 'observation', {'screen': f'旧历史画面 {index}'}, historical_works[0]['id'])
     for index in range(65):
@@ -269,6 +276,8 @@ async def verify(evidence: Path) -> dict:
                 assert await evaluate('document.querySelectorAll("#projects-events li[data-event-id]").length === 20 && document.querySelectorAll("#projects-history [data-work]").length === 10')
                 assert await evaluate('(()=>{const ids=Array.from(document.querySelectorAll("#projects-events [data-event-id]"),value=>Number(value.dataset.eventId));return ids.every((id,index)=>!index || id<ids[index-1])})()')
                 assert await evaluate('document.querySelector("#projects-history [data-work]").dataset.work === ' + json.dumps(work['id']))
+                assert await evaluate('document.querySelector(' + json.dumps('[data-work-duration="' + work['id'] + '"]') + ').textContent === "完成耗时 6 分 58 秒"')
+                assert await evaluate('document.querySelector("[data-work-duration=browser-history-000]").textContent === "完成耗时 1 小时 1 分 1 秒"')
 
                 # 迟到的旧工程观察只属于历史，不能把当前终端换成其他会话。
                 before_operations = (len(fixture.terminal.started), len(fixture.terminal.sent), len(fixture.terminal.controls))
@@ -316,7 +325,7 @@ async def verify(evidence: Path) -> dict:
                 assert before_operations == (len(fixture.terminal.started), len(fixture.terminal.sent), len(fixture.terminal.controls))
                 assert not fixture.pi.entered.is_set(), '读取历史意外启动了 Pi'
                 await evaluate('document.querySelector("#projects-tab-terminal").click()')
-                assert await evaluate('document.querySelector("#projects-progress-bar").value === 100 && document.querySelector("#projects-budget").textContent === ""')
+                assert await evaluate('document.querySelector("#projects-progress-bar").value === 100 && document.querySelector("#projects-budget").textContent === "完成耗时 6 分 58 秒"')
                 assert await evaluate('document.querySelector("#projects-account").getAttribute("form") === "projects-agent-form" && document.querySelector("#projects-account").closest("header") !== null')
                 assert await evaluate('Array.from(document.querySelectorAll(".projects-settings > details")).every(value => !value.open)')
                 assert await evaluate('document.querySelector("#projects-overview").getBoundingClientRect().top < document.querySelector("#projects-workspace").getBoundingClientRect().top')
@@ -365,6 +374,7 @@ async def verify(evidence: Path) -> dict:
                 await until('document.querySelector("[data-work]") !== null')
                 await evaluate('document.querySelector("[data-work]").click()')
                 await until('document.querySelector("[data-submission]") !== null')
+                assert await evaluate('document.querySelector("#projects-delivery-duration").textContent === "完成耗时 6 分 58 秒"')
                 await evaluate('document.querySelector("[data-submission]").click()')
                 await until('document.querySelector("[data-candidate-path]") !== null')
                 await evaluate('document.querySelector("[data-candidate-path]").click()')
@@ -487,7 +497,8 @@ async def verify(evidence: Path) -> dict:
             '筛选时全选覆盖全部项目', '筛选时清空全部项目', '单选实时更新已选数量', '项目池保存重载回显',
             '自动计划默认关闭与间隔范围', '运行中启停自动计划不重建Pi', 'SSE保留未保存的计划输入',
             '计划切账号及重载回填', '人工暂停关闭自动计划',
-            '顶部账号与总览及默认收起配置', '真实目标进度与已完成状态', '未知额度不冒充零',
+            '顶部账号与总览及默认收起配置', '真实目标进度与已完成状态', '完成目标总览与工程列表及交付详情显示耗时',
+            '累计耗时排除暂停等待及小时格式保留秒数', '未知额度不冒充零',
             '额度阈值与操作回执缓存', '启动即时反馈及禁止重复点击', '终端交互标签与明确等待原因',
             '待机倒计时及全部配置编辑保护', '折叠配置搜索快捷键',
             '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '无旧历史入口及请求', '1280暗色与390亮色布局']}
