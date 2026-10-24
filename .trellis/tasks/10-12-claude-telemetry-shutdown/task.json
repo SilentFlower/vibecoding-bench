@@ -1,0 +1,199 @@
+{
+  "id": "claude-telemetry-shutdown",
+  "name": "claude-telemetry-shutdown",
+  "title": "Claude 遥测收尾与原会话状态保留",
+  "description": "修复现有临时 worker 的 Claude 退出、代理关闭顺序及原会话遥测状态保留；不改为账号固定容器。",
+  "status": "planning",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-12",
+  "completedAt": null,
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-12T02:35:38Z",
+      "contextKey": "codex_01a12dc2-f512-7013-83da-0633efa59f92",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "49e8fb097a527bca9b16af1842b5c524ea5f2da9",
+        "status": [
+          {
+            "status": " M",
+            "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "49e8fb097a527bca9b16af1842b5c524ea5f2da9",
+            "status": [
+              {
+                "status": " M",
+                "path": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json"
+              }
+            ],
+            "worktreeDiffSha256": "42573c91f46371f0c132e36c5d19bfeff386320cd256533797e9f650e9ab1791",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/brief.md",
+                "sha256": "8ba4e9f26af89b42e2ce20fe88bee62e3e03bbf35a9718e02c96b7c4c27b5745"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/check.jsonl",
+                "sha256": "91534c2dd15014470e9266e207fea31ca117537fb0f5c74e7880d9954b2c8399"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/design.md",
+                "sha256": "0af15a1ee3eef2ad7d75bbfeee48ce78a7a5c47a977ab65e650f68ea3e85a50d"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.jsonl",
+                "sha256": "3f8050ff392e2bb0ed37ce8865bfe3b7c4e341c8fe89c01bd643386fc186c2e1"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/implement.md",
+                "sha256": "bd30f98dafc1b6726301d7d44183be17d2f1782d63cba44ec47bffd2c875c43f"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/prd.md",
+                "sha256": "34b4876aefc2ba9cb2c345839e614f18611050f2f429e4cbf69d52dc9fb79715"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/necessity-assessment.md",
+                "sha256": "1e907d1a7f469f49b46a4a9644156c8af2379164e5064b88ef069acc74b5fbc0"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md",
+                "sha256": "3b96b5901fa58216e783fafaf84f7c5e370c70aba8c2de82b5ed42bf5b6513df"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md",
+                "sha256": "95db129ed16d1a85e3ef21361ec506332a4cec902f20ec91cafa76c49a681819"
+              },
+              {
+                "path": ".trellis/tasks/10-12-account-persistent-runtime/task.json",
+                "sha256": "53a52a996c4db18c5b422746b488099f45c1dedc4d18b245d500e92a02edcdef"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "b799cc76a5c4bcb462310fb4b27bbf52ab1fd92779f4d110946fac82958c458a"
+          },
+          {
+            "root": "cc2api",
+            "head": "34ed25fd5a352e823c1ec0269bdfb39b530bae92",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "ff9bd0c6ed378484744ed52896ede5d864462ed3a787729a3a8df04bab9903a5"
+          }
+        ],
+        "fingerprint": "f1be7d336564ad63b3f3cc355c78fbe9b3ad821d71dc6d84741a7955d12599be"
+      }
+    },
+    "deferral": "{\"requested\":true,\"date\":\"2026-10-12\",\"reason\":\"用户明确要求遥测先不管，保留规划，转为讨论 vibecoding-bench 的账号接入和使用方式；未启动实现。\"}"
+  }
+}

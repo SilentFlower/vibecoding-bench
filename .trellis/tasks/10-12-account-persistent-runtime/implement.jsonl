@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md", "reason": "相关规范原文摘录：绑定、养号、被动额度、首次引导、managed OAuth 与回滚；避免长文件被截断"}
+{"file": ".trellis/spec/vibecoding-bench/backend/directory-structure.md", "reason": "账号环境管理分节与现有代码组织方式"}
+{"file": ".trellis/spec/vibecoding-bench/backend/error-handling.md", "reason": "启动错误、严格收口与清理失败的处理边界"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md", "reason": "正式代理链路、抓包隔离、间隔、冷却和证据权限"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/state-management.md", "reason": "账号环境提示、批次串行显示与终端状态更新"}
+{"file": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md", "reason": "本任务已确认代码位置、工作区基线与前置行为验证"}

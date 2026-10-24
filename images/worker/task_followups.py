@@ -112,14 +112,14 @@ def _text(content: object, role: str) -> str | None:
 
 
 def _matches_input(actual: str, expected: str) -> bool:
-    # CLI可能只包装首段并把末行留在标签外；移除的仅是有同ID的传输包装，正文仍须逐字核对。
+    # CLI可能只包装正文中间的一段；标签外的前后正文仍须保留并逐字核对，不能将任意引用认成输入。
     actual = actual.strip()
     if actual == expected.strip():
         return True
     pasted = re.fullmatch(
-        r'<pasted_content id="(?P<id>[A-Za-z0-9_-]{1,128})">\r?\n'
+        r'(?P<head>[\s\S]*?)<pasted_content id="(?P<id>[A-Za-z0-9_-]{1,128})">\r?\n'
         r'(?P<text>[\s\S]*?)</pasted_content id="(?P=id)">(?P<tail>[\s\S]*)', actual)
-    if pasted is None or re.search(r'</?pasted_content\b', pasted['text'] + pasted['tail']):
+    if pasted is None or re.search(r'</?pasted_content\b', pasted['head'] + pasted['text'] + pasted['tail']):
         return False
     body, tail = pasted['text'], pasted['tail']
     bodies = [body]
@@ -136,7 +136,7 @@ def _matches_input(actual: str, expected: str) -> bool:
             tails.append(tails[-1][1:])
         else:
             break
-    return any((prefix + suffix).strip() == expected.strip() for prefix in bodies for suffix in tails)
+    return any((pasted['head'] + prefix + suffix).strip() == expected.strip() for prefix in bodies for suffix in tails)
 
 
 def _ordered(items: list[dict], parents: dict[str, str | None]) -> list[dict]:

@@ -1,0 +1,5 @@
+{"file": ".trellis/tasks/10-12-account-persistent-runtime/research/spec-contracts.md", "reason": "相关规范原文摘录：绑定、养号、被动额度、首次引导、managed OAuth 与回滚；避免长文件被截断"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "SQLite、锁、Docker生命周期与错误处理规范；过时P1测试说明以现有回归为准"}
+{"file": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md", "reason": "验证抓包诊断撤销、正式证据和限频隔离"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "账号提示、批次并发显示、PTY和转义规则"}
+{"file": ".trellis/tasks/10-12-account-persistent-runtime/research/runtime-evidence.md", "reason": "核对未改cc2api、保留用户原有改动及真实行为验证边界"}

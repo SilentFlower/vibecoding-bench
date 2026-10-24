@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md", "reason": "worker 完成判定、镜像配套、凭据及会话归属契约"}
+{"file": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md", "reason": "额度等待、原 run 恢复和严格清理失败保护"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "本地验证及回归要求"}
+{"file": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md", "reason": "官方客户端原生退出、会话队列机制与现有缺陷证据"}

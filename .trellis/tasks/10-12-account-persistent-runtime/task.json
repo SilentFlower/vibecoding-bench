@@ -1,0 +1,36 @@
+{
+  "id": "account-persistent-runtime",
+  "name": "account-persistent-runtime",
+  "title": "账号固定持久环境与任务生命周期改造",
+  "description": "将 bench 从每次运行创建临时容器改为每个账号复用固定持久环境，适配普通任务、续聊、授权、养号和抓包，保留 MITM 被动额度保护及 cc2api 凭据刷新契约。",
+  "status": "cancelled",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-12",
+  "completedAt": null,
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-12T02:35:28Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "2026-10-12：用户撤回固定持久环境改造，先修复遥测收尾问题。保留规划与研究记录；本任务未实施、未完成交付。",
+  "meta": {
+    "cancellation": {
+      "cancelledAt": "2026-10-12T02:35:28Z",
+      "reason": "用户明确取消原改造任务，改为先修复现有遥测问题。"
+    }
+  }
+}

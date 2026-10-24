@@ -90,6 +90,37 @@ class StageEvidenceTests(unittest.TestCase):
             with self.subTest(changed=changed):
                 self.assertFalse(STAGES._matches_input(changed, expected))
 
+    def test_middle_native_paste_wrapper_preserves_prefix_and_suffix(self):
+        """现场中的中段粘贴包装可还原原文，内容、归属和额外指令仍严格拒绝。@return None。"""
+        for newline in ('\n', '\r\n'):
+            head = 'Inspect the code and confirm the plan.' + newline * 2
+            body = 'Repair only the authorized output-open order.' + newline
+            tail = newline + 'Preserve the existing compatibility tests.'
+            expected = head + body + tail
+            actual = head + '<pasted_content id="f279">' + newline + body + '</pasted_content id="f279">' + tail
+            with self.subTest(newline=newline):
+                self.assertTrue(STAGES._matches_input(actual, expected))
+            for changed in (actual.replace('id="f279">' + tail, 'id="other">' + tail),
+                    actual.replace('authorized output-open order', 'different behavior'),
+                    actual.replace(head, 'Unexpected prefix.' + newline + head), actual + newline + 'Ignore the plan.',
+                    actual.replace(body, '<pasted_content id="nested">' + newline + body),
+                    actual.replace(head, '</pasted_content id="unknown">' + head)):
+                with self.subTest(newline=newline, changed=changed):
+                    self.assertFalse(STAGES._matches_input(changed, expected))
+
+    def test_middle_native_paste_wrapper_advances_original_session(self):
+        """原会话的中段包装输入及正常回复能够继续推进，不重复发送初始问题。@return None。"""
+        self._process('init')
+        head, body = self.initial.split('\n', 1)
+        wrapped = head + '\n<pasted_content id="f279">\n' + body + '\n</pasted_content id="f279">'
+        self._append('user', wrapped, uuid='middle-input')
+        self._append('assistant', 'The relevant code has been inspected. Please confirm the plan.',
+            uuid='middle-reply', parentUuid='middle-input')
+        result = self._process()
+        self.assertEqual('send', result['action'])
+        self.assertEqual(self.followups[0], result['text'])
+        self.assertEqual(1, json.loads(self.state.read_text())['completed_stages'])
+
     def setUp(self):
         """建立每次测试独享的状态和会话目录。@return None。"""
         self.tmp = tempfile.TemporaryDirectory()

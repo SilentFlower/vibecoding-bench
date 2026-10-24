@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "被动额度合并、阈值、单次恢复与待替换的自动采样契约"}
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "固定 HOME、执行归属、清理、原生 TLS 与网关观察"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "usage 被动写入、手动入口和后台轮询边界"}
+{"file": ".trellis/tasks/10-14-v3-passive-quota-only/research/current-evidence.md", "reason": "当前自动调用清单、官方 statusLine 字段及兼容验证约束"}

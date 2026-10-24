@@ -1,0 +1,4 @@
+{"file": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/worker-contracts.md", "reason": "核对退出码、最终消息判定、managed OAuth 和镜像可用性"}
+{"file": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/recovery-contracts.md", "reason": "核对额度暂停及恢复的执行唯一性、原会话归属和代次"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "验证 A1–A5 的真实回归证据与语法检查"}
+{"file": ".trellis/tasks/10-12-claude-telemetry-shutdown/research/telemetry-evidence.md", "reason": "避免把文件保留、HTTP 200 或有界收尾误称为遥测必达"}

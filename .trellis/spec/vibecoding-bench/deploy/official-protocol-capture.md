@@ -12,6 +12,7 @@
 - Claude Code 新增权限模式、Auto Mode classifier、请求体字段、beta token 或 SSE 事件。
 - cc2api 调整 `version_profile`、请求头/请求体改写、CCH、`cc_version` 或流式转发。
 - 客户端出现网关兼容提示，或已有抓包与升级指南发生矛盾。
+- `/v1/messages` 经 new-api 等中间网关转发，且 Claude Code 新增请求字段或流式事件。
 
 协议事实只能来自正式 capture API 创建的 run。链路固定为：
 
@@ -76,8 +77,17 @@ anthropic-version
 anthropic-beta
 x-anthropic-billing-header:
   cc_version=<version>.<suffix>; cc_entrypoint=cli; cch=<5hex>;
-body: model, max_tokens, thinking, output_config, fallbacks, safeguards, thread
+body: model, max_tokens, thinking, output_config, diagnostics, fallbacks, safeguards, thread
 SSE: message_delta.delta.safeguard_results
+```
+
+中间网关核对点（只用于与官方基线对照，不作为官方抓包链路）：
+
+```text
+Claude Code -> new-api -> cc2api -> Anthropic
+new-api: relaykit/dto/claude.go::ClaudeRequest
+new-api: relay/helper/valid_request.go::GetAndValidateClaudeRequest
+new-api: relay/claude_handler.go::ClaudeHelper
 ```
 
 ---
@@ -129,6 +139,30 @@ SSE: message_delta.delta.safeguard_results
 文件权限为 `0600`。仓库、任务文档与对话只保留脱敏摘要、run ID 和证据路径，不复制 token、完整
 prompt、响应正文、组织 ID 或账号身份。
 
+### 3.4 中间网关请求体保真
+
+- 官方直连抓包是字段基线；经 new-api 的业务链路应在每一跳比较 `/v1/messages` 的顶层 key
+  集合、字段 JSON 类型及嵌套值。只比较 `safeguards` 不足以发现其他字段被 DTO 丢弃。
+- Claude Code 2.1.280 的 20 条本地辅助样本中，`diagnostics` 出现 10 次，`fallbacks`
+  出现 2 次，`thread` 出现 2 次；它们只用于排查中间网关丢字段，不能代替正式抓包基线。
+  正式 Auto/Plan 抓包另确认 Opus 5.5/4.8 的 `safeguards`。样本频次不是后续版本或其他
+  模型的允许字段清单。
+- `diagnostics` 是对象，样本键为 `previous_message_id`（字符串或 `null`）。它让上游比较前一
+  响应与当前请求的提示词缓存指纹，返回缓存未命中原因；丢失它会关闭该请求的诊断记录。
+  cc2api 的 Haiku 主请求 beta 画像也会按该字段是否存在分支。详见
+  [官方缓存诊断文档](https://platform.claude.com/docs/en/build-with-claude/cache-diagnostics)。
+- `fallbacks` 样本值为字符串 `"default"`；协议还允许指定回退模型列表。它请求在安全策略拒绝
+  后由服务端选择后备模型，并须与相应 `server-side-fallback-*` beta 一起核对；它不是限流或
+  过载重试开关。cc2api 对其存在性有 beta 规则，CCH 规则也随版本变化。详见
+  [官方拒绝与回退文档](https://platform.claude.com/docs/en/build-with-claude/refusals-and-fallback)。
+- `thread` 样本为 `{"type":"request"}`；已验证的 2.1.280 续轮可增加
+  `previous_message_id`。其会话续接用途由抓包形态与 cc2api 的续轮后缀逻辑推断，不把公开
+  文档尚未确认的服务器行为写成保证。丢失 `thread.previous_message_id` 会使 cc2api 无法按
+  续轮规则复用入站 `cc_version` 后缀；`message-threads-*` beta 仍以实际请求头为准。
+- 普通 new-api Claude 渠道会把请求反序列化为 `ClaudeRequest` 再序列化；DTO 未声明的顶层
+  字段会消失。全局或渠道请求体透传开启时使用原始 body。无论选择哪种路径，升级时都要
+  逐字段核对实际转发结果；已声明字段的未知嵌套内容应原样保留，不能凭字段名自行补值。
+
 ---
 
 ## 4. Validation & Error Matrix
@@ -147,6 +181,9 @@ prompt、响应正文、组织 ID 或账号身份。
 | 只有 Auto 出现 `safeguards` | 建立条件子画像，普通请求画像保持独立 |
 | Plan 出现 `safeguards` | 按实际 body 与 beta 建立 Plan/Auto 共用或独立画像，取决于逐字段证据 |
 | 模型不支持 Auto 且没有 safeguards | 记录为模型边界，不伪造或补齐 classifier 字段 |
+| 官方请求有字段而中间网关出站缺失 | 检查 DTO/透传设置，修复后按同一模式重放；不得把缺失字段解释成客户端未发送 |
+| `diagnostics` 丢失或 `fallbacks` 与 beta 不匹配 | 分别核对缓存诊断与服务端回退契约，再检查 cc2api 的 Haiku beta、fallback beta/CCH 画像 |
+| 续轮 `thread.previous_message_id` 丢失 | 核对各跳 body 与入站 `cc_version` 后缀，不按当前 user text 重算续轮后缀 |
 | 抓包包含凭据或完整正文 | 仅在受限目录分析，不进入 Git、日志摘要或对话 |
 
 ---
@@ -169,6 +206,11 @@ prompt、响应正文、组织 ID 或账号身份。
 **Correct**：单账号串行且间隔至少 120 秒；每个模型组先生成当前基线；CCH 对每条最终 body 独立
 复算，只有算法在整组样本上稳定不命中时才研究 seed。
 
+**Incorrect**：只在 new-api DTO 中补 `safeguards`，就认定新版本全部请求字段已透传。
+
+**Correct**：先从官方抓包提取每条请求的顶层 key 与关键嵌套字段，再逐跳比较；对
+`diagnostics`、`fallbacks`、`thread` 和以后新增的字段，检查值、类型、beta 配对与续轮行为。
+
 ---
 
 ## 6. Tests Required
@@ -181,5 +223,7 @@ prompt、响应正文、组织 ID 或账号身份。
   worker/sidecar 清理状态和受限证据路径。
 - 协议分析必须输出逐请求 CCH 与 `cc_version` 复算结果、beta 有序差异、关键 body 字段和
   safeguards/SSE 对应关系；任一失败都不得标记画像已验证。
+- 经过 new-api 时，DTO 往返测试须断言 `safeguards`、`diagnostics`、`fallbacks`、`thread`
+  及未知嵌套字段不丢失；逐跳回归须比较实际出站 JSON，不能仅检查 Go 字段声明。
 - cc2api 变更完成后运行 `cargo fmt --check`、`cargo test`、`cargo test cch`，并增加请求体未知字段
   保留与 `safeguard_results` 字节透传测试。
