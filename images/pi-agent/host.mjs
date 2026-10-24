@@ -2,7 +2,11 @@
  * 为单个账号运行持久 Pi 会话，通过独立管道调用控制端工具。
  * 配置与密钥仅从 stdin 接收，stdout 只发布协议事件。
  */
-import { mkdir } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { lstat, mkdir, open, realpath, rename, unlink } from 'node:fs/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 import { AuthStorage, createAgentSession, DefaultResourceLoader, defineTool, ModelRegistry,
   SessionManager, SettingsManager } from '@earendil-works/pi-coding-agent';
 
@@ -11,6 +15,106 @@ let session;
 let configured = false;
 let input = '';
 let sequence = 0;
+const cancellation = new AbortController();
+const cooldownMs = 5 * 60 * 1000;
+
+/**
+ * 读取当前账号的小型模型健康记录；配置变化会自然建立新状态。
+ * @param {object} config 私有启动配置。
+ * @return {Promise<object>} 有界健康状态及受控保存函数。
+ */
+async function modelHealth(config) {
+  const directory = await realpath(config.session_dir);
+  const directoryStat = await lstat(config.session_dir);
+  if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink()) throw new Error('模型健康目录无效');
+  const path = join(directory, '.model-health.json');
+  const hash = value => createHash('sha256').update(value).digest('hex');
+  const fingerprint = hash(JSON.stringify([config.base_url, config.models, config.revision ?? null,
+    hash(config.api_key)]));
+  const models = new Map(config.models.map(id => [id, {cooldown_until: 0, last_success_at: 0}]));
+  let preferred;
+  try {
+    const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.nlink !== 1 || stat.size > 65536) throw new Error('模型健康记录无效');
+      const value = JSON.parse(await handle.readFile('utf8'));
+      if (value.version === 1 && value.fingerprint === fingerprint) {
+        if (models.has(value.preferred_model)) preferred = value.preferred_model;
+        for (const [id, state] of models) {
+          const saved = value.models?.[id];
+          if (saved && typeof saved === 'object') {
+            for (const field of ['cooldown_until', 'last_success_at']) {
+              const limit = Date.now() + (field === 'cooldown_until' ? cooldownMs : 0);
+              if (Number.isFinite(saved[field]) && saved[field] >= 0 && saved[field] <= limit) {
+                state[field] = saved[field];
+              }
+            }
+          }
+        }
+      }
+    } finally { await handle.close(); }
+  } catch (error) {
+    // 损坏的普通 JSON 可重建；链接、越界文件和权限问题必须直接停止。
+    if (error.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;
+  }
+  return {
+    models,
+    preferred: () => preferred,
+    success: id => {
+      const state = models.get(id);
+      if (state) { state.last_success_at = Date.now(); state.cooldown_until = 0; preferred = id; }
+    },
+    /**
+     * 用同目录独占临时文件替换健康记录，不跟随或修改链接目标。
+     * @return {Promise<void>} 持久化结束。
+     */
+    save: async () => {
+      const stat = await lstat(directory);
+      if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error('模型健康目录已改变');
+      try {
+        const existing = await lstat(path);
+        if (!existing.isFile() || existing.isSymbolicLink() || existing.nlink !== 1) {
+          throw new Error('模型健康记录不可替换');
+        }
+      } catch (error) { if (error.code !== 'ENOENT') throw error; }
+      const temporary = join(directory, `.model-health-${randomBytes(12).toString('hex')}.tmp`);
+      let handle;
+      try {
+        handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
+          | constants.O_NOFOLLOW, 0o600);
+        await handle.writeFile(JSON.stringify({version: 1, fingerprint,
+          preferred_model: preferred ?? null, models: Object.fromEntries(models)}));
+        await handle.sync();
+        await handle.close(); handle = undefined;
+        await rename(temporary, path);
+      } finally {
+        await handle?.close();
+        await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error; });
+      }
+    },
+  };
+}
+
+/**
+ * 仅对已确认的服务可用性故障开放续接，正文里的状态码不会参与判断。
+ * @param {object} message SDK 最终助手消息。
+ * @return {string|null} 可恢复的故障类别。
+ */
+function unavailable(message) {
+  if (message?.stopReason !== 'error') return null;
+  const error = message.errorMessage || '';
+  if (error === 'Provider finish_reason: content_filter') return null;
+  // SDK 将 OpenAI APIError 的状态写在错误消息开头；不扫描响应正文中的任意数字。
+  const status = Number(error.match(/^\s*(?:Error:\s*)?(?:HTTP(?: error)?\s*)?(\d{3})(?:\s|:|$)/i)?.[1]);
+  if (status >= 400) {
+    if (status === 402) return 'quota';
+    return [408, 429, 500, 502, 503, 504].includes(status) ? 'transient' : null;
+  }
+  if (/context.{0,24}(?:length|window|limit|overflow)|(?:maximum|exceed).{0,24}(?:token|context)|invalid.{0,12}(?:model|request)|model.{0,20}(?:not found|does not exist)|unauthori[sz]ed|authentication|forbidden/i.test(error)) return null;
+  return /^(?:Provider finish_reason: network_error|Connection error\.?|Request timed out\.?|fetch failed|network error|NetworkError|APIConnectionError|APIConnectionTimeoutError|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND)(?:\b|$)|^(?:connect|read|connection|request|network|upstream|socket|fetch).{0,100}(?:timed? out|timeout|reset|refused|failed|closed)/i.test(error)
+    ? 'transient' : null;
+}
 
 /**
  * 写入一条有界协议事件。
@@ -36,7 +140,7 @@ function callTool(name, toolCallId, args, signal) {
       pending.delete(id);
       reject(new Error('操作已中止'));
     };
-    if (signal?.aborted) return abort();
+    if (signal?.aborted || cancellation.signal.aborted) return abort();
     signal?.addEventListener('abort', abort, {once: true});
     pending.set(id, {
       resolve: result => {
@@ -56,6 +160,20 @@ function callTool(name, toolCallId, args, signal) {
  */
 async function run(config) {
   await mkdir(config.session_dir, {recursive: true, mode: 0o700});
+  const health = await modelHealth(config);
+  const deadline = Date.now() + Math.min(86400, Math.max(1,
+    Number.isFinite(config.timeout_sec) ? config.timeout_sec : 1800)) * 1000;
+  const candidates = () => [health.preferred(), ...config.models].filter((id, index, all) =>
+    health.models.has(id) && all.indexOf(id) === index);
+  const available = () => candidates().find(id => health.models.get(id).cooldown_until <= Date.now());
+  const retryAt = () => Math.floor(Math.min(...[...health.models.values()].map(value => value.cooldown_until)) / 1000);
+  let model = available();
+  if (!model) {
+    emit({type: 'error', reason: 'model_unavailable', retry_at: retryAt(),
+      message: 'Pi 配置模型正在冷却，原会话和预算已保留，稍后自动恢复'});
+    return;
+  }
+  if (cancellation.signal.aborted) return;
   const authStorage = AuthStorage.inMemory();
   const modelRegistry = ModelRegistry.inMemory(authStorage);
   authStorage.setRuntimeApiKey('projects', config.api_key);
@@ -90,12 +208,21 @@ async function run(config) {
     : SessionManager.create(config.session_dir, config.session_dir);
   ({session} = await createAgentSession({cwd: config.session_dir, agentDir: config.session_dir,
     authStorage, modelRegistry, settingsManager, resourceLoader, sessionManager,
-    model: modelRegistry.find('projects', config.models[0]), thinkingLevel: 'off',
+    model: modelRegistry.find('projects', model), thinkingLevel: 'off',
     tools: customTools.map(tool => tool.name), customTools,
   }));
+  const previousPayload = session.agent.onPayload;
+  session.agent.onPayload = (payload, selectedModel) => {
+    // 初始化和会话预处理也可能异步等待，最后一道请求边界必须再次检查停止与原预算。
+    if (cancellation.signal.aborted || Date.now() >= deadline) throw new Error('本轮已停止或预算用尽');
+    return previousPayload?.(payload, selectedModel);
+  };
   session.subscribe(event => {
     if (event.type === 'message_end' && event.message.role === 'assistant') {
       const message = event.message;
+      // 故障不能触发 SDK 自带的压缩重试；所有恢复统一受本入口次数与原预算约束。
+      settingsManager.setCompactionEnabled(message.stopReason !== 'error' && message.stopReason !== 'aborted');
+      if (message.stopReason !== 'error' && message.stopReason !== 'aborted') health.success(message.model);
       const measured = message.usage && ['input', 'output', 'cacheRead', 'cacheWrite']
         .some(field => message.usage[field] > 0);
       emit({type: 'assistant', model: message.model, stop_reason: message.stopReason,
@@ -105,24 +232,72 @@ async function run(config) {
   });
   emit({type: 'ready', session_file: session.sessionFile, session_id: session.sessionId});
   try {
+    if (cancellation.signal.aborted) return;
     let message;
-    for (let index = 0; index < config.models.length; index += 1) {
-      if (index) await session.setModel(modelRegistry.find('projects', config.models[index]));
-      await session.prompt(config.prompt, {expandPromptTemplates: false});
+    let attempts = 0;
+    const maximumAttempts = Math.max(3, Math.min(8, config.models.length));
+    const failed = new Map();
+    // 在公开事件上等待持久化队列处理到 agent_end，再读取状态和启动下一次续接。
+    let endRun;
+    const unsubscribe = session.subscribe(event => { if (event.type === 'agent_end') endRun?.(); });
+    const execute = async first => {
+      const ended = new Promise(resolve => { endRun = resolve; });
+      settingsManager.setCompactionEnabled(session.messages.at(-1)?.stopReason !== 'error');
+      if (first) await session.prompt(config.prompt, {expandPromptTemplates: false});
+      else await session.agent.continue();
+      await ended;
+    };
+    await execute(true);
+    while (true) {
       message = session.messages.findLast(value => value.role === 'assistant');
-      // 只有尚未执行工具的明确额度或临时服务错误允许换模型，避免重放已经产生的终端操作。
-      const retryable = /\b(402|429|500|502|503|504)\b/.test(message?.errorMessage || '');
-      if (message?.stopReason !== 'error' || sequence || !retryable) break;
+      if (cancellation.signal.aborted || message?.stopReason === 'aborted') break;
+      const failure = unavailable(message);
+      if (!failure) break;
+      health.models.get(model).cooldown_until = Date.now() + cooldownMs;
+      failed.set(model, failure);
+      await health.save();
+      if (attempts >= maximumAttempts) break;
+      // 优先尚未冷却的其它模型；只有本轮已失败的临时服务错误允许短暂重试。
+      // 402 是余额问题，不向同一模型重复发业务请求；上轮冷却的模型也不会被探测。
+      const next = candidates().find(id => !failed.has(id)
+        && health.models.get(id).cooldown_until <= Date.now())
+        || available() || candidates().find(id => failed.get(id) === 'transient');
+      if (!next) break;
+      const wait = [2000, 5000, 15000][Math.min(attempts, 2)];
+      if (Date.now() + wait >= deadline) break;
+      attempts += 1;
+      emit({type: 'recovery', phase: next === model ? 'retry' : 'fallback', attempt: attempts,
+        model: next, reason: 'transient', delay_ms: wait});
+      try { await delay(wait, undefined, {signal: cancellation.signal}); }
+      catch (error) { if (error.name === 'AbortError') return; throw error; }
+      if (cancellation.signal.aborted || Date.now() >= deadline) return;
+      // 与锁定 SDK 自带重试一致：只移除内存中的失败助手消息，历史文件保留原记录。
+      // 最后一条真实 user/toolResult 继续驱动原轮，已经确认的工具调用不会重放。
+      const messages = session.agent.state.messages;
+      if (messages.at(-1) !== message || messages.length < 2) break;
+      session.agent.state.messages = messages.slice(0, -1);
+      if (next !== model) await session.setModel(modelRegistry.find('projects', next));
+      model = next;
+      if (cancellation.signal.aborted || Date.now() >= deadline) return;
+      await execute(false);
     }
+    unsubscribe();
+    await health.save();
+    if (cancellation.signal.aborted || message?.stopReason === 'aborted') return;
     if (message?.stopReason === 'error') {
       // 仅识别 SDK 对上游结束原因的固定映射，避免将模型正文误判为内容过滤。
       if (message.errorMessage === 'Provider finish_reason: content_filter') {
         emit({type: 'error', reason: 'provider_content_filter',
           message: 'Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复'});
+      } else if (unavailable(message)) {
+        emit({type: 'error', reason: 'model_unavailable', model, retry_at: retryAt(),
+          message: 'Pi 配置模型暂时不可用，有限恢复已结束，原会话和预算已保留'});
       } else {
         emit({type: 'error', message: 'Pi 模型请求失败，请检查模型的流式响应及工具调用兼容性'});
       }
     } else {
+      if (attempts) emit({type: 'recovery', phase: 'recovered', attempt: attempts,
+        model, reason: 'transient', delay_ms: 0});
       emit({type: 'settled'});
     }
   } finally {
@@ -145,6 +320,7 @@ function receive(record) {
     pending.delete(record.id);
     request?.resolve(record.result);
   } else if (record.type === 'abort') {
+    cancellation.abort();
     session?.abort();
     for (const request of pending.values()) request.reject(new Error('指挥已停止'));
     pending.clear();
@@ -164,6 +340,7 @@ process.stdin.on('data', chunk => {
   }
 });
 process.stdin.on('end', () => {
+  cancellation.abort();
   session?.abort().finally(() => process.exit());
   if (!session) process.exit();
 });

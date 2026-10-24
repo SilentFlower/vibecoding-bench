@@ -452,8 +452,20 @@ window.ProjectsUI = (() => {
     const element = $('#projects-events');
     const follow = element.scrollHeight - element.scrollTop - element.clientHeight < 40;
     const labels = {pi: 'Pi', input: '发送到 Claude', started: '原生会话', error: '异常',
-      verification: '独立验收', input_unknown: '输入待核对', reconciled: '人工核对'};
-    element.innerHTML = timeline.map(item => `<li><small class="muted">${escape(new Date(item.created_at * 1000).toLocaleTimeString())} · ${escape(labels[item.kind] || item.kind)}</small><pre>${escape(item.payload.text || item.payload.message || JSON.stringify(item.payload, null, 2))}</pre></li>`).join('')
+      verification: '独立验收', input_unknown: '输入待核对', reconciled: '人工核对', recovery: '模型恢复', manual_retry: '人工重试'};
+    element.innerHTML = timeline.map(item => {
+      const payload = item.payload;
+      let message = payload.text || payload.message;
+      if (item.kind === 'recovery') {
+        const seconds = Math.ceil((Number(payload.delay_ms) || 0) / 1000);
+        message = payload.message || {retry: `模型暂不可用，约 ${seconds} 秒后重试。`,
+          fallback: `模型暂不可用，约 ${seconds} 秒后切换到 ${payload.model}。`,
+          recovered: '模型已恢复，继续原会话。', reset: '已重置自动恢复次数，继续原会话。',
+          scheduled: '已安排自动恢复，原会话和预算已保留。', exhausted: '自动恢复已用尽，请人工检查。',
+          paused: '自动恢复已暂停，原会话已保留。'}[payload.phase] || '正在恢复模型，原会话已保留。';
+      } else if (item.kind === 'manual_retry') message ||= '已人工确认重试，继续原目标和原会话。';
+      return `<li><small class="muted">${escape(new Date(item.created_at * 1000).toLocaleTimeString())} · ${escape(labels[item.kind] || item.kind)}</small><pre>${escape(message || JSON.stringify(payload, null, 2))}</pre></li>`;
+    }).join('')
       || '<li class="hint">启动后在这里查看 Pi 的判断、实际输入和验收结果。</li>';
     if (follow) element.scrollTop = element.scrollHeight;
   }

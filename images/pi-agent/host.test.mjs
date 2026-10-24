@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile, mkdir, stat, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
@@ -31,9 +31,10 @@ function stream(response, tool) {
  * 启动真实入口并与其交换父进程工具协议。
  * @param {object} config 启动配置。
  * @param {Function} onTool 工具处理器。
+ * @param {Function} onEvent 协议事件处理器。
  * @return {Promise<Array<object>>} 实际协议事件。
  */
-async function execute(config, onTool) {
+async function execute(config, onTool, onEvent = () => {}) {
   const process = spawn('node', ['host.mjs'], {cwd: import.meta.dirname, stdio: ['pipe', 'pipe', 'pipe']});
   const records = [];
   let buffer = '', errors = '';
@@ -47,9 +48,10 @@ async function execute(config, onTool) {
       if (!line.trim()) continue;
       const event = JSON.parse(line); records.push(event);
       if (event.type === 'tool') onTool(event, value => process.stdin.write(JSON.stringify(value) + '\n'));
+      onEvent(event, value => process.stdin.write(JSON.stringify(value) + '\n'));
     }
   });
-  const timer = setTimeout(() => process.kill('SIGKILL'), 15000);
+  const timer = setTimeout(() => process.kill('SIGKILL'), 120000);
   process.stdin.write(JSON.stringify({type: 'configure', api_key: 'local-test-key', models: ['test-model'],
     instructions: '通过 account_state 核对账号。', prompt: '继续原任务', ...config}) + '\n');
   const [code] = await once(process, 'exit'); clearTimeout(timer);
@@ -230,5 +232,242 @@ test('已确认工具后的内容过滤保留会话且不重放工具或切换�
       .map(line => JSON.parse(line)).filter(value => value.type === 'message').map(value => value.message);
     assert.equal(messages.filter(value => value.role === 'toolResult').length, 1);
     assert.equal(messages.findLast(value => value.role === 'assistant').errorMessage, 'Provider finish_reason: content_filter');
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('单模型在已确认工具后遇到网络结束错误，真实续接且失败工具不执行', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-network-'));
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    if (requests.length === 1) return stream(response, true);
+    if (requests.length === 2) {
+      response.writeHead(200, {'content-type': 'text/event-stream'});
+      const values = [
+        {choices:[{index:0,delta:{role:'assistant',tool_calls:[{index:0,id:'failed-tool',type:'function',function:{name:'account_state',arguments:'{}'}}]},finish_reason:null}]},
+        {choices:[{index:0,delta:{},finish_reason:'network_error'}]},
+      ];
+      for (const chunk of values) response.write('data: '+JSON.stringify({id:'network-error',object:'chat.completion.chunk',model:value.model,created:1,...chunk})+'\n\n');
+      return response.end('data: [DONE]\n\n');
+    }
+    stream(response, false);
+  });
+  server.listen(0,'127.0.0.1'); await once(server,'listening');
+  try {
+    const records = await execute({session_dir:directory,base_url:'http://127.0.0.1:'+server.address().port+'/v1',tools:[{name:'account_state',description:'当前账号',parameters:{type:'object',properties:{}}}]}, (event,send)=>send({type:'tool_result',id:event.id,result:{confirmed:'真实结果'}}));
+    assert.equal(records.at(-1).type,'settled',JSON.stringify(records));
+    assert.equal(records.filter(value=>value.type==='tool').length,1);
+    assert.equal(requests.length,3);
+    assert.equal(requests[2].messages.filter(value=>value.role==='user').length,1);
+    assert.equal(requests[2].messages.filter(value=>value.role==='tool').length,1);
+    assert.ok(JSON.stringify(requests[2]).includes('真实结果'));
+    assert.ok(!JSON.stringify(requests[2]).includes('failed-tool'));
+    assert.equal(records.filter(value=>value.type==='recovery').length,2);
+    const ready=records.find(value=>value.type==='ready');
+    const transcript=await readFile(ready.session_file,'utf8');
+    assert.ok(transcript.includes('Provider finish_reason: network_error'));
+  } finally { server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); await rm(directory,{recursive:true,force:true}); }
+});
+
+test('跨轮记住成功模型且配置修订变化清除优先级', async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'pi-self-heal-sticky-'));
+  const models=[];
+  const server=createServer(async(request,response)=>{
+    let body='';for await(const chunk of request)body+=chunk;const value=JSON.parse(body);models.push(value.model);
+    if(value.model==='primary'){response.writeHead(503,{'content-type':'application/json'});return response.end(JSON.stringify({error:{message:'本地不可用'}}));}
+    stream(response,false);
+  });
+  server.listen(0,'127.0.0.1');await once(server,'listening');
+  try{
+    const config={session_dir:directory,base_url:'http://127.0.0.1:'+server.address().port+'/v1',models:['primary','secondary'],tools:[]};
+    const first=await execute(config,()=>assert.fail());assert.equal(first.at(-1).type,'settled');
+    const sessionFile=first.find(value=>value.type==='ready').session_file;
+    const next=await execute({...config,session_file:sessionFile},()=>assert.fail());assert.equal(next.at(-1).type,'settled');
+    assert.deepEqual(models,['primary','secondary','secondary']);
+    const health=await readFile(join(directory,'.model-health.json'),'utf8');assert.ok(!health.includes('local-test-key'));assert.ok(!health.includes(config.base_url));
+    await execute({...config,session_file:sessionFile,revision:'updated'},()=>assert.fail());
+    assert.deepEqual(models,['primary','secondary','secondary','primary','secondary']);
+  }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(directory,{recursive:true,force:true});}
+});
+
+test('原预算不足以退避时退出，新轮遵守冷却且不探测',async()=>{
+  const directory=await mkdtemp(join(tmpdir(),'pi-self-heal-cooldown-'));let count=0;
+  const server=createServer(async(request,response)=>{for await(const chunk of request){}count+=1;response.writeHead(503,{'content-type':'application/json'});response.end(JSON.stringify({error:{message:'本地不可用'}}));});
+  server.listen(0,'127.0.0.1');await once(server,'listening');
+  try{const config={session_dir:directory,base_url:'http://127.0.0.1:'+server.address().port+'/v1',timeout_sec:1,tools:[]};
+    const first=await execute(config,()=>assert.fail());assert.equal(first.at(-1).reason,'model_unavailable');assert.equal(count,1);
+    const second=await execute(config,()=>assert.fail());assert.equal(second.at(-1).reason,'model_unavailable');assert.ok(second.at(-1).retry_at>Date.now()/1000);assert.equal(count,1);
+  }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(directory,{recursive:true,force:true});}
+});
+
+test('单模型首次 503 后本轮自动恢复，健康记录仅存哈希且权限受限', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-single-'));
+  let requests = 0;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 消费本地请求。 */ }
+    requests += 1;
+    if (requests === 1) {
+      response.writeHead(503, {'content-type': 'application/json'});
+      return response.end(JSON.stringify({error: {message: '本地服务暂不可用'}}));
+    }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+    assert.equal(records.at(-1).type, 'settled');
+    assert.equal(requests, 2);
+    assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.phase), ['retry', 'recovered']);
+    const healthPath = join(directory, '.model-health.json');
+    const health = JSON.parse(await readFile(healthPath, 'utf8'));
+    assert.equal((await stat(healthPath)).mode & 0o777, 0o600);
+    assert.equal(health.models['test-model'].cooldown_until, 0);
+    assert.equal(health.preferred_model, 'test-model');
+    assert.match(health.fingerprint, /^[a-f0-9]{64}$/);
+    assert.ok(!JSON.stringify(health).includes('local-test-key'));
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('已确认工具后的 HTTP 500 在原上下文续接，不重新追加用户要求', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-after-tool-'));
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    if (requests.length === 1) return stream(response, true);
+    if (requests.length === 2) {
+      response.writeHead(500, {'content-type': 'application/json'});
+      return response.end(JSON.stringify({error: {message: '本地临时错误'}}));
+    }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`,
+      tools: [{name: 'account_state', description: '当前账号', parameters: {type: 'object', properties: {}}}]},
+      (event, send) => send({type: 'tool_result', id: event.id, result: {confirmed: '已落盘的工具结果'}}));
+    assert.equal(records.at(-1).type, 'settled');
+    assert.equal(records.filter(value => value.type === 'tool').length, 1);
+    assert.equal(requests.length, 3);
+    assert.equal(requests[2].messages.filter(value => value.role === 'user').length, 1);
+    assert.equal(requests[2].messages.filter(value => value.role === 'tool').length, 1);
+    assert.ok(JSON.stringify(requests[2]).includes('已落盘的工具结果'));
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('退避等待时取消立即结束，取消后不继续请求任何模型', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-abort-'));
+  let requests = 0;
+  let abortedAt;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 消费本地请求。 */ }
+    requests += 1;
+    response.writeHead(503, {'content-type': 'application/json'});
+    response.end(JSON.stringify({error: {message: '本地临时错误'}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail(),
+      (event, send) => {
+        if (event.type === 'recovery') { abortedAt = Date.now(); send({type: 'abort'}); }
+      });
+    assert.equal(requests, 1);
+    assert.ok(Date.now() - abortedAt < 1500);
+    assert.equal(records.filter(value => value.type === 'settled').length, 0);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('402 只向其它配置模型降级，认证和上下文硬错误均不隐式压缩重试', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-hard-errors-'));
+  const models = [];
+  let status = 402;
+  let detail = '本地额度不足';
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); models.push(value.model);
+    if (value.model === 'secondary') return stream(response, false);
+    response.writeHead(status, {'content-type': 'application/json'});
+    response.end(JSON.stringify({error: {message: detail}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const config = {session_dir: directory, models: ['primary', 'secondary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []};
+    const fallback = await execute(config, () => assert.fail());
+    assert.equal(fallback.at(-1).type, 'settled');
+    assert.deepEqual(models, ['primary', 'secondary']);
+    models.length = 0;
+    const alone = await execute({...config, session_dir: join(directory, 'quota-only'), models: ['primary']}, () => assert.fail());
+    assert.equal(alone.at(-1).reason, 'model_unavailable');
+    assert.deepEqual(models, ['primary']);
+    for (const value of [401, 403, 404, 400]) {
+      models.length = 0; status = value;
+      detail = value === 400 ? 'maximum context length exceeded; 503 mentioned in body' : '本地硬错误';
+      const records = await execute({...config, session_dir: join(directory, `hard-${value}`)}, () => assert.fail());
+      assert.equal(records.at(-1).type, 'error');
+      assert.equal(records.filter(event => event.type === 'recovery').length, 0);
+      assert.deepEqual(models, ['primary']);
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('健康文件链接不会被跟随或覆盖，停止前不向模型发出请求', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-link-'));
+  const target = join(directory, 'protected.json');
+  await writeFile(target, '{"protected":true}');
+  await symlink(target, join(directory, '.model-health.json'));
+  try {
+    const records = await execute({session_dir: directory, base_url: 'http://127.0.0.1:1/v1', tools: []}, () => assert.fail());
+    assert.equal(records.at(-1).type, 'error');
+    assert.equal(records.filter(value => value.type === 'ready').length, 0);
+    assert.equal(await readFile(target, 'utf8'), '{"protected":true}');
+  } finally { await rm(directory, {recursive: true, force: true}); }
+});
+
+test('八个候选中的最后一个可用时仍有恢复机会，整体次数受限', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-eight-'));
+  const configured = Array.from({length: 8}, (_, index) => `candidate-${index + 1}`);
+  const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requested.push(value.model);
+    if (value.model === configured.at(-1)) return stream(response, false);
+    response.writeHead(503, {'content-type': 'application/json'});
+    response.end(JSON.stringify({error: {message: '本地候选暂不可用'}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, models: configured, timeout_sec: 120,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+    assert.equal(records.at(-1).type, 'settled');
+    assert.deepEqual(requested, configured);
+    assert.equal(records.filter(value => value.type === 'recovery' && value.phase !== 'recovered').length, 7);
+    assert.equal(records.findLast(value => value.type === 'recovery').attempt, 7);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('单模型持续 503 仅恢复三次，耗尽后返回冷却原因且不形成请求风暴', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-exhausted-'));
+  let requests = 0;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 消费本地请求。 */ }
+    requests += 1;
+    response.writeHead(503, {'content-type': 'application/json'});
+    response.end(JSON.stringify({error: {message: '本地服务持续不可用'}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, timeout_sec: 60,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+    assert.equal(requests, 4);
+    assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.attempt), [1, 2, 3]);
+    assert.equal(records.at(-1).reason, 'model_unavailable');
+    assert.ok(records.at(-1).retry_at > Date.now() / 1000);
+    assert.ok(records.at(-1).retry_at <= Date.now() / 1000 + 301);
+    assert.equal(records.filter(value => value.type === 'settled').length, 0);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });

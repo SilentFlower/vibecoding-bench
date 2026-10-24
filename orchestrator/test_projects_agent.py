@@ -7,6 +7,7 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -115,9 +116,9 @@ class PiFixture:
 class ErrorPiFixture:
     """仅发出合成错误的 Pi，不访问模型或执行工具。"""
 
-    def __init__(self, events):
-        """保存合成事件和调用证据。:param events: 本轮事件。:return: None。"""
-        self.events, self.calls = events, []
+    def __init__(self, events, outcome='error'):
+        """保存合成事件和调用证据。:param events: 本轮事件。:param outcome: 本轮结果。:return: None。"""
+        self.events, self.calls, self.outcome = events, [], outcome
 
     def available(self):
         """声明隔离夹具就绪。:return: True。"""
@@ -128,7 +129,7 @@ class ErrorPiFixture:
         self.calls.append((configuration, timeout_sec))
         for value in self.events:
             event(value)
-        return 'error'
+        return self.outcome
 
 
 class ResumingPiFixture(PiFixture):
@@ -213,6 +214,22 @@ class ProjectsAgentTests(unittest.TestCase):
         self.service.configure_schedule(account_id, True)
         self.service._write("UPDATE projects_agents SET status='blocked',schedule_state='blocked',schedule_next_at=NULL WHERE account_id=?", (account_id,))
         return self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],)), self.service.events(account_id)[-2], session_file
+
+    def prepare_model_unavailable(self):
+        """创建原会话的临时模型故障夹具。:return: 原工作、Pi 及会话路径。"""
+        work, _, session_file = self.prepare_filter_blocked()
+        self.service._write("UPDATE projects_work SET status='paused' WHERE id=?", (work['id'],))
+        self.service._write("UPDATE projects_agents SET status='running',schedule_state='running' WHERE account_id=1")
+        pi = ErrorPiFixture([{'type': 'error', 'reason': 'model_unavailable', 'message': 'Pi 模型暂不可用'}])
+        self.service.pi = pi
+        return work, pi, session_file
+
+    def join_controller(self, account_id=1):
+        """等待已经启动的隔离控制者完成收尾。:param account_id: 账号。:return: None。"""
+        controller = self.service.controllers.get(account_id)
+        if controller:
+            controller[0].join(2)
+            self.assertFalse(controller[0].is_alive())
 
     def test_menu_and_multiline_input_use_actual_observation_and_never_replay(self):
         """菜单与中段粘贴正文无需固定回复匹配；重复调用不会重复发送。:return: None。"""
@@ -528,6 +545,147 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual(work, self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],)))
         self.assertEqual([], [item for item in self.service.events(1) if item['kind'] == 'manual_retry'])
         self.assertFalse(self.pi.entered.is_set())
+
+    def test_runtime_recovery_projection_is_bounded_and_does_not_change_outer_counter(self):
+        """仅投影安全恢复字段，第八个候选可显示，运行时成功通知不清除外层计数。:return: None。"""
+        generation = self.activate()
+        valid = {'type': 'recovery', 'phase': 'fallback', 'attempt': 8, 'model': 'configured-model',
+            'reason': 'transient', 'delay_ms': 15000, 'raw': '不应公开', 'generation': 999}
+        self.service._pi_event(1, generation, valid)
+        payload = self.service.events(1)[-1]['payload']
+        self.assertEqual({'phase': 'fallback', 'attempt': 8, 'model': 'configured-model', 'reason': 'transient',
+            'delay_ms': 15000, 'generation': generation, 'source': 'runtime'}, payload)
+        count = len(self.service.events(1))
+        for invalid in ({'attempt': 9}, {'delay_ms': 15001}, {'reason': 'raw-provider-error'}, {'model': '带\n正文'}):
+            self.service._pi_event(1, generation, {**valid, **invalid})
+        self.assertEqual(count, len(self.service.events(1)))
+        self.assertIsNone(self.service._model_recovery(1))
+        for retry_at in (float('inf'), float('nan'), time.time() + 10000):
+            self.service._pi_event(1, generation, {'type': 'error', 'reason': 'model_unavailable', 'message': '模型不可用',
+                'generation': 999, 'retry_at': retry_at})
+            self.assertEqual({'message': '模型不可用', 'reason': 'model_unavailable', 'generation': generation},
+                self.service.events(1)[-1]['payload'])
+
+    def test_model_recovery_has_three_persistent_rounds_then_explicit_manual_restart(self):
+        """恢复等待跨重启保留，三次自动轮耗尽后只有人工可重新开启有限周期。:return: None。"""
+        work, pi, session_file = self.prepare_model_unavailable()
+        self.service._run(1, 1, self.service.provider(), threading.Event())
+        for attempt, delay in enumerate((60, 120, 300), 1):
+            recovery = self.service._model_recovery(1)
+            agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+            self.assertEqual((attempt, delay * 1000), (recovery['attempt'], recovery['delay_ms']))
+            self.assertEqual(('waiting', 'waiting'), (agent['status'], agent['schedule_state']))
+            due = agent['schedule_next_at']
+            calls = len(pi.calls)
+            if attempt == 1:
+                self.service.recover()
+                self.assertEqual(due, self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at'])
+                self.assertEqual(attempt, self.service._model_recovery(1)['attempt'])
+            self.service.tick(due - 0.01)
+            self.assertEqual(calls, len(pi.calls))
+            with patch('projects.time.time', return_value=due + 0.01):
+                self.service.tick(due + 0.01)
+                self.join_controller()
+        agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        saved = self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+        self.assertEqual(('blocked', 'blocked', None), (agent['status'], agent['schedule_state'], agent['schedule_next_at']))
+        self.assertEqual('blocked', saved['status'])
+        self.assertEqual(work['work_sec'], saved['work_sec'])
+        self.assertEqual(1800, agent['budget_sec'])
+        self.assertEqual(4, len(pi.calls))
+        self.assertTrue(all(call[0]['session_file'] == str(session_file) and call[0]['timeout_sec'] == 1800 for call in pi.calls))
+        self.assertEqual(1, len(self.terminal.started))
+        self.assertEqual([], self.terminal.sent)
+        self.service.configure_schedule(1, True)
+        self.service.tick(time.time() + 86400)
+        self.assertEqual(4, len(pi.calls))
+
+        self.service.start(1)
+        self.join_controller()
+        self.assertEqual(5, len(pi.calls))
+        self.assertEqual(('scheduled', 1), (self.service._model_recovery(1)['phase'], self.service._model_recovery(1)['attempt']))
+        self.assertEqual(work['session_id'], self.service._one('SELECT session_id FROM projects_work WHERE id=?', (work['id'],))['session_id'])
+        self.assertEqual(1, len([event for event in self.service.events(1) if event['kind'] == 'manual_retry']))
+
+    def test_complete_settled_round_resets_recovery_and_uses_normal_interval(self):
+        """完整指挥成功后清零恢复次数，普通计划继续使用原运行间隔。:return: None。"""
+        _, pi, _ = self.prepare_model_unavailable()
+        self.service._run(1, 1, self.service.provider(), threading.Event())
+        due = self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at']
+        pi.events, pi.outcome = [], 'settled'
+        with patch('projects.time.time', return_value=due + 0.01):
+            self.service.tick(due + 0.01)
+            self.join_controller()
+        self.assertEqual(('recovered', 0), (self.service._model_recovery(1)['phase'], self.service._model_recovery(1)['attempt']))
+        planned = self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at']
+        self.assertGreaterEqual(planned, due + 3600)
+        pi.events, pi.outcome = [{'type': 'error', 'reason': 'model_unavailable', 'message': '模型不可用'}], 'error'
+        with patch('projects.time.time', return_value=planned + 0.01):
+            self.service.tick(planned + 0.01)
+            self.join_controller()
+        self.assertEqual(1, self.service._model_recovery(1)['attempt'])
+
+    def test_account_gate_and_model_cooldown_use_later_deadline(self):
+        """额度变化不能抹掉模型冷却，准入等待不消耗自动模型重试轮数。:return: None。"""
+        _, pi, _ = self.prepare_model_unavailable()
+        now = time.time()
+        pi.events[0]['retry_at'] = now + 200
+        self.service.admission = lambda *_: {'allowed': False, 'retryable': True, 'reason': 'quota', 'retry_at': now + 400}
+        with patch('projects.time.time', return_value=now):
+            self.service._run(1, 1, self.service.provider(), threading.Event())
+        self.assertEqual(now + 400, self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at'])
+        agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.service._wait_gate(agent, {'allowed': False, 'retryable': True, 'retry_at': now + 20}, now + 5)
+        self.assertEqual(now + 400, self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at'])
+        self.service.admission = lambda *_: {'allowed': False, 'retryable': True, 'reason': 'quota', 'retry_at': now + 600}
+        self.service.tick(now + 401)
+        self.assertEqual(1, len(pi.calls))
+        self.assertEqual(1, self.service._model_recovery(1)['attempt'])
+        self.assertEqual(now + 600, self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at'])
+
+    def test_manual_pause_cancels_pending_model_recovery(self):
+        """人工暂停关闭原计划并取消等待中的自动恢复。:return: None。"""
+        work, pi, _ = self.prepare_model_unavailable()
+        self.service._run(1, 1, self.service.provider(), threading.Event())
+        self.service.pause(1)
+        self.service.tick(time.time() + 86400)
+        agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.assertEqual(0, agent['schedule_enabled'])
+        self.assertIsNone(agent['schedule_next_at'])
+        self.assertEqual(1, len(pi.calls))
+        self.assertEqual(work['work_sec'], self.service._one('SELECT work_sec FROM projects_work WHERE id=?', (work['id'],))['work_sec'])
+
+    def test_model_recovery_preserves_unknown_input_and_budget_blocks(self):
+        """临时模型故障不能解除未知输入或耗尽预算的工作。:return: None。"""
+        work, pi, _ = self.prepare_model_unavailable()
+        for reason in ('unknown', 'budget'):
+            with self.subTest(reason=reason):
+                self.service._write("UPDATE projects_agents SET status='running' WHERE account_id=1")
+                self.service._write("UPDATE projects_work SET status='paused' WHERE id=?", (work['id'],))
+                if reason == 'unknown':
+                    self.service._write("INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)",
+                        ('pending', work['id'], 1, '{}', 'unknown', time.time()))
+                else:
+                    self.service._write('UPDATE projects_work SET work_sec=1800 WHERE id=?', (work['id'],))
+                self.service._run(1, 1, self.service.provider(), threading.Event())
+                agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+                self.assertEqual(('blocked', None), (agent['status'], agent['schedule_next_at']))
+                self.assertEqual('blocked', self.service._one('SELECT status FROM projects_work WHERE id=?', (work['id'],))['status'])
+                self.service._write('DELETE FROM projects_actions WHERE id=?', ('pending',))
+        self.assertEqual(2, len(pi.calls))
+
+    def test_filter_authentication_and_unknown_errors_never_schedule_model_recovery(self):
+        """过滤、认证及未分类错误仍需人工核对，不能归入临时可用性故障。:return: None。"""
+        work, pi, _ = self.prepare_model_unavailable()
+        for reason in ('provider_content_filter', 'authentication', None):
+            with self.subTest(reason=reason):
+                self.service._write("UPDATE projects_agents SET status='running' WHERE account_id=1")
+                self.service._write("UPDATE projects_work SET status='paused' WHERE id=?", (work['id'],))
+                pi.events = [{'type': 'error', 'reason': reason, 'message': '模型请求失败'}]
+                self.service._run(1, 1, self.service.provider(), threading.Event())
+                agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+                self.assertEqual(('blocked', None), (agent['status'], agent['schedule_next_at']))
+                self.assertIsNone(self.service._model_recovery(1))
 
     def test_api_uses_strict_types_and_manual_reconcile_route_is_reachable(self):
         """接口拒绝布尔账号字段与未知字段，人工对账不会被动作路由遮挡。:return: None。"""
