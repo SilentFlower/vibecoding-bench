@@ -32,10 +32,11 @@ function stream(response, tool) {
  * @param {object} config 启动配置。
  * @param {Function} onTool 工具处理器。
  * @param {Function} onEvent 协议事件处理器。
+ * @param {string} entry 本地回归入口，默认实际宿主。
  * @return {Promise<Array<object>>} 实际协议事件。
  */
-async function execute(config, onTool, onEvent = () => {}) {
-  const process = spawn('node', ['host.mjs'], {cwd: import.meta.dirname, stdio: ['pipe', 'pipe', 'pipe']});
+async function execute(config, onTool, onEvent = () => {}, entry = 'host.mjs') {
+  const process = spawn('node', [entry], {cwd: import.meta.dirname, stdio: ['pipe', 'pipe', 'pipe']});
   const records = [];
   let buffer = '', errors = '';
   process.stdout.setEncoding('utf8'); process.stderr.setEncoding('utf8');
@@ -469,5 +470,383 @@ test('单模型持续 503 仅恢复三次，耗尽后返回冷却原因且不形
     assert.ok(records.at(-1).retry_at > Date.now() / 1000);
     assert.ok(records.at(-1).retry_at <= Date.now() / 1000 + 301);
     assert.equal(records.filter(value => value.type === 'settled').length, 0);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 空正文一次后成功：只原模型续接，不修改健康优先级或冷却', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-once-'));
+  const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    requested.push(JSON.parse(body));
+    if (requested.length === 1) { response.writeHead(409); return response.end(); }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, models: ['primary', 'secondary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+    assert.equal(records.at(-1).type, 'settled');
+    assert.deepEqual(requested.map(value => value.model), ['primary', 'primary']);
+    assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.phase), ['retry', 'recovered']);
+    const health = JSON.parse(await readFile(join(directory, '.model-health.json'), 'utf8'));
+    assert.equal(health.preferred_model, 'primary');
+    assert.equal(health.models.primary.cooldown_until, 0);
+    assert.equal(health.models.secondary.cooldown_until, 0);
+    const transcript = await readFile(records.find(value => value.type === 'ready').session_file, 'utf8');
+    assert.ok(transcript.includes('409 status code (no body)'));
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 持续冲突两次原模型重试后降级备用，整体次数有界且保留冷却', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-exhausted-'));
+  const models = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    models.push(JSON.parse(body).model); response.writeHead(409); response.end();
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, models: ['primary', 'secondary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+    assert.deepEqual(models, ['primary', 'primary', 'primary', 'secondary']);
+    assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.phase), ['retry', 'retry', 'fallback']);
+    assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.attempt), [1, 2, 3]);
+    assert.equal(records.at(-1).reason, 'model_unavailable');
+    assert.ok(records.at(-1).retry_at > Date.now() / 1000);
+    assert.ok(records.at(-1).retry_at <= Date.now() / 1000 + 301);
+    const health = JSON.parse(await readFile(join(directory, '.model-health.json'), 'utf8'));
+    assert.ok(health.models.primary.cooldown_until > Date.now());
+    assert.equal(health.preferred_model, null);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 发生在已确认工具后：保留原工具结果且父进程工具总数保持一次', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-after-tool-'));
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    if (requests.length === 1) return stream(response, true);
+    if (requests.length === 2) { response.writeHead(409); return response.end(); }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    let tools = 0;
+    const records = await execute({session_dir: directory, models: ['primary', 'secondary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: [{name: 'account_state',
+        description: '当前账号', parameters: {type: 'object', properties: {}}}]}, (event, send) => {
+      tools += 1; send({type: 'tool_result', id: event.id, result: {confirmed: '只允许出现一次的已确认结果'}});
+    });
+    assert.equal(records.at(-1).type, 'settled'); assert.equal(tools, 1);
+    assert.equal(records.filter(value => value.type === 'tool').length, 1);
+    assert.deepEqual(requests.map(value => value.model), ['primary', 'primary', 'primary']);
+    assert.equal(requests[2].messages.filter(value => value.role === 'user').length, 1);
+    assert.equal(requests[2].messages.filter(value => value.role === 'tool').length, 1);
+    assert.ok(JSON.stringify(requests[2]).includes('只允许出现一次的已确认结果'));
+    const messages = (await readFile(records.find(value => value.type === 'ready').session_file, 'utf8'))
+      .trim().split('\n').map(value => JSON.parse(value)).filter(value => value.type === 'message');
+    assert.equal(messages.filter(value => value.message.role === 'toolResult').length, 1);
+    assert.ok(messages.some(value => value.message.errorMessage === '409 status code (no body)'));
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 硬认证、内容、上下文错误和禁止重试提示均优先停止', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-hard-'));
+  let detail; let shouldRetry; const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    requested.push(JSON.parse(body).model);
+    response.writeHead(409, {'content-type': 'application/json', ...(shouldRetry ? {'x-should-retry': shouldRetry} : {})});
+    response.end(detail === undefined ? undefined : JSON.stringify({error: {message: detail}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const [index, value] of [undefined, 'authentication failed', 'content_filter', 'maximum context length exceeded'].entries()) {
+      detail = value; shouldRetry = value === undefined ? 'false' : 'true'; requested.length = 0;
+      const records = await execute({session_dir: join(directory, String(index)), models: ['primary', 'secondary'],
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+      assert.deepEqual(requested, ['primary']);
+      assert.equal(records.filter(value => value.type === 'recovery').length, 0);
+      assert.equal(records.at(-1).type, 'error'); assert.equal(records.at(-1).reason, 'provider_conflict');
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 关联的硬HTTP状态不因服务端强制重试提示被放行', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-header-hard-'));
+  let status = 401; const models = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    models.push(JSON.parse(body).model); response.writeHead(status, {'x-should-retry': 'true'}); response.end();
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const value of [401, 403, 404]) {
+      status = value; models.length = 0;
+      const records = await execute({session_dir: join(directory, String(value)), models: ['primary', 'secondary'],
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+      assert.deepEqual(models, ['primary']); assert.equal(records.at(-1).type, 'error');
+      assert.equal(records.filter(value => value.type === 'recovery').length, 0);
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 退避期间取消，后续不再发起请求', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-abort-')); let count = 0; let abortedAt;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 只消费假服务请求。 */ }
+    count += 1; response.writeHead(409); response.end();
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, models: ['primary', 'secondary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail(), (event, send) => {
+      if (event.type === 'recovery') { abortedAt = Date.now(); send({type: 'abort'}); }
+    });
+    assert.ok(abortedAt); assert.ok(Date.now() - abortedAt < 1500); assert.equal(count, 1);
+    assert.equal(records.filter(value => value.type === 'settled').length, 0);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 原预算不足不开始重试，Retry-After不能被缩短或绕过上限', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-budget-')); let retryAfter; let count = 0;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 只消费假服务请求。 */ }
+    count += 1; response.writeHead(409, retryAfter ? {'retry-after': retryAfter} : {}); response.end();
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const [index, value] of [undefined, '120', '601'].entries()) {
+      retryAfter = value; count = 0;
+      const started = Date.now() / 1000;
+      const records = await execute({session_dir: join(directory, String(index)), timeout_sec: 1,
+        models: ['primary', 'secondary'], base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+      assert.equal(count, 1); assert.equal(records.filter(value => value.type === 'recovery').length, 0);
+      assert.equal(records.at(-1).reason, 'model_unavailable');
+      assert.ok(records.at(-1).retry_at > Date.now() / 1000);
+      if (value) assert.ok(records.at(-1).retry_at >= started + Number(value));
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 响应投影的fetch生命周期在正常、取消与初始化失败后均恢复', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-fetch-')); let mode = 'success'; let count = 0;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 只消费假服务请求。 */ }
+    count += 1;
+    if (mode === 'success') return stream(response, false);
+    response.writeHead(409, mode === 'blocked' ? {'x-should-retry': 'false'} : {}); response.end();
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const value of ['success', 'blocked', 'abort', 'invalid']) {
+      mode = value; count = 0;
+      const selected = join(directory, value); await mkdir(selected, {recursive: true});
+      if (value === 'invalid') { const target = join(selected, 'target.json'); await writeFile(target, '{}'); await symlink(target, join(selected, '.model-health.json')); }
+      const records = await execute({session_dir: selected, models: ['primary', 'secondary'],
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail(), (event, send) => {
+        if (value === 'abort' && event.type === 'recovery') send({type: 'abort'});
+      }, 'fetch-audit-entry.mjs');
+      assert.equal(records.at(-1).type, 'audit_fetch_restored'); assert.equal(records.at(-1).restored, true);
+      if (value === 'invalid') assert.equal(count, 0);
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 Retry-After明确存在但过长或无法可信解析时不短重试', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-invalid-wait-'));
+  let retryAfter; let count = 0;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 只消费本地合成请求。 */ }
+    count += 1; response.writeHead(409, {'retry-after': retryAfter}); response.end();
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const [index, value] of ['86401', 'not-a-date', '9'.repeat(129), ''].entries()) {
+      retryAfter = value; count = 0;
+      const records = await execute({session_dir: join(directory, String(index)),
+        models: ['primary', 'secondary'], base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+      assert.equal(count, 1);
+      assert.equal(records.filter(value => value.type === 'recovery').length, 0);
+      assert.equal(records.at(-1).reason, 'provider_conflict');
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 Retry-After遵守恢复事件十五秒及整数合同，长等待交受控计划', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi409-public-delay-'));
+  let retryAfter = '16'; let count = 0; let respondedAt;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 只消费本地假服务请求。 */ }
+    respondedAt = Date.now() / 1000;
+    count += 1; response.writeHead(409, {'retry-after': retryAfter}); response.end();
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const [index, value] of ['16', '1.2345'].entries()) {
+      retryAfter = value; count = 0;
+      const records = await execute({session_dir: join(directory, String(index)), timeout_sec: 60,
+        models: ['primary', 'secondary'], base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail(),
+      (event, send) => { if (event.type === 'recovery') send({type: 'abort'}); });
+      const recovery = records.filter(value => value.type === 'recovery');
+      assert.equal(count, 1);
+      if (value === '16') {
+        assert.equal(recovery.length, 0); assert.equal(records.at(-1).reason, 'model_unavailable');
+        assert.ok(records.at(-1).retry_at >= respondedAt + 16);
+      } else {
+        assert.equal(recovery.length, 1); assert.equal(recovery[0].delay_ms, 1235);
+        assert.ok(Number.isInteger(recovery[0].delay_ms));
+      }
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('409 连续冲突后备用成功，下一轮直接使用已成功模型且不重探冷却模型', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-recovery-conflict-preferred-'));
+  const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requested.push(value.model);
+    if (value.model === 'primary') { response.writeHead(409); return response.end(); }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const config = {session_dir: directory, models: ['primary', 'secondary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []};
+    const first = await execute(config, () => assert.fail());
+    assert.equal(first.at(-1).type, 'settled');
+    assert.deepEqual(requested, ['primary', 'primary', 'primary', 'secondary']);
+    assert.deepEqual(first.filter(value => value.type === 'recovery').map(value => value.phase),
+      ['retry', 'retry', 'fallback', 'recovered']);
+    const health = JSON.parse(await readFile(join(directory, '.model-health.json'), 'utf8'));
+    assert.equal(health.preferred_model, 'secondary');
+    assert.ok(health.models.primary.cooldown_until > Date.now());
+    const resumed = await execute({...config, session_file: first.find(value => value.type === 'ready').session_file},
+      () => assert.fail());
+    assert.equal(resumed.at(-1).type, 'settled');
+    assert.equal(resumed.find(value => value.type === 'ready').session_id, first.find(value => value.type === 'ready').session_id);
+    assert.deepEqual(requested, ['primary', 'primary', 'primary', 'secondary', 'secondary']);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('明确模型不存在可降级用户已配置模型，不把错误端点当作可恢复模型错误', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-recovery-missing-model-'));
+  const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requested.push(value.model);
+    if (value.model === 'primary') {
+      response.writeHead(404, {'content-type': 'application/json'});
+      return response.end(JSON.stringify({error: {message: 'The configured model does not exist'}}));
+    }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, models: ['primary', 'secondary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+    assert.equal(records.at(-1).type, 'settled');
+    assert.deepEqual(requested, ['primary', 'secondary']);
+    assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.phase), ['fallback', 'recovered']);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('其它5xx、425和服务端明确允许重试的400均可有限降级', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-recovery-transient-statuses-'));
+  let status; let shouldRetry; const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requested.push(value.model);
+    if (value.model === 'primary') {
+      response.writeHead(status, {'content-type': 'application/json', ...(shouldRetry ? {'x-should-retry': 'true'} : {})});
+      return response.end(JSON.stringify({error: {message: 'Temporary upstream capacity failure'}}));
+    }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const [index, value] of [507, 529, 425, 400].entries()) {
+      status = value; shouldRetry = value === 400; requested.length = 0;
+      const records = await execute({session_dir: join(directory, String(index)), models: ['primary', 'secondary'],
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+      assert.equal(records.at(-1).type, 'settled', String(value));
+      assert.deepEqual(requested, ['primary', 'secondary'], String(value));
+      assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.phase), ['fallback', 'recovered']);
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('所有可恢复HTTP错误均尊重二十分钟Retry-After且不提前请求备用模型', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-recovery-long-retry-after-'));
+  let status; let shouldRetry; let respondedAt; const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    requested.push(JSON.parse(body).model); respondedAt = Date.now() / 1000;
+    response.writeHead(status, {'content-type': 'application/json', 'retry-after': '1200',
+      ...(shouldRetry ? {'x-should-retry': 'true'} : {})});
+    response.end(JSON.stringify({error: {message: 'Temporary upstream capacity failure'}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const [index, value] of [429, 503, 409, 425, 402, 400].entries()) {
+      status = value; shouldRetry = value === 400; requested.length = 0;
+      const records = await execute({session_dir: join(directory, String(index)), models: ['primary', 'secondary'],
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+      assert.deepEqual(requested, ['primary'], String(value));
+      assert.equal(records.filter(value => value.type === 'recovery').length, 0);
+      assert.equal(records.at(-1).reason, 'model_unavailable');
+      assert.ok(records.at(-1).retry_at >= respondedAt + 1200);
+      assert.ok(records.at(-1).retry_at <= Date.now() / 1000 + 1201);
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('临时状态与强制重试提示不能覆盖明确认证、非法请求和内容拒绝', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-recovery-hard-response-details-'));
+  let status; let detail; const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    requested.push(JSON.parse(body).model);
+    response.writeHead(status, {'content-type': 'application/json', 'x-should-retry': 'true'});
+    response.end(JSON.stringify({error: {message: detail}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const cases = [[503, 'invalid api key'], [503, 'authentication failed'], [409, 'invalid api key'],
+      [503, 'forbidden'], [409, 'content_policy_violation'], [503, 'content_filter'],
+      [503, 'maximum context length exceeded'], [503, 'invalid request'], [409, 'unauthorized'],
+      [503, 'safety check blocked']];
+    for (const [index, value] of cases.entries()) {
+      [status, detail] = value; requested.length = 0;
+      const records = await execute({session_dir: join(directory, String(index)), models: ['primary', 'secondary'],
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+      assert.deepEqual(requested, ['primary'], detail);
+      assert.equal(records.at(-1).type, 'error');
+      assert.equal(records.filter(value => value.type === 'recovery').length, 0, detail);
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('合法HTTP日期Retry-After按原时间交外层，不被默认短退避缩短', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-recovery-http-date-'));
+  let due; const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    requested.push(JSON.parse(body).model);
+    const date = new Date(Date.now() + 1200 * 1000).toUTCString(); due = Date.parse(date) / 1000;
+    response.writeHead(429, {'retry-after': date}); response.end();
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, models: ['primary', 'secondary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+    assert.deepEqual(requested, ['primary']);
+    assert.equal(records.filter(value => value.type === 'recovery').length, 0);
+    assert.equal(records.at(-1).reason, 'model_unavailable');
+    assert.ok(records.at(-1).retry_at >= due);
+    assert.ok(records.at(-1).retry_at <= due + 1);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });

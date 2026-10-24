@@ -442,7 +442,7 @@ class ProjectsService:
         retry_at = gate.get('retry_at')
         next_at = max(now + 2, retry_at) if isinstance(retry_at, (int, float)) else now + 60
         recovery = self._model_recovery(agent['account_id'])
-        if recovery and recovery['phase'] == 'scheduled':
+        if recovery and recovery['phase'] in ('scheduled', 'exhausted') and recovery.get('retry_at') is not None:
             next_at = max(next_at, recovery['retry_at'])
         enabled = bool(agent['schedule_enabled'])
         message = gate.get('message') or '等待执行条件'
@@ -807,7 +807,7 @@ class ProjectsService:
         return json.loads(event['payload_json']) if event else None
 
     def _finish_model_recovery(self, agent: dict, work: dict | None, generation: int, retry_at: float | None) -> None:
-        """有界安排临时模型故障的自动恢复，保留原计划开关与工作预算。:param agent: 当前控制者。:param work: 已收口的原工作。:param generation: 本轮代次。:param retry_at: 模型最早可用时间。:return: None。"""
+        """临时故障先有限快速恢复，再按原计划低频检查，保留预算及所有门禁。:param agent: 当前控制者。:param work: 已收口的原工作。:param generation: 本轮代次。:param retry_at: 模型最早可用时间。:return: None。"""
         now = time.time()
         previous = self._model_recovery(agent['account_id'])
         attempt = previous['attempt'] if previous and previous['phase'] in ('scheduled', 'exhausted') else 0
@@ -816,20 +816,22 @@ class ProjectsService:
         if hold or (not gate['allowed'] and not gate.get('retryable', True)):
             phase, status, next_at, delay = 'exhausted', 'blocked', None, 0
             message = message or gate.get('message') or '账号暂不可运行，原工作已保留'
-        elif attempt >= 3:
-            phase, status, next_at, delay = 'exhausted', 'blocked', None, 0
-            message = 'Pi 模型连续自动恢复 3 轮仍不可用，原工作已保留，等待人工检查'
         elif not agent['schedule_enabled']:
             phase, status, next_at, delay = 'paused', 'paused', None, 0
             message = 'Pi 模型暂不可用，原工作已保留；定时运行已关闭，等待人工启动'
         else:
-            attempt += 1
-            delay = (60, 120, 300)[attempt - 1]
+            if attempt >= 3:
+                # 临时服务故障不能永久关闭用户已开启的计划；降低频率，避免持续快速请求。
+                phase, delay = 'exhausted', max(900, agent['schedule_interval_sec'])
+                message = f'Pi 模型连续恢复仍不可用，已转低频自动检查；至少 {delay // 60} 分钟后且门禁放行时再试'
+            else:
+                attempt += 1
+                phase, delay = 'scheduled', (60, 120, 300)[attempt - 1]
+                message = f'Pi 模型暂不可用，第 {attempt}/3 轮自动恢复将在冷却及账号门禁放行后启动'
             next_at = max(now + delay, retry_at or 0)
             if not gate['allowed'] and type(gate.get('retry_at')) in (int, float):
                 next_at = max(next_at, gate['retry_at'])
-            phase, status = 'scheduled', 'waiting'
-            message = f'Pi 模型暂不可用，第 {attempt}/3 轮自动恢复将在冷却及账号门禁放行后启动'
+            status = 'waiting'
         if status == 'blocked' and work and work['status'] not in ('passed', 'stopped'):
             self._release(work, 'blocked')
         payload = {'phase': phase, 'attempt': attempt, 'reason': 'model_unavailable', 'delay_ms': delay * 1000,
@@ -857,7 +859,7 @@ class ProjectsService:
         if not event or event['kind'] != 'error' or event['work_id'] != work['id']:
             return None
         payload = json.loads(event['payload_json'])
-        if payload.get('reason') not in ('provider_content_filter', 'model_unavailable'):
+        if payload.get('reason') not in ('provider_content_filter', 'provider_conflict', 'model_unavailable'):
             return None
         if payload.get('source') == 'operator_diagnosis':
             original_id = payload.get('diagnostic_of_event_id')
@@ -897,7 +899,8 @@ class ProjectsService:
                     or agent['schedule_next_at'] > now):
                 return self.state(account_id)
             recovery = self._model_recovery(account_id)
-            if scheduled and recovery and recovery['phase'] == 'scheduled' and recovery['retry_at'] > now:
+            if (scheduled and recovery and recovery['phase'] in ('scheduled', 'exhausted')
+                    and recovery.get('retry_at') is not None and recovery['retry_at'] > now):
                 self._write('UPDATE projects_agents SET schedule_next_at=? WHERE account_id=?',
                     (max(agent['schedule_next_at'], recovery['retry_at']), account_id))
                 return self.state(account_id)
@@ -1015,7 +1018,7 @@ class ProjectsService:
         for agent in self._rows('SELECT * FROM projects_agents'):
             work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
             recovery = self._model_recovery(agent['account_id'])
-            cooling = bool(recovery and recovery['phase'] == 'scheduled' and agent['schedule_enabled']
+            cooling = bool(recovery and recovery['phase'] in ('scheduled', 'exhausted') and agent['schedule_enabled']
                 and agent['schedule_state'] == 'waiting' and agent['schedule_next_at'] is not None)
             uncertain = False
             if work and work['status'] not in ('passed', 'stopped'):
@@ -1091,9 +1094,11 @@ class ProjectsService:
             nonlocal failure_reason, failure_retry_at
             self._pi_event(account_id, generation, value)
             if value['type'] == 'error':
-                failure_reason = value.get('reason') if value.get('reason') in ('provider_content_filter', 'model_unavailable') else None
+                failure_reason = value.get('reason') if value.get('reason') in ('provider_content_filter', 'provider_conflict', 'model_unavailable') else None
                 retry_at = value.get('retry_at')
-                failure_retry_at = retry_at if type(retry_at) in (int, float) and time.time() < retry_at <= time.time() + 300 else None
+                now = time.time()
+                # 服务端等待可以长于短退避窗口；只接受未来一天内的有限数值，不能缩短明确的限流等待。
+                failure_retry_at = retry_at if type(retry_at) in (int, float) and now < retry_at < now + 86400 else None
 
         try:
             agent, work = self._current(account_id, generation)
@@ -1147,8 +1152,8 @@ class ProjectsService:
                                     'delay_ms': 0, 'generation': generation, 'source': 'schedule'}, work['id'] if work else None,
                                     f'model-recovery:{account_id}:{generation}:recovered')
                             # 只依据本轮结构化类别说明原因，历史错误不能影响下一轮状态。
-                            failure_message = ('Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复'
-                                if failure_reason == 'provider_content_filter' else None)
+                            failure_message = {'provider_content_filter': 'Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复',
+                                'provider_conflict': 'Pi 上游返回 409 冲突，当前响应不允许自动恢复，原会话和预算已保留'}.get(failure_reason)
                             self._write('UPDATE projects_agents SET status=?,message=?,updated_at=? WHERE account_id=? AND generation=?',
                                 ('paused' if outcome != 'error' else 'blocked',
                                     {'settled': 'Pi 已结束本轮指挥', 'stopped': '已停止', 'timeout': '本次指挥预算已用尽'}.get(outcome,
@@ -1193,11 +1198,12 @@ class ProjectsService:
         elif value['type'] == 'error':
             payload = {'message': value['message']}
             # 仅透传已定义枚举，避免将上游正文或任意字段写入公开事件。
-            if value.get('reason') in ('provider_content_filter', 'model_unavailable'):
+            if value.get('reason') in ('provider_content_filter', 'provider_conflict', 'model_unavailable'):
                 payload['reason'] = value['reason']
                 payload['generation'] = generation
                 retry_at = value.get('retry_at')
-                if value['reason'] == 'model_unavailable' and type(retry_at) in (int, float) and time.time() < retry_at <= time.time() + 300:
+                now = time.time()
+                if value['reason'] == 'model_unavailable' and type(retry_at) in (int, float) and now < retry_at < now + 86400:
                     payload['retry_at'] = retry_at
                 model = value.get('model')
                 if isinstance(model, str) and 1 <= len(model) <= 200 and model.isprintable():

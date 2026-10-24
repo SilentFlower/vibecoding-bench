@@ -97,21 +97,75 @@ async function modelHealth(config) {
 }
 
 /**
+ * 在单账号子进程内只投影配置端点的响应元数据，不读取请求头、正文或密钥。
+ * @param {object} config 私有配置，只在内存中匹配请求端点。
+ * @return {object} 当前响应、清空及恢复原 fetch 的受控接口。
+ */
+function providerResponses(config) {
+  const original = globalThis.fetch;
+  const maximumRetryAfterMs = 24 * 60 * 60 * 1000;
+  const endpoint = new URL(config.base_url);
+  const path = endpoint.pathname.replace(/\/$/, '') + '/chat/completions';
+  let current = null;
+  const wrapped = async (request, options) => {
+    let matches = false;
+    try {
+      const url = new URL(typeof request === 'string' || request instanceof URL ? request : request.url);
+      matches = url.origin === endpoint.origin && url.pathname === path;
+    } catch { /* 非配置端点的请求不参与额度或恢复推断。 */ }
+    if (matches) current = null;
+    const response = await original(request, options);
+    if (matches) {
+      const shouldRetry = response.headers.get('x-should-retry');
+      const retryAfter = response.headers.get('retry-after');
+      let retryAfterMs = null;
+      if (retryAfter && retryAfter.length <= 128) {
+        const value = /^\d+(?:\.\d+)?$/.test(retryAfter)
+          ? Number(retryAfter) * 1000 : Date.parse(retryAfter) - Date.now();
+        // 持久恢复时间按秒上取整，给二十四小时的协议上界保留一秒余量。
+        if (Number.isFinite(value) && value >= 0 && value <= maximumRetryAfterMs - 1000) retryAfterMs = value;
+      }
+      // 明确存在却不可可信解析的等待不能伪装成缺省，避免缩短上游指定的等待。
+      current = {status: response.status, should_retry: shouldRetry === 'true' ? true
+        : shouldRetry === 'false' ? false : null, retry_after_ms: retryAfterMs,
+        retry_after_valid: retryAfter === null || retryAfterMs !== null};
+    }
+    return response;
+  };
+  globalThis.fetch = wrapped;
+  return {current: () => current, reset: () => { current = null; },
+    restore: () => { if (globalThis.fetch === wrapped) globalThis.fetch = original; }};
+}
+
+/**
  * 仅对已确认的服务可用性故障开放续接，正文里的状态码不会参与判断。
  * @param {object} message SDK 最终助手消息。
+ * @param {object|null} response 当前真实请求的响应元数据。
  * @return {string|null} 可恢复的故障类别。
  */
-function unavailable(message) {
+function unavailable(message, response) {
   if (message?.stopReason !== 'error') return null;
   const error = message.errorMessage || '';
   if (error === 'Provider finish_reason: content_filter') return null;
-  // SDK 将 OpenAI APIError 的状态写在错误消息开头；不扫描响应正文中的任意数字。
-  const status = Number(error.match(/^\s*(?:Error:\s*)?(?:HTTP(?: error)?\s*)?(\d{3})(?:\s|:|$)/i)?.[1]);
+  // 认证、请求、上下文及内容拒绝不能被临时状态码或服务端重试提示掩盖。
+  if (/content[_ -]?(?:filter|policy)|safety|context.{0,24}(?:length|window|limit|overflow)|(?:maximum|exceed).{0,24}(?:token|context)|invalid.{0,12}request|unauthori[sz]ed|authentication|forbidden|(?:invalid|incorrect|missing|expired).{0,12}(?:api[_ -]?key|credentials|token)|(?:api[_ -]?key|credentials|token).{0,12}(?:invalid|incorrect|missing|expired)/i.test(error)
+      || response?.should_retry === false) return null;
+  const reported = Number(error.match(/^\s*(?:Error:\s*)?(?:HTTP(?: error)?\s*)?(\d{3})(?:\s|:|$)/i)?.[1]);
+  // 模型不存在可换用户已配置的模型；错误端点、权限和请求格式不能盲目重试。
+  const missingModel = /\b(?:invalid[_ -]model|unknown[_ -]model|model[_ -]not[_ -]found|model.{0,30}(?:not found|does not exist|not available|unavailable|disabled|not supported))\b/i.test(error);
+  const status = response?.status >= 400 ? response.status : reported;
+  if ([401, 403, 405, 406, 410, 413, 414, 415, 422].includes(status)
+      || [401, 403].includes(reported)) return null;
+  if (response && !response.retry_after_valid) return null;
+  if (missingModel) return 'model';
   if (status >= 400) {
+    if (status === 404) return null;
+    // 冲突必须来自本次真实响应；其它临时错误统一使用响应类别与明确重试提示。
+    if (status === 409) return response?.status === 409 ? 'conflict' : null;
     if (status === 402) return 'quota';
-    return [408, 429, 500, 502, 503, 504].includes(status) ? 'transient' : null;
+    return [408, 425, 429].includes(status) || status >= 500 && status <= 599
+      || response?.should_retry === true ? 'transient' : null;
   }
-  if (/context.{0,24}(?:length|window|limit|overflow)|(?:maximum|exceed).{0,24}(?:token|context)|invalid.{0,12}(?:model|request)|model.{0,20}(?:not found|does not exist)|unauthori[sz]ed|authentication|forbidden/i.test(error)) return null;
   return /^(?:Provider finish_reason: network_error|Connection error\.?|Request timed out\.?|fetch failed|network error|NetworkError|APIConnectionError|APIConnectionTimeoutError|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND)(?:\b|$)|^(?:connect|read|connection|request|network|upstream|socket|fetch).{0,100}(?:timed? out|timeout|reset|refused|failed|closed)/i.test(error)
     ? 'transient' : null;
 }
@@ -159,6 +213,18 @@ function callTool(name, toolCallId, args, signal) {
  * @return {Promise<void>} 当前 Pi 指挥轮次结束。
  */
 async function run(config) {
+  const responses = providerResponses(config);
+  try { await runSession(config, responses); }
+  finally { responses.restore(); }
+}
+
+/**
+ * 在已安装的响应投影生命周期内执行原会话，所有退出路径都会恢复原 fetch。
+ * @param {object} config 私有启动配置。
+ * @param {object} responses 当前请求的有界响应元数据。
+ * @return {Promise<void>} 当前指挥轮次结束。
+ */
+async function runSession(config, responses) {
   await mkdir(config.session_dir, {recursive: true, mode: 0o700});
   const health = await modelHealth(config);
   const deadline = Date.now() + Math.min(86400, Math.max(1,
@@ -166,7 +232,12 @@ async function run(config) {
   const candidates = () => [health.preferred(), ...config.models].filter((id, index, all) =>
     health.models.has(id) && all.indexOf(id) === index);
   const available = () => candidates().find(id => health.models.get(id).cooldown_until <= Date.now());
-  const retryAt = () => Math.floor(Math.min(...[...health.models.values()].map(value => value.cooldown_until)) / 1000);
+  const retryAt = () => {
+    const now = Date.now();
+    // 未被标为故障的模型不能把持久等待压成零；所有候选冷却时仍选择最早可用时间。
+    const waiting = [...health.models.values()].map(value => value.cooldown_until).filter(value => value > now);
+    return Math.ceil(Math.min(...waiting, now + cooldownMs) / 1000);
+  };
   let model = available();
   if (!model) {
     emit({type: 'error', reason: 'model_unavailable', retry_at: retryAt(),
@@ -235,12 +306,15 @@ async function run(config) {
     if (cancellation.signal.aborted) return;
     let message;
     let attempts = 0;
+    const conflictAttempts = new Map();
+    let deferredRetryAt;
     const maximumAttempts = Math.max(3, Math.min(8, config.models.length));
     const failed = new Map();
     // 在公开事件上等待持久化队列处理到 agent_end，再读取状态和启动下一次续接。
     let endRun;
     const unsubscribe = session.subscribe(event => { if (event.type === 'agent_end') endRun?.(); });
     const execute = async first => {
+      responses.reset();
       const ended = new Promise(resolve => { endRun = resolve; });
       settingsManager.setCompactionEnabled(session.messages.at(-1)?.stopReason !== 'error');
       if (first) await session.prompt(config.prompt, {expandPromptTemplates: false});
@@ -251,20 +325,38 @@ async function run(config) {
     while (true) {
       message = session.messages.findLast(value => value.role === 'assistant');
       if (cancellation.signal.aborted || message?.stopReason === 'aborted') break;
-      const failure = unavailable(message);
+      const response = responses.current();
+      const failure = unavailable(message, response);
       if (!failure) break;
-      health.models.get(model).cooldown_until = Date.now() + cooldownMs;
-      failed.set(model, failure);
-      await health.save();
-      if (attempts >= maximumAttempts) break;
-      // 优先尚未冷却的其它模型；只有本轮已失败的临时服务错误允许短暂重试。
-      // 402 是余额问题，不向同一模型重复发业务请求；上轮冷却的模型也不会被探测。
-      const next = candidates().find(id => !failed.has(id)
-        && health.models.get(id).cooldown_until <= Date.now())
-        || available() || candidates().find(id => failed.get(id) === 'transient');
-      if (!next) break;
-      const wait = [2000, 5000, 15000][Math.min(attempts, 2)];
-      if (Date.now() + wait >= deadline) break;
+      const serverWait = response?.retry_after_ms || 0;
+      // 长等待持久交接给 Python 调度，不占住子进程，也不向备用模型提前发送请求。
+      if (serverWait > 15000) {
+        deferredRetryAt = Math.ceil((Date.now() + serverWait) / 1000);
+        break;
+      }
+      let next = model;
+      let wait;
+      const conflicts = conflictAttempts.get(model) || 0;
+      if (failure === 'conflict' && conflicts < 2) {
+        if (attempts >= maximumAttempts) break;
+        wait = Math.ceil(Math.max([1000, 2000][conflicts], serverWait));
+        conflictAttempts.set(model, conflicts + 1);
+      } else {
+        health.models.get(model).cooldown_until = Date.now() + cooldownMs;
+        failed.set(model, failure);
+        await health.save();
+        if (attempts >= maximumAttempts) break;
+        // 持续冲突或模型不存在也可降级；余额和模型配置错误不向原模型重复请求。
+        next = candidates().find(id => !failed.has(id)
+          && health.models.get(id).cooldown_until <= Date.now())
+          || available() || candidates().find(id => failed.get(id) === 'transient');
+        if (!next) break;
+        wait = Math.ceil(Math.max([2000, 5000, 15000][Math.min(attempts, 2)], serverWait));
+      }
+      if (Date.now() + wait >= deadline) {
+        if (serverWait) deferredRetryAt = Math.ceil((Date.now() + serverWait) / 1000);
+        break;
+      }
       attempts += 1;
       emit({type: 'recovery', phase: next === model ? 'retry' : 'fallback', attempt: attempts,
         model: next, reason: 'transient', delay_ms: wait});
@@ -289,9 +381,13 @@ async function run(config) {
       if (message.errorMessage === 'Provider finish_reason: content_filter') {
         emit({type: 'error', reason: 'provider_content_filter',
           message: 'Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复'});
-      } else if (unavailable(message)) {
-        emit({type: 'error', reason: 'model_unavailable', model, retry_at: retryAt(),
-          message: 'Pi 配置模型暂时不可用，有限恢复已结束，原会话和预算已保留'});
+      } else if (unavailable(message, responses.current())) {
+        emit({type: 'error', reason: 'model_unavailable', model, retry_at: deferredRetryAt ?? retryAt(),
+          message: deferredRetryAt ? 'Pi 上游要求延后重试，已保留原会话和预算，等待自动恢复'
+            : 'Pi 配置模型暂时不可用，有限重试与降级已结束，原会话和预算已保留'});
+      } else if (responses.current()?.status === 409) {
+        emit({type: 'error', reason: 'provider_conflict', model,
+          message: 'Pi 上游返回 409 冲突，当前响应不允许自动恢复，原会话和预算已保留'});
       } else {
         emit({type: 'error', message: 'Pi 模型请求失败，请检查模型的流式响应及工具调用兼容性'});
       }
