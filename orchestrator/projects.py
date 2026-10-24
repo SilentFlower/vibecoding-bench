@@ -872,6 +872,15 @@ class ProjectsService:
 
     def _run(self, account_id: int, generation: int, provider: dict, stop: threading.Event) -> None:
         outcome = 'error'
+        failure_reason = None
+
+        def receive(value: dict) -> None:
+            """记录本轮已确认的失败类别并保存事件。:param value: Pi 事件。:return: None。"""
+            nonlocal failure_reason
+            self._pi_event(account_id, generation, value)
+            if value['type'] == 'error' and value.get('reason') == 'provider_content_filter':
+                failure_reason = 'provider_content_filter'
+
         try:
             agent, work = self._current(account_id, generation)
             directory = self.data / 'projects/agents' / str(account_id)
@@ -891,8 +900,9 @@ class ProjectsService:
                     '不要沿用旧总结中“没有任务”的推测。核对并优先恢复原会话、未完成工作和待处理事件。'}
             outcome = self.pi.run(config,
                 lambda name, args, call_id: self.tool(account_id, generation, name, args, call_id, stop),
-                lambda value: self._pi_event(account_id, generation, value), stop, agent['budget_sec'])
+                receive, stop, agent['budget_sec'])
         except Exception as error:
+            failure_reason = None
             detail = str(error)[:300] if isinstance(error, ValueError) else type(error).__name__
             self._event(account_id, 'error', {'message': 'Pi 指挥中断：' + detail})
         finally:
@@ -906,16 +916,20 @@ class ProjectsService:
                                 self._release(work, 'paused' if outcome in ('settled', 'stopped', 'timeout') else 'blocked')
                             except Exception:
                                 outcome = 'error'
+                                failure_reason = None
                                 self._event(account_id, 'error', {'message': 'CLI 执行收口未确认，保留环境及租约待对账'}, work['id'])
+                        # 只依据本轮结构化类别说明原因，历史错误不能影响下一轮状态。
+                        failure_message = ('Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复'
+                            if failure_reason == 'provider_content_filter' else None)
                         self._write('UPDATE projects_agents SET status=?,message=?,updated_at=? WHERE account_id=? AND generation=?',
                             ('paused' if outcome != 'error' else 'blocked',
                                 {'settled': 'Pi 已结束本轮指挥', 'stopped': '已停止', 'timeout': '本次指挥预算已用尽'}.get(outcome,
-                                    'Pi 运行失败，请查看事件并检查模型工具调用兼容性'), time.time(), account_id, generation))
+                                    failure_message or 'Pi 运行失败，请查看事件并检查模型工具调用兼容性'), time.time(), account_id, generation))
                         if agent['schedule_enabled']:
                             current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
                             hold, message = self._eligibility(agent, current_work)
                             if outcome == 'error':
-                                hold, message = 'blocked', 'Pi 运行异常，等待人工核对后重新启用或启动'
+                                hold, message = 'blocked', failure_message or 'Pi 运行异常，等待人工核对后重新启用或启动'
                             gate = self.admission(self.account(account_id), current_work) if not hold else {'allowed': True}
                             if not gate['allowed']:
                                 self._wait_gate(agent, gate, time.time())
@@ -949,7 +963,11 @@ class ProjectsService:
             if value.get('text'):
                 self._event(account_id, 'pi', {'text': value['text'][:24000], 'model': value.get('model')}, work['id'] if work else None)
         elif value['type'] == 'error':
-            self._event(account_id, 'error', {'message': value['message']}, work['id'] if work else None)
+            payload = {'message': value['message']}
+            # 仅透传已定义枚举，避免将上游正文或任意字段写入公开事件。
+            if value.get('reason') == 'provider_content_filter':
+                payload['reason'] = value['reason']
+            self._event(account_id, 'error', payload, work['id'] if work else None)
 
     def tool(self, account_id: int, generation: int, name: str, args: dict,
              call_id: str, stop: threading.Event | None = None) -> dict:

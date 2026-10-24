@@ -115,7 +115,13 @@ async function run(config) {
       if (message?.stopReason !== 'error' || sequence || !retryable) break;
     }
     if (message?.stopReason === 'error') {
-      emit({type: 'error', message: 'Pi 模型请求失败，请检查模型的流式响应及工具调用兼容性'});
+      // 仅识别 SDK 对上游结束原因的固定映射，避免将模型正文误判为内容过滤。
+      if (message.errorMessage === 'Provider finish_reason: content_filter') {
+        emit({type: 'error', reason: 'provider_content_filter',
+          message: 'Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复'});
+      } else {
+        emit({type: 'error', message: 'Pi 模型请求失败，请检查模型的流式响应及工具调用兼容性'});
+      }
     } else {
       emit({type: 'settled'});
     }

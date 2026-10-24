@@ -112,6 +112,25 @@ class PiFixture:
         return 'stopped'
 
 
+class ErrorPiFixture:
+    """仅发出合成错误的 Pi，不访问模型或执行工具。"""
+
+    def __init__(self, events):
+        """保存合成事件和调用证据。:param events: 本轮事件。:return: None。"""
+        self.events, self.calls = events, []
+
+    def available(self):
+        """声明隔离夹具就绪。:return: True。"""
+        return True
+
+    def run(self, configuration, tools, event, stop, timeout_sec):
+        """发出失败并结束本轮。:param configuration: 配置。:param tools: 工具。:param event: 事件。:param stop: 取消。:param timeout_sec: 时限。:return: error。"""
+        self.calls.append((configuration, timeout_sec))
+        for value in self.events:
+            event(value)
+        return 'error'
+
+
 class ProjectsAgentTests(unittest.TestCase):
     """验证新架构独立于旧阶段脚本的业务及恢复行为。"""
 
@@ -296,6 +315,82 @@ class ProjectsAgentTests(unittest.TestCase):
         thread = self.service.controllers[1][0]
         self.service.pause(1); thread.join(timeout=3)
         self.assertFalse(thread.is_alive()); self.assertNotIn(1, self.service.controllers)
+
+    def test_pi_error_event_only_exposes_known_reason(self):
+        """错误事件只公开定义过的类别，其他上游字段不能透传。:return: None。"""
+        generation = self.activate()
+        for reason in ('provider_content_filter', 'unknown-provider-detail', None):
+            with self.subTest(reason=reason):
+                self.service._pi_event(1, generation, {'type': 'error', 'message': '模型请求失败',
+                    'reason': reason, 'raw': '不应公开的上游正文'})
+                expected = {'message': '模型请求失败'}
+                if reason == 'provider_content_filter':
+                    expected['reason'] = reason
+                self.assertEqual(expected, self.service.events(1)[-1]['payload'])
+
+    def test_content_filter_blocks_run_and_schedule_without_reset_or_restart(self):
+        """内容过滤保留原工作与预算，定时扫描和重启恢复都不能自动重试。:return: None。"""
+        generation = self.activate()
+        self.service.configure(1, ['example'], budget_sec=1800)
+        original = self.start_work()
+        work = self.service._one('SELECT * FROM projects_work WHERE id=?', (original['work_id'],))
+        self.service._release(work, 'paused')
+        self.service._write('UPDATE projects_work SET work_sec=? WHERE id=?', (165.04067087173462, work['id']))
+        session_file = self.root / 'projects/agents/1/original.jsonl'
+        session_file.parent.mkdir(parents=True)
+        session_file.write_text('{}\n')
+        self.service._pi_event(1, generation, {'type': 'ready', 'session_file': str(session_file)})
+        self.service.configure_schedule(1, True)
+        message = 'Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复'
+        pi = ErrorPiFixture([{'type': 'error', 'reason': 'provider_content_filter', 'message': message}])
+        self.service.pi = pi
+
+        self.service._run(1, generation, {'models': ['primary', 'backup']}, threading.Event())
+
+        agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        saved = self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+        self.assertEqual(('blocked', message, 'blocked', message, None),
+            tuple(agent[key] for key in ('status', 'message', 'schedule_state', 'schedule_message', 'schedule_next_at')))
+        self.assertEqual(1, agent['schedule_enabled'])
+        self.assertEqual(1800, agent['budget_sec'])
+        self.assertEqual(str(session_file), agent['session_file'])
+        self.assertEqual(work['id'], agent['current_work_id'])
+        self.assertEqual(work['session_id'], saved['session_id'])
+        self.assertEqual('blocked', saved['status'])
+        self.assertEqual(165.04067087173462, saved['work_sec'])
+        self.assertIsNone(saved['runtime_json'])
+        self.assertIsNone(saved['segment_started_at'])
+        self.assertEqual(1800, pi.calls[0][1])
+        self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
+        self.assertEqual({'message': message, 'reason': 'provider_content_filter'},
+            self.service.events(1)[-1]['payload'])
+
+        self.service.tick(time.time() + 86400)
+        self.service.recover()
+        self.service.tick(time.time() + 172800)
+        self.assertEqual(1, len(pi.calls))
+        self.assertEqual(1, len(self.terminal.started))
+        self.assertEqual([], self.terminal.sent)
+        self.assertEqual([], self.service.actions(1))
+        restored = self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+        self.assertEqual(('blocked', 165.04067087173462), (restored['status'], restored['work_sec']))
+
+    def test_unknown_pi_reason_does_not_inherit_content_filter_from_previous_events(self):
+        """旧过滤事件与本轮任意类别不能改变当前通用失败说明。:return: None。"""
+        generation = self.activate()
+        self.service.configure_schedule(1, True)
+        self.service._pi_event(1, generation, {'type': 'error', 'reason': 'provider_content_filter', 'message': '旧轮错误'})
+        self.service.pi = ErrorPiFixture([{'type': 'error', 'reason': 'untrusted-provider-detail', 'message': '模型请求失败'}])
+
+        self.service._run(1, generation, {}, threading.Event())
+
+        agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.assertEqual('blocked', agent['status'])
+        self.assertEqual('Pi 运行失败，请查看事件并检查模型工具调用兼容性', agent['message'])
+        self.assertEqual('Pi 运行异常，等待人工核对后重新启用或启动', agent['schedule_message'])
+        self.assertEqual('blocked', agent['schedule_state'])
+        self.assertIsNone(agent['schedule_next_at'])
+        self.assertEqual({'message': '模型请求失败'}, self.service.events(1)[-1]['payload'])
 
     def test_api_uses_strict_types_and_manual_reconcile_route_is_reachable(self):
         """接口拒绝布尔账号字段与未知字段，人工对账不会被动作路由遮挡。:return: None。"""
