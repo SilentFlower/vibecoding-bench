@@ -34,6 +34,20 @@ test('服务端明确允许恢复可覆盖其它临时状态，权限、端点�
   }
 });
 
+test('真实过滤结束原因可恢复，普通错误正文、硬状态和禁止恢复提示不放行', () => {
+  const filtered = message('Provider finish_reason: content_filter');
+  assert.equal(classify(filtered, response(200)), 'content_filter');
+  assert.equal(classify(filtered, null), 'content_filter');
+  assert.equal(classify(filtered, response(200, {should_retry: false})), null);
+  assert.equal(classify(filtered, response(200, {retry_after_valid: false})), null);
+  for (const status of [401, 403, 405, 406, 410, 413, 414, 415, 422]) {
+    assert.equal(classify(filtered, response(status, {should_retry: true})), null, String(status));
+  }
+  assert.equal(classify(message('503 content_filter'), response(503)), null);
+  assert.equal(classify(message('content_policy_violation'), response(200)), null);
+  assert.equal(classify({stopReason: 'stop', errorMessage: filtered.errorMessage}, response(200)), null);
+});
+
 test('只对明确不可用的模型开放备用模型，不把错误端点或权限问题当成模型缺失', () => {
   for (const detail of ['model_not_found', 'invalid_model', 'unknown model', 'Model primary does not exist']) {
     assert.equal(classify(message(`404 ${detail}`), response(404)), 'model', detail);

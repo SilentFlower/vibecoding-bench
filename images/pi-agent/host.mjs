@@ -138,7 +138,7 @@ function providerResponses(config) {
 }
 
 /**
- * 仅对已确认的服务可用性故障开放续接，正文里的状态码不会参与判断。
+ * 仅对已确认的上游故障开放续接，正文里的状态码不会参与判断。
  * @param {object} message SDK 最终助手消息。
  * @param {object|null} response 当前真实请求的响应元数据。
  * @return {string|null} 可恢复的故障类别。
@@ -146,9 +146,9 @@ function providerResponses(config) {
 function unavailable(message, response) {
   if (message?.stopReason !== 'error') return null;
   const error = message.errorMessage || '';
-  if (error === 'Provider finish_reason: content_filter') return null;
-  // 认证、请求、上下文及内容拒绝不能被临时状态码或服务端重试提示掩盖。
-  if (/content[_ -]?(?:filter|policy)|safety|context.{0,24}(?:length|window|limit|overflow)|(?:maximum|exceed).{0,24}(?:token|context)|invalid.{0,12}request|unauthori[sz]ed|authentication|forbidden|(?:invalid|incorrect|missing|expired).{0,12}(?:api[_ -]?key|credentials|token)|(?:api[_ -]?key|credentials|token).{0,12}(?:invalid|incorrect|missing|expired)/i.test(error)
+  const contentFilter = error === 'Provider finish_reason: content_filter';
+  // 只放行 SDK 对真实过滤结束原因的固定映射，其它内容拒绝和硬错误仍须停止。
+  if (!contentFilter && /content[_ -]?(?:filter|policy)|safety|context.{0,24}(?:length|window|limit|overflow)|(?:maximum|exceed).{0,24}(?:token|context)|invalid.{0,12}request|unauthori[sz]ed|authentication|forbidden|(?:invalid|incorrect|missing|expired).{0,12}(?:api[_ -]?key|credentials|token)|(?:api[_ -]?key|credentials|token).{0,12}(?:invalid|incorrect|missing|expired)/i.test(error)
       || response?.should_retry === false) return null;
   const reported = Number(error.match(/^\s*(?:Error:\s*)?(?:HTTP(?: error)?\s*)?(\d{3})(?:\s|:|$)/i)?.[1]);
   // 模型不存在可换用户已配置的模型；错误端点、权限和请求格式不能盲目重试。
@@ -157,6 +157,7 @@ function unavailable(message, response) {
   if ([401, 403, 405, 406, 410, 413, 414, 415, 422].includes(status)
       || [401, 403].includes(reported)) return null;
   if (response && !response.retry_after_valid) return null;
+  if (contentFilter) return 'content_filter';
   if (missingModel) return 'model';
   if (status >= 400) {
     if (status === 404) return null;
@@ -306,7 +307,7 @@ async function runSession(config, responses) {
     if (cancellation.signal.aborted) return;
     let message;
     let attempts = 0;
-    const conflictAttempts = new Map();
+    const sameModelAttempts = new Map();
     let deferredRetryAt;
     const maximumAttempts = Math.max(3, Math.min(8, config.models.length));
     const failed = new Map();
@@ -336,17 +337,16 @@ async function runSession(config, responses) {
       }
       let next = model;
       let wait;
-      const conflicts = conflictAttempts.get(model) || 0;
-      if (failure === 'conflict' && conflicts < 2) {
-        if (attempts >= maximumAttempts) break;
-        wait = Math.ceil(Math.max([1000, 2000][conflicts], serverWait));
-        conflictAttempts.set(model, conflicts + 1);
+      const retries = sameModelAttempts.get(model) || 0;
+      if ((failure === 'conflict' || failure === 'content_filter') && retries < 2 && attempts < maximumAttempts) {
+        wait = Math.ceil(Math.max([1000, 2000][retries], serverWait));
+        sameModelAttempts.set(model, retries + 1);
       } else {
         health.models.get(model).cooldown_until = Date.now() + cooldownMs;
         failed.set(model, failure);
         await health.save();
         if (attempts >= maximumAttempts) break;
-        // 持续冲突或模型不存在也可降级；余额和模型配置错误不向原模型重复请求。
+        // 持续过滤或冲突先耗尽原模型重试再降级；余额和模型配置错误不重复请求。
         next = candidates().find(id => !failed.has(id)
           && health.models.get(id).cooldown_until <= Date.now())
           || available() || candidates().find(id => failed.get(id) === 'transient');
@@ -377,14 +377,14 @@ async function runSession(config, responses) {
     await health.save();
     if (cancellation.signal.aborted || message?.stopReason === 'aborted') return;
     if (message?.stopReason === 'error') {
-      // 仅识别 SDK 对上游结束原因的固定映射，避免将模型正文误判为内容过滤。
-      if (message.errorMessage === 'Provider finish_reason: content_filter') {
-        emit({type: 'error', reason: 'provider_content_filter',
-          message: 'Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复'});
-      } else if (unavailable(message, responses.current())) {
+      // 可恢复过滤耗尽本轮尝试后交给既有调度，避免项目及养号计划永久阻塞。
+      if (unavailable(message, responses.current())) {
         emit({type: 'error', reason: 'model_unavailable', model, retry_at: deferredRetryAt ?? retryAt(),
           message: deferredRetryAt ? 'Pi 上游要求延后重试，已保留原会话和预算，等待自动恢复'
             : 'Pi 配置模型暂时不可用，有限重试与降级已结束，原会话和预算已保留'});
+      } else if (message.errorMessage === 'Provider finish_reason: content_filter') {
+        emit({type: 'error', reason: 'provider_content_filter',
+          message: 'Pi 上游模型返回内容过滤，当前响应不允许自动恢复，原会话和预算已保留'});
       } else if (responses.current()?.status === 409) {
         emit({type: 'error', reason: 'provider_conflict', model,
           message: 'Pi 上游返回 409 冲突，当前响应不允许自动恢复，原会话和预算已保留'});

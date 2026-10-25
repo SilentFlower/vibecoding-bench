@@ -138,7 +138,7 @@ test('明确额度错误有限降级，认证错误不通过更换模型掩盖',
 });
 
 
-test('上游内容过滤准确分类且不重试、不切模型、不执行失败响应中的工具', async () => {
+test('内容过滤先重试原模型再降级，耗尽后交接自动恢复且不执行失败工具', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'projects-pi-filter-'));
   const models = [];
   const server = createServer(async (request, response) => {
@@ -161,12 +161,15 @@ test('上游内容过滤准确分类且不重试、不切模型、不执行失�
       models: ['primary', 'secondary'], tools: [{name: 'account_state', description: '当前账号',
         parameters: {type: 'object', properties: {}, required: [], additionalProperties: false}}]},
       () => assert.fail('被过滤响应中的工具不得执行'));
-    assert.deepEqual(models, ['primary']);
+    assert.deepEqual(models, ['primary', 'primary', 'primary', 'secondary']);
     assert.equal(records.filter(value => value.type === 'tool').length, 0);
     assert.equal(records.filter(value => value.type === 'error').length, 1);
     assert.equal(records.at(-1).type, 'error');
-    assert.equal(records.at(-1).reason, 'provider_content_filter');
-    assert.equal(records.at(-1).message, 'Pi 上游模型返回内容过滤，原工作已保留，需人工核对后恢复');
+    assert.equal(records.at(-1).reason, 'model_unavailable');
+    assert.equal(records.at(-1).model, 'secondary');
+    assert.ok(records.at(-1).retry_at > Date.now() / 1000);
+    assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.phase),
+      ['retry', 'retry', 'fallback']);
     assert.equal(records.findLast(value => value.type === 'assistant').stop_reason, 'error');
     const ready = records.find(value => value.type === 'ready');
     const messages = (await readFile(ready.session_file, 'utf8')).trim().split('\n')
@@ -174,6 +177,83 @@ test('上游内容过滤准确分类且不重试、不切模型、不执行失�
     const failed = messages.findLast(value => value.message.role === 'assistant');
     assert.equal(failed.message.stopReason, 'error');
     assert.equal(failed.message.errorMessage, 'Provider finish_reason: content_filter');
+    assert.equal(messages.filter(value => value.message.role === 'user').length, 1);
+    const health = JSON.parse(await readFile(join(directory, '.model-health.json'), 'utf8'));
+    assert.ok(health.models.primary.cooldown_until > Date.now());
+    assert.ok(health.models.secondary.cooldown_until > Date.now());
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('内容过滤可在原模型第一次或第二次重试后恢复，单模型也能继续原任务', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'projects-pi-filter-retry-'));
+  let failures = 1;
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    if (requests.length > failures) return stream(response, false);
+    response.writeHead(200, {'content-type': 'text/event-stream'});
+    response.write('data: ' + JSON.stringify({id: 'chat-filter-retry', object: 'chat.completion.chunk',
+      model: value.model, created: 1,
+      choices: [{index: 0, delta: {role: 'assistant'}, finish_reason: 'content_filter'}]}) + '\n\n');
+    response.end('data: [DONE]\n\n');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const count of [1, 2]) {
+      failures = count; requests.length = 0;
+      const records = await execute({session_dir: join(directory, String(count)),
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+      assert.equal(records.at(-1).type, 'settled');
+      assert.deepEqual(requests.map(value => value.model), Array(count + 1).fill('test-model'));
+      assert.equal(records.filter(value => value.type === 'error').length, 0);
+      assert.deepEqual(records.filter(value => value.type === 'recovery').map(value => value.phase),
+        [...Array(count).fill('retry'), 'recovered']);
+      assert.ok(requests.every(value => value.messages.filter(message => message.role === 'user').length === 1));
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('内容过滤恢复遵守取消、原预算、禁止重试和服务端等待', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'projects-pi-filter-guards-'));
+  let headers = {};
+  let requests = 0;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 仅消费本地合成请求，不访问真实模型。 */ }
+    requests += 1;
+    response.writeHead(200, {'content-type': 'text/event-stream', ...headers});
+    response.write('data: ' + JSON.stringify({id: 'chat-filter-guards', object: 'chat.completion.chunk',
+      model: 'primary', created: 1,
+      choices: [{index: 0, delta: {role: 'assistant'}, finish_reason: 'content_filter'}]}) + '\n\n');
+    response.end('data: [DONE]\n\n');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const mode of ['abort', 'budget', 'denied', 'invalid-wait', 'long-wait', 'single-model']) {
+      headers = mode === 'denied' ? {'x-should-retry': 'false'}
+        : mode === 'invalid-wait' ? {'retry-after': 'unparseable'}
+        : mode === 'long-wait' ? {'retry-after': '601'} : {};
+      requests = 0;
+      const started = Date.now() / 1000;
+      const records = await execute({session_dir: join(directory, mode),
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: [],
+        models: mode === 'single-model' ? ['primary'] : ['primary', 'secondary'],
+        timeout_sec: mode === 'budget' ? 1 : 60}, () => assert.fail(), (event, send) => {
+        if (mode === 'abort' && event.type === 'recovery') send({type: 'abort'});
+      });
+      assert.equal(requests, mode === 'single-model' ? 3 : 1, mode);
+      assert.equal(records.filter(value => value.type === 'settled').length, 0, mode);
+      if (mode === 'abort') {
+        assert.equal(records.filter(value => value.type === 'error').length, 0);
+      } else {
+        assert.equal(records.at(-1).reason,
+          ['denied', 'invalid-wait'].includes(mode) ? 'provider_content_filter' : 'model_unavailable', mode);
+        if (mode === 'long-wait') assert.ok(records.at(-1).retry_at >= started + 601);
+      }
+      if (!['abort', 'single-model'].includes(mode)) {
+        assert.equal(records.filter(value => value.type === 'recovery').length, 0, mode);
+      }
+    }
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
@@ -201,14 +281,16 @@ test('普通模型正文提及内容过滤不会产生错误分类', async () =>
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
-test('已确认工具后的内容过滤保留会话且不重放工具或切换模型', async () => {
+test('已确认工具后的内容过滤可降级恢复原会话，工具不重放且备用模型跨轮记忆', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'projects-pi-filter-after-tool-'));
   const models = [];
+  const requests = [];
   let toolCalls = 0;
   const server = createServer(async (request, response) => {
     let body = ''; for await (const chunk of request) body += chunk;
-    const value = JSON.parse(body); models.push(value.model);
+    const value = JSON.parse(body); models.push(value.model); requests.push(value);
     if (models.length === 1) return stream(response, true);
+    if (value.model === 'secondary') return stream(response, false);
     response.writeHead(200, {'content-type': 'text/event-stream'});
     response.write('data: ' + JSON.stringify({id: 'chat-filter-after-tool', object: 'chat.completion.chunk',
       model: value.model, created: 1,
@@ -217,22 +299,33 @@ test('已确认工具后的内容过滤保留会话且不重放工具或切换�
   });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   try {
-    const records = await execute({session_dir: directory, base_url: `http://127.0.0.1:${server.address().port}/v1`,
+    const config = {session_dir: directory, base_url: `http://127.0.0.1:${server.address().port}/v1`,
       models: ['primary', 'secondary'], tools: [{name: 'account_state', description: '当前账号',
-        parameters: {type: 'object', properties: {}, required: [], additionalProperties: false}}]},
+        parameters: {type: 'object', properties: {}, required: [], additionalProperties: false}}]};
+    const records = await execute(config,
     (event, send) => {
       toolCalls += 1;
       send({type: 'tool_result', id: event.id, result: {status: 'running'}});
     });
     assert.equal(toolCalls, 1);
-    assert.deepEqual(models, ['primary', 'primary']);
+    assert.deepEqual(models, ['primary', 'primary', 'primary', 'primary', 'secondary']);
     assert.equal(records.filter(value => value.type === 'tool').length, 1);
-    assert.equal(records.at(-1).reason, 'provider_content_filter');
+    assert.equal(records.at(-1).type, 'settled');
+    for (const request of requests.slice(1)) {
+      assert.equal(request.messages.filter(value => value.role === 'user').length, 1);
+      assert.equal(request.messages.filter(value => value.role === 'tool').length, 1);
+      assert.ok(JSON.stringify(request.messages).includes('running'));
+    }
     const ready = records.find(value => value.type === 'ready');
     const messages = (await readFile(ready.session_file, 'utf8')).trim().split('\n')
       .map(line => JSON.parse(line)).filter(value => value.type === 'message').map(value => value.message);
     assert.equal(messages.filter(value => value.role === 'toolResult').length, 1);
-    assert.equal(messages.findLast(value => value.role === 'assistant').errorMessage, 'Provider finish_reason: content_filter');
+    assert.equal(messages.filter(value => value.errorMessage === 'Provider finish_reason: content_filter').length, 3);
+    const resumed = await execute({...config, session_file: ready.session_file}, () => assert.fail('已确认工具不得重放'));
+    assert.equal(resumed.at(-1).type, 'settled');
+    assert.equal(resumed.find(value => value.type === 'ready').session_id, ready.session_id);
+    assert.equal(models.at(-1), 'secondary');
+    assert.equal(models.length, 6);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
