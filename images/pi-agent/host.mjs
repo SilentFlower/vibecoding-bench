@@ -253,12 +253,16 @@ async function runSession(config, responses) {
     baseUrl: config.base_url,
     apiKey: 'runtime-only',
     api: 'openai-completions',
-    models: config.models.map(id => ({id, name: id, reasoning: false, input: ['text'],
-      contextWindow: 32768, maxTokens: 4096,
-      cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0},
-      compat: {supportsDeveloperRole: false, supportsStore: false, supportsReasoningEffort: false,
-        maxTokensField: 'max_tokens'},
-    })),
+    models: config.models.map(id => {
+      // 代理地址无法触发 SDK 的 DeepSeek 自动识别；能力标记和格式共同保证 off 会发送显式关闭参数。
+      const deepseek = /(?:^|\/)deepseek(?:[-_.:]|$)/i.test(id);
+      return {id, name: id, reasoning: deepseek, input: ['text'],
+        contextWindow: 32768, maxTokens: 4096,
+        cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0},
+        compat: {supportsDeveloperRole: false, supportsStore: false, supportsReasoningEffort: false,
+          thinkingFormat: deepseek ? 'deepseek' : undefined, maxTokensField: 'max_tokens'},
+      };
+    }),
   });
   const customTools = (config.tools || []).map(tool => defineTool({
     name: tool.name, label: tool.name, description: tool.description,
@@ -266,6 +270,8 @@ async function runSession(config, responses) {
     execute: (toolCallId, args, signal) => callTool(tool.name, toolCallId, args, signal),
   }));
   const settingsManager = SettingsManager.inMemory({
+    // 从非思考模型切换时 SDK 会读取默认等级，必须与本轮明确的 off 保持一致。
+    defaultThinkingLevel: 'off',
     retry: {enabled: false, provider: {timeoutMs: 60000, maxRetries: 0}},
     compaction: {enabled: true, reserveTokens: 8192, keepRecentTokens: 12000},
   });

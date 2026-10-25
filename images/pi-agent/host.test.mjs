@@ -329,6 +329,97 @@ test('已确认工具后的内容过滤可降级恢复原会话，工具不重�
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
+test('DeepSeek 自定义端点关闭思考，工具结果及原会话可连续恢复', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'projects-pi-deepseek-thinking-'));
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    const missingReasoning = value.messages.some(message => message.role === 'assistant'
+      && message.tool_calls?.length && !message.reasoning_content);
+    if (value.thinking?.type !== 'disabled' && missingReasoning) {
+      response.writeHead(400, {'content-type': 'application/json'});
+      return response.end(JSON.stringify({error: {message:
+        'The `reasoning_content` in the thinking mode must be passed back to the API.'}}));
+    }
+    stream(response, !value.messages.some(message => message.role === 'tool'));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const model of ['deepseek-flash', 'vendor/DeepSeek-v4-pro']) {
+      requests.length = 0;
+      let tools = 0;
+      const config = {session_dir: join(directory, model.replaceAll('/', '-')),
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, models: [model],
+        tools: [{name: 'account_state', description: '当前账号', parameters: {type: 'object', properties: {}}}]};
+      const records = await execute(config, (event, send) => {
+        tools += 1; send({type: 'tool_result', id: event.id, result: {confirmed: '已确认且只执行一次'}});
+      });
+      assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
+      assert.equal(tools, 1);
+      assert.equal(requests.length, 2);
+      const ready = records.find(value => value.type === 'ready');
+      const resumed = await execute({...config, session_file: ready.session_file}, () => assert.fail('原工具不得重放'));
+      assert.equal(resumed.at(-1).type, 'settled');
+      assert.equal(resumed.find(value => value.type === 'ready').session_id, ready.session_id);
+      assert.equal(requests.length, 3);
+      assert.ok(requests.every(value => value.thinking?.type === 'disabled'));
+      assert.ok(requests.every(value => !Object.hasOwn(value, 'reasoning_effort')));
+      assert.equal(requests.at(-1).messages.filter(value => value.role === 'tool').length, 1);
+      assert.ok(JSON.stringify(requests.at(-1).messages).includes('已确认且只执行一次'));
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('内容过滤后切换 DeepSeek 保留 Gemini 工具历史并显式关闭思考', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'projects-pi-deepseek-fallback-'));
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    if (requests.length === 1) return stream(response, true);
+    if (value.model === 'gemini-3-flash-agent') {
+      response.writeHead(200, {'content-type': 'text/event-stream'});
+      response.write('data: ' + JSON.stringify({id: 'chat-deepseek-fallback', object: 'chat.completion.chunk',
+        model: value.model, created: 1,
+        choices: [{index: 0, delta: {role: 'assistant'}, finish_reason: 'content_filter'}]}) + '\n\n');
+      return response.end('data: [DONE]\n\n');
+    }
+    if (value.thinking?.type !== 'disabled') {
+      response.writeHead(400, {'content-type': 'application/json'});
+      return response.end(JSON.stringify({error: {message:
+        'The `reasoning_content` in the thinking mode must be passed back to the API.'}}));
+    }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const config = {session_dir: directory, base_url: `http://127.0.0.1:${server.address().port}/v1`,
+      models: ['gemini-3-flash-agent', 'deepseek-flash'], tools: [{name: 'account_state',
+        description: '当前账号', parameters: {type: 'object', properties: {}}}]};
+    let tools = 0;
+    const records = await execute(config, (event, send) => {
+      tools += 1; send({type: 'tool_result', id: event.id, result: {confirmed: '主模型已经取得的工具结果'}});
+    });
+    assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
+    assert.equal(tools, 1);
+    assert.deepEqual(requests.map(value => value.model),
+      ['gemini-3-flash-agent', 'gemini-3-flash-agent', 'gemini-3-flash-agent', 'gemini-3-flash-agent', 'deepseek-flash']);
+    assert.ok(requests.filter(value => value.model === 'gemini-3-flash-agent')
+      .every(value => !Object.hasOwn(value, 'thinking')));
+    const fallback = requests.at(-1);
+    assert.equal(fallback.thinking.type, 'disabled');
+    assert.equal(fallback.messages.filter(value => value.role === 'user').length, 1);
+    assert.equal(fallback.messages.filter(value => value.role === 'tool').length, 1);
+    assert.ok(JSON.stringify(fallback.messages).includes('主模型已经取得的工具结果'));
+    const ready = records.find(value => value.type === 'ready');
+    const resumed = await execute({...config, session_file: ready.session_file}, () => assert.fail('主模型工具不得重放'));
+    assert.equal(resumed.at(-1).type, 'settled');
+    assert.equal(requests.at(-1).model, 'deepseek-flash');
+    assert.equal(requests.at(-1).thinking.type, 'disabled');
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
 test('单模型在已确认工具后遇到网络结束错误，真实续接且失败工具不执行', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-network-'));
   const requests = [];
