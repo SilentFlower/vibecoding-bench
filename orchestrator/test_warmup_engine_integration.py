@@ -1,6 +1,7 @@
 """用真实 SQLite 与同类双工程服务验证养号空间，禁止真实模型和容器调用。"""
 import json
 import os
+import threading
 import time
 import unittest
 from unittest.mock import Mock, patch
@@ -181,6 +182,83 @@ class WarmupEngineIntegrationTests(unittest.TestCase):
         self.assertFalse(value['controller_active'])
         self.assertFalse(self.warmup_pi.entered.is_set())
         self.assertEqual('projects', self.owners.owner(1)['kind'])
+
+    def test_scheduler_keeps_own_claim_during_slow_terminal_resume_in_both_spaces(self):
+        """真实调度扫描穿过慢终端准备时，自己的认领不能撤销代次或丢失原目标与会话。:return: None。"""
+        migrate_warmup_configuration(main.get_db, main._db_lock)
+        for namespace, service, terminal, pi in (('projects', self.projects, self.terminal, self.pi),
+                ('warmup', self.warmup, self.warmup_terminal, self.warmup_pi)):
+            with self.subTest(namespace=namespace):
+                original_start = terminal.start
+
+                def native_start(account, work):
+                    """使用与真实终端一致的服务端来源。:param account: 账号。:param work: 工作。:return: 原生定位。"""
+                    return {**original_start(account, work), 'source': f"{namespace}:{work['id']}:{work['generation']}"}
+
+                with patch.object(terminal, 'start', side_effect=native_start):
+                    service.start(1)
+                    self.assertTrue(pi.entered.wait(1))
+                    first_generation = service.state(1)['agents'][0]['generation']
+                    first = service.tool(1, first_generation, 'claude_start', {'project_key': 'example', 'objective_id': 'feature'}, 'seed')
+                self.assertEqual('running', first['status'])
+                original = service.state(1)['agents'][0]['work']
+                service.pause(1)
+                self.join(service)
+                service._write('UPDATE projects_work SET work_sec=? WHERE id=?', (1804.6653017997742, original['id']))
+                service.start(1)
+                generation = service.state(1)['agents'][0]['generation']
+                registered, proceed = threading.Event(), threading.Event()
+                jobs, results = [], []
+
+                def slow_start(account, work):
+                    """先登记真实运行器作业，再等待测试允许终端准备返回。:param account: 账号。:param work: 工作。:return: 原生定位。"""
+                    job = {'row': {'account_id': account['id'], 'environment_id': 'slow-claim-fixture'},
+                        'source': f"{namespace}:{work['id']}:{work['generation']}", 'shared_cli': True, 'claimed': True}
+                    with main.account_runtime.lock:
+                        main.account_runtime._register_job(job)
+                    jobs.append(job)
+                    registered.set()
+                    if not proceed.wait(3):
+                        raise AssertionError('隔离终端准备未按预期释放')
+                    return native_start(account, work)
+
+                def resume():
+                    """从真实工具边界恢复原工程。:return: None。"""
+                    results.append(service.tool(1, generation, 'claude_start', {'project_key': 'example', 'objective_id': 'feature'}, 'resume'))
+
+                thread = threading.Thread(target=resume)
+                try:
+                    with patch.object(terminal, 'start', side_effect=slow_start):
+                        thread.start()
+                        self.assertTrue(registered.wait(1))
+                        saved = service._one('SELECT * FROM projects_work WHERE id=?', (original['id'],))
+                        self.assertIsNone(saved['runtime_json'])
+                        self.assertNotEqual(generation, saved['generation'])
+                        service.tick()
+                        service.tick()
+                        current = service.state(1)['agents'][0]
+                        self.assertEqual(generation, current['generation'])
+                        self.assertTrue(current['controller_active'])
+                        self.assertEqual('running', current['status'])
+                        proceed.set()
+                        thread.join(2)
+                    self.assertFalse(thread.is_alive())
+                    self.assertEqual('running', results[0]['status'])
+                    current = service.state(1)['agents'][0]
+                    self.assertEqual((original['id'], original['session_id'], 1804.6653017997742),
+                        tuple(current['work'][key] for key in ('id', 'session_id', 'work_sec')))
+                    self.assertFalse(any(item['kind'] == 'gate_wait' and item['payload'].get('reason') == 'busy'
+                        for item in service.event_page(1, limit=100)['items']))
+                    self.assertEqual(2, len(terminal.started))
+                    self.assertEqual([], terminal.sent)
+                finally:
+                    proceed.set()
+                    thread.join(3)
+                    with main.account_runtime.lock:
+                        for job in jobs:
+                            main.account_runtime._remove_job(job)
+                    service.pause(1)
+                    self.join(service)
 
     def test_quota_save_changes_no_schedule_and_legacy_plan_fields_are_explicitly_rejected(self):
         """保存额度只改额度，旧小时计划不能静默覆盖任一工程空间。:return: None。"""

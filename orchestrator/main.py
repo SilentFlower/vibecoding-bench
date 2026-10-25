@@ -8048,22 +8048,39 @@ def _engineering_pi_admission(account: dict, work: dict | None, namespace: str) 
     :param namespace: 受控的 projects 或 warmup。
     :return: 共同门禁和独占运行判定。
     """
-    gate = _pi_admission(account, work)
-    if not gate['allowed']:
-        return gate
     source = json.loads(work['runtime_json']).get('source') if work and work.get('runtime_json') else None
+    owner = pi_owners.owner(account['id']) if pi_owners else None
+    preparing_source = None
     connection = get_db()
     try:
+        if (work and not work.get('runtime_json') and work.get('account_id') == account['id']
+                and owner and owner['kind'] == namespace):
+            table = 'projects_agents' if namespace == 'projects' else 'warmup_projects_agents'
+            controller = connection.execute('SELECT generation,current_work_id,status FROM ' + table + ' WHERE account_id=?',
+                (account['id'],)).fetchone()
+            # 恢复期间工作行仍可能保存旧代次，只有当前控制者与目标指针能证明这次准备属于自己。
+            if (controller and controller['current_work_id'] == work.get('id')
+                    and controller['generation'] == owner['generation'] and controller['status'] in ('running', 'waiting')):
+                preparing_source = f"{namespace}:{work['id']}:{owner['generation']}"
         legacy = connection.execute("SELECT 1 FROM runs WHERE account_id=? "
             "AND status IN ('queued','running','stopping','quota_wait') LIMIT 1", (account['id'],)).fetchone()
     finally:
         connection.close()
-    busy = bool(legacy) or bool(continue_manager and continue_manager.has_active_account(account['id']))
+    quota_work, other_job = work, False
     if account_runtime:
         with account_runtime.lock:
-            busy = busy or any(job['row']['account_id'] == account['id'] and job['source'] != source
-                for job in account_runtime.jobs.values())
-    owner = pi_owners.owner(account['id']) if pi_owners else None
+            jobs = [job for job in account_runtime.jobs.values() if job['row']['account_id'] == account['id']]
+            own_jobs = [job for job in jobs if preparing_source and job['source'] == preparing_source]
+            if own_jobs:
+                source = preparing_source
+                # 只有已真实认领的精确作业可沿用自己的单次恢复许可；仅有 Pi 所有者不能虚构来源。
+                if any(job.get('claimed') is True for job in own_jobs):
+                    quota_work = {**work, 'runtime_json': json.dumps({'source': source})}
+            other_job = any(job['source'] != source for job in jobs)
+    gate = _pi_admission(account, quota_work)
+    if not gate['allowed']:
+        return gate
+    busy = bool(legacy) or other_job or bool(continue_manager and continue_manager.has_active_account(account['id']))
     if busy or owner and owner['kind'] != namespace:
         return {**gate, 'allowed': False, 'reason': 'busy', 'retryable': True, 'retry_at': time.time() + 60,
             'message': '账号已有执行，等待原工作结束后继续工程迭代'}

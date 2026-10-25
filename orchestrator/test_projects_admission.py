@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 import main
 import test_quota
 from account_runtime import AccountRuntime
+from pi_owners import AccountPiOwners
 
 
 class ProjectsAdmissionTests(unittest.TestCase):
@@ -26,6 +27,10 @@ class ProjectsAdmissionTests(unittest.TestCase):
         runtime_patch = patch.object(main, 'account_runtime', self.runtime)
         runtime_patch.start()
         self.addCleanup(runtime_patch.stop)
+        self.owners = AccountPiOwners()
+        owner_patch = patch.object(main, 'pi_owners', self.owners)
+        owner_patch.start()
+        self.addCleanup(owner_patch.stop)
         self.identifier = 'a' * 32
         self.source = 'projects:' + self.identifier + ':1'
         self.started = time.time() - 60
@@ -58,6 +63,108 @@ class ProjectsAdmissionTests(unittest.TestCase):
         return {'account_error': None, 'quota_limited': True, 'window': 'five_hour',
             'retry_at': None, 'observed_at': time.time() - 1, 'evidence_key': 'e' * 64,
             'native_error': 'rate_limit', **fields}
+
+    def claimed_start(self):
+        """构造已认领但终端尚未返回、原工作仍保存旧代次的真实启动间隙。:return: 原工作、作业及所有权令牌。"""
+        connection = main.get_db()
+        try:
+            with connection:
+                connection.execute("UPDATE projects_agents SET generation=2,status='running',current_work_id=? WHERE account_id=1",
+                    (self.identifier,))
+                connection.execute("UPDATE projects_work SET status='paused',runtime_json=NULL WHERE id=?", (self.identifier,))
+            work = dict(connection.execute('SELECT * FROM projects_work WHERE id=?', (self.identifier,)).fetchone())
+        finally:
+            connection.close()
+        token = self.owners.claim(1, 'projects', 2)
+        job = {'row': {'account_id': 1, 'environment_id': 'claimed-fixture'},
+            'source': f'projects:{self.identifier}:2', 'shared_cli': True, 'claimed': True}
+        with self.runtime.lock:
+            self.runtime._register_job(job)
+        return work, job, token
+
+    def test_claimed_start_excludes_only_the_current_owner_despite_old_work_generation(self):
+        """终端准备中的当前代次不能把自身租约当作其他执行，原工作旧代次保持可恢复。:return: None。"""
+        work, job, _ = self.claimed_start()
+        self.assertEqual(1, work['generation'])
+        self.assertIsNone(work['runtime_json'])
+        self.assertTrue(main._projects_admission(self.account, work)['allowed'])
+        self.assertEqual(f'projects:{self.identifier}:2', job['source'])
+
+    def test_claimed_start_requires_matching_account_pointer_generation_and_active_status(self):
+        """相同来源文本不能代替当前账号、目标、代次和运行状态的完整绑定。:return: None。"""
+        work, _, _ = self.claimed_start()
+        connection = main.get_db()
+        try:
+            for field, value in (('current_work_id', 'other-work'), ('generation', 3), ('status', 'paused')):
+                with self.subTest(field=field):
+                    with connection:
+                        connection.execute("UPDATE projects_agents SET generation=2,status='running',current_work_id=? WHERE account_id=1", (self.identifier,))
+                        connection.execute('UPDATE projects_agents SET ' + field + '=? WHERE account_id=1', (value,))
+                    self.assertEqual('busy', main._projects_admission(self.account, work)['reason'])
+            with connection:
+                connection.execute("UPDATE projects_agents SET generation=2,status='running',current_work_id=? WHERE account_id=1", (self.identifier,))
+            self.assertEqual('busy', main._projects_admission(self.account, {**work, 'account_id': 2})['reason'])
+        finally:
+            connection.close()
+
+    def test_claimed_start_keeps_other_work_generation_namespace_and_owner_busy(self):
+        """只排除自己的精确来源，其他目标、旧代次、其他空间及失去所有权都继续互斥。:return: None。"""
+        work, job, _ = self.claimed_start()
+        for source in (f'projects:other-work:2', f'projects:{self.identifier}:1', f'warmup:{self.identifier}:2', 'run:other:1'):
+            with self.subTest(source=source):
+                job['source'] = source
+                self.assertEqual('busy', main._projects_admission(self.account, work)['reason'])
+        job['source'] = f'projects:{self.identifier}:2'
+        for kind in (None, 'warmup'):
+            with self.subTest(owner=kind):
+                owners = AccountPiOwners()
+                if kind:
+                    owners.claim(1, kind, 2)
+                with patch.object(main, 'pi_owners', owners):
+                    self.assertEqual('busy', main._projects_admission(self.account, work)['reason'])
+
+    def test_claimed_start_preserves_real_quota_auth_and_login_gates(self):
+        """识别自身准备租约不能绕过实际登录、额度阈值和认证失败门禁。:return: None。"""
+        work, _, _ = self.claimed_start()
+        with patch.object(main, 'login_manager', Mock(has_active_name=Mock(return_value=True))):
+            self.assertEqual('login', main._projects_admission(self.account, work)['reason'])
+        self.observe(30)
+        self.assertEqual('quota', main._projects_admission(self.account, work)['reason'])
+        self.guard.record_auth_failure(self.account, 'invalid_grant')
+        self.assertEqual('account_error', main._projects_admission(self.account, work)['reason'])
+
+    def test_claimed_start_keeps_legacy_and_continuation_execution_busy(self):
+        """自身准备租约不能掩盖旧普通任务或继续执行管理器的真实账号占用。:return: None。"""
+        work, _, _ = self.claimed_start()
+        test_quota.QuotaGuardTests._run(self, rid='legacy-claimed-start')
+        self.assertEqual('busy', main._projects_admission(self.account, work)['reason'])
+        connection = main.get_db()
+        try:
+            with connection:
+                connection.execute("UPDATE runs SET status='completed' WHERE id='legacy-claimed-start'")
+        finally:
+            connection.close()
+        with patch.object(main, 'continue_manager', Mock(has_active_account=Mock(return_value=True))):
+            self.assertEqual('busy', main._projects_admission(self.account, work)['reason'])
+
+    def test_only_real_matching_claim_may_reuse_its_expired_window_recovery_permission(self):
+        """自己的真实认领可复用已登记许可，未认领作业或只有所有者时不能凭空借用。:return: None。"""
+        work, job, _ = self.claimed_start()
+        old = time.time() - 10
+        self.guard._observe(self.account, main._quota_identity(self.account), {'observed_at': old,
+            'allowed': False, 'windows': {'five_hour': {'observed_at': old,
+                'exhausted': True, 'rejected': True, 'reset_at': old + 1}}})
+        self.assertTrue(self.guard.admit(self.account, job['source'], warmup=True, workload='warmup'))
+        self.assertTrue(main._projects_admission(self.account, work)['allowed'])
+        self.assertIsNone(work['runtime_json'])
+        job['claimed'] = False
+        self.assertEqual('quota', main._projects_admission(self.account, work)['reason'])
+        job['claimed'] = True
+        job['source'] = f'projects:other-work:2'
+        self.assertEqual('quota', main._projects_admission(self.account, work)['reason'])
+        with self.runtime.lock:
+            self.runtime._remove_job(job)
+        self.assertEqual('quota', main._projects_admission(self.account, work)['reason'])
 
     def test_unknown_first_use_and_disabled_legacy_warmup_still_allow_pi(self):
         """首次未知不制造主动查询，旧定时养号关闭也不关闭 Pi 或它的额度策略。:return: None。"""
