@@ -160,7 +160,7 @@ class SingleObjectiveRoundTests(unittest.TestCase):
                 self.assertEqual(0, state['progress']['completed'])
 
     def test_timeout_resumes_original_goal_and_both_sessions_next_round(self):
-        """两空间超时后都只接续原目标，累计耗时和两个会话不清零。:return: None。"""
+        """首轮超时接续原目标，连续两轮后待复验，累计耗时和会话不清零。:return: None。"""
         for service in (self.primary, self.service):
             with self.subTest(namespace=service.namespace):
                 calls = []
@@ -189,7 +189,7 @@ class SingleObjectiveRoundTests(unittest.TestCase):
                 self.assertEqual(calls[0][1]['session_id'], calls[1][1]['session_id'])
                 self.assertEqual(calls[0][2], calls[1][0])
                 self.assertGreaterEqual(resumed['work']['work_sec'], 1804.5)
-                self.assertEqual('paused', resumed['work']['status'])
+                self.assertEqual('deferred', resumed['work']['status'])
                 self.assertEqual(1, service._one('SELECT count(*) AS total FROM projects_work')['total'])
 
     def test_failed_terminal_release_never_emits_round_completion(self):

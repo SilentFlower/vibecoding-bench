@@ -9,7 +9,7 @@ window.ProjectsUI = (() => {
   const escape = value => String(value ?? '').replace(/[&<>"']/g, character =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[character]));
   const names = {off: '未启动', running: 'Pi 指挥中', waiting: '等待执行条件', paused: '已暂停',
-    blocked: '需要处理', ready: '待开始', verifying: '独立验收中', passed: '验收通过', stopped: '已停止'};
+    blocked: '需要处理', ready: '待开始', verifying: '独立验收中', passed: '验收通过', stopped: '已停止', deferred: '待自动复验'};
 
   /**
    * 在当前页面显示操作结果，页面切换后不再写入旧 DOM。
@@ -461,12 +461,12 @@ window.ProjectsUI = (() => {
     if (known && progress.total > 0) bar.value = Math.min(100, progress.completed / progress.total * 100);
     else bar.removeAttribute('value');
     const readiness = known && Number.isInteger(progress.ready) && Number.isInteger(progress.waiting)
-      ? ` · 可开始 ${progress.ready} 项 · 等待前置验收 ${progress.waiting} 项` : '';
+      ? ` · 可开始 ${progress.ready} 项 · 等待前置或复验 ${progress.waiting} 项${progress.deferred ? ` · 待自动复验 ${progress.deferred} 项` : ''}` : '';
     $('#projects-progress-detail').textContent = known ? `授权池内剩余 ${progress.remaining} 项工程目标${readiness} · 通过独立验收才计入完成` : '以独立验收通过的目标计数。';
-    const work = agent?.work, unfinished = work && !['passed', 'stopped'].includes(work.status);
-    $('#projects-target-label').textContent = !work || unfinished ? '当前目标' : work.status === 'passed' ? '最近完成目标' : '最近停止目标';
+    const work = agent?.work, unfinished = work && !['passed', 'stopped', 'deferred'].includes(work.status);
+    $('#projects-target-label').textContent = !work || unfinished ? '当前目标' : work.status === 'passed' ? '最近完成目标' : work.status === 'deferred' ? '待复验目标' : '最近停止目标';
     $('#projects-current').innerHTML = work
-      ? `<p class="projects-target-state">${unfinished ? escape(names[work.status] || work.status) : work.status === 'passed' ? '上一目标已验收通过' : '上一目标已停止'}</p><strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p>`
+      ? `<p class="projects-target-state">${unfinished ? escape(names[work.status] || work.status) : work.status === 'passed' ? '上一目标已验收通过' : work.status === 'deferred' ? '保留原会话，冷却后自动复验' : '上一目标已停止'}</p><strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p>`
       : '<p class="hint">尚未开始工程目标，Pi 会从授权项目池选择。</p>';
     $('#projects-budget').textContent = unfinished
       ? `目标累计耗时 ${duration(progress?.elapsed_work_sec)} · ${progress?.turn_active ? '本轮剩余' : '下轮可用时长'} ${duration(progress?.remaining_work_sec)}`
@@ -483,7 +483,7 @@ window.ProjectsUI = (() => {
   function paintState() {
     const agent = agents.find(item => item.account_id === accountId);
     const pending = pendingActions.get(accountId), schedule = agent?.schedule, work = agent?.work;
-    const unfinished = work && !['passed', 'stopped'].includes(work.status), admission = agent?.admission;
+    const unfinished = work && !['passed', 'stopped', 'deferred'].includes(work.status), admission = agent?.admission;
     const active = agent?.controller_active && ['running', 'waiting'].includes(agent.status);
     let status = agent ? names[agent.status] || agent.status : '保存项目池后即可启动 Pi';
     if (pending) status = pending.action === 'start' ? '正在启动 / 恢复 Pi…' : '正在收口当前执行…';
@@ -510,7 +510,9 @@ window.ProjectsUI = (() => {
           : '本轮工程已全部验收通过，下一次启动将从固定种子开始新一轮。';
       else if (schedule?.state === 'completed' || agent.progress?.remaining === 0) next = '授权项目池已完成，扩充项目池后继续。';
       else if (admission?.allowed === false) next = schedule?.enabled && admission.retryable ? '满足运行条件后自动恢复原目标。' : '运行条件解除后，手动启动或恢复。';
-      else if (schedule?.enabled) next = '到达下次时间后自动检查，接续未完成目标。';
+      else if (schedule?.enabled) next = work?.status === 'deferred'
+        ? '原目标已保留，将自动处理其他可执行项目，冷却到期后复验，无需人工确认。'
+        : '到达下次时间后自动检查，接续未完成目标。';
       else next = unfinished ? '点击“启动 / 恢复 Pi”接续原目标并开始新一轮计时，保留目标累计耗时。' : '点击“启动 / 恢复 Pi”，从授权池选择未完成目标。';
     }
     $('#projects-next-action').textContent = next;

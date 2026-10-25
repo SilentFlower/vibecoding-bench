@@ -193,7 +193,7 @@ function emit(value) {
  */
 function callTool(name, toolCallId, args, signal) {
   if (roundComplete) return Promise.resolve({content: [{type: 'text',
-    text: '本轮工程目标已完成，等待下一次指挥。'}], details: {}, terminate: true});
+    text: '本轮已收尾，等待下一次指挥。'}], details: {}, terminate: true});
   const id = `${++sequence}`;
   return new Promise((resolve, reject) => {
     const abort = () => {
@@ -205,10 +205,11 @@ function callTool(name, toolCallId, args, signal) {
     pending.set(id, {
       resolve: result => {
         signal?.removeEventListener('abort', abort);
-        const complete = name === 'project_submit' && result?.status === 'passed' && result.round_complete === true;
+        const complete = name === 'project_submit' && ['passed', 'deferred'].includes(result?.status)
+          && result.round_complete === true;
         if (complete) {
           roundComplete = true;
-          // 已通过目标的收尾无需再生成压缩摘要；当前工具结果仍由 SDK 正常持久化。
+          // 已通过或安全暂存的目标无需额外推理；真实工具结果仍由 SDK 正常持久化。
           session.setAutoCompactionEnabled(false);
         }
         resolve({content: [{type: 'text', text: JSON.stringify(result)}], details: {}, terminate: complete});

@@ -544,7 +544,7 @@ ProjectsService.tool(account_id, generation, name, args, call_id, stop=None) -> 
 {"submission_id": "...", "status": "passed", "round_complete": True}
 ```
 
-- Pi 沿现有 JSONL `tool_result.result` 接收该字段；只在 `project_submit`、`status='passed'`、`round_complete === true` 同时成立时采用 SDK `AgentToolResult.terminate`。
+- Pi 沿现有 JSONL `tool_result.result` 接收该字段；只在 `project_submit`、`status='passed'|'deferred'`、`round_complete === true` 同时成立时采用 SDK `AgentToolResult.terminate`。`deferred` 表示已安全暂存，不表示目标通过，详见下方“验收反馈与自动复验”。
 - 不新增 HTTP 请求参数、环境键或数据库列。`projects_*` 与 `warmup_projects_*` 分别保存各自目标、代次及通过事实。
 
 ### 3. Contracts
@@ -606,7 +606,7 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 
 ### 3. Contracts
 
-- 上下文隔离边界是工程目标：开始新目标采用 fresh，本地追加隔离检查点；已有未完成目标采用 resume，跨控制代次继续原历史。不得在每次模型请求前重建。原始 Pi 文件、Claude 会话、工作区、输入事实和累计耗时留档。
+- 上下文隔离边界是工程目标：开始新目标采用 fresh，本地追加隔离检查点；已有未完成目标采用 resume，跨控制代次继续原历史。新的 `verification_correction` 进入时允许一次 fresh 隔离错误推理，并注入已核实纠错；后续通过 `guide_loaded.context_correction_event_id` 识别已应用事件。不得在每次模型请求前重建。原始 Pi 文件、Claude 会话、工作区、输入事实和累计耗时留档。
 - 压缩阈值默认 `350000`，范围 `10000..900000` 且必须为严格整数。PUT 中省略或 null 沿用当前值，旧私有 schema 1 文件缺字段时补默认；保存仍原子写 0600 文件并更新 revision，读取接口不返回密钥。启动／恢复冻结配置，两空间同时适用；没有新增环境键或数据库列。
 - 达到阈值时触发摘要。优先使用最近有效助手的 `input+output+cacheRead+cacheWrite`，再估算后续内容；排除错误／取消及摘要前旧用量。无有效用量则使用 SDK 估算并计入固定指南和工具定义。自定义规划窗口不改变上游真实容量。
 - SDK 原生自动压缩关闭。启动／恢复前和工具批次结束检查阈值；工具回执先持久化，再结束 SDK 子循环，在空闲边界摘要并 continue，不重发已确认工具或用户输入。正常正文不做字节硬裁剪，未配对工具及失败助手不进入模型历史。
@@ -637,6 +637,64 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 - 边界：保存 `{"base_url":"https://ai.flower-cli.com/v1","models":["gemini-3-flash-agent"],"compaction_threshold_tokens":450000}`，密钥沿用；下次项目或养号启动均采用 450000，在途执行保留原阈值。
 - 错误：每次请求清空历史、按 24 KiB 硬裁剪材料，或只看首 10 个目标就报告全部完成。正确：以工程目标隔离，同目标按 token 摘要，沿 next_offset 读取剩余页。
 - 错误：直接重发百万级旧历史，或清空会话解除旧通用错误。正确：分段归纳，并凭绑定原错误的诊断经原门禁显式恢复。
+
+## Scenario: 验收反馈与自动复验
+
+### 1. Scope / Trigger
+
+- 修改 `ProjectVerifier`、`ProjectsVerification`、`ProjectsService` 的验收归属、失败反馈、返工与恢复，以及 Pi 工具收尾时适用；项目和工程养号共用机制。
+
+### 2. Signatures
+
+```text
+projects_verification_holds / warmup_projects_verification_holds(
+  work_id TEXT PRIMARY KEY, retry_at REAL DEFAULT 0,
+  deferrals INTEGER DEFAULT 0, timeout_turns INTEGER DEFAULT 0,
+  last_deferred_at REAL DEFAULT 0, reason TEXT)
+projects_work.status += deferred
+project_submit -> {status: deferred, round_complete: true, work_id, retry_at,
+                   deferrals, reason, submission_id, verification}
+GET /api/projects、GET /api/accounts/warmup/pi:
+  agents[].deferred_objectives = [{work_id,project_key,objective_id,retry_at,reason}]
+  agents[].progress.deferred = integer
+  agents[].work.verification_correction = optional string
+failure_facts[] = {phase, reason, test_id?, exception_type?, required_percent?, actual_percent?}
+```
+
+### 3. Contracts
+
+- 历史唯一活动工作索引幂等迁移，排除 `passed/stopped/deferred`；SQL 名称在养号空间独立映射。待复验保留原 work、原冻结合同、源码、Claude session、原始 Pi 历史和累计用量，不产生通过证明。
+- 三次业务失败或同一候选连续两次失败后暂存；已持久提交参与计数，不因重启或换控制代次重置。基础设施错误仍先本地重验两次，失败后自动暂存；验证器抛错也须先确认严格释放。连续两轮指挥超时同样暂存，防止未提交而无限续跑。
+- 第一次冷却六小时，再次十二小时，以后二十四小时；只在冷却后新尝试重新计算本段返工上限，历史与累计退避次数保留。冷却不占 CLI 或模型调用；到期按原计划及账号门禁自动恢复同一 work/session。
+- 同一项目共享累计工作区；存在待复验修改时不开放该项目的其他目标，优先处理其他项目，防止半成品污染新需求。待复验仍计未完成，不满足前置，不触发养号完整工程池清零。全池无可执行项时自动等最早 retry_at，无需人工确认验收错误。
+- 暂存前后复核控制代次、取消和未知输入，必须先严格释放，再同事务发布 deferred、冷却记录和审计事件。只有已通过或已安全暂存的真实提交返回 round_complete；SDK 保存真实工具结果后终止本轮，不能让模型伪造字段越过后端。人工停止待复验目标仍会转 stopped 并取消自动续做。
+- 失败反馈只投影最多八项有界阶段、公开测试身份、异常类型或真实覆盖率数值，不透传 stdout、私有断言及异常正文；`_public_facts` 继续共享 12 KiB 体积预算。不能让模型猜测隐藏验收或用 pragma no cover、删测试换取通过。
+- Arrow `expansion_regression.py` 仅精确 SHA256 版本可适配。辅助覆盖脚本的空格式列表允许 TypeError/ValueError（含 ParserError），其他错误类型仍要求 TypeError；新能力检查失败单列 feature_coverage，原冻结测试节点独立执行和比较。临时可信入口及只读辅助挂载记录前后摘要，不原地改写旧资产或降低覆盖率门槛。
+- 已核实错误通过 `verification_correction` 事件追加事实，旧提交和原始记录留档；新纠错第一次隔离 Pi 旧推理，原 Claude 会话继续复用。该机制不自动绕过权限、身份、认证、未知输入或严格清理冲突。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 空格式列表合法拒绝 | 兼容约定内异常子类；错误接受输入仍失败 |
+| 新能力边界失败 | 单列 feature_coverage；不污染第一个原测试的 setup |
+| 三次业务失败／相同候选第二次失败／两轮超时 | 安全暂存，后续处理其他可执行项目 |
+| 基础设施本地重验仍失败 | 暂存并低频自动复验，不要求模型重新实现 |
+| 全池冷却或依赖待复验 | 持久安排下一次检查，不启动空模型循环 |
+| 取消、代次变化、未知投递、无法确认释放 | 沿用原保护，不发布正常收尾证明或新目标 |
+| 冻结脚本摘要未知 | 拒绝推测适配，按验收环境故障自动暂存 |
+
+### 5. Scenarios and Examples
+
+- 正常：目标 A 失败后依据具体事实返工，三次仍失败则保留原目标，下一轮选择其他项目 B；A 冷却到期使用原 work/session 续做。
+- 边界：无其他可执行目标时等待六小时后的复验，不将剩余数量归零或宣称全部通过。
+- 错误：只收到“1903 passed、1 error”便反复猜测时区，或改 TypeError 以迎合未声明的异常子类。正确：核对公开合同、修复精确版本的验收误判，提供可靠阶段事实并有界自动推进。
+
+### 6. Tests Required
+
+- `test_project_arrow_adapter`：两种合法异常、错误接受输入、来源摘要保护、真实 pytest 节点不受辅助失败污染、覆盖率数值及私有日志边界、真实入口只读辅助挂载。
+- `test_projects_verification_recovery`：三次不同候选、重复相同候选、双空间冷却、服务重启后的同 work/session、验证器抛错、连续两轮超时、取消竞争、人工停止及一次纠错上下文隔离。
+- `host.test.mjs`：待复验与 passed 均只在真实 project_submit 和布尔收尾标记下结束；普通失败或其他工具不能终止；原结果先持久化。
 
 ### 6. Tests Required
 

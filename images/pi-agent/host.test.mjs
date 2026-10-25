@@ -373,7 +373,7 @@ test('单目标通过后保存工具结果并结束，同批第二目标及后�
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
-test('只有可信完成结果结束单目标指挥，失败和其他工具的完成字段不生效', async () => {
+test('只有可信完成或待复验结果结束指挥，失败和其他工具字段不生效', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'projects-pi-round-marker-'));
   let tool = 'account_state';
   let requests = 0;
@@ -395,13 +395,16 @@ test('只有可信完成结果结束单目标指挥，失败和其他工具的�
       {tool: 'account_state', result: {status: 'passed', round_complete: true}},
       {tool: 'project_submit', result: {status: 'failed', round_complete: true}},
       {tool: 'project_submit', result: {status: 'passed', round_complete: 1}},
+      {tool: 'project_submit', result: {status: 'deferred', round_complete: true}, requests: 1},
+      {tool: 'project_submit', result: {status: 'deferred', round_complete: 1}},
+      {tool: 'account_state', result: {status: 'deferred', round_complete: true}},
     ]) {
       tool = current.tool; requests = 0;
       const records = await execute({session_dir: join(directory, String(Math.random())),
         base_url: `http://127.0.0.1:${server.address().port}/v1`,
         tools: [{name: tool, description: '合成字段校验', parameters: {type: 'object', properties: {}}}]},
         (event, send) => send({type: 'tool_result', id: event.id, result: current.result}));
-      assert.equal(requests, 2);
+      assert.equal(requests, current.requests ?? 2);
       assert.equal(records.at(-1).type, 'settled');
     }
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }

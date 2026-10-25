@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import hashlib
+import ast
 import json
 import math
+import re
 import shutil
 import tempfile
 import threading
@@ -176,6 +178,76 @@ sys.stdout.buffer.write(completed.stdout)
 sys.stderr.buffer.write(completed.stderr)
 raise SystemExit(completed.returncode)
 """
+
+
+def _native_arrow_adapter(source: bytes, helper: bytes, contract: dict) -> tuple[bytes, bytes, dict]:
+    """修复已核实的 Arrow 附加验收，原测试与新增边界结果分别报告。
+
+    :param source: 冻结的 Arrow 扩展回归入口。
+    :param helper: 冻结的新增能力覆盖脚本。
+    :param contract: 原生冻结合同。
+    :return: 可信入口、辅助脚本及适配审计；未知版本拒绝猜测。
+    """
+    original = hashlib.sha256(source).hexdigest()
+    if contract.get('project') != 'arrow' or original != '10c23ca9fa44613bf731463ee38a7064b786760daf827f82a703247c9d9d955c':
+        raise _NativeRegressionControlError('Arrow 扩展验收入口版本未知')
+    helper_original = hashlib.sha256(helper).hexdigest()
+    legacy = '        for argument in ([], [3], None):\n'
+    fixed = ("        # 公开合同未限定空列表的异常子类，不能把合法 ValueError 当作候选缺陷。\n"
+        "        try:\n            reader.parse_strict('2024-01-01', [])\n"
+        "        except (TypeError, ValueError):\n            pass\n        else:\n"
+        "            raise AssertionError('空严格格式被接受')\n        for argument in ([3], None):\n")
+    if helper_original == '1e3fd7036a3ee59df9777a8cc07ea9ba0de4e8cffc780d1d635174d403ec3e4f':
+        helper = helper.replace(legacy.encode(), fixed.encode(), 1)
+    elif hashlib.sha256(helper.replace(fixed.encode(), legacy.encode(), 1)).hexdigest() != '1e3fd7036a3ee59df9777a8cc07ea9ba0de4e8cffc780d1d635174d403ec3e4f':
+        raise _NativeRegressionControlError('Arrow 新能力覆盖脚本版本未知')
+    tree = ast.parse(source)
+    assignment = next(node for node in tree.body if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == 'hook' for target in node.targets))
+    hook = ast.literal_eval(assignment.value)
+    call = "    namespace['cover_features'](Path(control['project']), Path(control['evidence']))\n"
+    if hook.count(call) != 1:
+        raise _NativeRegressionControlError('Arrow 扩展调用片段不唯一')
+    # 辅助边界失败必须单独报告，不能污染第一个原测试的 setup 及冻结节点结果。
+    replacement = ("    try:\n        namespace['cover_features'](Path(control['project']), Path(control['evidence']))\n"
+        "    except Exception as error:\n        fact = {'status': 'failed', 'phase': 'feature_coverage', "
+        "'exception_type': type(error).__name__, 'reason': '新增能力边界未通过，原生回归单独报告'}\n"
+        "        (Path(control['evidence']) / 'expansion-coverage.json').write_text(json.dumps(fact))\n")
+    lines = source.decode().splitlines(keepends=True)
+    lines[assignment.lineno - 1] = 'hook = ' + repr(hook.replace(call, replacement)) + '\n'
+    actual = ''.join(lines).replace("source = Path(__file__).with_name('native_regression.py')",
+                                    "source = Path('/request-data/verification/native_regression.py')").encode()
+    return actual, helper, {'name': 'arrow-feature-boundaries-v1', 'scope': 'public_contract',
+        'original_runner_sha256': original, 'effective_runner_sha256': hashlib.sha256(actual).hexdigest(),
+        'original_helper_sha256': helper_original, 'effective_helper_sha256': hashlib.sha256(helper).hexdigest(),
+        'preserves_frozen_contract': True}
+
+
+def _native_failure_facts(report: dict) -> list[dict]:
+    """只提取公开失败身份和异常类型，原始日志与私有断言不进入模型反馈。
+
+    :param report: 可信控制器的原始报告。
+    :return: 至多八个有界诊断。
+    """
+    facts = []
+    probe = report.get('expansion_coverage')
+    if isinstance(probe, dict) and probe.get('status') == 'failed':
+        exception = probe.get('exception_type', '')
+        if isinstance(exception, str) and re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,79}', exception):
+            facts.append({'phase': 'feature_coverage', 'exception_type': exception,
+                'reason': '新增能力边界未通过；原测试结果独立统计，不要猜测覆盖率或环境原因'})
+    tail = report.get('stdout_tail', '')
+    if isinstance(tail, str):
+        coverage = re.search(r'FAIL Required test coverage of (\d+(?:\.\d+)?)% not reached\. Total coverage: (\d+(?:\.\d+)?)%', tail[-8192:])
+        if coverage and all(0 <= float(value) <= 100 for value in coverage.groups()):
+            facts.append({'phase': 'coverage', 'required_percent': float(coverage[1]),
+                'actual_percent': float(coverage[2]), 'reason': '真实覆盖率未达到原门槛，应补有效测试，不添加覆盖率豁免'})
+        for match in re.finditer(r'^(FAILED|ERROR) ([A-Za-z0-9_./:\[\]-]{1,240}) - ([A-Za-z][A-Za-z0-9_.]{0,79})(?::|\s|$)', tail[-8192:], re.MULTILINE):
+            facts.append({'phase': 'regression', 'test_id': match[2], 'exception_type': match[3],
+                'reason': '原测试失败，请只依据该节点的可复现事实返工'})
+            if len(facts) >= 8:
+                break
+    return facts
 
 
 def _same_json(actual: object, expected: object) -> bool:
@@ -373,8 +445,18 @@ class ProjectVerifier:
         try:
             source = (project_root / script).read_bytes()
             adapter = None
+            helper_mounts = {}
             if regression:
-                source, adapter = _native_regression_adapter(source, contract)
+                if script == 'verification/expansion_regression.py' and contract.get('project') == 'arrow':
+                    helper_path = project_root / 'verification/expansion_coverage.py'
+                    source, helper, adapter = _native_arrow_adapter(source, helper_path.read_bytes(), contract)
+                    staged_helper = directory / 'arrow-expansion-coverage.py'
+                    staged_helper.write_bytes(helper)
+                    staged_helper.chmod(0o644)
+                    helper_mounts[str(self.host_data / staged_helper.relative_to(self.data))] = {
+                        'bind': '/request-data/verification/expansion_coverage.py', 'mode': 'ro'}
+                else:
+                    source, adapter = _native_regression_adapter(source, contract)
             else:
                 source, adapter = _native_schema_adapter(source, specification)
                 if adapter is None:
@@ -407,7 +489,8 @@ class ProjectVerifier:
                         str(self.host_data / directory.relative_to(self.data)): {'bind': '/request-data', 'mode': 'ro'},
                         str(self.host_data / project_root.relative_to(self.data) / 'verification'): {'bind': '/request-data/verification', 'mode': 'ro'},
                         str(self.host_data / project_root.relative_to(self.data) / 'seed'): {'bind': '/baseline', 'mode': 'ro'},
-                        str(self.host_data / environment_root.relative_to(self.data)): {'bind': '/offline', 'mode': 'ro'}},
+                        str(self.host_data / environment_root.relative_to(self.data)): {'bind': '/offline', 'mode': 'ro'},
+                        **helper_mounts},
                     environment={'HOME': '/tmp', 'PYTHONDONTWRITEBYTECODE': '1', 'PIP_CONFIG_FILE': '/dev/null'},
                     log_config=LogConfig(type='json-file', config={'max-size': '2m', 'max-file': '1'}),
                     labels={'vibebench.project-verifier': 'native','vibebench.verifier-root':digest_json(str(self.host_data))})
@@ -452,6 +535,8 @@ class ProjectVerifier:
                     return {'status': 'failed', 'message': '原生验收没有输出单一有效 JSON',
                         **({'runtime_adapter': adapter} if adapter else {})}
                 if regression:
+                    if isinstance(actual, dict):
+                        actual['failure_facts'] = _native_failure_facts(actual)
                     expected_collection=digest_json([{'id':node['id'],'kind':node['kind']} for node in contract['nodes']])
                     valid=(completed.get('StatusCode')==0 and isinstance(actual,dict) and actual.get('status')=='passed' and actual.get('collection_matches_contract') is True
                         and actual.get('collected')==len(contract['nodes']) and actual.get('collection_digest')==expected_collection)

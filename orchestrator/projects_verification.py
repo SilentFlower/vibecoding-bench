@@ -230,6 +230,10 @@ class ProjectsVerification:
         for key in ('collection_errors', 'feedback_codes'):
             if isinstance(report.get(key), list):
                 result[key] = report[key][:8]
+        if isinstance(report.get('failure_facts'), list):
+            result['failure_facts'] = [{key: item[key] for key in
+                ('phase', 'test_id', 'exception_type', 'reason', 'required_percent', 'actual_percent') if key in item}
+                for item in report['failure_facts'][:8] if isinstance(item, dict)]
         for key in ('business', 'regression'):
             if isinstance(report.get(key), dict):
                 result[key] = ProjectsVerification._public_facts(report[key], _depth + 1)

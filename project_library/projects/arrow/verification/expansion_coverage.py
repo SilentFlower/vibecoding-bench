@@ -49,7 +49,14 @@ def cover_features(project, evidence):
                 pass
             else:
                 raise AssertionError('严格日历边界被接受')
-        for argument in ([], [3], None):
+        # 公开合同未限定空列表的异常子类，不能把合法 ValueError 当作候选缺陷。
+        try:
+            reader.parse_strict('2024-01-01', [])
+        except (TypeError, ValueError):
+            pass
+        else:
+            raise AssertionError('空严格格式被接受')
+        for argument in ([3], None):
             try:
                 reader.parse_strict('2024-01-01', argument)
             except TypeError:
