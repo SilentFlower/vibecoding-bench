@@ -1,0 +1,78 @@
+{
+  "id": "cc2api-usage-window-cost",
+  "name": "cc2api-usage-window-cost",
+  "title": "cc2api 5h／7d 用量与费用统计",
+  "description": "参考本机 sub2api，在 cc2api 账号卡片展示当前 5h／7d 的请求数、Token、网关折算费用与有条件的总额估算。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": "cc2api",
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-26",
+  "completedAt": "2026-10-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-25T18:44:16Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-25T17:45:10Z",
+      "contextKey": "codex_01a17427-4031-7eb2-80c0-9bf18aeeb897",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "a6c2334c0e8a1d4ea80d500e163f7eac5de7d0a9",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "a6c2334c0e8a1d4ea80d500e163f7eac5de7d0a9",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "a4ab550781e4cd6427bbec4caba049b8aef5132d774c03d1a089d90b8fa8dc23"
+          },
+          {
+            "root": "cc2api",
+            "head": "d5347fe81f67ff3f17b65677d30afb74ff63f8dc",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "96efb775366422aea45a8a3544726e28074338654c28021201f95fd2e2c303b5"
+          }
+        ],
+        "fingerprint": "96c21e9474c023ea15ed289973f56883bde458c0edafea3acfa2322e9c7e09a6"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "实现5h／7d用量采集、持久化与费用展示",
+      "完成cc2api全面检查和规范同步",
+      "按用户扩大范围提交推送两仓全部现有改动"
+    ],
+    "partialStep": null,
+    "nextStep": "代码交付已完成；等待 v3 Action 构建并按独立部署流程上线。",
+    "notes": "两仓全部现有业务改动已获确认并提交推送，复用已推送的同内容 Trellis 维护提交；新增维护变更未纳入此前 Check-All，PostgreSQL 实库测试未执行。用户随后授权等待 v3 构建并推进部署。",
+    "updatedAt": "2026-10-25T18:44:16Z"
+  }
+}

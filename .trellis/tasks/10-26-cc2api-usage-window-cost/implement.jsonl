@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "SQLx AnyPool、双数据库 schema、时间字段和账号 API 同步规则"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "分页账号列表、可选 API 类型、5 秒轮询及账号卡片展示规范"}
+{"file": ".trellis/tasks/10-26-cc2api-usage-window-cost/research/reference.md", "reason": "真实用量解析位置、参考定价来源、截图 A／U 与估算口径差异"}

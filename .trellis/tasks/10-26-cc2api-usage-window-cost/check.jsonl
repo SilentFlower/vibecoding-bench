@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "完整 Rust 检查、网关不变性、合成数据及敏感信息边界"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "数据库双栈迁移、跨连接可见性与前后端字段同步检查"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "未知状态、窗口来源、账号轮询和前端构建要求"}
+{"file": ".trellis/tasks/10-26-cc2api-usage-window-cost/research/reference.md", "reason": "核对引用事实、价格版本和网关统计与官方额度的口径区别"}
