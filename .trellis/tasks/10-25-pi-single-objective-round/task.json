@@ -1,0 +1,80 @@
+{
+  "id": "pi-single-objective-round",
+  "name": "pi-single-objective-round",
+  "title": "修复项目与养号单目标边界及 Pi 上下文超限",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-25",
+  "completedAt": "2026-10-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-25T10:46:21Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-25T08:53:34Z",
+      "contextKey": "codex_01a171a2-4a06-7fd1-9b5b-b4ece6f0d3ce",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "dfe8995e826887c2ef04bd1f3e9dda2fc2c9b6fd",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "dfe8995e826887c2ef04bd1f3e9dda2fc2c9b6fd",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "0ec9caf3fdce8b64d4793d93c2b6777b69bf5059ae4b06af21ef9dc7cee06bb5"
+          },
+          {
+            "root": "cc2api",
+            "head": "d5347fe81f67ff3f17b65677d30afb74ff63f8dc",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "96efb775366422aea45a8a3544726e28074338654c28021201f95fd2e2c303b5"
+          }
+        ],
+        "fingerprint": "55cc07da07c0bf5180287b8d69366ce0d0860c4183270e99e9f6d575c3571dbb"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-10-25T10:46:21.166640+00:00",
+    "completedSteps": [
+      "项目与养号单目标边界及目标级上下文修复",
+      "默认350K可配置摘要、分页及上下文恢复",
+      "232项回归通过及Check-All（FBK-001已接受风险）",
+      "执行契约同步",
+      "功能代码已提交并推送"
+    ],
+    "partialStep": null,
+    "nextStep": "部署同批v3镜像，核对配置与原目标恢复并开始运行",
+    "notes": "用户明确接受 FBK-001（P1）：长度截断的非空摘要仍可能发布，磁盘原文保留。上线后核对350K默认值、两空间版本、单目标收尾和原会话续做。"
+  }
+}

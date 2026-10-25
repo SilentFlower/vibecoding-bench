@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "共享后台控制者、并发写入、异常和清理的代码规范。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/error-handling.md", "reason": "正常完成、人工取消与执行收口失败的错误边界。"}
+{"file": "images/pi-agent/README.md", "reason": "Pi token 阈值、分段摘要、上下文恢复与旧故障重试的实际契约。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/type-safety.md", "reason": "Pi 模型配置的数值表单与后端严格 DTO 字段同步。"}
