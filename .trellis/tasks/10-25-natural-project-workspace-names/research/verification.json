@@ -1,0 +1,17 @@
+{
+  "command": "PYTHONPATH=orchestrator .venv/bin/python -m unittest orchestrator.test_projects_workspace orchestrator.test_projects_cycles orchestrator.test_projects_terminal orchestrator.test_projects_quota orchestrator.test_projects_agent orchestrator.test_projects_single_objective orchestrator.test_projects_engine_cycles",
+  "cwd": "/root/project/vibecoding-bench",
+  "exit_code": 0,
+  "tests": 101,
+  "seconds": 12.271,
+  "skipped": 0,
+  "result": "OK",
+  "files": {
+    "orchestrator/projects_runtime.py": "31b34c7534fc5de4694ed6c74c4dc7fc30147c308a631fa67be916dd34729c16",
+    "orchestrator/test_projects_cycles.py": "b737f279d7184db31e82d2c5f33cff47a54b7d6ba5ce5c9964cf911036ed586a",
+    "orchestrator/test_projects_workspace.py": "3591381e33e880b84593489a93dcc1532e19f01c01d66837c3bbdcb65ea5d6c6",
+    "orchestrator/test_projects_terminal.py": "3f7882d68f505f53191bab4371a4ebb0eb4c1db615406901e8d31c82b6a39cde",
+    "orchestrator/pi_terminal.py": "9998f18f5141a385c03f7093be7100cb0dde32a344698f21520489bd2dd7e80e"
+  },
+  "boundary": "仅本地合成账号、SQLite、真实文件和 tmux，不调用真实模型、OAuth 或生产服务"
+}

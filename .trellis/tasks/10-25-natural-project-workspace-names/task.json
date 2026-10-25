@@ -1,0 +1,79 @@
+{
+  "id": "natural-project-workspace-names",
+  "name": "natural-project-workspace-names",
+  "title": "统一项目迭代与养号迭代的自然工作区命名",
+  "description": "统一项目迭代与养号迭代的新工作区自然命名，保留旧目录、原生会话和工程轮次清理兼容。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-25",
+  "completedAt": "2026-10-25",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-25T14:54:58Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-25T14:14:46Z",
+      "contextKey": "codex_01a17348-9901-77b2-b6b6-89070e6a9684",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "d24df9217ba1235b21c5e2d0270028f0a3684837",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "d24df9217ba1235b21c5e2d0270028f0a3684837",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "79f91f92b434549dba5f869746706ac05c98bc6b008e0312c85b9b4644d2f43a"
+          },
+          {
+            "root": "cc2api",
+            "head": "d5347fe81f67ff3f17b65677d30afb74ff63f8dc",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "96efb775366422aea45a8a3544726e28074338654c28021201f95fd2e2c303b5"
+          }
+        ],
+        "fingerprint": "f9d6e1bb37a3949506cfa91af056970ba830b2ff54e368f6f40d612bc94d1671"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-10-25T14:54:58.720845+00:00",
+    "completedSteps": [
+      "项目迭代与养号迭代采用自然工作区名称，兼容旧注册、输入凭据和原 Claude 会话。",
+      "101 项本地回归及 Check-All 全面检查通过。",
+      "使用说明与可执行规范已同步。",
+      "业务变更已提交并推送。"
+    ],
+    "partialStep": null,
+    "nextStep": "本任务开发交付已完成。",
+    "notes": "新名称从新建工程生效，已有目录不迁移；生产部署不在本任务范围，未调用真实模型或 OAuth。"
+  }
+}
