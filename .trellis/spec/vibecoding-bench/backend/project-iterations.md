@@ -645,3 +645,61 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 - `host.test.mjs`：350K／自定义阈值、小数剩余预算下实际摘要成功、百万级历史、连续工具流、强制摘要仅一次续接、计量、摘要内容过滤同模型重试后降级及 DeepSeek 关闭思考。
 - `test_projects_agent`：目标级 fresh/resume、600 项分页与材料分段还原、公开事件白名单、旧错误诊断及未知输入／身份门禁。
 - 摘要 length 的本地真实 SDK 故障注入已复现 FBK-001；未修复前不得将“截断摘要被拒绝”计为已通过断言。
+
+## Scenario: 项目与养号工程的自然目录命名及历史接续
+
+### 1. Scope / Trigger
+
+- 修改 `ProjectsTerminal` 的工作区派生、注册读取、工程输入或 `cleanup_cycle` 时适用，项目迭代与养号迭代使用同一实现。
+- 目录名决定真实 Claude cwd 和主会话位置，命名升级不能迁移原工程、重建 seed 或改写历史会话。
+
+### 2. Signatures
+
+```python
+ProjectsTerminal._workspace_identity(account, row, project_key, seed_digest, cycle_no,
+    *, naming_version=2, namespace=None) -> tuple[str, dict]
+ProjectsTerminal._registered_identity(saved, account, row, *, namespace=None)
+ProjectsTerminal.cleanup_cycle(account: dict, cycle_no: int) -> None
+```
+
+- 工作区：`environments/<environment_id>/projects/<alias>`；CLI cwd：`/home/node/projects/<alias>`。
+- 私有注册：`runtime/<namespace>-workspaces/<alias>.json`；输入凭据：`runtime/<namespace>-inputs/<digest_json(receipt)>.json`。
+- 新注册包含 `account_id/environment_id/project_key/seed_digest/namespace/cycle_no/workspace/naming_version`，其中 `workspace="projects/<alias>"`、`naming_version=2`。不新增 HTTP 参数或数据库列。
+
+### 3. Contracts
+
+- 新别名为 `<project_key>-<8位小写hex>`，后缀取 `sha256(namespace:account_id:project_key:seed_digest:cycle_no)` 前 8 位。项目标识复用 `PROJECT_KEY`，seed 为 64 位小写 hex，轮次为正整数，命名版本只接受严格整数 1/2，空间只接受服务端固定 `projects/warmup`。
+- 未带 `naming_version` 的旧记录按版本 1 解释：普通首轮沿用 `workspace-<16位摘要>` 和原四字段注册；旧养号及后续轮次保留原空间前缀、轮次和相对路径字段。不为旧记录补新字段，原输入凭据摘要与字节保持有效。
+- 准备时核对新旧候选，已有唯一合法注册沿用原目录及累计修改；新旧同时有效、候选无注册却已有目录、完整身份不符或链接均拒绝。无候选且原工作已有 baseline 或要求 resume 时拒绝重建源码，不以新名称绕过原证明丢失。
+- 新名称仅从新建工作区生效，包括养号新轮次；项目原始中文标题、内容 key、计划、账号身份、通过事实和原会话 ID 保持原契约。
+- 清理先读取两个空间的完整注册，用命名版本重算别名和身份；注册内容与文件名须完全一致，同空间同项目/seed/轮次重复注册或跨空间同名注册拒绝。兄弟空间合法注册不属于本次清理目标；自然目录和旧格式目录无可核对注册时拒绝清理。
+- 早期养号的 `<32位小写hex>.json` 题库轮次 marker 原样保留，不解释为工程注册。注册目录链接、注册文件链接或硬链接，以及选中源码内的链接、特殊文件继续拒绝。
+- 全部校验完成后依次删除指定轮次源码、输入凭据、工作区注册；中断仍从保留注册重入，其他空间、账号、轮次和历史会话不删除。
+- `PiTerminal` 继续从选定目录生成 cwd、PYTHONPATH 与 native JSONL 位置，并通过已有 `runtime_json` 读取工作区和会话。生成版本 2 数据后，回退必须保留双格式读取能力，不能直接切回只识别旧命名的版本。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 两空间新建工程 / 已有合法旧注册 | 使用项目名加短后缀 / 原目录、原输入凭据及会话继续接续 |
+| 同项目跨账号、空间、轮次或 seed | 分别派生并核验身份，禁止互相覆盖 |
+| 新旧两份有效注册、短名碰撞、目录未登记 | 拒绝并保留所有既有源码，不猜最新版本或随机换名 |
+| 原工作有 baseline/resume，但原工作区证明缺失 | 拒绝重建，保留原会话及进度 |
+| 命名版本为 bool、未知版本或路径身份被篡改 | 校验拒绝，清理前不删任何选中目录 |
+| 自然目录与兄弟空间合法注册并存 | 仅清理当前空间指定轮次，兄弟目录保留 |
+| 未知自然目录、注册链接或原生执行仍占用 | 拒绝清理；无法证明归属不等于可删除 |
+| 删除源码后输入凭据删除中断 | 原注册保留，下次继续清理且不触及其他轮次 |
+
+### 5. Scenarios and Examples
+
+- 正常：新工程目录为 `python-frontmatter-a12f34bc`；项目迭代与养号模式分别持有自己的私有注册，不在目录前缀标注内部用途。
+- 历史：旧 `warmup-workspace-…` 工程暂停后继续，仍读取原目录和主 Claude JSONL；下一工程轮次新建时采用自然名称。
+- 错误：只改目录前缀，随后按新 cwd 搜索原会话，或向旧四字段注册补命名版本。正确：保留原注册及输入凭据，按版本核对唯一合法目录。
+- 错误：按项目名或前缀批量删除。正确：完整核对账号、环境、空间、seed、轮次、版本和实际注册路径，再按可重入顺序清理。
+
+### 6. Tests Required
+
+- `test_projects_workspace`：累计源码、材料补齐、原基线保持、未知工作区拒绝及原证明缺失时不重建 seed。
+- `test_projects_cycles`：两空间自然名称、真实旧四字段与旧养号夹具、原输入字节保持、实际准备器 cwd/PYTHONPATH 与原生会话读取、账号/空间/轮次/seed 隔离、新旧混合和中断清理、重复注册、主动短名碰撞、未知自然目录、非法版本及链接拒绝。
+- `test_projects_terminal`、`test_projects_quota`：合成原生 tmux 会话接续、隔离和额度补证；`test_projects_agent`、`test_projects_single_objective`、`test_projects_engine_cycles` 核对原任务优先、单目标边界和计划循环。
+- 验证仅使用本地合成账号与进程，不调用真实模型、OAuth 或生产数据。

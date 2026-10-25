@@ -126,6 +126,12 @@ class ProjectsWorkspaceTests(unittest.TestCase):
             self.prepare('SECOND', {'materials/SECOND/contract.md': '新需求'})
         self.assertEqual('VALUE = 1\n', (workspace / 'library/example.py').read_text())
 
+    def test_resumed_work_without_its_original_workspace_cannot_create_a_fresh_seed(self):
+        """原路径证明全部丢失时不能以新名字重建已有工作的初始源码。:return: None。"""
+        with self.assertRaisesRegex(ValueError, '原工程'):
+            self.prepare('RESUME', {}, baseline='{"files":{}}')
+        self.assertFalse((self.account_root / 'projects').exists())
+
 
 if __name__ == '__main__':
     unittest.main()
