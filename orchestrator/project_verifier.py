@@ -67,6 +67,48 @@ def _native_regression_adapter(source: bytes, contract: dict) -> tuple[bytes, di
         'preserves_frozen_duplicate_counts': True}
 
 
+_SCHEMA_OBSERVER_OLD = '8769aa7c8a983dd0046d213ce3077ff3071725ed07e9655961493ff58b0744ea'
+_SCHEMA_OBSERVER_FIXED = 'bce41ea17aabb4e7b4a94578bc8af98dee8d89f3d37662acae0e13c261be89d8'
+_SCHEMA_FEEDBACK_CODES = frozenset(('schema_error_positions', 'schema_strict_error_cap',
+    'schema_invalid_rules', 'schema_input_unchanged'))
+
+
+def _native_schema_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]:
+    """仅修正已确认的 Schema 观察器误判，保留旧工作的冻结内容及独立验证。
+
+    :param source: 从冻结验证目录读取的观察器字节。
+    :param specification: 原生业务观察的冻结协议。
+    :return: 实际执行字节和修复审计信息；其他版本保持原样。
+    """
+    original = hashlib.sha256(source).hexdigest()
+    if (specification.get('script') != 'verification/AG-SCHEMA-DEV-observe.py'
+            or specification.get('args') != [] or specification.get('python_paths') != ['library']
+            or not _same_json(specification.get('expected'), {'candidate_import': True, 'business': True})
+            or original not in (_SCHEMA_OBSERVER_OLD, _SCHEMA_OBSERVER_FIXED)):
+        return source, None
+    if original == _SCHEMA_OBSERVER_OLD:
+        # 公开合同未限定异常子类或 None 边界语义；用明确非法的不可比较对象检查规则拒绝。
+        replacements = (
+            ('business = False\ntry:', "business = False\nchecks = dict.fromkeys(('schema_error_positions', 'schema_strict_error_cap', 'schema_invalid_rules', 'schema_input_unchanged'), False)\ntry:"),
+            ("{'quantity': {'min': None}}", "{'quantity': {'min': object()}}"),
+            ('        except TypeError:', '        except (TypeError, ValueError):'),
+            ('    business = actual == expected and strict and rejected == 3 and len(source.rows) == 4',
+                '    checks.update(schema_error_positions=actual == expected, schema_strict_error_cap=strict,\n'
+                '        schema_invalid_rules=rejected == 3, schema_input_unchanged=len(source.rows) == 4)\n'
+                '    business = all(checks.values())'),
+            ("'business': bool(business)}", "'business': bool(business),\n    'feedback_codes': [code for code, passed in checks.items() if not passed]}"))
+        for before, after in replacements:
+            if source.count(before.encode()) != 1:
+                raise ValueError('已确认的 Schema 观察器片段不唯一，拒绝推测修复')
+            source = source.replace(before.encode(), after.encode(), 1)
+    effective = hashlib.sha256(source).hexdigest()
+    if effective != _SCHEMA_OBSERVER_FIXED:
+        raise ValueError('Schema 观察器修复字节不符合已核验版本')
+    return source, {'name': 'schema-public-contract-v1', 'scope': 'public_contract',
+        'original_runner_sha256': original, 'effective_runner_sha256': effective,
+        'preserves_frozen_contract': True}
+
+
 _EXECUTE = """import os,runpy,shutil,sys
 shutil.copytree('/source','/work/project')
 os.chdir('/work/project')
@@ -303,8 +345,10 @@ class ProjectVerifier:
             adapter = None
             if regression:
                 source, adapter = _native_regression_adapter(source, contract)
+            else:
+                source, adapter = _native_schema_adapter(source, specification)
             # verification会单独只读挂载；可信副本放输入根，确保执行的是已核SHA的实际字节。
-            execution_script = 'trusted-native-regression.py' if adapter else script
+            execution_script = ('trusted-native-regression.py' if regression else 'trusted-native-business.py') if adapter else script
             # 外层输入挂载只读，嵌套验证目录的挂载点必须先在宿主创建。
             (directory / 'verification').mkdir(exist_ok=True)
             target = directory / execution_script
@@ -365,14 +409,16 @@ class ProjectVerifier:
                     return {'status':'error','message':'原生准备阶段证明缺失，不能把环境异常算作业务失败'}
                 output=output.removeprefix(b'VIBEBENCH_NATIVE_READY_V1\n')
                 if completed.get('StatusCode') != 0 and not regression:
-                    return {'status': 'failed', 'message': '原生业务观察未正常结束', 'stderr': errors}
+                    return {'status': 'failed', 'message': '原生业务观察未正常结束', 'stderr': errors,
+                        **({'runtime_adapter': adapter} if adapter else {})}
                 if len(output) > 2 * 1024 * 1024:
                     return {'status': 'failed', 'message': '原生观察结果超过上限'}
                 try:
                     actual = json.loads(output)
                     canonical_json(actual)
                 except (ValueError, UnicodeError):
-                    return {'status': 'failed', 'message': '原生验收没有输出单一有效 JSON'}
+                    return {'status': 'failed', 'message': '原生验收没有输出单一有效 JSON',
+                        **({'runtime_adapter': adapter} if adapter else {})}
                 if regression:
                     expected_collection=digest_json([{'id':node['id'],'kind':node['kind']} for node in contract['nodes']])
                     valid=(completed.get('StatusCode')==0 and isinstance(actual,dict) and actual.get('status')=='passed' and actual.get('collection_matches_contract') is True
@@ -389,8 +435,17 @@ class ProjectVerifier:
                     if adapter is not None:
                         result['runtime_adapter'] = adapter
                     return result
-                return {'status': 'passed' if _same_json(actual, specification['expected']) else 'failed',
-                    'actual': actual, 'suite_digest': digest_json(specification), 'image': self.image}
+                diagnostics = {}
+                if adapter:
+                    # 只有精确核验过的观察器拥有诊断字段；其他输出仍按原协议逐字段严格比较。
+                    codes = actual.get('feedback_codes') if isinstance(actual, dict) else None
+                    if (not isinstance(codes, list) or len(codes) > len(_SCHEMA_FEEDBACK_CODES)
+                            or any(not isinstance(code, str) or code not in _SCHEMA_FEEDBACK_CODES for code in codes)):
+                        return {'status': 'failed', 'message': 'Schema 观察器诊断协议不合法', 'runtime_adapter': adapter}
+                    actual = {key: value for key, value in actual.items() if key != 'feedback_codes'}
+                    diagnostics = {'runtime_adapter': adapter, 'feedback_codes': codes}
+                return {'status': 'passed' if _same_json(actual, specification['expected']) and not diagnostics.get('feedback_codes') else 'failed',
+                    'actual': actual, 'suite_digest': digest_json(specification), 'image': self.image, **diagnostics}
         except _NativeRegressionControlError as error:
             return {'status': 'error', 'reason': 'unsupported_native_regression_runner', 'message': str(error)}
         except Exception as error:

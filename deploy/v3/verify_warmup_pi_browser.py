@@ -301,6 +301,35 @@ async def verify(evidence: Path) -> dict:
                 await until('document.querySelector("[data-warmup-console=\\"2\\"]") !== null')
                 await evaluate('document.querySelector("[data-warmup-console=\\"2\\"]").click()')
                 await until('document.querySelector("#projects-account")?.value === "2" && document.querySelector("#projects-screen")?.textContent === "养号工程当前最新画面"')
+                # 累计跨过单轮时长后仍等待计划接续；相同账号在另一空间不能继承这段现场。
+                turn_agent = warmup.service._one('SELECT * FROM projects_agents WHERE account_id=2')
+                turn_work = warmup.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+                project_agent = projects.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+                warmup.service._write('UPDATE projects_work SET status=?,work_sec=?,segment_started_at=NULL,ended_at=NULL WHERE id=?',
+                    ('paused', 1804.6653017997742, work['id']))
+                warmup.service._write('UPDATE projects_agents SET status=?,message=?,schedule_enabled=1,schedule_state=?,schedule_message=?,schedule_next_at=? WHERE account_id=2',
+                    ('paused', '服务已重启，保留原目标和会话', 'scheduled', '本轮指挥时限已到，将按计划接续原目标，累计耗时保留', time.time() + 90))
+                warmup.service._event(2, 'pi', {'text': '养号跨轮接续视图已更新'})
+                await until('document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到")')
+                assert await evaluate('document.querySelector("#projects-budget").textContent === "目标累计耗时 30 分 4 秒 · 下轮可用时长 30 分 0 秒" && document.querySelector("#projects-state").textContent.includes("待机") && document.querySelector("#projects-next-action").textContent === "到达下次时间后自动检查，接续未完成目标。"')
+                await evaluate('location.hash="#projects"')
+                await until('document.querySelector("#projects-title")?.textContent === "项目迭代" && document.querySelector("#projects-account")?.value === "1"')
+                await evaluate('document.querySelector("#projects-account").value="2";document.querySelector("#projects-account").dispatchEvent(new Event("change"))')
+                await until('document.querySelector("#projects-account").value === "2" && document.querySelector("[data-pi-action=start]").disabled')
+                assert not await evaluate('document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到") || document.querySelector("#projects-budget").textContent.includes("30 分 4 秒")')
+                assert projects.service._one('SELECT * FROM projects_agents WHERE account_id=1') == project_agent
+                assert projects.service._one('SELECT * FROM projects_agents WHERE account_id=2') is None
+                await evaluate('location.hash="#accounts"')
+                await until('document.querySelector("[data-warmup-console=\\"2\\"]") !== null')
+                await evaluate('document.querySelector("[data-warmup-console=\\"2\\"]").click()')
+                await until('document.querySelector("#projects-account")?.value === "2" && document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到")')
+                warmup.service._write('UPDATE projects_work SET status=?,work_sec=?,segment_started_at=?,ended_at=? WHERE id=?',
+                    (turn_work['status'], turn_work['work_sec'], turn_work['segment_started_at'], turn_work['ended_at'], work['id']))
+                warmup.service._write('UPDATE projects_agents SET status=?,message=?,schedule_enabled=?,schedule_state=?,schedule_message=?,schedule_next_at=? WHERE account_id=2',
+                    tuple(turn_agent[key] for key in ('status', 'message', 'schedule_enabled', 'schedule_state', 'schedule_message', 'schedule_next_at')))
+                warmup.service._event(2, 'pi', {'text': '养号跨轮隔离检查完成'})
+                await until('!document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到")')
+                checks.append('养号累计耗时不阻止按轮接续且相同账号跨空间不串现场')
                 # 新一轮由服务端事实驱动；浏览器只更新显示，不能自行清零或发控制请求。
                 cycle.update(number=3, completed=0)
                 warmup.service._write('UPDATE projects_agents SET current_work_id=NULL WHERE account_id=2')

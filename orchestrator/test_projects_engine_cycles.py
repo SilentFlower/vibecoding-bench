@@ -135,6 +135,38 @@ class ProjectsEngineCycleTests(unittest.TestCase):
         self.assertEqual(1, self.agent()['cycle_no'])
         self.terminal.cleanup_cycle.assert_not_called()
 
+    def test_timed_out_last_objective_resumes_without_resetting_600_cycle(self):
+        """最后一项累计超时仍接续原工作，六百项全部通过前不清理或重开整轮。:return: None。"""
+        self.complete(599)
+        self.service._write("UPDATE projects_agents SET generation=1,status='running' WHERE account_id=1")
+        original = self.service.tool(1, 1, 'claude_start',
+            {'project_key': self.catalog.keys[-1], 'objective_id': 'F-5'}, 'last-goal')
+        work = self.service._one('SELECT * FROM projects_work WHERE id=?', (original['work_id'],))
+        self.service._release(work, 'paused')
+        self.service._write('UPDATE projects_work SET work_sec=1804.6653017997742 WHERE id=?', (work['id'],))
+        self.service._write("UPDATE projects_agents SET status='paused' WHERE account_id=1")
+        self.service.configure_schedule(1, True, 1)
+        resumed = []
+
+        def run(configuration, tools, event, stop, timeout_sec):
+            """模拟下轮接续最后一项后再次到时。:param configuration: 配置。:param tools: 工具。:param event: 事件。:param stop: 取消。:param timeout_sec: 单轮剩余。:return: timeout。"""
+            resumed.append(tools('claude_start', {'project_key': self.catalog.keys[-1], 'objective_id': 'F-5'}, 'resume'))
+            return 'timeout'
+
+        self.service.pi.run = run
+        self.service.tick()
+        controller = self.service.controllers.get(1)
+        if controller:
+            controller[0].join(2)
+            self.assertFalse(controller[0].is_alive())
+        current = self.service.state(1)['agents'][0]
+        self.assertEqual((1, 599, 600), tuple(current['cycle'][key] for key in ('number', 'completed', 'total')))
+        self.assertEqual(original['work_id'], resumed[0]['work_id'])
+        self.assertEqual(original['session_id'], resumed[0]['session_id'])
+        self.assertGreaterEqual(current['work']['work_sec'], 1804.6653017997742)
+        self.assertEqual('scheduled', current['schedule']['state'])
+        self.terminal.cleanup_cycle.assert_not_called()
+
     def test_cleanup_failure_can_retry_without_resetting_old_facts(self):
         """清理中断保持本轮事实和旧轮号，成功重试才推进。:return: None。"""
         self.complete()

@@ -11,11 +11,11 @@ from sse_starlette.sse import EventSourceResponse
 
 
 class ProjectsAgentIn(BaseModel):
-    """配置账号的项目池、业务指南和工作预算。
+    """配置账号的项目池、业务指南和单轮指挥时限。
 
     :param project_keys: 允许 Pi 使用的项目列表。
     :param instructions: 用户提供的业务指南。
-    :param budget_sec: 单次指挥与工作累计预算。
+    :param budget_sec: 单轮指挥总时限，不限制目标跨轮累计耗时。
     """
     project_keys: list[StrictStr]
     instructions: StrictStr = ''

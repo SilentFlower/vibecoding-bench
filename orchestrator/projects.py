@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import random
 import threading
 import time
@@ -162,6 +163,7 @@ class ProjectsService:
         self.lock = threading.RLock()
         self.controllers = {}
         self.controller_identities = {}
+        self.controller_turns = {}
         self.closed = False
         self.scheduler_stop = threading.Event()
         self.scheduler_thread = None
@@ -216,7 +218,7 @@ class ProjectsService:
         :param account_id: 已存在的可用账号。
         :param project_keys: 允许该 Pi 操作的项目。
         :param instructions: 用户补充的业务指南。
-        :param budget_sec: 一次指挥及单目标累计工作时间上限。
+        :param budget_sec: 单轮指挥总时限；跨轮目标累计耗时仅保留统计。
         :return: 公开控制状态。
         """
         if (type(account_id) is not int or not self.account(account_id) or not isinstance(project_keys, list)
@@ -282,6 +284,51 @@ class ProjectsService:
         maximum = agent.get('schedule_interval_max_sec') or minimum
         return random.uniform(minimum, maximum) if maximum > minimum else minimum
 
+    def _turn_time(self, agent: dict) -> tuple[bool, float, float]:
+        """读取当前代次共用的单轮时钟，待机时展示下一轮完整时长。
+
+        :param agent: 持久控制者配置及代次。
+        :return: 是否在本轮、已经过秒数和剩余秒数。
+        """
+        turn = self.controller_turns.get(agent['account_id'])
+        if not turn or turn[0] != agent['generation']:
+            return False, 0, agent['budget_sec']
+        elapsed = max(0, time.monotonic() - turn[1])
+        return True, elapsed, max(0, turn[2] - time.monotonic())
+
+    def _recover_legacy_budget(self, agent: dict, work: dict | None, now: float) -> bool:
+        """为精确命中旧累计时限故障的计划重新检查门禁并排期。
+
+        :param agent: 尚未被其他控制者认领的配置。
+        :param work: 原未完成工作。
+        :param now: 本次检查的 UTC 秒。
+        :return: 是否处理了旧时限状态；其他阻塞不变。
+        """
+        if (not agent['schedule_enabled'] or agent['status'] != 'paused'
+                or agent['schedule_state'] != 'blocked' or agent['schedule_next_at'] is not None
+                or agent['schedule_message'] != '原任务累计预算已用尽，请调整预算或停止目标；定时运行不会重置预算'
+                or not work or work['status'] != 'paused' or work['runtime_json']
+                or work['segment_started_at'] is not None):
+            return False
+        account = self.account(agent['account_id'])
+        if not account or agent['schedule_identity'] != self.identity(account):
+            return False
+        hold, _ = self._eligibility(agent, work)
+        if hold:
+            return False
+        gate = self.admission(account, work)
+        # 迁移只撤销旧的累计时限解释；当前额度、认证和身份门禁仍由原逻辑决定。
+        if not gate['allowed']:
+            self._wait_gate(agent, gate, now)
+        else:
+            self._write("UPDATE projects_agents SET schedule_state='scheduled',schedule_next_at=?,schedule_message=?,updated_at=? "
+                "WHERE account_id=? AND generation=?", (now + self._next_interval(agent),
+                    '单轮时限规则已更新，将按计划接续原目标，累计耗时保留', now, agent['account_id'], agent['generation']))
+        self._event(agent['account_id'], 'budget_policy', {'reason': 'legacy_cumulative_limit_removed',
+            'generation': agent['generation'], 'elapsed_work_sec': work['work_sec'],
+            'turn_budget_sec': agent['budget_sec'], 'gate_allowed': bool(gate['allowed'])}, work['id'])
+        return True
+
     def start_scheduler(self) -> None:
         """启动本地计划扫描和持续门禁监控，扫描本身不调用模型。
 
@@ -323,6 +370,8 @@ class ProjectsService:
                         continue
                     checked = (agent['generation'], agent['updated_at'], agent['schedule_next_at'])
                     work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+                    if not controller and self._recover_legacy_budget(agent, work, now):
+                        continue
                 if controller and not controller[1].is_set():
                     # 运行中的 Pi 同样持续监控；无需启用计划才能受到额度与时段保护。
                     observation_failed = False
@@ -367,8 +416,6 @@ class ProjectsService:
                 return 'blocked', '原工作需要人工核对，不能自动恢复'
             if work['account_identity'] and work['account_identity'] != self.identity(self.account(agent['account_id'])):
                 return 'blocked', '原工作账号身份已变化，请先核对'
-            if work['work_sec'] >= agent['budget_sec']:
-                return 'blocked', '原任务累计预算已用尽，请调整预算或停止目标；定时运行不会重置预算'
             assets = self.catalog.for_work(work)
             _, definition = assets.objective(work['project_key'], work['objective_id'])
             if self._missing_prerequisites(agent['account_id'], assets, work['project_key'], definition):
@@ -698,10 +745,12 @@ class ProjectsService:
             elapsed = work['work_sec'] if work else 0
             if work and work['segment_started_at']:
                 elapsed += max(0, time.time() - work['segment_started_at'])
+            turn_active, turn_elapsed, turn_remaining = self._turn_time(agent)
             agent['progress'] = {'completed': completed, 'remaining': len(agent['remaining_objectives']),
                 'ready': len(agent['available_objectives']), 'waiting': len(agent['waiting_objectives']),
                 'total': completed + len(agent['remaining_objectives']), 'elapsed_work_sec': elapsed,
-                'remaining_work_sec': max(0, agent['budget_sec'] - elapsed) if work else agent['budget_sec']}
+                'remaining_work_sec': turn_remaining, 'turn_active': turn_active,
+                'turn_elapsed_sec': turn_elapsed, 'turn_budget_sec': agent['budget_sec']}
             event = self._one("SELECT kind,payload_json,created_at FROM projects_events WHERE account_id=? "
                 "AND kind IN ('pi','input','started','verification','error','gate_wait','cycle_started') ORDER BY id DESC LIMIT 1", (agent['account_id'],))
             agent['activity'] = None
@@ -1099,11 +1148,14 @@ class ProjectsService:
                 self.controllers[account_id] = (thread, stop)
                 self.controller_identities[account_id] = self.identity(account)
                 self.controller_owner_tokens[account_id] = (generation, owner_token)
+                started = time.monotonic()
+                self.controller_turns[account_id] = (generation, started, started + agent['budget_sec'])
                 try:
                     thread.start()
                 except Exception:
                     self.controllers.pop(account_id, None)
                     self.controller_identities.pop(account_id, None)
+                    self.controller_turns.pop(account_id, None)
                     self._write("UPDATE projects_agents SET status='blocked',message=?,schedule_state='blocked',schedule_next_at=NULL WHERE account_id=?",
                         ('Pi 控制线程未能启动，请人工核对后重试', account_id))
                     if retry_event:
@@ -1118,6 +1170,8 @@ class ProjectsService:
                     self.controller_identities.pop(account_id, None)
                 if self.controller_owner_tokens.get(account_id) == (generation, owner_token):
                     self.controller_owner_tokens.pop(account_id, None)
+                if self.controller_turns.get(account_id, (None,))[0] == generation:
+                    self.controller_turns.pop(account_id, None)
                 raise
         return self.state(account_id)
 
@@ -1170,6 +1224,9 @@ class ProjectsService:
             self._write('UPDATE projects_agents SET generation=generation+1,status=?,message=?,updated_at=? WHERE account_id=?',
                 ('blocked' if agent['status'] == 'blocked' or uncertain else 'waiting' if cooling else 'paused',
                     agent['message'] if cooling else '服务已重启，原会话和进度已保留', time.time(), agent['account_id']))
+            current = self._one('SELECT * FROM projects_agents WHERE account_id=?', (agent['account_id'],))
+            current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+            self._recover_legacy_budget(current, current_work, time.time())
             if agent['schedule_enabled'] and agent['schedule_state'] == 'completed' and not uncertain:
                 current = self._one('SELECT * FROM projects_agents WHERE account_id=?', (agent['account_id'],))
                 hold, _ = self._eligibility(current, work)
@@ -1242,6 +1299,10 @@ class ProjectsService:
 
         try:
             agent, work = self._current(account_id, generation)
+            with self.lock:
+                if self.controller_turns.get(account_id, (None,))[0] != generation:
+                    started = time.monotonic()
+                    self.controller_turns[account_id] = (generation, started, started + agent['budget_sec'])
             directory = self.data / ('projects/agents' if self.namespace == 'projects' else 'warmup-projects/agents') / str(account_id)
             directory.mkdir(parents=True, exist_ok=True, mode=0o700)
             session_file = agent['session_file']
@@ -1253,7 +1314,7 @@ class ProjectsService:
                     if evidence or work:
                         raise ValueError('Pi 原会话缺失，已保留现有业务进度，需恢复原会话文件')
                     session_file = None
-            config = {**provider, 'session_dir': str(directory), 'session_file': session_file, 'tools': TOOLS, 'timeout_sec': agent['budget_sec'],
+            config = {**provider, 'session_dir': str(directory), 'session_file': session_file, 'tools': TOOLS,
                 'instructions': AGENT_GUIDE + ('\n这是独立的养号工程空间。完成本轮全部授权工程目标后结束本次指挥。'
                     '服务会在下一次计划认领时核对全部独立验收、清理旧项目工作区并从原始内容开始新一轮。'
                     '不要自行删除项目、清零记录、跳过未完成工作或借用另一轮的通过事实。\n' if self.auto_cycle else '')
@@ -1264,9 +1325,14 @@ class ProjectsService:
             self._event(account_id, 'guide_loaded', {'generation': generation,
                 'user_guide_sha256': hashlib.sha256(agent['instructions'].encode()).hexdigest(),
                 'system_prompt_sha256': hashlib.sha256(config['instructions'].encode()).hexdigest()}, work['id'] if work else None)
-            outcome = self.pi.run(config,
-                lambda name, args, call_id: self.tool(account_id, generation, name, args, call_id, stop),
-                receive, stop, agent['budget_sec'])
+            _, _, remaining = self._turn_time(agent)
+            config['timeout_sec'] = remaining
+            if remaining <= 0:
+                outcome = 'timeout'
+            else:
+                outcome = self.pi.run(config,
+                    lambda name, args, call_id: self.tool(account_id, generation, name, args, call_id, stop),
+                    receive, stop, remaining)
         except Exception as error:
             failure_reason = None
             detail = str(error)[:300] if isinstance(error, ValueError) else type(error).__name__
@@ -1299,7 +1365,7 @@ class ProjectsService:
                                 'provider_conflict': 'Pi 上游返回 409 冲突，当前响应不允许自动恢复，原会话和预算已保留'}.get(failure_reason)
                             self._write('UPDATE projects_agents SET status=?,message=?,updated_at=? WHERE account_id=? AND generation=?',
                                 ('paused' if outcome != 'error' else 'blocked',
-                                    {'settled': 'Pi 已结束本轮指挥', 'stopped': '已停止', 'timeout': '本次指挥预算已用尽'}.get(outcome,
+                                    {'settled': 'Pi 已结束本轮指挥', 'stopped': '已停止', 'timeout': '本轮指挥时限已到，原目标和累计耗时已保留'}.get(outcome,
                                         failure_message or 'Pi 运行失败，请查看事件并检查模型工具调用兼容性'), time.time(), account_id, generation))
                             if agent['schedule_enabled']:
                                 current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
@@ -1311,7 +1377,8 @@ class ProjectsService:
                                     self._wait_gate(agent, gate, time.time())
                                 else:
                                     self._write('UPDATE projects_agents SET schedule_state=?,schedule_message=?,schedule_next_at=? WHERE account_id=? AND generation=?',
-                                        (hold or 'scheduled', message or '本轮已结束，按间隔自动继续',
+                                        (hold or 'scheduled', message or ('本轮指挥时限已到，将按计划接续原目标，累计耗时保留'
+                                            if outcome == 'timeout' else '本轮已结束，按间隔自动继续'),
                                             None if hold else time.time() + self._next_interval(agent), account_id, generation))
                 except Exception:
                     try:
@@ -1324,6 +1391,8 @@ class ProjectsService:
                     # 控制线程已经结束；回调异常也必须释放内存登记，不能让启动永远幂等到死线程。
                     self.controllers.pop(account_id, None)
                     self.controller_identities.pop(account_id, None)
+                    if self.controller_turns.get(account_id, (None,))[0] == generation:
+                        self.controller_turns.pop(account_id, None)
                     owned = self.controller_owner_tokens.get(account_id)
                     if owned and owned[0] == generation:
                         self.controller_owner_tokens.pop(account_id, None)
@@ -1483,9 +1552,10 @@ class ProjectsService:
         if not gate['allowed']:
             self._suspend_gate(account_id, generation, gate, time.time())
             return {'status': 'waiting', 'message': gate.get('message', '账号当前不可运行')}
-        remaining = int(agent['budget_sec'] - work['work_sec'])
+        _, _, remaining = self._turn_time(agent)
+        remaining = math.floor(remaining)
         if remaining <= 0:
-            raise ValueError('原任务累计预算已用尽，恢复不会重置预算')
+            raise ValueError('本轮指挥时限已到，等待下一轮接续原目标')
         work.update(generation=generation, remaining_sec=remaining)
         work['resume_required'] = bool(self._one("SELECT id FROM projects_actions WHERE work_id=? AND status='sent' LIMIT 1", (work['id'],)))
         info = self.terminal.start(account, work)
@@ -1496,6 +1566,8 @@ class ProjectsService:
                 self._current(account_id, generation)
                 if stop and stop.is_set():
                     raise ValueError('启动已取消或超过工作预算')
+                if self._turn_time(agent)[2] <= 0:
+                    raise ValueError('环境准备期间本轮指挥时限已到')
                 # 环境准备包含锁外 I/O；前置或身份在此期间改变时收口刚创建的终端。
                 missing = self._missing_prerequisites(account_id, assets, key, definition)
                 if missing:

@@ -44,6 +44,12 @@ class BrowserCatalog(CatalogFixture):
 class BrowserPi(PiFixture):
     """为浏览器表单操作保留充足时间，不调用模型或真实账号。"""
 
+    def __init__(self):
+        """初始化可控的单轮到时信号和实际调用时限记录。:return: None。"""
+        super().__init__()
+        self.timeout_turn = threading.Event()
+        self.turn_timeouts = []
+
     def run(self, configuration, tools, event, stop, timeout_sec):
         """持有合成控制者直到页面暂停，避免表单验证被短夹具超时打断。
 
@@ -55,7 +61,14 @@ class BrowserPi(PiFixture):
         :return: 已停止状态。
         """
         self.entered.set()
-        stop.wait(min(60, timeout_sec))
+        self.turn_timeouts.append(timeout_sec)
+        deadline = time.monotonic() + min(60, timeout_sec)
+        while not stop.wait(0.05):
+            if self.timeout_turn.is_set():
+                self.timeout_turn.clear()
+                return 'timeout'
+            if time.monotonic() >= deadline:
+                break
         return 'stopped'
 
 
@@ -247,7 +260,8 @@ async def verify(evidence: Path) -> dict:
                     for _ in range(100):
                         if await evaluate(expression): return
                         await asyncio.sleep(0.1)
-                    raise AssertionError('浏览器等待失败：' + expression)
+                    diagnostic = await evaluate('Object.fromEntries(["state","message","feedback","budget"].map(key=>[key,document.querySelector("#projects-"+key)?.textContent]))')
+                    raise AssertionError('浏览器等待失败：' + expression + '；页面状态：' + json.dumps(diagnostic, ensure_ascii=False))
 
                 async def reload():
                     """等待新文档真正替换旧页面，避免重载回显断言读到原 DOM。
@@ -468,6 +482,46 @@ async def verify(evidence: Path) -> dict:
                 assert configuration.agent_configuration()['api_key'] == 'browser-private-key'
                 assert 'api_key' not in configuration.public()
                 assert not await evaluate('!!document.querySelector("[id^=projects-legacy], [data-legacy]") || document.querySelector("#projects-agent-form").closest("section.view").textContent.includes("旧 Projects 只读历史")')
+                # 具体计划阻塞原因优先展示，避免重启后的通用文案掩盖真正需要处理的条件。
+                fixture.service._write('UPDATE projects_agents SET message=?,schedule_state=?,schedule_message=? WHERE account_id=1',
+                    ('服务已重启，保留原目标和会话', 'blocked', '合成模型配置需要处理'))
+                fixture.service._event(1, 'pi', {'text': '计划具体阻塞说明已更新'})
+                await until('document.querySelector("#projects-message").textContent === "合成模型配置需要处理"')
+                # 累计已跨过单轮时长，下一轮仍应恢复同一目标，并取得完整的单轮时限。
+                fixture.service._write('UPDATE projects_work SET status=?,work_sec=?,segment_started_at=NULL,ended_at=NULL WHERE id=?',
+                    ('paused', 1804.6653017997742, work['id']))
+                fixture.service.configure_schedule(1, True, 19)
+                fixture.service._write('UPDATE projects_agents SET status=?,budget_sec=?,schedule_enabled=1,schedule_state=?,schedule_message=?,schedule_next_at=? WHERE account_id=1',
+                    ('paused', 1800, 'scheduled', '原目标等待下一轮接续', time.time() + 90))
+                fixture.service._event(1, 'pi', {'text': '原目标跨轮接续视图已更新'})
+                await until('document.querySelector("#projects-message").textContent === "原目标等待下一轮接续"')
+                assert await evaluate('document.querySelector("#projects-budget").textContent === "目标累计耗时 30 分 4 秒 · 下轮可用时长 30 分 0 秒" && document.querySelector("#projects-state").textContent.includes("待机")')
+                assert await evaluate('document.querySelector("[name=budget_minutes]").closest("label").textContent.includes("单轮指挥时长") && !document.querySelector("#projects-agent-form").textContent.includes("累计预算耗尽")')
+                await evaluate('document.querySelector("[data-pi-action=start]").click()')
+                await until('document.querySelector("#projects-state").textContent.includes("指挥中") && document.querySelector("#projects-budget").textContent.includes("本轮剩余")')
+                resumed_turn = fixture.service.view(1)['agents'][0]
+                assert 1700 < fixture.pi.turn_timeouts[-1] <= 1800
+                assert resumed_turn['controller_active'] and resumed_turn['work']['id'] == work['id']
+                assert resumed_turn['work']['session_id'] == work['session_id']
+                assert resumed_turn['progress']['elapsed_work_sec'] == 1804.6653017997742
+                assert resumed_turn['progress']['turn_active'] and resumed_turn['progress']['turn_budget_sec'] == 1800
+                assert 1700 < resumed_turn['progress']['remaining_work_sec'] <= 1800
+                # 用隔离 Pi 返回真实 timeout 结果，经真实收口与计划分支驱动界面，不等待实际三十分钟。
+                fixture.pi.timeout_turn.set()
+                await until('document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到") && document.querySelector("#projects-state").textContent.includes("待机") && document.querySelector("#projects-budget").textContent.includes("下轮可用时长")')
+                ended_turn = fixture.service.view(1)['agents'][0]
+                assert not ended_turn['controller_active'] and ended_turn['status'] == 'paused'
+                assert ended_turn['schedule']['enabled'] and ended_turn['schedule']['state'] == 'scheduled'
+                assert ended_turn['schedule']['next_run_at'] > time.time()
+                assert ended_turn['progress']['elapsed_work_sec'] == 1804.6653017997742
+                assert not ended_turn['progress']['turn_active'] and ended_turn['progress']['remaining_work_sec'] == 1800
+                assert await evaluate('document.querySelector("#projects-budget").textContent === "目标累计耗时 30 分 4 秒 · 下轮可用时长 30 分 0 秒" && document.querySelector("#projects-next-action").textContent === "到达下次时间后自动检查，接续未完成目标。" && !document.querySelector("#projects-overview").textContent.includes("累计预算已用尽")')
+                turn_evidence = await evaluate('Object.fromEntries(["state","message","budget","next-action","schedule-next"].map(key=>[key,document.querySelector("#projects-"+key).textContent]))')
+                await evaluate('document.querySelector("#projects-account").value="2";document.querySelector("#projects-account").dispatchEvent(new Event("change"))')
+                await until('document.querySelector("#projects-account").value === "2" && document.querySelector("#projects-current").textContent.includes("尚未开始工程目标")')
+                assert not await evaluate('document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到") || document.querySelector("#projects-budget").textContent.includes("30 分 4 秒")')
+                await evaluate('document.querySelector("#projects-account").value="1";document.querySelector("#projects-account").dispatchEvent(new Event("change"))')
+                await until('document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到")')
                 await evaluate('document.querySelectorAll(".projects-settings > details").forEach(value=>value.open=false);document.querySelector("#projects-tab-terminal").click();window.scrollTo(0,0);')
                 for width, height, theme, name in ((1280, 900, 'dark', 'desktop'), (390, 844, 'light', 'mobile')):
                     await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False}, session)
@@ -487,6 +541,10 @@ async def verify(evidence: Path) -> dict:
         assert source_sha256 == {relative: hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
             for relative in source_paths}, '受测源码在验证期间发生变化，请重新验证'
         result = {'status': 'passed', 'started_at': started_at, 'finished_at': time.time(), 'source_sha256': source_sha256,
+            'turn_time_limit': {'elapsed_work_sec': 1804.6653017997742, 'budget_sec': 1800,
+                'pi_timeout_sec': fixture.pi.turn_timeouts[-1],
+                'active_remaining_work_sec': resumed_turn['progress']['remaining_work_sec'],
+                'synthetic_pi_timeout': True, 'display': turn_evidence},
             'feed_fixture': {'historical_observations': 450, 'historical_works': len(historical_works),
                 'initial_cursor': initial_cursor, 'reconnected_last_event_id': str(disconnect_id)},
             'checks': ['真实表单与SQLite保存', 'Pi启动暂停', 'SSE事件及切页关闭',
@@ -499,6 +557,8 @@ async def verify(evidence: Path) -> dict:
             '计划切账号及重载回填', '人工暂停关闭自动计划',
             '顶部账号与总览及默认收起配置', '真实目标进度与已完成状态', '完成目标总览与工程列表及交付详情显示耗时',
             '累计耗时排除暂停等待及小时格式保留秒数', '未知额度不冒充零',
+            '具体计划阻塞原因优先于重启通用文案', '目标累计跨越单轮时限仍恢复原目标原会话',
+            '活动轮剩余与下轮可用时长明确区分', '单轮到时真实收口并按原计划等待接续', '单轮接续状态切换账号不串',
             '额度阈值与操作回执缓存', '启动即时反馈及禁止重复点击', '终端交互标签与明确等待原因',
             '待机倒计时及全部配置编辑保护', '折叠配置搜索快捷键',
             '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '无旧历史入口及请求', '1280暗色与390亮色布局']}

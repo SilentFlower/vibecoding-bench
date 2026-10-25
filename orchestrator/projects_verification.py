@@ -168,8 +168,13 @@ class ProjectsVerification:
             report = {'status': status, 'business': report, 'previous_objectives': accepted_reports}
         write_document(directory / 'program.json', report)
         if report['status'] != 'passed':
+            reasons = {'schema_error_positions': '校验错误的位置、代码或顺序不符合公开约定',
+                'schema_strict_error_cap': '严格模式的异常错误列表或精确数量上限不符合公开约定',
+                'schema_invalid_rules': '非法布尔规则、字符串 choices 或不可比较边界未被明确拒绝',
+                'schema_input_unchanged': '校验过程改变了输入表的行数'}
             return {'status': report['status'], 'checks': checks,
-                'feedback': ['隔离程序或回归验收未通过，依据原工程目标修复；基础设施错误不能算业务失败'],
+                'feedback': ['隔离程序或回归验收未通过，依据原工程目标修复；基础设施错误不能算业务失败']
+                    + [reasons[code] for code in report.get('feedback_codes', []) if code in reasons],
                 'program': self._public_facts(report)}
         if definition['evaluation'].get('semantic'):
             rubric = load_rubric(project.root, definition)
@@ -220,7 +225,7 @@ class ProjectsVerification:
         if isinstance(report.get('runtime_adapter'), dict):
             result['runtime_adapter'] = {key: report['runtime_adapter'][key] for key in
                 ('name', 'scope', 'original_runner_sha256', 'effective_runner_sha256', 'expected_nodes',
-                    'expected_duplicate_identities', 'preserves_frozen_duplicate_counts')
+                    'expected_duplicate_identities', 'preserves_frozen_duplicate_counts', 'preserves_frozen_contract')
                 if key in report['runtime_adapter']}
         for key in ('collection_errors', 'feedback_codes'):
             if isinstance(report.get(key), list):

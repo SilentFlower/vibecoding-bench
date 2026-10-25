@@ -469,7 +469,7 @@ window.ProjectsUI = (() => {
       ? `<p class="projects-target-state">${unfinished ? escape(names[work.status] || work.status) : work.status === 'passed' ? '上一目标已验收通过' : '上一目标已停止'}</p><strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p>`
       : '<p class="hint">尚未开始工程目标，Pi 会从授权项目池选择。</p>';
     $('#projects-budget').textContent = unfinished
-      ? `当前目标累计 ${duration(progress?.elapsed_work_sec)} · 剩余预算 ${duration(progress?.remaining_work_sec)}`
+      ? `目标累计耗时 ${duration(progress?.elapsed_work_sec)} · ${progress?.turn_active ? '本轮剩余' : '下轮可用时长'} ${duration(progress?.remaining_work_sec)}`
       : work ? workDuration(work) : '';
     const activity = agent?.activity;
     $('#projects-activity').textContent = activity?.text
@@ -494,7 +494,9 @@ window.ProjectsUI = (() => {
     else if (schedule?.enabled) status = schedule.state === 'waiting' ? '等待运行条件' : '待机 · 已安排自动启动';
     $('#projects-state').textContent = status;
     $('#projects-overview').dataset.state = pending ? 'pending' : active ? 'running' : schedule?.state || agent?.status || 'off';
-    $('#projects-message').textContent = agent?.message || '';
+    $('#projects-message').textContent = schedule?.state === 'blocked'
+      || (!active && schedule?.enabled && schedule.state === 'scheduled')
+      ? schedule.message || agent?.message || '' : agent?.message || '';
     $('#projects-admission').textContent = !agent ? '选择账号并保存项目池后，查看运行条件。'
       : admission?.allowed === false ? admission.message || '当前执行条件未满足。'
       : admission?.allowed === true ? `运行条件允许${admission.window?.timezone ? ` · 账号时区 ${admission.window.timezone}` : ''}` : '执行条件尚未采集。';
@@ -509,7 +511,7 @@ window.ProjectsUI = (() => {
       else if (schedule?.state === 'completed' || agent.progress?.remaining === 0) next = '授权项目池已完成，扩充项目池后继续。';
       else if (admission?.allowed === false) next = schedule?.enabled && admission.retryable ? '满足运行条件后自动恢复原目标。' : '运行条件解除后，手动启动或恢复。';
       else if (schedule?.enabled) next = '到达下次时间后自动检查，接续未完成目标。';
-      else next = unfinished ? '点击“启动 / 恢复 Pi”继续原目标，累计预算保持不变。' : '点击“启动 / 恢复 Pi”，从授权池选择未完成目标。';
+      else next = unfinished ? '点击“启动 / 恢复 Pi”接续原目标并开始新一轮计时，保留目标累计耗时。' : '点击“启动 / 恢复 Pi”，从授权池选择未完成目标。';
     }
     $('#projects-next-action').textContent = next;
     paintProgress(agent); paintQuota(admission);
@@ -663,7 +665,7 @@ window.ProjectsUI = (() => {
         message = payload.message || {retry: `模型暂不可用，约 ${seconds} 秒后重试。`,
           fallback: `模型暂不可用，约 ${seconds} 秒后切换到 ${payload.model}。`,
           recovered: '模型已恢复，继续原会话。', reset: '已重置自动恢复次数，继续原会话。',
-          scheduled: '已安排自动恢复，原会话和预算已保留。', exhausted: '自动恢复已用尽，请人工检查。',
+          scheduled: '已安排自动恢复，原会话和目标累计耗时已保留。', exhausted: '自动恢复已用尽，请人工检查。',
           paused: '自动恢复已暂停，原会话已保留。'}[payload.phase] || '正在恢复模型，原会话已保留。';
       } else if (item.kind === 'manual_retry') message ||= '已人工确认重试，继续原目标和原会话。';
       else if (item.kind === 'guide_loaded') message = '本轮已将保存的追加业务指南与默认指南一起交给 Pi。';

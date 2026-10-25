@@ -86,7 +86,7 @@
         <p id="projects-feedback" class="hint projects-feedback hidden" role="status" aria-live="polite" aria-atomic="true"></p>
         <p id="projects-admission" class="projects-admission" role="status">选择账号后显示执行条件。</p>
         <div class="projects-overview-grid">
-          <article class="projects-summary-card projects-target"><span class="lbl" id="projects-target-label">当前目标</span><div id="projects-current"></div><p class="hint" id="projects-budget" title="按实际累计执行时间统计，暂停和计划等待不计入。"></p><p class="hint" id="projects-activity"></p></article>
+          <article class="projects-summary-card projects-target"><span class="lbl" id="projects-target-label">当前目标</span><div id="projects-current"></div><p class="hint" id="projects-budget" title="目标累计耗时按实际执行时间统计，暂停和计划等待不计入；本轮剩余时间独立计时，下一轮接续原目标。"></p><p class="hint" id="projects-activity"></p></article>
           <article class="projects-summary-card"><span class="lbl">授权项目池进度</span><strong class="projects-metric" id="projects-progress-text">尚未采集</strong><p class="hint" id="projects-cycle">周期进度尚未采集</p><progress class="projects-progress hidden" id="projects-progress-bar" max="100" aria-label="已通过工程目标占比"></progress><p class="hint" id="projects-progress-detail">以独立验收通过的目标计数。</p></article>
           <article class="projects-summary-card"><span class="lbl">下一步</span><p id="projects-next-action">选择账号并保存项目池。</p><p class="hint" id="projects-schedule-status" role="status">尚未启用定时指挥</p><p class="hint" id="projects-schedule-next"></p></article>
         </div>
@@ -112,8 +112,8 @@
         <details id="projects-agent-settings" class="batch-panel">
           <summary class="projects-settings-title"><strong>项目池与业务指南</strong><span class="hint" id="projects-selected-count" role="status"></span></summary>
           <form id="projects-agent-form" class="form">
-            <label><span class="lbl">本轮最长工作时间 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="60" required></label>
-            <p class="hint">恢复接续原目标与会话；累计预算耗尽后需人工调整，定时运行不会清零。</p>
+            <label><span class="lbl">单轮指挥时长 · 分钟</span><input type="number" name="budget_minutes" min="1" max="1440" value="60" required></label>
+            <p class="hint">每轮到时保留原目标与会话，开启定时后按计划接续；新一轮重新计时，目标累计耗时仅作统计。</p>
             <label><span class="lbl">给 Pi 的业务指南</span><textarea name="instructions" rows="4" maxlength="12000" placeholder="例如：先调查并讨论方案，确认后实施；优先完成一个目标，再换项目。"></textarea></label>
             <p class="hint">可用中文补充业务指南，保存后的原文会交给 Pi；与 Claude Code 的自然语言交流使用英文。修改指南前请先暂停，保存后启动 / 恢复生效。</p>
             <label><span class="lbl">授权项目池</span><input id="projects-filter" type="search" placeholder="搜索项目研究"></label>
@@ -814,7 +814,7 @@
     </div>
   </div>
 
-  <script src="projects.js?v=20261025-separate-projects-warmup"></script>
+  <script src="projects.js?v=20261025-turn-budget"></script>
   <script src="app.js?v=20261025-separate-projects-warmup"></script>
 </body>
 </html>

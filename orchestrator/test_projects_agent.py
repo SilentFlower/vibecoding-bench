@@ -322,7 +322,8 @@ class ProjectsAgentTests(unittest.TestCase):
         self.allowed = True
         resumed = self.start_work()
         self.assertEqual(original['session_id'], resumed['session_id'])
-        self.assertLess(self.terminal.started[-1][1]['remaining_sec'], 3600)
+        self.assertEqual(3600, self.terminal.started[-1][1]['remaining_sec'])
+        self.assertGreaterEqual(self.service.state(1)['agents'][0]['work']['work_sec'], 12)
         self.assertEqual('VALUE = 2\n', (self.terminal.workspace(work) / 'library/app.py').read_text())
 
     def test_actual_verification_failure_does_not_finish_work(self):
@@ -350,7 +351,7 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertNotIn('resume', [operation for _, operation in self.terminal.controls])
 
     def test_restart_reserves_elapsed_work_and_preserves_unknown_input(self):
-        """重启不能重置累计预算，未确认输入仍需对账。:return: None。"""
+        """重启不能清零累计耗时，未确认输入仍需对账。:return: None。"""
         self.activate(); result = self.start_work()
         self.service._write('UPDATE projects_work SET segment_started_at=? WHERE id=?', (time.time() - 25, result['work_id']))
         self.service._write("INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)",
@@ -418,7 +419,9 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual(165.04067087173462, saved['work_sec'])
         self.assertIsNone(saved['runtime_json'])
         self.assertIsNone(saved['segment_started_at'])
-        self.assertEqual(1800, pi.calls[0][1])
+        self.assertGreaterEqual(pi.calls[0][1], 1798)
+        self.assertLessEqual(pi.calls[0][1], 1800)
+        self.assertEqual(pi.calls[0][0]['timeout_sec'], pi.calls[0][1])
         self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
         self.assertEqual({'message': message, 'reason': 'provider_content_filter', 'generation': generation},
             self.service.events(1)[-1]['payload'])
@@ -451,7 +454,7 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual({'message': '模型请求失败'}, self.service.events(1)[-1]['payload'])
 
     def test_manual_start_retries_only_original_model_and_sessions_once(self):
-        """明确人工启动可恢复已核实故障，旧诊断跨服务代次仍使用原会话与累计预算。:return: None。"""
+        """明确人工启动可恢复已核实故障，旧诊断跨服务代次仍保留原会话与累计耗时。:return: None。"""
         for account_id, operator in ((1, False), (2, True)):
             with self.subTest(operator_diagnosis=operator):
                 work, error, session_file = self.prepare_filter_blocked(account_id, operator)
@@ -468,7 +471,8 @@ class ProjectsAgentTests(unittest.TestCase):
                 self.assertEqual(work['session_id'], pi.result['session_id'])
                 self.assertEqual(work['work_sec'], resumed['work_sec'])
                 self.assertEqual(1800, agent['budget_sec'])
-                self.assertEqual(1634, self.terminal.started[-1][1]['remaining_sec'])
+                self.assertGreaterEqual(self.terminal.started[-1][1]['remaining_sec'], 1798)
+                self.assertLessEqual(self.terminal.started[-1][1]['remaining_sec'], 1800)
                 self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
                 self.assertEqual(['test'], pi.calls[0][0]['models'])
                 self.assertEqual(1, len(pi.calls))
@@ -491,20 +495,20 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual([], [item for item in self.service.events(1) if item['kind'] == 'manual_retry'])
 
     def test_manual_retry_does_not_bypass_other_blocking_facts(self):
-        """人工重试不解除未知输入、身份变化、预算耗尽、合同变化或更新故障。:return: None。"""
+        """人工重试不解除未知输入、身份变化、项目撤权、合同变化或更新故障。:return: None。"""
         work, error, _ = self.prepare_filter_blocked()
         original_account = self.service.account
         original_payload = self.service._one('SELECT payload_json FROM projects_events WHERE id=?', (error['id'],))['payload_json']
         last_event_id = self.service.events(1)[-1]['id']
-        for condition in ('unknown', 'identity', 'budget', 'contract', 'other_error', 'stale_generation', 'untrusted_diagnosis', 'newer_start'):
+        for condition in ('unknown', 'identity', 'authorization', 'contract', 'other_error', 'stale_generation', 'untrusted_diagnosis', 'newer_start'):
             with self.subTest(condition=condition):
                 if condition == 'unknown':
                     self.service._write("INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)",
                         ('pending', work['id'], work['generation'], '{}', 'unknown', time.time()))
                 elif condition == 'identity':
                     self.service.account = lambda account_id: {'id': account_id, 'cc2api_account_id': 99}
-                elif condition == 'budget':
-                    self.service._write('UPDATE projects_work SET work_sec=1800 WHERE id=?', (work['id'],))
+                elif condition == 'authorization':
+                    self.service._write('UPDATE projects_agents SET project_keys_json=? WHERE account_id=1', ('["other"]',))
                 elif condition == 'contract':
                     self.service._write("UPDATE projects_work SET definition_json='{}' WHERE id=?", (work['id'],))
                 elif condition == 'other_error':
@@ -525,6 +529,7 @@ class ProjectsAgentTests(unittest.TestCase):
                 self.assertFalse(self.pi.entered.is_set())
                 self.assertEqual([], [item for item in self.service.events(1) if item['kind'] == 'manual_retry'])
                 self.service.account = original_account
+                self.service._write('UPDATE projects_agents SET project_keys_json=? WHERE account_id=1', ('["example"]',))
                 self.service._write('DELETE FROM projects_actions WHERE id=?', ('pending',))
                 self.service._write('DELETE FROM projects_events WHERE id>?', (last_event_id,))
                 self.service._write('UPDATE projects_events SET payload_json=? WHERE id=?', (original_payload, error['id']))
@@ -605,8 +610,11 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual(work['id'], pi.result['work_id'])
         self.assertEqual(work['session_id'], pi.result['session_id'])
         self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
-        self.assertEqual(1800, pi.calls[0][1])
-        self.assertEqual(1634, self.terminal.started[-1][1]['remaining_sec'])
+        self.assertGreaterEqual(pi.calls[0][1], 1798)
+        self.assertLessEqual(pi.calls[0][1], 1800)
+        self.assertEqual(pi.calls[0][0]['timeout_sec'], pi.calls[0][1])
+        self.assertGreaterEqual(self.terminal.started[-1][1]['remaining_sec'], 1798)
+        self.assertLessEqual(self.terminal.started[-1][1]['remaining_sec'], 1800)
         self.assertEqual([], self.terminal.sent)
         manual = [event for event in self.service.events(1) if event['kind'] == 'manual_retry']
         self.assertEqual(1, len(manual))
@@ -615,20 +623,20 @@ class ProjectsAgentTests(unittest.TestCase):
         self.service.pause(1)
         controller.join(2)
 
-    def test_manual_conflict_retry_does_not_bypass_input_budget_or_account_gates(self):
-        """已知冲突不能掩盖未知输入、预算耗尽、执行门禁或更新的未知故障。:return: None。"""
+    def test_manual_conflict_retry_does_not_bypass_input_authorization_or_account_gates(self):
+        """已知冲突不能掩盖未知输入、项目撤权、执行门禁或更新的未知故障。:return: None。"""
         work, failed_pi, _ = self.prepare_model_unavailable()
         failed_pi.events = [{'type': 'error', 'reason': 'provider_conflict', 'message': '上游不允许自动重试'}]
         self.service._run(1, 1, self.service.provider(), threading.Event())
         self.service.pi = self.pi
         last_event_id = self.service.events(1)[-1]['id']
-        for condition in ('unknown_input', 'budget', 'admission', 'unknown_error'):
+        for condition in ('unknown_input', 'authorization', 'admission', 'unknown_error'):
             with self.subTest(condition=condition):
                 if condition == 'unknown_input':
                     self.service._write("INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)",
                         ('pending', work['id'], work['generation'], '{}', 'unknown', time.time()))
-                elif condition == 'budget':
-                    self.service._write('UPDATE projects_work SET work_sec=1800 WHERE id=?', (work['id'],))
+                elif condition == 'authorization':
+                    self.service._write('UPDATE projects_agents SET project_keys_json=? WHERE account_id=1', ('["other"]',))
                 elif condition == 'admission':
                     self.allowed = False
                 else:
@@ -644,6 +652,7 @@ class ProjectsAgentTests(unittest.TestCase):
                 self.assertEqual([], self.terminal.sent)
                 self.assertEqual([], [event for event in self.service.events(1) if event['kind'] == 'manual_retry'])
                 self.allowed = True
+                self.service._write('UPDATE projects_agents SET project_keys_json=? WHERE account_id=1', ('["example"]',))
                 self.service._write('DELETE FROM projects_actions WHERE id=?', ('pending',))
                 self.service._write('DELETE FROM projects_events WHERE id>?', (last_event_id,))
                 self.service._write('UPDATE projects_work SET work_sec=? WHERE id=?', (work['work_sec'], work['id']))
@@ -726,7 +735,7 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual(work['work_sec'], saved['work_sec'])
         self.assertEqual(1800, agent['budget_sec'])
         self.assertEqual(4, len(pi.calls))
-        self.assertTrue(all(call[0]['session_file'] == str(session_file) and call[0]['timeout_sec'] == 1800 for call in pi.calls))
+        self.assertTrue(all(call[0]['session_file'] == str(session_file) and 1798 <= call[0]['timeout_sec'] <= 1800 for call in pi.calls))
         self.assertEqual(1, len(self.terminal.started))
         self.assertEqual([], self.terminal.sent)
         due = agent['schedule_next_at']
@@ -821,10 +830,10 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertEqual(1, len(pi.calls))
         self.assertEqual(work['work_sec'], self.service._one('SELECT work_sec FROM projects_work WHERE id=?', (work['id'],))['work_sec'])
 
-    def test_model_recovery_preserves_unknown_input_and_budget_blocks(self):
-        """临时模型故障不能解除未知输入或耗尽预算的工作。:return: None。"""
+    def test_model_recovery_preserves_unknown_input_and_authentication_blocks(self):
+        """临时模型故障不能解除未知输入或认证阻塞。:return: None。"""
         work, pi, _ = self.prepare_model_unavailable()
-        for reason in ('unknown', 'budget'):
+        for reason in ('unknown', 'authentication'):
             with self.subTest(reason=reason):
                 self.service._write("UPDATE projects_agents SET status='running' WHERE account_id=1")
                 self.service._write("UPDATE projects_work SET status='paused' WHERE id=?", (work['id'],))
@@ -832,7 +841,8 @@ class ProjectsAgentTests(unittest.TestCase):
                     self.service._write("INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)",
                         ('pending', work['id'], 1, '{}', 'unknown', time.time()))
                 else:
-                    self.service._write('UPDATE projects_work SET work_sec=1800 WHERE id=?', (work['id'],))
+                    self.service.admission = lambda *_: {'allowed': False, 'retryable': False,
+                        'reason': 'authentication', 'message': '账号认证需要人工核对'}
                 self.service._run(1, 1, self.service.provider(), threading.Event())
                 agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
                 self.assertEqual(('blocked', None), (agent['status'], agent['schedule_next_at']))
