@@ -15,6 +15,7 @@
 !images/pi-agent/package.json
 !images/pi-agent/package-lock.json
 !images/pi-agent/host.mjs
+!images/pi-agent/context-policy.mjs
 !research
 !research/github-projects
 !research/github-projects/*.md

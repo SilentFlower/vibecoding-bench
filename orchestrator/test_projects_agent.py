@@ -263,8 +263,8 @@ class ProjectsAgentTests(unittest.TestCase):
             agent['available_objectives'])
         self.assertEqual('example', agent['passed'][0]['project_key'])
 
-    def test_six_hundred_objectives_keep_a_complete_model_index_without_duplicate_payload(self):
-        """600项保持完整可启动索引，未完成总数不再携带重复正文。:return: None。"""
+    def test_six_hundred_objectives_are_fully_pageable_without_duplicate_payload(self):
+        """600项可分页完整遍历，真实总数防止将首屏误认为全部目标。:return: None。"""
         self.activate()
         objectives = [{'id': f'goal-{index}', 'goal': f'独立完整工程交付{index}'} for index in range(600)]
         self.catalog.project = lambda key, detail=False: {'project_key': key, 'ready': True,
@@ -272,11 +272,59 @@ class ProjectsAgentTests(unittest.TestCase):
         full = self.service.state(1)['agents'][0]
         model = self.tool('account_state')['agents'][0]
         self.assertEqual(600, model['remaining_objective_count'])
-        self.assertEqual({item['id'] for item in objectives},
-            {item['objective_id'] for item in model['available_objectives']})
+        self.assertEqual(600, model['objective_page']['available_objectives_total'])
+        self.assertEqual(10, len(model['available_objectives']))
+        seen, offset = [], 0
+        while offset is not None:
+            page = self.tool('account_state', {'offset': offset, 'limit': 20})['agents'][0]
+            seen.extend(item['objective_id'] for item in page['available_objectives'])
+            offset = page['objective_page']['next_offset']
+        self.assertEqual([item['id'] for item in objectives], seen)
+        self.assertEqual(600, len(full['available_objectives']))
         self.assertEqual([], model['waiting_objectives'])
         self.assertNotIn('remaining_objectives', model)
+        self.assertNotIn('instructions', model)
         self.assertLess(len(json.dumps(model, ensure_ascii=False)), len(json.dumps(full, ensure_ascii=False)) * 0.6)
+
+    def test_project_material_pages_restore_only_the_selected_objective(self):
+        """按目标读取的所有片段可还原原文，其他目标和研究不会重复夹带。:return: None。"""
+        self.activate()
+        objective = {'id': 'feature', 'goal': '原目标', 'prompt': '公开需求🧪' * 1200,
+            'materials': {'public.md': '完整材料' * 1500}}
+        research = {'report': '项目研究' * 1800, 'roadmap': '工程路线' * 1200}
+        self.catalog.project = lambda key, detail=True: {'project_key': key, 'objectives': [objective,
+            {'id': 'other', 'prompt': 'OTHER_OBJECTIVE_MUST_NOT_ENTER'}], 'research': research}
+        for args, expected in (({'objective_id': 'feature'}, objective), ({'section': 'research'}, research)):
+            with self.subTest(section=args):
+                pieces, offset = [], 0
+                while offset is not None:
+                    page = self.tool('project_read', {'project_key': 'example', **args, 'offset': offset})
+                    self.assertLessEqual(len(page['content']), 2000)
+                    pieces.append(page['content'])
+                    offset = page['next_offset']
+                document = ''.join(pieces)
+                self.assertEqual(expected, json.loads(document))
+                self.assertEqual(len(document), page['total_chars'])
+                self.assertNotIn('OTHER_OBJECTIVE_MUST_NOT_ENTER', document)
+        short = self.tool('project_read', {'project_key': 'example', 'objective_id': 'feature', 'limit': 17})
+        self.assertEqual(17, len(short['content']))
+        self.assertEqual(17, short['next_offset'])
+        for args in ({'offset': -1}, {'offset': True}, {'section': 'objective'}, {'limit': True}, {'limit': 2001},
+                {'objective_id': 'missing'}, {'offset': 10 ** 9}, {'section': 'private'}):
+            self.assertEqual('rejected', self.tool('project_read', {'project_key': 'example', **args})['status'])
+
+    def test_context_events_only_publish_valid_bounded_statistics(self):
+        """压缩事件只保存计数和原因，不能泄漏会话正文或伪造统计。:return: None。"""
+        self.activate()
+        for event in ({'reason': 'threshold', 'before_tokens': True, 'after_tokens': 1},
+                {'reason': 'unknown', 'before_tokens': 100, 'after_tokens': 10}):
+            self.service._pi_event(1, 1, {'type': 'context', **event})
+        self.assertIsNone(self.service._one("SELECT id FROM projects_events WHERE kind='context_compacted'"))
+        self.service._pi_event(1, 1, {'type': 'context', 'reason': 'startup', 'before_tokens': 4000000,
+            'after_tokens': 5000, 'summary': 'PRIVATE_CONTEXT_MUST_NOT_PUBLISH'})
+        saved = self.service._one("SELECT payload_json FROM projects_events WHERE kind='context_compacted'")
+        self.assertEqual({'reason': 'startup', 'before_tokens': 4000000, 'after_tokens': 5000, 'generation': 1},
+            json.loads(saved['payload_json']))
 
     def test_two_accounts_are_isolated_and_pool_cannot_be_extended_by_model(self):
         """同目标的两账号使用不同工作目录、会话与工具归属。:return: None。"""
@@ -493,6 +541,35 @@ class ProjectsAgentTests(unittest.TestCase):
         self.assertFalse(self.pi.entered.is_set())
         self.assertEqual('blocked', self.service._one('SELECT status FROM projects_work WHERE id=?', (work['id'],))['status'])
         self.assertEqual([], [item for item in self.service.events(1) if item['kind'] == 'manual_retry'])
+
+    def test_manual_context_retry_preserves_sessions_and_requires_a_confirmed_cause(self):
+        """上下文阻塞可显式恢复，旧通用错误须先有绑定原事件的诊断，不能泛化解除阻塞。:return: None。"""
+        for account_id, legacy in ((1, False), (2, True)):
+            with self.subTest(legacy=legacy):
+                work, error, session_file = self.prepare_filter_blocked(account_id)
+                if legacy:
+                    self.service._write('UPDATE projects_events SET payload_json=? WHERE id=?',
+                        (json.dumps({'message': '旧版通用模型错误'}), error['id']))
+                    with self.assertRaises(ValueError):
+                        self.service.start(account_id)
+                    self.service._event(account_id, 'error', {'reason': 'context_limit', 'source': 'operator_diagnosis',
+                        'diagnostic_of_event_id': error['id']}, work['id'],
+                        f"operator-diagnosis:context-limit:event-{error['id']}")
+                else:
+                    self.service._write('UPDATE projects_events SET payload_json=? WHERE id=?',
+                        (json.dumps({'reason': 'context_limit', 'generation': work['generation']}), error['id']))
+                pi = ResumingPiFixture()
+                self.service.pi = pi
+                self.service.start(account_id)
+                self.assertTrue(pi.entered.wait(2))
+                self.assertEqual(work['id'], pi.result['work_id'])
+                self.assertEqual(work['session_id'], pi.result['session_id'])
+                self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
+                self.assertEqual('resume', pi.calls[0][0]['context_mode'])
+                self.assertEqual([], self.terminal.sent)
+                controller = self.service.controllers[account_id][0]
+                self.service.pause(account_id)
+                controller.join(2)
 
     def test_manual_retry_does_not_bypass_other_blocking_facts(self):
         """人工重试不解除未知输入、身份变化、项目撤权、合同变化或更新故障。:return: None。"""

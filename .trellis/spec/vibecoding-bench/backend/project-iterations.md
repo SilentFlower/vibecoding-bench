@@ -458,14 +458,14 @@ ProjectDialogueClient(base_url, api_key, model, fallback_model='', *, timeout=30
 ProjectDialogueClient.generate(context, preferred_model=None, timeout_sec=None)
 ProjectRequesterSettings(path, environment=None)
 ProjectRequesterSettings.public()
-ProjectRequesterSettings.save(base_url, models, api_key=None)
+ProjectRequesterSettings.save(base_url, models, api_key=None, *, compaction_threshold_tokens=None)
 ProjectRequesterSettings.reset()
 ```
 
 - `GET /api/settings/project-requester`：读取脱敏配置。
-- `PUT /api/settings/project-requester`：`{base_url: string, models: string[], api_key?: string|null}`；未知字段拒绝。
+- `PUT /api/settings/project-requester`：`{base_url: string, models: string[], api_key?: string|null, compaction_threshold_tokens?: integer|null}`；未知字段拒绝，Pi 阈值见下文 token 摘要契约。
 - `DELETE /api/settings/project-requester`：清除页面覆盖并恢复环境初始值。
-- 响应字段固定为 `base_url`、`models`、`api_key_configured`、`source`（`page/environment/invalid`）、`revision`、`ready`、`error`；不返回 `api_key`。
+- 响应字段为 `base_url`、`models`、`api_key_configured`、`source`（`page/environment/invalid`）、`revision`、`ready`、`error`、`compaction_threshold_tokens`；不返回 `api_key`。
 - `project_dialogue_jobs` 以 `evaluation_job_id UNIQUE` 绑定冻结回答，保存 `task_id/generation/status/phase/request_json/result_json/attempts_json/model/work_sec/reserved_sec/recoveries/retry_at/error` 及时间；不新增需求方 CLI 作业角色。
 
 ### 3. Contracts
@@ -527,3 +527,121 @@ ProjectRequesterSettings.reset()
 - `validate-development-content.py`：逐任务核原版失败、参考通过、授权范围、冻结回归；双试点另拒绝错误候选。来源、许可证、离线制品与交付副本摘要一致。
 - `verify-project-development-pilots.py --browser`：合成开发者／语义评审、本机 HTTPS 需求方、真实 SQLite／原生交接／Docker 原生验收；Chrome 双主题与 390／1280 宽度核配置保存、三模型降级、新 Bearer、连续对话及 API 对账。
 - 真实供应商最小连通、真实模型完整业务、模拟机制及生产部署分别留证；未实测的模型质量、费用与缓存收益不报通过。
+
+## Scenario: Pi 项目与工程养号每次指挥只处理一个目标
+
+### 1. Scope / Trigger
+
+- 修改 `ProjectsService` 的目标创建、交付收口或 `images/pi-agent/host.mjs` 的工具结果与循环结束时适用。
+- 一次指挥按账号、空间和控制者 `generation` 区分；养号的 `cycle_no` 是完整工程池轮次，两者不能混用。
+
+### 2. Signatures
+
+```python
+ProjectsService._check_round_work(account_id: int, generation: int, work: dict | None) -> None
+ProjectsService.tool(account_id, generation, name, args, call_id, stop=None) -> dict
+# project_submit 完整通过并成功释放原执行后的工具结果：
+{"submission_id": "...", "status": "passed", "round_complete": True}
+```
+
+- Pi 沿现有 JSONL `tool_result.result` 接收该字段；只在 `project_submit`、`status='passed'`、`round_complete === true` 同时成立时采用 SDK `AgentToolResult.terminate`。
+- 不新增 HTTP 请求参数、环境键或数据库列。`projects_*` 与 `warmup_projects_*` 分别保存各自目标、代次及通过事实。
+
+### 3. Contracts
+
+- 每次指挥最多绑定一个工程目标；已有未完成工作优先恢复。后端按该账号及代次查询持久工作，已结束或已绑定其他工作时拒绝创建第二项。入口及选材后发布前均在服务锁内核对，不能仅依赖模型指南。
+- 完整交付验收通过、通过事实保存且原 Claude 执行成功释放后，才返回布尔完成标志。失败返工仍属同一目标；超时、额度等待和重启按原门禁续原 work、工作区、会话与累计耗时，不重建 seed。
+- Pi 先让 SDK 保存真实工具结果，再结束本次循环。混合工具批次中完成后的工具不再交给控制端；`prepareNextTurn` 阻止后续推理。新进程的结束标志重新初始化，旧会话中的完成字段不能提前终止下一次指挥。
+- 可信目标完成后无需额外生成摘要或回复；此次收尾停止额外压缩／推理。同目标的 token 摘要策略见下文，模型重试和降级规则保持。SDK 因混合批次收尾生成的零用量本地 aborted 消息不计入上游调用。
+- 正常收尾复用原计划排期；关闭计划不自动重启，开启时遵守各自固定或随机间隔。人工暂停、取消、控制代次变化和共享账号占用继续优先，异步收尾后须再次核取消状态。
+- 两种迭代共用该边界。养号必须全部工程目标独立通过后才在后续合法认领时清理并重开工程池，不能在完成单目标时清零。项目迭代不自动重开工程池。
+- 发布须同时更新共享后端和 Pi 入口，重载后保留原会话、通过事实及各空间计划；不能只更新指南或只更新单侧运行文件。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 处理 |
+| --- | --- |
+| 本轮首目标已通过或停止，又请求新目标 | `status='rejected'`，不新增工作或启动 Claude |
+| 并发首次选择不同目标 | 发布前复查，只允许一个工作落库并启动 |
+| 验收失败、基础设施异常或执行收口失败 | 不发完成标志，按原返工／阻塞规则保留现场 |
+| 其他工具携带完成字段，或字段是数字等非布尔值 | 不触发 Pi 单目标收尾 |
+| 完成时人工暂停或取消 | 不重开计划，不把迟到结果覆盖新代次状态 |
+| 下一次合法启动 | 可选择下一目标；未完成工作则只恢复原目标 |
+
+### 5. Scenarios and Examples
+
+- 正常：目标 A 通过后结束本次指挥；原计划间隔到期且门禁放行，再开始目标 B。
+- 边界：目标 A 多次片段超时，下一次指挥仍使用同一 work/session，累计耗时保留；单轮时限沿用当前配置，本契约不另设累计预算策略。
+- 错误：修改提示词后仍允许本轮 `claude_start` 创建 B，或为了结束 Pi 丢掉 A 的真实工具结果。正确：后端限制目标，并在 SDK 保存通过结果后结束循环。
+- 错误：把“单目标已完成”当成养号全部工程已完成。正确：`cycle_no` 仅在全部独立通过后的后续认领推进。
+
+### 6. Tests Required
+
+- `test_projects_single_objective`：两空间第二目标拦截、并发发布、失败返工、超时保留两个会话、人工暂停竞争、执行收口失败，以及养号重开后首目标仍单独收尾。
+- `test_projects_pi_round`：真实 Python→Node→SDK 管道中，通过结果持久化、父进程得到 settled、上游请求恰好一次。
+- Pi `host.test.mjs`：单工具及混合批次、完成字段严格校验、停止后的工具不执行、原会话重开不重放工具、取消优先和本地空用量不冒充上游调用。
+- 依赖、调度、命名空间和工程池回归须按真实跨轮代次构造；不能继续用同一代次连续完成多个目标的旧夹具来绕过新边界。
+
+## Scenario: Pi 按工程目标隔离上下文及可配置 token 摘要
+
+### 1. Scope / Trigger
+
+- 修改 Pi 会话恢复、工具循环、模型设置或目标材料读取时适用；项目与工程养号共用此契约。
+- 固定 SDK 0.75.1 的原生压缩未覆盖持续工具循环，且零用量错误尾消息不能代表此前上下文已变小，因此由宿主在安全边界统一判断。
+
+### 2. Signatures
+
+```text
+GET/PUT/DELETE /api/settings/project-requester
+ProjectRequesterSettings.agent_configuration() -> dict | None
+contextTokens(messages, fixedTokens = 0) -> number
+freshContext(manager) -> object | null
+compactContext(manager, options, summarize, signal) -> Promise<object | null>
+account_state({offset?: integer, limit?: integer})
+project_read({project_key: string, objective_id?: string, section?: string, offset?: integer, limit?: integer})
+```
+
+- Pi 启动配置新增 `context_mode='fresh'|'resume'` 和 `compaction_threshold_tokens`；`options` 包含 `threshold/fixedTokens/force/deadline`。
+- `context` 事件仅持久化 `reason`（`new_objective/startup/threshold/overflow`）、非负整数 `before_tokens/after_tokens`（上限 `2**40`）及控制端 `generation`；不保存摘要正文、凭据或私有路径。
+
+### 3. Contracts
+
+- 上下文隔离边界是工程目标：开始新目标采用 fresh，本地追加隔离检查点；已有未完成目标采用 resume，跨控制代次继续原历史。不得在每次模型请求前重建。原始 Pi 文件、Claude 会话、工作区、输入事实和累计耗时留档。
+- 压缩阈值默认 `350000`，范围 `10000..900000` 且必须为严格整数。PUT 中省略或 null 沿用当前值，旧私有 schema 1 文件缺字段时补默认；保存仍原子写 0600 文件并更新 revision，读取接口不返回密钥。启动／恢复冻结配置，两空间同时适用；没有新增环境键或数据库列。
+- 达到阈值时触发摘要。优先使用最近有效助手的 `input+output+cacheRead+cacheWrite`，再估算后续内容；排除错误／取消及摘要前旧用量。无有效用量则使用 SDK 估算并计入固定指南和工具定义。自定义规划窗口不改变上游真实容量。
+- SDK 原生自动压缩关闭。启动／恢复前和工具批次结束检查阈值；工具回执先持久化，再结束 SDK 子循环，在空闲边界摘要并 continue，不重发已确认工具或用户输入。正常正文不做字节硬裁剪，未配对工具及失败助手不进入模型历史。
+- 较早正文按至多约 16000 个估算 token 分块，顺序归纳并携带上次摘要；近期完整交互最多保留 `min(12000, threshold/4)` 个估算 token。各片段摘要须非空且估算不超过 8192；取消／原截止时间仍允许，且估算用量确实降低并低于阈值后才追加检查点。异常不发布新检查点，原文保留。
+- 摘要和普通推理共享本轮额外尝试上限（至多 8 次）、模型健康状态、同模型重试／降级、服务端等待及原截止时间；真实摘要调用纳入计量。可信目标完成后直接收尾，无额外摘要或推理。
+- 当前已知限制：摘要 `stopReason='length'` 仍可能通过非空及长度检查并发布未完成摘要。此行为属于 FBK-001 的保护缺口，不能把现有检查描述为已保证摘要完整结束；不代表磁盘原文已删除。
+- 真正 400／413 上下文拒绝最多在强制摘要且确实缩减后续接一次；认证、明确内容拒绝、禁止重试、服务端等待及原预算优先。无法缩减或重复拒绝明确报 `context_limit`，不盲发相同超长请求给其他模型。
+- `account_state` 的 offset 默认 0、limit 默认 10 且范围 1..20；三个列表 `available_objectives/waiting_objectives/passed` 同步分页，`objective_page` 给出各自真实总数及公共 next_offset，保留全部未完成目标数量。模型视图去除重复指南，页面完整视图保持。
+- `project_read` 默认读取 overview，提供 objective_id 时默认读取 objective，research 读取研究；offset 默认 0、limit 默认 1000 且范围 1..2000，按字符返回 `content/offset/limit/total_chars/next_offset`。原工作继续使用冻结材料，仅提供公开正文，不向模型暴露私有验收。
+- 已确认 `context_limit` 可按既有显式启动入口恢复；旧通用错误须先追加绑定原错误的 `operator_diagnosis`，事件键为 `operator-diagnosis:context-limit:event-<原事件ID>`。身份、未知输入、合同及账号门禁仍须满足，不能泛化解锁。
+- 镜像必须同时包含 host 与 `context-policy.mjs`，Docker COPY 与上下文白名单成对更新；发布后核对前后端字段和两空间运行版本。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 处理 |
+| --- | --- |
+| 阈值为 bool／字符串／小数或未知 DTO 字段 | 422；整数越界为 400，均保持原配置 |
+| 旧配置缺阈值，或新配置省略该字段 | 分别补 350000 或沿用已保存值；下一次启动／恢复生效 |
+| 百万级历史后有零用量 error／aborted | 仍依据此前成功用量，分段摘要后恢复原目标 |
+| 摘要抛错、为空、过长、未降低用量或取消／超时 | 不发布新检查点，不继续超长推理；原历史保留 |
+| 摘要返回非空但 finish_reason=length | 当前已知保护缺口：仍可能发布并继续，见 FBK-001 |
+| 强制摘要后仍收到真实上下文拒绝 | 明确 context_limit，不继续自动重试 |
+| 分页参数非法或材料 offset 超出正文 | 工具返回 rejected，不能把截断页当作完整清单 |
+
+### 5. Scenarios and Examples
+
+- 正常：新目标 A 使用 fresh；同一目标的多次模型／工具交互连续保留。累计输入含缓存达到 350000 后摘要，再继续 A；A 通过后结束，下轮 B 再隔离旧上下文。
+- 边界：保存 `{"base_url":"https://ai.flower-cli.com/v1","models":["gemini-3-flash-agent"],"compaction_threshold_tokens":450000}`，密钥沿用；下次项目或养号启动均采用 450000，在途执行保留原阈值。
+- 错误：每次请求清空历史、按 24 KiB 硬裁剪材料，或只看首 10 个目标就报告全部完成。正确：以工程目标隔离，同目标按 token 摘要，沿 next_offset 读取剩余页。
+- 错误：直接重发百万级旧历史，或清空会话解除旧通用错误。正确：分段归纳，并凭绑定原错误的诊断经原门禁显式恢复。
+
+### 6. Tests Required
+
+- `test_project_requester_settings`：默认、旧文件、保存重启、字段省略、严格类型／值域、密钥脱敏及失败原子性；`test_projects_single_objective` 核保存阈值进入两空间启动快照。
+- `context-policy.test.mjs`：缓存用量、零用量尾消息、摘要前旧 usage 失效、完整正文分段、近期工具配对、原文留档及失败／取消不发布检查点。
+- `host.test.mjs`：350K／自定义阈值、百万级历史、连续工具流、强制摘要仅一次续接、计量、摘要内容过滤同模型重试后降级及 DeepSeek 关闭思考。
+- `test_projects_agent`：目标级 fresh/resume、600 项分页与材料分段还原、公开事件白名单、旧错误诊断及未知输入／身份门禁。
+- 摘要 length 的本地真实 SDK 故障注入已复现 FBK-001；未修复前不得将“截断摘要被拒绝”计为已通过断言。

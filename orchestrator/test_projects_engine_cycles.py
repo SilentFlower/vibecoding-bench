@@ -90,7 +90,9 @@ class ProjectsEngineCycleTests(unittest.TestCase):
     def complete(self, count=600, service=None):
         """写入本轮独立通过的冻结事实。:param count: 通过数。:param service: 空间。:return: 最后一项ID。"""
         service = service or self.service
-        identity, cycle = service.identity({'id': 1, 'name': '1'}), self.agent(service)['cycle_no']
+        agent = self.agent(service)
+        identity, cycle = service.identity({'id': 1, 'name': '1'}), agent['cycle_no']
+        generation = max(1, agent['generation'])
         last, connection = None, service.database()
         try:
             with connection:
@@ -101,10 +103,11 @@ class ProjectsEngineCycleTests(unittest.TestCase):
                     connection.execute('INSERT INTO projects_work(id,account_id,project_key,objective_id,goal,definition_json,'
                         'library_root,library_digest,settings_json,generation,status,session_id,created_at,account_identity,cycle_no) '
                         'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', (last, 1, key, task, definition['goal'], json.dumps(definition),
-                            str(self.catalog.library.root), self.catalog.library.digest, '{}', 1, 'passed', str(uuid.uuid4()), time.time(), identity, cycle))
+                            str(self.catalog.library.root), self.catalog.library.digest, '{}', generation, 'passed', str(uuid.uuid4()), time.time(), identity, cycle))
                     connection.execute('INSERT INTO projects_submissions(id,work_id,generation,digest,status,report_json,created_at) VALUES(?,?,?,?,?,?,?)',
-                        (uuid.uuid4().hex, last, 1, 'frozen-delivery', 'passed', '{"status":"passed"}', time.time()))
-                connection.execute('UPDATE projects_agents SET current_work_id=? WHERE account_id=1', (last,))
+                        (uuid.uuid4().hex, last, generation, 'frozen-delivery', 'passed', '{"status":"passed"}', time.time()))
+                # 这些历史事实已经消耗过控制代次，下一次启动必须进入新代次。
+                connection.execute('UPDATE projects_agents SET current_work_id=?,generation=? WHERE account_id=1', (last, generation))
         finally:
             connection.close()
         return last
@@ -138,8 +141,8 @@ class ProjectsEngineCycleTests(unittest.TestCase):
     def test_timed_out_last_objective_resumes_without_resetting_600_cycle(self):
         """最后一项累计超时仍接续原工作，六百项全部通过前不清理或重开整轮。:return: None。"""
         self.complete(599)
-        self.service._write("UPDATE projects_agents SET generation=1,status='running' WHERE account_id=1")
-        original = self.service.tool(1, 1, 'claude_start',
+        self.service._write("UPDATE projects_agents SET generation=2,status='running' WHERE account_id=1")
+        original = self.service.tool(1, 2, 'claude_start',
             {'project_key': self.catalog.keys[-1], 'objective_id': 'F-5'}, 'last-goal')
         work = self.service._one('SELECT * FROM projects_work WHERE id=?', (original['work_id'],))
         self.service._release(work, 'paused')

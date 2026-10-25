@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "engines": {"node": ">=22.19.0"},
-  "scripts": {"test": "node --test host.test.mjs recovery-policy.test.mjs transport-privacy.test.mjs"},
+  "scripts": {"test": "node --test host.test.mjs context-policy.test.mjs recovery-policy.test.mjs transport-privacy.test.mjs"},
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.75.1",
     "typebox": "1.1.24"

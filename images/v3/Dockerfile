@@ -32,7 +32,7 @@ COPY --from=frontend /usr/local/lib/node_modules/npm /usr/local/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 COPY images/pi-agent/package.json images/pi-agent/package-lock.json /opt/pi-agent/
 RUN cd /opt/pi-agent && npm ci --ignore-scripts --no-audit --no-fund
-COPY images/pi-agent/host.mjs /opt/pi-agent/host.mjs
+COPY images/pi-agent/host.mjs images/pi-agent/context-policy.mjs /opt/pi-agent/
 COPY orchestrator/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"

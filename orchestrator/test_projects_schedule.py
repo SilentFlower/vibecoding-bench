@@ -210,28 +210,32 @@ class ProjectsScheduleTests(unittest.TestCase):
 
     join_controller = fixtures.ProjectsAgentTests.join_controller
 
-    def test_multiple_objectives_share_one_deadline_and_next_turn_gets_full_time(self):
-        """一轮内完成首目标不会重给时限；下一轮恢复末目标时重新获得完整单轮。:return: None。"""
+    def test_completed_objective_ends_round_and_next_turn_gets_full_time(self):
+        """完成首目标后拒绝本轮第二项，下一轮启动新目标时获得完整时限。:return: None。"""
         self.service.configure(1, ['example', 'other'], budget_sec=1800)
         clock = [1000.0]
         snapshots = []
+        opened = []
         self.verification = {'status': 'passed', 'feedback': []}
 
         def run(configuration, tools, event, stop, timeout_sec):
-            """用可控时钟执行两个目标。:param configuration: 配置。:param tools: 工具。:param event: 事件。:param stop: 取消。:param timeout_sec: 单轮剩余。:return: timeout。"""
+            """在两个指挥轮次使用可控时钟。:param configuration: 配置。:param tools: 工具。:param event: 事件。:param stop: 取消。:param timeout_sec: 单轮剩余。:return: 正常完成或超时。"""
             if not snapshots:
-                tools('claude_start', {'project_key': 'example', 'objective_id': 'feature'}, 'first')
-                self.assertEqual('passed', tools('project_submit', {'summary': '首目标已独立通过'}, 'submit')['status'])
+                opened.append(tools('claude_start', {'project_key': 'example', 'objective_id': 'feature'}, 'first'))
+                self.assertIs(tools('project_submit', {'summary': '首目标已独立通过'}, 'submit')['round_complete'], True)
                 clock[0] += 1200
             result = tools('claude_start', {'project_key': 'other', 'objective_id': 'feature'}, 'next')
+            if result['status'] == 'running':
+                opened.append(result)
             snapshots.append((result, self.service.view(1)['agents'][0]['progress'], timeout_sec))
-            return 'timeout'
+            return 'settled' if len(snapshots) == 1 else 'timeout'
 
         self.pi.run = run
         with patch('projects.time.monotonic', side_effect=lambda: clock[0]):
             self.service.start(1)
             self.join_controller()
-            self.assertEqual(600, self.terminal.started[-1][1]['remaining_sec'])
+            self.assertEqual('rejected', snapshots[0][0]['status'])
+            self.assertEqual(1, len(self.terminal.started))
             self.assertEqual((True, 1200, 600), tuple(snapshots[0][1][key]
                 for key in ('turn_active', 'turn_elapsed_sec', 'remaining_work_sec')))
             self.assertFalse(self.service.state(1)['agents'][0]['schedule']['enabled'])
@@ -242,7 +246,7 @@ class ProjectsScheduleTests(unittest.TestCase):
             self.join_controller()
         self.assertEqual(1800, snapshots[1][2])
         self.assertEqual(1800, self.terminal.started[-1][1]['remaining_sec'])
-        self.assertEqual(snapshots[0][0]['work_id'], snapshots[1][0]['work_id'])
+        self.assertNotEqual(opened[0]['work_id'], opened[1]['work_id'])
 
     def prepare_legacy_budget_block(self):
         """构造旧版本累计时限导致的精确阻塞，不调用真实模型。:return: 原工作。"""

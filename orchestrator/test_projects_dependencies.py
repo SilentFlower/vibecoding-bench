@@ -83,6 +83,8 @@ class ProjectsDependencyTests(unittest.TestCase):
         result = self.fixture.tool('project_submit', {'summary': '合成工程验收通过'},
             account_id=account_id, generation=generation)
         self.assertEqual('passed', result['status'])
+        # 依赖链分别属于后续指挥；不能再用同一代次连续交付多个目标。
+        self.service._write('UPDATE projects_agents SET generation=generation+1 WHERE account_id=?', (account_id,))
         return started['work_id']
 
     def test_all_unfinished_ready_and_waiting_are_separate(self):

@@ -138,6 +138,8 @@
           <form id="projects-model-form" class="form">
             <div class="row"><label><span class="lbl">服务地址</span><input name="base_url" type="url" maxlength="2048" placeholder="https://ai.flower-cli.com/v1" required></label><label><span class="lbl">API Key</span><input name="api_key" type="password" autocomplete="new-password" maxlength="4096" placeholder="留空沿用已配置密钥"></label></div>
             <label><span class="lbl">模型 · 按优先级一行一个</span><textarea name="models" rows="2" required></textarea></label>
+            <label><span class="lbl">上下文摘要压缩阈值 · token</span><input name="compaction_threshold_tokens" type="number" min="10000" max="900000" step="1" value="350000" required></label>
+            <p class="hint">同一目标达到阈值后生成摘要并继续；新目标从干净上下文开始。默认 350,000 token，保存后在下次启动或恢复时生效。</p>
             <p class="hint" id="projects-model-status"></p>
             <div class="row-end"><button type="button" class="btn btn-sm" id="projects-model-reset">恢复环境配置</button><button class="btn btn-primary" type="submit">保存模型配置</button></div>
           </form>

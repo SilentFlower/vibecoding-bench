@@ -57,6 +57,28 @@ class RequesterSettingsTests(unittest.TestCase):
                 self.store.save(url, models)
             self.assertEqual(before, self.path.read_bytes())
 
+    def test_compaction_threshold_survives_restart_and_old_configuration_defaults(self) -> None:
+        """旧配置补 350K，页面值持久化并进入 Pi，旧客户端省略字段不覆盖。@return None。"""
+        self.assertEqual(350000, self.store.public()['compaction_threshold_tokens'])
+        self.store.save('https://valid.example/v1', ['first'])
+        legacy = json.loads(self.path.read_text())
+        legacy.pop('compaction_threshold_tokens')
+        self.path.write_text(json.dumps(legacy))
+        self.assertEqual(350000, self.store.agent_configuration()['compaction_threshold_tokens'])
+        self.store.save('https://valid.example/v1', ['first'], compaction_threshold_tokens=410000)
+        restored = ProjectRequesterSettings(self.path, self.environment)
+        self.assertEqual(410000, restored.public()['compaction_threshold_tokens'])
+        self.assertEqual(410000, restored.agent_configuration()['compaction_threshold_tokens'])
+        restored.save('https://next.example/v1', ['next'], '')
+        self.assertEqual(410000, restored.agent_configuration()['compaction_threshold_tokens'])
+        before = self.path.read_bytes()
+        for value in (True, '350000', 350000.5, 9999, 900001):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                restored.save('https://next.example/v1', ['next'], compaction_threshold_tokens=value)
+            self.assertEqual(before, self.path.read_bytes())
+        restored.reset()
+        self.assertEqual(350000, restored.public()['compaction_threshold_tokens'])
+
     def test_all_models_are_attempted_once_in_order_and_configuration_is_recorded(self) -> None:
         """主备均暂时失败时依次使用第三模型，记录本轮真实配置来源。@return None。"""
         client = self.store.save('https://models.example/v1', ['first', 'second', 'third'])
@@ -88,16 +110,26 @@ class RequesterSettingsTests(unittest.TestCase):
             api = TestClient(main.app)
             self.addCleanup(api.close)
             response = api.put('/api/settings/project-requester', json={'base_url': 'https://updated.example/v1',
-                'models': ['first', 'second', 'third'], 'api_key': 'replacement-private-key'})
+                'models': ['first', 'second', 'third'], 'api_key': 'replacement-private-key',
+                'compaction_threshold_tokens': 410000})
             self.assertEqual(200, response.status_code)
             self.assertNotIn('replacement-private-key', response.text)
             self.assertEqual(('first', 'second', 'third'), owner.dialogue.models)
+            self.assertEqual(410000, response.json()['compaction_threshold_tokens'])
+            self.assertEqual(410000, self.store.agent_configuration()['compaction_threshold_tokens'])
             original_client = owner.dialogue
             response = api.put('/api/settings/project-requester', json={'base_url': 'https://next.example/v1', 'models': ['next']})
             self.assertEqual(200, response.status_code)
             self.assertEqual('https://updated.example/v1', original_client.base_url)
             self.assertEqual('https://next.example/v1', owner.dialogue.base_url)
             self.assertEqual(['next'], api.get('/api/settings/project-requester').json()['models'])
+            self.assertEqual(410000, api.get('/api/settings/project-requester').json()['compaction_threshold_tokens'])
+            before = self.path.read_bytes()
+            for value, code in ((True, 422), ('350000', 422), (9999, 400), (900001, 400)):
+                invalid = api.put('/api/settings/project-requester', json={'base_url': 'https://next.example/v1',
+                    'models': ['next'], 'compaction_threshold_tokens': value})
+                self.assertEqual(code, invalid.status_code)
+                self.assertEqual(before, self.path.read_bytes())
             self.assertEqual(200, api.delete('/api/settings/project-requester').status_code)
             self.assertEqual(('primary', 'secondary'), owner.dialogue.models)
 

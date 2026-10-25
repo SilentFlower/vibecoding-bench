@@ -11,6 +11,9 @@ from project_dialogue import MODEL_NAME, ProjectDialogueClient
 from project_library import read_document, write_document
 
 
+DEFAULT_COMPACTION_THRESHOLD_TOKENS = 350_000
+
+
 class ProjectRequesterSettings:
     """管理一个 Base URL、私有密钥和按优先级排列的多个模型。
 
@@ -35,16 +38,23 @@ class ProjectRequesterSettings:
         if self.path.exists() or self.path.is_symlink():
             try:
                 value = read_document(self.path)
-                if (not isinstance(value, dict) or set(value) != {'schema', 'base_url', 'api_key', 'models', 'revision'}
+                required = {'schema', 'base_url', 'api_key', 'models', 'revision'}
+                if (not isinstance(value, dict) or not required <= set(value)
+                        or set(value) - required - {'compaction_threshold_tokens'}
                         or type(value['schema']) is not int or value['schema'] != 1):
                     raise ValueError('配置格式不合法')
+                threshold = value.get('compaction_threshold_tokens', DEFAULT_COMPACTION_THRESHOLD_TOKENS)
+                if type(threshold) is not int or not 10_000 <= threshold <= 900_000:
+                    raise ValueError('压缩阈值不合法')
+                value['compaction_threshold_tokens'] = threshold
                 return value, 'page'
             except (OSError, ValueError):
                 raise ValueError('已保存的需求方配置损坏，请重新填写或恢复环境配置') from None
         names = [self.environment.get(key, '').strip() for key in ('PROJECT_REQUESTER_MODEL', 'PROJECT_REQUESTER_FALLBACK_MODEL')]
         return {'schema': 1, 'base_url': self.environment.get('PROJECT_REQUESTER_BASE_URL', '').strip(),
             'api_key': self.environment.get('PROJECT_REQUESTER_API_KEY', '').strip(),
-            'models': list(dict.fromkeys(name for name in names if name)), 'revision': 'environment'}, 'environment'
+            'models': list(dict.fromkeys(name for name in names if name)), 'revision': 'environment',
+            'compaction_threshold_tokens': DEFAULT_COMPACTION_THRESHOLD_TOKENS}, 'environment'
 
     @staticmethod
     def _client(value: dict) -> ProjectDialogueClient:
@@ -75,20 +85,20 @@ class ProjectRequesterSettings:
     def agent_configuration(self) -> dict | None:
         """为 Pi 子进程提供内存启动配置，不能用于公开 API 或日志。
 
-        :return: 已校验的服务地址、模型及密钥；未就绪时为 None。
+        :return: 已校验的服务地址、模型、密钥及压缩阈值；未就绪时为 None。
         """
         with self.lock:
             try:
                 value, _ = self._read()
                 self._client(value)
-                return {key: value[key] for key in ('base_url', 'api_key', 'models', 'revision')}
+                return {key: value[key] for key in ('base_url', 'api_key', 'models', 'revision', 'compaction_threshold_tokens')}
             except ValueError:
                 return None
 
     def public(self) -> dict:
         """返回页面可编辑字段和密钥是否已配置，不回传密钥内容。
 
-        :return: 配置来源、模型优先级、就绪状态和固定错误说明。
+        :return: 配置来源、模型优先级、压缩阈值、就绪状态和固定错误说明。
         """
         with self.lock:
             try:
@@ -96,29 +106,42 @@ class ProjectRequesterSettings:
                 configured = bool(value['api_key'])
                 if not any((value['base_url'], value['models'], configured)):
                     return {'base_url': '', 'models': [], 'api_key_configured': False, 'source': source,
-                        'revision': value['revision'], 'ready': False, 'error': None}
+                        'revision': value['revision'], 'ready': False, 'error': None,
+                        'compaction_threshold_tokens': value['compaction_threshold_tokens']}
                 self._client(value)
                 return {'base_url': value['base_url'], 'models': value['models'], 'api_key_configured': configured,
-                    'source': source, 'revision': value['revision'], 'ready': True, 'error': None}
+                    'source': source, 'revision': value['revision'], 'ready': True, 'error': None,
+                    'compaction_threshold_tokens': value['compaction_threshold_tokens']}
             except ValueError:
                 return {'base_url': '', 'models': [], 'api_key_configured': False, 'source': 'invalid',
-                    'revision': None, 'ready': False, 'error': '需求方配置未就绪，请重新填写或恢复环境配置'}
+                    'revision': None, 'ready': False, 'error': '需求方配置未就绪，请重新填写或恢复环境配置',
+                    'compaction_threshold_tokens': DEFAULT_COMPACTION_THRESHOLD_TOKENS}
 
-    def save(self, base_url: str, models: list[str], api_key: str | None = None) -> ProjectDialogueClient:
+    def save(self, base_url: str, models: list[str], api_key: str | None = None,
+             *, compaction_threshold_tokens: int | None = None) -> ProjectDialogueClient:
         """校验后原子保存覆盖值，空密钥沿用现有值。
 
         :param base_url: 一个 OpenAI 兼容 HTTPS 根地址。
         :param models: 有序的主用与降级模型列表。
         :param api_key: 新密钥；空值沿用当前服务端密钥。
+        :param compaction_threshold_tokens: Pi 摘要压缩阈值；省略时沿用当前值。
         :return: 保存后的客户端；无效输入不影响现有配置。
         """
         with self.lock:
             key = api_key.strip() if isinstance(api_key, str) else None
-            if not key:
+            try:
                 current, _ = self._read()
+            except ValueError:
+                if not key:
+                    raise
+                current = {'compaction_threshold_tokens': DEFAULT_COMPACTION_THRESHOLD_TOKENS}
+            if not key:
                 key = current['api_key']
+            threshold = current['compaction_threshold_tokens'] if compaction_threshold_tokens is None else compaction_threshold_tokens
+            if type(threshold) is not int or not 10_000 <= threshold <= 900_000:
+                raise ValueError('Pi 压缩阈值必须为 10000～900000 的整数 token 数')
             value = {'schema': 1, 'base_url': base_url.strip(), 'models': models,
-                'api_key': key, 'revision': uuid.uuid4().hex}
+                'api_key': key, 'revision': uuid.uuid4().hex, 'compaction_threshold_tokens': threshold}
             client = self._client(value)
             write_document(self.path, value)
             return client

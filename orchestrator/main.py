@@ -8470,12 +8470,14 @@ class ProjectRequesterIn(BaseModel):
     :param base_url: OpenAI 兼容 HTTPS 根地址。
     :param models: 按优先级排列的主用与备用模型。
     :param api_key: 可选新密钥；留空沿用服务端当前密钥。
+    :param compaction_threshold_tokens: Pi 摘要压缩阈值；省略时沿用原设置。
     """
 
     model_config = ConfigDict(extra='forbid')
     base_url: StrictStr
     models: list[StrictStr]
     api_key: StrictStr | None = None
+    compaction_threshold_tokens: StrictInt | None = None
 
 
 class RuntimeEffortIn(BaseModel):
@@ -8656,12 +8658,13 @@ def update_project_requester(body: ProjectRequesterIn):
         raise HTTPException(503, '需求方配置服务尚未就绪')
     try:
         with project_requester_settings.lock:
-            client = project_requester_settings.save(body.base_url, body.models, body.api_key)
+            client = project_requester_settings.save(body.base_url, body.models, body.api_key,
+                compaction_threshold_tokens=body.compaction_threshold_tokens)
             if project_iterations:
                 project_iterations.dialogue = client
             return project_requester_settings.public()
     except ValueError:
-        raise HTTPException(400, '需求方配置无效，请检查 HTTPS 地址、密钥及 1～8 个不重复的模型') from None
+        raise HTTPException(400, '需求方配置无效，请检查 HTTPS 地址、密钥、1～8 个不重复的模型及 10000～900000 token 的压缩阈值') from None
     except OSError:
         raise HTTPException(500, '需求方配置未能保存，现有配置继续生效') from None
 

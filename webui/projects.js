@@ -743,6 +743,7 @@ window.ProjectsUI = (() => {
     const form = $('#projects-model-form');
     form.elements.base_url.value = value.base_url;
     form.elements.models.value = value.models.join('\n');
+    form.elements.compaction_threshold_tokens.value = value.compaction_threshold_tokens ?? 350000;
     form.elements.api_key.value = '';
     $('#projects-model-status').textContent = value.ready ? `配置已就绪 · ${value.api_key_configured ? '密钥已配置' : '无密钥'}；启动或恢复的 Pi 使用该配置。` : value.error || '请配置支持流式响应和工具调用的外接模型。';
   }
@@ -757,6 +758,7 @@ window.ProjectsUI = (() => {
     await api('/settings/project-requester', {method: 'PUT', body: JSON.stringify({
       base_url: form.elements.base_url.value, api_key: form.elements.api_key.value || null,
       models: form.elements.models.value.split('\n').map(value => value.trim()).filter(Boolean),
+      compaction_threshold_tokens: Number(form.elements.compaction_threshold_tokens.value),
     })});
     if (current !== revision) return;
     await loadModel();

@@ -7,21 +7,25 @@ import { mkdtemp, readFile, rm, writeFile, mkdir, stat, symlink } from 'node:fs/
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
+import { SessionManager } from '@earendil-works/pi-coding-agent';
+import { DEFAULT_COMPACTION_THRESHOLD_TOKENS } from './context-policy.mjs';
 
 /**
  * 返回 OpenAI 兼容的实际流式文本或工具调用。
  * @param {object} response HTTP 响应。
  * @param {boolean} tool 是否请求工具。
+ * @param {number} promptTokens 上游报告的输入 token 数。
+ * @param {string} text 上游报告的文本。
  * @return {void}
  */
-function stream(response, tool) {
+function stream(response, tool, promptTokens = 11, text = '账号已核对，原会话继续。') {
   response.writeHead(200, {'content-type': 'text/event-stream'});
   const delta = tool ? {role: 'assistant', tool_calls: [{index: 0, id: 'call-account', type: 'function',
-    function: {name: 'account_state', arguments: '{}'}}]} : {role: 'assistant', content: '账号已核对，原会话继续。'};
+    function: {name: 'account_state', arguments: '{}'}}]} : {role: 'assistant', content: text};
   for (const value of [
     {choices: [{index: 0, delta, finish_reason: null}]},
     {choices: [{index: 0, delta: {}, finish_reason: tool ? 'tool_calls' : 'stop'}]},
-    {choices: [], usage: {prompt_tokens: 11, completion_tokens: 7, total_tokens: 18}},
+    {choices: [], usage: {prompt_tokens: promptTokens, completion_tokens: 7, total_tokens: promptTokens + 7}},
   ]) response.write('data: ' + JSON.stringify({id: 'chat-test', object: 'chat.completion.chunk',
     model: 'test-model', created: 1, ...value}) + '\n\n');
   response.end('data: [DONE]\n\n');
@@ -60,6 +64,229 @@ async function execute(config, onTool, onEvent = () => {}, entry = 'host.mjs') {
   return records;
 }
 
+/**
+ * 建立真实可恢复的历史，包含已确认工具及零用量错误尾消息。
+ * @param {string} directory 私有测试目录。
+ * @param {string} background 可压缩的旧背景。
+ * @param {string} stopReason 最后一条合成失败的结束原因。
+ * @param {number} tokens 历史成功消息的总用量，包含缓存输入。
+ * @return {object} 相同会话的文件与标识。
+ */
+function historicalSession(directory, background, stopReason = 'aborted', tokens = 995718) {
+  const manager = SessionManager.create(directory, directory);
+  manager.appendMessage({role: 'user', content: [{type: 'text', text: background}], timestamp: 1});
+  const usage = {input: 1, output: 1, cacheRead: tokens - 2, cacheWrite: 0, totalTokens: tokens,
+    cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0}};
+  for (let index = 0; index < 6; index++) {
+    manager.appendMessage({role: 'assistant', api: 'openai-completions', provider: 'projects', model: 'test-model',
+      content: [{type: 'toolCall', id: 'confirmed-' + index, name: 'account_state', arguments: {}}],
+      stopReason: 'toolUse', timestamp: 2 + index * 2, usage});
+    manager.appendMessage({role: 'toolResult', toolCallId: 'confirmed-' + index, toolName: 'account_state',
+      content: [{type: 'text', text: 'known-delivery-ack-' + index + 'x'.repeat(700)}],
+      isError: false, timestamp: 3 + index * 2});
+  }
+  manager.appendMessage({role: 'assistant', api: 'openai-completions', provider: 'projects', model: 'test-model',
+    content: [], stopReason, timestamp: 20, errorMessage: stopReason === 'error'
+      ? '400 The input token count exceeds the maximum number of tokens allowed 1048576.' : 'Request was aborted',
+    usage: {...usage, input: 0, output: 0, cacheRead: 0, totalTokens: 0}});
+  return {session_file: manager.getSessionFile(), session_id: manager.getSessionId()};
+}
+
+/**
+ * 从实际上游请求识别 SDK 摘要操作，不依赖未公开事件。
+ * @param {object} request 已解析请求。
+ * @return {boolean} 是否为摘要请求。
+ */
+function summaryRequest(request) {
+  return JSON.stringify(request.messages).includes('<conversation>');
+}
+
+test('350K token 含缓存输入触发摘要，阈值可配置且同目标阈值以下保留完整历史', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-token-threshold-'));
+  let requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    stream(response, false, 11, summaryRequest(value) ? 'SUMMARY_CONFIRMED_DECISIONS_AND_PENDING_WORK' : '原目标继续。');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const [index, threshold, tokens, expected] of [[0, 350000, 349000, false], [1, 350000, 350000, true],
+      [2, 450000, 350000, false], [3, 200000, 250000, true]]) {
+      requests = [];
+      const current = join(directory, String(index));
+      const original = historicalSession(current, 'FULL_HISTORY_BELOW_TOKEN_LIMIT_'.repeat(2000), 'aborted', tokens);
+      const records = await execute({session_dir: current, session_file: original.session_file,
+        compaction_threshold_tokens: threshold,
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail('已确认工具不能重放'));
+      assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
+      assert.equal(requests.some(summaryRequest), expected);
+      assert.equal(JSON.stringify(requests.at(-1)).includes('FULL_HISTORY_BELOW_TOKEN_LIMIT_'), !expected);
+      if (expected) {
+        assert.ok(JSON.stringify(requests.at(-1)).includes('SUMMARY_CONFIRMED_DECISIONS'));
+        const event = records.find(event => event.type === 'context');
+        assert.ok(event.before_tokens >= threshold);
+        assert.ok(event.after_tokens < threshold);
+      } else assert.ok(Buffer.byteLength(JSON.stringify(requests.at(-1))) > 24000);
+      assert.equal(records.find(event => event.type === 'ready').session_id, original.session_id);
+    }
+    assert.equal(DEFAULT_COMPACTION_THRESHOLD_TOKENS, 350000);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('百万级旧会话分段摘要后恢复，零用量错误不漏压缩，新目标直接使用干净上下文', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-token-legacy-'));
+  let requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    stream(response, false, 11, summaryRequest(value) ? 'SUMMARY_PRESERVED_ORIGINAL_GOAL' : '继续原目标。');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const [mode, stop] of [['resume', 'aborted'], ['resume', 'error'], ['fresh', 'aborted']]) {
+      requests = [];
+      const current = join(directory, mode + stop);
+      const original = historicalSession(current, 'ARCHIVED_LARGE_CONTEXT'.repeat(70000), stop);
+      const records = await execute({session_dir: current, session_file: original.session_file, context_mode: mode,
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail('历史工具不能重放'));
+      assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
+      const summaries = requests.filter(summaryRequest);
+      assert.equal(summaries.length > 1, mode === 'resume');
+      assert.ok(summaries.every(request => JSON.stringify(request).length < 100000));
+      assert.ok(!JSON.stringify(requests.at(-1)).includes('ARCHIVED_LARGE_CONTEXT'));
+      assert.equal(JSON.stringify(requests.at(-1)).includes('known-delivery-ack'), mode === 'resume');
+      assert.equal(records.filter(event => event.type === 'assistant').length, requests.length);
+      assert.ok((await readFile(original.session_file, 'utf8')).includes('ARCHIVED_LARGE_CONTEXT'));
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('连续工具流达到350K时先保存回执并摘要，再继续原目标且不重发工具', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-token-loop-'));
+  const requests = [];
+  let ordinary = 0;
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    if (summaryRequest(value)) return stream(response, false, 11, 'SUMMARY_ORIGINAL_GOAL_AND_ACKNOWLEDGED_INPUT');
+    ordinary += 1;
+    stream(response, ordinary <= 2, ordinary === 2 ? 349993 : 11);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    let tools = 0;
+    const records = await execute({session_dir: directory,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: [{name: 'account_state',
+        description: '本地状态', parameters: {type: 'object', properties: {}, required: []}}]}, (event, send) => {
+      tools += 1;
+      send({type: 'tool_result', id: event.id, result: {account_id: 1,
+        observation: 'FULL_OBSERVATION_' + tools + '_' + '完整业务事实'.repeat(2000)}});
+    });
+    assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
+    assert.equal(tools, 2);
+    assert.equal(ordinary, 3);
+    assert.ok(requests.some(summaryRequest));
+    assert.ok(JSON.stringify(requests.at(-1)).includes('SUMMARY_ORIGINAL_GOAL'));
+    assert.equal(records.filter(event => event.type === 'assistant').length, requests.length);
+    const ready = records.find(event => event.type === 'ready');
+    const entries = (await readFile(ready.session_file, 'utf8')).trim().split('\n').map(JSON.parse);
+    assert.equal(entries.filter(entry => entry.message?.role === 'toolResult').length, 2);
+    assert.ok(entries.some(entry => entry.type === 'compaction'));
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('上下文拒绝只在摘要后原模型继续一次，禁止重试、服务端等待与预算仍优先', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-token-overflow-'));
+  let requests = [], ordinary = 0, scenario;
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requests.push(value);
+    if (summaryRequest(value)) return stream(response, false, 11, 'SUMMARY_REDUCED_CONTEXT');
+    ordinary += 1;
+    if (ordinary === 2 && scenario === 'recover') return stream(response, false);
+    if (scenario === 'deadline') await new Promise(resolve => setTimeout(resolve, 1100));
+    response.writeHead(400, {'content-type': 'application/json',
+      ...(scenario === 'forbid' ? {'x-should-retry': 'false'} : {}),
+      ...(scenario === 'wait' ? {'retry-after': '120'} : {})});
+    response.end(JSON.stringify({error: {message: 'The input token count exceeds the maximum number of tokens allowed 1048576.'}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (scenario of ['recover', 'persistent', 'forbid', 'wait', 'deadline']) {
+      requests = []; ordinary = 0;
+      const current = join(directory, scenario);
+      const original = historicalSession(current, '原始目标', 'aborted', 10000);
+      const records = await execute({session_dir: current, session_file: original.session_file,
+        models: ['primary', 'secondary'], timeout_sec: scenario === 'deadline' ? 1 : 30,
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail('不能重发工具'));
+      assert.equal(ordinary, ['recover', 'persistent'].includes(scenario) ? 2 : 1, scenario);
+      assert.ok(requests.every(request => request.model === 'primary'));
+      assert.equal(requests.some(summaryRequest), ordinary === 2);
+      assert.equal(records.at(-1).type, scenario === 'recover' ? 'settled' : 'error', JSON.stringify(records));
+      if (scenario !== 'recover') assert.equal(records.at(-1).reason, 'context_limit');
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('摘要失败或取消不发布半成品，原历史保留且不进入后续推理', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-token-cancel-'));
+  let count = 0, scenario, stop;
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body);
+    assert.ok(summaryRequest(value));
+    count += 1;
+    if (scenario === 'cancel') { stop({type: 'abort'}); return; }
+    if (count === 1) return stream(response, false, 11, '尚未完成全部归纳');
+    response.writeHead(401, {'content-type': 'application/json'});
+    response.end(JSON.stringify({error: {message: 'local authentication failure'}}));
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (scenario of ['failed', 'cancel']) {
+      count = 0;
+      const current = join(directory, scenario);
+      const original = historicalSession(current, 'ARCHIVED_ATOMIC_HISTORY'.repeat(10000));
+      const records = await execute({session_dir: current, session_file: original.session_file,
+        base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail(),
+        (_event, send) => { stop = send; });
+      assert.equal(records.filter(event => event.type === 'settled').length, 0);
+      assert.equal(records.filter(event => event.type === 'context').length, 0);
+      const entries = (await readFile(original.session_file, 'utf8')).trim().split('\n').map(JSON.parse);
+      assert.equal(entries.filter(entry => entry.type === 'compaction').length, 0);
+      assert.ok(JSON.stringify(entries).includes('ARCHIVED_ATOMIC_HISTORY'));
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('摘要内容过滤也先原模型两次重试后降级DeepSeek，关闭思考并共享计量', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-token-summary-retry-'));
+  const requested = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); requested.push(value);
+    if (summaryRequest(value) && value.model === 'primary') {
+      response.writeHead(200, {'content-type': 'text/event-stream'});
+      response.end('data: ' + JSON.stringify({id: 'filtered-summary', object: 'chat.completion.chunk',
+        choices: [{index: 0, delta: {}, finish_reason: 'content_filter'}]}) + '\n\ndata: [DONE]\n\n');
+      return;
+    }
+    assert.deepEqual(value.thinking, {type: 'disabled'});
+    stream(response, false, 11, summaryRequest(value) ? 'SUMMARY_AFTER_CONFIGURED_FALLBACK' : '继续原目标。');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const original = historicalSession(directory, '原始决策'.repeat(2000), 'aborted', 350000);
+    const records = await execute({session_dir: directory, session_file: original.session_file,
+      models: ['primary', 'DeepSeek-V4-Flash'], base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail());
+    assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
+    assert.deepEqual(requested.map(request => request.model), ['primary', 'primary', 'primary', 'DeepSeek-V4-Flash', 'DeepSeek-V4-Flash']);
+    assert.equal(records.filter(event => event.type === 'assistant').length, requested.length);
+    assert.ok(JSON.stringify(requested.at(-1)).includes('SUMMARY_AFTER_CONFIGURED_FALLBACK'));
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
 test('真实工具调用与明确原会话恢复，禁用宿主默认工具及自动扩展', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'projects-pi-sdk-'));
   const requests = [];
@@ -91,6 +318,120 @@ test('真实工具调用与明确原会话恢复，禁用宿主默认工具及�
     assert.equal(resumed.find(value => value.type === 'ready').session_id, ready.session_id);
     assert.equal(resumed.at(-1).type, 'settled');
     assert.equal(requests.length, 3);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('单目标通过后保存工具结果并结束，同批第二目标及后续推理均不执行', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'projects-pi-round-'));
+  const requests = [];
+  let mixed = false;
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    requests.push(JSON.parse(body));
+    if (requests.length > 1) return stream(response, false);
+    const names = mixed ? ['account_state', 'project_submit', 'claude_start'] : ['project_submit'];
+    response.writeHead(200, {'content-type': 'text/event-stream'});
+    response.write('data: ' + JSON.stringify({id: 'round', object: 'chat.completion.chunk', model: 'test-model',
+      choices: [{index: 0, delta: {role: 'assistant', tool_calls: names.map((name, index) => ({
+        index, id: 'round-' + index, type: 'function', function: {name, arguments: '{}'},
+      }))}, finish_reason: null}]}) + '\n\n');
+    response.write('data: ' + JSON.stringify({id: 'round', object: 'chat.completion.chunk', model: 'test-model',
+      choices: [{index: 0, delta: {}, finish_reason: 'tool_calls'}]}) + '\n\n');
+    response.end('data: [DONE]\n\n');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (mixed of [false, true]) {
+      requests.length = 0;
+      const seen = [];
+      const config = {session_dir: join(directory, String(mixed)),
+        base_url: `http://127.0.0.1:${server.address().port}/v1`,
+        tools: ['account_state', 'project_submit', 'claude_start'].map(name => ({name, description: '本地受控工具',
+          parameters: {type: 'object', properties: {}, required: [], additionalProperties: false}}))};
+      const records = await execute(config, (event, send) => {
+        seen.push(event.name);
+        assert.notEqual(event.name, 'claude_start', '通过后的第二目标不能到达控制端');
+        const result = event.name === 'project_submit'
+          ? {status: 'passed', round_complete: true, submission_id: 'confirmed-local-delivery'} : {account_id: 1};
+        send({type: 'tool_result', id: event.id, result});
+      });
+      assert.deepEqual(seen, mixed ? ['account_state', 'project_submit'] : ['project_submit']);
+      assert.equal(requests.length, 1);
+      assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
+      assert.equal(records.filter(event => event.type === 'settled').length, 1);
+      assert.equal(records.filter(event => event.type === 'error').length, 0);
+      assert.equal(records.filter(event => event.type === 'assistant').length, 1);
+      const ready = records.find(event => event.type === 'ready');
+      const entries = (await readFile(ready.session_file, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+      const delivery = entries.find(entry => entry.message?.role === 'toolResult' && entry.message.toolName === 'project_submit');
+      assert.equal(JSON.parse(delivery.message.content[0].text).submission_id, 'confirmed-local-delivery');
+      // 下一次启动复用原会话，但旧的完成字段不能提前结束新的请求或重放原工具。
+      const resumed = await execute({...config, session_file: ready.session_file}, () => assert.fail('旧工具不得重放'));
+      assert.equal(resumed.at(-1).type, 'settled');
+      assert.equal(requests.length, 2);
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('只有可信完成结果结束单目标指挥，失败和其他工具的完成字段不生效', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'projects-pi-round-marker-'));
+  let tool = 'account_state';
+  let requests = 0;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 仅消费本地合成请求。 */ }
+    requests += 1;
+    if (requests === 2) return stream(response, false);
+    response.writeHead(200, {'content-type': 'text/event-stream'});
+    response.write('data: ' + JSON.stringify({id: 'marker', object: 'chat.completion.chunk', model: 'test-model',
+      choices: [{index: 0, delta: {role: 'assistant', tool_calls: [{index: 0, id: 'marker-call', type: 'function',
+        function: {name: tool, arguments: '{}'}}]}, finish_reason: null}]}) + '\n\n');
+    response.write('data: ' + JSON.stringify({id: 'marker', object: 'chat.completion.chunk', model: 'test-model',
+      choices: [{index: 0, delta: {}, finish_reason: 'tool_calls'}]}) + '\n\n');
+    response.end('data: [DONE]\n\n');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    for (const current of [
+      {tool: 'account_state', result: {status: 'passed', round_complete: true}},
+      {tool: 'project_submit', result: {status: 'failed', round_complete: true}},
+      {tool: 'project_submit', result: {status: 'passed', round_complete: 1}},
+    ]) {
+      tool = current.tool; requests = 0;
+      const records = await execute({session_dir: join(directory, String(Math.random())),
+        base_url: `http://127.0.0.1:${server.address().port}/v1`,
+        tools: [{name: tool, description: '合成字段校验', parameters: {type: 'object', properties: {}}}]},
+        (event, send) => send({type: 'tool_result', id: event.id, result: current.result}));
+      assert.equal(requests, 2);
+      assert.equal(records.at(-1).type, 'settled');
+    }
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('成功收尾信号与人工取消竞争时，取消仍优先且不再请求模型', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'projects-pi-round-cancel-'));
+  let requests = 0;
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 消费本地合成请求。 */ }
+    requests += 1;
+    response.writeHead(200, {'content-type': 'text/event-stream'});
+    for (const value of [
+      {delta: {role: 'assistant', tool_calls: [{index: 0, id: 'cancel-submit', type: 'function',
+        function: {name: 'project_submit', arguments: '{}'}}]}, finish_reason: null},
+      {delta: {}, finish_reason: 'tool_calls'},
+    ]) response.write('data: ' + JSON.stringify({id: 'cancel-round', object: 'chat.completion.chunk',
+      model: 'test-model', choices: [{index: 0, ...value}]}) + '\n\n');
+    response.end('data: [DONE]\n\n');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, base_url: `http://127.0.0.1:${server.address().port}/v1`,
+      tools: [{name: 'project_submit', description: '本地验收', parameters: {type: 'object', properties: {}}}]},
+      (event, send) => {
+        send({type: 'tool_result', id: event.id, result: {status: 'passed', round_complete: true}});
+        send({type: 'abort'});
+      });
+    assert.equal(requests, 1);
+    assert.equal(records.filter(event => event.type === 'settled').length, 0);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
