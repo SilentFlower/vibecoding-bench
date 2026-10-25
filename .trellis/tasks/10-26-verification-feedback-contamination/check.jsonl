@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/project-iterations.md", "reason": "验收反馈、持久复验与Pi上下文的权威契约"}
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "原会话、账号身份、部署归属和用户部署偏好"}
+{"file": ".trellis/spec/vibecoding-bench/backend/quality-guidelines.md", "reason": "SQLite事务、中文说明和验证约定"}

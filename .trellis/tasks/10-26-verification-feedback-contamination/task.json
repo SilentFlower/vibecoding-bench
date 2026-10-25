@@ -1,0 +1,79 @@
+{
+  "id": "verification-feedback-contamination",
+  "name": "verification-feedback-contamination",
+  "title": "修复验收误判导致的反馈污染和重复返工",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-26",
+  "completedAt": null,
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-25T23:15:30Z",
+      "contextKey": "codex_01a17427-4031-7eb2-80c0-9bf18aeeb897",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "d237334255b0cae9ef5edafed09d8e6432bdbfb4",
+        "status": [],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "d237334255b0cae9ef5edafed09d8e6432bdbfb4",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "5c4fe5d47b193382327f75cb210adc88ee34e9bfbd16831e4dfb73a568730abc"
+          },
+          {
+            "root": "cc2api",
+            "head": "0c60adfeb1382f1c794bc1b512e4662803807970",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "85c04e1be39803c8f3cffff5cc5203f4635c2b3ad33658b3a4d5d827429d31bd"
+          }
+        ],
+        "fingerprint": "6eff3a6222bd1d83e81176e8140123c22fd149e94717a11f647f227b3270459f"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "验收误判修复、脱敏事实与有界自动复验实现完成",
+      "全面检查及后端/Pi回归通过",
+      "原冻结候选业务与1904项原生回归通过",
+      "规范更新及业务推送完成"
+    ],
+    "partialStep": "等待Action构建并部署修复到v3，恢复原目标计划",
+    "nextStep": "核对Action同批清单后部署，追加纠错事实并验证原会话自动恢复",
+    "notes": "用户要求验收自动收敛，无需人工确认；部署不备份、不计算内存，保留原候选与会话。",
+    "updatedAt": "2026-10-25T23:34:47Z"
+  }
+}
