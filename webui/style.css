@@ -108,7 +108,8 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
   top: 0;
   z-index: 100;
   display: grid;
-  grid-template-columns: minmax(220px, auto) 1fr minmax(220px, auto);
+  /* 品牌和状态栏保留实际宽度，导航在剩余空间整项换行，避免文字溢出相邻列。 */
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
   align-items: center;
   gap: 24px;
   padding: 10px 20px;
@@ -148,6 +149,8 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
 
 .tabs {
   display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 0;
   justify-content: center;
   align-items: stretch;
@@ -188,6 +191,9 @@ input, textarea, select { font-variant-numeric: tabular-nums; }
 
 .statline {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   justify-self: end;
