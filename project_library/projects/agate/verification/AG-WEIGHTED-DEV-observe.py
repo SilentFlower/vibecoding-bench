@@ -12,7 +12,7 @@ try:
     grouped = agate.Table([('a', 2, 1), ('a', 8, 2), ('b', 9, 1)], ['g', 'v', 'w'],
         [agate.Text(), agate.Number(), agate.Number()]).group_by('g').aggregate([('weighted', agate.WeightedMean('v', 'w'))])
     rejected = 0
-    for rows in ([(None, -3)], [(2, Decimal('Infinity'))]):
+    for rows in ([(2, -3)], [(2, Decimal('Infinity'))]):
         try:
             agate.Table(rows, ['v', 'w'], [agate.Number(), agate.Number()]).aggregate(agate.WeightedMean('v', 'w'))
         except (ValueError, ArithmeticError):

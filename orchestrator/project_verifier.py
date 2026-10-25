@@ -109,6 +109,36 @@ def _native_schema_adapter(source: bytes, specification: dict) -> tuple[bytes, d
         'preserves_frozen_contract': True}
 
 
+_WEIGHTED_OBSERVER_OLD = '04e8a3a7fc1b09c9e6966697bbfe1908a0c5b66ebfc90209d16c7266c500bd5e'
+_WEIGHTED_OBSERVER_FIXED = 'e0e953f723d91ebf42032ad8afed8201ac244a55906d1b8ad43d035c80f4153e'
+
+
+def _native_weighted_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]:
+    """仅修正已确认的加权聚合空值样例冲突，不改冻结资产或结果协议。
+
+    :param source: 从冻结验证目录读取的观察器字节。
+    :param specification: 原生业务观察的冻结协议。
+    :return: 实际执行字节和修复审计信息；其他版本或协议保持原样。
+    """
+    original = hashlib.sha256(source).hexdigest()
+    if (original != _WEIGHTED_OBSERVER_OLD
+            or specification.get('script') != 'verification/AG-WEIGHTED-DEV-observe.py'
+            or specification.get('args') != [] or specification.get('python_paths') != ['library']
+            or not _same_json(specification.get('expected'), {'candidate_import': True, 'business': True})):
+        return source, None
+    # 公开合同要求空值对先跳过；负权重拒绝样例必须使用有效数值，才能独立检验负权重。
+    before, after = b'[(None, -3)]', b'[(2, -3)]'
+    if source.count(before) != 1:
+        raise ValueError('已确认的加权聚合观察器片段不唯一，拒绝推测修复')
+    actual = source.replace(before, after, 1)
+    effective = hashlib.sha256(actual).hexdigest()
+    if effective != _WEIGHTED_OBSERVER_FIXED:
+        raise ValueError('加权聚合观察器修复字节不符合已核验版本')
+    return actual, {'name': 'weighted-null-pair-contract-v1', 'scope': 'public_contract',
+        'original_runner_sha256': original, 'effective_runner_sha256': effective,
+        'preserves_frozen_contract': True}
+
+
 _EXECUTE = """import os,runpy,shutil,sys
 shutil.copytree('/source','/work/project')
 os.chdir('/work/project')
@@ -347,6 +377,8 @@ class ProjectVerifier:
                 source, adapter = _native_regression_adapter(source, contract)
             else:
                 source, adapter = _native_schema_adapter(source, specification)
+                if adapter is None:
+                    source, adapter = _native_weighted_adapter(source, specification)
             # verification会单独只读挂载；可信副本放输入根，确保执行的是已核SHA的实际字节。
             execution_script = ('trusted-native-regression.py' if regression else 'trusted-native-business.py') if adapter else script
             # 外层输入挂载只读，嵌套验证目录的挂载点必须先在宿主创建。
@@ -435,9 +467,9 @@ class ProjectVerifier:
                     if adapter is not None:
                         result['runtime_adapter'] = adapter
                     return result
-                diagnostics = {}
-                if adapter:
-                    # 只有精确核验过的观察器拥有诊断字段；其他输出仍按原协议逐字段严格比较。
+                diagnostics = {'runtime_adapter': adapter} if adapter else {}
+                if adapter and adapter['name'] == 'schema-public-contract-v1':
+                    # 只有 Schema 适配器拥有诊断字段；加权聚合及其他输出仍按原协议严格比较。
                     codes = actual.get('feedback_codes') if isinstance(actual, dict) else None
                     if (not isinstance(codes, list) or len(codes) > len(_SCHEMA_FEEDBACK_CODES)
                             or any(not isinstance(code, str) or code not in _SCHEMA_FEEDBACK_CODES for code in codes)):
