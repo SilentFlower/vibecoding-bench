@@ -100,6 +100,63 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `test_create_is_committed_before_independent_read`：使用生产 `init_db` 的 WAL 模式、独立 reader 连接池；创建返回后立即按 ID 查询，必须为 1。不得改成同池读取或添加等待。
 - `account_store_timestamp_test`：原时间／空值／OAuth／策略字段回归保持；v3 联合堆栈通过正式同步 API 创建后立即解析凭据并绑定。
 
+## Scenario: 网关请求窗口费用
+
+### 1. Scope / Trigger
+
+- 修改网关业务用量记录、5h／7d 费用汇总、账号分页 `request_usage` 或卡片统计展示时适用。官方额度百分比与本地请求费用属于不同数据源，不能把订阅额度解释成固定美元余额。
+
+### 2. Signatures
+
+- `UsageStore::migrate(pool: &AnyPool) -> Result<(), sqlx::Error>`：通过 `db::migrate` 幂等建表，SQLite／PostgreSQL 共用 SQL。
+- `UsageStore::record(&self, record: &UsageRecord) -> Result<(), AppError>`：按 `record_id` 唯一键插入一次调用。
+- `UsageStore::summaries(&self, accounts: &[Account], now: DateTime<Utc>) -> Result<HashMap<i64, RequestUsage>, AppError>`：在数据库内批量聚合当前账号页。
+- `GatewayService::new(account_svc, rewriter, telemetry_svc, settings_store, cache, usage_store)`：最后一个参数是全进程共享的 `Arc<UsageStore>`。
+- `GET /admin/accounts`：保留原分页与账号字段，账号新增可选／可空 `request_usage`。
+- 新表 `usage_records` 保存账号、UTC 毫秒时间、模型、Token 数、可空费用、partial 和价格版本；`usage_stats_meta` 的 `recorded_since` 保存首次启用时间，不是可编辑 setting。
+
+### 3. Contracts
+
+- 只采集实际成功转发的 `/v1/messages`，独立于自动遥测开关；普通 JSON、SSE、压缩与提前断开都通过同一一次性上下文收口。EOF、末帧、body error 与 Drop 不得重复写入。首次实际非流探针调用计入，本地缓存命中、mock、count_tokens 和手动 usage 查询不计入。
+- 共用 `merge_message_usage` 的累计最大值语义；输入、输出、缓存读与缓存写总量分别累加，5m／1h 写入只是总写量明细，不能再次加入总 Token。采样和解码限长；未知模型、无用量、损坏响应和中断使用未定价／部分记录状态，不能假装免费且完整。
+- Claude 价格由 `src/service/claude-pricing.json` 内置，版本来自本机 sub2api 快照及其明确兜底规则。已记录费用不随目录更新回算；不在业务热路径访问远程价格或参考仓库。该资源随现有 Docker `COPY src` 进入构建。
+- `usage_records` 只保存数值摘要，不保存正文、凭据和会话明文。时间统一为 UTC RFC3339 毫秒字符串；按时间至少保留完整周窗口，当前为八天，禁止按固定条数裁剪。已成功落库的记录重启后可读，异步尚未落盘的调用不承诺崩溃恢复。
+- 两个窗口分别采用有效未来 reset 减去 5h／7d 作为开始时间，且 reset 不得超过该窗口长度；按请求开始时间的左闭右开区间汇总，查询上限不超过本次 now。reset 缺失、非法或到期时返回明确标为 `rolling` 的最近窗口。
+- `request_usage` 包含 `recorded_since`、`five_hour`、`seven_day`。各窗口字段为 `requests`、`tokens`、`cost_usd`、`unpriced_requests`、`partial_requests`、`starts_at`、`ends_at`、`basis: "quota" | "rolling"`、`coverage_complete`、`estimated_total_cost_usd`。
+- `cost_usd` 是已知部分的标准 API 折算费用，不是 A／U 用户结算。费用未确定的请求计入 `unpriced_requests`；不完整响应计入 `partial_requests`。读取数据库失败时 API 保留账号列表并返回空统计，前端不得填成零请求／零费用。
+- 总额只在有效官方周期、有限正百分比／费用、无未定价／部分记录且覆盖完整时使用 `cost_usd * 100 / utilization`。覆盖起点保守取首次记录时间、本进程开始时间和最近写失败；因此启用／重启后的首个未完整覆盖周期隐藏估算。页面标明按网关记录估算，不称为官方配额或余额。
+- 列表刷新只读，不删除记录；5h 重置只切换自身周期，7d 按自己的 reset 切换。手动额度刷新成功后立即重读列表，正常页面维持既有 5 秒轮询，不新增自动 usage POST。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 同一 `record_id` 重复 finalize | 一条记录、一次请求费用 |
+| 同一 SSE usage 多次出现 | 保留字段最大值，不累计重复事件 |
+| 未知模型／缺少 usage | 请求仍可统计，费用未知；不生成总额估算 |
+| 中断、损坏或解码超限 | 标记部分数据，只展示已知费用 |
+| 缺少／非法／过期 reset | 本地统计 `basis=rolling`，官方百分比未知／待更新，无外推 |
+| 真实已知 0% | 允许显示 0%，不做除零外推 |
+| 普通刷新／重启 | 已落库金额保留；重启后覆盖不足时隐藏外推 |
+| 5h reset 推进，7d 未推进 | 5h 只计新周期，7d 保留仍属于其周期的请求 |
+| 数据库读写失败 | 记录脱敏诊断，统计不可用或覆盖不完整；不阻断业务转发，不伪造零值 |
+
+### 5. Scenarios and Examples
+
+- 正常：同一请求按所属周期同时进入 5h／7d；完整周期的费用为 $12.50、官方占用为 10% 时，按网关记录估算 $125.00。
+- 基础／边界：上线首周仍可显示已记录请求和费用，首个周期缺少历史数据时不外推；页面刷新保留金额，新 reset 使窗口查询自然排除旧周期。
+- 错误：刷新页面时执行 DELETE 清空统计，或把所有请求费用挂到 Fable 专属窗口。
+- 正确：仅后台按保留时长裁剪历史记录，当前 5h／7d 由各自 reset 选区间；模型专属额度继续使用原有含义。
+
+### 6. Tests Required
+
+- `refresh_keeps_records_and_each_reset_selects_its_own_cycle`：重复读取与重复 finalize、两个周期独立推进、请求边界和 Token／费用汇总。
+- `committed_records_survive_independent_connection_and_reopening`：幂等迁移、独立连接可见、重启保留金额、覆盖不足禁止外推。
+- `unknown_or_incomplete_data_never_produces_total_estimate`：缺失／非法／到期 reset、零比例、未定价和部分响应。
+- `gateway_usage_records_real_responses_once_without_telemetry`：本地真实 HTTP 上游验证 JSON、分块 SSE、gzip、取消、首次探针与缓存命中、count_tokens 的调用／记录次数。
+- `service::usage`／`service::usage_pricing`：实际模型与 speed、累计 Token、不同 TTL、别名、长上下文、未知模型及有界解码；金额断言对照参考价格。
+- 管理 API／浏览器：字段与 TypeScript 契约一致，自动刷新独立切换周期、未知与待更新明确、手机无横向溢出、零自动 usage POST；通过 `cargo fmt --check`、`cargo test --locked`、`npm run build`。
+
 ## Common Mistakes
 
 | 反模式 | 风险 | 正确做法 |

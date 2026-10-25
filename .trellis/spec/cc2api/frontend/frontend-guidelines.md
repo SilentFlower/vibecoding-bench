@@ -110,6 +110,7 @@ const isValidLimit = computed(() => {
 - `access_token`、`refresh_token`、setup token、proxy password 默认不完整展示。
 - 邮箱、账号 UUID、organization UUID 可以展示，但不要和 token 一起导出到日志。
 - usage、RPM、并发和队列状态应标明窗口来源，避免把 5h/7d/RPM 混在一起。
+- 5h／7d 请求与费用读取列表附加的 `request_usage`，沿用 5 秒刷新；读页面不能清空记录，过期额度显示待更新。金额、完整性与估算条件统一见 [网关请求窗口费用](../backend/settings-database.md#scenario-网关请求窗口费用)。
 
 ### Scenario: 账号基础版本与画像选择配置展示
 
