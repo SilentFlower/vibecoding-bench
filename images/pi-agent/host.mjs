@@ -244,8 +244,9 @@ async function runSession(config, responses) {
     return;
   }
   const health = await modelHealth(config);
-  const deadline = Date.now() + Math.min(86400, Math.max(1,
-    Number.isFinite(config.timeout_sec) ? config.timeout_sec : 1800)) * 1000;
+  // Python 剩余预算可能带小数；计时器只接受整数毫秒，向下取整避免延长原预算。
+  const deadline = Date.now() + Math.floor(Math.min(86400, Math.max(1,
+    Number.isFinite(config.timeout_sec) ? config.timeout_sec : 1800)) * 1000);
   const candidates = () => [health.preferred(), ...config.models].filter((id, index, all) =>
     health.models.has(id) && all.indexOf(id) === index);
   const available = () => candidates().find(id => health.models.get(id).cooldown_until <= Date.now());

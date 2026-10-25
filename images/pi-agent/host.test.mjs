@@ -117,7 +117,7 @@ test('350K token 含缓存输入触发摘要，阈值可配置且同目标阈值
       const current = join(directory, String(index));
       const original = historicalSession(current, 'FULL_HISTORY_BELOW_TOKEN_LIMIT_'.repeat(2000), 'aborted', tokens);
       const records = await execute({session_dir: current, session_file: original.session_file,
-        compaction_threshold_tokens: threshold,
+        compaction_threshold_tokens: threshold, timeout_sec: 30.012345,
         base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []}, () => assert.fail('已确认工具不能重放'));
       assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
       assert.equal(requests.some(summaryRequest), expected);
