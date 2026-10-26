@@ -9,6 +9,7 @@ from datetime import datetime
 from math import isfinite
 from pathlib import Path
 from socket import SHUT_WR
+from stat import S_ISREG
 from threading import RLock
 
 from account_runtime import AccountRuntime, atomic_json
@@ -123,7 +124,8 @@ class PiTerminal:
                 configuration = {'session': session, 'socket': socket, 'session_id': work['session_id'],
                     'resume': native.is_file(), 'settings': f'/run/v3/jobs/{handle}/settings.json',
                     'model': settings.get('execution_model'), 'timeout_sec': work['remaining_sec'],
-                    'exit_file': f'/run/v3/jobs/{handle}/exit-code', 'quota_signal': signal}
+                    'exit_file': f'/run/v3/jobs/{handle}/exit-code', 'quota_signal': signal,
+                    'source': source, 'interaction_signal': f'/run/v3/jobs/{handle}/interaction.json'}
                 atomic_json(runtime_job / (self.namespace + '.json'), configuration)
                 os.chown(runtime_job / (self.namespace + '.json'), 1000, 1000, follow_symlinks=False)
                 script = root / 'runtime/drivers' / (self.namespace + '-' + handle + '.py')
@@ -153,6 +155,7 @@ class PiTerminal:
                 os.chown(controls / 'start.json', 0, 1000, follow_symlinks=False)
                 return {'token': job['token'], 'source': source, 'workspace': str(workspace.relative_to(runtime.data)),
                     'native': str((root / 'home/.claude/projects' / cwd.replace('/', '-')).relative_to(runtime.data)),
+                    'interaction_signal': str((runtime_job / 'interaction.json').relative_to(runtime.data)),
                     'quota_signal': str((controls / 'pause.json').relative_to(runtime.data))}
             except Exception:
                 runtime.cleanup(job['token'])
@@ -280,6 +283,46 @@ class PiTerminal:
                 facts['retry_at'] = float(reset)
         return facts
 
+    def _interaction(self, work: dict, info: dict, job: dict) -> dict | None:
+        """读取当前作业的有界唤醒提示，不把可写提示当授权证明。
+
+        :param work: 当前工作。
+        :param info: 已持久化的执行定位。
+        :param job: 已核对容器的作业。
+        :return: 合法提示；旧配置、陈旧或无效提示返回 None。
+        """
+        if not info.get('interaction_signal'):
+            return None
+        expected_source = f"{self.namespace}:{work['id']}:{work['generation']}"
+        path = self.runtime.data / safe_relative(info['interaction_signal'])
+        expected = self.runtime._root(job['row']) / 'runtime/jobs' / job['handle'] / 'interaction.json'
+        if path != expected or info.get('source') != expected_source or job['source'] != expected_source:
+            raise ValueError('交互通知与原执行归属不符')
+        try:
+            descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(descriptor, 'rb') as stream:
+                metadata = os.fstat(stream.fileno())
+                if not S_ISREG(metadata.st_mode) or metadata.st_size > 4096:
+                    return None
+                raw = stream.read(4097)
+            if len(raw) > 4096:
+                return None
+            value = json.loads(raw)
+            if (not isinstance(value, dict) or set(value) != {'schema', 'source', 'session_id', 'id', 'event', 'tool', 'observed_at'}
+                    or type(value['schema']) is not int or value['schema'] != 1
+                    or value['source'] != expected_source or value['session_id'] != work['session_id']
+                    or not isinstance(value['id'], str) or len(value['id']) != 32
+                    or any(letter not in '0123456789abcdef' for letter in value['id'])
+                    or value['event'] not in ('PermissionRequest', 'PreToolUse', 'Stop')
+                    or value['tool'] is not None and (not isinstance(value['tool'], str) or len(value['tool']) > 200)
+                    or value['event'] == 'PreToolUse' and value['tool'] not in ('AskUserQuestion', 'ExitPlanMode')
+                    or type(value['observed_at']) not in (int, float) or not isfinite(value['observed_at'])
+                    or not 0 < value['observed_at'] <= time.time() + 60):
+                return None
+            return value
+        except (OSError, ValueError, TypeError):
+            return None
+
     def observe(self, work: dict, cursor: int = 0) -> dict:
         """取得有界终端画面及原生会话增量，不推断应当发送的回复。
 
@@ -295,7 +338,7 @@ class PiTerminal:
         container = runtime._container(job['row'])
         result = container.exec_run(['tmux', '-S', job['tmux_socket'], 'capture-pane', '-p', '-S', '-120', '-t', job['tmux']])
         screen = result.output.decode('utf-8', errors='replace')[-32000:] if not result.exit_code else ''
-        events = []
+        events, interactions = [], []
         path = runtime.data / safe_relative(info['native']) / (work['session_id'] + '.jsonl')
         if path.exists():
             if path.is_symlink() or not path.is_file() or cursor > path.stat().st_size:
@@ -315,10 +358,16 @@ class PiTerminal:
                         block.get('text', '') for block in content if block.get('type') == 'text') if isinstance(content, list) else ''
                     if message.get('role') in ('user', 'assistant') and text:
                         events.append({'id': value.get('uuid'), 'role': message['role'], 'text': text[-24000:]})
+                    if message.get('role') == 'assistant' and isinstance(content, list):
+                        for block in content:
+                            if (block.get('type') == 'tool_use' and block.get('name') in ('AskUserQuestion', 'ExitPlanMode')
+                                    and isinstance(block.get('id'), str)):
+                                interactions.append({'id': block['id'][:200], 'tool': block['name']})
                 cursor = source.tell()
         process = runtime.client.api.exec_inspect(job['exec'])
         running = bool(process.get('Running'))
         return {'screen': screen, 'events': events, 'cursor': cursor, 'running': running, 'terminal_ready': not result.exit_code,
+            'interactions': interactions, 'interaction': self._interaction(work, info, job),
             'exit_code': process.get('ExitCode') if not running else None,
             'quota_paused': (runtime.data / safe_relative(info['quota_signal'])).is_file()}
 

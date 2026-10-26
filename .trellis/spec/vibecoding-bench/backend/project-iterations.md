@@ -668,6 +668,8 @@ GET /api/projects、GET /api/accounts/warmup/pi:
   agents[].progress.deferred = integer
   agents[].work.verification_correction = optional string
 failure_facts[] = {phase, reason, test_id?, exception_type?, required_percent?, actual_percent?}
+attrs 受信业务输出 = {candidate_import: bool, business: bool, feedback_codes: list[str]}
+ProjectsVerification._business_feedback(report: dict) -> list[str]
 ```
 
 ### 3. Contracts
@@ -679,6 +681,10 @@ failure_facts[] = {phase, reason, test_id?, exception_type?, required_percent?, 
 - 暂存前后复核控制代次、取消和未知输入，必须先严格释放，再同事务发布 deferred、冷却记录和审计事件。只有已通过或已安全暂存的真实提交返回 round_complete；SDK 保存真实工具结果后终止本轮，不能让模型伪造字段越过后端。人工停止待复验目标仍会转 stopped 并取消自动续做。
 - 失败反馈只投影最多八项有界阶段、公开测试身份、异常类型或真实覆盖率数值，不透传 stdout、私有断言及异常正文；`_public_facts` 继续共享 12 KiB 体积预算。不能让模型猜测隐藏验收或用 pragma no cover、删测试换取通过。
 - Arrow `expansion_regression.py` 仅精确 SHA256 版本可适配。辅助覆盖脚本的空格式列表允许 TypeError/ValueError（含 ParserError），其他错误类型仍要求 TypeError；新能力检查失败单列 feature_coverage，原冻结测试节点独立执行和比较。临时可信入口及只读辅助挂载记录前后摘要，不原地改写旧资产或降低覆盖率门槛。
+- attrs 适配只接受 `script='verification/AT-VALIDATION-REPORT-DEV-observe.py'`、`args=[]`、`python_paths=['library/src']` 和严格 `expected={candidate_import:true,business:true}`。原观察器 SHA256 为 `304a4403f8a037da3e6a5c4eb0d125678fb725fe69580c6ce479a878d5304461`，修正版为 `b6a7f9f3156b449572499dcc742b8f856ea72520da76a16a205b4d69df705716`；仅这两个版本可以使用控制端同目录的 `project_attrs_observer.py`。受信程序与未来内容副本须字节相同，固定摘要复核后写临时入口，审计保留原始/实际摘要，不改冻结资产。
+- attrs 按公开合同检查字段声明顺序、真实字段名/Attribute/原异常对象、每字段一次及普通 validate 首错兼容、字段不变、可选聚合、共享禁用、组合短路/一次迭代和 BaseException 原对象传播。不要求非 bool 的 `raise_errors` 必须抛 TypeError；不同调用使用独立输入和计数，避免检查器自身重放造成误判。
+- attrs 诊断对象只允许上述三个键，两个结果字段必须为严格布尔。`feedback_codes` 仅允许 `attrs_report_order`、`attrs_report_identity`、`attrs_report_once`、`attrs_report_values`、`attrs_report_aggregate`、`attrs_report_disabled`、`attrs_report_composites`、`attrs_report_base_exception`，必须去重，且 `business == (not feedback_codes)`；拆出诊断后仍严格比较原 expected。其他未授权观察器不因此放宽输出协议。
+- 公开业务反馈只映射受信枚举，不透传任意诊断字符串；递归只读取 `business/regression/previous_objectives[].report`，深度至多 5，每层历史目标至多 16，结果最多八项去重说明。具体反馈存在时替代泛化返工提示，原 `_public_facts` 的私有内容过滤和总预算继续生效。
 - 已核实错误通过 `verification_correction` 事件追加事实，旧提交和原始记录留档；新纠错第一次隔离 Pi 旧推理，原 Claude 会话继续复用。该机制不自动绕过权限、身份、认证、未知输入或严格清理冲突。
 
 ### 4. Validation & Error Matrix
@@ -692,16 +698,20 @@ failure_facts[] = {phase, reason, test_id?, exception_type?, required_percent?, 
 | 全池冷却或依赖待复验 | 持久安排下一次检查，不启动空模型循环 |
 | 取消、代次变化、未知投递、无法确认释放 | 沿用原保护，不发布正常收尾证明或新目标 |
 | 冻结脚本摘要未知 | 拒绝推测适配，按验收环境故障自动暂存 |
+| attrs 已匹配合同但脚本版本未知或控制端受信摘要不符 | 返回验收环境 error，不把来源错误算业务失败 |
+| attrs 结果出现额外键、非 bool、未知/重复类别或 business 与类别矛盾 | failed，不将任意诊断投影到公开事实 |
 
 ### 5. Scenarios and Examples
 
 - 正常：目标 A 失败后依据具体事实返工，三次仍失败则保留原目标，下一轮选择其他项目 B；A 冷却到期使用原 work/session 续做。
 - 边界：无其他可执行目标时等待六小时后的复验，不将剩余数量归零或宣称全部通过。
 - 错误：只收到“1903 passed、1 error”便反复猜测时区，或改 TypeError 以迎合未声明的异常子类。正确：核对公开合同、修复精确版本的验收误判，提供可靠阶段事实并有界自动推进。
+- attrs 正常：宽松真值实现和严格 bool 实现均按相同公开功能矩阵验收；若旧目标命中已核验来源，使用可信副本执行，原报告留档。错误：要求候选为了隐藏的 `raise_errors=1` 断言改代码；正确：移除未公布要求，同时用原生回归与独立错误反例证明没有放宽真实业务合同。
 
 ### 6. Tests Required
 
 - `test_project_arrow_adapter`：两种合法异常、错误接受输入、来源摘要保护、真实 pytest 节点不受辅助失败污染、覆盖率数值及私有日志边界、真实入口只读辅助挂载。
+- `test_project_attrs_adapter`：新旧字节与分发副本一致、未知来源环境错误、真实入口临时暂存/只读挂载、严格结果协议、严格 bool 与真值两种合法实现、八类真实错误反例、历史嵌套反馈和私有内容边界。真实候选另经离线 Docker 业务、公开六项及冻结原生回归验证；业务通过不能替代语义审查或历史回归。
 - `test_projects_verification_recovery`：三次不同候选、重复相同候选、双空间冷却、服务重启后的同 work/session、验证器抛错、连续两轮超时、取消竞争、人工停止及一次纠错上下文隔离。
 - `host.test.mjs`：待复验与 passed 均只在真实 project_submit 和布尔收尾标记下结束；普通失败或其他工具不能终止；原结果先持久化。
 
@@ -770,3 +780,60 @@ ProjectsTerminal.cleanup_cycle(account: dict, cycle_no: int) -> None
 - `test_projects_cycles`：两空间自然名称、真实旧四字段与旧养号夹具、原输入字节保持、实际准备器 cwd/PYTHONPATH 与原生会话读取、账号/空间/轮次/seed 隔离、新旧混合和中断清理、重复注册、主动短名碰撞、未知自然目录、非法版本及链接拒绝。
 - `test_projects_terminal`、`test_projects_quota`：合成原生 tmux 会话接续、隔离和额度补证；`test_projects_agent`、`test_projects_single_objective`、`test_projects_engine_cycles` 核对原任务优先、单目标边界和计划循环。
 - 验证仅使用本地合成账号与进程，不调用真实模型、OAuth 或生产数据。
+
+## Scenario: Pi 观察的事件唤醒与模型增量
+
+### 1. Scope / Trigger
+
+- 修改 `ProjectsService._observe`、`PiTerminal.observe`、作业 CLI 通知或 Pi 宿主工具回执时适用，项目与工程养号共用本契约。
+- 终端流式正文和进度动画不应反复唤醒模型；交互仍交给 Pi 决定，控制端只等待和传递真实事实。
+
+### 2. Signatures
+
+```text
+claude_observe({wait_sec?: integer = 30, full_screen?: boolean = false})
+ProjectsService._observe(work: dict, generation: int, wait_sec: int, stop) -> dict
+PiTerminal.observe(work: dict, cursor: int = 0) -> dict
+ObservationView.project(result: object, full: boolean = false) -> object
+ObservationView.reset() -> void
+模型画面 = {observation_id, screen_mode: full|patch|unchanged,
+            screen?, screen_base_observation_id?,
+            screen_patch?: {start_line, delete_count, lines}, ...原观察事实}
+通知 = {schema: 1, source, session_id, id, event, tool, observed_at}
+```
+
+### 3. Contracts
+
+- `wait_sec` 是严格整数 0..30；首次、输入后及恢复执行后的观察即时获取现场，显式 0 保留即时语义。恢复仅清除旧 `observation_id`，保留完整原观察、游标、工作区和会话；重新观察后才允许输入。
+- 本地每 0.5 秒检查控制代次、取消并采样；新原生文本、原生提问工具、相对上次变化的通知、退出、额度暂停及终端可读性变化优先返回。Docker/文件读取后再次校验取消和代次，不能让迟到观察推进输入授权；等待服从原本轮预算。
+- 变化检测仅归一化已实测的固定 CLI 进度行、指定提示行和空白，不修改存储画面。忙碌期间合并流式正文；空闲或有编号选择界面时，有效画面稳定一秒便返回。无有效事件才等到截止时间；采样/读取及模型推理耗时另计，不能承诺所有终端形态的固定延迟。
+- `projects_cli.py --config <本作业配置> --notify` 只在作业级 settings 追加 `PermissionRequest`、`PreToolUse`（`AskUserQuestion|ExitPlanMode`）和 `Stop` 通知，保留原钩子且重复安装幂等。输入至多 64 KiB，只写事件/工具名而不保存完整参数，不向 CLI 返回答案、授权或业务结论；失败退出 0，由原生记录和画面补充。
+- 通知通过独占临时文件、0600、fsync 和原子替换发布。`runtime_json.interaction_signal` 须指向精确作业的 `runtime/jobs/<handle>/interaction.json`；读端拒绝链接/特殊文件及超过 4 KiB 内容，核对严格 schema、键集合、事件、32 位小写 hex 标识、有限正时间且不超当前 60 秒。`source` 必须等于 `<namespace>:<work_id>:<generation>`，同时匹配原 job 与 session；旧 runtime 无此字段时兼容。
+- 原生 `AskUserQuestion/ExitPlanMode` 工具即使没有文本也返回 `interactions`；只保留工具名与标识，不把工具参数当答案。等待内游标单调前进，一旦有新文本/交互立即返回，不能越过未交付事件。通知只是唤醒提示，任何输入仍受最新观察、身份和未知投递保护。
+- Python 存储及传给 Node 的结果保留完整 screen；只有宿主向模型投影。首次、进程重启、fresh、摘要成功或 `full_screen=true` 使用 full。相同画面使用 unchanged；其他画面用零基行号 `start_line`、删除行数及原始 `lines` 替换基线，按 `split('\n')`/`join('\n')` 必须精确还原。patch 的 UTF-8 JSON 字节不比 full 少时回退 full。
+- patch/unchanged 必须引用上次交付的 `screen_base_observation_id`；只有合法观察推进基线，拒绝/取消不推进。状态、观察 ID、原生事件和交互提示保留。摘要成功后清空宿主基线，磁盘原文和页面快照继续读取原始完整观察，不存模型增量。镜像的 COPY 与上下文白名单必须同时分发 `observation-view.mjs`。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| wait_sec 为 bool/非整数/越界，或 full_screen 非 bool | 工具 rejected，不推进观察 |
+| 进度计时或忙碌流式正文持续刷新 | 本地合并等待，不额外产生模型请求或 usage |
+| 新交互标记/原生提问，或无钩子的新稳定菜单 | 事件优先返回 / 约一秒去抖后返回 |
+| 相同通知、旧 runtime 无通知、坏通知或其他会话内容 | 不重复唤醒 / 兼容原生和画面；归属定位冲突则拒绝 |
+| 本轮停止/换代或输入后仍引用旧 observation_id | 拒绝迟到观察/输入，不能重复投递 |
+| 无基线、摘要成功或显式请求整屏 | 返回 full，不能引用模型未见基线 |
+
+### 5. Scenarios and Examples
+
+- 正常：Pi 调用 `claude_observe({})` 后由本地等待；原生 `AskUserQuestion` 到达即返回当前画面，Pi 根据现场决定操作。
+- 边界：屏幕没有变化时返回 unchanged 与基线 ID；`claude_observe({wait_sec:0,full_screen:true})` 立即读取真实整屏。patch 将基线拆行，在 `start_line` 删除 `delete_count` 行并插入 `lines` 后连接即可还原。
+- 错误：看到两秒一次的 token 动画便请求模型，或拿恢复前的观察 ID 发送按键。正确：合并无效变化，恢复后先重观察；基线不明时用 full_screen=true，不猜菜单内容或重发未知输入。
+- 费用证据：固定时间轨迹回放分别记录观察返回次数和载荷字节；mock 上游核对请求与 usage，无请求等待不计量。回放不代表真实模型后续决策、收费或所有业务的固定降幅。
+
+### 6. Tests Required
+
+- `test_projects_observation`：可控时钟的三十秒合并、流式正文、原生文本与游标、事件/重复标记、无钩子及与忙碌共存的编号菜单、默认/零等待、停止/换代、恢复后旧 ID 和严格参数。
+- `test_pi_interaction`：真实通知子进程、原 settings 与幂等、无授权/参数泄漏、错误/超大/链接/FIFO、旧 runtime、原生无文本提问及两空间来源隔离。固定 CLI 2.1.293 的真实 Stop 钩子另以回环 mock 验证，不调用外部模型。
+- `observation-view.test.mjs`：增删和尾换行精确还原、相同画面、较大 patch 回退、按需 full、reset 和拒绝不推进；`host.test.mjs` 核对真实 SDK 收到的 full/patch/full 与等待期间请求/usage 不增长，复用摘要及终止回归。
+- `test_projects_agent/terminal/feed/store/single_objective/cycles/engine_cycles/quota`：最新观察输入保护、菜单/多行与未知投递、完整页面事实、双空间、停止恢复和目标收尾不变。

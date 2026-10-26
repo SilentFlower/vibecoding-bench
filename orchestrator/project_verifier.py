@@ -114,6 +114,12 @@ def _native_schema_adapter(source: bytes, specification: dict) -> tuple[bytes, d
 _WEIGHTED_OBSERVER_OLD = '04e8a3a7fc1b09c9e6966697bbfe1908a0c5b66ebfc90209d16c7266c500bd5e'
 _WEIGHTED_OBSERVER_FIXED = 'e0e953f723d91ebf42032ad8afed8201ac244a55906d1b8ad43d035c80f4153e'
 
+_ATTRS_OBSERVER_OLD = '304a4403f8a037da3e6a5c4eb0d125678fb725fe69580c6ce479a878d5304461'
+_ATTRS_OBSERVER_FIXED = 'b6a7f9f3156b449572499dcc742b8f856ea72520da76a16a205b4d69df705716'
+_ATTRS_FEEDBACK_CODES = frozenset(('attrs_report_order', 'attrs_report_identity', 'attrs_report_once',
+    'attrs_report_values', 'attrs_report_aggregate', 'attrs_report_disabled',
+    'attrs_report_composites', 'attrs_report_base_exception'))
+
 
 def _native_weighted_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]:
     """仅修正已确认的加权聚合空值样例冲突，不改冻结资产或结果协议。
@@ -138,6 +144,29 @@ def _native_weighted_adapter(source: bytes, specification: dict) -> tuple[bytes,
         raise ValueError('加权聚合观察器修复字节不符合已核验版本')
     return actual, {'name': 'weighted-null-pair-contract-v1', 'scope': 'public_contract',
         'original_runner_sha256': original, 'effective_runner_sha256': effective,
+        'preserves_frozen_contract': True}
+
+
+def _native_attrs_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]:
+    """按公开合同修正已确认 attrs 观察器，并为旧冻结目标提供可信副本。
+
+    :param source: 冻结观察器原始字节。
+    :param specification: 原业务执行参数与严格结果协议。
+    :return: 实际执行字节及来源审计；其他协议不参与适配。
+    """
+    if (specification.get('script') != 'verification/AT-VALIDATION-REPORT-DEV-observe.py'
+            or specification.get('args') != [] or specification.get('python_paths') != ['library/src']
+            or not _same_json(specification.get('expected'), {'candidate_import': True, 'business': True})):
+        return source, None
+    original = hashlib.sha256(source).hexdigest()
+    if original not in (_ATTRS_OBSERVER_OLD, _ATTRS_OBSERVER_FIXED):
+        raise ValueError('attrs 观察器版本未知，拒绝推测修复')
+    # 当前受信副本独立于旧内容目录，避免改写冻结资产或从候选工作区加载验收代码。
+    current = Path(__file__).with_name('project_attrs_observer.py').read_bytes()
+    if hashlib.sha256(current).hexdigest() != _ATTRS_OBSERVER_FIXED:
+        raise ValueError('attrs 受信观察器字节不符合已核验版本')
+    return current, {'name': 'attrs-validation-report-contract-v1', 'scope': 'public_contract',
+        'original_runner_sha256': original, 'effective_runner_sha256': _ATTRS_OBSERVER_FIXED,
         'preserves_frozen_contract': True}
 
 
@@ -461,6 +490,8 @@ class ProjectVerifier:
                 source, adapter = _native_schema_adapter(source, specification)
                 if adapter is None:
                     source, adapter = _native_weighted_adapter(source, specification)
+                if adapter is None:
+                    source, adapter = _native_attrs_adapter(source, specification)
             # verification会单独只读挂载；可信副本放输入根，确保执行的是已核SHA的实际字节。
             execution_script = ('trusted-native-regression.py' if regression else 'trusted-native-business.py') if adapter else script
             # 外层输入挂载只读，嵌套验证目录的挂载点必须先在宿主创建。
@@ -553,12 +584,19 @@ class ProjectVerifier:
                         result['runtime_adapter'] = adapter
                     return result
                 diagnostics = {'runtime_adapter': adapter} if adapter else {}
-                if adapter and adapter['name'] == 'schema-public-contract-v1':
-                    # 只有 Schema 适配器拥有诊断字段；加权聚合及其他输出仍按原协议严格比较。
+                if adapter and adapter['name'] in ('schema-public-contract-v1', 'attrs-validation-report-contract-v1'):
+                    # 仅精确核验的观察器允许诊断字段；其他业务输出继续严格比较完整协议。
+                    attrs_protocol = adapter['name'] == 'attrs-validation-report-contract-v1'
+                    allowed = _ATTRS_FEEDBACK_CODES if attrs_protocol else _SCHEMA_FEEDBACK_CODES
                     codes = actual.get('feedback_codes') if isinstance(actual, dict) else None
-                    if (not isinstance(codes, list) or len(codes) > len(_SCHEMA_FEEDBACK_CODES)
-                            or any(not isinstance(code, str) or code not in _SCHEMA_FEEDBACK_CODES for code in codes)):
-                        return {'status': 'failed', 'message': 'Schema 观察器诊断协议不合法', 'runtime_adapter': adapter}
+                    if (not isinstance(codes, list) or len(codes) > len(allowed)
+                            or any(not isinstance(code, str) or code not in allowed for code in codes)
+                            or attrs_protocol and (len(set(codes)) != len(codes)
+                                or set(actual) != {'candidate_import', 'business', 'feedback_codes'}
+                                or type(actual.get('candidate_import')) is not bool or type(actual.get('business')) is not bool
+                                or actual['business'] != (not codes))):
+                        label = 'attrs' if attrs_protocol else 'Schema'
+                        return {'status': 'failed', 'message': label + ' 观察器诊断协议不合法', 'runtime_adapter': adapter}
                     actual = {key: value for key, value in actual.items() if key != 'feedback_codes'}
                     diagnostics = {'runtime_adapter': adapter, 'feedback_codes': codes}
                 return {'status': 'passed' if _same_json(actual, specification['expected']) and not diagnostics.get('feedback_codes') else 'failed',

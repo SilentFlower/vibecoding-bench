@@ -101,6 +101,61 @@ function summaryRequest(request) {
   return JSON.stringify(request.messages).includes('<conversation>');
 }
 
+test('观察回执进入真实 SDK 前生成增量，按需完整读取且请求计量准确', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-observation-view-'));
+  const requests = [];
+  const before = Array.from({length: 100}, (_, index) => `业务正文 ${index} ${'原始内容'.repeat(8)}`).join('\n');
+  const after = before.replace('业务正文 50', '新菜单 50');
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    requests.push(JSON.parse(body));
+    if (requests.length === 4) return stream(response, false);
+    const args = requests.length === 3 ? {full_screen: true} : {};
+    response.writeHead(200, {'content-type': 'text/event-stream'});
+    const id = 'observe-' + requests.length;
+    for (const value of [
+      {choices: [{index: 0, delta: {role: 'assistant', tool_calls: [{index: 0, id, type: 'function',
+        function: {name: 'claude_observe', arguments: JSON.stringify(args)}}]}, finish_reason: null}]},
+      {choices: [{index: 0, delta: {}, finish_reason: 'tool_calls'}]},
+      {choices: [], usage: {prompt_tokens: 11, completion_tokens: 7, total_tokens: 18}},
+    ]) response.write('data: ' + JSON.stringify({id, object: 'chat.completion.chunk', model: 'test-model', ...value}) + '\n\n');
+    response.end('data: [DONE]\n\n');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    let observations = 0, measured = 0;
+    const records = await execute({session_dir: directory,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, timeout_sec: 30,
+      tools: [{name: 'claude_observe', description: '本地受控观察',
+        parameters: {type: 'object', properties: {full_screen: {type: 'boolean'}}}}]}, (event, reply) => {
+      observations++;
+      const result = {type: 'tool_result', id: event.id, result: {observation_id: 'observation-' + observations,
+        screen: observations === 1 ? before : after, events: [], running: true}};
+      if (observations === 1) {
+        setTimeout(() => {
+          assert.equal(requests.length, 1, '本地等待期间不能发出额外模型请求');
+          assert.equal(measured, 1, '没有上游请求时不能伪造用量');
+          reply(result);
+        }, 200);
+      } else reply(result);
+    }, event => { if (event.type === 'assistant' && event.usage) measured++; });
+    const visible = requests.slice(1).map(request => JSON.parse(request.messages.findLast(item => item.role === 'tool').content));
+    assert.equal(visible[0].screen_mode, 'full');
+    assert.equal(visible[1].screen_mode, 'patch');
+    assert.equal(visible[1].screen_base_observation_id, 'observation-1');
+    assert.equal('screen' in visible[1], false);
+    assert.equal(visible[2].screen_mode, 'full');
+    assert.equal(visible[2].screen, after);
+    assert.equal(observations, 3);
+    assert.equal(requests.length, 4);
+    assert.equal(records.filter(record => record.type === 'assistant' && record.usage).length, 4);
+    assert.equal(records.at(-1).type, 'settled');
+  } finally {
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
 test('350K token 含缓存输入触发摘要，阈值可配置且同目标阈值以下保留完整历史', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'pi-token-threshold-'));
   let requests = [];

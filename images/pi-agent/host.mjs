@@ -11,8 +11,10 @@ import { AuthStorage, createAgentSession, DefaultResourceLoader, defineTool, Mod
   SessionManager, SettingsManager, estimateTokens, generateSummary } from '@earendil-works/pi-coding-agent';
 import { compactContext, contextTokens, DEFAULT_COMPACTION_THRESHOLD_TOKENS, freshContext,
   isContextLimit, requestMessages } from './context-policy.mjs';
+import { ObservationView } from './observation-view.mjs';
 
 const pending = new Map();
+const observations = new ObservationView();
 let session;
 let configured = false;
 let input = '';
@@ -212,7 +214,8 @@ function callTool(name, toolCallId, args, signal) {
           // 已通过或安全暂存的目标无需额外推理；真实工具结果仍由 SDK 正常持久化。
           session.setAutoCompactionEnabled(false);
         }
-        resolve({content: [{type: 'text', text: JSON.stringify(result)}], details: {}, terminate: complete});
+        const visible = name === 'claude_observe' ? observations.project(result, args.full_screen === true) : result;
+        resolve({content: [{type: 'text', text: JSON.stringify(visible)}], details: {}, terminate: complete});
       },
       reject,
     });
@@ -238,6 +241,7 @@ async function run(config) {
  * @return {Promise<void>} 当前指挥轮次结束。
  */
 async function runSession(config, responses) {
+  observations.reset();
   await mkdir(config.session_dir, {recursive: true, mode: 0o700});
   const threshold = config.compaction_threshold_tokens ?? DEFAULT_COMPACTION_THRESHOLD_TOKENS;
   if (!Number.isInteger(threshold) || threshold < 10000 || threshold > 900000) {
@@ -444,6 +448,7 @@ async function runSession(config, responses) {
           return false;
         }
         session.agent.state.messages = requestMessages(sessionManager.buildSessionContext().messages);
+        observations.reset();
         emit({type: 'context', reason, ...result});
         return true;
       } catch {

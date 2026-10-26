@@ -184,7 +184,11 @@ class ProjectsAgentTests(unittest.TestCase):
 
     def tool(self, name, args=None, call_id='call', account_id=1, generation=1):
         """调用真实工具边界。:param name: 工具。:param args: 参数。:param call_id: 调用标识。:param account_id: 账号。:param generation: 代次。:return: 结果。"""
-        return self.service.tool(account_id, generation, name, args or {}, call_id)
+        arguments = dict(args or {})
+        if name == 'claude_observe':
+            # 通用夹具核对即时操作；默认长等待由可控时钟的观察策略用例独立覆盖。
+            arguments.setdefault('wait_sec', 0)
+        return self.service.tool(account_id, generation, name, arguments, call_id)
 
     def start_work(self, account_id=1):
         """开启夹具工程。:param account_id: 账号。:return: 工具结果。"""

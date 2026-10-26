@@ -14,6 +14,7 @@ from project_library import canonical_json, digest_json, read_document, safe_rel
 from account_runtime import RuntimeBusy
 from projects_pi import ProjectsPi
 from projects_store import ProjectsDatabase
+from projects_observation import screen_busy, screen_content, screen_menu
 from pi_owners import AccountPiOwners
 from projects_runtime import KEYS
 
@@ -81,7 +82,8 @@ project_read 默认读取概览；指定 objective_id 读取该目标的公开�
 先完成或恢复已有未完成工作；仅在没有未完成工作且 remaining_objective_count 为0时报告目标全部完成。
 每个目标都是调查、方案确认、修改真实源码或应用、独立程序验收及失败返工的完整工程交付；问答、测试和文档步骤不能单独计为完成目标。
 从已选项目中选择尚未通过的工程目标，以 claude_start 创建或恢复同一项目工作区和 Claude 原会话。
-用 claude_observe 取得终端画面和原生会话事件；没有变化时使用它的 wait_sec 等待，避免无意义的模型循环。
+用 claude_observe 取得终端画面和原生会话事件；默认等待30秒，交互、新回复和稳定新画面会提前唤醒，不需反复零等待轮询。
+画面默认使用 full、patch 或 unchanged 形态；patch 的 screen_patch 按行替换引用 screen_base_observation_id 的画面。无法确认基线或需要完整菜单时用 full_screen=true 重新读取。
 你可以发送文本，使用 Enter、方向键、Tab、Escape、Ctrl-C 等处理真正看到的交互。
 每次 claude_input 必须引用最近取得的 observation_id。输入成功只证明投递到终端，后续仍要观察实际结果。
 输入状态 unknown 或 reconcile_required 时不可换一个操作标识盲目重发，应停止并报告现场。
@@ -115,8 +117,9 @@ TOOLS = [
             'limit': {'type': 'integer', 'minimum': 1, 'maximum': 2000}}, ['project_key'])},
     {'name': 'claude_start', 'description': '启动选定工程目标，或恢复本账号未完成目标的同一个 Claude 会话。',
         'parameters': _schema({'project_key': {'type': 'string'}, 'objective_id': {'type': 'string'}}, ['project_key', 'objective_id'])},
-    {'name': 'claude_observe', 'description': '观察 Claude 终端及原生会话增量，可等待最多30秒的新变化。',
-        'parameters': _schema({'wait_sec': {'type': 'integer', 'minimum': 0, 'maximum': 30}})},
+    {'name': 'claude_observe', 'description': '默认本地等待最多30秒；交互、新回复和稳定新画面提前返回，full_screen 可按需取整屏。',
+        'parameters': _schema({'wait_sec': {'type': 'integer', 'minimum': 0, 'maximum': 30},
+            'full_screen': {'type': 'boolean'}})},
     {'name': 'claude_input', 'description': '向当前 Claude 终端发送文本、菜单按键或中断；必须引用最近观察。',
         'parameters': _schema({'observation_id': {'type': 'string'}, 'text': {'type': 'string', 'maxLength': 24000},
             'keys': {'type': 'array', 'items': {'type': 'string', 'enum': sorted(KEYS)}, 'maxItems': 16}, 'submit': {'type': 'boolean'}}, ['observation_id'])},
@@ -1648,7 +1651,9 @@ class ProjectsService:
                 self._suspend_gate(account_id, generation, gate, time.time())
                 return {'status': 'waiting', 'message': gate.get('message', '账号门禁未放行')}
             if name == 'claude_observe':
-                return self._observe(work, generation, args.get('wait_sec', 0), stop)
+                if type(args.get('full_screen', False)) is not bool:
+                    raise ValueError('完整画面参数必须为布尔值')
+                return self._observe(work, generation, args.get('wait_sec', 30), stop)
             if name == 'claude_input':
                 return self._input(work, generation, args, call_id, stop)
             if name == 'project_submit':
@@ -1803,7 +1808,8 @@ class ProjectsService:
                 gate = self.admission(self.account(account_id), work)
                 if not gate['allowed']:
                     raise ValueError('环境准备后账号门禁发生改变')
-                self._write("UPDATE projects_work SET status='running',generation=?,runtime_json=?,baseline_json=?,"
+                # 恢复后先重新观察现场，旧执行的观察不能继续授权输入。
+                self._write("UPDATE projects_work SET status='running',generation=?,runtime_json=?,baseline_json=?,observation_id=NULL,"
                     'started_at=COALESCE(started_at,?),segment_started_at=?,message=NULL WHERE id=?',
                     (generation, work['runtime_json'], baseline, time.time(), time.time(), work['id']))
                 self._event(account_id, 'started', {'project_key': key, 'objective_id': objective_id,
@@ -1829,18 +1835,48 @@ class ProjectsService:
             raise ValueError('本轮只处理一个工程目标，目标结束后请等待下一轮')
 
     def _observe(self, work: dict, generation: int, wait_sec: int, stop) -> dict:
+        """本地等待需要 Pi 决策的新事实，合并进度动画并保留完整现场。
+
+        :param work: 当前工作与上次完整观察。
+        :param generation: 本轮控制代次。
+        :param wait_sec: 最长本地等待秒数。
+        :param stop: 本轮取消与预算截止信号。
+        :return: 已持久化的完整观察；模型增量视图由 Pi 宿主生成。
+        """
         if type(wait_sec) is not int or not 0 <= wait_sec <= 30:
             raise ValueError('观察等待时间不合法')
         previous = json.loads(work['observation_json']) if work['observation_json'] else {}
         deadline = time.monotonic() + wait_sec
+        baseline = screen_content(previous.get('screen', ''))
+        pending_screen, changed_at = None, None
+        cursor = previous.get('cursor', 0)
+        stopped = stop or threading.Event()
         while True:
             self._current(work['account_id'], generation)
-            observed = self.terminal.observe(work, previous.get('cursor', 0))
-            if (observed['screen'] != previous.get('screen', '') or observed['events'] or not observed['running']
-                    or observed.get('quota_paused') or time.monotonic() >= deadline):
-                break
-            if (stop or threading.Event()).wait(0.5):
+            if stopped.is_set():
                 raise ValueError('观察已取消')
+            observed = self.terminal.observe(work, cursor)
+            cursor = observed.get('cursor', cursor)
+            now = time.monotonic()
+            content = screen_content(observed['screen'])
+            if content != pending_screen:
+                pending_screen, changed_at = content, now
+            interaction = observed.get('interaction')
+            # 执行中的正文也会流式刷新；交互事件优先，前台空闲后的新稳定画面才需 Pi 决策。
+            if (not work.get('observation_id') or observed['events'] or observed.get('interactions')
+                    or interaction and interaction != previous.get('interaction')
+                    or not observed['running'] or observed.get('quota_paused')
+                    or observed.get('terminal_ready', True) != previous.get('terminal_ready', True)
+                    or content != baseline and (not screen_busy(observed['screen']) or screen_menu(observed['screen']))
+                        and now - changed_at >= 1
+                    or now >= deadline):
+                break
+            if stopped.wait(min(0.5, max(0, deadline - now))):
+                raise ValueError('观察已取消')
+        # Docker/文件读取期间也可能停止或换代，迟到观察不能再推进输入授权。
+        self._current(work['account_id'], generation)
+        if stopped.is_set():
+            raise ValueError('观察已取消')
         observation_id = uuid.uuid4().hex
         self._write('UPDATE projects_work SET observation_json=?,observation_id=? WHERE id=? AND generation=?',
             (canonical_json(observed).decode(), observation_id, work['id'], generation))

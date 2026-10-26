@@ -168,13 +168,9 @@ class ProjectsVerification:
             report = {'status': status, 'business': report, 'previous_objectives': accepted_reports}
         write_document(directory / 'program.json', report)
         if report['status'] != 'passed':
-            reasons = {'schema_error_positions': '校验错误的位置、代码或顺序不符合公开约定',
-                'schema_strict_error_cap': '严格模式的异常错误列表或精确数量上限不符合公开约定',
-                'schema_invalid_rules': '非法布尔规则、字符串 choices 或不可比较边界未被明确拒绝',
-                'schema_input_unchanged': '校验过程改变了输入表的行数'}
             return {'status': report['status'], 'checks': checks,
-                'feedback': ['隔离程序或回归验收未通过，依据原工程目标修复；基础设施错误不能算业务失败']
-                    + [reasons[code] for code in report.get('feedback_codes', []) if code in reasons],
+                'feedback': self._business_feedback(report) or
+                    ['隔离程序或回归验收未通过，依据原工程目标修复；基础设施错误不能算业务失败'],
                 'program': self._public_facts(report)}
         if definition['evaluation'].get('semantic'):
             rubric = load_rubric(project.root, definition)
@@ -200,6 +196,45 @@ class ProjectsVerification:
         if snapshot_tree(candidate)['digest'] != snapshot['digest']:
             raise ValueError('验收期间冻结候选被改写')
         return {'status': 'passed', 'checks': checks, 'feedback': ['独立交付验收通过']}
+
+    @staticmethod
+    def _business_feedback(report: dict) -> list[str]:
+        """把已核实的业务枚举转为可操作反馈，兼容历史目标的嵌套报告。
+
+        :param report: 独立验证报告，不读取原始 stdout 或异常正文。
+        :return: 最多八项去重后的公开行为说明。
+        """
+        reasons = {'schema_error_positions': '校验错误的位置、代码或顺序不符合公开约定',
+            'schema_strict_error_cap': '严格模式的异常错误列表或精确数量上限不符合公开约定',
+            'schema_invalid_rules': '非法布尔规则、字符串 choices 或不可比较边界未被明确拒绝',
+            'schema_input_unchanged': '校验过程改变了输入表的行数',
+            'attrs_report_order': '验证报告未按独立字段的声明顺序保留真实字段名',
+            'attrs_report_identity': '报告未保留真实字段 Attribute、原异常对象或两命名空间的公共类型',
+            'attrs_report_once': '独立字段验证器未恰好执行一次，或改变了普通 validate 的首错行为',
+            'attrs_report_values': '收集验证错误时改变了实例字段值',
+            'attrs_report_aggregate': 'raise_errors=True 未抛出包含原始错误 issues 元组的聚合异常',
+            'attrs_report_disabled': '未遵守共享的验证禁用开关',
+            'attrs_report_composites': '组合验证的短路、可空或深层一次迭代语义不符合公开合同',
+            'attrs_report_base_exception': '错误报告吞掉或替换了应直接传播的 BaseException'}
+        result = []
+
+        def collect(value, depth=0):
+            """限制嵌套和数量，只读取固定报告字段。:param value: 当前报告。:param depth: 嵌套深度。:return: None。"""
+            if not isinstance(value, dict) or depth > 5 or len(result) >= 8:
+                return
+            codes = value.get('feedback_codes', [])
+            for code in codes[:8] if isinstance(codes, list) else []:
+                if isinstance(code, str) and code in reasons and reasons[code] not in result and len(result) < 8:
+                    result.append(reasons[code])
+            for key in ('business', 'regression'):
+                collect(value.get(key), depth + 1)
+            previous = value.get('previous_objectives', [])
+            for item in previous[:16] if isinstance(previous, list) else []:
+                if isinstance(item, dict):
+                    collect(item.get('report'), depth + 1)
+
+        collect(report)
+        return result
 
     @staticmethod
     def _public_facts(report: dict, _depth: int = 0) -> dict:
