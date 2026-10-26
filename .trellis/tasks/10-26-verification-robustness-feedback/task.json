@@ -1,0 +1,105 @@
+{
+  "id": "verification-robustness-feedback",
+  "name": "verification-robustness-feedback",
+  "title": "验收鲁棒性与可操作失败反馈",
+  "description": "修正未公开验收细节导致的误拒绝，复用受信观察器和有界具体反馈，提高符合公开需求候选的真实通过率。",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": "vibecoding-bench 验收观察器、冻结版本适配、业务失败反馈与未来内容同步",
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-26",
+  "completedAt": "2026-10-26",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-26T13:55:33Z",
+    "blockers": []
+  },
+  "branch": "v3",
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "orchestrator/project_verifier.py",
+    "orchestrator/projects_verification.py",
+    "orchestrator/project_locale_preferences_observer.py",
+    "orchestrator/project_pages_observer.py",
+    "project_library/projects/babel/verification/BA-PREFERENCES-DEV-observe.py",
+    "project_library/projects/bibtexparser/verification/BIBTEXPARSER-O03-DEV-observe.py",
+    ".trellis/spec/vibecoding-bench/backend/project-iterations.md"
+  ],
+  "notes": "用户已确认完整 Brief；实现、115 项定向回归、三候选业务及原生回归、Full Check-All 已通过。待规范同步与精确 Git 计划确认；线上最终验收由发布流程承接。",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-26T13:19:05Z",
+      "contextKey": "codex_01a17838-7918-7600-a7a5-67fb05472e0e",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "ba034fa587bc5e6110d6d89823f99014f793bd08",
+        "status": [
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-update-spec/SKILL.md"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "ba034fa587bc5e6110d6d89823f99014f793bd08",
+            "status": [
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-update-spec/SKILL.md"
+              }
+            ],
+            "worktreeDiffSha256": "d6dadac3a9f4a67d340b8d9b0aff3d7775695fe651f35ce777412d821c3c6b63",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "6c2a0ac703957373153b5527b88f5f1f91faf9f04e2429565d4e6e2296009e11"
+          },
+          {
+            "root": "cc2api",
+            "head": "d238aacb3a8ae430995f4742dfcd49b2df10e3fa",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "df9cdd30a34736cd40a88c22e40886fdd785acaf24d6aef66a98656b9228c0d5"
+          }
+        ],
+        "fingerprint": "56a3cab6ac366f4014ea3f4494b3e3c81781a3ca2ae9a4e215b23af621c5e7ff"
+      }
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-10-26T13:55:33.881484+00:00",
+    "completedSteps": [
+      "修正 Babel 与 Bibtexparser 的合同容错边界及精确冻结适配",
+      "提供受信、有界且具体的失败反馈并同步未来内容",
+      "115 项回归、13 项冻结公开测试与三个候选原生回归通过",
+      "Full Check-All 通过并同步执行规范"
+    ],
+    "partialStep": null,
+    "nextStep": "发布后通过原会话完成线上完整验收，核对适配器与反馈生效",
+    "notes": "原生回归合计 12,209 项通过、0 失败、0 错误；线上状态未在本地改写。"
+  }
+}

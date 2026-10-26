@@ -1,0 +1,85 @@
+{
+  "focused_unittest": {
+    "status": "passed",
+    "executed": 115,
+    "command": "PYTHONPATH=orchestrator .venv/bin/python -m unittest test_project_contract_observers test_project_attrs_adapter test_project_schema_adapter test_project_weighted_adapter test_project_arrow_adapter test_projects_verification_recovery test_project_native_verifier test_projects_verification_history"
+  },
+  "original_public_tests": {
+    "status": "passed",
+    "executed": 13,
+    "original_evidence": "/tmp/vibebench-deferred-audit-vgew_i65/reproduction.json"
+  },
+  "candidates": {
+    "attrs": {
+      "business_status": "passed",
+      "feedback_codes": [],
+      "runtime_adapter": {
+        "name": "attrs-validation-report-contract-v1",
+        "scope": "public_contract",
+        "original_runner_sha256": "304a4403f8a037da3e6a5c4eb0d125678fb725fe69580c6ce479a878d5304461",
+        "effective_runner_sha256": "b6a7f9f3156b449572499dcc742b8f856ea72520da76a16a205b4d69df705716",
+        "preserves_frozen_contract": true
+      },
+      "regression_status": "passed",
+      "regression_counts": {
+        "passed": 1401,
+        "failed": 0,
+        "error": 0,
+        "skipped": 10,
+        "xfailed": 1,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "regression_collected": 1412,
+      "contract_digest": "542af5c10613945b7c6f242c8e6ab33b943216315d072ed4fcfb34fd6dfb8a0f"
+    },
+    "bibtexparser": {
+      "business_status": "passed",
+      "feedback_codes": [],
+      "runtime_adapter": {
+        "name": "bibtexparser-pages-contract-v1",
+        "scope": "public_contract",
+        "original_runner_sha256": "8d95cce3afe191108213fe59aadef3449522f4a75c2039448d78623e509881e2",
+        "effective_runner_sha256": "df64b50177e178ee88d2fd1fad08bf494725b071528e53c93ddd6dacc802fb60",
+        "preserves_frozen_contract": true
+      },
+      "regression_status": "passed",
+      "regression_counts": {
+        "passed": 2819,
+        "failed": 0,
+        "error": 0,
+        "skipped": 12,
+        "xfailed": 0,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "regression_collected": 2831,
+      "contract_digest": "5953f89712a07411141d030c6edd7f3e6a20482b8e67dcbff0656fb27d36f7ce"
+    },
+    "babel": {
+      "business_status": "passed",
+      "feedback_codes": [],
+      "runtime_adapter": {
+        "name": "babel-locale-preferences-contract-v1",
+        "scope": "public_contract",
+        "original_runner_sha256": "c9470d69d118400e7042fe6f7ccb702d9d6a0107f656d5b7d2de72e2bf8bfe99",
+        "effective_runner_sha256": "c387742407ebeb5cc5f6d0fae0180d4e60cb3ea2ed5975996116faa1f2b39015",
+        "preserves_frozen_contract": true
+      },
+      "regression_status": "passed",
+      "regression_counts": {
+        "passed": 7989,
+        "failed": 0,
+        "error": 0,
+        "skipped": 7,
+        "xfailed": 2,
+        "xpassed": 0,
+        "unexecuted": 0
+      },
+      "regression_collected": 7998,
+      "contract_digest": "4fb32f9a978230671a90b49836990cee9bf9742cfc5ec6811b3ac8dcd5b921f2"
+    }
+  },
+  "live_state_modified": false,
+  "semantic_review": "not_run"
+}

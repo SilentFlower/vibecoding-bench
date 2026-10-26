@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/project-iterations.md", "reason": "冻结验收适配、诊断协议与复验恢复约束"}
+{"file": ".trellis/tasks/10-26-verification-robustness-feedback/research/online-deferred-analysis.md", "reason": "线上三项目标的失败根因、不可变候选和旧观察器摘要"}
+{"file": ".trellis/tasks/10-26-verification-robustness-feedback/research/validation.json", "reason": "已执行的定向回归及真实产品入口离线验证证据"}
