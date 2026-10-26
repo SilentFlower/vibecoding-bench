@@ -1,0 +1,115 @@
+{
+  "id": "pi-efficiency-feedback",
+  "name": "pi-efficiency-feedback",
+  "title": "Pi 指挥用量与验收反馈联合优化",
+  "description": "按用户确认联合推进等待合并、观察增量、验收合同与具体反馈，覆盖项目与工程养号空间并兼容冻结旧目标。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-26",
+  "completedAt": "2026-10-26",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-26T06:03:19Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-26-pi-observation-efficiency",
+    "10-26-attrs-verification-contract-feedback"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-26T04:17:42Z",
+      "contextKey": "codex_01a1765e-c763-72f2-804d-949fb69e4fcf",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "856b50356d2a940a8318fa70d88dcfaa2f7c3c56",
+        "status": [
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugin-lock.json"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugins.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "856b50356d2a940a8318fa70d88dcfaa2f7c3c56",
+            "status": [
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugin-lock.json"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugins.json"
+              }
+            ],
+            "worktreeDiffSha256": "31f8e48da822540d32784614e8b7a68c314f863c16c0dc61f17656f7d250a06e",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "1df73f8e27aa370d2071123079dc85d8e7475f5a32c4fb15edc75b5a8d0e844d"
+          },
+          {
+            "root": "cc2api",
+            "head": "21e0901634a30105405ce7fee0c6dc3060638f77",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "f06ad6542c15882c00eb71bb935d6fe34ebfe4474f3ae769e96aed289dbe6111"
+          }
+        ],
+        "fingerprint": "790e47924e95411a620dd1af46b1bb4689f7c0d21b213fc266caa359fca28f53"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成两个子任务的观察效率、模型增量及 attrs 验收反馈联合优化",
+      "通过统一 full Check-All、324 项自动化回归与候选隔离业务及原生验证，完成规范同步",
+      "完成共同业务交付及两个子任务的完成记录同步"
+    ],
+    "partialStep": null,
+    "nextStep": "本轮交付完成",
+    "notes": "离线回放为 341 次观察合并至 52 次、模型载荷减少约 85%；这不是实际计费预测。本轮未部署，发布后由既有流程核对两空间真实交互延迟与用量。",
+    "updatedAt": "2026-10-26T06:03:19Z"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "scope": "对已记录观察时点的规划模拟；不是实现验证、连续调度或真实付费调用预测",
+  "original_observations": 341,
+  "merged_observations": 39,
+  "original_payload_bytes": 1289513,
+  "merged_full_payload_bytes": 179813,
+  "observation_return_reduction_percent": 88.56,
+  "payload_reduction_before_delta_percent": 86.06,
+  "baseline_pi_requests": 355,
+  "estimated_requests_if_other_turns_unchanged": 53
+}

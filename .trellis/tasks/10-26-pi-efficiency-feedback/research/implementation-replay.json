@@ -1,0 +1,19 @@
+{
+  "scope": "实际观察实现对已记录时点的离线回放，未执行真实模型或连续线上调度",
+  "original_observations": 341,
+  "optimized_observations": 52,
+  "original_pi_requests": 355,
+  "estimated_pi_requests_if_other_turns_unchanged": 66,
+  "original_payload_bytes": 1307245,
+  "optimized_full_payload_bytes": 245079,
+  "elapsed_replay_seconds": 727.5,
+  "optimized_model_payload_bytes": 192155,
+  "model_payload_reduction_percent": 85.3,
+  "screen_modes": {
+    "full": 10,
+    "patch": 42,
+    "unchanged": 0
+  },
+  "payload_encoding": "UTF-8",
+  "payload_serialization": "紧凑 JSON，保留 Unicode 字符，不输出分隔空格"
+}

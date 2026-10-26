@@ -1,0 +1,11 @@
+{
+  "cli_version": "2.1.293",
+  "returncode": 0,
+  "mock_model_requests": 1,
+  "external_model_requests": 0,
+  "stdout": "OK\n",
+  "stderr": "We're changing auto mode to no longer charge for classifier requests in Claude Code. However, this session isn't eligible because your requests go through 127.0.0.1:45795, which isn't compatible with this update. Nothing breaks: auto mode keeps working, and its classifier requests are billed as before. To fix it and access the new version of auto mode, ask your gateway to implement: https://code.claude.com/docs/en/auto-mode-classifier-billing\n",
+  "actual_hook_event": "Stop",
+  "source_matches": true,
+  "session_matches": true
+}

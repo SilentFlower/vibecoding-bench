@@ -1,0 +1,44 @@
+{
+  "frozen_business": {
+    "status": "passed",
+    "actual": {
+      "candidate_import": true,
+      "business": true
+    },
+    "runtime_adapter": {
+      "name": "attrs-validation-report-contract-v1",
+      "scope": "public_contract",
+      "original_runner_sha256": "304a4403f8a037da3e6a5c4eb0d125678fb725fe69580c6ce479a878d5304461",
+      "effective_runner_sha256": "b6a7f9f3156b449572499dcc742b8f856ea72520da76a16a205b4d69df705716",
+      "preserves_frozen_contract": true
+    },
+    "regression_counts": null,
+    "message": null
+  },
+  "native_regression": {
+    "status": "passed",
+    "actual": null,
+    "runtime_adapter": null,
+    "regression_counts": {
+      "passed": 1401,
+      "failed": 0,
+      "error": 0,
+      "skipped": 10,
+      "xfailed": 1,
+      "xpassed": 0,
+      "unexecuted": 0
+    },
+    "message": null
+  },
+  "frozen_public_six": {
+    "status": "passed",
+    "actual": {
+      "passed": true,
+      "executed": 6,
+      "failures": 0
+    },
+    "runtime_adapter": null,
+    "regression_counts": null,
+    "message": null
+  }
+}
