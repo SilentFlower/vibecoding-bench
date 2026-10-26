@@ -669,6 +669,7 @@ GET /api/projects、GET /api/accounts/warmup/pi:
   agents[].work.verification_correction = optional string
 failure_facts[] = {phase, reason, test_id?, exception_type?, required_percent?, actual_percent?}
 attrs 受信业务输出 = {candidate_import: bool, business: bool, feedback_codes: list[str]}
+_native_contract_observer_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]
 ProjectsVerification._business_feedback(report: dict) -> list[str]
 ```
 
@@ -684,6 +685,9 @@ ProjectsVerification._business_feedback(report: dict) -> list[str]
 - attrs 适配只接受 `script='verification/AT-VALIDATION-REPORT-DEV-observe.py'`、`args=[]`、`python_paths=['library/src']` 和严格 `expected={candidate_import:true,business:true}`。原观察器 SHA256 为 `304a4403f8a037da3e6a5c4eb0d125678fb725fe69580c6ce479a878d5304461`，修正版为 `b6a7f9f3156b449572499dcc742b8f856ea72520da76a16a205b4d69df705716`；仅这两个版本可以使用控制端同目录的 `project_attrs_observer.py`。受信程序与未来内容副本须字节相同，固定摘要复核后写临时入口，审计保留原始/实际摘要，不改冻结资产。
 - attrs 按公开合同检查字段声明顺序、真实字段名/Attribute/原异常对象、每字段一次及普通 validate 首错兼容、字段不变、可选聚合、共享禁用、组合短路/一次迭代和 BaseException 原对象传播。不要求非 bool 的 `raise_errors` 必须抛 TypeError；不同调用使用独立输入和计数，避免检查器自身重放造成误判。
 - attrs 诊断对象只允许上述三个键，两个结果字段必须为严格布尔。`feedback_codes` 仅允许 `attrs_report_order`、`attrs_report_identity`、`attrs_report_once`、`attrs_report_values`、`attrs_report_aggregate`、`attrs_report_disabled`、`attrs_report_composites`、`attrs_report_base_exception`，必须去重，且 `business == (not feedback_codes)`；拆出诊断后仍严格比较原 expected。其他未授权观察器不因此放宽输出协议。
+- Babel `BA-PREFERENCES-DEV-observe.py` 只接受 `args=[]`、`python_paths=['library']`、严格双布尔 expected，原摘要 `c9470d69d118400e7042fe6f7ccb702d9d6a0107f656d5b7d2de72e2bf8bfe99` 或修正版摘要 `c387742407ebeb5cc5f6d0fae0180d4e60cb3ea2ed5975996116faa1f2b39015`。实际执行控制端 `project_locale_preferences_observer.py`，审计名 `babel-locale-preferences-contract-v1`。质量、同权顺序、别名、实际可用拼写、通配符排除、输入边界、一次物化和旧接口继续验证；`en;q=0, en-US;q=1, fr;q=0.1` 的未确定冲突允许前缀排除或更具体正偏好优先两种解释，不将其强制收窄为一个结果。
+- Bibtexparser `BIBTEXPARSER-O03-DEV-observe.py` 只接受 `args=[]`、`python_paths=['library','app']`、严格双布尔 expected，原摘要 `8d95cce3afe191108213fe59aadef3449522f4a75c2039448d78623e509881e2` 或修正版摘要 `df64b50177e178ee88d2fd1fad08bf494725b071528e53c93ddd6dacc802fb60`。实际执行控制端 `project_pages_observer.py`，审计名 `bibtexparser-pages-contract-v1`。明确数字范围比较时容忍首尾空白，仍检查数字原文、双连字符、未知格式整体保持、首次原值、非原地修改、其它字段、幂等和默认解析栈。
+- 上述两类观察器与 attrs 使用相同的三键严格诊断协议：两个严格布尔、无额外键、类别不重复且 `business == (not feedback_codes)`。Babel 类别使用 `locale_preferences_` 前缀，后缀仅为 `api/quality/order/matching/exclusions/headers/once/legacy`；页码类别使用 `pages_` 前缀，后缀仅为 `api/ranges/unknown/original/immutable/fields/idempotent/default_stack`。类别按当前适配器分别校验，未知来源及控制端摘要不符返回验收环境 error，任意诊断或非法协议不能通过。未来项目内容使用控制端字节相同的副本，并同步公开合同、任务提示、说明与示例；不改写既有冻结内容。
 - 公开业务反馈只映射受信枚举，不透传任意诊断字符串；递归只读取 `business/regression/previous_objectives[].report`，深度至多 5，每层历史目标至多 16，结果最多八项去重说明。具体反馈存在时替代泛化返工提示，原 `_public_facts` 的私有内容过滤和总预算继续生效。
 - 已核实错误通过 `verification_correction` 事件追加事实，旧提交和原始记录留档；新纠错第一次隔离 Pi 旧推理，原 Claude 会话继续复用。该机制不自动绕过权限、身份、认证、未知输入或严格清理冲突。
 
@@ -700,6 +704,10 @@ ProjectsVerification._business_feedback(report: dict) -> list[str]
 | 冻结脚本摘要未知 | 拒绝推测适配，按验收环境故障自动暂存 |
 | attrs 已匹配合同但脚本版本未知或控制端受信摘要不符 | 返回验收环境 error，不把来源错误算业务失败 |
 | attrs 结果出现额外键、非 bool、未知/重复类别或 business 与类别矛盾 | failed，不将任意诊断投影到公开事实 |
+| Babel 或页码旧脚本摘要已确认且协议匹配 | 执行受信临时副本，旧脚本和旧结果保留审计 |
+| Babel 冲突采用合理解释／页码仅保留首尾空白 | 不因未约定细节拒绝；其它公开功能仍须逐项通过 |
+| 忽略通配符排除、破坏页码数字／来源、修改输入 | failed，并返回对应公开行为类别 |
+| 新观察器来源未知、可信副本摘要不符／诊断协议非法 | 来源错误为 error；非法输出为 failed，不放行或透传任意正文 |
 
 ### 5. Scenarios and Examples
 
@@ -707,11 +715,14 @@ ProjectsVerification._business_feedback(report: dict) -> list[str]
 - 边界：无其他可执行目标时等待六小时后的复验，不将剩余数量归零或宣称全部通过。
 - 错误：只收到“1903 passed、1 error”便反复猜测时区，或改 TypeError 以迎合未声明的异常子类。正确：核对公开合同、修复精确版本的验收误判，提供可靠阶段事实并有界自动推进。
 - attrs 正常：宽松真值实现和严格 bool 实现均按相同公开功能矩阵验收；若旧目标命中已核验来源，使用可信副本执行，原报告留档。错误：要求候选为了隐藏的 `raise_errors=1` 断言改代码；正确：移除未公布要求，同时用原生回归与独立错误反例证明没有放宽真实业务合同。
+- Babel 边界：可用 `en_US/fr` 时，对未明确的冲突偏好分别接受两种现有解释；错误是因此跳过所有排除检查，正确是另用 `en;q=0, *` 等明确用例继续拒绝选回被排除语言的实现。
+- 页码边界：`' 001 - 009 '` 变为 `'001--009'` 或 `' 001--009 '` 均可接受，首次原值仍须精确保留；错误是仅做 strip 后接受未转换的连字符，正确是同时检查数字文本、双连字符及不变性。
 
 ### 6. Tests Required
 
 - `test_project_arrow_adapter`：两种合法异常、错误接受输入、来源摘要保护、真实 pytest 节点不受辅助失败污染、覆盖率数值及私有日志边界、真实入口只读辅助挂载。
 - `test_project_attrs_adapter`：新旧字节与分发副本一致、未知来源环境错误、真实入口临时暂存/只读挂载、严格结果协议、严格 bool 与真值两种合法实现、八类真实错误反例、历史嵌套反馈和私有内容边界。真实候选另经离线 Docker 业务、公开六项及冻结原生回归验证；业务通过不能替代语义审查或历史回归。
+- `test_project_contract_observers`：Babel、页码参考实现及两类合理变体通过业务与公开示例；错误权重/顺序/排除/输入边界/重复消费、页码未规范化/未知格式被改/原值丢失/输入或其它字段被改等真实反例失败并有具体类别。核对新旧摘要、未来副本一致、真实入口只读挂载、严格三键协议、历史嵌套反馈与私有内容过滤；真实冻结候选另经禁网产品入口业务及原生回归，不能把离线结果直接写成线上通过。
 - `test_projects_verification_recovery`：三次不同候选、重复相同候选、双空间冷却、服务重启后的同 work/session、验证器抛错、连续两轮超时、取消竞争、人工停止及一次纠错上下文隔离。
 - `host.test.mjs`：待复验与 passed 均只在真实 project_submit 和布尔收尾标记下结束；普通失败或其他工具不能终止；原结果先持久化。
 

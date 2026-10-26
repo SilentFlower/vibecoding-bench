@@ -120,6 +120,56 @@ _ATTRS_FEEDBACK_CODES = frozenset(('attrs_report_order', 'attrs_report_identity'
     'attrs_report_values', 'attrs_report_aggregate', 'attrs_report_disabled',
     'attrs_report_composites', 'attrs_report_base_exception'))
 
+_CONTRACT_OBSERVERS = {
+    'verification/BA-PREFERENCES-DEV-observe.py': {
+        'python_paths': ['library'], 'filename': 'project_locale_preferences_observer.py',
+        'original_sha256': 'c9470d69d118400e7042fe6f7ccb702d9d6a0107f656d5b7d2de72e2bf8bfe99',
+        'current_sha256': 'c387742407ebeb5cc5f6d0fae0180d4e60cb3ea2ed5975996116faa1f2b39015',
+        'name': 'babel-locale-preferences-contract-v1', 'label': 'Babel',
+        'feedback_codes': frozenset(('locale_preferences_api', 'locale_preferences_quality',
+            'locale_preferences_order', 'locale_preferences_matching', 'locale_preferences_exclusions',
+            'locale_preferences_headers', 'locale_preferences_once', 'locale_preferences_legacy')),
+    },
+    'verification/BIBTEXPARSER-O03-DEV-observe.py': {
+        'python_paths': ['library', 'app'], 'filename': 'project_pages_observer.py',
+        'original_sha256': '8d95cce3afe191108213fe59aadef3449522f4a75c2039448d78623e509881e2',
+        'current_sha256': 'df64b50177e178ee88d2fd1fad08bf494725b071528e53c93ddd6dacc802fb60',
+        'name': 'bibtexparser-pages-contract-v1', 'label': 'Bibtexparser',
+        'feedback_codes': frozenset(('pages_api', 'pages_ranges', 'pages_unknown', 'pages_original',
+            'pages_immutable', 'pages_fields', 'pages_idempotent', 'pages_default_stack')),
+    },
+}
+_BUSINESS_FEEDBACK_PROTOCOLS = {
+    'schema-public-contract-v1': ('Schema', _SCHEMA_FEEDBACK_CODES, False),
+    'attrs-validation-report-contract-v1': ('attrs', _ATTRS_FEEDBACK_CODES, True),
+    **{configuration['name']: (configuration['label'], configuration['feedback_codes'], True)
+        for configuration in _CONTRACT_OBSERVERS.values()},
+}
+
+
+def _native_contract_observer_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]:
+    """为精确来源的公开合同观察器提供可信兼容副本。
+
+    :param source: 原冻结观察器的字节。
+    :param specification: 原业务执行参数和严格布尔结果协议。
+    :return: 实际执行字节及摘要审计；无匹配时保持原样。
+    """
+    configuration = _CONTRACT_OBSERVERS.get(specification.get('script'))
+    if (configuration is None or specification.get('args') != []
+            or specification.get('python_paths') != configuration['python_paths']
+            or not _same_json(specification.get('expected'), {'candidate_import': True, 'business': True})):
+        return source, None
+    original = hashlib.sha256(source).hexdigest()
+    if original not in (configuration['original_sha256'], configuration['current_sha256']):
+        raise ValueError(configuration['label'] + ' 观察器版本未知，拒绝推测修复')
+    # 可信代码来自控制端，不能让候选或已冻结目录决定纠错后的实际执行内容。
+    current = Path(__file__).with_name(configuration['filename']).read_bytes()
+    if hashlib.sha256(current).hexdigest() != configuration['current_sha256']:
+        raise ValueError(configuration['label'] + ' 受信观察器字节不符合已核验版本')
+    return current, {'name': configuration['name'], 'scope': 'public_contract',
+        'original_runner_sha256': original, 'effective_runner_sha256': configuration['current_sha256'],
+        'preserves_frozen_contract': True}
+
 
 def _native_weighted_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]:
     """仅修正已确认的加权聚合空值样例冲突，不改冻结资产或结果协议。
@@ -492,6 +542,8 @@ class ProjectVerifier:
                     source, adapter = _native_weighted_adapter(source, specification)
                 if adapter is None:
                     source, adapter = _native_attrs_adapter(source, specification)
+                if adapter is None:
+                    source, adapter = _native_contract_observer_adapter(source, specification)
             # verification会单独只读挂载；可信副本放输入根，确保执行的是已核SHA的实际字节。
             execution_script = ('trusted-native-regression.py' if regression else 'trusted-native-business.py') if adapter else script
             # 外层输入挂载只读，嵌套验证目录的挂载点必须先在宿主创建。
@@ -584,18 +636,17 @@ class ProjectVerifier:
                         result['runtime_adapter'] = adapter
                     return result
                 diagnostics = {'runtime_adapter': adapter} if adapter else {}
-                if adapter and adapter['name'] in ('schema-public-contract-v1', 'attrs-validation-report-contract-v1'):
+                protocol = _BUSINESS_FEEDBACK_PROTOCOLS.get(adapter['name']) if adapter else None
+                if protocol:
                     # 仅精确核验的观察器允许诊断字段；其他业务输出继续严格比较完整协议。
-                    attrs_protocol = adapter['name'] == 'attrs-validation-report-contract-v1'
-                    allowed = _ATTRS_FEEDBACK_CODES if attrs_protocol else _SCHEMA_FEEDBACK_CODES
+                    label, allowed, strict_protocol = protocol
                     codes = actual.get('feedback_codes') if isinstance(actual, dict) else None
                     if (not isinstance(codes, list) or len(codes) > len(allowed)
                             or any(not isinstance(code, str) or code not in allowed for code in codes)
-                            or attrs_protocol and (len(set(codes)) != len(codes)
+                            or strict_protocol and (len(set(codes)) != len(codes)
                                 or set(actual) != {'candidate_import', 'business', 'feedback_codes'}
                                 or type(actual.get('candidate_import')) is not bool or type(actual.get('business')) is not bool
                                 or actual['business'] != (not codes))):
-                        label = 'attrs' if attrs_protocol else 'Schema'
                         return {'status': 'failed', 'message': label + ' 观察器诊断协议不合法', 'runtime_adapter': adapter}
                     actual = {key: value for key, value in actual.items() if key != 'feedback_codes'}
                     diagnostics = {'runtime_adapter': adapter, 'feedback_codes': codes}

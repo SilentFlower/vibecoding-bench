@@ -215,7 +215,23 @@ class ProjectsVerification:
             'attrs_report_aggregate': 'raise_errors=True 未抛出包含原始错误 issues 元组的聚合异常',
             'attrs_report_disabled': '未遵守共享的验证禁用开关',
             'attrs_report_composites': '组合验证的短路、可空或深层一次迭代语义不符合公开合同',
-            'attrs_report_base_exception': '错误报告吞掉或替换了应直接传播的 BaseException'}
+            'attrs_report_base_exception': '错误报告吞掉或替换了应直接传播的 BaseException',
+            'locale_preferences_api': '缺少公开约定的带权语言偏好协商接口',
+            'locale_preferences_quality': '语言偏好未按权重选择实际可用区域',
+            'locale_preferences_order': '同权语言偏好未保持请求中的先后顺序',
+            'locale_preferences_matching': '语言匹配未保留原区域拼写、别名或分隔符兼容',
+            'locale_preferences_exclusions': '通配符重新选中了明确排除的语言，或冲突偏好未返回合理的可用区域',
+            'locale_preferences_headers': '无效权重、参数或超限头部未被拒绝，或空偏好未返回空结果',
+            'locale_preferences_once': '可用区域未完整物化一次，不能正确处理一次性迭代器',
+            'locale_preferences_legacy': '原有语言协商接口的回退行为发生变化',
+            'pages_api': '缺少公开约定的非原地页码块中间件接口',
+            'pages_ranges': '明确数字范围未转换为双连字符，或数字原文发生变化',
+            'pages_unknown': '电子、单页、罗马、倒序或混合未知页码未整体保持',
+            'pages_original': '页码首次原值记录缺失或被覆盖',
+            'pages_immutable': '默认页码变换修改了原库、原页码或原元数据',
+            'pages_fields': '页码变换改变了其它字段或文献身份',
+            'pages_idempotent': '重复页码变换改变了归一结果或首次原值',
+            'pages_default_stack': '可选页码中间件改变了默认解析栈的行为'}
         result = []
 
         def collect(value, depth=0):
