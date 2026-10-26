@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "核对粘性会话、候选过滤、入口范围和 Fable 叠加"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "核对双库升级、字段往返与提交可见性"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "必需完整测试和验证边界"}
+{"file": ".trellis/tasks/10-26-cc2api-usage-window-limits/research/validation.md", "reason": "最终 Rust、PostgreSQL、bench 与页面验证证据"}

@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "消息选号、粘性会话与 Fable 限额兼容契约"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "账号字段跨层同步、双库迁移与类型兼容"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "账号表单、类型与数字输入契约"}
+{"file": ".trellis/tasks/10-26-cc2api-usage-window-limits/research/implementation-context.md", "reason": "现有 Account、DTO、存储和 bench 调用的核对依据"}

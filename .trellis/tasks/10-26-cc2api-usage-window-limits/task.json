@@ -1,0 +1,113 @@
+{
+  "id": "cc2api-usage-window-limits",
+  "name": "cc2api-usage-window-limits",
+  "title": "cc2api 每账号 5h/7d 用量百分比上限",
+  "description": "为每个 cc2api 账号分别配置 5 小时和 7 天用量百分比上限，覆盖账号编辑、持久化、粘性与普通选号以及窗口重置恢复。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-26",
+  "completedAt": "2026-10-26",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-26T07:27:14Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-26T06:22:14Z",
+      "contextKey": "codex_01a176db-d648-7590-bcc6-ff3fb523f50b",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "7e1e1c1dc6f7dfc4d32d01580ac73e5bb247b699",
+        "status": [
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugin-lock.json"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugins.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "7e1e1c1dc6f7dfc4d32d01580ac73e5bb247b699",
+            "status": [
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugin-lock.json"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugins.json"
+              }
+            ],
+            "worktreeDiffSha256": "31f8e48da822540d32784614e8b7a68c314f863c16c0dc61f17656f7d250a06e",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "bd37edeb182b987f0c9f430984c3b975e583743acc2b34d14f9492cb7410b3f6"
+          },
+          {
+            "root": "cc2api",
+            "head": "cb4b2304856ab8e1cad4c9070c9476af25f8ca0e",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "96038b7b4f10a88a7f880a6da1b81727c4cae71046a98b15247593b610f6ff25"
+          }
+        ],
+        "fingerprint": "e3fff525766a6352969c3b941e2f0a9cb3e7aea448231a17414a6f582b4b6e84"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "实现每账号5h/7d控制线与账号页",
+      "完成双库迁移、调度和bench兼容验证",
+      "完成Check-All与规范更新",
+      "提交并推送cc2api与vibecoding-bench业务变更"
+    ],
+    "partialStep": null,
+    "nextStep": "任务完成",
+    "notes": "独立CLI与后台任务不受网关消息选号控制；限制按最近观测用量执行。",
+    "updatedAt": "2026-10-26T07:27:14Z"
+  }
+}
