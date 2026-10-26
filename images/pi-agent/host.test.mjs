@@ -625,16 +625,17 @@ test('普通模型正文提及内容过滤不会产生错误分类', async () =>
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
-test('已确认工具后的内容过滤可降级恢复原会话，工具不重放且备用模型跨轮记忆', async () => {
+test('已确认工具后的内容过滤可降级，冷却结束后原会话回切且工具不重放', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'projects-pi-filter-after-tool-'));
   const models = [];
   const requests = [];
   let toolCalls = 0;
+  let primaryAvailable = false;
   const server = createServer(async (request, response) => {
     let body = ''; for await (const chunk of request) body += chunk;
     const value = JSON.parse(body); models.push(value.model); requests.push(value);
     if (models.length === 1) return stream(response, true);
-    if (value.model === 'secondary') return stream(response, false);
+    if (value.model === 'secondary' || primaryAvailable) return stream(response, false);
     response.writeHead(200, {'content-type': 'text/event-stream'});
     response.write('data: ' + JSON.stringify({id: 'chat-filter-after-tool', object: 'chat.completion.chunk',
       model: value.model, created: 1,
@@ -670,6 +671,23 @@ test('已确认工具后的内容过滤可降级恢复原会话，工具不重�
     assert.equal(resumed.find(value => value.type === 'ready').session_id, ready.session_id);
     assert.equal(models.at(-1), 'secondary');
     assert.equal(models.length, 6);
+    const healthPath = join(directory, '.model-health.json');
+    const health = JSON.parse(await readFile(healthPath, 'utf8'));
+    assert.equal(health.preferred_model, 'secondary');
+    assert.ok(health.models.primary.cooldown_until > Date.now());
+    // 只推进持久冷却边界，避免等待五分钟，同时保留线上旧文件的备用优先字段。
+    health.models.primary.cooldown_until = Date.now() - 1;
+    await writeFile(healthPath, JSON.stringify(health));
+    primaryAvailable = true;
+    const recovered = await execute({...config, session_file: ready.session_file}, () => assert.fail('回切不能重放已确认工具'));
+    assert.equal(recovered.at(-1).type, 'settled');
+    assert.equal(recovered.find(value => value.type === 'ready').session_id, ready.session_id);
+    assert.deepEqual(models, ['primary', 'primary', 'primary', 'primary', 'secondary', 'secondary', 'primary']);
+    assert.equal(requests.at(-1).messages.filter(value => value.role === 'tool').length, 1);
+    assert.ok(JSON.stringify(requests.at(-1).messages).includes('running'));
+    assert.equal(toolCalls, 1);
+    const recoveredMessages = (await readFile(ready.session_file, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+    assert.equal(recoveredMessages.filter(value => value.message?.role === 'toolResult').length, 1);
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
@@ -799,7 +817,7 @@ test('单模型在已确认工具后遇到网络结束错误，真实续接且�
   } finally { server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); await rm(directory,{recursive:true,force:true}); }
 });
 
-test('跨轮记住成功模型且配置修订变化清除优先级', async()=>{
+test('跨轮遵守模型冷却且配置修订变化重新按配置顺序选模', async()=>{
   const directory=await mkdtemp(join(tmpdir(),'pi-self-heal-sticky-'));
   const models=[];
   const server=createServer(async(request,response)=>{
@@ -818,6 +836,48 @@ test('跨轮记住成功模型且配置修订变化清除优先级', async()=>{
     await execute({...config,session_file:sessionFile,revision:'updated'},()=>assert.fail());
     assert.deepEqual(models,['primary','secondary','secondary','primary','secondary']);
   }finally{server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(directory,{recursive:true,force:true});}
+});
+
+test('多模型按配置优先级恢复已过冷却模型，未过冷却的主模型继续跳过', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-self-heal-ordered-'));
+  const models = [];
+  let secondaryAvailable = false;
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    const value = JSON.parse(body); models.push(value.model);
+    if (value.model !== 'tertiary' && !(value.model === 'secondary' && secondaryAvailable)) {
+      response.writeHead(503, {'content-type': 'application/json'});
+      return response.end(JSON.stringify({error: {message: '本地模型暂不可用'}}));
+    }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const config = {session_dir: directory, models: ['primary', 'secondary', 'tertiary'],
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: []};
+    const first = await execute(config, () => assert.fail());
+    assert.equal(first.at(-1).type, 'settled');
+    assert.deepEqual(models, ['primary', 'secondary', 'tertiary']);
+    const ready = first.find(value => value.type === 'ready');
+    const resumed = await execute({...config, session_file: ready.session_file}, () => assert.fail());
+    assert.equal(resumed.at(-1).type, 'settled');
+    assert.deepEqual(models, ['primary', 'secondary', 'tertiary', 'tertiary']);
+    const healthPath = join(directory, '.model-health.json');
+    const health = JSON.parse(await readFile(healthPath, 'utf8'));
+    assert.equal(health.preferred_model, 'tertiary');
+    assert.ok(health.models.primary.cooldown_until > Date.now());
+    assert.ok(health.models.secondary.cooldown_until > Date.now());
+    health.models.secondary.cooldown_until = Date.now() - 1;
+    await writeFile(healthPath, JSON.stringify(health));
+    secondaryAvailable = true;
+    const recovered = await execute({...config, session_file: ready.session_file}, () => assert.fail());
+    assert.equal(recovered.at(-1).type, 'settled');
+    assert.equal(recovered.find(value => value.type === 'ready').session_id, ready.session_id);
+    assert.deepEqual(models, ['primary', 'secondary', 'tertiary', 'tertiary', 'secondary']);
+    const updated = JSON.parse(await readFile(healthPath, 'utf8'));
+    assert.ok(updated.models.primary.cooldown_until > Date.now());
+    assert.equal(updated.models.secondary.cooldown_until, 0);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
 test('原预算不足以退避时退出，新轮遵守冷却且不探测',async()=>{
@@ -1231,7 +1291,7 @@ test('409 Retry-After遵守恢复事件十五秒及整数合同，长等待交�
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
-test('409 连续冲突后备用成功，下一轮直接使用已成功模型且不重探冷却模型', async () => {
+test('409 连续冲突后备用成功，下一轮跳过仍在冷却的主模型', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'pi-recovery-conflict-preferred-'));
   const requested = [];
   const server = createServer(async (request, response) => {

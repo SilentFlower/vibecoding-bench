@@ -63,7 +63,6 @@ async function modelHealth(config) {
   }
   return {
     models,
-    preferred: () => preferred,
     success: id => {
       const state = models.get(id);
       if (state) { state.last_success_at = Date.now(); state.cooldown_until = 0; preferred = id; }
@@ -86,6 +85,7 @@ async function modelHealth(config) {
       try {
         handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL
           | constants.O_NOFOLLOW, 0o600);
+        // 兼容旧健康文件，最近成功模型只供诊断，不改变配置中的主备顺序。
         await handle.writeFile(JSON.stringify({version: 1, fingerprint,
           preferred_model: preferred ?? null, models: Object.fromEntries(models)}));
         await handle.sync();
@@ -248,7 +248,8 @@ async function runSession(config, responses) {
   // Python 剩余预算可能带小数；计时器只接受整数毫秒，向下取整避免延长原预算。
   const deadline = Date.now() + Math.floor(Math.min(86400, Math.max(1,
     Number.isFinite(config.timeout_sec) ? config.timeout_sec : 1800)) * 1000);
-  const candidates = () => [health.preferred(), ...config.models].filter((id, index, all) =>
+  // 冷却只临时跳过故障模型；新一轮始终按配置顺序选模，避免备用模型永久置顶。
+  const candidates = () => config.models.filter((id, index, all) =>
     health.models.has(id) && all.indexOf(id) === index);
   const available = () => candidates().find(id => health.models.get(id).cooldown_until <= Date.now());
   const retryAt = () => {

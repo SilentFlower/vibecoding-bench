@@ -612,6 +612,8 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 - SDK 原生自动压缩关闭。启动／恢复前和工具批次结束检查阈值；工具回执先持久化，再结束 SDK 子循环，在空闲边界摘要并 continue，不重发已确认工具或用户输入。正常正文不做字节硬裁剪，未配对工具及失败助手不进入模型历史。
 - 较早正文按至多约 16000 个估算 token 分块，顺序归纳并携带上次摘要；近期完整交互最多保留 `min(12000, threshold/4)` 个估算 token。各片段摘要须非空且估算不超过 8192；取消／原截止时间仍允许，且估算用量确实降低并低于阈值后才追加检查点。异常不发布新检查点，原文保留。
 - 摘要和普通推理共享本轮额外尝试上限（至多 8 次）、模型健康状态、同模型重试／降级、服务端等待及原截止时间；真实摘要调用纳入计量。Python 传来的剩余秒数可带小数，宿主须向下取整到整数毫秒后建立截止时间，避免 `AbortSignal.timeout` 拒绝小数或延长原预算。可信目标完成后直接收尾，无额外摘要或推理。
+- Pi 每次启动／恢复按冻结的 `models` 配置顺序选择首个 `cooldown_until <= Date.now()` 的模型；失败模型的五分钟冷却跨轮保留，到期后在下一轮重新参与原顺序选择。正常执行中的轮次不因冷却到期主动回切；故障恢复继续遵守既有重试、降级、服务端等待及预算边界。
+- `.model-health.json` 的 version 1、配置指纹及旧 `preferred_model` 字段保持兼容；`preferred_model` 仅记录最近成功模型供诊断，不参与候选排序。回切复用原 Pi 会话和已确认工具结果，不通过清空健康文件或重建会话恢复主用。
 - 当前已知限制：摘要 `stopReason='length'` 仍可能通过非空及长度检查并发布未完成摘要。此行为属于 FBK-001 的保护缺口，不能把现有检查描述为已保证摘要完整结束；不代表磁盘原文已删除。
 - 真正 400／413 上下文拒绝最多在强制摘要且确实缩减后续接一次；认证、明确内容拒绝、禁止重试、服务端等待及原预算优先。无法缩减或重复拒绝明确报 `context_limit`，不盲发相同超长请求给其他模型。
 - `account_state` 的 offset 默认 0、limit 默认 10 且范围 1..20；三个列表 `available_objectives/waiting_objectives/passed` 同步分页，`objective_page` 给出各自真实总数及公共 next_offset，保留全部未完成目标数量。模型视图去除重复指南，页面完整视图保持。
@@ -629,6 +631,8 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 | 摘要抛错、为空、过长、未降低用量或取消／超时 | 不发布新检查点，不继续超长推理；原历史保留 |
 | 摘要返回非空但 finish_reason=length | 当前已知保护缺口：仍可能发布并继续，见 FBK-001 |
 | 强制摘要后仍收到真实上下文拒绝 | 明确 context_limit，不继续自动重试 |
+| 高优先级模型仍在冷却 | 跳过该模型，按配置顺序选择其它未冷却候选；全部冷却时保留既有等待恢复 |
+| 高优先级模型已过冷却，旧 preferred_model 仍指向低优先级备用 | 下一轮选择顺位最靠前的可用模型，旧成功记录不能将备用永久置顶 |
 | 分页参数非法或材料 offset 超出正文 | 工具返回 rejected，不能把截断页当作完整清单 |
 
 ### 5. Scenarios and Examples
@@ -637,6 +641,11 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 - 边界：保存 `{"base_url":"https://ai.flower-cli.com/v1","models":["gemini-3-flash-agent"],"compaction_threshold_tokens":450000}`，密钥沿用；下次项目或养号启动均采用 450000，在途执行保留原阈值。
 - 错误：每次请求清空历史、按 24 KiB 硬裁剪材料，或只看首 10 个目标就报告全部完成。正确：以工程目标隔离，同目标按 token 摘要，沿 next_offset 读取剩余页。
 - 错误：直接重发百万级旧历史，或清空会话解除旧通用错误。正确：分段归纳，并凭绑定原错误的诊断经原门禁显式恢复。
+- 正常回切：配置 `[gemini-3-flash-agent, deepseek-flash]`，Gemini 故障后冷却期间使用 DeepSeek；五分钟冷却到期后的下一轮再次优先尝试 Gemini，已有工具回执继续沿原会话使用。
+
+### 6. Tests Required
+
+- `cd images/pi-agent && npm test`：覆盖冷却期间继续使用备用、冷却到期后按配置顺序回切、三模型中仅恢复已过冷却的候选、兼容旧备用成功记录，以及同会话恢复不重放已确认工具；摘要、取消与有界重试回归继续通过。
 
 ## Scenario: 验收反馈与自动复验
 
