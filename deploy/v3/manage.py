@@ -154,6 +154,8 @@ def preflight(values: dict) -> Path:
     # 自有网关允许重复 up；其它进程或 Docker NAT 占用仍在预检拒绝。
     if not owned_port:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            # 允许复用已关闭连接的 TIME_WAIT，真实监听与外部 Docker 发布仍由原检查拒绝。
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind((address, port))
     inspect_images(values)
     marker = root / ".v3-deployment.json"

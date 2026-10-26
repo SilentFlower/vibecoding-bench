@@ -47,6 +47,7 @@ class PreflightTests(unittest.TestCase):
     def test_real_occupied_port_rejects_without_changing_owner(self) -> None:
         """真实 socket 占用应在 up 之前失败。@return None。"""
         with socket.socket() as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             listener.bind(("127.0.0.1", 0))
             listener.listen()
             self.values["V3_HOST_PORT"] = str(listener.getsockname()[1])
@@ -54,6 +55,27 @@ class PreflightTests(unittest.TestCase):
                 with self.assertRaises(OSError):
                     manage.preflight(self.values)
             self.assertTrue(listener.fileno() >= 0)
+
+    def test_closed_connection_time_wait_allows_immediate_start(self) -> None:
+        """旧服务连接已关闭时无需等待 TIME_WAIT，仍须拒绝真实监听。@return None。"""
+        with socket.socket() as listener:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen()
+            address = listener.getsockname()
+            with socket.create_connection(address) as client:
+                connection, _ = listener.accept()
+                with connection:
+                    connection.shutdown(socket.SHUT_WR)
+                    self.assertEqual(client.recv(1), b"")
+        with socket.socket() as probe:
+            with self.assertRaises(OSError):
+                probe.bind(address)
+        self.values.update(V3_BIND_ADDRESS=address[0], V3_HOST_PORT=str(address[1]), V3_ACCOUNT_MEMORY="1536m")
+        with patch.object(manage, "command", side_effect=["", ""]), \
+                patch.object(manage, "inspect_images", return_value={}), \
+                patch.object(manage.Path, "read_text", return_value="MemAvailable: 2097152 kB\nSwapFree: 0 kB\n"):
+            self.assertEqual(self.root, manage.preflight(self.values))
 
     def test_published_docker_nat_port_rejects_without_host_listener(self) -> None:
         """Docker 禁用 userland proxy 时，也必须检查 NAT 发布端口。@return None。"""

@@ -124,7 +124,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 两个窗口分别采用有效未来 reset 减去 5h／7d 作为开始时间，且 reset 不得超过该窗口长度；按请求开始时间的左闭右开区间汇总，查询上限不超过本次 now。reset 缺失、非法或到期时返回明确标为 `rolling` 的最近窗口。
 - `request_usage` 包含 `recorded_since`、`five_hour`、`seven_day`。各窗口字段为 `requests`、`tokens`、`cost_usd`、`unpriced_requests`、`partial_requests`、`starts_at`、`ends_at`、`basis: "quota" | "rolling"`、`coverage_complete`、`estimated_total_cost_usd`。
 - `cost_usd` 是已知部分的标准 API 折算费用，不是 A／U 用户结算。费用未确定的请求计入 `unpriced_requests`；不完整响应计入 `partial_requests`。读取数据库失败时 API 保留账号列表并返回空统计，前端不得填成零请求／零费用。
-- 总额只在有效官方周期、有限正百分比／费用、无未定价／部分记录且覆盖完整时使用 `cost_usd * 100 / utilization`。覆盖起点保守取首次记录时间、本进程开始时间和最近写失败；因此启用／重启后的首个未完整覆盖周期隐藏估算。页面标明按网关记录估算，不称为官方配额或余额。
+- 总额预估与本机 sub2api 一致：有效官方周期内，只要官方百分比和已记录费用为有限正数，就使用 `cost_usd * 100 / utilization`；启用、重启、采集间断、未定价或部分响应均不作为隐藏已有正费用预估的门槛。完整性字段保留为元数据，卡片不显示“部分记录”标签，金额标为“预计总费用”，不称为官方配额或余额。
 - 列表刷新只读，不删除记录；5h 重置只切换自身周期，7d 按自己的 reset 切换。手动额度刷新成功后立即重读列表，正常页面维持既有 5 秒轮询，不新增自动 usage POST。
 
 ### 4. Validation & Error Matrix
@@ -133,26 +133,27 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | --- | --- |
 | 同一 `record_id` 重复 finalize | 一条记录、一次请求费用 |
 | 同一 SSE usage 多次出现 | 保留字段最大值，不累计重复事件 |
-| 未知模型／缺少 usage | 请求仍可统计，费用未知；不生成总额估算 |
-| 中断、损坏或解码超限 | 标记部分数据，只展示已知费用 |
+| 未知模型／缺少 usage | 请求仍可统计；没有已知正费用时不预估，混合窗口按已知正费用预估 |
+| 中断、损坏或解码超限 | 保留部分数据事实，按已知正费用和有效正比例预估 |
 | 缺少／非法／过期 reset | 本地统计 `basis=rolling`，官方百分比未知／待更新，无外推 |
 | 真实已知 0% | 允许显示 0%，不做除零外推 |
-| 普通刷新／重启 | 已落库金额保留；重启后覆盖不足时隐藏外推 |
+| 普通刷新／重启 | 已落库金额保留；不因重启重新等待完整周期才显示预估 |
 | 5h reset 推进，7d 未推进 | 5h 只计新周期，7d 保留仍属于其周期的请求 |
 | 数据库读写失败 | 记录脱敏诊断，统计不可用或覆盖不完整；不阻断业务转发，不伪造零值 |
 
 ### 5. Scenarios and Examples
 
 - 正常：同一请求按所属周期同时进入 5h／7d；完整周期的费用为 $12.50、官方占用为 10% 时，按网关记录估算 $125.00。
-- 基础／边界：上线首周仍可显示已记录请求和费用，首个周期缺少历史数据时不外推；页面刷新保留金额，新 reset 使窗口查询自然排除旧周期。
+- 基础／边界：上线首周和重启后均按已有正费用与有效官方占用预估；页面刷新保留金额，新 reset 使窗口查询自然排除旧周期。
 - 错误：刷新页面时执行 DELETE 清空统计，或把所有请求费用挂到 Fable 专属窗口。
 - 正确：仅后台按保留时长裁剪历史记录，当前 5h／7d 由各自 reset 选区间；模型专属额度继续使用原有含义。
 
 ### 6. Tests Required
 
 - `refresh_keeps_records_and_each_reset_selects_its_own_cycle`：重复读取与重复 finalize、两个周期独立推进、请求边界和 Token／费用汇总。
-- `committed_records_survive_independent_connection_and_reopening`：幂等迁移、独立连接可见、重启保留金额、覆盖不足禁止外推。
-- `unknown_or_incomplete_data_never_produces_total_estimate`：缺失／非法／到期 reset、零比例、未定价和部分响应。
+- `committed_records_survive_independent_connection_and_reopening`：幂等迁移、独立连接可见、重启保留金额与总额预估。
+- `unpriced_data_without_positive_cost_never_produces_total_estimate`：缺失／非法／到期 reset、零比例及无已知正费用。
+- `partial_window_estimates_use_known_cost_like_sub2api`：重启及混合未定价／部分响应时，两个窗口仍按已有正费用预估。
 - `gateway_usage_records_real_responses_once_without_telemetry`：本地真实 HTTP 上游验证 JSON、分块 SSE、gzip、取消、首次探针与缓存命中、count_tokens 的调用／记录次数。
 - `service::usage`／`service::usage_pricing`：实际模型与 speed、累计 Token、不同 TTL、别名、长上下文、未知模型及有界解码；金额断言对照参考价格。
 - 管理 API／浏览器：字段与 TypeScript 契约一致，自动刷新独立切换周期、未知与待更新明确、手机无横向溢出、零自动 usage POST；通过 `cargo fmt --check`、`cargo test --locked`、`npm run build`。
