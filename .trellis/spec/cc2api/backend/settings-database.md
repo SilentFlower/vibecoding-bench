@@ -158,6 +158,65 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `service::usage`／`service::usage_pricing`：实际模型与 speed、累计 Token、不同 TTL、别名、长上下文、未知模型及有界解码；金额断言对照参考价格。
 - 管理 API／浏览器：字段与 TypeScript 契约一致，自动刷新独立切换周期、未知与待更新明确、手机无横向溢出、零自动 usage POST；通过 `cargo fmt --check`、`cargo test --locked`、`npm run build`。
 
+## Scenario: 请求级诊断与发送尝试关联
+
+### 1. Scope / Trigger
+
+- 修改 messages 请求观测、响应关联头、sender 请求 ID、诊断数据库、管理查询、留存或响应解析时适用。
+- 诊断用于排查实际调用行为，独立于 `usage_records` 计费和自动遥测。不得为了补齐诊断改变准入、画像、调度、重试、session 池或上游协议字节。
+
+### 2. Signatures
+
+- `GatewayService::with_diagnostics(self, Arc<DiagnosticsStore>) -> Self`：生产装配入口，保留原构造函数兼容性。
+- `DiagnosticsStore::migrate(&AnyPool)`：由正式 `db::migrate` 调用，幂等创建 `request_diagnostics`、`request_diagnostic_attempts` 和索引；两表分别以请求 UUID、尝试 UUID 为唯一键。
+- `DiagnosticsStore::list(DiagnosticQuery) -> Result<DiagnosticPage, AppError>`；`detail(&str) -> Result<DiagnosticDetail, AppError>`，均为 async。
+- `GET /admin/request-diagnostics`：沿用管理鉴权；参数为 `page`、`page_size`、`account_id`、`correlation_id`、`outcome`、`since`、`until`；返回 `items/total/page/page_size/health`。
+- `GET /admin/request-diagnostics/:request_id`：返回 `request` 和按序排列的 `attempts`。
+- `PreparedRequest.request_id`：有合法内部 UUID 时保留，空值继续生成；v3 sender 的既有 observations 复用该尝试 UUID。
+
+### 3. Contracts
+
+- 仅在网关 Token 鉴权后的精确 `/v1/messages` 入口建立根请求 UUID；每次真实提交建立独立尝试 UUID。`count_tokens`、Hello、后台遥测不混入此请求尝试链。
+- 下游新增 `X-CC2API-Request-Id` 根 UUID；保留已有 `X-Request-Id`，缺失时补根 UUID。根 UUID、最终响应 ID、上游 `request-id/x-request-id` 可用于列表反查；标准 UUID 和 `req_` 字母数字 ID 保留，其它头值先 SHA256。诊断 ID 不增加到发往上游的业务 headers/body。
+- 尝试记录实际冻结画像 key/选择方式、最终模型/max_tokens/thinking 类型与预算/effort/stream/工具数量、匿名 session/thread、响应模型与消息、stop_reason、六类 token、partial、状态、耗时、重试原因和受控错误阶段/类型。未知字段保留 `null`；累计 usage 使用每字段最大值，5m/1h 缓存写明细不重复加入总量。
+- 根记录包含起止时间、下游状态、最终选中账号、结果和尝试数。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
+- 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
+- session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
+- 不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
+- 有界异步队列容量 1024，热路径不等待数据库；每个摘要上限 16 KiB，响应解析/压缩采样上限 1 MiB。`health.dropped_records` 统计丢弃写入事件，`write_failures` 统计写入/清理失败，`observation_failures` 统计采样/解码/解析失败尝试；均为进程内计数，重启清零，日志只输出固定文案、计数及内部 UUID。
+- 按请求开始时间保留至少八天，后台每小时清理，列表 GET 不删除。已提交记录跨重启可查，进程崩溃前未提交缓冲不承诺恢复；`in_progress` 不能被直接当作仍在运行。追加表支持回滚旧程序后保留，不影响原费用表。
+- 请求与尝试分别 upsert，迟到的进行中快照不得覆盖终态。SQLx Any 0.7 将无类型 NULL 参数编码为 i32；同一缓存 SQL 的可空字段先空后有值时须保持绑定类型稳定。内部非空标识/时间用字符串绑定再 `NULLIF($n,'')`，正整数账号 ID 用 i64 绑定再 `NULLIF($n,0)`；不得把这些占位约定用于允许真实空字符串或零值的业务字段。
+- 分页默认 1/50，每页 1..=200；账号 ID 为正整数。关联条件最多 128 字节，并执行与写入相同的规范化。时间为 RFC3339，统一 UTC 毫秒，筛选区间左闭右开。无新环境变量或 setting。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 401 恢复、签名修复或换号 | 同一根请求，独立尝试与实际账号/状态/重试原因 |
+| 模拟、缓存、本地拒绝 | 根结果明确，未发送时尝试数为零 |
+| 流内错误、读取异常、取消 | 保留部分 token，受控终态，响应原始字节继续透传 |
+| 损坏压缩、采样超限、非法 JSON | `partial=true`，受控错误类型与观察失败计数，不阻断业务 |
+| 队列满、写入或清理失败 | 记录脱敏失败信号，不改变转发/费用，不返回假完整覆盖 |
+| 非法分页、账号、时间或结果筛选 | 400 |
+| 未鉴权管理查询 / 不存在详情 / 存储不可用 | 401 / 404 / 503，不伪装为空列表 |
+| SQLite/PG 首次/重复迁移，可空字段从开始到终态 | 幂等、正确保留 NULL，无参数类型漂移 |
+
+### 5. Scenarios and Examples
+
+- 正常：new-api 留下响应 ID，管理员以 `correlation_id` 查到根 UUID，再读取两次 401→200 尝试；sender evidence 的 request_id 对应尝试 UUID。
+- 边界：两个真实 session 借用同一上游成员时，真实散列不同、上游散列相同；目标过期后可观察新目标，诊断不能延长旧目标 TTL。
+- 错误用法：HTTP 200 且没有完整 usage 就填零并标成功，或把缓存/中间重试写入原费用表。正确处理：未知值为 `null`，结果与完整性分开判定，费用保持原语义。
+- PostgreSQL 可空正整数示例：`.bind(request.account_id.unwrap_or(0))` 配合 `NULLIF($7,0)`；不能直接复用先绑定 `None::<i64>`、再绑定实值的 Any 缓存语句，也不能把未知账号持久化为真实 0。
+
+### 6. Tests Required
+
+- `sqlite_diagnostics_storage_contract` 与显式执行 `postgres_diagnostics_storage_contract`：开始→终态、重复写入、迟到快照、NULL、分页/账号/关联过滤、重开连接、八天精确边界。PG 使用 `CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN` 指向独立临时库，ignored 不等于通过。
+- `diagnostics_preserve_bytes_and_correlate_anonymous_sessions`：最终参数、stop_reason、null token、匿名标识、头值保留/散列反查及合成秘密不泄露。
+- `diagnostics_record_stream_errors_and_cancellation_once`、`diagnostics_report_observation_failures_without_changing_bytes`、`diagnostics_cover_early_cancellation_and_unavailable_storage`：流内错误、读取失败、取消、超限/解码/解析、数据库故障与响应保真。
+- `diagnostics_overload_and_write_failures_are_observable` 与 `diagnostics_routes_require_admin_and_expose_committed_requests`：队列立即返回、健康计数、管理员鉴权、分页错误和详情查询。
+- Gateway 现有真实 HTTP 回归：`gateway_usage_records_real_responses_once_without_telemetry` 验证 JSON/SSE/gzip/取消、缓存/count_tokens 与费用次数；签名重试、OAuth 恢复、setup 换号及 `gateway_hello_probe_reuses_resolved_upstream_session` 核对独立尝试、实际画像和会话归属。
+- `raw_body_header_order_and_upstream_error_survive_bridge`：sender 证据保留尝试 UUID，上游业务 headers 不泄漏该 UUID，原字节/头顺序不变。执行 `cargo fmt --check` 与完整 `cargo test --locked`；协议改写变化复用完整测试中的 CCH 回归或补定向验证。
+
 ## Common Mistakes
 
 | 反模式 | 风险 | 正确做法 |
