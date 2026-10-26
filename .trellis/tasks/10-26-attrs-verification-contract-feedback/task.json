@@ -1,0 +1,42 @@
+{
+  "id": "attrs-verification-contract-feedback",
+  "name": "attrs-verification-contract-feedback",
+  "title": "attrs 验收合同修正与可用反馈",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-26",
+  "completedAt": "2026-10-26",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-26T06:02:25Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-26-pi-efficiency-feedback",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成 attrs 公开验收合同修正、精确冻结适配和具体反馈",
+      "完成真实候选隔离业务验证、公开六项及原生回归，以及八类错误反例",
+      "通过父任务统一 full Check-All，完成规范同步及业务交付"
+    ],
+    "partialStep": null,
+    "nextStep": "本子任务交付完成",
+    "notes": "保留旧冻结资产与历史报告；生产目标状态及冷却未修改，完整通过仍遵循原验收链。",
+    "updatedAt": "2026-10-26T06:02:25Z"
+  }
+}
