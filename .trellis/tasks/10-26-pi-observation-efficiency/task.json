@@ -1,0 +1,42 @@
+{
+  "id": "pi-observation-efficiency",
+  "name": "pi-observation-efficiency",
+  "title": "Pi 观察等待合并与增量上下文",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-26",
+  "completedAt": "2026-10-26",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-26T06:01:35Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "10-26-pi-efficiency-feedback",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "完成交互事件优先唤醒、本地等待合并和可还原模型观察增量",
+      "完成双空间、输入保护、真实 SDK 计量及确定性回放验证",
+      "通过父任务统一 full Check-All，完成规范同步及业务交付"
+    ],
+    "partialStep": null,
+    "nextStep": "本子任务交付完成",
+    "notes": "联合验证证据保存在父任务 research/validation.md；实际额度及生产交互表现由后续发布流程验证。",
+    "updatedAt": "2026-10-26T06:01:35Z"
+  }
+}
