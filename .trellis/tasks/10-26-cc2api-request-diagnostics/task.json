@@ -1,0 +1,168 @@
+{
+  "id": "cc2api-request-diagnostics",
+  "name": "cc2api-request-diagnostics",
+  "title": "cc2api 请求级排障观测与调用关联",
+  "description": "增加实际画像、匿名会话、请求参数、响应终态及重试的持久化诊断和关联查询，保持转发与记费行为。",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": "cc2api",
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-26",
+  "completedAt": "2026-10-26",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-26T05:03:43Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "cc2api/src/service/gateway.rs",
+    "cc2api/src/service/usage.rs",
+    "cc2api/src/service/runtime_transport.rs",
+    "cc2api/src/store/usage_store.rs",
+    "cc2api/src/handler/router.rs"
+  ],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-26T04:17:57Z",
+      "contextKey": "codex_01a17652-69fb-76a0-9c65-09dcbc6ed57a",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "856b50356d2a940a8318fa70d88dcfaa2f7c3c56",
+        "status": [
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugin-lock.json"
+          },
+          {
+            "status": " M",
+            "path": ".flower/plugins.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-26-pi-efficiency-feedback/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-26-pi-efficiency-feedback/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-26-pi-efficiency-feedback/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-26-pi-efficiency-feedback/task.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "856b50356d2a940a8318fa70d88dcfaa2f7c3c56",
+            "status": [
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugin-lock.json"
+              },
+              {
+                "status": " M",
+                "path": ".flower/plugins.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-26-pi-efficiency-feedback/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-26-pi-efficiency-feedback/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-26-pi-efficiency-feedback/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-26-pi-efficiency-feedback/task.json"
+              }
+            ],
+            "worktreeDiffSha256": "31f8e48da822540d32784614e8b7a68c314f863c16c0dc61f17656f7d250a06e",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/10-26-pi-efficiency-feedback/check.jsonl",
+                "sha256": "40dabff4b3e0949c79f6dbbbec55ba4d8eb31ab989ba5c77786bf2c951c88b92"
+              },
+              {
+                "path": ".trellis/tasks/10-26-pi-efficiency-feedback/implement.jsonl",
+                "sha256": "40dabff4b3e0949c79f6dbbbec55ba4d8eb31ab989ba5c77786bf2c951c88b92"
+              },
+              {
+                "path": ".trellis/tasks/10-26-pi-efficiency-feedback/prd.md",
+                "sha256": "8284ac59006a75ba1dbafefafff6a2c2d48bc9f7a04124c33d01a47a9b5a334f"
+              },
+              {
+                "path": ".trellis/tasks/10-26-pi-efficiency-feedback/task.json",
+                "sha256": "66c2d6d6f00d2bf8d8c6f8b752356f4dd5f143c952469e6e2cb5aa7f54b712bf"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "53a839b9137300779201bcd977fb8fbfc2a3c07bd17e81ddd7a9d6b742da78f2"
+          },
+          {
+            "root": "cc2api",
+            "head": "21e0901634a30105405ce7fee0c6dc3060638f77",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "f06ad6542c15882c00eb71bb935d6fe34ebfe4474f3ae769e96aed289dbe6111"
+          }
+        ],
+        "fingerprint": "f180c0e8cc89c4ac07a13dbe0a7107c91db97135b5c8ca1a27a95b1bfc95931d"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成请求与发送尝试诊断、响应关联和管理员查询",
+      "完成双数据库、重试、流式取消、隐私与故障验证",
+      "通过 Full Check-All 并更新项目规范",
+      "已提交并推送 cc2api 和 vibecoding-bench 业务变更"
+    ],
+    "partialStep": null,
+    "nextStep": "无，开发交付完成",
+    "notes": "生产环境未部署；真实 new-api 响应 ID 留存由后续上线验收核对。",
+    "updatedAt": "2026-10-26T05:03:42Z"
+  }
+}

@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "敏感信息、真实流式传输和完整检查"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "跨重启、幂等和当前周留存验证"}

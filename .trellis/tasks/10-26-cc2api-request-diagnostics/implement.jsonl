@@ -1,0 +1,2 @@
+{"file": ".trellis/tasks/10-26-cc2api-request-diagnostics/research/guideline-context.md", "reason": "网关热路径、会话池和冻结画像的原规范摘录，避免自动注入截断"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "双数据库、用量留存与不重复记费"}
