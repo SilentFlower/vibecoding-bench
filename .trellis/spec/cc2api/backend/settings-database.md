@@ -55,6 +55,10 @@ web/src/components/Accounts.vue
 
 新增账号字段时必须同步读写、分页列表、更新接口、前端类型和 UI。涉及 token、邮箱、OAuth、usage 的字段必须默认脱敏展示。
 
+`AccountStore` 使用 SQLx Any：PostgreSQL 的 JSONB 写入参数必须显式转为 `::JSONB`；查询和 INSERT RETURNING 的原生 JSONB/时间列须投影为 TEXT 后解码。时间解析同时接受 SQLite RFC3339 和 PostgreSQL 带时区文本，不能把无法直接解码的原生类型误当作空 JSON、无到期时间或当前时间。
+
+`five_hour_usage_limit_percent`、`seven_day_usage_limit_percent` 的账号字段、双库升级和局部更新合同见 [每账号 5h/7d 用量控制线](./service-architecture.md#scenario-每账号-5h7d-用量控制线)。凭据刷新、进程指标更新和状态快捷操作必须保留这两个配置；状态与控制线同时提交时用独立控制线 SQL 避免旧 Account 快照覆盖新凭据或状态。
+
 ## 时间字段
 
 - 后端持久化时间优先使用 RFC3339 字符串。

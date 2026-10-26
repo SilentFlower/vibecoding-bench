@@ -343,6 +343,66 @@ let Some(model) = item.get("scope").and_then(|scope| scope.get("model")) else {
 };
 ```
 
+## Scenario: 每账号 5h/7d 用量控制线
+
+### 1. Scope / Trigger
+
+- 修改账号用量限制、消息选号、sticky、账号新建/编辑页或 bench 创建账号兼容性时适用。
+- 控制线约束网关消息分配，依据最近观测的真实额度百分比；与本地请求费用统计、RPM、Fable 专属额度分别处理。
+
+### 2. Signatures
+
+- `Account.five_hour_usage_limit_percent: i32`、`seven_day_usage_limit_percent: i32`，serde 缺失默认 0；SQLite/PostgreSQL 对应列为 `NOT NULL DEFAULT 0` 整数。
+- `POST /admin/accounts` 可提交两个 JSON 整数字段，缺失默认为 0；`PUT /admin/accounts/{id}` 未提交的字段保留既有值。
+- `AccountSelectionContext.usage_limits_enabled: bool` 仅在网关精确 `/v1/messages` 路径为 true，`disabled()` 为 false；普通窗口控制不依赖请求模型名。
+- `AccountService::update_account_usage_limits(&self, account: &Account) -> Result<(), AppError>` 校验后调用 `AccountStore::update_usage_limits`，只写两个控制线和 `updated_at`。
+- `account_usage_limit_reached(account)` 对普通 `five_hour`、`seven_day` 窗口进行判断；`select_account_with_selection_context` 在 sticky 与普通候选路径执行同一规则。
+
+### 3. Contracts
+
+- 两个控制线分别接受 0～100 的整数，0 关闭，1～100 为百分比；新账号、旧库升级及 bench 省略字段的创建请求均默认关闭，不新增全局设置或继承关系。
+- 只有窗口用量为有限非负数字、`resets_at` 是未来 RFC3339 时间且 `utilization >= limit` 时命中；不使用调度评分的衰减百分比。未知、非法或过期窗口不据此拦截。
+- OAuth 与 SetupToken 的普通窗口同样适用；不要照搬 Fable helper 的 OAuth-only 条件。
+- sticky 达线时加入本轮排除并保留原绑定，只有替代账号实际承载后才重绑；无替代账号返回本地 `TooManyRequests`。普通候选先遵守 Token 范围和运行时排除，再过滤额度，最后执行既有 RPM/优先级/评分。
+- 通用与 Fable 规则同时适用；混合达线不能回退到任何受限账号。普通账号阈值可以不同，错误信息不能把它们描述为同一全局阈值。
+- 达线不改变 active/disabled 或写入 `rate_limit_reset_at`；窗口到期、调高或关闭上限后下次选号恢复，同时继续遵守其他窗口、Fable 与真实上游冷却。
+- 判断点是选号读取到的账号快照；已分配、排队或执行中的请求不取消，不预扣/预测，不保证单次或并发请求严格不越线，不新增主动 usage 查询。
+- count_tokens、管理接口、后台 poller/PrimePoller 和独立 CLI 不套用新控制线；不能宣称它限制全部账号用量来源。本地拦截保持原消息链路顺序。
+- 服务创建、CLI 身份创建、更新均校验值域；动态更新必须在状态或配置写入前拒绝错误类型与越界值。同次提交 active/disabled 与控制线时仍须保存控制线，只写必要字段，不能把旧快照的凭据或状态整行回写。
+- 账号表单所有初始化、新建、编辑、授权导入、保存入口必须同步；列表额度区显示已配置上限。控件为 0～100、步长 1，空值不能被转换成关闭限制的 0。
+- bench 的现有创建载荷继续省略新字段，保留并发 4、RPM 50、session 池 4/owner_only 和 rewrite 等既有默认；后续关联、OAuth 刷新和进程指标导入不能清掉管理员设置的控制线。
+- 双库 schema、幂等补列、INSERT/UPDATE bind 顺序、`ACCOUNT_COLS` 和 row mapping 必须同步；PostgreSQL JSONB 与时间列通过文本投影适配 SQLx Any，具体类型约束见 [Settings & Database](./settings-database.md#account-字段同步)。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 账号 A 的 5h=80/7d=60，任一窗口恰好达线 | 跳过 A；可用替代账号仍按既有范围和评分选择 |
+| 两个窗口分别为 79.9%/59.9% | 允许 A，不提前预留缓冲 |
+| 0 / 100 控制线 | 0 不检查该窗口；100 在 99.9% 允许、100% 命中 |
+| 已达线账号无可用替代 | 本地 429，保留原 sticky，不调用上游 |
+| 窗口未知、无效或过期 | 不按该窗口拦截；其他有效窗口仍可拦截 |
+| 创建/更新字段为负数或大于 100 | BadRequest，旧数据不变 |
+| 字段为字符串、布尔、小数或 null | 创建反序列化拒绝，动态更新 BadRequest，不静默忽略 |
+| 仅更新一个控制线或不提交两个字段 | 另一个值或两个既有值保留 |
+| 状态快捷操作同时提交控制线 | 状态与控制线都生效，保留新凭据和其他策略 |
+| 两次迁移或刷新凭据/指标 | 非零控制线保留 |
+
+### 5. Scenarios and Examples
+
+- 正常：A 的上限为 80/60，B 为 90/70；A 的 5h 观测为 85% 后不能继续承载消息，同样用量的 B 仍可使用。
+- 基础/边界：bench 新建账号省略字段，两个值均为 0；管理员在 cc2api 编辑页设置 80/60，后续凭据同步不会恢复为 0。
+- 错误：直接设置 `rate_limit_reset_at` 表示管理员控制线，或状态切换后把旧 Account 整行更新，会延迟配置恢复或覆盖新凭据。
+- 正确：每次消息选号只读窗口与账号阈值；状态与控制线组合更新走独立控制线 SQL，保持其余字段和真实上游冷却。
+
+### 6. Tests Required
+
+- `tests/account_scheduler_test.rs::usage_limits_*`：两窗口/两类账号、临界值、独立阈值、Token 范围、sticky 保留与重绑、全部达线、关闭/调高/重置恢复、脏窗口、Fable 叠加和服务校验。
+- `handler::router::tests::usage_limits_*`：bench 旧载荷默认、局部更新、错误类型/范围无部分写入、状态与控制线组合保存。
+- `gateway::tests::usage_limits_gateway_filters_messages_and_preserves_count_tokens`：真实本地上游账号选择、达线无上游发送、count_tokens 兼容与调高热生效。
+- `tests/account_store_timestamp_test.rs::usage_limits_*`：SQLite/PostgreSQL 旧库缺列升级、重复迁移、创建/更新/详情/分页/调度字段往返，以及凭据/指标/状态变化后独立控制线写入不覆盖其它字段。
+- 管理页构建及真实输入保存/回显/0 关闭/非法输入不提交/新建重置；必需 `cargo fmt --check`、完整 `cargo test --locked`、`npm run build`。
+
 ## Scenario: Fable 周用量上限 fallback
 
 ### 1. Scope / Trigger
