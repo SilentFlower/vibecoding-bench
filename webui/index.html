@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261025-navigation-wrap" />
+  <link rel="stylesheet" href="style.css?v=20261027-verification-progress" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -98,6 +98,11 @@
       </section>
       <section id="projects-reconciliation" class="batch-panel hidden"><h3>输入结果待核对</h3><div id="projects-actions"></div></section>
       <section id="projects-workspace" class="batch-panel projects-workspace">
+        <section id="projects-verification" class="projects-verification hidden" aria-label="独立验收进度">
+          <strong id="projects-verification-stage" role="status" aria-live="polite"></strong>
+          <p id="projects-verification-clock" class="hint"></p>
+          <details><summary>查看各阶段耗时</summary><ol id="projects-verification-stages"></ol></details>
+        </section>
         <div class="projects-tabs" role="tablist" aria-label="执行现场">
           <button id="projects-tab-terminal" type="button" role="tab" aria-controls="projects-terminal-panel" aria-selected="true">Claude Code 终端</button>
           <button id="projects-tab-events" type="button" role="tab" aria-controls="projects-events-panel" aria-selected="false">Pi 与 Claude 交互</button>
@@ -816,7 +821,7 @@
     </div>
   </div>
 
-  <script src="projects.js?v=20261025-turn-budget"></script>
+  <script src="projects.js?v=20261027-verification-progress"></script>
   <script src="app.js?v=20261025-separate-projects-warmup"></script>
 </body>
 </html>

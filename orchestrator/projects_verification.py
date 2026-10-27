@@ -81,7 +81,7 @@ class ProjectsVerification:
     :param native: 原生隔离容器验证器。
     :param pi: Pi SDK 运行时，仅用于独立无工具的交付审查。
     :param provider: 私有模型配置回调。
-    :param event: 记录审查实际用量的回调。
+    :param event: 记录公开验收阶段和审查实际用量的回调。
     :param accepted: 返回权威已验收工作，用于保护同项目此前交付的能力。
     """
 
@@ -93,13 +93,27 @@ class ProjectsVerification:
         :param native: 隔离验证器。
         :param pi: Pi 运行时。
         :param provider: 模型配置。
-        :param event: 用量事件回调。
+        :param event: 公开验收阶段与用量事件回调。
         :param accepted: 返回同账号、身份和固定项目已验收工作的权威回调。
         :return: None。
         """
         self.catalog, self.terminal, self.native = catalog, terminal, native
         self.pi, self.provider, self.event = pi, provider, event
         self.accepted = accepted
+
+    def _progress(self, work: dict, directory: Path, stage: str, message: str, **details) -> None:
+        """在耗时操作前发布真实阶段，不公开私有检查内容。
+
+        :param work: 当前工程及其账号。
+        :param directory: 本次冻结提交目录。
+        :param stage: 控制端固定的阶段名称。
+        :param message: 用户可读的当前操作。
+        :param details: 公开目标序号、总数或重试次数。
+        :return: None。
+        """
+        if self.event:
+            self.event(work['account_id'], 'verification_progress',
+                {'submission_id': directory.name, 'stage': stage, 'message': message, **details}, work['id'])
 
     def __call__(self, work: dict, snapshot: dict, objects: Path, directory: Path, summary: str,
                  cancel: threading.Event | None = None) -> dict:
@@ -113,6 +127,7 @@ class ProjectsVerification:
         :param cancel: 当前控制者的取消信号。
         :return: 可公开的检查状态及返工事实。
         """
+        self._progress(work, directory, 'scope', '核对交付范围与冻结合同')
         assets = self.catalog.for_work(work)
         library = assets.library
         project, definition = assets.objective(work['project_key'], work['objective_id'])
@@ -131,19 +146,27 @@ class ProjectsVerification:
         answer = next((item['content'] for item in reversed(conversation) if item['role'] == 'assistant'), '')
         if not answer:
             return {'status': 'error', 'feedback': ['缺少 Claude 原生实际交付回答']}
+        self._progress(work, directory, 'business', '执行当前目标的业务检查')
         report = self.native.verify_native(candidate, project.root, specification, environment, profile, answer=answer, cancel=cancel)
         if report['status'] == 'error':
+            self._progress(work, directory, 'business', '业务检查环境异常，正在重试（第 2 次）', attempt=2)
             report = self.native.verify_native(candidate, project.root, specification, environment, profile, answer=answer, cancel=cancel)
         checks = {'scope': 'passed', 'business': report['status']}
         if report['status'] == 'passed' and specification.get('regression'):
+            self._progress(work, directory, 'regression', '执行完整回归测试')
             regression = self.native.verify_native(candidate, project.root, specification, environment, profile, regression=True, cancel=cancel)
             if regression['status'] == 'error':
+                self._progress(work, directory, 'regression', '回归测试环境异常，正在重试（第 2 次）', attempt=2)
                 regression = self.native.verify_native(candidate, project.root, specification, environment, profile, regression=True, cancel=cancel)
             checks['regression'] = regression['status']
             report = {'status': regression['status'], 'business': report, 'regression': regression}
         if report['status'] == 'passed' and self.accepted:
             accepted_reports = []
-            for previous in self.accepted(work):
+            previous_work = list(self.accepted(work))
+            for index, previous in enumerate(previous_work, 1):
+                message = f"检查历史目标 {index}/{len(previous_work)}：{previous['objective_id']}"
+                self._progress(work, directory, 'previous_objectives', message,
+                    current=index, total=len(previous_work))
                 old_assets = self.catalog.for_work(previous)
                 old_project, old_definition = old_assets.objective(previous['project_key'], previous['objective_id'])
                 if old_definition != json.loads(previous['definition_json']):
@@ -155,6 +178,8 @@ class ProjectsVerification:
                     old_library.root / 'environments' / old_environment, old_library.environments[old_environment],
                     cancel=cancel)
                 if prior['status'] == 'error':
+                    self._progress(work, directory, 'previous_objectives', message + '，环境异常重试（第 2 次）',
+                        current=index, total=len(previous_work), attempt=2)
                     prior = self.native.verify_native(candidate, old_project.root, old_specification,
                         old_library.root / 'environments' / old_environment, old_library.environments[old_environment],
                         cancel=cancel)
@@ -173,6 +198,7 @@ class ProjectsVerification:
                     ['隔离程序或回归验收未通过，依据原工程目标修复；基础设施错误不能算业务失败'],
                 'program': self._public_facts(report)}
         if definition['evaluation'].get('semantic'):
+            self._progress(work, directory, 'review', '独立模型评审')
             rubric = load_rubric(project.root, definition)
             job = {'job_id': directory.name, 'task_id': work['id'], 'turn_no': 1,
                 'response_digest': digest_json(answer), 'basis_digest': digest_json(rubric),
@@ -193,6 +219,7 @@ class ProjectsVerification:
             if result['decision'] != 'pass':
                 return {'status': 'failed' if result['decision'] == 'fail' else 'error', 'checks': checks,
                     'feedback': [item['reason'] for item in result['criteria'] if item['status'] != 'satisfied']}
+        self._progress(work, directory, 'finalize', '复核冻结交付并汇总验收结果')
         if snapshot_tree(candidate)['digest'] != snapshot['digest']:
             raise ValueError('验收期间冻结候选被改写')
         return {'status': 'passed', 'checks': checks, 'feedback': ['独立交付验收通过']}

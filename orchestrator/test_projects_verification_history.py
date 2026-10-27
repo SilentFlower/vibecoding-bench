@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from project_library import ProjectDefinition, snapshot_tree
 from projects_verification import ProjectsVerification
@@ -68,7 +69,7 @@ class ProjectsVerificationHistoryTests(unittest.TestCase):
         self.old_assets = self.assets('old', 'previous.json', {'expected': {'previous': 1}}, self.previous)
         self.old_work = {'id': 'old-work', 'project_key': 'example', 'objective_id': 'FIRST',
             'definition_json': json.dumps(self.previous), 'library_digest': 'old'}
-        self.work = {'id': 'new-work', 'project_key': 'example', 'objective_id': 'NEXT',
+        self.work = {'id': 'new-work', 'account_id': 1, 'project_key': 'example', 'objective_id': 'NEXT',
             'definition_json': json.dumps(self.current), 'library_digest': 'new',
             'baseline_json': json.dumps(snapshot_tree(self.baseline))}
         self.native = NativeBehavior()
@@ -138,6 +139,38 @@ class ProjectsVerificationHistoryTests(unittest.TestCase):
         self.old_work['definition_json'] = json.dumps({'id': 'FIRST'})
         with self.assertRaisesRegex(ValueError, '冻结合同'):
             self.submit(1)
+
+    def test_progress_is_published_before_each_real_program_check(self):
+        """用户在检查仍执行时即可看到当前阶段，事件只含公开操作信息。:return: None。"""
+        events, observed = [], []
+        self.verification.event = lambda *args: events.append(args)
+        original = self.native.verify_native
+
+        def verify(*args, **kwargs):
+            """在实际独立进程启动前核对当前阶段。:param args: 验收参数。:param kwargs: 可选参数。:return: 程序结果。"""
+            observed.append(events[-1][2])
+            return original(*args, **kwargs)
+
+        with patch.object(self.native, 'verify_native', side_effect=verify):
+            result = self.submit(1)
+        self.assertEqual('passed', result['status'])
+        self.assertEqual(['business', 'regression', 'previous_objectives'], [item['stage'] for item in observed])
+        self.assertEqual((1, 1), (observed[-1]['current'], observed[-1]['total']))
+        self.assertEqual('finalize', events[-1][2]['stage'])
+        self.assertTrue(all(event[0] == 1 and event[1] == 'verification_progress'
+            and event[2]['submission_id'] == 'submission' and event[3] == 'new-work' for event in events))
+        self.assertNotIn(str(self.root), json.dumps(events))
+
+    def test_environment_retry_is_visible_without_claiming_completion(self):
+        """环境故障重试显示实际次数，失败不发布最终成功阶段。:return: None。"""
+        events = []
+        self.verification.event = lambda *args: events.append(args[2])
+        self.native.errors = 2
+        result = self.submit(1)
+        self.assertEqual('error', result['status'])
+        self.assertEqual(2, events[-1]['attempt'])
+        self.assertIn('重试', events[-1]['message'])
+        self.assertNotIn('finalize', [item['stage'] for item in events])
 
 
 if __name__ == '__main__':

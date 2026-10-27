@@ -522,6 +522,57 @@ async def verify(evidence: Path) -> dict:
                 assert not await evaluate('document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到") || document.querySelector("#projects-budget").textContent.includes("30 分 4 秒")')
                 await evaluate('document.querySelector("#projects-account").value="1";document.querySelector("#projects-account").dispatchEvent(new Event("change"))')
                 await until('document.querySelector("#projects-message").textContent.includes("本轮指挥时限已到")')
+                # 用隔离数据库中的在途提交核对进度；浏览器只读，不启动真实验收或模型。
+                progress_work = fixture.service._one('SELECT * FROM projects_work WHERE id=?', (ended_turn['current_work_id'],))
+                progress_started = time.time() - 245
+                progress_submission = 'browser-verification-progress'
+                fixture.service._write('UPDATE projects_submissions SET created_at=? WHERE work_id=?',
+                    (progress_started - 1, progress_work['id']))
+                fixture.service._write('INSERT INTO projects_submissions(id,work_id,generation,digest,status,created_at) '
+                    'VALUES(?,?,?,?,?,?)', (progress_submission, progress_work['id'], progress_work['generation'],
+                        'synthetic-progress', 'verifying', progress_started))
+                fixture.service._write("UPDATE projects_work SET status='verifying' WHERE id=?", (progress_work['id'],))
+                for phase, offset, message in (('prepare', 0, '准备独立验收'), ('business', 2, '执行当前目标的业务检查'),
+                        ('regression', 5, '执行完整回归测试 <img src=x onerror="window.verificationInjected=true">')):
+                    key = 'browser-progress:' + phase
+                    fixture.service._event(1, 'verification_progress', {'submission_id': progress_submission,
+                        'stage': phase, 'message': message}, progress_work['id'], key)
+                    fixture.service._write('UPDATE projects_events SET created_at=? WHERE event_key=?',
+                        (progress_started + offset, key))
+                await until('!document.querySelector("#projects-verification").classList.contains("hidden") && document.querySelector("#projects-verification-stage").textContent.includes("执行完整回归测试")')
+                assert await evaluate('document.querySelector("#projects-verification-clock").textContent.includes("当前阶段已用 4 分") && !window.verificationInjected && document.querySelectorAll("#projects-verification img").length === 0')
+                await evaluate('window.progressClock=document.querySelector("#projects-verification-clock").textContent')
+                await until('document.querySelector("#projects-verification-clock").textContent !== window.progressClock')
+                await reload()
+                await until('document.querySelector("#projects-verification-stage")?.textContent.includes("执行完整回归测试")')
+                await evaluate('document.querySelector("#projects-account").value="2";document.querySelector("#projects-account").dispatchEvent(new Event("change"))')
+                await until('document.querySelector("#projects-verification").classList.contains("hidden")')
+                await evaluate('document.querySelector("#projects-account").value="1";document.querySelector("#projects-account").dispatchEvent(new Event("change"))')
+                await until('document.querySelector("#projects-verification-stage").textContent.includes("执行完整回归测试")')
+                await evaluate('document.querySelector("#projects-verification details").open=true')
+                assert await evaluate('document.querySelectorAll("#projects-verification-stages li").length === 3')
+                fixture.service._write('UPDATE projects_events SET payload_json=? WHERE event_key=?',
+                    (json.dumps({'submission_id': progress_submission, 'stage': 'regression',
+                        'message': '执行完整回归测试'}, ensure_ascii=False), 'browser-progress:regression'))
+                await until('document.querySelector("#projects-verification-stage").textContent === "独立验收中 · 执行完整回归测试"')
+                for width, height, theme, name in ((1280, 900, 'dark', 'verification-desktop'), (390, 844, 'light', 'verification-mobile')):
+                    await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False}, session)
+                    await evaluate(f'document.documentElement.dataset.theme="{theme}";document.querySelector("#projects-verification").scrollIntoView({{block:"center"}})')
+                    await asyncio.sleep(0.2)
+                    assert await evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+                    image = await rpc('Page.captureScreenshot', {'format': 'png', 'captureBeyondViewport': False}, session)
+                    (evidence / (name + '.png')).write_bytes(base64.b64decode(image['data']))
+                fixture.service._write("UPDATE projects_submissions SET status='failed',ended_at=? WHERE id=?",
+                    (time.time(), progress_submission))
+                fixture.service._write('UPDATE projects_work SET status=? WHERE id=?',
+                    (progress_work['status'], progress_work['id']))
+                fixture.service._event(1, 'verification', {'submission_id': progress_submission,
+                    'status': 'failed', 'feedback': ['合成失败用于核对计时结束']}, progress_work['id'])
+                await until('document.querySelector("#projects-verification-stage").textContent.includes("验收未通过")')
+                completed_clock = await evaluate('document.querySelector("#projects-verification-clock").textContent')
+                await asyncio.sleep(1.2)
+                assert completed_clock == await evaluate('document.querySelector("#projects-verification-clock").textContent')
+                assert not await evaluate('document.querySelector("#projects-verification-clock").textContent.includes("当前阶段已用") || window.verificationInjected')
                 await evaluate('document.querySelectorAll(".projects-settings > details").forEach(value=>value.open=false);document.querySelector("#projects-tab-terminal").click();window.scrollTo(0,0);')
                 for width, height, theme, name in ((1280, 900, 'dark', 'desktop'), (390, 844, 'light', 'mobile')):
                     await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False}, session)
@@ -560,6 +611,8 @@ async def verify(evidence: Path) -> dict:
             '具体计划阻塞原因优先于重启通用文案', '目标累计跨越单轮时限仍恢复原目标原会话',
             '活动轮剩余与下轮可用时长明确区分', '单轮到时真实收口并按原计划等待接续', '单轮接续状态切换账号不串',
             '额度阈值与操作回执缓存', '启动即时反馈及禁止重复点击', '终端交互标签与明确等待原因',
+            '验收阶段在终端和交互上方持续可见', '当前阶段与总耗时每秒更新', '刷新恢复验收阶段及历史耗时',
+            '验收进度切账号不串用', '验收失败后停止计时', '阶段信息XSS与明暗窄屏布局',
             '待机倒计时及全部配置编辑保护', '折叠配置搜索快捷键',
             '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '无旧历史入口及请求', '1280暗色与390亮色布局']}
         (evidence / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')

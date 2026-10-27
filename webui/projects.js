@@ -66,7 +66,7 @@ window.ProjectsUI = (() => {
     $('#projects-projects').onchange = paintSelectionCount;
     $('#projects-account').onchange = event => selectAccount(Number(event.target.value));
     fillSchedule();
-    scheduleClock = setInterval(paintSchedule, 1000);
+    scheduleClock = setInterval(() => { paintSchedule(); paintVerification(); }, 1000);
     $('#projects-tab-terminal').onclick = () => selectTab('terminal');
     $('#projects-tab-events').onclick = () => selectTab('events');
     for (const kind of ['events', 'history']) {
@@ -530,7 +530,41 @@ window.ProjectsUI = (() => {
         ? {start: '正在启动…', pause: '正在暂停…', stop: '正在停止…'}[pending.action]
         : {start: '启动 / 恢复 Pi', pause: '暂停', stop: '停止当前目标'}[button.dataset.piAction];
     });
-    paintSchedule(); paintScreen();
+    paintSchedule(); paintScreen(); paintVerification();
+  }
+
+  /**
+   * 在终端与交互记录上方展示真实验收阶段，计时不产生后端或模型请求。
+   * @return {void}
+   */
+  function paintVerification() {
+    const panel = $('#projects-verification');
+    if (!panel) return;
+    const agent = agents.find(item => item.account_id === accountId), verification = agent?.verification;
+    panel.classList.toggle('hidden', !verification);
+    if (!verification) return;
+    const stages = verification.stages || [], latest = stages.at(-1), active = verification.active;
+    const result = {passed: '验收通过', failed: '验收未通过', error: '验收环境异常', cancelled: '验收已取消'};
+    const status = active ? '独立验收中' : result[verification.status] || '验收已暂停，等待收尾';
+    const message = active ? latest?.message || '具体阶段尚未记录' :
+      verification.status === 'passed' && agent.work?.status === 'verifying' ? '正在收尾' : latest?.message;
+    const title = `${status}${message ? ' · ' + message : ''}`;
+    const heading = $('#projects-verification-stage');
+    // 仅在阶段变化时更新播报区域，避免每秒计时反复打断屏幕阅读器。
+    if (heading.textContent !== title) heading.textContent = title;
+    panel.dataset.state = active ? 'verifying' : verification.status;
+    const now = Date.now() / 1000;
+    const total = active ? Math.max(0, now - verification.started_at) : verification.elapsed_sec;
+    const elapsed = latest && (active ? Math.max(0, now - latest.started_at) : latest.elapsed_sec);
+    const updated = latest && new Date(latest.started_at * 1000).toLocaleTimeString('zh-CN', {hour12: false});
+    $('#projects-verification-clock').textContent = `验收总耗时 ${duration(total)}`
+      + (latest ? ` · ${active ? '当前阶段已用' : '最后阶段耗时'} ${duration(elapsed)} · 阶段更新于 ${updated}` : ' · 该次验收未记录阶段明细')
+      + (active ? '。计时表示已等待时间，阶段结束后更新结果。' : '');
+    $('#projects-verification-stages').innerHTML = stages.map((stage, index) => {
+      const running = active && index === stages.length - 1;
+      const seconds = running ? Math.max(0, now - stage.started_at) : stage.elapsed_sec;
+      return `<li data-active="${running}"><span>${escape(stage.message)}</span><span>${running ? '进行中 · ' : ''}${escape(duration(seconds))}</span></li>`;
+    }).join('') || '<li>该次验收未记录阶段明细。</li>';
   }
 
   /**
@@ -657,7 +691,7 @@ window.ProjectsUI = (() => {
   function paintEvents() {
     const element = $('#projects-events');
     const labels = {pi: 'Pi', input: '发送到 Claude', started: '原生会话', error: '异常',
-      verification: '独立验收', input_unknown: '输入待核对', reconciled: '人工核对', recovery: '模型恢复', manual_retry: '人工重试',
+      verification: '独立验收', verification_progress: '验收进度', input_unknown: '输入待核对', reconciled: '人工核对', recovery: '模型恢复', manual_retry: '人工重试',
       guide_loaded: '业务指南'};
     element.innerHTML = (recordPages.events.pages[recordPages.events.index]?.items || []).map(item => {
       const payload = item.payload;

@@ -41,7 +41,7 @@ class ProjectsLanguageTests(unittest.TestCase):
         self.assertIn('所有自然语言指令必须使用英文', configuration['instructions'])
         events = [item for item in self.service.events(1) if item['kind'] == 'guide_loaded']
         self.assertEqual(1, len(events))
-        self.assertEqual({'generation': 1,
+        self.assertEqual({'generation': 1, 'context_correction_event_id': None,
             'user_guide_sha256': hashlib.sha256(instructions.encode()).hexdigest(),
             'system_prompt_sha256': hashlib.sha256(configuration['instructions'].encode()).hexdigest()}, events[0]['payload'])
         self.assertNotIn(configuration['api_key'], str(events[0]['payload']))

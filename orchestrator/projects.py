@@ -795,8 +795,9 @@ class ProjectsService:
                 'remaining_work_sec': turn_remaining, 'turn_active': turn_active,
                 'turn_elapsed_sec': turn_elapsed, 'turn_budget_sec': agent['budget_sec']}
             agent['progress']['deferred'] = len(agent['deferred_objectives'])
+            agent['verification'] = self._verification_progress(work)
             event = self._one("SELECT kind,payload_json,created_at FROM projects_events WHERE account_id=? "
-                "AND kind IN ('pi','input','started','verification','error','gate_wait','cycle_started') ORDER BY id DESC LIMIT 1", (agent['account_id'],))
+                "AND kind IN ('pi','input','started','verification','verification_progress','error','gate_wait','cycle_started') ORDER BY id DESC LIMIT 1", (agent['account_id'],))
             agent['activity'] = None
             if event:
                 payload = json.loads(event['payload_json'])
@@ -804,6 +805,37 @@ class ProjectsService:
                 agent['activity'] = {'kind': event['kind'], 'created_at': event['created_at'],
                     'text': text[:300] if isinstance(text, str) else ''}
         return result
+
+    def _verification_progress(self, work: dict | None) -> dict | None:
+        """从当前工作最近一次提交和持久事件恢复验收进度，读取不触发执行。
+
+        :param work: 当前账号绑定的工程，没有工程时为空。
+        :return: 公开阶段、真实时间与提交结果；尚未提交时为空。
+        """
+        if not work:
+            return None
+        submission = self._one('SELECT id,status,created_at,ended_at FROM projects_submissions '
+            'WHERE work_id=? ORDER BY created_at DESC,id DESC LIMIT 1', (work['id'],))
+        if not submission:
+            return None
+        rows = self._rows("SELECT payload_json,created_at FROM projects_events WHERE work_id=? "
+            "AND kind='verification_progress' AND created_at>=? ORDER BY id", (work['id'], submission['created_at']))
+        stages = []
+        for row in rows:
+            payload = json.loads(row['payload_json'])
+            # 同一工作可以多次返工；迟到事件不能混入另一份冻结提交。
+            if payload.get('submission_id') == submission['id']:
+                stages.append({'stage': payload['stage'], 'message': payload['message'],
+                    'started_at': row['created_at']})
+        ended_at = submission['ended_at']
+        now = time.time()
+        for index, stage in enumerate(stages):
+            stage['ended_at'] = stages[index + 1]['started_at'] if index + 1 < len(stages) else ended_at
+            stage['elapsed_sec'] = max(0, (stage['ended_at'] or now) - stage['started_at'])
+        return {'submission_id': submission['id'], 'status': submission['status'],
+            'active': submission['status'] == 'verifying' and work['status'] == 'verifying',
+            'started_at': submission['created_at'], 'ended_at': ended_at,
+            'elapsed_sec': max(0, (ended_at or now) - submission['created_at']), 'stages': stages}
 
     def events(self, account_id: int, after: int = 0) -> list[dict]:
         """读取账号独立事件流，使用整数游标分页。
@@ -1941,6 +1973,8 @@ class ProjectsService:
             self._write('INSERT INTO projects_submissions(id,work_id,generation,digest,status,created_at) VALUES(?,?,?,?,?,?)',
                 (submission, work['id'], generation, snapshot['digest'], 'verifying', time.time()))
             self._write("UPDATE projects_work SET status='verifying' WHERE id=? AND generation=?", (work['id'], generation))
+            self._event(work['account_id'], 'verification_progress', {'submission_id': submission,
+                'stage': 'prepare', 'message': '准备独立验收'}, work['id'])
             result = self.verifier(work, snapshot, objects, directory, summary, stop)
             with self.lock:
                 self._current(work['account_id'], generation)

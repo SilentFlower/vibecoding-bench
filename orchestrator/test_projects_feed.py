@@ -1,12 +1,15 @@
 """验证现场快照、倒序交互与工程分页，读取页面不会重放终端操作。"""
 import asyncio
 import json
+import threading
+import time
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from projects import ProjectsService
 from projects_api import projects_router
 import test_projects_agent as fixtures
 
@@ -39,6 +42,109 @@ class ProjectsFeedTests(unittest.TestCase):
     def _event_count(self):
         """读取事件总数以核对页面请求没有业务写入。:return: 事件总数。"""
         return self.service._one('SELECT COUNT(*) AS total FROM projects_events')['total']
+
+    def test_inflight_verification_is_visible_before_the_verifier_returns(self):
+        """验收尚未返回时页面可读取阶段，结束后保留固定耗时且读取不触发额外操作。:return: None。"""
+        entered, finish = threading.Event(), threading.Event()
+        result = {}
+
+        def verify(work, snapshot, objects, directory, summary, stop):
+            """阻塞在合成回归阶段，供真实接口并发读取。:param work: 工作。:param snapshot: 快照。:param objects: 对象。:param directory: 提交。:param summary: 说明。:param stop: 取消。:return: 验收结果。"""
+            self.service._event(1, 'verification_progress', {'submission_id': directory.name,
+                'stage': 'regression', 'message': '执行完整回归测试'}, work['id'])
+            entered.set()
+            if not finish.wait(5):
+                raise RuntimeError('合成验收未被释放')
+            return {'status': 'passed', 'feedback': []}
+
+        self.service.verifier = verify
+        thread = threading.Thread(target=lambda: result.update(self.tool('project_submit', {'summary': '合成交付'})))
+        thread.start()
+        try:
+            self.assertTrue(entered.wait(2))
+            application = FastAPI()
+            application.include_router(projects_router(lambda: self.service))
+            before = self._event_count()
+            with TestClient(application) as client:
+                agent = client.get('/api/projects').json()['agents'][0]
+            progress = agent['verification']
+            self.assertTrue(progress['active'])
+            self.assertEqual('regression', progress['stages'][-1]['stage'])
+            self.assertIsNone(progress['stages'][-1]['ended_at'])
+            self.assertEqual('执行完整回归测试', agent['activity']['text'])
+            self.assertEqual(before, self._event_count())
+            self.assertFalse(self.pi.entered.is_set())
+            self.assertEqual([], self.terminal.sent)
+            self.assertEqual('verification_progress', self.service.event_page(1)['items'][0]['kind'])
+        finally:
+            finish.set()
+            thread.join(3)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual('passed', result['status'])
+        completed = self.service.view(1)['agents'][0]['verification']
+        self.assertFalse(completed['active'])
+        self.assertEqual('passed', completed['status'])
+        with patch('projects.time.time', return_value=time.time() + 600):
+            self.assertEqual(completed, self.service.view(1)['agents'][0]['verification'])
+
+    def test_verification_progress_is_scoped_to_latest_submission_and_survives_read_recreation(self):
+        """返工记录不混用，重新建立页面快照仍能恢复持久阶段和耗时。:return: None。"""
+        self.tool('project_submit', {'summary': '第一次交付'})
+        first = self.service.view(1)['agents'][0]['verification']['submission_id']
+        self.tool('project_submit', {'summary': '返工后交付'}, 'second-submission')
+        second = self.service.view(1)['agents'][0]['verification']['submission_id']
+        self.assertNotEqual(first, second)
+        self.service._event(1, 'verification_progress', {'submission_id': first,
+            'stage': 'review', 'message': '旧提交迟到阶段'}, self.work['id'])
+        self.service._event(1, 'verification_progress', {'submission_id': second,
+            'stage': 'business', 'message': '当前提交的业务检查', 'private': '不应公开'}, self.work['id'])
+        progress = self.service.snapshot(1)['state']['agents'][0]['verification']
+        self.assertEqual(second, progress['submission_id'])
+        self.assertNotIn('旧提交迟到阶段', json.dumps(progress, ensure_ascii=False))
+        self.assertNotIn('不应公开', json.dumps(progress, ensure_ascii=False))
+        self.assertEqual('business', progress['stages'][-1]['stage'])
+        self.assertTrue(all(stage['elapsed_sec'] >= 0 for stage in progress['stages']))
+
+    def test_legacy_submission_and_paused_work_do_not_show_active_verification(self):
+        """旧提交没有阶段时不编造进度，暂停也不能继续显示执行中。:return: None。"""
+        self.assertIsNone(self.service.view(1)['agents'][0]['verification'])
+        self.tool('project_submit', {'summary': '旧格式交付'})
+        self.service._write("DELETE FROM projects_events WHERE kind='verification_progress'")
+        progress = self.service.view(1)['agents'][0]['verification']
+        self.assertEqual([], progress['stages'])
+        self.service._write("UPDATE projects_submissions SET status='verifying',ended_at=NULL")
+        self.service._write("UPDATE projects_work SET status='paused' WHERE id=?", (self.work['id'],))
+        self.assertFalse(self.service.view(1)['agents'][0]['verification']['active'])
+
+    def test_stage_durations_use_persisted_boundaries_and_stop_at_submission_end(self):
+        """阶段时间按同次提交的事件边界计算，刷新和墙钟推进不会增加已完成耗时。:return: None。"""
+        self.tool('project_submit', {'summary': '固定时序验收'})
+        submission = self.service._one('SELECT id FROM projects_submissions')['id']
+        self.service._write('UPDATE projects_submissions SET created_at=100,ended_at=300')
+        self.service._write("UPDATE projects_events SET created_at=100 WHERE kind='verification_progress'")
+        for stage, timestamp in (('business', 105), ('regression', 110)):
+            self.service._event(1, 'verification_progress', {'submission_id': submission,
+                'stage': stage, 'message': stage}, self.work['id'], stage)
+            self.service._write('UPDATE projects_events SET created_at=? WHERE event_key=?', (timestamp, stage))
+        progress = self.service.view(1)['agents'][0]['verification']
+        self.assertEqual(200, progress['elapsed_sec'])
+        self.assertEqual([5, 5, 190], [item['elapsed_sec'] for item in progress['stages']])
+
+    def test_warmup_verification_progress_cannot_reuse_project_or_other_account_events(self):
+        """双空间与账号各自读取当前提交，页面进度不能串到其他任务。:return: None。"""
+        self.tool('project_submit', {'summary': '项目交付'})
+        projects = self.service
+        warmup = ProjectsService(self.root, self.database, threading.Lock(), self.catalog, self.terminal,
+            projects.account, projects.admission, projects.provider, projects.verifier, self.pi, namespace='warmup')
+        self.addCleanup(warmup.close)
+        self.service = warmup
+        self.activate()
+        self.start_work()
+        self.tool('project_submit', {'summary': '养号交付'})
+        current = warmup.view(1)['agents'][0]['verification']
+        other = projects.view(1)['agents'][0]['verification']
+        self.assertNotEqual(current['submission_id'], other['submission_id'])
+        self.assertIsNone(projects.view(2)['agents'][0]['verification'])
 
     def test_snapshot_skips_hundreds_of_old_screens_and_uses_current_work_only(self):
         """超过两页历史时直接取当前工作最新画面，其他工作较新的观测不能覆盖。:return: None。"""
