@@ -1,0 +1,101 @@
+{
+  "id": "projects-runtime-resilience",
+  "name": "projects-runtime-resilience",
+  "title": "项目运行环境兼容与失败恢复可见性",
+  "description": "放宽同主次 Python 补丁版本限制；统一启动与验收兼容策略，持久展示真实启动故障，并按原因交回调度恢复。",
+  "status": "completed",
+  "dev_type": "fullstack",
+  "scope": "projects",
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-27",
+  "completedAt": "2026-10-27",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-27T07:07:03Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-27T06:05:49Z",
+      "contextKey": "codex_01a17bf2-336f-7ee2-8d0b-50cf61a6e808",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "760b688f985c206e270e43e70368624e96ccf9ef",
+        "status": [
+          {
+            "status": " M",
+            "path": ".agents/skills/trellis-update-spec/SKILL.md"
+          },
+          {
+            "status": " M",
+            "path": ".claude/skills/trellis-update-spec/SKILL.md"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "760b688f985c206e270e43e70368624e96ccf9ef",
+            "status": [
+              {
+                "status": " M",
+                "path": ".agents/skills/trellis-update-spec/SKILL.md"
+              },
+              {
+                "status": " M",
+                "path": ".claude/skills/trellis-update-spec/SKILL.md"
+              }
+            ],
+            "worktreeDiffSha256": "d6dadac3a9f4a67d340b8d9b0aff3d7775695fe651f35ce777412d821c3c6b63",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "a8e016f8677bf688a1668495a538408e4fe106fc7f3329613c7697cbd0060229"
+          },
+          {
+            "root": "cc2api",
+            "head": "d238aacb3a8ae430995f4742dfcd49b2df10e3fa",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "df9cdd30a34736cd40a88c22e40886fdd785acaf24d6aef66a98656b9228c0d5"
+          }
+        ],
+        "fingerprint": "9f5b0e126250ff0c46ee67877aaf66571ef68312fba7bbed86934d991fb581a2"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "首次Brief已获用户明确确认并启动任务",
+      "实现共享Python补丁兼容、缓存复核及冻结回归受信适配",
+      "实现启动故障持久化、控制轮交接和页面原因展示",
+      "真实3.12.16容器验证Cerberus原版失败、参考通过与完整回归通过",
+      "Python 主回归330项及后续恢复71项、适配器20项、tmux与Pi管道定向验证完成",
+      "两空间最终Chrome验证及源码摘要核对通过",
+      "full Check-All通过并完成运行环境兼容与持久故障规范更新",
+      "按确认的精确文件范围完成业务提交推送"
+    ],
+    "partialStep": null,
+    "nextStep": "开发任务完成；生产交付另按部署 SOP 执行",
+    "notes": "Python主回归按既有条件跳过1项nose2测试；Node夹具UTF-8问题修正后定向通过；生产未部署。",
+    "updatedAt": "2026-10-27T07:07:03Z"
+  }
+}
