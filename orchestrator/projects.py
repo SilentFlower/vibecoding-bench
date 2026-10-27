@@ -17,6 +17,7 @@ from projects_store import ProjectsDatabase
 from projects_observation import screen_busy, screen_content, screen_menu
 from pi_owners import AccountPiOwners
 from projects_runtime import KEYS
+from project_runtime_policy import ProjectRuntimeError
 
 
 PROJECTS_SCHEMA = '''
@@ -39,7 +40,7 @@ CREATE TABLE IF NOT EXISTS projects_work (
   runtime_json TEXT, baseline_json TEXT, observation_json TEXT, observation_id TEXT,
   account_identity TEXT, claude_usage_json TEXT NOT NULL DEFAULT '{}',
   started_at REAL, segment_started_at REAL, work_sec REAL NOT NULL DEFAULT 0,
-  created_at REAL NOT NULL, ended_at REAL, message TEXT,
+  created_at REAL NOT NULL, ended_at REAL, message TEXT, failure_json TEXT,
   cycle_no INTEGER NOT NULL DEFAULT 1,
   FOREIGN KEY(account_id) REFERENCES projects_agents(account_id)
 );
@@ -196,7 +197,8 @@ class ProjectsService:
                     connection.execute('DROP INDEX projects_one_work_per_account')
                     connection.execute("CREATE UNIQUE INDEX projects_one_work_per_account ON projects_work(account_id) WHERE status NOT IN ('passed','stopped','deferred')")
                 columns = {row['name'] for row in connection.execute('PRAGMA table_info(projects_work)')}
-                for name, definition in (('account_identity', 'TEXT'), ('claude_usage_json', "TEXT NOT NULL DEFAULT '{}'")):
+                for name, definition in (('account_identity', 'TEXT'), ('claude_usage_json', "TEXT NOT NULL DEFAULT '{}'"),
+                        ('failure_json', 'TEXT')):
                     if name not in columns:
                         connection.execute(f'ALTER TABLE projects_work ADD COLUMN {name} {definition}')
                 if 'cycle_no' not in columns:
@@ -752,7 +754,8 @@ class ProjectsService:
         if work is None:
             return None
         return {**{key: work[key] for key in ('id', 'project_key', 'objective_id', 'goal', 'status',
-            'session_id', 'work_sec', 'created_at', 'started_at', 'ended_at', 'message')}, 'cycle_no': work.get('cycle_no', 1)}
+            'session_id', 'work_sec', 'created_at', 'started_at', 'ended_at', 'message')}, 'cycle_no': work.get('cycle_no', 1),
+            'failure': json.loads(work['failure_json']) if work.get('failure_json') else None}
 
     def view(self, account_id: int | None = None) -> dict:
         """为控制台补充可读准入、真实任务进度与最近动作，不创建任务或调用模型。
@@ -1109,6 +1112,75 @@ class ProjectsService:
         self._write('INSERT OR IGNORE INTO projects_events(account_id,work_id,kind,payload_json,event_key,created_at) '
             'VALUES(?,?,?,?,?,?)', (account_id, work_id, kind, canonical_json(payload).decode(), key, time.time()))
 
+    def _record_start_failure(self, account_id: int, generation: int, error: ProjectRuntimeError) -> dict:
+        """将真实启动故障与原工作原子绑定，旧代次不能覆盖新状态。
+
+        :param account_id: 当前所有者账号。
+        :param generation: 本次控制者代次。
+        :param error: 不含私有正文的结构化故障。
+        :return: 保存的公开故障。
+        """
+        with self.lock:
+            agent, work = self._current(account_id, generation)
+            if not work or work['status'] in ('passed', 'stopped', 'deferred'):
+                raise ValueError('原工作已结束，不能记录迟到的启动故障')
+            account = self.account(account_id)
+            if not account or work['account_identity'] and work['account_identity'] != self.identity(account):
+                raise ValueError('账号身份已变化，不能记录旧执行的启动结果')
+            now = time.time()
+            previous = json.loads(work['failure_json']) if work.get('failure_json') else None
+            same = previous and not previous.get('resolved_at') and previous['code'] == error.code
+            count = previous['attempt_count'] + 1 if same else 1
+            retry_at = now + (60, 120, 300)[count - 1] if count <= 3 else now + max(900, agent['schedule_interval_sec'])
+            failure = {'code': error.code, 'phase': error.phase,
+                'message': str(error)[:400], 'retryable': error.retryable,
+                'first_at': previous['first_at'] if same else now, 'last_at': now, 'attempt_count': count,
+                'retry_at': retry_at if error.retryable and agent['schedule_enabled'] else None,
+                'details': {key: value for key, value in error.details.items() if key in
+                    ('expected_python', 'actual_python', 'python_compatibility', 'exception_type')
+                    and isinstance(value, str) and len(value) <= 120},
+                'resolved_at': None, 'generation': generation}
+            with self.write_lock:
+                connection = self.database()
+                try:
+                    with connection:
+                        connection.execute('UPDATE projects_work SET failure_json=?,message=?,status=? WHERE id=?',
+                            (canonical_json(failure).decode(), failure['message'],
+                                'paused' if error.retryable else 'blocked', work['id']))
+                        connection.execute('INSERT INTO projects_events(account_id,work_id,kind,payload_json,created_at) VALUES(?,?,?,?,?)',
+                            (account_id, work['id'], 'error', canonical_json({'reason': 'runtime_preparation',
+                                'source': 'runtime', **failure}).decode(), now))
+                        connection.execute('UPDATE projects_agents SET message=? WHERE account_id=? AND generation=?',
+                            (failure['message'], account_id, generation))
+                finally:
+                    connection.close()
+            return failure
+
+    def _finish_start_failure(self, agent: dict, work: dict | None, generation: int) -> bool:
+        """让未解决的启动事实优先于 Pi 正常收尾，保留原恢复安排。
+
+        :param agent: 当前控制者。
+        :param work: 原工作。
+        :param generation: 当前控制代次。
+        :return: 是否由启动故障接管收尾。
+        """
+        failure = json.loads(work['failure_json']) if work and work.get('failure_json') else None
+        if (not failure or failure.get('resolved_at') or not work or work.get('runtime_json')
+                or work['status'] in ('passed', 'stopped', 'deferred')):
+            return False
+        waiting = failure['retryable'] and agent['schedule_enabled']
+        if waiting and (failure.get('retry_at') is None or failure['retry_at'] <= time.time()):
+            # 准备期间开启计划也必须留下真实截止，不能成为永远没有下一次时间的等待。
+            failure['retry_at'] = max(agent['schedule_next_at'] or 0, time.time() + 60)
+            self._write('UPDATE projects_work SET failure_json=? WHERE id=? AND failure_json=?',
+                (canonical_json(failure).decode(), work['id'], work['failure_json']))
+        self._write('UPDATE projects_agents SET status=?,message=?,schedule_state=?,schedule_message=?,schedule_next_at=?,updated_at=? '
+            'WHERE account_id=? AND generation=?',
+            ('waiting' if waiting else 'paused' if failure['retryable'] else 'blocked', failure['message'],
+                'waiting' if waiting else 'blocked' if agent['schedule_enabled'] else 'off', failure['message'],
+                failure['retry_at'] if waiting else None, time.time(), agent['account_id'], generation))
+        return True
+
     def _model_recovery(self, account_id: int) -> dict | None:
         """读取控制端持久化的恢复计数，运行时通知不参与计数。:param account_id: 账号。:return: 最近控制端恢复事实或 None。"""
         event = self._one("SELECT payload_json FROM projects_events WHERE account_id=? AND kind='recovery' "
@@ -1168,7 +1240,14 @@ class ProjectsService:
         if not event or event['kind'] != 'error' or event['work_id'] != work['id']:
             return None
         payload = json.loads(event['payload_json'])
-        if payload.get('reason') not in ('provider_content_filter', 'provider_conflict', 'model_unavailable', 'context_limit'):
+        if payload.get('reason') == 'runtime_preparation':
+            failure = json.loads(work['failure_json']) if work.get('failure_json') else None
+            if (not failure or failure.get('resolved_at') or failure.get('code') not in
+                    ('python_incompatible', 'python_probe_failed', 'python_cache_invalid', 'artifact_invalid',
+                        'offline_install_failed', 'workspace_conflict', 'runtime_busy')
+                    or payload.get('generation') != failure.get('generation')):
+                return None
+        elif payload.get('reason') not in ('provider_content_filter', 'provider_conflict', 'model_unavailable', 'context_limit'):
             return None
         if payload.get('source') == 'operator_diagnosis':
             original_id = payload.get('diagnostic_of_event_id')
@@ -1221,6 +1300,12 @@ class ProjectsService:
                     "WHERE w.account_id=? AND a.status IN ('intent','unknown') LIMIT 1", (account_id,)):
                 raise ValueError('有未对账的终端输入，请先核对操作结果')
             current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+            runtime_failure = json.loads(current_work['failure_json']) if current_work and current_work.get('failure_json') else None
+            if (scheduled and runtime_failure and not runtime_failure.get('resolved_at')
+                    and runtime_failure.get('retry_at') is not None and runtime_failure['retry_at'] > now):
+                self._write('UPDATE projects_agents SET schedule_next_at=? WHERE account_id=?',
+                    (max(agent['schedule_next_at'], runtime_failure['retry_at']), account_id))
+                return self.state(account_id)
             if recovering and self.auto_cycle and not agent['schedule_enabled'] and self._cycle_complete(agent):
                 # 单次手动执行已经完成整轮时，进程恢复不能把“接续原工作”扩成新一轮付费执行。
                 self._write("UPDATE projects_agents SET status='paused',message=?,schedule_next_at=NULL WHERE account_id=?",
@@ -1278,7 +1363,7 @@ class ProjectsService:
                                 if not saved or dict(saved) != current_work or not latest or latest['id'] != retry_event['id']:
                                     raise ValueError('原工作或故障事实已变化，请重新核对后启动')
                                 connection.execute("UPDATE projects_work SET status='paused',message=? WHERE id=?",
-                                    ('人工已确认重试原模型，保留原工作和会话', current_work['id']))
+                                    ('人工已确认重试，保留原工作和会话', current_work['id']))
                                 connection.execute('INSERT INTO projects_events(account_id,work_id,kind,payload_json,created_at) VALUES(?,?,?,?,?)',
                                     (account_id, current_work['id'], 'manual_retry', canonical_json({'reason': json.loads(retry_event['payload_json'])['reason'],
                                         'error_event_id': retry_event['id'], 'generation': generation, 'source': 'manual_start'}).decode(), now))
@@ -1366,18 +1451,26 @@ class ProjectsService:
         for agent in self._rows('SELECT * FROM projects_agents'):
             work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
             recovery = self._model_recovery(agent['account_id'])
+            failure = json.loads(work['failure_json']) if work and work.get('failure_json') else None
+            failure = failure if failure and not failure.get('resolved_at') else None
+            if failure and failure['retryable'] and agent['schedule_enabled'] and failure.get('retry_at') is not None:
+                agent['schedule_next_at'] = max(agent['schedule_next_at'] or 0, failure['retry_at'])
+                self._write('UPDATE projects_agents SET schedule_next_at=? WHERE account_id=?',
+                    (agent['schedule_next_at'], agent['account_id']))
             cooling = bool(recovery and recovery['phase'] in ('scheduled', 'exhausted') and agent['schedule_enabled']
                 and agent['schedule_state'] == 'waiting' and agent['schedule_next_at'] is not None)
+            cooling = cooling or bool(failure and failure['retryable'] and agent['schedule_enabled']
+                and agent['schedule_next_at'] is not None)
             uncertain = False
             if work and work['status'] not in ('passed', 'stopped', 'deferred'):
                 uncertain = self._one("SELECT id FROM projects_actions WHERE work_id=? AND status IN ('intent','unknown') LIMIT 1", (work['id'],))
                 reserved = max(0, time.time() - work['segment_started_at']) if work['segment_started_at'] else 0
                 self._write('UPDATE projects_work SET status=?,runtime_json=NULL,segment_started_at=NULL,work_sec=work_sec+?,message=? WHERE id=?',
                     ('blocked' if uncertain or work['status'] == 'blocked' else 'paused', min(reserved, agent['budget_sec']),
-                        '服务已重启，原工作及会话保留，请核对后恢复', work['id']))
+                        failure['message'] if failure else '服务已重启，原工作及会话保留，请核对后恢复', work['id']))
             self._write('UPDATE projects_agents SET generation=generation+1,status=?,message=?,updated_at=? WHERE account_id=?',
                 ('blocked' if agent['status'] == 'blocked' or uncertain else 'waiting' if cooling else 'paused',
-                    agent['message'] if cooling else '服务已重启，原会话和进度已保留', time.time(), agent['account_id']))
+                    (agent['message'] or failure['message']) if failure else agent['message'] if cooling else '服务已重启，原会话和进度已保留', time.time(), agent['account_id']))
             current = self._one('SELECT * FROM projects_agents WHERE account_id=?', (agent['account_id'],))
             current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
             self._recover_legacy_budget(current, current_work, time.time())
@@ -1512,21 +1605,29 @@ class ProjectsService:
                     agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
                     if agent and agent['generation'] == generation:
                         work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+                        runtime_failure = json.loads(work['failure_json']) if work and work.get('failure_json') else None
+                        runtime_failure = runtime_failure if runtime_failure and not runtime_failure.get('resolved_at') else None
+                        handles_runtime_failure = runtime_failure and (runtime_failure['generation'] == generation or outcome != 'error')
                         if work and work['status'] not in ('passed', 'stopped', 'deferred'):
                             try:
-                                if outcome == 'timeout':
+                                if outcome == 'timeout' and not runtime_failure:
                                     self._write('INSERT INTO projects_verification_holds(work_id,timeout_turns) VALUES(?,1) '
                                         'ON CONFLICT(work_id) DO UPDATE SET timeout_turns=timeout_turns+1', (work['id'],))
                                     hold = self._one('SELECT timeout_turns FROM projects_verification_holds WHERE work_id=?', (work['id'],))
                                     if hold['timeout_turns'] >= 2:
                                         self._defer_work(work, generation, '原目标连续两轮指挥时限耗尽，冷却后自动续做')
-                                self._release(work, 'paused' if outcome in ('settled', 'stopped', 'timeout')
-                                    or failure_reason == 'model_unavailable' else 'blocked')
+                                release_status = 'paused' if outcome in ('settled', 'stopped', 'timeout') or failure_reason == 'model_unavailable' else 'blocked'
+                                if handles_runtime_failure:
+                                    release_status = 'paused' if runtime_failure['retryable'] else 'blocked'
+                                self._release(work, release_status)
                             except Exception:
                                 outcome = 'error'
                                 failure_reason = None
                                 self._event(account_id, 'error', {'message': 'CLI 执行收口未确认，保留环境及租约待对账'}, work['id'])
-                        if outcome == 'error' and failure_reason == 'model_unavailable':
+                        current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
+                        if handles_runtime_failure and self._finish_start_failure(agent, current_work, generation):
+                            pass
+                        elif outcome == 'error' and failure_reason == 'model_unavailable':
                             current_work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
                             self._finish_model_recovery(agent, current_work, generation, failure_retry_at)
                         else:
@@ -1823,7 +1924,21 @@ class ProjectsService:
             raise ValueError('本轮指挥时限已到，等待下一轮接续原目标')
         work.update(generation=generation, remaining_sec=remaining)
         work['resume_required'] = bool(self._one("SELECT id FROM projects_actions WHERE work_id=? AND status='sent' LIMIT 1", (work['id'],)))
-        info = self.terminal.start(account, work)
+        preparation_error = None
+        try:
+            info = self.terminal.start(account, work)
+        except ProjectRuntimeError as error:
+            preparation_error = error
+        except RuntimeBusy:
+            preparation_error = ProjectRuntimeError('runtime_busy', '账号环境暂被其他执行占用，稍后恢复', retryable=True)
+        except Exception as error:
+            # 未知启动错误不能公开原始异常，也不能推断进程从未写入而自动重发。
+            preparation_error = ProjectRuntimeError('startup_unknown', '启动结果未确认，请检查运行环境后人工核对',
+                details={'exception_type': type(error).__name__})
+        if preparation_error:
+            failure = self._record_start_failure(account_id, generation, preparation_error)
+            return {'status': 'waiting' if failure['retryable'] else 'rejected', 'message': failure['message'],
+                'controller_yield': True, 'failure': failure}
         try:
             work['runtime_json'] = json.dumps(info)
             baseline = work['baseline_json'] or canonical_json(snapshot_tree(self.terminal.workspace(work))).decode()
@@ -1841,17 +1956,31 @@ class ProjectsService:
                 if not gate['allowed']:
                     raise ValueError('环境准备后账号门禁发生改变')
                 # 恢复后先重新观察现场，旧执行的观察不能继续授权输入。
+                previous_failure = json.loads(work['failure_json']) if work.get('failure_json') else None
+                resolved = {**previous_failure, 'resolved_at': time.time(), 'retry_at': None} if previous_failure else None
                 self._write("UPDATE projects_work SET status='running',generation=?,runtime_json=?,baseline_json=?,observation_id=NULL,"
-                    'started_at=COALESCE(started_at,?),segment_started_at=?,message=NULL WHERE id=?',
-                    (generation, work['runtime_json'], baseline, time.time(), time.time(), work['id']))
+                    'started_at=COALESCE(started_at,?),segment_started_at=?,message=NULL,failure_json=? WHERE id=?',
+                    (generation, work['runtime_json'], baseline, time.time(), time.time(),
+                        canonical_json(resolved).decode() if resolved else None, work['id']))
+                if previous_failure and not previous_failure.get('resolved_at'):
+                    self._event(account_id, 'runtime_recovered', {'message': '原工作已成功启动，启动故障已解除',
+                        'code': previous_failure['code'], 'attempt_count': previous_failure['attempt_count']}, work['id'])
                 self._event(account_id, 'started', {'project_key': key, 'objective_id': objective_id,
                     'session_id': work['session_id'], 'resumed': bool(work['started_at'])}, work['id'])
             return {'status': 'running', 'work_id': work['id'], 'session_id': work['session_id'],
                 'instruction': '先观察终端，再依据工程目标和实际交互决定输入；本工具没有代你发送初始需求。'
                     '旧验收结论若缺少具体失败事实，不得继续猜测；严禁用覆盖率豁免或删测试迎合误判。'}
-        except Exception:
-            self.terminal.control({**work, 'runtime_json': json.dumps(info)}, 'stop')
-            raise
+        except Exception as error:
+            phase = 'starting'
+            try:
+                self.terminal.control({**work, 'runtime_json': json.dumps(info)}, 'stop')
+            except Exception:
+                # 收口失败保留账号运行时的原登记，不能以一次启动重试解除未知占用。
+                phase = 'cleanup'
+            failure = self._record_start_failure(account_id, generation,
+                ProjectRuntimeError('startup_unknown', '启动准备或执行收口未能确认，请人工核对原现场',
+                    phase=phase, details={'exception_type': type(error).__name__}))
+            return {'status': 'rejected', 'message': failure['message'], 'controller_yield': True, 'failure': failure}
 
     def _check_round_work(self, account_id: int, generation: int, work: dict | None) -> None:
         """按持久工作代次守住单目标边界，旧模型上下文不能扩大本轮范围。

@@ -1741,6 +1741,10 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-block: 12px; }
 .projects-pagination .hint { flex: 1; min-width: 180px; }
 .projects-records { display: grid; gap: 10px; margin-bottom: 14px; }
+.projects-failure { display: grid; gap: .3rem; margin-top: .6rem; padding: .65rem; border-left: 3px solid var(--amber); background: var(--bg-soft); overflow-wrap: anywhere; }
+.projects-failure strong { font-weight: 500; }
+.projects-failure small { color: var(--text-muted); }
+.projects-failure.is-resolved { border-left-color: var(--text-muted); }
 .projects-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .projects-history-row > span:nth-child(2) { flex: 1; min-width: 150px; overflow-wrap: anywhere; }
 .projects-history-row small { display: block; margin-top: 4px; }

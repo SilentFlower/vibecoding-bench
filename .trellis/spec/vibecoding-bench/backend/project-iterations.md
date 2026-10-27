@@ -848,3 +848,64 @@ ObservationView.reset() -> void
 - `test_pi_interaction`：真实通知子进程、原 settings 与幂等、无授权/参数泄漏、错误/超大/链接/FIFO、旧 runtime、原生无文本提问及两空间来源隔离。固定 CLI 2.1.293 的真实 Stop 钩子另以回环 mock 验证，不调用外部模型。
 - `observation-view.test.mjs`：增删和尾换行精确还原、相同画面、较大 patch 回退、按需 full、reset 和拒绝不推进；`host.test.mjs` 核对真实 SDK 收到的 full/patch/full 与等待期间请求/usage 不增长，复用摘要及终止回归。
 - `test_projects_agent/terminal/feed/store/single_objective/cycles/engine_cycles/quota`：最新观察输入保护、菜单/多行与未知投递、完整页面事实、双空间、停止恢复和目标收尾不变。
+
+## Scenario: Python 补丁兼容与持久启动故障
+
+### 1. Scope / Trigger
+
+- 修改冻结环境准入、离线依赖缓存、原生验收的版本前置条件、Claude 启动故障、Pi 交接或页面恢复提示时适用。Projects、工程养号与 legacy 场景共享版本判断；两个工程空间共享故障合同。
+- 兼容补丁差异只改变环境准入，冻结制品摘要、原回归节点／插件／结果、工作区身份、未知输入及严格清理仍受原合同约束。
+
+### 2. Signatures
+
+```python
+python_versions_match(expected: str, actual: str, policy: str = 'minor') -> bool
+check_python_runtime(profile: dict, actual: str) -> dict
+ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
+                    phase: str = 'preparing', details: dict | None = None)
+```
+
+- `projects_work.failure_json TEXT` 为可空新增列，初始化幂等升级；原 SQL 命名空间映射同样升级 `warmup_projects_work`。旧记录为 NULL，不追溯造数。
+- 原状态、snapshot、历史列表／分页、work 详情和 SSE 的 work 投影增加 `failure: object | null`。既有前缀为 `/api/projects` 与 `/api/accounts/warmup/pi`；详情仍为 `GET <prefix>/work/{work_id}`，不增设错误 API。
+- 真实启动故障的 `claude_start` 回执为 `{status:'waiting'|'rejected', message, controller_yield:true, failure}`；这不是 `project_submit` 的目标通过标志。
+
+### 3. Contracts
+
+- `profile.python` 保留冻结验证版本；可选 `python_compatibility` 仅接受 `minor|exact`，默认 minor。版本只接受正常数字主次或主次补丁格式；minor 比较主次，exact 比较全部数字段及补丁是否存在。非法版本／策略不能默认为兼容。
+- 每次准备都先探测实际解释器，命中缓存也执行。缓存仍按 `profile_digest` 定位；兼容复核后在证明中保存 `expected_python/actual_python/python_compatibility`，旧证明可补齐。补丁变化本身不重复安装相同固定 wheel。
+- 独立验收将共享策略与 `native.json.python_profile` 暂存到只读 `/request-data`。环境不兼容输出 `VIBEBENCH_RUNTIME_ERROR_V1` 并返回 `status='error', reason='python_incompatible', details`；准备就绪后输出 `VIBEBENCH_PYTHON_RUNTIME_V1`，宿主复核并在报告保留 `python_runtime`。不能把环境拒绝算成业务失败。
+- 历史 runner 适配仅接受 `_PYTHON_RUNNER_SHA256` 中已核来源，且旧版本比较与导入定位片段均唯一匹配。只在可信临时副本替换版本判断，并记录原始／实际摘要；原合同和冻结文件不改。与重复身份适配组合时仍反查原始字节；Arrow 外层入口的内层 runner 同样核源并只读暂存。新控制器的共享策略须在执行函数局部导入，兼容复制为隔离 worker 的运行方式。
+- `failure` 包含字符串 `code/phase/message`、布尔 `retryable`、时间 `first_at/last_at`、整数 `attempt_count/generation`、可空 `retry_at/resolved_at` 及 `details`。message 至多 400 字符；details 仅允许 `expected_python/actual_python/python_compatibility/exception_type` 的至多 120 字符字符串，不透传任意异常正文、凭据或私有路径。
+- 写故障必须在服务锁内确认当前 agent 代次、current_work、账号身份及非终态工作；合法恢复允许原 work 代次较旧。故障行、对应 error 事件和 agent 摘要同事务保存；同 code 且未解决才累计连续真实尝试，换原因或已恢复后重开序列。
+- 临时故障在计划开启时，前三次失败分别保存 60／120／300 秒后的恢复时间，此后使用 `max(900, schedule_interval_sec)`；等待不持续调用模型。收尾时才开启计划或旧截止已过，必须保存至少 60 秒后的实际截止。计划关闭不安排自动重试；重启／计划认领不能提前该截止。
+- 实际终端启动、基线及启动后门禁均确认后才设置 `resolved_at`、清空故障 retry_at 并记录 `runtime_recovered`。启动 Pi、开始准备或 Pi settled 均不算恢复。未解决故障优先于正常收尾，但后续明确的模型阻断、人工暂停／停止和新代次继续优先。
+- 宿主仅对 `claude_start` 的 waiting／rejected、严格布尔 `controller_yield === true` 及字符串 `failure.code` 结束当前循环；先让 SDK 持久化原工具回执，同批后续工具及额外推理停止，不声明目标已通过。
+- 页面当前目标、工程历史和详情读取同一事实，按 started_at 区分启动／恢复失败。自动重试时间使用当前工作对应账号的真实 `schedule.next_run_at`，历史工作不能借用当前计划；已停止先显示停止。所有外部文本转义，未保存配置不被 SSE 回填，旧记录正常展示。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 故障／行为 |
+| --- | --- |
+| 3.12.15 → 3.12.16，默认 minor | 放行并分别留证；业务／回归条件不变 |
+| 跨主次、exact 不满足或非法版本 | `python_incompatible`；profile 自身非法则校验拒绝 |
+| 探测进程非零或账号资源暂占 | `python_probe_failed`／`runtime_busy`，可按计划等待 |
+| 缓存证明冲突、制品摘要不符或离线安装失败 | `python_cache_invalid`／`artifact_invalid`／`offline_install_failed`，处理后显式重试 |
+| 工作区归属冲突 | `workspace_conflict`，保留原现场，仍核对身份及未知输入 |
+| 未知启动、基线或收口结果 | `startup_unknown`；固定说明和异常类型，先人工核对，不自动重发 |
+| 迟到旧代次、已结束工作或账号身份变化 | 拒绝写入；不能复活计划或清除新状态 |
+| Pi 正常结束、刷新或服务重启 | 保留未解决故障和真实次数；不覆盖后续明确模型错误 |
+
+### 5. Scenarios and Examples
+
+- 正常：`{"python":"3.12.15"}` 在 3.12.16 准备依赖并执行完整 Cerberus 原生回归；缓存及验收报告同时保留两个版本，原版业务仍应失败，参考实现应通过。
+- 边界：旧缓存只有 profile_digest，实测兼容后补齐证明；原工作较旧代次可恢复，重启不增加尝试次数。显式 `{"python":"3.12.15","python_compatibility":"exact"}` 在 3.12.16 返回明确环境拒绝。
+- 错误：Pi settled 后改写成“正常结束”、把历史任务显示为当前计划的下次重试，或在每次计划到期重新请求模型解释同一确定故障。正确：读取持久 failure，历史停止任务保留停止说明，确定问题处理后从原入口恢复同一工作。
+- 错误：把普通工具参数拒绝或未知执行结果加入自动重试白名单。正确：仅真实启动边界记录故障；显式恢复仍经过原身份、输入、额度、工作区及清理门禁。
+
+### 6. Tests Required
+
+- `test_projects_runtime_resilience`：版本／策略边界、全部已核冻结来源及篡改拒绝、缓存实测、两空间故障投影、无模型空转、真实计数、成功才解除、重启截止、迟到取消、启动后异常脱敏及后续模型错误优先。
+- `test_project_native_verifier`、`test_project_duplicate_adapter`、`test_project_arrow_adapter`：环境错误分类与版本事实、组合适配、原文件不改及可信内层只读挂载；`test_project_native_regression` 继续核冻结节点与结果约束。
+- `test_projects_pi_round` 和 `images/pi-agent/host.test.mjs`：真实 Python／Node／SDK 回执先落盘，故障交接仅一次上游请求，伪造／非布尔标志无效，混合批次及下一轮边界正确。
+- 两个 `deploy/v3/verify_*pi*browser.py` 既有入口：API／SQLite／SSE 驱动真实 Chrome，核明暗主题、390／1280、刷新、次数／阶段／实际版本、恢复解除、XSS、旧历史不借当前时间和未保存配置保护。
+- 实际核对为 3.12.16 的本地禁网容器：冻结 Cerberus 环境准备及缓存复用，原版失败、参考和完整原生回归通过；显式 exact 返回带期望／实际版本的环境错误。不以 mock 版本函数代替此证据。

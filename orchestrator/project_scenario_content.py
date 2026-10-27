@@ -8,6 +8,7 @@ from pathlib import Path
 from stat import S_ISREG
 
 from project_library import canonical_json, read_document, safe_relative, snapshot_tree
+from project_runtime_policy import python_versions_match
 
 
 CONTENT_SCHEMA = 2
@@ -357,6 +358,8 @@ def validate_environment(root: Path, key: str) -> dict:
             or profile['schema'] != 1
             or profile.get('adapter') != 'python-native' or not isinstance(profile.get('python'), str)):
         raise ValueError('原生环境档案不合法')
+    if not python_versions_match(profile['python'], profile['python'], profile.get('python_compatibility', 'minor')):
+        raise ValueError('原生环境 Python 版本或兼容策略不合法')
     for name in ('business', 'regression'):
         resources = profile.get(name)
         if not isinstance(resources, dict):

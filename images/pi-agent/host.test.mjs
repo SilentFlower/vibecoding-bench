@@ -107,6 +107,8 @@ test('观察回执进入真实 SDK 前生成增量，按需完整读取且请求
   const before = Array.from({length: 100}, (_, index) => `业务正文 ${index} ${'原始内容'.repeat(8)}`).join('\n');
   const after = before.replace('业务正文 50', '新菜单 50');
   const server = createServer(async (request, response) => {
+    // HTTP 分片可能切开中文 UTF-8 字符，先解码再累积才能保持观察原文。
+    request.setEncoding('utf8');
     let body = ''; for await (const chunk of request) body += chunk;
     requests.push(JSON.parse(body));
     if (requests.length === 4) return stream(response, false);
@@ -428,7 +430,7 @@ test('单目标通过后保存工具结果并结束，同批第二目标及后�
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
 });
 
-test('只有可信完成或待复验结果结束指挥，失败和其他工具字段不生效', async () => {
+test('仅可信目标收尾或启动故障交接结束指挥，其他字段不生效', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'projects-pi-round-marker-'));
   let tool = 'account_state';
   let requests = 0;
@@ -453,6 +455,11 @@ test('只有可信完成或待复验结果结束指挥，失败和其他工具�
       {tool: 'project_submit', result: {status: 'deferred', round_complete: true}, requests: 1},
       {tool: 'project_submit', result: {status: 'deferred', round_complete: 1}},
       {tool: 'account_state', result: {status: 'deferred', round_complete: true}},
+      {tool: 'claude_start', result: {status: 'rejected', controller_yield: true, failure: {code: 'python_incompatible'}}, requests: 1},
+      {tool: 'claude_start', result: {status: 'waiting', controller_yield: true, failure: {code: 'runtime_busy'}}, requests: 1},
+      {tool: 'claude_start', result: {status: 'rejected', controller_yield: 1, failure: {code: 'python_incompatible'}}},
+      {tool: 'account_state', result: {status: 'rejected', controller_yield: true, failure: {code: 'python_incompatible'}}},
+      {tool: 'claude_start', result: {status: 'rejected', controller_yield: true}},
     ]) {
       tool = current.tool; requests = 0;
       const records = await execute({session_dir: join(directory, String(Math.random())),

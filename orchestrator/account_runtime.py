@@ -28,6 +28,7 @@ from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
+from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, isolated_account_limits
 from storage_maintenance import deduplicate_immutable_tree
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
@@ -1545,8 +1546,9 @@ class AccountRuntime:
         project = library.projects[context['project_key']]
         profile = library.environments[project.manifest['environment']]
         observed = container.exec_run(['python3','-c','import platform;print(platform.python_version())'])
-        if observed.exit_code or observed.output.decode().strip() != profile['python']:
-            raise ValueError('候选Python版本不匹配冻结原生环境')
+        if observed.exit_code:
+            raise ProjectRuntimeError('python_probe_failed', '无法读取候选环境的 Python 版本', retryable=True)
+        proof = check_python_runtime(profile, observed.output.decode().strip())
         from project_library import digest_json
         checksum = digest_json(profile)
         base = self._root(row) / 'cli/project-python' / checksum
@@ -1579,7 +1581,7 @@ class AccountRuntime:
                     environment={'TMPDIR':'/cli/project-python/'+checksum+'/'+Path(temporary).name})
             if result.exit_code:
                 raise ValueError('候选离线Python依赖准备失败')
-            atomic_json(marker,{'profile_digest':checksum,'python':profile['python']})
+        atomic_json(marker, {'profile_digest': checksum, **proof})
         if not virtual_marker.exists():
             result = network.exec_run(['python3','-m','venv','--without-pip',virtual])
             if result.exit_code:

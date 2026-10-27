@@ -15,6 +15,7 @@ from account_isolation import role_container
 from account_runtime import AccountRuntime, atomic_json
 from pi_terminal import KEYS, PiTerminal
 from project_library import PROJECT_KEY, digest_json, materialize_snapshot, read_document, safe_relative, snapshot_tree
+from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 
 
 class ProjectsTerminal(PiTerminal):
@@ -85,7 +86,10 @@ class ProjectsTerminal(PiTerminal):
         """准备同一项目累计源码与其冻结离线 Python 依赖。:param root: 账号目录。:param row: 环境。:param account: 账号。:param work: 原工程。:return: 工作区和原有工程环境。"""
         assets = self.catalog.for_work(work)
         project, definition = assets.objective(work['project_key'], work['objective_id'])
-        workspace = self._prepare_workspace(root, row, account, work, project, definition)
+        try:
+            workspace = self._prepare_workspace(root, row, account, work, project, definition)
+        except ValueError as error:
+            raise ProjectRuntimeError('workspace_conflict', str(error)[:400]) from None
         python = self._prepare_python(row, project, assets.library)
         version = json.loads(work['settings_json'])['claude_code_version']
         cwd = '/home/node/projects/' + workspace.name
@@ -344,24 +348,25 @@ class ProjectsTerminal(PiTerminal):
         base = root / 'cli/projects-python' / checksum
         marker = root / 'runtime/projects-python' / (checksum + '.json')
         container_root = '/cli/projects-python/' + checksum
+        network = role_container(runtime, row, 'network')
+        observed = network.exec_run(['python3', '-c', 'import platform;print(platform.python_version())'])
+        if observed.exit_code:
+            raise ProjectRuntimeError('python_probe_failed', '无法读取运行环境的 Python 版本', retryable=True)
+        proof = check_python_runtime(profile, observed.output.decode().strip())
         if marker.exists():
             if read_document(marker).get('profile_digest') != checksum or not (base / 'site-packages').is_dir():
-                raise ValueError('已准备的离线 Python 依赖证明不符')
+                raise ProjectRuntimeError('python_cache_invalid', '已准备的离线 Python 依赖证明不符')
         else:
             artifacts = base / 'artifacts'
             artifacts.mkdir(parents=True, exist_ok=True)
             for artifact in profile['artifacts']:
                 original = library.root / 'environments' / project.manifest['environment'] / artifact['path']
                 if original.is_symlink() or library._artifact_digest(original) != artifact['digest']:
-                    raise ValueError('离线依赖制品摘要不符')
+                    raise ProjectRuntimeError('artifact_invalid', '离线依赖制品摘要不符')
                 shutil.copyfile(original, artifacts / Path(artifact['path']).name)
                 (artifacts / Path(artifact['path']).name).chmod(0o644)
             for path in (base.parent, base, artifacts):
                 path.chmod(0o755)
-            network = role_container(runtime, row, 'network')
-            observed = network.exec_run(['python3', '-c', 'import platform;print(platform.python_version())'])
-            if observed.exit_code or observed.output.decode().strip() != profile['python']:
-                raise ValueError('离线 Python 版本与冻结环境不符')
             # 安装到私有暂存后再发布，避免失败的半成品缓存及 network 的 64MiB 临时盘限制。
             with TemporaryDirectory(prefix='.install-', dir=base) as temporary:
                 relative = container_root + '/' + Path(temporary).name
@@ -369,7 +374,7 @@ class ProjectsTerminal(PiTerminal):
                     '--no-cache-dir', '--no-index', '--no-deps', '--no-compile', '--target', relative + '/site-packages',
                     '--find-links', container_root + '/artifacts', *profile['requirements']], environment={'TMPDIR': relative})
                 if result.exit_code:
-                    raise ValueError('项目离线依赖准备失败')
+                    raise ProjectRuntimeError('offline_install_failed', '项目离线依赖准备失败，请核对冻结依赖与当前环境', details=proof)
                 installed = Path(temporary) / 'site-packages'
                 for current, directories, files in os.walk(installed):
                     Path(current).chmod(0o755)
@@ -386,5 +391,6 @@ class ProjectsTerminal(PiTerminal):
                 if target.exists():
                     shutil.rmtree(target)
                 installed.rename(target)
-            atomic_json(marker, {'profile_digest': checksum})
+        # 即使命中旧缓存也先核对实际解释器，升级不会靠旧凭据绕过兼容规则。
+        atomic_json(marker, {'profile_digest': checksum, **proof})
         return {'bin': container_root + '/site-packages/bin', 'site': container_root + '/site-packages'}

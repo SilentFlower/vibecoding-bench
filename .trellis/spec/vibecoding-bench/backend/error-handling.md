@@ -11,7 +11,7 @@
 1. **API 请求路径**:用 `fastapi.HTTPException(status, detail)` 把错误抛出去,FastAPI 自动转 `{"detail": "..."}` JSON 响应。前端拿到 `r.json().detail` 弹 `alert`
 2. **后台 / 清理路径**(`Runner.cleanup`、`LoginManager.cleanup`、SSE 轮询、PTY 桥):**故意吞异常**,因为这些路径出错不能让主流程崩。每个 `try` 包一段尽量小的代码,`except Exception: pass`
 
-**不自定义错误类型**。P1 阶段所有错误要么 `HTTPException(code, msg)`,要么 `ValueError(msg)`,要么裸 `Exception`,通过 status code + msg 区分语义就够。
+普通 API／输入校验沿用 `HTTPException(code, msg)`、`ValueError(msg)` 或下游异常。Projects 的真实环境准备故障使用轻量 `ProjectRuntimeError(ValueError)` 携带恢复语义；字段、持久化及重试合同见 [项目运行环境与启动故障](./project-iterations.md#scenario-python-补丁兼容与持久启动故障)，不能用异常文案判断调度。
 
 ---
 
@@ -23,9 +23,10 @@
 | `HTTPException(404, "...")` | 资源不存在 | `HTTPException(404, "task not found")` |
 | `HTTPException(500, "...")` | 内部子系统失败但仍想给前端有意义提示 | `HTTPException(500, f"exec failed: {e}")` |
 | `ValueError("...")` | 在非 FastAPI 路径(`LoginManager.start`)的输入校验 | `ValueError("invalid account name: must match ...")`,调用方再翻译成 `HTTPException(400, str(e))` |
+| `ProjectRuntimeError(ValueError)` | 已绑定工作在真实环境准备／启动边界的故障 | `code/phase/retryable/details` 决定持久提示与恢复；未知底层异常仅公开固定说明和异常类型 |
 | 裸 `Exception` | 不知具体类型的下游错误(docker SDK / sqlite / socket) | 由调用方 `except Exception as e` 决定吞还是转 |
 
-**不引入** 自定义异常基类、不引入 `BenchException(Exception)` 之类的等级结构。P1 业务面太小,加抽象只是噪音。
+不引入 `BenchException(Exception)` 之类的通用异常等级结构；有明确持久恢复合同的 `ValueError` 子类只服务其领域，不能把普通参数拒绝升级成运行故障。
 
 ---
 

@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT / 'orchestrator'))
 from project_requester_settings import ProjectRequesterSettings
 from project_library import materialize_snapshot, read_document
 from projects_api import projects_router
+from project_runtime_policy import ProjectRuntimeError
 from test_projects_agent import CatalogFixture, PiFixture, ProjectsAgentTests
 
 
@@ -582,6 +583,50 @@ async def verify(evidence: Path) -> dict:
                     (evidence / (name + '.png')).write_bytes(base64.b64decode(image['data']))
                     overflow = await evaluate('document.documentElement.scrollWidth <= window.innerWidth ? [] : Array.from(document.querySelectorAll("body *")).filter(value => value.getBoundingClientRect().right > innerWidth + 1).slice(0,16).map(value => ({tag:value.tagName,id:value.id,class:value.className,width:value.getBoundingClientRect().width,right:value.getBoundingClientRect().right}))')
                     assert not overflow, {'width': width, 'overflow': overflow}
+                failure_agent = fixture.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+                failed_id = failure_agent['current_work_id']
+                fixture.service._write("UPDATE projects_agents SET status='running',schedule_enabled=1 WHERE account_id=1")
+                failure_agent['schedule_enabled'] = 1
+                fixture.service._write('UPDATE projects_work SET started_at=NULL,work_sec=0,runtime_json=NULL,segment_started_at=NULL WHERE id=?', (failed_id,))
+                for _ in range(2):
+                    fixture.service._record_start_failure(1, failure_agent['generation'], ProjectRuntimeError('python_incompatible',
+                        'Python 版本不兼容：3.12.15 → 3.13.0 <img src=x onerror="window.failureInjected=true">',
+                        details={'expected_python': '3.12.15', 'actual_python': '3.13.0'}))
+                failed = fixture.service._one('SELECT * FROM projects_work WHERE id=?', (failed_id,))
+                fixture.service._finish_start_failure(failure_agent, failed, failure_agent['generation'])
+                await until('document.querySelector("#projects-current").textContent.includes("连续失败 2 次") && document.querySelector("#projects-state").textContent.includes("启动失败")')
+                assert await evaluate('!window.failureInjected && document.querySelectorAll(".projects-failure img").length === 0')
+                fixture.service._write('UPDATE projects_agents SET message=?,schedule_message=? WHERE account_id=1',
+                    ('新的模型错误需要处理', '新的模型错误需要处理'))
+                fixture.service._event(1, 'error', {'message': '新的模型错误需要处理'}, failed_id)
+                await until('document.querySelector("#projects-message").textContent === "新的模型错误需要处理" && document.querySelector("#projects-state").textContent === "需要处理"')
+                fixture.service._write('UPDATE projects_agents SET message=?,schedule_message=? WHERE account_id=1',
+                    (failed['message'], failed['message']))
+                await reload()
+                await until('document.querySelector("#projects-current")?.textContent.includes("处理原因后手动重试") && document.querySelector("#projects-history").textContent.includes("连续失败 2 次")')
+                await evaluate('document.querySelector("#projects-history [data-work]").click()')
+                await until('document.querySelector("#projects-delivery-failure").textContent.includes("实际版本：3.13.0")')
+                historical_id = historical_works[0]['id']
+                fixture.service._write("UPDATE projects_work SET status='stopped',failure_json=? WHERE id=?", (failed['failure_json'], historical_id))
+                fixture.service._write("UPDATE projects_agents SET schedule_state='waiting',schedule_next_at=? WHERE account_id=1", (time.time() + 120,))
+                fixture.service._event(1, 'pi', {'text': '核对历史故障不借用当前恢复时间'}, historical_id)
+                await reload()
+                await until('document.querySelector("#projects-history").textContent.includes("任务已停止")')
+                await evaluate('document.querySelector(' + json.dumps('[data-work="' + historical_id + '"]') + ').click()')
+                await until('document.querySelector("#projects-delivery-failure").textContent.includes("任务已停止")')
+                assert not await evaluate('document.querySelector("#projects-delivery-failure").textContent.includes("下次重试")')
+                fixture.service._write("UPDATE projects_agents SET schedule_state='blocked',schedule_next_at=NULL WHERE account_id=1")
+                for width, height, theme in ((1280, 900, 'dark'), (1280, 900, 'light'), (390, 844, 'dark'), (390, 844, 'light')):
+                    await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False}, session)
+                    await evaluate(f'document.documentElement.dataset.theme="{theme}";document.querySelector("#projects-current").scrollIntoView({{block:"center"}})')
+                    assert await evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+                    image = await rpc('Page.captureScreenshot', {'format': 'png', 'captureBeyondViewport': False}, session)
+                    (evidence / f'failure-{width}-{theme}.png').write_bytes(base64.b64decode(image['data']))
+                failure = json.loads(failed['failure_json'])
+                failure['resolved_at'] = time.time()
+                fixture.service._write('UPDATE projects_work SET failure_json=? WHERE id=?', (json.dumps(failure), failed_id))
+                fixture.service._event(1, 'runtime_recovered', {'message': '原工作已成功启动'}, failed_id)
+                await until('document.querySelector("#projects-current .projects-failure.is-resolved") !== null')
                 await evaluate('location.hash="#topics"')
                 await until('window.projectStreams.length > 0 && window.projectStreams.every(value => value.wasClosed)')
                 assert before_operations == (len(fixture.terminal.started), len(fixture.terminal.sent), len(fixture.terminal.controls)), '切账号或翻页意外操作了原生终端'
@@ -614,7 +659,8 @@ async def verify(evidence: Path) -> dict:
             '验收阶段在终端和交互上方持续可见', '当前阶段与总耗时每秒更新', '刷新恢复验收阶段及历史耗时',
             '验收进度切账号不串用', '验收失败后停止计时', '阶段信息XSS与明暗窄屏布局',
             '待机倒计时及全部配置编辑保护', '折叠配置搜索快捷键',
-            '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '无旧历史入口及请求', '1280暗色与390亮色布局']}
+            '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '启动故障持久展示及次数阶段与恢复解除',
+            '启动故障刷新及明暗窄屏与XSS', '历史停止任务不借用当前重试时间', '无旧历史入口及请求', '1280暗色与390亮色布局']}
         (evidence / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
         return result
     finally:

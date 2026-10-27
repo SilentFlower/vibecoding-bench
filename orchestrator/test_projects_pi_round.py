@@ -21,6 +21,22 @@ class PiRoundPipeTests(unittest.TestCase):
 
     def test_parent_delivers_success_and_receives_normal_completion(self):
         """通过结果沿真实管道进入原生会话，父进程按 settled 正常退出。:return: None。"""
+        self.verify_round('project_submit', {'summary': '本地合成交付'},
+            {'status': 'passed', 'submission_id': 'verified-pipe-result', 'round_complete': True})
+
+    def test_startup_failure_is_persisted_before_handing_back_without_more_model_requests(self):
+        """真实 Python／Node 管道保存故障回执后结束，不追加一次模型解释。:return: None。"""
+        self.verify_round('claude_start', {'project_key': 'example', 'objective_id': 'feature'},
+            {'status': 'rejected', 'controller_yield': True, 'failure': {'code': 'python_incompatible'}})
+
+    def verify_round(self, tool_name, arguments, result):
+        """驱动真实 SDK 与父进程交接一个工具结果。
+
+        :param tool_name: 本次调用的真实工具。
+        :param arguments: 工具参数。
+        :param result: 控制端返回的交接事实。
+        :return: None。
+        """
         requests, tools, events = [], [], []
 
         class Handler(BaseHTTPRequestHandler):
@@ -34,7 +50,7 @@ class PiRoundPipeTests(unittest.TestCase):
                 self.send_header('Content-Type', 'text/event-stream')
                 self.end_headers()
                 delta = {'role': 'assistant', 'tool_calls': [{'index': 0, 'id': 'local-submission', 'type': 'function',
-                    'function': {'name': 'project_submit', 'arguments': '{"summary":"本地合成交付"}'}}]}
+                    'function': {'name': tool_name, 'arguments': json.dumps(arguments)}}]}
                 chunks = [
                     {'choices': [{'index': 0, 'delta': delta, 'finish_reason': None}]},
                     {'choices': [{'index': 0, 'delta': {}, 'finish_reason': 'tool_calls'}]},
@@ -56,7 +72,7 @@ class PiRoundPipeTests(unittest.TestCase):
         def execute(name, args, call_id):
             """返回控制端已接受的合成交付事实。:param name: 工具。:param args: 参数。:param call_id: 操作标识。:return: 完成事实。"""
             tools.append((name, args, call_id))
-            return {'status': 'passed', 'submission_id': 'verified-pipe-result', 'round_complete': True}
+            return result
 
         try:
             with tempfile.TemporaryDirectory() as directory:
@@ -70,13 +86,13 @@ class PiRoundPipeTests(unittest.TestCase):
                 self.assertEqual({tool['name'] for tool in TOOLS},
                     {tool['function']['name'] for tool in requests[0]['tools']})
                 self.assertEqual(1, len(tools))
-                self.assertEqual(('project_submit', {'summary': '本地合成交付'}, 'local-submission'), tools[0])
+                self.assertEqual((tool_name, arguments, 'local-submission'), tools[0])
                 self.assertEqual(1, sum(event['type'] == 'settled' for event in events))
                 session = next(event['session_file'] for event in events if event['type'] == 'ready')
                 entries = [json.loads(line) for line in Path(session).read_text().splitlines()]
                 delivered = next(entry['message'] for entry in entries
                     if entry.get('message', {}).get('role') == 'toolResult')
-                self.assertEqual('verified-pipe-result', json.loads(delivered['content'][0]['text'])['submission_id'])
+                self.assertEqual(result, json.loads(delivered['content'][0]['text']))
         finally:
             server.shutdown()
             server.server_close()

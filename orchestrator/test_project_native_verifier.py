@@ -1,5 +1,6 @@
 """原生验证的环境阶段、业务退出码与真实并发收口回归。"""
 import tempfile
+import json
 import threading
 import time
 import unittest
@@ -52,6 +53,18 @@ class NativeVerifierTests(unittest.TestCase):
         failed.logs.return_value=b'VIBEBENCH_NATIVE_READY_V1\n'
         failed.wait.return_value={'StatusCode':80}
         self.assertEqual('failed',self.verify()['status'])
+
+    def test_runtime_incompatibility_is_infrastructure_with_expected_and_actual_versions(self) -> None:
+        """独立验收的版本错误保留事实，不计为候选业务失败。:return: None。"""
+        child = self.container('exited')
+        fact = {'reason': 'python_incompatible', 'message': 'Python 版本不兼容：3.12.15 / 3.12.16',
+            'details': {'expected_python': '3.12.15', 'actual_python': '3.12.16', 'python_compatibility': 'exact'}}
+        child.logs.return_value = ('VIBEBENCH_RUNTIME_ERROR_V1 ' + json.dumps(fact)).encode()
+        self.client.containers.create.return_value = child
+        result = self.verify()
+        self.assertEqual('error', result['status'])
+        self.assertEqual(fact['message'], result['message'])
+        self.assertEqual(fact['details'], result['details'])
 
     def test_cleanup_keeps_slot_until_container_has_been_removed(self) -> None:
         """超时来源尚在强制收口时，第二个验证不能占用同一个名额。@return None。"""

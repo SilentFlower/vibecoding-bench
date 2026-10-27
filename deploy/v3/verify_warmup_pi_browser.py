@@ -337,6 +337,16 @@ async def verify(evidence: Path) -> dict:
                 await until('document.querySelector("#projects-cycle").textContent === "第 3 轮 · 完成 0 / 2" && document.querySelector("#projects-screen").textContent === "尚无工程目标。"')
                 assert await evaluate('document.querySelector("#projects-history").textContent.includes("第 2 轮") && document.querySelector("#projects-progress-text").textContent.includes("0 / 2")')
                 checks.append('新周期清空当前画面并保留原交付耗时历史')
+                from project_runtime_policy import ProjectRuntimeError
+                warmup.service._write("UPDATE projects_agents SET current_work_id=?,status='running',schedule_enabled=1 WHERE account_id=2", (work['id'],))
+                warmup.service._write("UPDATE projects_work SET status='paused',started_at=NULL,work_sec=0,runtime_json=NULL,segment_started_at=NULL WHERE id=?", (work['id'],))
+                failed_agent = warmup.service._one('SELECT * FROM projects_agents WHERE account_id=2')
+                warmup.service._record_start_failure(2, failed_agent['generation'], ProjectRuntimeError('python_incompatible',
+                    '养号 Python 版本不兼容：3.12.15 → 3.13.0'))
+                failed_work = warmup.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+                warmup.service._finish_start_failure(failed_agent, failed_work, failed_agent['generation'])
+                await until('document.querySelector("#projects-current").textContent.includes("养号 Python 版本不兼容") && document.querySelector("#projects-state").textContent.includes("启动失败")')
+                checks.append('工程养号同样直接显示持久启动故障和恢复方式')
                 for name, width, height, theme in (('desktop-dark', 1280, 900, 'dark'), ('desktop-light', 1280, 900, 'light'), ('mobile-dark', 390, 844, 'dark'), ('mobile-light', 390, 844, 'light')):
                     await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': width < 600}, session)
                     await evaluate('document.documentElement.dataset.theme=' + json.dumps(theme))

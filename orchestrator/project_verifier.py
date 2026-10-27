@@ -20,6 +20,7 @@ from requests.exceptions import ReadTimeout
 
 from project_library import canonical_json, digest_json, read_document, safe_relative, write_document
 from project_scenario_content import read_native_contract
+from project_runtime_policy import check_python_runtime
 
 
 _DUPLICATE_RUNNER_SHA256 = frozenset({
@@ -43,6 +44,60 @@ _SCOPED_DUPLICATE_COLLECTOR = """        state['duplicate_identities'] = duplica
 """
 
 
+
+# 冻结内容中已核对的原生控制器；仅适配唯一版本判断，不改测试或插件。
+_PYTHON_RUNNER_SHA256 = frozenset({
+    '037082662ddf7b6c74db126abe13a7e6684586cfc9ae5225fc42551f942b5268',
+    '0ffc9f24d34a43d5e835566246d6488af99e9e78e1ab64e499dcdae24771b3d9',
+    '158bd0fd313e6f3fd645a01b4af10e150a08bd24fdcf828cf87ba08420e545db',
+    '1860b4986d577e399361624e127f28edc52fddd39d63425fd9f7fa472bf01686',
+    '18aef5146a6c1af1cc1129ad8604310659f8684aab60f83cd43a9af7e1cc0e2f',
+    '1dbafdf3306907abf4558bf959b4f62392da888f07cade1f2c98eb76eee1dcbb',
+    '21903b10c0cce2a04551685bbd2e221d5dc0a009ec93a0331e9cc3876228a633',
+    '234856de282a61843bd58d1f8e7eb21ce4a07fcf8ca26a5eb903f891287fd988',
+    '332c782b777a1c24e647d133a86154140a92760a68e59ae791084540191420a1',
+    '3bbf34e44c67ae040ade28f601634f7ef61af9c8f38da6fad1cb4e6cf8cd6ec0',
+    '3c96af2065e313156ff341ced4ed6f35c0756138d59fffcf09c4ddce0cb630ba',
+    '3e719ee08e402118d8612c1beecc0bbc705d3b90ff230eaaef6cc9ab10a847e3',
+    '3edb4206910fbcb92a5aa6ce698011f0de75e451c4ba078f40c1e122a3325bb5',
+    '3f550fa246911e822dfa0c529938b9ffa38bcd771f1ccb66e18788c331449fd3',
+    '4142098c7cd0e2c9f184a12de1d6209ce9ac61c318ef469e21c6fe362556b479',
+    '41ef9fd27615a74832029e37716758d0627cb44046f662f93adcc759cd6ffb22',
+    '47691fa38c305c5bb3043bbe94066d6a042e52075866b0c93f65ff772731f05a',
+    '48fca0ca6315fdcee9269acd673b62e865e11436f00cac47b1df666369b94f4d',
+    '4acca1633aea0ca25b4b8ced785d1b234c769e0d7223c4395cec519ed1391f14',
+    '539679710de2ccd340b385928bd7e33526a15318638737ccf637f027372025e4',
+    '54eb7162fa4f217dc815ab4193d37bdd12f191d897326deab031b65f2713e60c',
+    '5668ef850d7ec7886d4bafb0612a9676f47504e4229ba5c2ed3c72a23ba66ed2',
+    '5a8017493779a1e0164314bc1b99a852a1c378b59fe1f4aa00e3cc61aadfbfe0',
+    '5f74afea1195e2d51d6eb85899f4430a6c0e7b3b66cac086aa572f48fce751eb',
+    '710a135c7db1712cb59945a3cc2df50f8629be6b0ba2156190dd7fc4e94e396c',
+    '834a3705c301b60167179f0083deeb0618d71e578d0dd7399a98320c182f81e9',
+    '8427114908f90aed68fc0143a471756c82943b33e62dda3e08aafdca49f6fdde',
+    '89e86dd92304d819a341797e75659d9ee1322e4e304d6eca470d3dc4d4cc2ae2',
+    '8ba56caabd5d6bc736c7cef3f6f888680a86c825684ca5f2ebc90cbe3b873e10',
+    'a8fdc4721655636c354fc94fedde09290924da01f618fbdabf53b53758a57bdb',
+    'a9bfa25c3e00281d095ad36b01d196f3bfd7d1ecbf4c0ef585c9a29e7db716e7',
+    'aa63dd488a6b5e68358b10f577a3c5cd762edf3fb2e42c6940785db361366dd7',
+    'b27545c2e7a4a5f270bb75a28a19aca33a48c5a1bfb924f148cdc338d3251c76',
+    'b3e75e056b684fa6d5a6a4871bf8793b8422d373460562110207612c97ba65c3',
+    'b3e8963ecf3ddc022b4b23d3d0791ee2ff864037fb4e91f04a360ef309daf4a9',
+    'b921fcda4178ea5a0c0c562c281a51aebc2f826a9e8d3a02147481ccd6c04473',
+    'c269bb1a4c91930f5cd114e3f9f608d1783343b490eac924108804c7d066653c',
+    'c731c909d4a547aeb5435c1f964a017c76643b0dfed7d832182d6015ea1f29ca',
+    'ca072ccd14ca27001d3b7ea0c0918a2c6185beb0024c162488266ed8f53fcad1',
+    'cdd2955e760fe76e60ce5a11b28a1c7266bd6c619fcbe1d19c3685d4aec54e5c',
+    'd2baee592699a0bb040f17fdebac1776f3cf4ecc6e41acfc0893f9cd78c2cd72',
+    'd5af8be492c238351179969c8a5b2099552905cd92d8864174c4f8eda378079c',
+    'ed59327b8d2f60dc64cd64e494cff9abbfb9f1b5517b616dd746d2df85465117',
+    'f202f2252deee451abbb6bcf963e5b3d56c5ebe0dfd10caa8a6a19c48b824c4a',
+    'fa81331076a0898262b83f8c7d35554064794d17fd219439546d7ed99997bb84',
+    'fb4d87610fda41602c4c0c00fc3550fb23060f6eb5b05a52db6ec9c924c77692',
+    'fb830e46bde90d788f9fcc075596dec686bb94db702176ee4f1aa9feaa8bfee4',
+    'fc5bf6e1d6e85fbd8cc7d88c3deaf2d1844fb313dbfc10160b380d881de25d33',
+    'fd4ed43aaef58f3d27ac8445def84fc84876c748991a6dca36ec1ecb19c98352',
+})
+
 class _NativeRegressionControlError(ValueError):
     """表示冻结回归控制器不属于已确认可安全适配的版本。"""
 
@@ -54,9 +109,16 @@ def _native_regression_adapter(source: bytes, contract: dict) -> tuple[bytes, di
     :param contract: 原冻结回归合同。
     :return: 实际执行字节及可公开的摘要；不需要适配时摘要为 None。
     """
+    source, compatibility = _native_python_adapter(source)
     if not contract.get('duplicate_identities'):
-        return source, None
-    original = hashlib.sha256(source).hexdigest()
+        return source, compatibility
+    original_source = source
+    if compatibility:
+        # 重复身份适配校验原始冻结来源，兼容适配本身不能改变来源归属。
+        original_source = source.replace(b'    from project_runtime_policy import python_versions_match\n', b'', 1)
+        original_source = original_source.replace(b"not python_versions_match(contract['python'], sys.version.split()[0])",
+            b"contract['python'] != sys.version.split()[0]", 1)
+    original = hashlib.sha256(original_source).hexdigest()
     if original not in _DUPLICATE_RUNNER_SHA256:
         raise _NativeRegressionControlError('重复身份控制器版本未知，拒绝推测适配')
     anchor = _DUPLICATE_COLLECTOR.encode('utf-8')
@@ -66,7 +128,27 @@ def _native_regression_adapter(source: bytes, contract: dict) -> tuple[bytes, di
     return actual, {'name': 'required-node-duplicate-identities-v1', 'scope': 'required_nodes',
         'original_runner_sha256': original, 'effective_runner_sha256': hashlib.sha256(actual).hexdigest(),
         'expected_nodes': len(contract['nodes']), 'expected_duplicate_identities': len(contract['duplicate_identities']),
-        'preserves_frozen_duplicate_counts': True}
+        'preserves_frozen_duplicate_counts': True, 'python_compatibility': compatibility}
+
+
+def _native_python_adapter(source: bytes) -> tuple[bytes, dict | None]:
+    """仅为已核来源的历史控制器统一补丁兼容判断。
+
+    :param source: 原冻结控制器字节。
+    :return: 可信临时字节和原始／实际摘要；无旧判断时原样返回。
+    """
+    anchor = b"contract['python'] != sys.version.split()[0]"
+    if anchor not in source:
+        return source, None
+    original = hashlib.sha256(source).hexdigest()
+    binding = b'    plugins = _plugins(suite)\n'
+    if original not in _PYTHON_RUNNER_SHA256 or source.count(anchor) != 1 or source.count(binding) != 1:
+        raise _NativeRegressionControlError('原生回归 Python 控制器版本未知，请核对后更新')
+    actual = source.replace(binding, binding + b'    from project_runtime_policy import python_versions_match\n', 1)
+    actual = actual.replace(anchor, b"not python_versions_match(contract['python'], sys.version.split()[0])", 1)
+    return actual, {'name': 'python-patch-compatibility-v1', 'scope': 'python_runtime',
+        'original_runner_sha256': original, 'effective_runner_sha256': hashlib.sha256(actual).hexdigest(),
+        'preserves_frozen_contract': True}
 
 
 _SCHEMA_OBSERVER_OLD = '8769aa7c8a983dd0046d213ce3077ff3071725ed07e9655961493ff58b0744ea'
@@ -231,6 +313,13 @@ runpy.run_path('app.py',run_name='__main__')
 
 _NATIVE_EXECUTE = """import json,os,pathlib,shutil,subprocess,sys
 spec=json.load(open('/request-data/native.json'))
+sys.path.insert(0,'/request-data')
+from project_runtime_policy import ProjectRuntimeError,check_python_runtime
+try:
+    proof=check_python_runtime(spec['python_profile'],sys.version.split()[0])
+except ProjectRuntimeError as error:
+    print('VIBEBENCH_RUNTIME_ERROR_V1 '+json.dumps({'reason':error.code,'message':str(error),'details':error.details}),flush=True)
+    raise SystemExit(80)
 shutil.copytree('/source','/work/project')
 prepared=subprocess.run([sys.executable,'-m','venv','/work/python'],stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
 if prepared.returncode:
@@ -246,12 +335,13 @@ if prepared.returncode or installed.returncode:
 os.chdir('/work/project')
 paths=[str(pathlib.Path('/work/project')/p) for p in spec['python_paths']]
 site=next(pathlib.Path('/work/python/lib').glob('python*/site-packages'))
-(site/'project-source.pth').write_text('\\n'.join(paths)+'\\n')
+(site/'project-source.pth').write_text('\\n'.join(['/request-data',*paths])+'\\n')
 os.environ['PATH']='/work/python/bin:'+os.environ.get('PATH','')
 os.environ['PYTHONDONTWRITEBYTECODE']='1'
 os.environ['PROJECT_ANSWER_FILE']='/request-data/answer.txt'
 os.environ['PROJECT_CANDIDATE_ROOT']='/work/project'
 print('VIBEBENCH_NATIVE_READY_V1',flush=True)
+print('VIBEBENCH_PYTHON_RUNTIME_V1 '+json.dumps(proof),flush=True)
 completed=subprocess.run([python,'-I','-B','/request-data/'+spec['script'],*spec['args']],capture_output=True)
 sys.stdout.buffer.write(completed.stdout)
 sys.stderr.buffer.write(completed.stderr)
@@ -534,6 +624,13 @@ class ProjectVerifier:
                     staged_helper.chmod(0o644)
                     helper_mounts[str(self.host_data / staged_helper.relative_to(self.data))] = {
                         'bind': '/request-data/verification/expansion_coverage.py', 'mode': 'ro'}
+                    inner, inner_adapter = _native_python_adapter((project_root / 'verification/native_regression.py').read_bytes())
+                    adapter['python_compatibility'] = inner_adapter
+                    staged_inner = directory / 'arrow-native-regression.py'
+                    staged_inner.write_bytes(inner)
+                    staged_inner.chmod(0o644)
+                    helper_mounts[str(self.host_data / staged_inner.relative_to(self.data))] = {
+                        'bind': '/request-data/verification/native_regression.py', 'mode': 'ro'}
                 else:
                     source, adapter = _native_regression_adapter(source, contract)
             else:
@@ -555,6 +652,10 @@ class ProjectVerifier:
             (directory / 'answer.txt').write_text(answer, encoding='utf-8')
             (directory / 'answer.txt').chmod(0o644)
             payload = {'script': execution_script, 'args': args, 'python_paths': paths, 'requirements': requirements}
+            payload['python_profile'] = {key: profile[key] for key in ('python', 'python_compatibility') if key in profile}
+            policy = directory / 'project_runtime_policy.py'
+            policy.write_bytes(Path(__file__).with_name('project_runtime_policy.py').read_bytes())
+            policy.chmod(0o644)
             write_document(directory / 'native.json', payload, mode=0o644)
             with self._slots, self._native_cleanup(lambda:container):
                 if cancel and cancel.is_set():
@@ -584,6 +685,15 @@ class ProjectVerifier:
                         return {'status': 'cancelled', 'message': '当前交付验收已取消'}
                     container.reload()
                     if container.status!='running' or time.monotonic()>=deadline:
+                        failure_output = container.logs(stdout=True, stderr=False)
+                        if failure_output.startswith(b'VIBEBENCH_RUNTIME_ERROR_V1 '):
+                            try:
+                                fact = json.loads(failure_output.removeprefix(b'VIBEBENCH_RUNTIME_ERROR_V1 '))
+                                if fact.get('reason') == 'python_incompatible':
+                                    return {'status': 'error', 'message': fact['message'], 'reason': fact['reason'],
+                                        'details': fact['details']}
+                            except (ValueError, KeyError, TypeError):
+                                pass
                         return {'status':'error','message':'原生离线环境准备异常或超时'}
                     time.sleep(0.1)
                 try:
@@ -606,6 +716,14 @@ class ProjectVerifier:
                 if not output.startswith(b'VIBEBENCH_NATIVE_READY_V1\n'):
                     return {'status':'error','message':'原生准备阶段证明缺失，不能把环境异常算作业务失败'}
                 output=output.removeprefix(b'VIBEBENCH_NATIVE_READY_V1\n')
+                runtime_proof = None
+                if output.startswith(b'VIBEBENCH_PYTHON_RUNTIME_V1 '):
+                    proof_line, _, output = output.partition(b'\n')
+                    try:
+                        proof = json.loads(proof_line.removeprefix(b'VIBEBENCH_PYTHON_RUNTIME_V1 '))
+                        runtime_proof = check_python_runtime(profile, proof['actual_python'])
+                    except (ValueError, KeyError, TypeError):
+                        return {'status': 'error', 'message': '原生 Python 运行证明不符合环境策略'}
                 if completed.get('StatusCode') != 0 and not regression:
                     return {'status': 'failed', 'message': '原生业务观察未正常结束', 'stderr': errors,
                         **({'runtime_adapter': adapter} if adapter else {})}
@@ -628,7 +746,8 @@ class ProjectVerifier:
                         duplicate_match = isinstance(actual, dict) and actual.get('duplicate_identities') == contract['duplicate_identities']
                         valid = valid and duplicate_match
                     result = {'status':'passed' if valid else 'error' if isinstance(actual,dict) and actual.get('status')=='error' else 'failed',
-                        'regression':actual,'contract_digest':digest_json(contract),'suite_digest':digest_json(specification),'image':self.image}
+                        'regression':actual,'contract_digest':digest_json(contract),'suite_digest':digest_json(specification),'image':self.image,
+                        'python_runtime':runtime_proof}
                     if duplicate_match is not None:
                         result.update(duplicate_identities_match_contract=duplicate_match,
                             expected_duplicate_execution_count=len(contract['duplicate_identities']))
@@ -651,7 +770,8 @@ class ProjectVerifier:
                     actual = {key: value for key, value in actual.items() if key != 'feedback_codes'}
                     diagnostics = {'runtime_adapter': adapter, 'feedback_codes': codes}
                 return {'status': 'passed' if _same_json(actual, specification['expected']) and not diagnostics.get('feedback_codes') else 'failed',
-                    'actual': actual, 'suite_digest': digest_json(specification), 'image': self.image, **diagnostics}
+                    'actual': actual, 'suite_digest': digest_json(specification), 'image': self.image,
+                    'python_runtime': runtime_proof, **diagnostics}
         except _NativeRegressionControlError as error:
             return {'status': 'error', 'reason': 'unsupported_native_regression_runner', 'message': str(error)}
         except Exception as error:

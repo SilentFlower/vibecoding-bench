@@ -209,13 +209,15 @@ function callTool(name, toolCallId, args, signal) {
         signal?.removeEventListener('abort', abort);
         const complete = name === 'project_submit' && ['passed', 'deferred'].includes(result?.status)
           && result.round_complete === true;
-        if (complete) {
+        const yieldController = name === 'claude_start' && ['rejected', 'waiting'].includes(result?.status)
+          && result.controller_yield === true && typeof result.failure?.code === 'string';
+        if (complete || yieldController) {
           roundComplete = true;
-          // 已通过或安全暂存的目标无需额外推理；真实工具结果仍由 SDK 正常持久化。
+          // 目标收尾或启动故障交接后无需额外推理；真实回执仍由 SDK 正常持久化。
           session.setAutoCompactionEnabled(false);
         }
         const visible = name === 'claude_observe' ? observations.project(result, args.full_screen === true) : result;
-        resolve({content: [{type: 'text', text: JSON.stringify(visible)}], details: {}, terminate: complete});
+        resolve({content: [{type: 'text', text: JSON.stringify(visible)}], details: {}, terminate: complete || yieldController});
       },
       reject,
     });

@@ -416,6 +416,37 @@ window.ProjectsUI = (() => {
   }
 
   /**
+   * 用持久故障区分启动失败和暂停，不从 Pi 的总结推测原因。
+   * @param {object} work 工程公开摘要。
+   * @return {string} 当前工程状态。
+   */
+  function workStatus(work) {
+    if (work.failure && !work.failure.resolved_at && !['passed', 'stopped'].includes(work.status))
+      return work.started_at ? '恢复失败' : '启动失败';
+    return names[work.status] || work.status;
+  }
+
+  /**
+   * 当前任务和历史使用相同错误事实，旧记录不补造错误或次数。
+   * @param {object} work 工程公开摘要。
+   * @param {object|undefined} schedule 当前账号的真实计划。
+   * @return {string} 已转义的故障说明。
+   */
+  function failureDetails(work, schedule) {
+    const failure = work?.failure;
+    if (!failure) return '';
+    const resolved = Boolean(failure.resolved_at), next = !resolved && schedule?.enabled && schedule?.next_run_at;
+    const when = new Date(failure.last_at * 1000).toLocaleString('zh-CN', {hour12: false});
+    const phase = {preparing: '准备运行环境', recovering: '恢复原会话', starting: '启动与核对执行', cleanup: '收尾原执行'}[failure.phase] || '启动或恢复';
+    const plan = resolved ? '已恢复' : work.status === 'stopped' ? '任务已停止，保留上次故障供查询'
+      : next ? `下次重试 ${new Date(next * 1000).toLocaleString('zh-CN', {hour12: false})}`
+      : failure.code === 'startup_unknown' ? '执行结果未确认，请先人工核对现场'
+      : schedule && !schedule.enabled ? '自动运行已关闭，等待手动恢复'
+      : failure.retryable ? '等待重新安排恢复' : '处理原因后手动重试';
+    return `<div class="projects-failure${resolved ? ' is-resolved' : ''}" role="status"><strong>${escape(failure.message)}</strong><small>${escape(`失败阶段：${phase} · 连续失败 ${failure.attempt_count} 次 · 最近 ${when}`)}</small><small>${escape(plan)}</small></div>`;
+  }
+
+  /**
    * 显示公开被动额度和用户阈值，未知数值始终留空而非冒充零。
    * @param {object|undefined} admission 最近一次公开门禁视图。
    * @return {void}
@@ -466,7 +497,7 @@ window.ProjectsUI = (() => {
     const work = agent?.work, unfinished = work && !['passed', 'stopped', 'deferred'].includes(work.status);
     $('#projects-target-label').textContent = !work || unfinished ? '当前目标' : work.status === 'passed' ? '最近完成目标' : work.status === 'deferred' ? '待复验目标' : '最近停止目标';
     $('#projects-current').innerHTML = work
-      ? `<p class="projects-target-state">${unfinished ? escape(names[work.status] || work.status) : work.status === 'passed' ? '上一目标已验收通过' : work.status === 'deferred' ? '保留原会话，冷却后自动复验' : '上一目标已停止'}</p><strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p>`
+      ? `<p class="projects-target-state">${unfinished ? escape(workStatus(work)) : work.status === 'passed' ? '上一目标已验收通过' : work.status === 'deferred' ? '保留原会话，冷却后自动复验' : '上一目标已停止'}</p><strong>${escape(work.goal)}</strong><p class="hint">${escape(work.project_key)} · 原会话 ${escape(work.session_id.slice(0, 8))}</p>${failureDetails(work, agent.schedule)}`
       : '<p class="hint">尚未开始工程目标，Pi 会从授权项目池选择。</p>';
     $('#projects-budget').textContent = unfinished
       ? `目标累计耗时 ${duration(progress?.elapsed_work_sec)} · ${progress?.turn_active ? '本轮剩余' : '下轮可用时长'} ${duration(progress?.remaining_work_sec)}`
@@ -485,8 +516,12 @@ window.ProjectsUI = (() => {
     const pending = pendingActions.get(accountId), schedule = agent?.schedule, work = agent?.work;
     const unfinished = work && !['passed', 'stopped', 'deferred'].includes(work.status), admission = agent?.admission;
     const active = agent?.controller_active && ['running', 'waiting'].includes(agent.status);
+    const currentFailure = work?.failure && !work.failure.resolved_at
+      && (!agent?.message || agent.message === work.failure.message);
     let status = agent ? names[agent.status] || agent.status : '保存项目池后即可启动 Pi';
     if (pending) status = pending.action === 'start' ? '正在启动 / 恢复 Pi…' : '正在收口当前执行…';
+    else if (currentFailure && (active || agent?.status !== 'paused') && work.status !== 'stopped')
+      status = `${active && work.failure.generation < agent.generation ? '正在重试 · 上次' : ''}${workStatus(work)}${schedule?.state === 'waiting' ? ' · 等待自动恢复' : ''}`;
     else if (active) status = work?.status === 'verifying' ? '独立验收中'
       : unfinished ? 'Pi 指挥中' : 'Pi 指挥中 · 准备下一个目标';
     else if (schedule?.state === 'blocked' || agent?.status === 'blocked') status = '需要处理';
@@ -494,7 +529,8 @@ window.ProjectsUI = (() => {
     else if (schedule?.enabled) status = schedule.state === 'waiting' ? '等待运行条件' : '待机 · 已安排自动启动';
     $('#projects-state').textContent = status;
     $('#projects-overview').dataset.state = pending ? 'pending' : active ? 'running' : schedule?.state || agent?.status || 'off';
-    $('#projects-message').textContent = schedule?.state === 'blocked'
+    $('#projects-message').textContent = currentFailure
+      ? work.failure.message : schedule?.state === 'blocked'
       || (!active && schedule?.enabled && schedule.state === 'scheduled')
       ? schedule.message || agent?.message || '' : agent?.message || '';
     $('#projects-admission').textContent = !agent ? '选择账号并保存项目池后，查看运行条件。'
@@ -692,7 +728,7 @@ window.ProjectsUI = (() => {
     const element = $('#projects-events');
     const labels = {pi: 'Pi', input: '发送到 Claude', started: '原生会话', error: '异常',
       verification: '独立验收', verification_progress: '验收进度', input_unknown: '输入待核对', reconciled: '人工核对', recovery: '模型恢复', manual_retry: '人工重试',
-      guide_loaded: '业务指南'};
+      guide_loaded: '业务指南', runtime_recovered: '运行已恢复'};
     element.innerHTML = (recordPages.events.pages[recordPages.events.index]?.items || []).map(item => {
       const payload = item.payload;
       let message = payload.text || payload.message;
@@ -716,7 +752,8 @@ window.ProjectsUI = (() => {
    * @return {void}
    */
   function paintHistory(rows) {
-    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${namespace === 'warmup' ? `第 ${escape(Number.isInteger(item.cycle_no) && item.cycle_no > 0 ? item.cycle_no : 1)} 轮 · ` : ''}${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small></span><span>${escape(names[item.status] || item.status)}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
+    const agent = agents.find(item => item.account_id === accountId);
+    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${namespace === 'warmup' ? `第 ${escape(Number.isInteger(item.cycle_no) && item.cycle_no > 0 ? item.cycle_no : 1)} 轮 · ` : ''}${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small>${failureDetails(item, agent?.work?.id === item.id ? agent.schedule : undefined)}</span><span>${escape(workStatus(item))}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
     document.querySelectorAll('[data-work]').forEach(button => {
       button.onclick = () => perform(async () => {
         const current = revision, selected = accountId;
@@ -725,6 +762,10 @@ window.ProjectsUI = (() => {
         $('#projects-delivery').open = true;
         $('#projects-delivery-title').textContent = detail.work.goal;
         $('#projects-delivery-duration').textContent = workDuration(detail.work);
+        const facts = detail.work.failure?.details;
+        const currentAgent = agents.find(item => item.account_id === accountId);
+        $('#projects-delivery-failure').innerHTML = failureDetails(detail.work, currentAgent?.work?.id === detail.work.id ? currentAgent.schedule : undefined)
+          + (facts?.actual_python ? `<p class="hint">${escape(`验证版本：${facts.expected_python} · 实际版本：${facts.actual_python} · ${facts.python_compatibility === 'exact' ? '要求精确版本' : '允许同主次补丁差异'}`)}</p>` : '');
         $('#projects-submissions').innerHTML = detail.submissions.map(item => `<button class="btn btn-sm" type="button" data-submission="${escape(item.id)}">${escape(names[item.status] || item.status)} · ${escape(new Date(item.created_at * 1000).toLocaleString())}</button>`).join(' ') || '<p class="hint">尚未提交独立验收。</p>';
         $('#projects-delivery-files').innerHTML = ''; $('#projects-delivery-preview').textContent = '';
         document.querySelectorAll('[data-submission]').forEach(submission => {

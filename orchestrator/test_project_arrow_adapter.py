@@ -127,6 +127,8 @@ runpy=SimpleNamespace(run_path=lambda path:{'cover_features':fail})
                 (root / relative).mkdir(parents=True)
             (project / 'verification/expansion_regression.py').write_bytes(self.runner)
             (project / 'verification/expansion_coverage.py').write_bytes(self.legacy)
+            inner = (self.project / 'verification/native_regression.py').read_bytes()
+            (project / 'verification/native_regression.py').write_bytes(inner)
             contract = {'project': 'arrow', 'nodes': [{'id': 'tests/test_original.py::test_original', 'kind': 'Function', 'outcome': 'passed'}]}
             actual = {'status': 'passed', 'collection_matches_contract': True, 'collected': 1,
                       'collection_digest': digest_json([{'id': contract['nodes'][0]['id'], 'kind': 'Function'}])}
@@ -141,6 +143,10 @@ runpy=SimpleNamespace(run_path=lambda path:{'cover_features':fail})
                     if mount['bind'] == '/request-data/verification/expansion_coverage.py')
                 self.assertEqual(self.current, staged.read_bytes())
                 self.assertEqual(self.legacy, (project / 'verification/expansion_coverage.py').read_bytes())
+                staged_inner = next(Path(path) for path, mount in kwargs['volumes'].items()
+                    if mount['bind'] == '/request-data/verification/native_regression.py')
+                self.assertIn(b'python_versions_match', staged_inner.read_bytes())
+                self.assertEqual(inner, (project / 'verification/native_regression.py').read_bytes())
                 self.assertEqual('none', kwargs['network_mode'])
                 return child
 
