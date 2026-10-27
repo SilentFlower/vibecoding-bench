@@ -26,6 +26,8 @@ class ContractObserverTests(unittest.TestCase):
         cls.addClassCleanup(cls.temporary.cleanup)
         cls.references = Path(cls.temporary.name)
         cls.cases = {
+            'chardet': ('CHARDET-O04-DEV', 'project_chardet_batch_observer.py',
+                'chardet-batch-observer-legacy.txt', ['library', 'app'], 'batch_results'),
             'babel': ('BA-PREFERENCES-DEV', 'project_locale_preferences_observer.py',
                 'babel-preferences-observer-legacy.txt', ['library'], 'locale_preferences_quality'),
             'bibtexparser': ('BIBTEXPARSER-O03-DEV', 'project_pages_observer.py',
@@ -196,6 +198,71 @@ module.NormalizePages = Spaced
                 ('import babel.core as module\nmodule.negotiate_locale=lambda *args,**kwargs:None', 'locale_preferences_legacy')):
             self.assertIn(code, self.observe('babel', prelude)['feedback_codes'])
 
+    def test_chardet_reasonable_indexes_and_error_representations_pass(self):
+        """两种连续编号及三种明确错误表示均保持相同业务语义。:return: None。"""
+        for offset in (0, 1):
+            for error_form in ('string', 'mapping', 'exception'):
+                prelude = ('import chardet.batch as module\noriginal=module.detect_many\n'
+                    'def alternate(records, **kwargs):\n'
+                    '    """只转换公开合同未限定的表示。:param records: 记录。:param kwargs: 策略。:return: 结果迭代器。"""\n'
+                    '    for row in original(records, **kwargs):\n'
+                    '        row=dict(row)\n        row["index"] += ' + str(offset - 1) + '\n'
+                    '        if row["error"] is not None:\n'
+                    '            if ' + repr(error_form) + ' == "mapping":row["error"]={"reason":row["error"]}\n'
+                    '            if ' + repr(error_form) + ' == "exception":row["error"]=ValueError("局部记录失败")\n'
+                    '        yield row\nmodule.detect_many=alternate\n')
+                with self.subTest(offset=offset, error_form=error_form):
+                    report = self.observe('chardet', prelude)
+                    self.assertTrue(report['business'], report)
+                    self.assertEqual([], report['feedback_codes'])
+                    self.assertEqual(3, self.observe('chardet', prelude, public=True)['executed'])
+
+    def test_chardet_real_behavior_errors_still_fail(self):
+        """结果、顺序、惰性、局部隔离、策略、上游与真实检测错误仍拒绝。:return: None。"""
+        variants = {
+            'batch_results': 'row["result"]={"encoding":"fake"} if row["error"] is None else None',
+            'batch_order': 'row["index"]=0',
+            'batch_errors': 'row["result"]={"encoding":"fake"} if row["error"] is not None else row["result"]',
+        }
+        for code, body in variants.items():
+            prelude = ('import chardet.batch as module\noriginal=module.detect_many\n'
+                'def broken(records, **kwargs):\n'
+                '    """注入可观察的业务错误。:param records: 记录。:param kwargs: 策略。:return: 错误记录。"""\n'
+                '    for row in original(records, **kwargs):\n        row=dict(row)\n        ' + body
+                + '\n        yield row\nmodule.detect_many=broken\n')
+            with self.subTest(code=code):
+                self.assertIn(code, self.observe('chardet', prelude)['feedback_codes'])
+        prelude = ('import chardet.batch as module\noriginal=module.detect_many\n'
+            'module.detect_many=lambda records,**kwargs:iter(list(original(records,**kwargs)))')
+        self.assertIn('batch_laziness', self.observe('chardet', prelude)['feedback_codes'])
+        prelude = ('import chardet.batch as module\noriginal=module.detect_many\n'
+            'module.detect_many=lambda records,**kwargs:original(records)')
+        self.assertIn('batch_policies', self.observe('chardet', prelude)['feedback_codes'])
+        prelude = '''import chardet.batch as module
+original=module.detect_many
+def swallowed(records, **kwargs):
+    """错误地吞掉上游异常。:param records: 输入记录。:param kwargs: 策略。:return: 部分结果。"""
+    try:
+        yield from original(records, **kwargs)
+    except LookupError:
+        return
+module.detect_many=swallowed
+'''
+        self.assertIn('batch_upstream', self.observe('chardet', prelude)['feedback_codes'])
+        prelude = '''import chardet.batch as module
+original_detect=module.detect
+cache={}
+def cached(data, should_rename_legacy=False):
+    """错误地复用旧检测结果。:param data: 字节。:param should_rename_legacy: 选项。:return: 缓存结果。"""
+    key=(bytes(data),should_rename_legacy)
+    if key not in cache:cache[key]=original_detect(data,should_rename_legacy=should_rename_legacy)
+    return dict(cache[key])
+module.detect=cached
+'''
+        self.assertIn('batch_detection', self.observe('chardet', prelude)['feedback_codes'])
+        self.assertIn('batch_api', self.observe('chardet',
+            'import chardet.batch as module\nmodule.detect_many=None')['feedback_codes'])
+
     def test_wrong_pages_behaviors_remain_failures_with_specific_feedback(self):
         """归一、未知格式、原值、非原地修改和其它字段错误均拒绝。:return: None。"""
         variants = {
@@ -245,6 +312,12 @@ module.NormalizePages=Inplace
         self.assertNotIn('PRIVATE_OUTPUT', json.dumps(feedback))
         self.assertEqual(feedback, ProjectsVerification._business_feedback(
             {'feedback_codes': ['locale_preferences_exclusions', 'pages_original'] * 100}))
+        batch_feedback = ProjectsVerification._business_feedback({'business': {'feedback_codes': ['batch_errors']},
+            'previous_objectives': [{'report': {'feedback_codes': ['batch_order', 'PRIVATE_OUTPUT']}}]})
+        self.assertEqual(2, len(batch_feedback))
+        self.assertIn('局部失败', batch_feedback[0])
+        self.assertIn('编号可以从零或一开始', batch_feedback[1])
+        self.assertNotIn('PRIVATE_OUTPUT', json.dumps(batch_feedback))
 
 
 if __name__ == '__main__':

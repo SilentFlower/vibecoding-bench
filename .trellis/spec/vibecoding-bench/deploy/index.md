@@ -25,7 +25,7 @@
 | [Remote Deploy](./remote-deploy.md) | 4 件套部署清单、HOST_BENCH_DATA 解析、端口冲突、Security Group | Filled |
 | [Auth Design](./auth-design.md) | Cookie session 中间件契约、为什么不用 Basic Auth、WS 间接保护 | Filled |
 | [Claude Code 官方协议抓包](./official-protocol-capture.md) | 权限模式/模型矩阵、正式代理链路、限频、CCH 与 `cc_version` 漂移复核 | Filled |
-| [v3 固定账号环境与交付](../backend/account-runtime-v3.md) | 两镜像联合清单、独立 Compose/端口/数据、生命周期与本地隔离验收 | Filled |
+| [v3 固定账号环境与交付](../backend/account-runtime-v3.md) | 两镜像联合清单、独立 Compose/端口/数据、生命周期、本地隔离验收与部署后旧镜像回收 | Filled |
 
 ---
 
@@ -36,6 +36,7 @@
 3. **远程重启 cc2api / claude-code-gateway**:读 [Remote Deploy](./remote-deploy.md) 的 `cc2api.env` 场景
 4. **加 / 改鉴权**:读 [Auth Design](./auth-design.md) 看中间件豁免规则与 API 契约
 5. **升级 Claude Code 或核对 cc2api wire 画像**:读 [Claude Code 官方协议抓包](./official-protocol-capture.md)，按正式链路生成当前版本基线和模式矩阵
+6. **部署 v3 或清理旧镜像**:读 [v3 部署成功后的旧镜像回收](../backend/account-runtime-v3.md#scenario-v3-部署成功后的旧镜像回收)，每次部署健康验收后定向回收，保留当前批次、最近两个完整历史批次及全部容器引用的镜像，再复核空间与服务
 
 每个文件结尾的 **Common Mistakes** 是上次实际踩到的坑,新人先看那部分。
 

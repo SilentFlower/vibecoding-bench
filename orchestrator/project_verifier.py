@@ -203,6 +203,14 @@ _ATTRS_FEEDBACK_CODES = frozenset(('attrs_report_order', 'attrs_report_identity'
     'attrs_report_composites', 'attrs_report_base_exception'))
 
 _CONTRACT_OBSERVERS = {
+    'verification/CHARDET-O04-DEV-observe.py': {
+        'python_paths': ['library', 'app'], 'filename': 'project_chardet_batch_observer.py',
+        'original_sha256': 'adcf87f9f11228e81eaf0d8ada307dea2673086530613f7c645f6961ade2dc37',
+        'current_sha256': '888ee5787ffcba578725bcea8174bf6f9118c4fef75ea1d110d7209d7016cbab',
+        'name': 'chardet-batch-contract-v1', 'label': 'Chardet',
+        'feedback_codes': frozenset(('batch_api', 'batch_results', 'batch_order', 'batch_laziness',
+            'batch_errors', 'batch_policies', 'batch_upstream', 'batch_detection')),
+    },
     'verification/BA-PREFERENCES-DEV-observe.py': {
         'python_paths': ['library'], 'filename': 'project_locale_preferences_observer.py',
         'original_sha256': 'c9470d69d118400e7042fe6f7ccb702d9d6a0107f656d5b7d2de72e2bf8bfe99',

@@ -258,7 +258,15 @@ class ProjectsVerification:
             'pages_immutable': '默认页码变换修改了原库、原页码或原元数据',
             'pages_fields': '页码变换改变了其它字段或文献身份',
             'pages_idempotent': '重复页码变换改变了归一结果或首次原值',
-            'pages_default_stack': '可选页码中间件改变了默认解析栈的行为'}
+            'pages_default_stack': '可选页码中间件改变了默认解析栈的行为',
+            'batch_api': '缺少公开约定的惰性批量编码检测接口',
+            'batch_results': '批量检测未保留真实编码结果、选项或重复记录标识',
+            'batch_order': '记录顺序或连续编号不正确；编号可以从零或一开始',
+            'batch_laziness': '创建、读取首条或关闭批次时提前消费了后续记录',
+            'batch_errors': '局部失败缺少错误事实、仍带成功结果或阻断后续合法记录',
+            'batch_policies': '停止或抛错策略未生效，或消费了失败后的记录',
+            'batch_upstream': '上游迭代器异常被吞掉、替换或误当作局部记录错误',
+            'batch_detection': '未逐条执行独立真实检测，或把原始字节误当作批量记录'}
         result = []
 
         def collect(value, depth=0):

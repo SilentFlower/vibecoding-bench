@@ -652,6 +652,7 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 ### 1. Scope / Trigger
 
 - 修改 `ProjectVerifier`、`ProjectsVerification`、`ProjectsService` 的验收归属、失败反馈、返工与恢复，以及 Pi 工具收尾时适用；项目和工程养号共用机制。
+- 新增或修改任一独立业务观察器、复核“公开测试通过但 business=false”或同一候选重复失败时，先按下方跨项目规则归因，再决定修候选、修验收器或处理环境。
 
 ### 2. Signatures
 
@@ -671,9 +672,35 @@ failure_facts[] = {phase, reason, test_id?, exception_type?, required_percent?, 
 attrs 受信业务输出 = {candidate_import: bool, business: bool, feedback_codes: list[str]}
 _native_contract_observer_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]
 ProjectsVerification._business_feedback(report: dict) -> list[str]
+runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
+                   preserves_frozen_contract, ...}
 ```
 
 ### 3. Contracts
+
+**跨项目归因与修正规则**：
+
+1. **每个拒绝条件必须能追溯到公开要求。** 以原 work 的公开任务、材料、已确认澄清和兼容承诺为依据；参考补丁和私有断言用于验证这些要求，不能反过来追加唯一实现方式。异常子类、布尔真值、编号起点、空白和输出表示等未约定细节，按可观察业务含义判断；合同明确承诺的原对象身份、顺序、不变性和错误传播仍须精确验证。Chardet 的错误表示可兼容，attrs 明确要求的原异常对象身份不能因此改成字符串。
+2. **先固定事实，再决定谁需要修复。** 核对原 work/submission、候选摘要、冻结公开合同、实际观察器与 Python/离线依赖；区分授权范围失败、真实业务失败、原生/历史回归失败、验收器自身误判和基础设施错误。公开示例全通过只是调查线索，不能单独证明候选正确；`business=false` 或汇总失败数也不能单独证明候选有错。
+3. **观察器本身也要有反例。** 同一修正版须同时覆盖原版明确不满足、参考实现满足、符合公开合同的替代实现满足、真实功能错误仍失败。按行为拆分检查，用独立输入、实例和计数；不要让检查器的重复调用、一次性迭代器消费或辅助检查异常污染其它结论。每个被容忍的差异都要有一项邻近的真实错误反例，不能用全局宽松比较替代具体合同判断。
+4. **失败必须给出可行动事实。** 独立报告业务、原生回归、历史目标和辅助检查阶段；经来源核对后将固定 `feedback_codes` 或有界 `failure_facts` 映射到公开行为说明。反馈应说明哪项行为未满足，不能只返回 `business=false` 或总失败数，也不能把私有断言、原始日志及异常正文交给模型猜测。
+5. **冻结纠错复用已有受信路径。** 先保存旧字节证据，只有脚本、参数、路径、严格 expected 和已知 SHA256 匹配才使用控制端临时可信副本；记录 `runtime_adapter` 的原始/实际摘要，不原地改历史合同或结果，不因同名脚本就自动替换。未来内容与可信副本同步；格式兼容不改变严格布尔、来源证明和诊断白名单协议。
+6. **修规则时同时处理反馈污染。** 旧误判可能已经让 Pi/Claude 猜测时区、路径、覆盖率或增加 `pragma: no cover`。复核这些改动是否有真实需求依据，追加 `verification_correction` 说明已核实事实；首次纠错隔离旧 Pi 推理，保留原 Claude session/workspace、历史和累计耗时。重复提交、重启、缩短冷却或更换模型都不能修正错误规则；沿既有有界返工、暂存和冷却恢复，不借此取消身份、未知投递及严格释放门禁。
+7. **验收执行版本与上线结果单独证明。** 用原冻结候选经过真实 `verify_native` 禁网入口验证业务、公开示例、完整原生回归和此前接受的能力，必要语义审查照常进行。发布后核对真正执行的后端/可信脚本摘要和 `runtime_adapter`，再走原提交验收链；源码已提交、CI 成功或仅更新 Pi 入口都不能证明线上验收器已加载修复。离线通过不直接写成线上 passed。
+
+**已发生的误判与复用依据**：
+
+| 案例 | 实际踩坑点 | 后续检查规则与证据入口 |
+| --- | --- | --- |
+| Schema / agate | 强制未约定的异常子类，并把 `min=None` 当作必然非法 | 使用明确不可比较的非法规则验证拒绝，兼容合同内的异常差异；`_native_schema_adapter`，提交 `ecc131dd` |
+| 加权聚合 / agate | 要求 `(None, -3)` 报错，与“任一值为空先跳过”冲突；修复曾只更新 Pi 入口而未加载到验收后端 | 按公开的空值优先级构造独立负权重反例，发布后核对实际验收器；`_native_weighted_adapter`，提交 `3334b627`，执行版本排查见会话 `01a171a2-4a06-7fd1-9b5b-b4ece6f0d3ce` |
+| Arrow | 空格式列表的合法 ValueError/ParserError 被当作失败，辅助覆盖检查又污染原测试 setup | 兼容已确认的异常范围，辅助边界与原生回归独立计数；`_native_arrow_adapter`、`test_project_arrow_adapter`，提交 `76e7c7e2` |
+| attrs | 未公开的 `raise_errors=1` 严格 bool 要求，以及观察器重复调用污染一次执行计数 | 独立实例/计数检验公开验证语义；`project_attrs_observer.py`、`test_project_attrs_adapter`，提交 `13ee9685` |
+| Babel | 对未定义的广泛零权重排除与具体正偏好冲突强制单一结果 | 接受两种符合公开合同的解释，同时单独拒绝违反明确通配符排除的实现；`project_locale_preferences_observer.py`，提交 `0e069d51` |
+| Bibtexparser | 将保留首尾空白的正确页码归一化判错 | 比较约定的数字和双连字符，继续保护原值、对象及其它字段；`project_pages_observer.py`，提交 `0e069d51` |
+| Chardet | 强制从一编号和字符串 TypeError，公开合同未规定；模型收到泛化失败后反复猜测 | 兼容合理编号和错误表示，分别检查惰性、策略、隔离与真实逐条检测；`project_chardet_batch_observer.py`、`test_project_contract_observers` |
+
+上述案例的逐项摘要、允许的兼容范围和协议约束以下方适配器合同为准；不能把一个项目的例外推广到其它未核实目标。历史取舍可用 `trellis mem context <session-id> --grep <关键词>` 复核：自动收敛与反馈污染见 `01a17427-4031-7eb2-80c0-9bf18aeeb897`，真实通过率与合理差异见 `01a17838-7918-7600-a7a5-67fb05472e0e`。
 
 - 历史唯一活动工作索引幂等迁移，排除 `passed/stopped/deferred`；SQL 名称在养号空间独立映射。待复验保留原 work、原冻结合同、源码、Claude session、原始 Pi 历史和累计用量，不产生通过证明。
 - 三次业务失败或同一候选连续两次失败后暂存；已持久提交参与计数，不因重启或换控制代次重置。基础设施错误仍先本地重验两次，失败后自动暂存；验证器抛错也须先确认严格释放。连续两轮指挥超时同样暂存，防止未提交而无限续跑。
@@ -687,7 +714,8 @@ ProjectsVerification._business_feedback(report: dict) -> list[str]
 - attrs 诊断对象只允许上述三个键，两个结果字段必须为严格布尔。`feedback_codes` 仅允许 `attrs_report_order`、`attrs_report_identity`、`attrs_report_once`、`attrs_report_values`、`attrs_report_aggregate`、`attrs_report_disabled`、`attrs_report_composites`、`attrs_report_base_exception`，必须去重，且 `business == (not feedback_codes)`；拆出诊断后仍严格比较原 expected。其他未授权观察器不因此放宽输出协议。
 - Babel `BA-PREFERENCES-DEV-observe.py` 只接受 `args=[]`、`python_paths=['library']`、严格双布尔 expected，原摘要 `c9470d69d118400e7042fe6f7ccb702d9d6a0107f656d5b7d2de72e2bf8bfe99` 或修正版摘要 `c387742407ebeb5cc5f6d0fae0180d4e60cb3ea2ed5975996116faa1f2b39015`。实际执行控制端 `project_locale_preferences_observer.py`，审计名 `babel-locale-preferences-contract-v1`。质量、同权顺序、别名、实际可用拼写、通配符排除、输入边界、一次物化和旧接口继续验证；`en;q=0, en-US;q=1, fr;q=0.1` 的未确定冲突允许前缀排除或更具体正偏好优先两种解释，不将其强制收窄为一个结果。
 - Bibtexparser `BIBTEXPARSER-O03-DEV-observe.py` 只接受 `args=[]`、`python_paths=['library','app']`、严格双布尔 expected，原摘要 `8d95cce3afe191108213fe59aadef3449522f4a75c2039448d78623e509881e2` 或修正版摘要 `df64b50177e178ee88d2fd1fad08bf494725b071528e53c93ddd6dacc802fb60`。实际执行控制端 `project_pages_observer.py`，审计名 `bibtexparser-pages-contract-v1`。明确数字范围比较时容忍首尾空白，仍检查数字原文、双连字符、未知格式整体保持、首次原值、非原地修改、其它字段、幂等和默认解析栈。
-- 上述两类观察器与 attrs 使用相同的三键严格诊断协议：两个严格布尔、无额外键、类别不重复且 `business == (not feedback_codes)`。Babel 类别使用 `locale_preferences_` 前缀，后缀仅为 `api/quality/order/matching/exclusions/headers/once/legacy`；页码类别使用 `pages_` 前缀，后缀仅为 `api/ranges/unknown/original/immutable/fields/idempotent/default_stack`。类别按当前适配器分别校验，未知来源及控制端摘要不符返回验收环境 error，任意诊断或非法协议不能通过。未来项目内容使用控制端字节相同的副本，并同步公开合同、任务提示、说明与示例；不改写既有冻结内容。
+- Chardet `CHARDET-O04-DEV-observe.py` 只接受 `args=[]`、`python_paths=['library','app']`、严格双布尔 expected，原摘要 `adcf87f9f11228e81eaf0d8ada307dea2673086530613f7c645f6961ade2dc37` 或修正版摘要 `888ee5787ffcba578725bcea8174bf6f9118c4fef75ea1d110d7209d7016cbab`。实际执行控制端 `project_chardet_batch_observer.py`，审计名 `chardet-batch-contract-v1`。公开合同未规定编号起点和错误表示，连续编号可从零或一开始，失败信息可为非空字符串、异常对象或包含错误事实的字典；不强制错误必须是字符串 `TypeError`。仍检查真实编码及选项、重复标识、顺序、创建/读取/关闭时的惰性、局部错误无成功结果、continue/stop/raise、后续输入保留、上游原异常传播、逐条独立真实检测和原始字节拒绝。
+- 上述三类观察器与 attrs 使用相同的三键严格诊断协议：两个严格布尔、无额外键、类别不重复且 `business == (not feedback_codes)`。Babel 类别使用 `locale_preferences_` 前缀，后缀仅为 `api/quality/order/matching/exclusions/headers/once/legacy`；页码类别使用 `pages_` 前缀，后缀仅为 `api/ranges/unknown/original/immutable/fields/idempotent/default_stack`；批检测类别使用 `batch_` 前缀，后缀仅为 `api/results/order/laziness/errors/policies/upstream/detection`。类别按当前适配器分别校验，未知来源及控制端摘要不符返回验收环境 error，任意诊断或非法协议不能通过。未来项目内容使用控制端字节相同的副本，并同步公开合同、任务提示、说明与示例；不改写既有冻结内容。
 - 公开业务反馈只映射受信枚举，不透传任意诊断字符串；递归只读取 `business/regression/previous_objectives[].report`，深度至多 5，每层历史目标至多 16，结果最多八项去重说明。具体反馈存在时替代泛化返工提示，原 `_public_facts` 的私有内容过滤和总预算继续生效。
 - 已核实错误通过 `verification_correction` 事件追加事实，旧提交和原始记录留档；新纠错第一次隔离 Pi 旧推理，原 Claude 会话继续复用。该机制不自动绕过权限、身份、认证、未知输入或严格清理冲突。
 
@@ -695,6 +723,9 @@ ProjectsVerification._business_feedback(report: dict) -> list[str]
 
 | 条件 | 结果 |
 | --- | --- |
+| 只有公开示例通过、business=false 或汇总失败数 | 固定原候选并对照公开合同和逐项事实调查，不直接改候选或放行 |
+| 拒绝理由只有参考补丁细节、观察器重放或辅助检查污染 | 先复核验收器，按精确来源修正并补合理变体及真实错误反例 |
+| 源码/CI/Pi 已更新，但实际验收摘要仍旧 | 保留现场，补齐真正执行后端的发布和原目标复验，不重复要求模型迎合旧错误 |
 | 空格式列表合法拒绝 | 兼容约定内异常子类；错误接受输入仍失败 |
 | 新能力边界失败 | 单列 feature_coverage；不污染第一个原测试的 setup |
 | 三次业务失败／相同候选第二次失败／两轮超时 | 安全暂存，后续处理其他可执行项目 |
@@ -706,6 +737,7 @@ ProjectsVerification._business_feedback(report: dict) -> list[str]
 | attrs 结果出现额外键、非 bool、未知/重复类别或 business 与类别矛盾 | failed，不将任意诊断投影到公开事实 |
 | Babel 或页码旧脚本摘要已确认且协议匹配 | 执行受信临时副本，旧脚本和旧结果保留审计 |
 | Babel 冲突采用合理解释／页码仅保留首尾空白 | 不因未约定细节拒绝；其它公开功能仍须逐项通过 |
+| Chardet 从零编号、错误为结构化事实或异常对象 | 按公开行为验收；编号乱序、错误记录仍有成功结果、预读、吞异常或复用旧检测仍失败 |
 | 忽略通配符排除、破坏页码数字／来源、修改输入 | failed，并返回对应公开行为类别 |
 | 新观察器来源未知、可信副本摘要不符／诊断协议非法 | 来源错误为 error；非法输出为 failed，不放行或透传任意正文 |
 
@@ -717,12 +749,14 @@ ProjectsVerification._business_feedback(report: dict) -> list[str]
 - attrs 正常：宽松真值实现和严格 bool 实现均按相同公开功能矩阵验收；若旧目标命中已核验来源，使用可信副本执行，原报告留档。错误：要求候选为了隐藏的 `raise_errors=1` 断言改代码；正确：移除未公布要求，同时用原生回归与独立错误反例证明没有放宽真实业务合同。
 - Babel 边界：可用 `en_US/fr` 时，对未明确的冲突偏好分别接受两种现有解释；错误是因此跳过所有排除检查，正确是另用 `en;q=0, *` 等明确用例继续拒绝选回被排除语言的实现。
 - 页码边界：`' 001 - 009 '` 变为 `'001--009'` 或 `' 001--009 '` 均可接受，首次原值仍须精确保留；错误是仅做 strip 后接受未转换的连字符，正确是同时检查数字文本、双连字符及不变性。
+- 批检测边界：从零编号且 `error={'type':'ValueError','message':'...'}` 的局部失败与从一编号、错误为字符串的实现都可通过。错误是要求模型猜测参考补丁的编号和错误类型；正确是核对连续顺序、无成功结果、后续输入保留及真实检测，并按受信类别返回具体失败事实。
 
 ### 6. Tests Required
 
+- 新增/修改观察器的准入证据必须覆盖原版、参考实现、合理替代实现和真实错误四类，分别记录业务、公开测试、完整原生/历史回归结果；复用 `scripts/validate-development-content.py`、`scripts/validate-development-sequences.py` 及对应适配器回归。已存在的精确版本兼容修正还必须用原失败冻结候选经过真实 `ProjectVerifier.verify_native` 复验，并核对旧字节不变、实际执行摘要和新增的具体失败反馈；未来发布须另核对线上生效。
 - `test_project_arrow_adapter`：两种合法异常、错误接受输入、来源摘要保护、真实 pytest 节点不受辅助失败污染、覆盖率数值及私有日志边界、真实入口只读辅助挂载。
 - `test_project_attrs_adapter`：新旧字节与分发副本一致、未知来源环境错误、真实入口临时暂存/只读挂载、严格结果协议、严格 bool 与真值两种合法实现、八类真实错误反例、历史嵌套反馈和私有内容边界。真实候选另经离线 Docker 业务、公开六项及冻结原生回归验证；业务通过不能替代语义审查或历史回归。
-- `test_project_contract_observers`：Babel、页码参考实现及两类合理变体通过业务与公开示例；错误权重/顺序/排除/输入边界/重复消费、页码未规范化/未知格式被改/原值丢失/输入或其它字段被改等真实反例失败并有具体类别。核对新旧摘要、未来副本一致、真实入口只读挂载、严格三键协议、历史嵌套反馈与私有内容过滤；真实冻结候选另经禁网产品入口业务及原生回归，不能把离线结果直接写成线上通过。
+- `test_project_contract_observers`：Babel、页码和批检测参考实现及合理变体通过业务与公开示例；批检测覆盖两种编号与三种错误表示。错误权重/顺序/排除/输入边界/重复消费、页码未规范化/未知格式被改/原值丢失/输入或其它字段被改、批检测错误结果/编号/预读/错误隔离/策略/上游异常/检测缓存等真实反例失败并有具体类别。核对新旧摘要、未来副本一致、真实入口只读挂载、严格三键协议、历史嵌套反馈与私有内容过滤；真实冻结候选另经禁网产品入口业务及原生回归，不能把离线结果直接写成线上通过。
 - `test_projects_verification_recovery`：三次不同候选、重复相同候选、双空间冷却、服务重启后的同 work/session、验证器抛错、连续两轮超时、取消竞争、人工停止及一次纠错上下文隔离。
 - `host.test.mjs`：待复验与 passed 均只在真实 project_submit 和布尔收尾标记下结束；普通失败或其他工具不能终止；原结果先持久化。
 
