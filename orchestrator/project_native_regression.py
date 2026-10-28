@@ -1657,7 +1657,7 @@ def _system_libraries(specification: tuple[str, str]) -> list[dict]:
 
 def _run(options) -> dict:
     """构建并执行可信测试树。@param options 已验证命令参数。@return 最终报告。"""
-    from project_runtime_policy import python_versions_match
+    from project_runtime_policy import python_plugins_match, python_versions_match
 
     suite = SUITES[options.project]
     framework = suite.get('framework', 'pytest')
@@ -1670,7 +1670,8 @@ def _run(options) -> dict:
             or contract.get('baseline_digest') != baseline_digest):
         raise ValueError('冻结回归 contract 与原版来源不一致')
     plugins = _plugins(suite)
-    if contract is not None and (contract['plugins'] != plugins or not python_versions_match(contract['python'], sys.version.split()[0])):
+    if contract is not None and (not python_plugins_match(contract['plugins'], plugins)
+            or not python_versions_match(contract['python'], sys.version.split()[0])):
         raise RuntimeError('原生回归环境已变，必须先校准同平台原版 contract')
     if framework in ('unittest', 'nose2') and contract is not None and contract.get('framework') != framework:
         raise ValueError('原生框架必须使用同入口校准的冻结合同')

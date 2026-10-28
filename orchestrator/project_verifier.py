@@ -45,7 +45,7 @@ _SCOPED_DUPLICATE_COLLECTOR = """        state['duplicate_identities'] = duplica
 
 
 
-# 冻结内容中已核对的原生控制器；仅适配唯一版本判断，不改测试或插件。
+# 冻结内容中已核对的原生控制器；仅适配版本判断，保留测试和插件源码摘要。
 _PYTHON_RUNNER_SHA256 = frozenset({
     '037082662ddf7b6c74db126abe13a7e6684586cfc9ae5225fc42551f942b5268',
     '0ffc9f24d34a43d5e835566246d6488af99e9e78e1ab64e499dcdae24771b3d9',
@@ -109,16 +109,10 @@ def _native_regression_adapter(source: bytes, contract: dict) -> tuple[bytes, di
     :param contract: 原冻结回归合同。
     :return: 实际执行字节及可公开的摘要；不需要适配时摘要为 None。
     """
+    original = hashlib.sha256(source).hexdigest()
     source, compatibility = _native_python_adapter(source)
     if not contract.get('duplicate_identities'):
         return source, compatibility
-    original_source = source
-    if compatibility:
-        # 重复身份适配校验原始冻结来源，兼容适配本身不能改变来源归属。
-        original_source = source.replace(b'    from project_runtime_policy import python_versions_match\n', b'', 1)
-        original_source = original_source.replace(b"not python_versions_match(contract['python'], sys.version.split()[0])",
-            b"contract['python'] != sys.version.split()[0]", 1)
-    original = hashlib.sha256(original_source).hexdigest()
     if original not in _DUPLICATE_RUNNER_SHA256:
         raise _NativeRegressionControlError('重复身份控制器版本未知，拒绝推测适配')
     anchor = _DUPLICATE_COLLECTOR.encode('utf-8')
@@ -142,10 +136,14 @@ def _native_python_adapter(source: bytes) -> tuple[bytes, dict | None]:
         return source, None
     original = hashlib.sha256(source).hexdigest()
     binding = b'    plugins = _plugins(suite)\n'
-    if original not in _PYTHON_RUNNER_SHA256 or source.count(anchor) != 1 or source.count(binding) != 1:
+    plugins = b"contract['plugins'] != plugins"
+    if (original not in _PYTHON_RUNNER_SHA256 or source.count(anchor) != 1
+            or source.count(binding) != 1 or source.count(plugins) != 1):
         raise _NativeRegressionControlError('原生回归 Python 控制器版本未知，请核对后更新')
-    actual = source.replace(binding, binding + b'    from project_runtime_policy import python_versions_match\n', 1)
+    actual = source.replace(binding,
+        binding + b'    from project_runtime_policy import python_plugins_match, python_versions_match\n', 1)
     actual = actual.replace(anchor, b"not python_versions_match(contract['python'], sys.version.split()[0])", 1)
+    actual = actual.replace(plugins, b"not python_plugins_match(contract['plugins'], plugins)", 1)
     return actual, {'name': 'python-patch-compatibility-v1', 'scope': 'python_runtime',
         'original_runner_sha256': original, 'effective_runner_sha256': hashlib.sha256(actual).hexdigest(),
         'preserves_frozen_contract': True}

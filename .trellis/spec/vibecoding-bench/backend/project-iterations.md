@@ -894,6 +894,7 @@ ObservationView.reset() -> void
 
 ```python
 python_versions_match(expected: str, actual: str, policy: str = 'minor') -> bool
+python_plugins_match(expected: list[dict], actual: list[dict], policy: str = 'minor') -> bool
 check_python_runtime(profile: dict, actual: str) -> dict
 ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
                     phase: str = 'preparing', details: dict | None = None)
@@ -906,6 +907,7 @@ ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
 ### 3. Contracts
 
 - `profile.python` 保留冻结验证版本；可选 `python_compatibility` 仅接受 `minor|exact`，默认 minor。版本只接受正常数字主次或主次补丁格式；minor 比较主次，exact 比较全部数字段及补丁是否存在。非法版本／策略不能默认为兼容。
+- 原生插件元数据通过 `python_plugins_match` 统一比较。仅 `distribution='stdlib'` 的版本字段沿用 Python 兼容策略，`module_sha256`、模块身份、全部其他字段及列表顺序仍须精确相等；第三方插件的版本和源码摘要不放宽。比较不改写冻结或实测元数据，新控制器和已核历史控制器共用此规则。
 - 每次准备都先探测实际解释器，命中缓存也执行。缓存仍按 `profile_digest` 定位；兼容复核后在证明中保存 `expected_python/actual_python/python_compatibility`，旧证明可补齐。补丁变化本身不重复安装相同固定 wheel。
 - 独立验收将共享策略与 `native.json.python_profile` 暂存到只读 `/request-data`。环境不兼容输出 `VIBEBENCH_RUNTIME_ERROR_V1` 并返回 `status='error', reason='python_incompatible', details`；准备就绪后输出 `VIBEBENCH_PYTHON_RUNTIME_V1`，宿主复核并在报告保留 `python_runtime`。不能把环境拒绝算成业务失败。
 - 历史 runner 适配仅接受 `_PYTHON_RUNNER_SHA256` 中已核来源，且旧版本比较与导入定位片段均唯一匹配。只在可信临时副本替换版本判断，并记录原始／实际摘要；原合同和冻结文件不改。与重复身份适配组合时仍反查原始字节；Arrow 外层入口的内层 runner 同样核源并只读暂存。新控制器的共享策略须在执行函数局部导入，兼容复制为隔离 worker 的运行方式。
@@ -920,7 +922,8 @@ ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
 
 | 条件 | 故障／行为 |
 | --- | --- |
-| 3.12.15 → 3.12.16，默认 minor | 放行并分别留证；业务／回归条件不变 |
+| 3.12.15 → 3.12.16，默认 minor，标准库源码摘要相同 | 自动适配解释器及 doctest／unittest 的版本字段，保留实测版本；业务／回归条件不变 |
+| 标准库源码摘要、插件身份／顺序／其他字段或第三方版本变化 | 拒绝原生回归准入，要求复核同平台原版基线；不能仅凭补丁兼容忽略源码变化 |
 | 跨主次、exact 不满足或非法版本 | `python_incompatible`；profile 自身非法则校验拒绝 |
 | 探测进程非零或账号资源暂占 | `python_probe_failed`／`runtime_busy`，可按计划等待 |
 | 缓存证明冲突、制品摘要不符或离线安装失败 | `python_cache_invalid`／`artifact_invalid`／`offline_install_failed`，处理后显式重试 |
@@ -932,14 +935,16 @@ ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
 ### 5. Scenarios and Examples
 
 - 正常：`{"python":"3.12.15"}` 在 3.12.16 准备依赖并执行完整 Cerberus 原生回归；缓存及验收报告同时保留两个版本，原版业务仍应失败，参考实现应通过。
+- 正常：ConfigObj 的冻结 doctest 版本为 3.12.15，实际为 3.12.16 且源码摘要相同，自动继续全部 79 个原生节点及 524 个补充示例。不能只放宽解释器而遗漏标准库元数据，也不能为兼容版本改写冻结合同。
 - 边界：旧缓存只有 profile_digest，实测兼容后补齐证明；原工作较旧代次可恢复，重启不增加尝试次数。显式 `{"python":"3.12.15","python_compatibility":"exact"}` 在 3.12.16 返回明确环境拒绝。
 - 错误：Pi settled 后改写成“正常结束”、把历史任务显示为当前计划的下次重试，或在每次计划到期重新请求模型解释同一确定故障。正确：读取持久 failure，历史停止任务保留停止说明，确定问题处理后从原入口恢复同一工作。
 - 错误：把普通工具参数拒绝或未知执行结果加入自动重试白名单。正确：仅真实启动边界记录故障；显式恢复仍经过原身份、输入、额度、工作区及清理门禁。
 
 ### 6. Tests Required
 
-- `test_projects_runtime_resilience`：版本／策略边界、全部已核冻结来源及篡改拒绝、缓存实测、两空间故障投影、无模型空转、真实计数、成功才解除、重启截止、迟到取消、启动后异常脱敏及后续模型错误优先。
+- `test_projects_runtime_resilience`：版本／策略边界、标准库兼容补丁及源码摘要／第三方版本／插件元数据漂移拒绝、输入不变、全部已核冻结来源及篡改拒绝、缓存实测、两空间故障投影、无模型空转、真实计数、成功才解除、重启截止、迟到取消、启动后异常脱敏及后续模型错误优先。
 - `test_project_native_verifier`、`test_project_duplicate_adapter`、`test_project_arrow_adapter`：环境错误分类与版本事实、组合适配、原文件不改及可信内层只读挂载；`test_project_native_regression` 继续核冻结节点与结果约束。
 - `test_projects_pi_round` 和 `images/pi-agent/host.test.mjs`：真实 Python／Node／SDK 回执先落盘，故障交接仅一次上游请求，伪造／非布尔标志无效，混合批次及下一轮边界正确。
 - 两个 `deploy/v3/verify_*pi*browser.py` 既有入口：API／SQLite／SSE 驱动真实 Chrome，核明暗主题、390／1280、刷新、次数／阶段／实际版本、恢复解除、XSS、旧历史不借当前时间和未保存配置保护。
 - 实际核对为 3.12.16 的本地禁网容器：冻结 Cerberus 环境准备及缓存复用，原版失败、参考和完整原生回归通过；显式 exact 返回带期望／实际版本的环境错误。不以 mock 版本函数代替此证据。
+- 同版禁网容器另核 ConfigObj 冻结原版及原线上候选：业务检查通过、79 个原生节点及 524 个补充示例全部匹配原合同；改变标准库源码摘要仍返回环境 error。`test_project_native_regression` 在补丁版本不同的真实 unittest 子进程中继续拒绝错误候选、跳过漂移和空集合。

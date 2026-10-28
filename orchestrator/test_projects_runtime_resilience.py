@@ -1,4 +1,5 @@
 """验证补丁兼容、启动故障持久化及两空间的安全恢复。"""
+from copy import deepcopy
 import json
 import threading
 import time
@@ -7,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from project_runtime_policy import ProjectRuntimeError, check_python_runtime, python_versions_match
+from project_runtime_policy import ProjectRuntimeError, check_python_runtime, python_plugins_match, python_versions_match
 from project_library import digest_json, write_document
 from projects import ProjectsService
 from projects_runtime import ProjectsTerminal
@@ -45,11 +46,36 @@ class RuntimeCompatibilityTests(unittest.TestCase):
                 compile(actual, str(path), 'exec')
                 self.assertTrue(facts['preserves_frozen_contract'])
                 self.assertIn(b"not python_versions_match(contract['python']", actual)
+                self.assertIn(b"not python_plugins_match(contract['plugins'], plugins)", actual)
                 self.assertEqual(before, path.read_bytes())
                 with self.assertRaises(_NativeRegressionControlError):
                     _native_python_adapter(before + b'\n')
             count += 1
         self.assertGreater(count, 90)
+
+    def test_stdlib_patch_versions_keep_hashes_and_third_party_plugins_strict(self):
+        """标准库补丁版本可兼容，但源码、第三方版本及完整元数据不能漂移。:return: None。"""
+        frozen = [{'distribution': 'pytest', 'module': 'pytest', 'version': '9.1.1', 'module_sha256': 'a' * 64},
+            {'distribution': 'stdlib', 'module': 'doctest', 'version': '3.12.15', 'module_sha256': 'b' * 64},
+            {'distribution': 'stdlib', 'module': 'unittest', 'version': '3.12.15', 'module_sha256': 'c' * 64}]
+        actual = deepcopy(frozen)
+        for plugin in actual[1:]:
+            plugin['version'] = '3.12.16'
+        before = deepcopy((frozen, actual))
+        self.assertTrue(python_plugins_match(frozen, actual))
+        self.assertEqual(before, (frozen, actual))
+        self.assertFalse(python_plugins_match(frozen, actual, 'exact'))
+        for index, field, value in [(0, 'version', '9.1.2'), (0, 'module_sha256', 'd' * 64),
+                (1, 'module_sha256', 'd' * 64), (2, 'module_sha256', 'd' * 64),
+                (1, 'module', 'unittest'), (1, 'extra', True), (1, 'version', '3.13.0'),
+                (1, 'version', '3.12.16rc1'), (1, 'version', None)]:
+            with self.subTest(index=index, field=field, value=value):
+                changed = deepcopy(actual)
+                changed[index][field] = value
+                self.assertFalse(python_plugins_match(frozen, changed))
+        for changed in (actual[:-1], list(reversed(actual)), [None], None):
+            with self.subTest(plugins=changed):
+                self.assertFalse(python_plugins_match(frozen, changed))
 
 
 class StartupFailureTests(unittest.TestCase):

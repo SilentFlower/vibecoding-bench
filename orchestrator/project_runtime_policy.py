@@ -47,6 +47,30 @@ def python_versions_match(expected: str, actual: str, policy: str = 'minor') -> 
     return left.groups()[:2] == right.groups()[:2] if policy == 'minor' else left.groups() == right.groups()
 
 
+def python_plugins_match(expected: list[dict], actual: list[dict], policy: str = 'minor') -> bool:
+    """允许标准库的兼容补丁版本差异，其余插件元数据保持精确匹配。
+
+    :param expected: 冻结合同中的有序插件元数据。
+    :param actual: 当前运行时实测的有序插件元数据。
+    :param policy: 标准库使用的 Python 版本兼容策略。
+    :return: 插件身份、源码摘要及非标准库版本均符合合同时为 True。
+    """
+    if (policy not in ('minor', 'exact') or not isinstance(expected, list)
+            or not isinstance(actual, list) or len(expected) != len(actual)):
+        return False
+    for frozen, observed in zip(expected, actual):
+        if not isinstance(frozen, dict) or not isinstance(observed, dict):
+            return False
+        if frozen.get('distribution') == observed.get('distribution') == 'stdlib':
+            if not python_versions_match(frozen.get('version'), observed.get('version'), policy):
+                return False
+            # 标准库版本随解释器变化；只归一化版本，保留源码摘要及全部其他字段的校验。
+            observed = {**observed, 'version': frozen['version']}
+        if frozen != observed:
+            return False
+    return True
+
+
 def check_python_runtime(profile: dict, actual: str) -> dict:
     """核对实际版本并返回独立的运行证明。
 

@@ -676,7 +676,7 @@ class NativeRegressionTests(unittest.TestCase):
                 regression._subtest_results([{**common, **changes}], ['test_parent'])
 
     def test_unittest_keeps_original_nodes_rejects_wrong_code_and_changed_skip(self) -> None:
-        """实际子进程发现原测试，拒绝错误实现、空集合和跳过理由漂移。@return None。"""
+        """补丁升级后仍执行全部原测试，拒绝错误实现、空集合及跳过漂移。@return None。"""
         suite = {'package': 'sample', 'overlay': True, 'framework': 'unittest', 'discover': 'tests',
             'doctests': 0, 'plugins': [], 'env': {}}
         with tempfile.TemporaryDirectory() as directory, patch.dict(regression.SUITES, {'fixture-unittest': suite}):
@@ -701,6 +701,11 @@ class NativeRegressionTests(unittest.TestCase):
             self.assertEqual(original['counts']['skipped'], 1)
             self.assertEqual(original['xml_testcases'], 2)
             self.assertEqual(json.loads(contract_path.read_text())['unittest_skips'][0]['reason'], 'upstream')
+            contract = json.loads(contract_path.read_text())
+            major, minor, patch_version = sys.version.split()[0].split('.')
+            contract['python'] = f'{major}.{minor}.{int(patch_version) + 1}'
+            contract['plugins'][0]['version'] = contract['python']
+            contract_path.write_text(json.dumps(contract))
             options.contract, options.freeze_baseline_contract = contract_path, None
             options.candidate_root = candidate.parent
             # 候选自己的测试与配置不进入受控原生树，原版测试始终完整执行。
