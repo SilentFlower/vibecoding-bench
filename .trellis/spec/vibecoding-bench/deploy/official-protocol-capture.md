@@ -163,6 +163,33 @@ prompt、响应正文、组织 ID 或账号身份。
   字段会消失。全局或渠道请求体透传开启时使用原始 body。无论选择哪种路径，升级时都要
   逐字段核对实际转发结果；已声明字段的未知嵌套内容应原样保留，不能凭字段名自行补值。
 
+### 3.5 条件标识、正文归因与 TLS 的采集边界
+
+- 核对 303 等新版本时，从完整 `http_capture.jsonl` 的 `request.headers` 盘点
+  `x-claude-code-wiggly-dove`、`x-cc-atis`、`anthropic-dispatch-id`、
+  `x-claude-code-prompt-id`、`x-claude-code-request-class`、agent 与 compaction 相关头。
+  记录版本、入口、请求用途、地址、权限模式及开关证据；条件未覆盖记为未知，不补造头值。
+- bootstrap 实际发生时，将响应正文 `client_data.atis` 与后续请求 `x-cc-atis`、响应
+  `x-cc-atis-current` 按账号和会话关联。研究产物仅保留存在性、长度和哈希关系；不复制
+  opaque token 原值。持久 HOME 命中缓存、没有 bootstrap flow 时，不能断言 token 不存在。
+- `images/sidecar/recorder.py::_capture_record` 保存完整请求/响应头与正文；
+  `_capture_index_entry` 只保存子集，`analysis.cch_headers` 按头名正则
+  `cch|fingerprint|billing|anthropic` 筛选。索引缺少 wiggly、atis、prompt-id 等值不能说明
+  客户端未发送。`_extract_analysis` 当前只解析同名 HTTP billing 头；system 文本中的
+  `x-anthropic-billing-header:` 必须从完整请求正文另行提取，不能把空摘要当作归因缺失。
+- `body_text` 经 `get_text(strict=False)` 解码，`body_base64` 是文本读取失败时的回退；
+  复算前检查 `body_truncated` 和 Content-Encoding，需要时从 `.flow` 恢复并解压原始内容。
+  重复头与头名线序优先核对 `.flow`，不能只使用普通 dict 或重新序列化后的 JSON。
+- 完整 HTTP JSONL 在 `response()` 阶段写入；无完整响应或中断时，结合 `.flow`、stats 和
+  采集错误判断是否漏采。`CAPTURE_SCOPE=all` 不免除当前 `response()` 的目标域名判断；
+  v3 也须检查实际账号网络 context，不能只套用旧每-run sidecar 的 scope 默认值。
+- 当前 recorder 未输出完整 ClientHello、JA3 / JA4、签名算法或 key_share。MITM 出口的握手
+  可能来自代理，不能当作原生 CLI TLS 画像。TLS 对照需补充客户端侧握手证据，标明接口、方向、
+  目标和 run 关联，并与相同版本无解密透传条件对照；`.flow` 的部分 TLS 元数据不能替代完整握手。
+- vm2api 改造 CLI 对本地模拟上游的结果和外部逆向文章只作为研究线索，不直接写成原版 303
+  的正式画像。后缀文本源、Unicode 取样和线程续轮规则有冲突时，沿用旧版本已验证契约，
+  对新版本单独安排正式样本。详见 [303 对照研究与采样清单](../../../../doc/claude-code-2.1.303-protocol-study.md)。
+
 ---
 
 ## 4. Validation & Error Matrix
@@ -184,6 +211,9 @@ prompt、响应正文、组织 ID 或账号身份。
 | 官方请求有字段而中间网关出站缺失 | 检查 DTO/透传设置，修复后按同一模式重放；不得把缺失字段解释成客户端未发送 |
 | `diagnostics` 丢失或 `fallbacks` 与 beta 不匹配 | 分别核对缓存诊断与服务端回退契约，再检查 cc2api 的 Haiku beta、fallback beta/CCH 画像 |
 | 续轮 `thread.previous_message_id` 丢失 | 核对各跳 body 与入站 `cc_version` 后缀，不按当前 user text 重算续轮后缀 |
+| 完整 HTTP 有条件头但索引没有 | 认定摘要未覆盖，从完整记录继续分析，不补造字段 |
+| system 有 billing 而 analysis 为空 | 从原始 system 提取并复算，不按 HTTP 同名头是否存在判断 |
+| 仅取得 MITM 出口握手或 JA3 | TLS 原生画像未验证；补客户端侧 ClientHello 与透传对照 |
 | 抓包包含凭据或完整正文 | 仅在受限目录分析，不进入 Git、日志摘要或对话 |
 
 ---
@@ -223,6 +253,10 @@ prompt、响应正文、组织 ID 或账号身份。
   worker/sidecar 清理状态和受限证据路径。
 - 协议分析必须输出逐请求 CCH 与 `cc_version` 复算结果、beta 有序差异、关键 body 字段和
   safeguards/SSE 对应关系；任一失败都不得标记画像已验证。
+- 验收条件头时逐条对照完整 request/response 与轻量索引，覆盖 system 内 billing、bootstrap
+  `client_data.atis` 的脱敏关联、采集截断和无完整响应；合成离线探针只能证明采集函数能力。
+- 若实施 TLS 补采，须覆盖客户端侧与 MITM 出口方向区分、signature_algorithms、key_share、
+  ALPN 及无解密透传对照；没有握手产物时不得将 HTTP 检查通过报告为 TLS 指纹通过。
 - 经过 new-api 时，DTO 往返测试须断言 `safeguards`、`diagnostics`、`fallbacks`、`thread`
   及未知嵌套字段不丢失；逐跳回归须比较实际出站 JSON，不能仅检查 Go 字段声明。
 - cc2api 变更完成后运行 `cargo fmt --check`、`cargo test`、`cargo test cch`，并增加请求体未知字段

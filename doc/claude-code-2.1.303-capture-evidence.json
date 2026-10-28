@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-28",
+  "official_capture": false,
+  "evidence_boundary": "合成离线采集探针，以及改造 CLI 对本地模拟上游的行为；不代表原版 303 的正式官方基线。",
+  "baselines": {
+    "vibecoding_bench": "d944bbb57e51f550d8409bb686ef68cc80458308",
+    "cc2api": "d238aacb3a8ae430995f4742dfcd49b2df10e3fa",
+    "vm2api": "073a04ab6df836c9c3234839f28432503fc400b0"
+  },
+  "source_sha256": {
+    "images/sidecar/recorder.py": "2adceca7a314e83c4ce83fc55a67a96711576d78d9d5c88ed518301261b7d64a",
+    "cc2api/src/service/version_profile.rs": "8fcd87e3b5a385ab25f53c9f6e0dda76970f74d1f0e980a1c7041d5f3d6cfb0a",
+    "cc2api/src/service/rewriter.rs": "020fa604b0742775f574c005e196da6f947d6fbca296e95601d6d2e7c04d24ad",
+    "cc2api/src/tlsfp/tlsfp.rs": "178aaa38cba8d22c1f223ff34652807a16deca8c97ba3c64679cc1b52b28ce2b"
+  },
+  "recorder_probe": {
+    "schema_version": 1,
+    "date": "2026-10-28",
+    "evidence_kind": "synthetic_offline_capability_probe",
+    "official_capture": false,
+    "source": "images/sidecar/recorder.py::_capture_record/_capture_index_entry",
+    "network_requests": 0,
+    "request_header_preserved": {
+      "user-agent": true,
+      "x-claude-code-wiggly-dove": true,
+      "x-cc-atis": true,
+      "anthropic-dispatch-id": true,
+      "x-claude-code-prompt-id": true,
+      "x-claude-code-request-class": true,
+      "x-claude-code-agent-id": true,
+      "x-claude-code-parent-agent-id": true,
+      "x-cc-compaction-request": true,
+      "x-claude-code-compaction": true,
+      "x-claude-code-context-compacted": true
+    },
+    "request_body_text_exact_for_uncompressed_utf8": true,
+    "billing_in_system_preserved_in_full_http": true,
+    "billing_in_system_detected_by_analysis": false,
+    "response_atis_header_preserved_in_full_http": true,
+    "response_atis_body_preserved_in_full_http": true,
+    "selected_headers_present_in_index_cch_headers": {
+      "user-agent": false,
+      "x-claude-code-wiggly-dove": false,
+      "x-cc-atis": false,
+      "anthropic-dispatch-id": true,
+      "x-claude-code-prompt-id": false,
+      "x-claude-code-request-class": false,
+      "x-claude-code-agent-id": false,
+      "x-claude-code-parent-agent-id": false,
+      "x-cc-compaction-request": false,
+      "x-claude-code-compaction": false,
+      "x-claude-code-context-compacted": false
+    },
+    "response_atis_header_present_in_index": false,
+    "tls_clienthello_or_ja_fields_recorded_in_jsonl": false,
+    "limitations": [
+      "替身流仅证明当前 Python 采集函数会保存这些字段，不证明原版 Claude Code 实际发送。",
+      "未执行真实账号、正式 capture API 或远程抓包。",
+      "未验证 TLS 或压缩正文的原始字节恢复。"
+    ]
+  },
+  "vm2api_local_chain": {
+    "scenario": "本地模拟上游、API Key、第三方入站；不覆盖真实首方地址与远程开关",
+    "http_status": 200,
+    "billing_fields": {
+      "cc_version": "2.1.303.d98",
+      "cc_entrypoint": "cli",
+      "cc_turn_origin": "sdk",
+      "cc_prompt_index": 0,
+      "cc_turn_index": 1
+    },
+    "version_suffix_comparison": {
+      "fixture": "单个 user 文本块，中文合成字符串，无真实用户数据",
+      "vm2api_function": "d98",
+      "article_utf16_candidate": "e9a",
+      "final_wire": "d98"
+    },
+    "selected_header_presence": {
+      "x-claude-code-wiggly-dove": false,
+      "x-cc-atis": false,
+      "anthropic-dispatch-id": false,
+      "x-claude-code-prompt-id": true,
+      "x-claude-code-request-class": true,
+      "x-claude-code-agent-id": false,
+      "x-claude-code-parent-agent-id": false,
+      "x-cc-compaction-request": false,
+      "x-claude-code-compaction": false
+    },
+    "final_request_class": "subagent",
+    "prompt_header_equals_billing_prompt_id": true,
+    "entrypoint_checks": [
+      {
+        "entrypoint": "cli",
+        "http_status": 200,
+        "business_instruction_preserved": true,
+        "dynamic_boundary_removed": true,
+        "cch_matches_final_body": true,
+        "content_length_matches_final_body": true
+      },
+      {
+        "entrypoint": "sdk-cli",
+        "http_status": 200,
+        "business_instruction_preserved": true,
+        "dynamic_boundary_removed": true,
+        "cch_matches_final_body": true,
+        "content_length_matches_final_body": true
+      }
+    ],
+    "limitations": [
+      "API Key 与自定义本地上游，不覆盖真实首方地址、账号实验和全部远程开关。",
+      "没有 TLS ClientHello、JA3 或 JA4 的实测。",
+      "Unicode 后缀差异尚需原版 303 正式样本定性。"
+    ]
+  }
+}
