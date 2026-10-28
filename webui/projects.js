@@ -66,7 +66,9 @@ window.ProjectsUI = (() => {
     $('#projects-projects').onchange = paintSelectionCount;
     $('#projects-account').onchange = event => selectAccount(Number(event.target.value));
     fillSchedule();
-    scheduleClock = setInterval(() => { paintSchedule(); paintVerification(); }, 1000);
+    scheduleClock = setInterval(() => {
+      paintSchedule(); paintVerification(); paintQuota(agents.find(item => item.account_id === accountId)?.admission);
+    }, 1000);
     $('#projects-tab-terminal').onclick = () => selectTab('terminal');
     $('#projects-tab-events').onclick = () => selectTab('events');
     for (const kind of ['events', 'history']) {
@@ -447,7 +449,7 @@ window.ProjectsUI = (() => {
   }
 
   /**
-   * 显示公开被动额度和用户阈值，未知数值始终留空而非冒充零。
+   * 显示公开被动额度、用户阈值和真实窗口截止时间，未知数值不冒充零。
    * @param {object|undefined} admission 最近一次公开门禁视图。
    * @return {void}
    */
@@ -467,8 +469,14 @@ window.ProjectsUI = (() => {
       marker.classList.toggle('hidden', !limited);
       marker.style.left = limited ? `${Math.min(100, limit)}%` : '';
       marker.title = limited ? `自动运行阈值 ${limit}%` : '';
+      // 只显示上游提供的真实截止时间，固定北京时间以免浏览器时区影响。
+      const reset = quota?.windows?.[key]?.reset_at;
+      const resetAt = typeof reset === 'number' && Number.isFinite(reset) && reset > 0 ? new Date(reset * 1000) : null;
+      const deadline = resetAt && Number.isFinite(resetAt.getTime())
+        ? `窗口截止 ${resetAt.toLocaleString('zh-CN', {timeZone: 'Asia/Shanghai', hour12: false})}（北京时间）${reset <= Date.now() / 1000 ? ' · 窗口已到期' : ''}`
+        : '截止时间未知';
       const observed = quota?.observed_at;
-      element.querySelector('[data-quota-description]').textContent = `${limited ? `运行阈值 ${limit}%` : '未设置运行阈值'} · ${measured && typeof observed === 'number' ? `最近采集 ${new Date(observed * 1000).toLocaleTimeString('zh-CN', {hour12: false})}` : '等待真实响应采集'}`;
+      element.querySelector('[data-quota-description]').textContent = `${limited ? `运行阈值 ${limit}%` : '未设置运行阈值'} · ${deadline} · ${measured && typeof observed === 'number' ? `最近采集 ${new Date(observed * 1000).toLocaleTimeString('zh-CN', {hour12: false})}` : '等待真实响应采集'}`;
     }
   }
 
