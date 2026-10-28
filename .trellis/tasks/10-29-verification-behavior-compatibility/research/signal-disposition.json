@@ -1,0 +1,2699 @@
+{
+  "reviewed_at": "2026-10-28T17:16:28.197499+00:00",
+  "coverage": {
+    "projects": 100,
+    "engineering_targets": 600,
+    "unique_business_observers": 594,
+    "runner_variants": 45,
+    "subtest_projects": 16,
+    "address_records_by_project": {
+      "more-itertools": 31,
+      "pyparsing": 6,
+      "wrapt": 8
+    },
+    "targets_with_unmentioned_specific_handlers": 71,
+    "targets_with_private_access": 39
+  },
+  "disposition_counts": {
+    "保留：既有API或正常路径失败": 28,
+    "保留：缺失属性协议": 1,
+    "保留：禁止污染输入": 1,
+    "保留：固定原生状态或测试设置": 20,
+    "保留：公开身份或状态承诺": 5,
+    "保留：测试辅助处理": 1,
+    "保留：原异常传播": 16,
+    "已修正并通过真实隔离四组矩阵": 4,
+    "待等价候选动态验证的线索": 24,
+    "保留：固定容器不变量": 5,
+    "保留：真实底层文档结构": 4,
+    "保留：受控失败夹具": 1
+  },
+  "pending_dynamic_reproduction": [
+    "BIDICT-O01-DEV",
+    "BOTTLE-O04-DEV",
+    "BX-PATH-DEV",
+    "CHARDET-O06-DEV",
+    "CHARSET-NORMALIZER-O02-DEV",
+    "CHARSET-NORMALIZER-O06-DEV",
+    "CSSSELECT-O01-DEV",
+    "DATASET-O01-DEV",
+    "DATASET-O06-DEV",
+    "DC-FACTORY-DEV",
+    "DE-M01-DEV",
+    "IF-RULES-DEV",
+    "IF-TEMPLATE-DEV",
+    "PACKAGING-03-DEV",
+    "PLUGGY-04-DEV",
+    "PT-AFFINE-DEV",
+    "PT-SPLIT-DEV",
+    "PYDASH-05-DEV",
+    "PYTHON-FRONTMATTER-06-DEV",
+    "PYTHON-MARKDOWN-01-DEV",
+    "SJ-POINTER-DEV",
+    "TK-ATOMIC-FILE-DEV",
+    "TN-M01-DEV",
+    "WTFORMS-06-DEV"
+  ],
+  "rows": [
+    {
+      "project": "alive-progress",
+      "objective": "AP-FORMAT-DEV",
+      "observer": "project_library/projects/alive-progress/verification/AP-FORMAT-DEV-observe.py",
+      "basis_manifest": "project_library/projects/alive-progress/development.json",
+      "public_materials": [
+        "materials/AP-FORMAT-DEV-contract.md",
+        "materials/AP-FORMAT-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 18,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "alive-progress",
+      "objective": "AP-PROTOCOL-DEV",
+      "observer": "project_library/projects/alive-progress/verification/AP-PROTOCOL-DEV-observe.py",
+      "basis_manifest": "project_library/projects/alive-progress/development.json",
+      "public_materials": [
+        "materials/AP-PROTOCOL-DEV-contract.md",
+        "materials/AP-PROTOCOL-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：缺失属性协议",
+          "reason": "未知私有属性的getattr默认值正是公开要求，不是指定候选必须持有某私有字段。",
+          "locations": [
+            {
+              "line": 14,
+              "expression": "getattr(adapter,'_unknown_internal',False)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "anytree",
+      "objective": "AN-FOLD-DEV",
+      "observer": "project_library/projects/anytree/verification/AN-FOLD-DEV-observe.py",
+      "basis_manifest": "project_library/projects/anytree/development.json",
+      "public_materials": [
+        "materials/AN-FOLD-DEV-contract.md",
+        "materials/AN-FOLD-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 22,
+              "exception": "KeyError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "保留：禁止污染输入",
+          "reason": "公开禁止把结果或缓存挂到源节点上；该观察只是检查源节点未被改写。",
+          "locations": [
+            {
+              "line": 26,
+              "expression": "hasattr(root, '_fold_result')"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "arrow",
+      "objective": "AR-WEEKDAY-DEV",
+      "observer": "project_library/projects/arrow/verification/AR-WEEKDAY-DEV-observe.py",
+      "basis_manifest": "project_library/projects/arrow/development.json",
+      "public_materials": [
+        "materials/AR-WEEKDAY-DEV-contract.md",
+        "materials/AR-WEEKDAY-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 17,
+              "expression": "parser._parse_token"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "attrs",
+      "objective": "AT-VALIDATION-REPORT-DEV",
+      "observer": "project_library/projects/attrs/verification/AT-VALIDATION-REPORT-DEV-observe.py",
+      "basis_manifest": "project_library/projects/attrs/development.json",
+      "public_materials": [
+        "materials/AT-VALIDATION-REPORT-DEV-contract.md",
+        "materials/AT-VALIDATION-REPORT-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：公开身份或状态承诺",
+          "reason": "公开合同明确要求真实字段身份、兼容字段、原签名、锁归属或独立运行状态。",
+          "locations": [
+            {
+              "line": 115,
+              "expression": "fields._private"
+            },
+            {
+              "line": 118,
+              "expression": "value._private"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "babel",
+      "objective": "BA-DURATION-DEV",
+      "observer": "project_library/projects/babel/verification/BA-DURATION-DEV-observe.py",
+      "basis_manifest": "project_library/projects/babel/development.json",
+      "public_materials": [
+        "materials/BA-DURATION-DEV-contract.md",
+        "materials/BA-DURATION-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：测试辅助处理",
+          "reason": "异常来自观察器自身对CLDR列表样式的回退，不是要求候选抛指定异常。",
+          "locations": [
+            {
+              "line": 23,
+              "exception": "KeyError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "backoff",
+      "objective": "BF-EXHAUST-DEV",
+      "observer": "project_library/projects/backoff/verification/development-observe.py",
+      "basis_manifest": "project_library/projects/backoff/development.json",
+      "public_materials": [
+        "materials/development-contract.md",
+        "materials/development-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 22,
+              "exception": "RuntimeError"
+            },
+            {
+              "line": 60,
+              "exception": "KeyError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "backoff",
+      "objective": "BF-CALLABLE-DEV",
+      "observer": "project_library/projects/backoff/verification/BF-CALLABLE-DEV-observe.py",
+      "basis_manifest": "project_library/projects/backoff/development.json",
+      "public_materials": [
+        "materials/BF-CALLABLE-DEV-contract.md",
+        "materials/BF-CALLABLE-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 28,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bibtexparser",
+      "objective": "BIBTEXPARSER-O02-DEV",
+      "observer": "project_library/projects/bibtexparser/verification/BIBTEXPARSER-O02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/bibtexparser/development.json",
+      "public_materials": [
+        "materials/BIBTEXPARSER-O02-DEV-contract.md",
+        "materials/BIBTEXPARSER-O02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "已修正并通过真实隔离四组矩阵",
+          "reason": "公开只要求拒绝，合理替代异常由原观察器误拒；新规则仍拒绝未拒绝输入及开发错误。",
+          "locations": [
+            {
+              "line": 29,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bidict",
+      "objective": "BIDICT-O01-DEV",
+      "observer": "project_library/projects/bidict/verification/BIDICT-O01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/bidict/development.json",
+      "public_materials": [
+        "materials/BIDICT-O01-DEV-contract.md",
+        "materials/BIDICT-O01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 28,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bidict",
+      "objective": "BIDICT-O02-DEV",
+      "observer": "project_library/projects/bidict/verification/BIDICT-O02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/bidict/development.json",
+      "public_materials": [
+        "materials/BIDICT-O02-DEV-contract.md",
+        "materials/BIDICT-O02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 32,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bidict",
+      "objective": "BIDICT-O03-DEV",
+      "observer": "project_library/projects/bidict/verification/BIDICT-O03-DEV-observe.py",
+      "basis_manifest": "project_library/projects/bidict/development.json",
+      "public_materials": [
+        "materials/BIDICT-O03-DEV-contract.md",
+        "materials/BIDICT-O03-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 31,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "boltons",
+      "objective": "BO-M01-DEV",
+      "observer": "project_library/projects/boltons/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/boltons/development.json",
+      "public_materials": [
+        "materials/redundancy.py",
+        "materials/key-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 57,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bottle",
+      "objective": "BOTTLE-O03-DEV",
+      "observer": "project_library/projects/bottle/verification/BOTTLE-O03-DEV-observe.py",
+      "basis_manifest": "project_library/projects/bottle/development.json",
+      "public_materials": [
+        "materials/BOTTLE-O03-DEV-contract.md",
+        "materials/BOTTLE-O03-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 30,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "bottle",
+      "objective": "BOTTLE-O04-DEV",
+      "observer": "project_library/projects/bottle/verification/BOTTLE-O04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/bottle/development.json",
+      "public_materials": [
+        "materials/BOTTLE-O04-DEV-contract.md",
+        "materials/BOTTLE-O04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 31,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "cachetools",
+      "objective": "CT-M01-DEV",
+      "observer": "project_library/projects/cachetools/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/cachetools/development.json",
+      "public_materials": [
+        "materials/receiver-reproducer.py",
+        "materials/receiver-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 217,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "cachetools",
+      "objective": "CT-REMAINING-DEV",
+      "observer": "project_library/projects/cachetools/verification/CT-REMAINING-DEV-observe.py",
+      "basis_manifest": "project_library/projects/cachetools/development.json",
+      "public_materials": [
+        "materials/CT-REMAINING-DEV-contract.md",
+        "materials/CT-REMAINING-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定容器不变量",
+          "reason": "调用原生索引/顺序检查或检查读取没有改变既有缓存状态，符合公开兼容边界。",
+          "locations": [
+            {
+              "line": 14,
+              "expression": "cache._TTLCache__links"
+            },
+            {
+              "line": 17,
+              "expression": "cache._TTLCache__links"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "chardet",
+      "objective": "CHARDET-O06-DEV",
+      "observer": "project_library/projects/chardet/verification/CHARDET-O06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/chardet/development.json",
+      "public_materials": [
+        "materials/CHARDET-O06-DEV-contract.md",
+        "materials/CHARDET-O06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 28,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "charset-normalizer",
+      "objective": "CHARSET-NORMALIZER-O02-DEV",
+      "observer": "project_library/projects/charset-normalizer/verification/CHARSET-NORMALIZER-O02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/charset-normalizer/development.json",
+      "public_materials": [
+        "materials/CHARSET-NORMALIZER-O02-DEV-contract.md",
+        "materials/CHARSET-NORMALIZER-O02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 33,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "charset-normalizer",
+      "objective": "CHARSET-NORMALIZER-O06-DEV",
+      "observer": "project_library/projects/charset-normalizer/verification/CHARSET-NORMALIZER-O06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/charset-normalizer/development.json",
+      "public_materials": [
+        "materials/CHARSET-NORMALIZER-O06-DEV-contract.md",
+        "materials/CHARSET-NORMALIZER-O06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 31,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "cli-helpers",
+      "objective": "CH-M01-DEV",
+      "observer": "project_library/projects/cli-helpers/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/cli-helpers/development.json",
+      "public_materials": [
+        "materials/option-leak.py",
+        "materials/option-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 49,
+              "expression": "cls._output_formats"
+            },
+            {
+              "line": 50,
+              "expression": "cls._output_formats"
+            },
+            {
+              "line": 75,
+              "expression": "cls._output_formats"
+            },
+            {
+              "line": 50,
+              "expression": "row._replace"
+            },
+            {
+              "line": 53,
+              "expression": "cls._output_formats"
+            },
+            {
+              "line": 58,
+              "expression": "cls._output_formats"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "click",
+      "objective": "CK-M01-DEV",
+      "observer": "project_library/projects/click/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/click/development.json",
+      "public_materials": [
+        "materials/error-notes.py",
+        "materials/notes-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 38,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "click",
+      "objective": "CK-STABLE-WRITE-DEV",
+      "observer": "project_library/projects/click/verification/CK-STABLE-WRITE-DEV-observe.py",
+      "basis_manifest": "project_library/projects/click/development.json",
+      "public_materials": [
+        "materials/CK-STABLE-WRITE-DEV-contract.md",
+        "materials/CK-STABLE-WRITE-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "已修正并通过真实隔离四组矩阵",
+          "reason": "公开只要求拒绝，合理替代异常由原观察器误拒；新规则仍拒绝未拒绝输入及开发错误。",
+          "locations": [
+            {
+              "line": 21,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "configargparse",
+      "objective": "CONFIGARGPARSE-O01-DEV",
+      "observer": "project_library/projects/configargparse/verification/CONFIGARGPARSE-O01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/configargparse/development.json",
+      "public_materials": [
+        "materials/CONFIGARGPARSE-O01-DEV-contract.md",
+        "materials/CONFIGARGPARSE-O01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 31,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "configargparse",
+      "objective": "CONFIGARGPARSE-O04-DEV",
+      "observer": "project_library/projects/configargparse/verification/CONFIGARGPARSE-O04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/configargparse/development.json",
+      "public_materials": [
+        "materials/CONFIGARGPARSE-O04-DEV-contract.md",
+        "materials/CONFIGARGPARSE-O04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 32,
+              "expression": "hasattr(p,'_source_to_settings')"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "configobj",
+      "objective": "CONFIGOBJ-O02-DEV",
+      "observer": "project_library/projects/configobj/verification/CONFIGOBJ-O02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/configobj/development.json",
+      "public_materials": [
+        "materials/CONFIGOBJ-O02-DEV-contract.md",
+        "materials/CONFIGOBJ-O02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 25,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "cssselect",
+      "objective": "CSSSELECT-O01-DEV",
+      "observer": "project_library/projects/cssselect/verification/CSSSELECT-O01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/cssselect/development.json",
+      "public_materials": [
+        "materials/CSSSELECT-O01-DEV-contract.md",
+        "materials/CSSSELECT-O01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 26,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "dataset",
+      "objective": "DATASET-O01-DEV",
+      "observer": "project_library/projects/dataset/verification/DATASET-O01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/dataset/development.json",
+      "public_materials": [
+        "materials/DATASET-O01-DEV-contract.md",
+        "materials/DATASET-O01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 26,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "dataset",
+      "objective": "DATASET-O04-DEV",
+      "observer": "project_library/projects/dataset/verification/DATASET-O04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/dataset/development.json",
+      "public_materials": [
+        "materials/DATASET-O04-DEV-contract.md",
+        "materials/DATASET-O04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 27,
+              "exception": "TypeError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 23,
+              "expression": "empty._conn"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "dataset",
+      "objective": "DATASET-O06-DEV",
+      "observer": "project_library/projects/dataset/verification/DATASET-O06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/dataset/development.json",
+      "public_materials": [
+        "materials/DATASET-O06-DEV-contract.md",
+        "materials/DATASET-O06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 34,
+              "exception": "TypeError"
+            },
+            {
+              "line": 26,
+              "exception": "KeyError"
+            },
+            {
+              "line": 31,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "deepdiff",
+      "objective": "DEEPDIFF-O01-DEV",
+      "observer": "project_library/projects/deepdiff/verification/DEEPDIFF-O01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/deepdiff/development.json",
+      "public_materials": [
+        "materials/DEEPDIFF-O01-DEV-contract.md",
+        "materials/DEEPDIFF-O01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 26,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "deepdiff",
+      "objective": "DEEPDIFF-O02-DEV",
+      "observer": "project_library/projects/deepdiff/verification/DEEPDIFF-O02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/deepdiff/development.json",
+      "public_materials": [
+        "materials/DEEPDIFF-O02-DEV-contract.md",
+        "materials/DEEPDIFF-O02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 25,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "dpath",
+      "objective": "DP-M01-DEV",
+      "observer": "project_library/projects/dpath/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/dpath/development.json",
+      "public_materials": [
+        "materials/write.md",
+        "materials/delete.md",
+        "materials/delete-repair.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 23,
+              "exception": "ValueError"
+            },
+            {
+              "line": 81,
+              "exception": "TypeError"
+            },
+            {
+              "line": 87,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "dynaconf",
+      "objective": "DYNACONF-O04-DEV",
+      "observer": "project_library/projects/dynaconf/verification/DYNACONF-O04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/dynaconf/development.json",
+      "public_materials": [
+        "materials/DYNACONF-O04-DEV-contract.md",
+        "materials/DYNACONF-O04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 29,
+              "exception": "TypeError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 28,
+              "expression": "settings._loaded_files"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "dynaconf",
+      "objective": "DYNACONF-O06-DEV",
+      "observer": "project_library/projects/dynaconf/verification/DYNACONF-O06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/dynaconf/development.json",
+      "public_materials": [
+        "materials/DYNACONF-O06-DEV-contract.md",
+        "materials/DYNACONF-O06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 27,
+              "expression": "cli._list"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "feedgen",
+      "objective": "FG-M01-DEV",
+      "observer": "project_library/projects/feedgen/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/feedgen/development.json",
+      "public_materials": [
+        "materials/link-repair.md",
+        "materials/public-test-example.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 55,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "ftfy",
+      "objective": "FT-PIPELINE-DEV",
+      "observer": "project_library/projects/ftfy/verification/FT-PIPELINE-DEV-observe.py",
+      "basis_manifest": "project_library/projects/ftfy/development.json",
+      "public_materials": [
+        "materials/FT-PIPELINE-DEV-contract.md",
+        "materials/FT-PIPELINE-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 20,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "humanize",
+      "objective": "HUMANIZE-O01-DEV",
+      "observer": "project_library/projects/humanize/verification/HUMANIZE-O01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/humanize/development.json",
+      "public_materials": [
+        "materials/HUMANIZE-O01-DEV-contract.md",
+        "materials/HUMANIZE-O01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 43,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "icecream",
+      "objective": "ICECREAM-O02-DEV",
+      "observer": "project_library/projects/icecream/verification/ICECREAM-O02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/icecream/development.json",
+      "public_materials": [
+        "materials/ICECREAM-O02-DEV-contract.md",
+        "materials/ICECREAM-O02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：公开身份或状态承诺",
+          "reason": "公开合同明确要求真实字段身份、兼容字段、原签名、锁归属或独立运行状态。",
+          "locations": [
+            {
+              "line": 24,
+              "expression": "timer._enter_time"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "icecream",
+      "objective": "ICECREAM-O03-DEV",
+      "observer": "project_library/projects/icecream/verification/ICECREAM-O03-DEV-observe.py",
+      "basis_manifest": "project_library/projects/icecream/development.json",
+      "public_materials": [
+        "materials/ICECREAM-O03-DEV-contract.md",
+        "materials/ICECREAM-O03-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 27,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "inflect",
+      "objective": "IF-RULES-DEV",
+      "observer": "project_library/projects/inflect/verification/IF-RULES-DEV-observe.py",
+      "basis_manifest": "project_library/projects/inflect/development.json",
+      "public_materials": [
+        "materials/IF-RULES-DEV-contract.md",
+        "materials/IF-RULES-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 19,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "inflect",
+      "objective": "IF-TEMPLATE-DEV",
+      "observer": "project_library/projects/inflect/verification/IF-TEMPLATE-DEV-observe.py",
+      "basis_manifest": "project_library/projects/inflect/development.json",
+      "public_materials": [
+        "materials/IF-TEMPLATE-DEV-contract.md",
+        "materials/IF-TEMPLATE-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 18,
+              "exception": "KeyError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 20,
+              "expression": "target._number_args"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "injector",
+      "objective": "INJECTOR-O03-DEV",
+      "observer": "project_library/projects/injector/verification/INJECTOR-O03-DEV-observe.py",
+      "basis_manifest": "project_library/projects/injector/development.json",
+      "public_materials": [
+        "materials/INJECTOR-O03-DEV-contract.md",
+        "materials/INJECTOR-O03-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 29,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "jinja",
+      "objective": "JINJA-O05-DEV",
+      "observer": "project_library/projects/jinja/verification/JINJA-O05-DEV-observe.py",
+      "basis_manifest": "project_library/projects/jinja/development.json",
+      "public_materials": [
+        "materials/JINJA-O05-DEV-contract.md",
+        "materials/JINJA-O05-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 16,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "loguru",
+      "objective": "LOGURU-O02-DEV",
+      "observer": "project_library/projects/loguru/verification/LOGURU-O02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/loguru/development.json",
+      "public_materials": [
+        "materials/LOGURU-O02-DEV-contract.md",
+        "materials/LOGURU-O02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 29,
+              "expression": "log._core"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "marshmallow",
+      "objective": "MM-UNION-DEV",
+      "observer": "project_library/projects/marshmallow/verification/MM-UNION-DEV-observe.py",
+      "basis_manifest": "project_library/projects/marshmallow/development.json",
+      "public_materials": [
+        "materials/MM-UNION-DEV-contract.md",
+        "materials/MM-UNION-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 18,
+              "expression": "field._serialize"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "marshmallow",
+      "objective": "MM-STREAM-DEV",
+      "observer": "project_library/projects/marshmallow/verification/MM-STREAM-DEV-observe.py",
+      "basis_manifest": "project_library/projects/marshmallow/development.json",
+      "public_materials": [
+        "materials/MM-STREAM-DEV-contract.md",
+        "materials/MM-STREAM-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 24,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "mdit-py-plugins",
+      "objective": "MDIT-PLUGINS-O06-DEV",
+      "observer": "project_library/projects/mdit-py-plugins/verification/MDIT-PLUGINS-O06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/mdit-py-plugins/development.json",
+      "public_materials": [
+        "materials/MDIT-PLUGINS-O06-DEV-contract.md",
+        "materials/MDIT-PLUGINS-O06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 28,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "mistletoe",
+      "objective": "MISTLETOE-04-DEV",
+      "observer": "project_library/projects/mistletoe/verification/MISTLETOE-04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/mistletoe/development.json",
+      "public_materials": [
+        "materials/MISTLETOE-04-DEV-contract.md",
+        "materials/MISTLETOE-04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 24,
+              "expression": "renderer._headings"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "packaging",
+      "objective": "PACKAGING-03-DEV",
+      "observer": "project_library/projects/packaging/verification/PACKAGING-03-DEV-observe.py",
+      "basis_manifest": "project_library/projects/packaging/development.json",
+      "public_materials": [
+        "materials/PACKAGING-03-DEV-contract.md",
+        "materials/PACKAGING-03-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 24,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "pendulum",
+      "objective": "PENDULUM-04-DEV",
+      "observer": "project_library/projects/pendulum/verification/PENDULUM-04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/pendulum/development.json",
+      "public_materials": [
+        "materials/PENDULUM-04-DEV-contract.md",
+        "materials/PENDULUM-04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：公开身份或状态承诺",
+          "reason": "公开合同明确要求真实字段身份、兼容字段、原签名、锁归属或独立运行状态。",
+          "locations": [
+            {
+              "line": 23,
+              "expression": "restored._signature"
+            },
+            {
+              "line": 23,
+              "expression": "value._signature"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "pluggy",
+      "objective": "PLUGGY-04-DEV",
+      "observer": "project_library/projects/pluggy/verification/PLUGGY-04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/pluggy/development.json",
+      "public_materials": [
+        "materials/PLUGGY-04-DEV-contract.md",
+        "materials/PLUGGY-04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 35,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "portion",
+      "objective": "PT-MEASURE-DEV",
+      "observer": "project_library/projects/portion/verification/PT-MEASURE-DEV-observe.py",
+      "basis_manifest": "project_library/projects/portion/development.json",
+      "public_materials": [
+        "materials/PT-MEASURE-DEV-contract.md",
+        "materials/PT-MEASURE-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 36,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "portion",
+      "objective": "PT-TRANSFORM-DEV",
+      "observer": "project_library/projects/portion/verification/PT-TRANSFORM-DEV-observe.py",
+      "basis_manifest": "project_library/projects/portion/development.json",
+      "public_materials": [
+        "materials/PT-TRANSFORM-DEV-contract.md",
+        "materials/PT-TRANSFORM-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 27,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "portion",
+      "objective": "PT-SPLIT-DEV",
+      "observer": "project_library/projects/portion/verification/PT-SPLIT-DEV-observe.py",
+      "basis_manifest": "project_library/projects/portion/development.json",
+      "public_materials": [
+        "materials/PT-SPLIT-DEV-contract.md",
+        "materials/PT-SPLIT-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 29,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "portion",
+      "objective": "PT-AFFINE-DEV",
+      "observer": "project_library/projects/portion/verification/PT-AFFINE-DEV-observe.py",
+      "basis_manifest": "project_library/projects/portion/development.json",
+      "public_materials": [
+        "materials/PT-AFFINE-DEV-contract.md",
+        "materials/PT-AFFINE-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 25,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "pydash",
+      "objective": "PYDASH-05-DEV",
+      "observer": "project_library/projects/pydash/verification/PYDASH-05-DEV-observe.py",
+      "basis_manifest": "project_library/projects/pydash/development.json",
+      "public_materials": [
+        "materials/PYDASH-05-DEV-contract.md",
+        "materials/PYDASH-05-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 23,
+              "exception": "KeyError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "pyrsistent",
+      "objective": "PYRSISTENT-06-DEV",
+      "observer": "project_library/projects/pyrsistent/verification/PYRSISTENT-06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/pyrsistent/development.json",
+      "public_materials": [
+        "materials/PYRSISTENT-06-DEV-contract.md",
+        "materials/PYRSISTENT-06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 30,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-box",
+      "objective": "BX-YAML-DEV",
+      "observer": "project_library/projects/python-box/verification/development-observe.py",
+      "basis_manifest": "project_library/projects/python-box/development.json",
+      "public_materials": [
+        "materials/development-contract.md",
+        "materials/development-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 28,
+              "expression": "config._box_config"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-box",
+      "objective": "BX-PICKLE-DEV",
+      "observer": "project_library/projects/python-box/verification/BX-PICKLE-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-box/development.json",
+      "public_materials": [
+        "materials/BX-PICKLE-DEV-contract.md",
+        "materials/BX-PICKLE-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 21,
+              "expression": "result._box_config"
+            },
+            {
+              "line": 20,
+              "expression": "result._box_config"
+            },
+            {
+              "line": 19,
+              "expression": "result._box_config"
+            },
+            {
+              "line": 19,
+              "expression": "result._box_config"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-box",
+      "objective": "BX-PATH-DEV",
+      "observer": "project_library/projects/python-box/verification/BX-PATH-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-box/development.json",
+      "public_materials": [
+        "materials/BX-PATH-DEV-contract.md",
+        "materials/BX-PATH-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 19,
+              "exception": "KeyError"
+            },
+            {
+              "line": 26,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-box",
+      "objective": "BX-STRICT-CAST-DEV",
+      "observer": "project_library/projects/python-box/verification/BX-STRICT-CAST-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-box/development.json",
+      "public_materials": [
+        "materials/BX-STRICT-CAST-DEV-contract.md",
+        "materials/BX-STRICT-CAST-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 22,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-constraint",
+      "objective": "PYTHON-CONSTRAINT-01-DEV",
+      "observer": "project_library/projects/python-constraint/verification/PYTHON-CONSTRAINT-01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-constraint/development.json",
+      "public_materials": [
+        "materials/PYTHON-CONSTRAINT-01-DEV-contract.md",
+        "materials/PYTHON-CONSTRAINT-01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 22,
+              "expression": "problem._constraints"
+            },
+            {
+              "line": 21,
+              "expression": "problem._constraints"
+            },
+            {
+              "line": 21,
+              "expression": "problem._str_constraints"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-constraint",
+      "objective": "PYTHON-CONSTRAINT-03-DEV",
+      "observer": "project_library/projects/python-constraint/verification/PYTHON-CONSTRAINT-03-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-constraint/development.json",
+      "public_materials": [
+        "materials/PYTHON-CONSTRAINT-03-DEV-contract.md",
+        "materials/PYTHON-CONSTRAINT-03-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 29,
+              "exception": "RuntimeError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 27,
+              "expression": "problem._variables"
+            },
+            {
+              "line": 31,
+              "expression": "problem._variables"
+            },
+            {
+              "line": 33,
+              "expression": "problem._variables"
+            },
+            {
+              "line": 22,
+              "expression": "problem._variables"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-constraint",
+      "objective": "PYTHON-CONSTRAINT-06-DEV",
+      "observer": "project_library/projects/python-constraint/verification/PYTHON-CONSTRAINT-06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-constraint/development.json",
+      "public_materials": [
+        "materials/PYTHON-CONSTRAINT-06-DEV-contract.md",
+        "materials/PYTHON-CONSTRAINT-06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 28,
+              "expression": "problem._constraints"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-dateutil",
+      "objective": "PYTHON-DATEUTIL-06-DEV",
+      "observer": "project_library/projects/python-dateutil/verification/PYTHON-DATEUTIL-06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-dateutil/development.json",
+      "public_materials": [
+        "materials/PYTHON-DATEUTIL-06-DEV-contract.md",
+        "materials/PYTHON-DATEUTIL-06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：公开身份或状态承诺",
+          "reason": "公开合同明确要求真实字段身份、兼容字段、原签名、锁归属或独立运行状态。",
+          "locations": [
+            {
+              "line": 24,
+              "expression": "restored._cache_lock"
+            },
+            {
+              "line": 24,
+              "expression": "rule._cache_lock"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-decouple",
+      "objective": "DC-STRICT-ENV-DEV",
+      "observer": "project_library/projects/python-decouple/verification/DC-STRICT-ENV-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-decouple/development.json",
+      "public_materials": [
+        "materials/DC-STRICT-ENV-DEV-contract.md",
+        "materials/DC-STRICT-ENV-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 24,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-decouple",
+      "objective": "DC-FACTORY-DEV",
+      "observer": "project_library/projects/python-decouple/verification/DC-FACTORY-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-decouple/development.json",
+      "public_materials": [
+        "materials/DC-FACTORY-DEV-contract.md",
+        "materials/DC-FACTORY-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 35,
+              "exception": "TypeError"
+            },
+            {
+              "line": 17,
+              "exception": "RuntimeError"
+            },
+            {
+              "line": 31,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-docx",
+      "objective": "PYTHON-DOCX-03-DEV",
+      "observer": "project_library/projects/python-docx/verification/PYTHON-DOCX-03-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-docx/development.json",
+      "public_materials": [
+        "materials/PYTHON-DOCX-03-DEV-contract.md",
+        "materials/PYTHON-DOCX-03-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：真实底层文档结构",
+          "reason": "通过固定OOXML对象检查真实关系、XML及副作用，没有要求新增私有存储布局。",
+          "locations": [
+            {
+              "line": 20,
+              "expression": "a._element"
+            },
+            {
+              "line": 20,
+              "expression": "b._element"
+            },
+            {
+              "line": 23,
+              "expression": "a._element"
+            },
+            {
+              "line": 23,
+              "expression": "b._element"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-docx",
+      "objective": "PYTHON-DOCX-04-DEV",
+      "observer": "project_library/projects/python-docx/verification/PYTHON-DOCX-04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-docx/development.json",
+      "public_materials": [
+        "materials/PYTHON-DOCX-04-DEV-contract.md",
+        "materials/PYTHON-DOCX-04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：真实底层文档结构",
+          "reason": "通过固定OOXML对象检查真实关系、XML及副作用，没有要求新增私有存储布局。",
+          "locations": [
+            {
+              "line": 21,
+              "expression": "link._hyperlink"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-dotenv",
+      "objective": "DE-M01-DEV",
+      "observer": "project_library/projects/python-dotenv/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/python-dotenv/development.json",
+      "public_materials": [
+        "materials/newline-reproduction.md",
+        "materials/newline-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 229,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-dotenv",
+      "objective": "DE-LAYERS-DEV",
+      "observer": "project_library/projects/python-dotenv/verification/DE-LAYERS-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-dotenv/development.json",
+      "public_materials": [
+        "materials/DE-LAYERS-DEV-contract.md",
+        "materials/DE-LAYERS-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 19,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-frontmatter",
+      "objective": "PYTHON-FRONTMATTER-06-DEV",
+      "observer": "project_library/projects/python-frontmatter/verification/PYTHON-FRONTMATTER-06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-frontmatter/development.json",
+      "public_materials": [
+        "materials/PYTHON-FRONTMATTER-06-DEV-contract.md",
+        "materials/PYTHON-FRONTMATTER-06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 32,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-liquid",
+      "objective": "PYTHON-LIQUID-02-DEV",
+      "observer": "project_library/projects/python-liquid/verification/PYTHON-LIQUID-02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-liquid/development.json",
+      "public_materials": [
+        "materials/PYTHON-LIQUID-02-DEV-contract.md",
+        "materials/PYTHON-LIQUID-02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "已修正并通过真实隔离四组矩阵",
+          "reason": "新增API的公开合同没有指定私有字段名；改用公开读写隔离或实际缓存命中/淘汰验证。",
+          "locations": [
+            {
+              "line": 23,
+              "expression": "loader._cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-markdown",
+      "objective": "PYTHON-MARKDOWN-01-DEV",
+      "observer": "project_library/projects/python-markdown/verification/PYTHON-MARKDOWN-01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-markdown/development.json",
+      "public_materials": [
+        "materials/PYTHON-MARKDOWN-01-DEV-contract.md",
+        "materials/PYTHON-MARKDOWN-01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 29,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-pptx",
+      "objective": "PYTHON-PPTX-04-DEV",
+      "observer": "project_library/projects/python-pptx/verification/PYTHON-PPTX-04-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-pptx/development.json",
+      "public_materials": [
+        "materials/PYTHON-PPTX-04-DEV-contract.md",
+        "materials/PYTHON-PPTX-04-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：真实底层文档结构",
+          "reason": "通过固定OOXML对象检查真实关系、XML及副作用，没有要求新增私有存储布局。",
+          "locations": [
+            {
+              "line": 23,
+              "expression": "paragraph._p"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "python-pptx",
+      "objective": "PYTHON-PPTX-05-DEV",
+      "observer": "project_library/projects/python-pptx/verification/PYTHON-PPTX-05-DEV-observe.py",
+      "basis_manifest": "project_library/projects/python-pptx/development.json",
+      "public_materials": [
+        "materials/PYTHON-PPTX-05-DEV-contract.md",
+        "materials/PYTHON-PPTX-05-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：真实底层文档结构",
+          "reason": "通过固定OOXML对象检查真实关系、XML及副作用，没有要求新增私有存储布局。",
+          "locations": [
+            {
+              "line": 22,
+              "expression": "frame._bodyPr"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "schedule",
+      "objective": "SC-M01-DEV",
+      "observer": "project_library/projects/schedule/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/schedule/development.json",
+      "public_materials": [
+        "materials/run-all-trace.json",
+        "materials/run-all-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 237,
+              "exception": "TypeError"
+            },
+            {
+              "line": 348,
+              "exception": "TypeError"
+            },
+            {
+              "line": 322,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "schedule",
+      "objective": "SC-M02-DEV",
+      "observer": "project_library/projects/schedule/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/schedule/development.json",
+      "public_materials": [
+        "materials/interactive.txt",
+        "materials/repr-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 322,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "simplejson",
+      "objective": "SJ-M01-DEV",
+      "observer": "project_library/projects/simplejson/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/simplejson/development.json",
+      "public_materials": [
+        "materials/cli-repair.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 62,
+              "exception": "ValueError"
+            },
+            {
+              "line": 67,
+              "exception": "ValueError"
+            },
+            {
+              "line": 98,
+              "exception": "ValueError"
+            },
+            {
+              "line": 88,
+              "exception": "ValueError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 140,
+              "expression": "simplejson._toggle_speedups"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "simplejson",
+      "objective": "SJ-POINTER-DEV",
+      "observer": "project_library/projects/simplejson/verification/SJ-POINTER-DEV-observe.py",
+      "basis_manifest": "project_library/projects/simplejson/development.json",
+      "public_materials": [
+        "materials/SJ-POINTER-DEV-contract.md",
+        "materials/SJ-POINTER-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 16,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "sortedcontainers",
+      "objective": "SORTEDCONTAINERS-01-DEV",
+      "observer": "project_library/projects/sortedcontainers/verification/SORTEDCONTAINERS-01-DEV-observe.py",
+      "basis_manifest": "project_library/projects/sortedcontainers/development.json",
+      "public_materials": [
+        "materials/SORTEDCONTAINERS-01-DEV-contract.md",
+        "materials/SORTEDCONTAINERS-01-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定容器不变量",
+          "reason": "调用原生索引/顺序检查或检查读取没有改变既有缓存状态，符合公开兼容边界。",
+          "locations": [
+            {
+              "line": 22,
+              "expression": "values._check"
+            },
+            {
+              "line": 23,
+              "expression": "plain._reset"
+            },
+            {
+              "line": 23,
+              "expression": "plain._check"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "sortedcontainers",
+      "objective": "SORTEDCONTAINERS-02-DEV",
+      "observer": "project_library/projects/sortedcontainers/verification/SORTEDCONTAINERS-02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/sortedcontainers/development.json",
+      "public_materials": [
+        "materials/SORTEDCONTAINERS-02-DEV-contract.md",
+        "materials/SORTEDCONTAINERS-02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定容器不变量",
+          "reason": "调用原生索引/顺序检查或检查读取没有改变既有缓存状态，符合公开兼容边界。",
+          "locations": [
+            {
+              "line": 22,
+              "expression": "values._check"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "sortedcontainers",
+      "objective": "SORTEDCONTAINERS-03-DEV",
+      "observer": "project_library/projects/sortedcontainers/verification/SORTEDCONTAINERS-03-DEV-observe.py",
+      "basis_manifest": "project_library/projects/sortedcontainers/development.json",
+      "public_materials": [
+        "materials/SORTEDCONTAINERS-03-DEV-contract.md",
+        "materials/SORTEDCONTAINERS-03-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定容器不变量",
+          "reason": "调用原生索引/顺序检查或检查读取没有改变既有缓存状态，符合公开兼容边界。",
+          "locations": [
+            {
+              "line": 22,
+              "expression": "result._check"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "sortedcontainers",
+      "objective": "SORTEDCONTAINERS-05-DEV",
+      "observer": "project_library/projects/sortedcontainers/verification/SORTEDCONTAINERS-05-DEV-observe.py",
+      "basis_manifest": "project_library/projects/sortedcontainers/development.json",
+      "public_materials": [
+        "materials/SORTEDCONTAINERS-05-DEV-contract.md",
+        "materials/SORTEDCONTAINERS-05-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定容器不变量",
+          "reason": "调用原生索引/顺序检查或检查读取没有改变既有缓存状态，符合公开兼容边界。",
+          "locations": [
+            {
+              "line": 19,
+              "expression": "values._reset"
+            },
+            {
+              "line": 21,
+              "expression": "values._check"
+            },
+            {
+              "line": 24,
+              "expression": "mapping._check"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "tabulate",
+      "objective": "TB-M01-DEV",
+      "observer": "project_library/projects/tabulate/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/tabulate/development.json",
+      "public_materials": [
+        "materials/tuple-layout.py",
+        "materials/tuple-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 44,
+              "exception": "TypeError"
+            },
+            {
+              "line": 56,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "tabulate",
+      "objective": "TB-PARAGRAPHS-DEV",
+      "observer": "project_library/projects/tabulate/verification/TB-PARAGRAPHS-DEV-observe.py",
+      "basis_manifest": "project_library/projects/tabulate/development.json",
+      "public_materials": [
+        "materials/TB-PARAGRAPHS-DEV-contract.md",
+        "materials/TB-PARAGRAPHS-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 13,
+              "expression": "tabulate._wrap_text_to_colwidths"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "tenacity",
+      "objective": "TN-M01-DEV",
+      "observer": "project_library/projects/tenacity/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/tenacity/development.json",
+      "public_materials": [
+        "materials/zero-reproducer.py",
+        "materials/zero-contract.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 460,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "tinydb",
+      "objective": "TD-M01-DEV",
+      "observer": "project_library/projects/tinydb/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/tinydb/development.json",
+      "public_materials": [
+        "materials/tags-report.md",
+        "materials/fragment-reproducer.py",
+        "materials/fragment-observed.txt",
+        "materials/fragment-repair.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 230,
+              "exception": "ValueError"
+            },
+            {
+              "line": 305,
+              "exception": "ValueError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 84,
+              "expression": "db._query_cache"
+            },
+            {
+              "line": 133,
+              "expression": "db._query_cache"
+            },
+            {
+              "line": 149,
+              "expression": "db._query_cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "tinydb",
+      "objective": "TD-M02-DEV",
+      "observer": "project_library/projects/tinydb/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/tinydb/development.json",
+      "public_materials": [
+        "materials/rule-order.py",
+        "materials/rule-order-observed.txt",
+        "materials/generator-reproducer.py",
+        "materials/generator-observed.txt",
+        "materials/generator-repair.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 230,
+              "exception": "ValueError"
+            },
+            {
+              "line": 305,
+              "exception": "ValueError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 84,
+              "expression": "db._query_cache"
+            },
+            {
+              "line": 133,
+              "expression": "db._query_cache"
+            },
+            {
+              "line": 149,
+              "expression": "db._query_cache"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "tomlkit",
+      "objective": "TK-M02-DEV",
+      "observer": "project_library/projects/tomlkit/verification/native_observe.py",
+      "basis_manifest": "project_library/projects/tomlkit/development.json",
+      "public_materials": [
+        "materials/inline-delete-reproducer.py",
+        "materials/inline-repair.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 90,
+              "exception": "TypeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "tomlkit",
+      "objective": "TK-ATOMIC-FILE-DEV",
+      "observer": "project_library/projects/tomlkit/verification/TK-ATOMIC-FILE-DEV-observe.py",
+      "basis_manifest": "project_library/projects/tomlkit/development.json",
+      "public_materials": [
+        "materials/TK-ATOMIC-FILE-DEV-contract.md",
+        "materials/TK-ATOMIC-FILE-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 27,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "toolz",
+      "objective": "TZ-UPDATE-ONLY-DEV",
+      "observer": "project_library/projects/toolz/verification/TZ-UPDATE-ONLY-DEV-observe.py",
+      "basis_manifest": "project_library/projects/toolz/development.json",
+      "public_materials": [
+        "materials/TZ-UPDATE-ONLY-DEV-contract.md",
+        "materials/TZ-UPDATE-ONLY-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 24,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "toolz",
+      "objective": "TZ-KEYMAP-DEV",
+      "observer": "project_library/projects/toolz/verification/TZ-KEYMAP-DEV-observe.py",
+      "basis_manifest": "project_library/projects/toolz/development.json",
+      "public_materials": [
+        "materials/TZ-KEYMAP-DEV-contract.md",
+        "materials/TZ-KEYMAP-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 30,
+              "exception": "TypeError"
+            },
+            {
+              "line": 19,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "tqdm",
+      "objective": "TQDM-05-DEV",
+      "observer": "project_library/projects/tqdm/verification/TQDM-05-DEV-observe.py",
+      "basis_manifest": "project_library/projects/tqdm/development.json",
+      "public_materials": [
+        "materials/TQDM-05-DEV-contract.md",
+        "materials/TQDM-05-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：公开身份或状态承诺",
+          "reason": "公开合同明确要求真实字段身份、兼容字段、原签名、锁归属或独立运行状态。",
+          "locations": [
+            {
+              "line": 34,
+              "expression": "Local._lock"
+            },
+            {
+              "line": 25,
+              "expression": "cls._lock"
+            },
+            {
+              "line": 29,
+              "expression": "cls._lock"
+            },
+            {
+              "line": 38,
+              "expression": "Local._lock"
+            },
+            {
+              "line": 24,
+              "expression": "hasattr(cls,'_lock')"
+            },
+            {
+              "line": 24,
+              "expression": "cls._lock"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "treelib",
+      "objective": "TREELIB-02-DEV",
+      "observer": "project_library/projects/treelib/verification/TREELIB-02-DEV-observe.py",
+      "basis_manifest": "project_library/projects/treelib/development.json",
+      "public_materials": [
+        "materials/TREELIB-02-DEV-contract.md",
+        "materials/TREELIB-02-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：受控失败夹具",
+          "reason": "私有字段属于观察器自己定义的带副作用setter，用于验证原状态恢复。",
+          "locations": [
+            {
+              "line": 24,
+              "expression": "getattr(self,'_risky','old')"
+            },
+            {
+              "line": 28,
+              "expression": "self._risky"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "typer",
+      "objective": "TY-M01-DEV",
+      "observer": "project_library/projects/typer/verification/native_checks.py",
+      "basis_manifest": "project_library/projects/typer/development.json",
+      "public_materials": [
+        "materials/TY-M01/shop.py",
+        "materials/TY-M01/catalog.json",
+        "materials/TY-M01/README.md"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 334,
+              "exception": "ValueError"
+            },
+            {
+              "line": 342,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "webcolors",
+      "objective": "WEBCOLORS-06-DEV",
+      "observer": "project_library/projects/webcolors/verification/WEBCOLORS-06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/webcolors/development.json",
+      "public_materials": [
+        "materials/WEBCOLORS-06-DEV-contract.md",
+        "materials/WEBCOLORS-06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：既有API或正常路径失败",
+          "reason": "分支用于识别原生API既有拒绝、正常调用不应出错或已存在的业务行为，没有证明它额外收窄新增功能的合理实现。",
+          "locations": [
+            {
+              "line": 23,
+              "exception": "TypeError"
+            },
+            {
+              "line": 26,
+              "exception": "TypeError"
+            }
+          ]
+        },
+        {
+          "signal": "private_access",
+          "disposition": "已修正并通过真实隔离四组矩阵",
+          "reason": "新增API的公开合同没有指定私有字段名；改用公开读写隔离或实际缓存命中/淘汰验证。",
+          "locations": [
+            {
+              "line": 25,
+              "expression": "a._colors"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "wtforms",
+      "objective": "WTFORMS-05-DEV",
+      "observer": "project_library/projects/wtforms/verification/WTFORMS-05-DEV-observe.py",
+      "basis_manifest": "project_library/projects/wtforms/development.json",
+      "public_materials": [
+        "materials/WTFORMS-05-DEV-contract.md",
+        "materials/WTFORMS-05-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "private_access",
+          "disposition": "保留：固定原生状态或测试设置",
+          "reason": "访问固定原版已经存在的结构以核对状态、隔离、回归或建立输入；没有发现本轮已证实的新增存储名称要求。",
+          "locations": [
+            {
+              "line": 23,
+              "expression": "Base._unbound_fields"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "wtforms",
+      "objective": "WTFORMS-06-DEV",
+      "observer": "project_library/projects/wtforms/verification/WTFORMS-06-DEV-observe.py",
+      "basis_manifest": "project_library/projects/wtforms/development.json",
+      "public_materials": [
+        "materials/WTFORMS-06-DEV-contract.md",
+        "materials/WTFORMS-06-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "待等价候选动态验证的线索",
+          "reason": "公开材料没有直接限定该异常子类；本轮尚未用完整等价候选证明其所有行为满足，保留为后续复现线索，不计为已确认误判或已修复。",
+          "locations": [
+            {
+              "line": 29,
+              "exception": "ValueError"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "project": "xlsxwriter",
+      "objective": "XW-REPORT-DEV",
+      "observer": "project_library/projects/xlsxwriter/verification/XW-REPORT-DEV-observe.py",
+      "basis_manifest": "project_library/projects/xlsxwriter/development.json",
+      "public_materials": [
+        "materials/XW-REPORT-DEV-contract.md",
+        "materials/XW-REPORT-DEV-tests.py"
+      ],
+      "review": [
+        {
+          "signal": "specific_exception_handler",
+          "disposition": "保留：原异常传播",
+          "reason": "该分支检查测试输入或回调实际抛出的原异常，或兼有正常失败捕获；放宽会隐藏吞错或异常替换。",
+          "locations": [
+            {
+              "line": 24,
+              "exception": "RuntimeError"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,622 @@
+{
+  "id": "verification-behavior-compatibility",
+  "name": "verification-behavior-compatibility",
+  "title": "修复原生验收顺序误判并审计非必要严格约束",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-29",
+  "completedAt": "2026-10-28",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-28T17:33:14Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-28T16:18:53Z",
+      "contextKey": "codex_01a18347-43e5-7fa3-962f-7a9ca6cc80b3",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "c6d9406310783687084bfbf77819cc7c8c051c3f",
+        "status": [
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/known-findings.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/utf16-evidence.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/brief.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/current-state.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.lock"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.toml"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/src/main.rs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-stderr-smoke.log"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/generate-corpus.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health-smoke.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results-smoke.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/run-differential.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/task.json"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "c6d9406310783687084bfbf77819cc7c8c051c3f",
+            "status": [
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/known-findings.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/utf16-evidence.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/brief.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/current-state.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.lock"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.toml"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/src/main.rs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-stderr-smoke.log"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/generate-corpus.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health-smoke.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results-smoke.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/run-differential.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/task.json"
+              }
+            ],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/check.jsonl",
+                "sha256": "a5d8d3261aa6e3f893868e9a8d4b27da187614d10a40c7cdeef689f995a453e3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/implement.jsonl",
+                "sha256": "cf7f285666799d558d9ee38ceba0a272e3b655b059db3748dc278be569c9f37b"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/prd.md",
+                "sha256": "8ae4877a56474c1b0f2ae8cb271113c1179658b039067d1e1f5ed11c6ee0e45b"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/baseline.json",
+                "sha256": "43774118a7f58d2bd9a7d8001a62ed2c06520bb2cd9fd174fe6037293e7d711c"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/known-findings.md",
+                "sha256": "88b5724aeb57635c580cde169c499c17297d465615806c9afafef6636a41134c"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/task.json",
+                "sha256": "ac60b4f3e9837bc920b69a8c0618de99c5ad3814cc450de32612e20ac2627aa0"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/check.jsonl",
+                "sha256": "94ce057560791db170bb71ce04887a35d9d55bc1b4cf5141965b915ca086c2f3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/implement.jsonl",
+                "sha256": "9fde1d60b50f11666f633103f332767313fe09d67ed4489de99e232d6dfa2121"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/prd.md",
+                "sha256": "527491c5257a70d388525ff67d9e594736b4dd4d06e954469c43f3cc5cab372f"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/task.json",
+                "sha256": "7e2dfb8e30cabbbc92e0fe41f96fe05d50fca11b06193290f37a391dd31618f5"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/utf16-evidence.json",
+                "sha256": "c8f6fb3d1fe01771541e5bff97e2e96826be1592e353a6bf375744b6695c90dd"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/check.jsonl",
+                "sha256": "e8d19b9ef04cbe62639d770275e70d59cbd271702bcc74a105bf717fd35665b8"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/design.md",
+                "sha256": "2c6baa4c8240502ad6bec279a3f125d1de2bb1360eaf114ac8f07477accdcb01"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.jsonl",
+                "sha256": "ac2cf8b9b591fe2573ad53735a404467230605993e054d7cd32eb11eecfcbfa3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.md",
+                "sha256": "1c03f4cfb70fbc09eaf7c677d838b978b0febc503403e50dc63e2cc540c5f090"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/prd.md",
+                "sha256": "00eb8001e060adca3ee30a90054e9b436324578f94d39c3f3674de6c6246566e"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/task.json",
+                "sha256": "45accb54cd69c204e431985e28a2e1e60933f3f6e89dbe67857c9a04f6979366"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/check.jsonl",
+                "sha256": "e8d19b9ef04cbe62639d770275e70d59cbd271702bcc74a105bf717fd35665b8"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/design.md",
+                "sha256": "85321efb8da2b9bc2d3bc85d721447d3731f6008fde69e630396052e314bbe74"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.jsonl",
+                "sha256": "ac2cf8b9b591fe2573ad53735a404467230605993e054d7cd32eb11eecfcbfa3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.md",
+                "sha256": "e107d999e44d5ead9191bad20168aaa99cadfcd036d3242c1cf65633c57a5453"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/prd.md",
+                "sha256": "66638458e0b969b063167c5c5b204f75186d15b16762763f9cdd91bb2d127187"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/task.json",
+                "sha256": "bd5560fbe7bc21db638828911ea4069fdd96a80047e7b8c5bc63789288052dd1"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/brief.md",
+                "sha256": "2487d752127bc927b7fea6defc3fca69cde359e8ebb2406f54c9253af5851ceb"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/check.jsonl",
+                "sha256": "e8d19b9ef04cbe62639d770275e70d59cbd271702bcc74a105bf717fd35665b8"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/design.md",
+                "sha256": "6c638484d4b833260796ad5d2947804f2da11109473e7108d7a0161387826c36"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/implement.jsonl",
+                "sha256": "ac2cf8b9b591fe2573ad53735a404467230605993e054d7cd32eb11eecfcbfa3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/implement.md",
+                "sha256": "b839f878b11ebb3b25314ea134ebf86d09d2080055b13aed86f8f322c117b5de"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/prd.md",
+                "sha256": "83c7ca19c10ba716b5d4a2cf74e6a5cee6f2ee686dd0c6a540c79a668cb080f4"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/baseline.json",
+                "sha256": "32f6eb3441923613386e35d8b8fbd92cae06dffb0919cb579b17f9874a8bc8a9"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/current-state.md",
+                "sha256": "add51db44651a23989520c14bffca7befa5ef7d4254c4bdb7a4f009ba4ca89f9"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/task.json",
+                "sha256": "97f8949f9b600ee0323d95106294d6220d6e7be2a035b2682784dd4651b8b4cc"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/check.jsonl",
+                "sha256": "40dabff4b3e0949c79f6dbbbec55ba4d8eb31ab989ba5c77786bf2c951c88b92"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/implement.jsonl",
+                "sha256": "40dabff4b3e0949c79f6dbbbec55ba4d8eb31ab989ba5c77786bf2c951c88b92"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/prd.md",
+                "sha256": "c9360fa8d7c8b384a4f9d84b693875f899eb6208a73ddba241987f939fab31fe"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.lock",
+                "sha256": "f0661d319d6aa15eca8b5e4d038b2984c23f58bea0038e7f4e938f2f7ee686cc"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.toml",
+                "sha256": "b8f4d43382145685a438768e0b36d25bb69d01a36f1d7776707fcd2ac6c61a86"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/src/main.rs",
+                "sha256": "346863fdd5d3dfe6f1cf4bd218d20774c2fc07cfdfd7b2913d3430d48e318ba4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-stderr-smoke.log",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/corpus.jsonl",
+                "sha256": "e51c8833290f4d3b49bb71dff075c9797b34053787a887ddb018fa7a161b4461"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/generate-corpus.mjs",
+                "sha256": "29fca13faa369e4d5ac9c2ff407fe8bf62820e588b8944043be0bd9cdf5cd47f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health-smoke.json",
+                "sha256": "f8f94132129ebdf4286085bc906021fd27fa75ea93358f12c9956315a511f897"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results-smoke.jsonl",
+                "sha256": "36e50a41168bcfe0bcdab5f8f8933480a217c505d36f7c57b904310233084221"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/run-differential.mjs",
+                "sha256": "ba122e4aaeb9104bf2643f80908a9952cd8851ed75c5d1dcd0efcb9386353784"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/task.json",
+                "sha256": "945842790293643570186b8de2319ceb736d42debdf40e433a630831908a35bd"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "d9d224d6f0c1d36d88caa2bcecade3efe37cd3b9dba08ac95679937904990037"
+          },
+          {
+            "root": "cc2api",
+            "head": "d238aacb3a8ae430995f4742dfcd49b2df10e3fa",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "df9cdd30a34736cd40a88c22e40886fdd785acaf24d6aef66a98656b9228c0d5"
+          }
+        ],
+        "fingerprint": "812648ed994bfd56a53a18e39b434b6ff71b59781fc60206cbe46d4e86deb36c"
+      }
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "完成七项验收修正及100项目600目标静态审计",
+      "通过106项唯一单元用例、四套原生回归和16个业务场景",
+      "完成Check-All与规范更新",
+      "业务修复已提交并推送"
+    ],
+    "partialStep": null,
+    "nextStep": "按既有发布流程部署并完成原Docutils候选的独立线上验收",
+    "notes": "保留24条待等价候选动态复现的存量线索；本次未改生产状态。",
+    "updatedAt": "2026-10-28T17:33:14.712998+00:00"
+  }
+}

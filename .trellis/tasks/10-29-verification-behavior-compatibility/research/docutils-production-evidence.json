@@ -1,0 +1,127 @@
+{
+  "observed_at": "2026-10-28T16:27:53.398591+00:00",
+  "work": {
+    "id": "e356d08e75304437b47d99a4aa39eac6",
+    "project_key": "docutils",
+    "objective_id": "DOCUTILS-O01-DEV",
+    "status": "deferred",
+    "library_digest": "3ab8d8711a662922f074840cdace4d41cd9d431a2fd66f151cbfda3b7f465aa7",
+    "work_sec": 684.883887052536
+  },
+  "submissions": [
+    {
+      "id": "eb67eb537faa4482b96732bd63c38f76",
+      "snapshot_digest": "a5d9a63a1edb8a640e9b5c90032c464f08733e519563001c719bfbcfe4a40217",
+      "business": "passed",
+      "regression_counts": {
+        "error": 0,
+        "failed": 0,
+        "passed": 457,
+        "skipped": 2,
+        "unexecuted": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "returncode": 0,
+      "subtests_match_contract": false,
+      "subtest_count": 1776,
+      "same_multiset_without_ordinal": true,
+      "position_mismatches": 39,
+      "affected_parents": [
+        "test_functional.FunctionalTests.test_functional"
+      ],
+      "first_difference": {
+        "expected": {
+          "context": {
+            "kwargs": {
+              "test_file": "'functional/tests/compact_lists.py'"
+            },
+            "msg": null
+          },
+          "ordinal": 1,
+          "outcome": "passed",
+          "parent_nodeid": "test_functional.FunctionalTests.test_functional",
+          "when": "call"
+        },
+        "actual": {
+          "context": {
+            "kwargs": {
+              "test_file": "'functional/tests/latex_memoir.py'"
+            },
+            "msg": null
+          },
+          "ordinal": 1,
+          "outcome": "passed",
+          "parent_nodeid": "test_functional.FunctionalTests.test_functional",
+          "when": "call"
+        }
+      },
+      "program_sha256": "f606837c711bc44f336608f36e0310b92e9a782243a0c322e5d26d8e594cfe7b",
+      "runtime_adapter": {
+        "effective_runner_sha256": "c26ec4272b5a5bad6e6bd4cc323c24d9a451674924ab1386b6092f1646063867",
+        "name": "python-patch-compatibility-v1",
+        "original_runner_sha256": "234856de282a61843bd58d1f8e7eb21ce4a07fcf8ca26a5eb903f891287fd988",
+        "preserves_frozen_contract": true,
+        "scope": "python_runtime"
+      }
+    },
+    {
+      "id": "441e4f3374534cb7b5513db8484b37a5",
+      "snapshot_digest": "a5d9a63a1edb8a640e9b5c90032c464f08733e519563001c719bfbcfe4a40217",
+      "business": "passed",
+      "regression_counts": {
+        "error": 0,
+        "failed": 0,
+        "passed": 457,
+        "skipped": 2,
+        "unexecuted": 0,
+        "xfailed": 0,
+        "xpassed": 0
+      },
+      "returncode": 0,
+      "subtests_match_contract": false,
+      "subtest_count": 1776,
+      "same_multiset_without_ordinal": true,
+      "position_mismatches": 39,
+      "affected_parents": [
+        "test_functional.FunctionalTests.test_functional"
+      ],
+      "first_difference": {
+        "expected": {
+          "context": {
+            "kwargs": {
+              "test_file": "'functional/tests/compact_lists.py'"
+            },
+            "msg": null
+          },
+          "ordinal": 1,
+          "outcome": "passed",
+          "parent_nodeid": "test_functional.FunctionalTests.test_functional",
+          "when": "call"
+        },
+        "actual": {
+          "context": {
+            "kwargs": {
+              "test_file": "'functional/tests/latex_memoir.py'"
+            },
+            "msg": null
+          },
+          "ordinal": 1,
+          "outcome": "passed",
+          "parent_nodeid": "test_functional.FunctionalTests.test_functional",
+          "when": "call"
+        }
+      },
+      "program_sha256": "d3b3d78a45a0fbeeffe243dc08a066a20daee53eedf1a2b90e96b71afc450bfa",
+      "runtime_adapter": {
+        "effective_runner_sha256": "c26ec4272b5a5bad6e6bd4cc323c24d9a451674924ab1386b6092f1646063867",
+        "name": "python-patch-compatibility-v1",
+        "original_runner_sha256": "234856de282a61843bd58d1f8e7eb21ce4a07fcf8ca26a5eb903f891287fd988",
+        "preserves_frozen_contract": true,
+        "scope": "python_runtime"
+      }
+    }
+  ],
+  "production_mutations": false,
+  "runner_sha256": "234856de282a61843bd58d1f8e7eb21ce4a07fcf8ca26a5eb903f891287fd988"
+}

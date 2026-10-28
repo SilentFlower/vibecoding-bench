@@ -1,0 +1,451 @@
+{
+  "native": {
+    "image": "vibebench-v3-account:v3-account-review-serial-local-20261022-f",
+    "results": [
+      {
+        "case": "docutils-business",
+        "status": "passed",
+        "elapsed_sec": 7.09,
+        "counts": null,
+        "subtests_match_contract": null,
+        "message": null,
+        "runtime_adapter": null
+      },
+      {
+        "case": "docutils-regression",
+        "status": "passed",
+        "elapsed_sec": 18.0,
+        "counts": {
+          "passed": 457,
+          "failed": 0,
+          "error": 0,
+          "skipped": 2,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "subtests_match_contract": true,
+        "message": null,
+        "runtime_adapter": {
+          "name": "native-evidence-semantics-v1",
+          "scope": "native_metadata",
+          "original_runner_sha256": "234856de282a61843bd58d1f8e7eb21ce4a07fcf8ca26a5eb903f891287fd988",
+          "effective_runner_sha256": "23c056d10b2ec9ed89f91d244cde1438c3880fbbe59a74ea96f7d30b37e3e800",
+          "metadata_policy_sha256": "b5e599c2d10b6751ff3b165f8326c7b791d5a25c7f5c5a7e415560979cf67494",
+          "preserves_frozen_contract": true,
+          "python_compatibility": {
+            "name": "python-patch-compatibility-v1",
+            "scope": "python_runtime",
+            "original_runner_sha256": "234856de282a61843bd58d1f8e7eb21ce4a07fcf8ca26a5eb903f891287fd988",
+            "effective_runner_sha256": "c26ec4272b5a5bad6e6bd4cc323c24d9a451674924ab1386b6092f1646063867",
+            "preserves_frozen_contract": true
+          }
+        }
+      },
+      {
+        "case": "more-itertools-regression",
+        "status": "passed",
+        "elapsed_sec": 80.26,
+        "counts": {
+          "passed": 765,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "subtests_match_contract": true,
+        "message": null,
+        "runtime_adapter": {
+          "name": "native-evidence-semantics-v1",
+          "scope": "native_metadata",
+          "original_runner_sha256": "140cb53b6d35659cbcb198e504d6e2663e7938ebad28cf23eacd454da8a788ae",
+          "effective_runner_sha256": "caee56bbeb642f3352b9ff78969f0ea40f4ab039afe058daed7b8d294e11d096",
+          "metadata_policy_sha256": "b5e599c2d10b6751ff3b165f8326c7b791d5a25c7f5c5a7e415560979cf67494",
+          "preserves_frozen_contract": true,
+          "python_compatibility": {
+            "name": "python-patch-compatibility-v1",
+            "scope": "python_runtime",
+            "original_runner_sha256": "140cb53b6d35659cbcb198e504d6e2663e7938ebad28cf23eacd454da8a788ae",
+            "effective_runner_sha256": "caee56bbeb642f3352b9ff78969f0ea40f4ab039afe058daed7b8d294e11d096",
+            "preserves_frozen_contract": true
+          }
+        }
+      },
+      {
+        "case": "wrapt-regression",
+        "status": "passed",
+        "elapsed_sec": 30.33,
+        "counts": {
+          "passed": 1412,
+          "failed": 0,
+          "error": 0,
+          "skipped": 6,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "subtests_match_contract": true,
+        "message": null,
+        "runtime_adapter": {
+          "name": "native-evidence-semantics-v1",
+          "scope": "native_metadata",
+          "original_runner_sha256": "ed2347ae748e0720dcaf65a201dd4f7fb9ef33c0f9beda318c3bae0fa88d9a49",
+          "effective_runner_sha256": "b66107625725f335980d0dd3fdaa7383b9e9d345aca1fa36ce957b997b0a30c9",
+          "metadata_policy_sha256": "b5e599c2d10b6751ff3b165f8326c7b791d5a25c7f5c5a7e415560979cf67494",
+          "preserves_frozen_contract": true,
+          "python_compatibility": {
+            "name": "python-patch-compatibility-v1",
+            "scope": "python_runtime",
+            "original_runner_sha256": "ed2347ae748e0720dcaf65a201dd4f7fb9ef33c0f9beda318c3bae0fa88d9a49",
+            "effective_runner_sha256": "b66107625725f335980d0dd3fdaa7383b9e9d345aca1fa36ce957b997b0a30c9",
+            "preserves_frozen_contract": true
+          }
+        }
+      },
+      {
+        "case": "pyparsing-regression",
+        "status": "passed",
+        "elapsed_sec": 144.35,
+        "counts": {
+          "passed": 2175,
+          "failed": 0,
+          "error": 0,
+          "skipped": 0,
+          "xfailed": 0,
+          "xpassed": 0,
+          "unexecuted": 0
+        },
+        "subtests_match_contract": true,
+        "message": null,
+        "runtime_adapter": {
+          "name": "native-evidence-semantics-v1",
+          "scope": "native_metadata",
+          "original_runner_sha256": "4b01492b716157fd6d2480be0d949a339787ad5e7944093e9546ecef0c187408",
+          "effective_runner_sha256": "d042300ee3f7c2a3883f00b560dd5fc3403ca5fa862c99ff9d80d65ca8f5e3e4",
+          "metadata_policy_sha256": "b5e599c2d10b6751ff3b165f8326c7b791d5a25c7f5c5a7e415560979cf67494",
+          "preserves_frozen_contract": true,
+          "python_compatibility": {
+            "name": "python-patch-compatibility-v1",
+            "scope": "python_runtime",
+            "original_runner_sha256": "4b01492b716157fd6d2480be0d949a339787ad5e7944093e9546ecef0c187408",
+            "effective_runner_sha256": "d042300ee3f7c2a3883f00b560dd5fc3403ca5fa862c99ff9d80d65ca8f5e3e4",
+            "preserves_frozen_contract": true
+          }
+        }
+      }
+    ],
+    "original_candidate_digest": "a5d9a63a1edb8a640e9b5c90032c464f08733e519563001c719bfbcfe4a40217",
+    "real_model_calls": 0,
+    "production_mutations": false
+  },
+  "business": {
+    "image": "vibebench-v3-account:v3-account-review-serial-local-20261022-f",
+    "results": [
+      {
+        "project": "webcolors",
+        "variant": "original",
+        "expected": "failed",
+        "status": "failed",
+        "expectation_met": true,
+        "feedback_codes": [
+          "palette_values",
+          "palette_isolation",
+          "palette_immutable",
+          "palette_builtins"
+        ],
+        "runtime_adapter": {
+          "name": "webcolors-palette-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b",
+          "effective_runner_sha256": "db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "webcolors",
+        "variant": "reference",
+        "expected": "passed",
+        "status": "passed",
+        "expectation_met": true,
+        "feedback_codes": [],
+        "runtime_adapter": {
+          "name": "webcolors-palette-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b",
+          "effective_runner_sha256": "db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "webcolors",
+        "variant": "alternative",
+        "expected": "passed",
+        "status": "passed",
+        "expectation_met": true,
+        "feedback_codes": [],
+        "runtime_adapter": {
+          "name": "webcolors-palette-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b",
+          "effective_runner_sha256": "db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "webcolors",
+        "variant": "broken",
+        "expected": "failed",
+        "status": "failed",
+        "expectation_met": true,
+        "feedback_codes": [
+          "palette_values"
+        ],
+        "runtime_adapter": {
+          "name": "webcolors-palette-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b",
+          "effective_runner_sha256": "db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "bibtexparser",
+        "variant": "original",
+        "expected": "failed",
+        "status": "failed",
+        "expectation_met": true,
+        "feedback_codes": [
+          "bibliography_diagnostics",
+          "bibliography_immutable",
+          "bibliography_version"
+        ],
+        "runtime_adapter": {
+          "name": "bibtexparser-validation-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715",
+          "effective_runner_sha256": "f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "bibtexparser",
+        "variant": "reference",
+        "expected": "passed",
+        "status": "passed",
+        "expectation_met": true,
+        "feedback_codes": [],
+        "runtime_adapter": {
+          "name": "bibtexparser-validation-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715",
+          "effective_runner_sha256": "f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "bibtexparser",
+        "variant": "broken",
+        "expected": "failed",
+        "status": "failed",
+        "expectation_met": true,
+        "feedback_codes": [
+          "bibliography_version"
+        ],
+        "runtime_adapter": {
+          "name": "bibtexparser-validation-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715",
+          "effective_runner_sha256": "f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "bibtexparser",
+        "variant": "alternative",
+        "expected": "passed",
+        "status": "passed",
+        "expectation_met": true,
+        "feedback_codes": [],
+        "runtime_adapter": {
+          "name": "bibtexparser-validation-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715",
+          "effective_runner_sha256": "f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "click",
+        "variant": "original",
+        "expected": "failed",
+        "status": "failed",
+        "expectation_met": true,
+        "feedback_codes": [
+          "stable_write_content",
+          "stable_write_unchanged",
+          "stable_write_symlink"
+        ],
+        "runtime_adapter": {
+          "name": "click-stable-write-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69",
+          "effective_runner_sha256": "b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "click",
+        "variant": "reference",
+        "expected": "passed",
+        "status": "passed",
+        "expectation_met": true,
+        "feedback_codes": [],
+        "runtime_adapter": {
+          "name": "click-stable-write-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69",
+          "effective_runner_sha256": "b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "click",
+        "variant": "broken",
+        "expected": "failed",
+        "status": "failed",
+        "expectation_met": true,
+        "feedback_codes": [
+          "stable_write_symlink"
+        ],
+        "runtime_adapter": {
+          "name": "click-stable-write-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69",
+          "effective_runner_sha256": "b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "click",
+        "variant": "alternative",
+        "expected": "passed",
+        "status": "passed",
+        "expectation_met": true,
+        "feedback_codes": [],
+        "runtime_adapter": {
+          "name": "click-stable-write-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69",
+          "effective_runner_sha256": "b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "python-liquid",
+        "variant": "original",
+        "expected": "failed",
+        "status": "failed",
+        "expectation_met": true,
+        "feedback_codes": [
+          "versioned_loader_cache",
+          "versioned_loader_versions",
+          "versioned_loader_async"
+        ],
+        "runtime_adapter": {
+          "name": "liquid-versioned-loader-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de",
+          "effective_runner_sha256": "e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "python-liquid",
+        "variant": "reference",
+        "expected": "passed",
+        "status": "passed",
+        "expectation_met": true,
+        "feedback_codes": [],
+        "runtime_adapter": {
+          "name": "liquid-versioned-loader-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de",
+          "effective_runner_sha256": "e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "python-liquid",
+        "variant": "broken",
+        "expected": "failed",
+        "status": "failed",
+        "expectation_met": true,
+        "feedback_codes": [
+          "versioned_loader_cache"
+        ],
+        "runtime_adapter": {
+          "name": "liquid-versioned-loader-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de",
+          "effective_runner_sha256": "e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de",
+          "preserves_frozen_contract": true
+        }
+      },
+      {
+        "project": "python-liquid",
+        "variant": "alternative",
+        "expected": "passed",
+        "status": "passed",
+        "expectation_met": true,
+        "feedback_codes": [],
+        "runtime_adapter": {
+          "name": "liquid-versioned-loader-contract-v1",
+          "scope": "public_contract",
+          "original_runner_sha256": "e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de",
+          "effective_runner_sha256": "e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de",
+          "preserves_frozen_contract": true
+        }
+      }
+    ],
+    "real_model_calls": 0,
+    "production_mutations": false
+  },
+  "unit_tests": {
+    "command": "PYTHONPATH=orchestrator .venv/bin/python -B -m unittest test_project_native_contract test_project_native_regression test_project_native_verifier test_projects_runtime_resilience test_project_duplicate_adapter test_project_contract_observers test_project_behavior_observers test_project_evaluation test_projects_verification_review",
+    "cwd": "/root/project/vibecoding-bench",
+    "exit_code": 0,
+    "tests_run": 106,
+    "skipped": 1,
+    "remaining_failed": 0,
+    "supplemental_nose2": {
+      "command": ".deploy/verification-behavior-compatibility-20261029/nose2-python/bin/python -B -m unittest test_project_native_regression.NativeRegressionTests.test_nose2_keeps_function_and_class_nodes_and_rejects_code_or_skip_drift",
+      "tests_run": 1,
+      "skipped": 0,
+      "exit_code": 0,
+      "reason": "主环境缺nose2，使用已有离线wheel创建专用环境补跑原跳过用例"
+    },
+    "unique_tests_covered": 106
+  },
+  "production_mutations": false,
+  "real_model_calls": 0,
+  "content_validation": {
+    "content_schema": 3,
+    "projects": 100,
+    "scenarios": 600,
+    "tasks": 600,
+    "reviewed_projects": 100,
+    "blocked_projects": 0,
+    "digest": "96d27cdbd7a24969ba5acd5c7e17e8e98d98c8edcc2aebf1f5c3bb25d7dfb72b",
+    "evidence": "内容结构及离线制品摘要，不代表原生验收或模型完成"
+  },
+  "static_validation": {
+    "frozen_controllers_checked": 100,
+    "owned_python_files": 35,
+    "trusted_copies": "passed",
+    "syntax": "passed",
+    "git_diff_check": "passed",
+    "seeds_and_contracts_unchanged": true
+  }
+}
