@@ -653,6 +653,7 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 
 - 修改 `ProjectVerifier`、`ProjectsVerification`、`ProjectsService` 的验收归属、失败反馈、返工与恢复，以及 Pi 工具收尾时适用；项目和工程养号共用机制。
 - 新增或修改任一独立业务观察器、复核“公开测试通过但 business=false”或同一候选重复失败时，先按下方跨项目规则归因，再决定修候选、修验收器或处理环境。
+- 修改原生子测试/跳过记录比较、默认 repr 归一化或冻结报告预算时，同样按本节保留来源、真实结果与完整原始证据。
 
 ### 2. Signatures
 
@@ -671,11 +672,14 @@ GET /api/projects、GET /api/accounts/warmup/pi:
 failure_facts[] = {phase, reason, test_id?, exception_type?, required_percent?, actual_percent?}
 attrs 受信业务输出 = {candidate_import: bool, business: bool, feedback_codes: list[str]}
 _native_contract_observer_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]
+native_subtests_match(project: str, actual: object, expected: object) -> bool
+native_skips_match(actual: object, expected: object) -> bool
+native_metadata_facts(project: str, actual: dict, contract: dict) -> list[dict]
 ProjectsVerification._business_feedback(report: dict) -> list[str]
 parse_review(raw: str, package: dict) -> dict
 ProjectsVerification._review(work: dict, directory: Path, package: dict, cancel) -> dict
 runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
-                   preserves_frozen_contract, ...}
+                   preserves_frozen_contract, metadata_policy_sha256?, ...}
 ```
 
 ### 3. Contracts
@@ -722,6 +726,11 @@ runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
 - 上述三类观察器与 attrs 使用相同的三键严格诊断协议：两个严格布尔、无额外键、类别不重复且 `business == (not feedback_codes)`。Babel 类别使用 `locale_preferences_` 前缀，后缀仅为 `api/quality/order/matching/exclusions/headers/once/legacy`；页码类别使用 `pages_` 前缀，后缀仅为 `api/ranges/unknown/original/immutable/fields/idempotent/default_stack`；批检测类别使用 `batch_` 前缀，后缀仅为 `api/results/order/laziness/errors/policies/upstream/detection`。类别按当前适配器分别校验，未知来源及控制端摘要不符返回验收环境 error，任意诊断或非法协议不能通过。未来项目内容使用控制端字节相同的副本，并同步公开合同、任务提示、说明与示例；不改写既有冻结内容。
 - 公开业务反馈只映射受信枚举，不透传任意诊断字符串；递归只读取 `business/regression/previous_objectives[].report`，深度至多 5，每层历史目标至多 16，结果最多八项去重说明。具体反馈存在时替代泛化返工提示，原 `_public_facts` 的私有内容过滤和总预算继续生效。
 - 已核实错误通过 `verification_correction` 事件追加事实，旧提交和原始记录留档；新纠错第一次隔离 Pi 旧推理，原 Claude 会话继续复用。该机制不自动绕过权限、身份、认证、未知输入或严格清理冲突。
+- 原生完整列表子测试使用 `project_native_contract.py` 按父测试、阶段、上下文和结果比较多重集合，只忽略 ordinal 与枚举顺序；重复次数、缺项、多项和状态变化仍须拒绝，真实业务数组顺序仍由原测试及 `_same_json` 验证。已有不可逆摘要沿其原格式比较；原始子测试记录不改写。跳过清单只忽略顺序，保留身份、原因和重复次数。
+- 默认 repr 地址只在已核 more-itertools、pyparsing、wrapt 的父测试与参数位置完整匹配后归一化，保留对象类型、函数名及其余字面；带引号的用户字符串、SQL 十六进制和未知位置不能全局替换。旧控制器通过精确原始 SHA 或可逆的唯一已准许片段变换核来源，汇总入口导入受信比较模块，插件工作进程不依赖该导入；输入根只读暂存模块并记录 `metadata_policy_sha256`。
+- `WEBCOLORS-06-DEV` 与 `PYTHON-LIQUID-02-DEV` 分别使用受信 `project_palette_observer.py`、`project_versioned_loader_observer.py` 验证公开 Mapping 隔离/不可变行为及实际缓存命中/容量/LRU 淘汰，不要求 `_colors` 或 `_cache` 字段名。`BIBTEXPARSER-O02-DEV` 未知版本允许 ValueError/TypeError/LookupError，`CK-STABLE-WRITE-DEV` 软链接拒绝允许 ValueError/OSError；正常输出、原数据/文件/链接不变和临时文件清理继续检查，NameError/AttributeError 等开发错误不算合法拒绝。
+- 上述四个观察器沿 `_CONTRACT_OBSERVERS` 核精确脚本、空 args、原 python_paths、严格双布尔 expected 及新旧 SHA，再执行同字节控制端/未来副本；使用既有三键诊断协议。类别前缀分别为 `palette_`、`versioned_loader_`、`bibliography_`、`stable_write_`，允许后缀以注册表枚举为准，公开说明由 `_business_feedback` 映射，不能透传任意字符串或错误正文。
+- 原生回归结果预算为 `max(2 MiB, min(16 MiB, len(canonical_json(contract))*2+65536))`，日志为结果预算的两倍加 65536 字节，保留 Docker JSON 转义空间和准备证明；业务观察沿原 2 MiB 结果预算。可信回归报告超过预算返回环境 error，不能算候选功能失败。子测试差异提供固定原因及缺少/额外计数，不要求模型猜隐藏规则。
 
 ### 4. Validation & Error Matrix
 
@@ -748,6 +757,11 @@ runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
 | Chardet 从零编号、错误为结构化事实或异常对象 | 按公开行为验收；编号乱序、错误记录仍有成功结果、预读、吞异常或复用旧检测仍失败 |
 | 忽略通配符排除、破坏页码数字／来源、修改输入 | failed，并返回对应公开行为类别 |
 | 新观察器来源未知、可信副本摘要不符／诊断协议非法 | 来源错误为 error；非法输出为 failed，不放行或透传任意正文 |
+| 相同原生子测试仅遍历次序不同／已核默认对象地址变化 | 完整多重集合相符即可通过；原始顺序与表示继续留证 |
+| 子测试缺项、多项、重复次数、类型/函数身份、业务字面或结果改变 | 不匹配并返回有界差异事实；业务错误仍失败 |
+| 色板/缓存换用另一私有字段名，公开行为全部相符 | 通过；可变导出、实例污染、不命中或不淘汰仍失败 |
+| 未知版本合法参数错误／软链接合法文件错误 | 按已核拒绝族接受；忽略拒绝、写穿链接、改变输入或开发错误仍失败 |
+| 冻结报告超过旧2MiB但在按合同计算的有限预算内 | 完整读取并验证，不轮转丢准备标记；超过当前预算为环境error |
 
 ### 5. Scenarios and Examples
 
@@ -759,6 +773,8 @@ runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
 - Babel 边界：可用 `en_US/fr` 时，对未明确的冲突偏好分别接受两种现有解释；错误是因此跳过所有排除检查，正确是另用 `en;q=0, *` 等明确用例继续拒绝选回被排除语言的实现。
 - 页码边界：`' 001 - 009 '` 变为 `'001--009'` 或 `' 001--009 '` 均可接受，首次原值仍须精确保留；错误是仅做 strip 后接受未转换的连字符，正确是同时检查数字文本、双连字符及不变性。
 - 批检测边界：从零编号且 `error={'type':'ValueError','message':'...'}` 的局部失败与从一编号、错误为字符串的实现都可通过。错误是要求模型猜测参考补丁的编号和错误类型；正确是核对连续顺序、无成功结果、后续输入保留及真实检测，并按受信类别返回具体失败事实。
+- Docutils 正常：原交付 457 通过、2 跳过，1776 条子项只有 39 条枚举位置变化时按完整多重集合验收。错误是要求候选修改上游 glob 遍历顺序或直接写 passed；正确是保留原候选和旧报告，修控制端规则后走真实禁网复验与独立评审。
+- 表示边界：`<range_iterator object at 0x1234>` 在已核参数位置可随地址变化；`SELECT 0x1234`、对象类型或函数名改变不可因此被忽略。错误是全局替换十六进制或把列表转 set；正确是限定上下文并保留重复计数。
 
 ### 6. Tests Required
 
@@ -766,6 +782,8 @@ runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
 - `test_project_arrow_adapter`：两种合法异常、错误接受输入、来源摘要保护、真实 pytest 节点不受辅助失败污染、覆盖率数值及私有日志边界、真实入口只读辅助挂载。
 - `test_project_attrs_adapter`：新旧字节与分发副本一致、未知来源环境错误、真实入口临时暂存/只读挂载、严格结果协议、严格 bool 与真值两种合法实现、八类真实错误反例、历史嵌套反馈和私有内容边界。真实候选另经离线 Docker 业务、公开六项及冻结原生回归验证；业务通过不能替代语义审查或历史回归。
 - `test_project_contract_observers`：Babel、页码和批检测参考实现及合理变体通过业务与公开示例；批检测覆盖两种编号与三种错误表示。错误权重/顺序/排除/输入边界/重复消费、页码未规范化/未知格式被改/原值丢失/输入或其它字段被改、批检测错误结果/编号/预读/错误隔离/策略/上游异常/检测缓存等真实反例失败并有具体类别。核对新旧摘要、未来副本一致、真实入口只读挂载、严格三键协议、历史嵌套反馈与私有内容过滤；真实冻结候选另经禁网产品入口业务及原生回归，不能把离线结果直接写成线上通过。
+- `test_project_native_contract`：重排通过而漏项/多项/去重/状态/上下文变化失败，45 条已核 repr 地址变化通过而类型/函数/业务字面变化失败；跳过原因与重复次数保留，原始证据和未知来源保护不变。
+- `test_project_behavior_observers`：四个目标的原版失败、参考及合理字段/异常变体通过、真实功能错误失败；真实 `verify_native` 另跑四组16场景并核诊断协议。`test_project_native_verifier` 核约4MB冻结结果可完整解析且日志预算覆盖JSON转义；nose2跳过漂移测试在对应离线专用环境补跑。
 - `test_projects_verification_recovery`：三次不同候选、重复相同候选、双空间冷却、服务重启后的同 work/session、验证器抛错、连续两轮超时、取消竞争、人工停止及一次纠错上下文隔离。
 - `test_project_evaluation`：冗余规则归一化且原包不变、单 JSON 代码块兼容；前后说明、多对象、重复键、缺项、输出超限、未知字段、布尔伪装、越权证据及程序失败反例仍拒绝。真实原失败输出另用新旧解析器离线重放，不能改写历史提交或直接替线上标记通过。
 - `test_projects_verification_review` 与 `test_projects_verification_history`：同包仅一次格式重评、两份会话和用量、180 秒累计余量、取消／耗尽不增开、合法 fail/uncertain 不重抽、传输失败不叠加重试；完整提交只执行一次各程序阶段，同一冻结候选完成最终核对。

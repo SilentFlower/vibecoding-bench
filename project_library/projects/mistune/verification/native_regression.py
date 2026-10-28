@@ -469,6 +469,7 @@ def _tail(path: Path, limit: int) -> str:
 
 def _run(options) -> dict:
     """构建并执行可信测试树。@param options 已验证命令参数。@return 最终报告。"""
+    from project_native_contract import native_skips_match, native_subtests_match
     suite = SUITES[options.project]
     _, import_root = _suite_paths(suite)
     baseline = options.baseline_root.resolve(strict=True)
@@ -577,7 +578,7 @@ def _run(options) -> dict:
         if subtests is not None:
             valid = (valid and bool(subtests)
                 and all(item['outcome'] in ('passed', 'skipped', 'xfailed') for item in subtests)
-                and (contract is None or subtests == contract['subtests']))
+                and (contract is None or native_subtests_match(options.project, subtests, contract['subtests'])))
         frozen = {'schema': SCHEMA, 'project': options.project, 'baseline_digest': baseline_digest,
             'python': sys.version.split()[0], 'plugins': plugins, 'nodes': nodes}
         if subtests is not None:
@@ -606,7 +607,7 @@ def _run(options) -> dict:
             'scope': '冻结原生集合回归，不代表模型完成或独立业务目标已满足'}
         if subtests is not None:
             report.update(subtests=subtests, subtest_count=len(subtests),
-                subtests_match_contract=subtests == contract['subtests'] if contract else None)
+                subtests_match_contract=native_subtests_match(options.project, subtests, contract['subtests']) if contract else None)
         _save(evidence / 'summary.json', report)
         return report
 

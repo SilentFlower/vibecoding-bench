@@ -1524,6 +1524,7 @@ def _system_libraries(specification: tuple[str, str]) -> list[dict]:
 
 def _run(options) -> dict:
     """构建并执行可信测试树。@param options 已验证命令参数。@return 最终报告。"""
+    from project_native_contract import native_skips_match, native_subtests_match
     suite = SUITES[options.project]
     framework = suite.get('framework', 'pytest')
     _, import_root = _suite_paths(suite)
@@ -1732,7 +1733,7 @@ def _run(options) -> dict:
         if subtests is not None:
             valid = (valid and bool(subtests)
                 and all(item['outcome'] in ('passed', 'skipped', 'xfailed') for item in subtests)
-                and (contract is None or subtests == contract['subtests']))
+                and (contract is None or native_subtests_match(options.project, subtests, contract['subtests'])))
         frozen = {'schema': SCHEMA, 'project': options.project, 'baseline_digest': baseline_digest,
             'python': sys.version.split()[0], 'plugins': plugins, 'nodes': nodes}
         if framework in ('unittest', 'nose2'):
@@ -1742,7 +1743,7 @@ def _run(options) -> dict:
                 # 官方工厂按文件系统顺序构造两轮，跳过表按身份规范化，不改变执行或丢弃条目。
                 skips.sort(key=lambda item: item['id'])
             frozen.update(framework=framework, unittest_skips=skips)
-            valid = valid and (contract is None or skips == contract.get('unittest_skips'))
+            valid = valid and (contract is None or native_skips_match(skips, contract.get('unittest_skips')))
         if suite.get('unittest_entry'):
             frozen['unittest_entry'] = suite['unittest_entry']
             frozen['unittest_contexts'] = [{'id': item['id'], 'raw_id': item['raw_id'], 'mode': item['mode']}
@@ -1792,7 +1793,7 @@ def _run(options) -> dict:
             'scope': '冻结原生集合回归，不代表模型完成或独立业务目标已满足'}
         if subtests is not None:
             report.update(subtests=subtests, subtest_count=len(subtests),
-                subtests_match_contract=subtests == contract['subtests'] if contract else None)
+                subtests_match_contract=native_subtests_match(options.project, subtests, contract['subtests']) if contract else None)
         if suite.get('supplementary'):
             report.update(supplementary=supplements,
                 supplementary_example_count=sum(len(item['examples']) for item in supplements),

@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 from requests.exceptions import ReadTimeout
 
 from project_verifier import ProjectVerifier
+from project_library import digest_json
 
 
 class NativeVerifierTests(unittest.TestCase):
@@ -65,6 +66,28 @@ class NativeVerifierTests(unittest.TestCase):
         self.assertEqual('error', result['status'])
         self.assertEqual(fact['message'], result['message'])
         self.assertEqual(fact['details'], result['details'])
+
+    def test_large_frozen_regression_keeps_ready_proof_and_complete_results(self) -> None:
+        """冻结记录超过2MiB时扩展有限结果预算，并为JSON日志转义预留空间。:return: None。"""
+        source = Path(__file__).resolve().parents[1] / 'project_library/projects/more-itertools/verification'
+        contract = json.loads((source / 'native-contract.json').read_text())
+        (self.project / 'verification/native.py').write_bytes((source / 'native_regression.py').read_bytes())
+        (self.project / 'verification/contract.json').write_text(json.dumps(contract))
+        specification = {**self.spec, 'regression': {'runner': 'verification/native.py', 'contract': 'verification/contract.json'}}
+        report = {'status': 'passed', 'collection_matches_contract': True, 'collected': len(contract['nodes']),
+            'collection_digest': digest_json([{'id': item['id'], 'kind': item['kind']} for item in contract['nodes']]),
+            'subtests_match_contract': True, 'subtests': contract['subtests']}
+        payload = json.dumps(report).encode()
+        self.assertGreater(len(payload), 2 * 1024 * 1024)
+        child = self.container()
+        child.logs.return_value = b'VIBEBENCH_NATIVE_READY_V1\n' + payload
+        self.client.containers.create.return_value = child
+        profile = {**self.profile, 'regression': self.profile['business']}
+        result = self.verifier.verify_native(self.data / 'candidate', self.project, specification,
+            self.data / 'environment', profile, regression=True)
+        self.assertEqual(result['status'], 'passed', result)
+        logging = self.client.containers.create.call_args.kwargs['log_config']
+        self.assertGreater(int(logging.config['max-size']), len(payload) * 2)
 
     def test_cleanup_keeps_slot_until_container_has_been_removed(self) -> None:
         """超时来源尚在强制收口时，第二个验证不能占用同一个名额。@return None。"""

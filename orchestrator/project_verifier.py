@@ -21,6 +21,7 @@ from requests.exceptions import ReadTimeout
 from project_library import canonical_json, digest_json, read_document, safe_relative, write_document
 from project_scenario_content import read_native_contract
 from project_runtime_policy import check_python_runtime
+from project_native_contract import native_metadata_facts
 
 
 _DUPLICATE_RUNNER_SHA256 = frozenset({
@@ -102,6 +103,56 @@ class _NativeRegressionControlError(ValueError):
     """表示冻结回归控制器不属于已确认可安全适配的版本。"""
 
 
+_METADATA_IMPORT = b'    from project_native_contract import native_skips_match, native_subtests_match\n'
+_METADATA_COMPARISONS = (
+    (b"subtests == contract['subtests']", b"native_subtests_match(options.project, subtests, contract['subtests'])"),
+    (b"subtest_contract == contract['subtests']", b"native_subtests_match(options.project, subtest_contract, contract['subtests'])"),
+    (b"skips == contract.get('unittest_skips')", b"native_skips_match(skips, contract.get('unittest_skips'))"),
+)
+
+
+def _legacy_metadata_source(source: bytes) -> bytes:
+    """还原本轮唯一允许的元数据变换以核来源，不接受其他源码变化。:param source: 待核字节。:return: 原版形式。"""
+    if source.count(_METADATA_IMPORT) != 1:
+        return source
+    original = source.replace(_METADATA_IMPORT, b'', 1)
+    for before, after in _METADATA_COMPARISONS:
+        original = original.replace(after, before)
+    return original
+
+
+def _native_metadata_adapter(source: bytes, contract: dict, original: bytes) -> tuple[bytes, dict | None]:
+    """让已核冻结控制器按测试行为比较元数据，不改历史证据。
+
+    :param source: 已组合 Python 兼容后的执行字节。
+    :param contract: 原冻结合同。
+    :param original: 适配前原始字节，用于精确来源识别。
+    :return: 实际字节及受控比较模块的审计摘要。
+    """
+    if not contract.get('subtests') and 'unittest_skips' not in contract:
+        return source, None
+    known = hashlib.sha256(_legacy_metadata_source(original)).hexdigest() in _PYTHON_RUNNER_SHA256
+    if not known:
+        raise _NativeRegressionControlError('原生元数据控制器版本未知，请核对后更新')
+    if _METADATA_IMPORT not in source:
+        binding = b'    suite = SUITES[options.project]\n'
+        if source.count(binding) != 1:
+            raise _NativeRegressionControlError('原生元数据导入片段不唯一')
+        # 工作进程会重新导入控制器作插件；比较模块只由汇总进程读取。
+        source = source.replace(binding, _METADATA_IMPORT + binding, 1)
+        for before, after in _METADATA_COMPARISONS:
+            count = source.count(before)
+            expected = 1 if before.startswith(b'skips ') else 2
+            if count not in (0, expected):
+                raise _NativeRegressionControlError('原生元数据比较片段不唯一或不完整')
+            source = source.replace(before, after)
+    helper = Path(__file__).with_name('project_native_contract.py').read_bytes()
+    return source, {'name': 'native-evidence-semantics-v1', 'scope': 'native_metadata',
+        'original_runner_sha256': hashlib.sha256(original).hexdigest(),
+        'effective_runner_sha256': hashlib.sha256(source).hexdigest(),
+        'metadata_policy_sha256': hashlib.sha256(helper).hexdigest(), 'preserves_frozen_contract': True}
+
+
 def _native_regression_adapter(source: bytes, contract: dict) -> tuple[bytes, dict | None]:
     """为已知控制器收窄重复身份统计范围，不改冻结资产。
 
@@ -109,10 +160,12 @@ def _native_regression_adapter(source: bytes, contract: dict) -> tuple[bytes, di
     :param contract: 原冻结回归合同。
     :return: 实际执行字节及可公开的摘要；不需要适配时摘要为 None。
     """
+    original_source = source
     original = hashlib.sha256(source).hexdigest()
     source, compatibility = _native_python_adapter(source)
+    source, metadata = _native_metadata_adapter(source, contract, original_source)
     if not contract.get('duplicate_identities'):
-        return source, compatibility
+        return source, {**metadata, 'python_compatibility': compatibility} if metadata else compatibility
     if original not in _DUPLICATE_RUNNER_SHA256:
         raise _NativeRegressionControlError('重复身份控制器版本未知，拒绝推测适配')
     anchor = _DUPLICATE_COLLECTOR.encode('utf-8')
@@ -122,7 +175,8 @@ def _native_regression_adapter(source: bytes, contract: dict) -> tuple[bytes, di
     return actual, {'name': 'required-node-duplicate-identities-v1', 'scope': 'required_nodes',
         'original_runner_sha256': original, 'effective_runner_sha256': hashlib.sha256(actual).hexdigest(),
         'expected_nodes': len(contract['nodes']), 'expected_duplicate_identities': len(contract['duplicate_identities']),
-        'preserves_frozen_duplicate_counts': True, 'python_compatibility': compatibility}
+        'preserves_frozen_duplicate_counts': True, 'python_compatibility': compatibility,
+        **({'metadata_compatibility': metadata} if metadata else {})}
 
 
 def _native_python_adapter(source: bytes) -> tuple[bytes, dict | None]:
@@ -137,7 +191,7 @@ def _native_python_adapter(source: bytes) -> tuple[bytes, dict | None]:
     original = hashlib.sha256(source).hexdigest()
     binding = b'    plugins = _plugins(suite)\n'
     plugins = b"contract['plugins'] != plugins"
-    if (original not in _PYTHON_RUNNER_SHA256 or source.count(anchor) != 1
+    if (hashlib.sha256(_legacy_metadata_source(source)).hexdigest() not in _PYTHON_RUNNER_SHA256 or source.count(anchor) != 1
             or source.count(binding) != 1 or source.count(plugins) != 1):
         raise _NativeRegressionControlError('原生回归 Python 控制器版本未知，请核对后更新')
     actual = source.replace(binding,
@@ -201,6 +255,34 @@ _ATTRS_FEEDBACK_CODES = frozenset(('attrs_report_order', 'attrs_report_identity'
     'attrs_report_composites', 'attrs_report_base_exception'))
 
 _CONTRACT_OBSERVERS = {
+    'verification/PYTHON-LIQUID-02-DEV-observe.py': {
+        'python_paths': ['library', 'app'], 'filename': 'project_versioned_loader_observer.py',
+        'original_sha256': '3ab2094db8dd5be6a3fce777b06a6f9f1668ae4b9bbfbcf02de95fbc016b2b4b',
+        'current_sha256': 'e432a8e38c25912e5a73375cdfa1c17db7a5e293c049f69696abc78c6fdaf1de',
+        'name': 'liquid-versioned-loader-contract-v1', 'label': 'Liquid',
+        'feedback_codes': frozenset(('versioned_loader_cache', 'versioned_loader_versions', 'versioned_loader_async')),
+    },
+    'verification/WEBCOLORS-06-DEV-observe.py': {
+        'python_paths': ['library', 'app'], 'filename': 'project_palette_observer.py',
+        'original_sha256': '532613e7afa6a09573506dd5d76058fad5606bc759d6f3f5be32ed3e10664beb',
+        'current_sha256': 'db25657cc3e19bdc5644b80db10bf373b048a0c814df562630127e627163683b',
+        'name': 'webcolors-palette-contract-v1', 'label': 'Webcolors',
+        'feedback_codes': frozenset(('palette_values', 'palette_isolation', 'palette_immutable', 'palette_builtins')),
+    },
+    'verification/BIBTEXPARSER-O02-DEV-observe.py': {
+        'python_paths': ['library', 'app'], 'filename': 'project_bibtex_validation_observer.py',
+        'original_sha256': '8cecbceba8464f8267f085951d57c8eb19f898cbfa53d9c6287cb21b9d85cb8e',
+        'current_sha256': 'f9de23d3d7a0b139358379c2a8d028f1c76f8475ec3ab7b68e32de6783f4c715',
+        'name': 'bibtexparser-validation-contract-v1', 'label': 'Bibtexparser',
+        'feedback_codes': frozenset(('bibliography_diagnostics', 'bibliography_immutable', 'bibliography_version')),
+    },
+    'verification/CK-STABLE-WRITE-DEV-observe.py': {
+        'python_paths': ['library/src', 'app'], 'filename': 'project_stable_write_observer.py',
+        'original_sha256': '12326ed2450af06779a4eed9eea069c1753f4fd57d97b53ea826e354ae4720f4',
+        'current_sha256': 'b3e1fa5d8e36562a6fb64d67e6b519bcff8ce65bc24e00834b7937aea7117b69',
+        'name': 'click-stable-write-contract-v1', 'label': 'Click',
+        'feedback_codes': frozenset(('stable_write_content', 'stable_write_unchanged', 'stable_write_symlink')),
+    },
     'verification/CHARDET-O04-DEV-observe.py': {
         'python_paths': ['library', 'app'], 'filename': 'project_chardet_batch_observer.py',
         'original_sha256': 'adcf87f9f11228e81eaf0d8ada307dea2673086530613f7c645f6961ade2dc37',
@@ -398,13 +480,14 @@ def _native_arrow_adapter(source: bytes, helper: bytes, contract: dict) -> tuple
         'preserves_frozen_contract': True}
 
 
-def _native_failure_facts(report: dict) -> list[dict]:
+def _native_failure_facts(report: dict, contract: dict | None = None) -> list[dict]:
     """只提取公开失败身份和异常类型，原始日志与私有断言不进入模型反馈。
 
     :param report: 可信控制器的原始报告。
+    :param contract: 可选的原冻结合同，用于核验元数据差异。
     :return: 至多八个有界诊断。
     """
-    facts = []
+    facts = native_metadata_facts(contract['project'], report, contract) if contract else []
     probe = report.get('expansion_coverage')
     if isinstance(probe, dict) and probe.get('status') == 'failed':
         exception = probe.get('exception_type', '')
@@ -609,6 +692,9 @@ class ProjectVerifier:
         if not isinstance(args, list) or any(not isinstance(value, str) for value in args):
             raise ValueError('原生验收参数必须是冻结字符串数组')
         resources = profile[specification.get('resource_profile', 'business')]
+        # 冻结原生记录本身可能超过2MiB；结果预算按受控合同规模计算，不能误判真实候选。
+        output_limit = max(2 * 1024 * 1024, min(16 * 1024 * 1024,
+            len(canonical_json(contract)) * 2 + 65536)) if contract else 2 * 1024 * 1024
         requirements = profile.get('requirements')
         if not isinstance(requirements, list) or not requirements:
             return {'status': 'error', 'message': '原生环境缺少冻结安装清单'}
@@ -662,6 +748,9 @@ class ProjectVerifier:
             policy = directory / 'project_runtime_policy.py'
             policy.write_bytes(Path(__file__).with_name('project_runtime_policy.py').read_bytes())
             policy.chmod(0o644)
+            metadata = directory / 'project_native_contract.py'
+            metadata.write_bytes(Path(__file__).with_name('project_native_contract.py').read_bytes())
+            metadata.chmod(0o644)
             write_document(directory / 'native.json', payload, mode=0o644)
             with self._slots, self._native_cleanup(lambda:container):
                 if cancel and cancel.is_set():
@@ -682,7 +771,8 @@ class ProjectVerifier:
                         str(self.host_data / environment_root.relative_to(self.data)): {'bind': '/offline', 'mode': 'ro'},
                         **helper_mounts},
                     environment={'HOME': '/tmp', 'PYTHONDONTWRITEBYTECODE': '1', 'PIP_CONFIG_FILE': '/dev/null'},
-                    log_config=LogConfig(type='json-file', config={'max-size': '2m', 'max-file': '1'}),
+                    log_config=LogConfig(type='json-file', config={
+                        'max-size': str(output_limit * 2 + 65536) if regression else '2m', 'max-file': '1'}),
                     labels={'vibebench.project-verifier': 'native','vibebench.verifier-root':digest_json(str(self.host_data))})
                 container.start()
                 deadline=time.monotonic()+60
@@ -733,8 +823,8 @@ class ProjectVerifier:
                 if completed.get('StatusCode') != 0 and not regression:
                     return {'status': 'failed', 'message': '原生业务观察未正常结束', 'stderr': errors,
                         **({'runtime_adapter': adapter} if adapter else {})}
-                if len(output) > 2 * 1024 * 1024:
-                    return {'status': 'failed', 'message': '原生观察结果超过上限'}
+                if len(output) > output_limit:
+                    return {'status': 'error' if regression else 'failed', 'message': '原生观察结果超过按冻结合同计算的上限'}
                 try:
                     actual = json.loads(output)
                     canonical_json(actual)
@@ -743,7 +833,7 @@ class ProjectVerifier:
                         **({'runtime_adapter': adapter} if adapter else {})}
                 if regression:
                     if isinstance(actual, dict):
-                        actual['failure_facts'] = _native_failure_facts(actual)
+                        actual['failure_facts'] = _native_failure_facts(actual, contract)
                     expected_collection=digest_json([{'id':node['id'],'kind':node['kind']} for node in contract['nodes']])
                     valid=(completed.get('StatusCode')==0 and isinstance(actual,dict) and actual.get('status')=='passed' and actual.get('collection_matches_contract') is True
                         and actual.get('collected')==len(contract['nodes']) and actual.get('collection_digest')==expected_collection)

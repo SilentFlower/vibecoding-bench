@@ -267,13 +267,30 @@ class ProjectsVerification:
             'batch_errors': '局部失败缺少错误事实、仍带成功结果或阻断后续合法记录',
             'batch_policies': '停止或抛错策略未生效，或消费了失败后的记录',
             'batch_upstream': '上游迭代器异常被吞掉、替换或误当作局部记录错误',
-            'batch_detection': '未逐条执行独立真实检测，或把原始字节误当作批量记录'}
+            'batch_detection': '未逐条执行独立真实检测，或把原始字节误当作批量记录',
+            'palette_values': '色板的实际转换、别名或稳定遍历不符合公开约定',
+            'palette_isolation': '修改色板输入或导出副本会改变原色板，或不同实例相互污染',
+            'palette_immutable': '色板未通过公开 Mapping 接口保持不可变',
+            'palette_builtins': '品牌色板组合改变了所选内建颜色规范',
+            'bibliography_diagnostics': '书目校验没有报告真实类型与字段诊断',
+            'bibliography_immutable': '书目校验改变了原始条目或字段',
+            'bibliography_version': '未知书目规则版本未被明确拒绝，或拒绝时改变了输入',
+            'stable_write_content': '稳定输出没有写入正确字节或保留原文件模式',
+            'stable_write_unchanged': '相同输出字节仍改变了文件身份、时间或模式',
+            'stable_write_symlink': '软链接输出未被明确拒绝，或拒绝时改变了目标、链接或遗留临时文件',
+            'versioned_loader_cache': '模板缓存未复用命中结果，或没有按容量与最近使用顺序淘汰',
+            'versioned_loader_versions': '更新模板时改变了旧模板或原始快照',
+            'versioned_loader_async': '异步模板加载没有读取已发布的新版本'}
         result = []
 
         def collect(value, depth=0):
             """限制嵌套和数量，只读取固定报告字段。:param value: 当前报告。:param depth: 嵌套深度。:return: None。"""
             if not isinstance(value, dict) or depth > 5 or len(result) >= 8:
                 return
+            if value.get('subtests_match_contract') is False:
+                message = '原生子测试的身份、上下文、结果或重复次数与冻结记录不符；先核验元数据差异，不要猜测隐藏业务要求'
+                if message not in result:
+                    result.append(message)
             codes = value.get('feedback_codes', [])
             for code in codes[:8] if isinstance(codes, list) else []:
                 if isinstance(code, str) and code in reasons and reasons[code] not in result and len(result) < 8:
@@ -312,7 +329,8 @@ class ProjectsVerification:
         if isinstance(report.get('runtime_adapter'), dict):
             result['runtime_adapter'] = {key: report['runtime_adapter'][key] for key in
                 ('name', 'scope', 'original_runner_sha256', 'effective_runner_sha256', 'expected_nodes',
-                    'expected_duplicate_identities', 'preserves_frozen_duplicate_counts', 'preserves_frozen_contract')
+                    'expected_duplicate_identities', 'preserves_frozen_duplicate_counts', 'preserves_frozen_contract',
+                    'metadata_policy_sha256')
                 if key in report['runtime_adapter']}
         for key in ('collection_errors', 'feedback_codes'):
             if isinstance(report.get(key), list):
