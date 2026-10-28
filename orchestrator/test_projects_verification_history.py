@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -171,6 +172,50 @@ class ProjectsVerificationHistoryTests(unittest.TestCase):
         self.assertEqual(2, events[-1]['attempt'])
         self.assertIn('重试', events[-1]['message'])
         self.assertNotIn('finalize', [item['stage'] for item in events])
+
+    def test_review_format_recovery_keeps_the_candidate_and_does_not_repeat_program_checks(self):
+        """评审格式恢复复用全部已通过的程序事实，同一冻结候选完成最终校验。:return: None。"""
+        rubric = {'criteria': [{'id': 'business', 'requirement': '新旧能力都满足公开要求',
+            'evidence': [], 'allow_candidate_evidence': True}]}
+        (self.current_assets.objective('example', 'NEXT')[0].root / 'verification/rubric.json').write_text(json.dumps(rubric))
+        self.current.update(kind='modify', prompt='Preserve both features.', outcomes=['implemented'])
+        self.current['evaluation'].update(semantic=True, rubric='verification/rubric.json')
+        self.work['definition_json'] = json.dumps(self.current)
+        self.verification.provider = lambda: {'models': ['test-model']}
+        events, packages = [], []
+        self.verification.event = lambda *args: events.append(args)
+
+        def run(configuration, tools, event, stop, timeout_sec):
+            """先给出错误格式，随后使用产品收到的原冻结包完成评审。
+
+            :param configuration: 含原包的评审配置。
+            :param tools: 禁用工具的回调。
+            :param event: 真实同型事件回调。
+            :param stop: 原取消信号。
+            :param timeout_sec: 原评审剩余时限。
+            :return: settled。
+            """
+            package = json.loads(configuration['prompt'].split('Frozen review data:\n', 1)[1])
+            packages.append(deepcopy(package))
+            result = {key: package[key] for key in
+                ('job_id', 'task_id', 'turn_no', 'response_digest', 'basis_digest')}
+            result.update(decision='pass', outcome='implemented', branch_id=None, feedback_codes=[],
+                criteria=[{'id': 'business', 'status': 'satisfied', 'reason': '新旧能力均保持',
+                    'evidence': ['candidate:library/example.py'], 'allow_candidate_evidence': True}])
+            event({'type': 'assistant', 'text': '{}' if len(packages) == 1 else json.dumps(result),
+                'message_id': str(len(packages))})
+            return 'settled'
+
+        self.verification.pi = SimpleNamespace(run=run)
+        result = self.submit(1)
+        self.assertEqual('passed', result['status'])
+        self.assertEqual('pass', result['checks']['review'])
+        self.assertEqual(2, len(packages))
+        self.assertEqual(packages[0], packages[1])
+        self.assertEqual(3, len(self.native.paths))
+        self.assertEqual(1, len(set(self.native.paths)))
+        self.assertEqual('finalize', [event[2] for event in events
+            if event[1] == 'verification_progress'][-1]['stage'])
 
 
 if __name__ == '__main__':

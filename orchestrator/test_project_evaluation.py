@@ -79,6 +79,64 @@ class ReviewProtocolTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_review(json.dumps(self.result),self.package)
 
+    def test_copied_rubric_metadata_is_normalized_without_changing_the_frozen_package(self) -> None:
+        """兼容评审抄回的输入元数据，返回值只保留判定且不改写冻结依据。@return None。"""
+        criterion = self.package['rubric']['criteria'][0]
+        criterion['allow_candidate_evidence'] = True
+        self.result['criteria'][0].update(allow_candidate_evidence=True, requirement=criterion['requirement'])
+        frozen = copy.deepcopy(self.package)
+        result = parse_review(json.dumps(self.result), self.package)
+        self.assertEqual('pass', result['decision'])
+        self.assertEqual({'id', 'status', 'reason', 'evidence'}, set(result['criteria'][0]))
+        self.assertEqual(frozen, self.package)
+
+    def test_single_json_fence_is_accepted_but_surrounding_text_or_multiple_objects_are_rejected(self) -> None:
+        """纯 JSON 代码块不改变结论，夹带说明和多个对象仍无法确定唯一评审。@return None。"""
+        raw = json.dumps(self.result)
+        for language in ('json', 'JSON', ''):
+            with self.subTest(language=language):
+                self.assertEqual('pass', parse_review(f'\n```{language}\n{raw}\n```\n', self.package)['decision'])
+        for invalid in (f'Result:\n```json\n{raw}\n```', f'```json\n{raw}\n```\nDone',
+                f'```json\n{raw}\n{raw}\n```', f'```json\n{raw}\n```\n```json\n{raw}\n```'):
+            with self.subTest(raw=invalid), self.assertRaises(ValueError):
+                parse_review(invalid, self.package)
+
+    def test_redundant_metadata_cannot_grant_evidence_permission_or_rewrite_requirements(self) -> None:
+        """输出中的权限和要求不能替代原冻结规则，布尔值也不能用整数冒充。@return None。"""
+        self.package['rubric']['criteria'][0]['allow_candidate_evidence'] = True
+        for extra in ({'allow_candidate_evidence': False}, {'allow_candidate_evidence': 1},
+                {'requirement': '另一个要求'}, {'override': True}):
+            result = copy.deepcopy(self.result)
+            result['criteria'][0].update(extra)
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                parse_review(json.dumps(result), self.package)
+        self.package['rubric']['criteria'][0]['allow_candidate_evidence'] = False
+        self.package['candidate_files'] = {'app/example.py': {'text': 'VALUE = 1'}}
+        self.result['criteria'][0].update(allow_candidate_evidence=True, evidence=['candidate:app/example.py'])
+        with self.assertRaises(ValueError):
+            parse_review(json.dumps(self.result), self.package)
+
+    def test_tolerant_envelope_preserves_identity_evidence_and_business_guards(self) -> None:
+        """兼容展示格式后，身份错配、重复字段、伪造证据和程序失败仍必须拒绝。@return None。"""
+        for change in ('identity', 'evidence', 'program', 'missing', 'duplicate', 'oversized'):
+            result, package = copy.deepcopy(self.result), copy.deepcopy(self.package)
+            result['criteria'][0]['requirement'] = package['rubric']['criteria'][0]['requirement']
+            if change == 'identity':
+                result['task_id'] = 99
+            elif change == 'evidence':
+                result['criteria'][0]['evidence'] = ['not-provided.py:1']
+            elif change == 'program':
+                package['native_result']['status'] = 'failed'
+            elif change == 'missing':
+                del result['criteria'][0]['reason']
+            elif change == 'oversized':
+                result['criteria'][0]['reason'] = 'x' * (64 * 1024)
+            raw = json.dumps(result)
+            if change == 'duplicate':
+                raw = raw.replace('"job_id": 1', '"job_id": 1, "job_id": 1')
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                parse_review(f'```json\n{raw}\n```', package)
+
 
 class ScenarioUsageTests(unittest.TestCase):
     """逐来源去重、部分字段和未知区间不被重复计费或补零。"""

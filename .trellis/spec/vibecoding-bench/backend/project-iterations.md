@@ -268,7 +268,7 @@ restore_upstream_checkout_bytes(root: Path) -> list[str]  # deploy/v3/manage.py
 
 有效交接期间 `ensure` 只提供原API环境，不唤醒固定CLI；CLI准备返回RuntimeBusy等待。恢复失败、未知running孤儿、代次／限额冲突或缺少执行登记保留记录和占用；串行执行仍登记但交接记录丢失时，只有原CLI实际运行且私有容器停净才允许退租。回退前必须停净私有评审并完成原CLI恢复；旧版缺少串行协议，不能删记录或在回退后承诺普通布局仍可评审。
 
-评审包冻结完整已消费当前任务对话、回答、rubric、真实源码事实、程序结果及实际交付candidate_files（逐对象摘要核对），总上限512KiB，超限受阻不截断。输出最多64KiB的单JSON，身份字段为 `job_id/task_id/turn_no/response_digest/basis_digest`；decision限disclose/pass/fail/uncertain，逐criterion恰好一次，证据必须在冻结清单且candidate引用获显式许可，反馈限白名单。程序失败不能被语义覆盖；合法uncertain直接受阻，不重抽。modify仅在native及适用regression通过后接受；声明semantic的交付要求还须评审。
+评审包冻结完整已消费当前任务对话、回答、rubric、真实源码事实、程序结果及实际交付candidate_files（逐对象摘要核对），总上限512KiB，超限受阻不截断。输出最多64KiB的单JSON，身份字段为 `job_id/task_id/turn_no/response_digest/basis_digest`；decision限disclose/pass/fail/uncertain，逐criterion恰好一次，证据必须在冻结清单且candidate引用获显式许可，反馈限白名单。程序失败不能被语义覆盖；合法uncertain直接受阻，不重抽。modify仅在native及适用regression通过后接受；声明semantic的交付要求还须评审。共用解析器的展示与冗余规则字段兼容边界见[验收反馈与自动复验](#scenario-验收反馈与自动复验)。
 
 原所有者刷新待办位于 `project-review-owner-refresh/<account_id>.json`，绑定 request_id／原身份／environment_id与generation／被拒AT摘要。旧身份、旧环境或原所有者已发布不同且未过期AT的请求不阻新准入；新请求把旧记录归档为superseded并保留previous_status。当前被拒AT的error仍阻断；双参数 `refresh(account, request)` 在原owner锁内重读身份／环境／request_id，迟到写回用request_id CAS，不能刷新或覆盖新请求。私有作业未停净时保留holder及创建意图，未知running孤儿阻止第二评审。
 
@@ -672,6 +672,8 @@ failure_facts[] = {phase, reason, test_id?, exception_type?, required_percent?, 
 attrs 受信业务输出 = {candidate_import: bool, business: bool, feedback_codes: list[str]}
 _native_contract_observer_adapter(source: bytes, specification: dict) -> tuple[bytes, dict | None]
 ProjectsVerification._business_feedback(report: dict) -> list[str]
+parse_review(raw: str, package: dict) -> dict
+ProjectsVerification._review(work: dict, directory: Path, package: dict, cancel) -> dict
 runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
                    preserves_frozen_contract, ...}
 ```
@@ -703,6 +705,8 @@ runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
 上述案例的逐项摘要、允许的兼容范围和协议约束以下方适配器合同为准；不能把一个项目的例外推广到其它未核实目标。历史取舍可用 `trellis mem context <session-id> --grep <关键词>` 复核：自动收敛与反馈污染见 `01a17427-4031-7eb2-80c0-9bf18aeeb897`，真实通过率与合理差异见 `01a17838-7918-7600-a7a5-67fb05472e0e`。
 
 - 历史唯一活动工作索引幂等迁移，排除 `passed/stopped/deferred`；SQL 名称在养号空间独立映射。待复验保留原 work、原冻结合同、源码、Claude session、原始 Pi 历史和累计用量，不产生通过证明。
+- 共用 `parse_review` 允许单个完整 JSON 的 Markdown 代码块包装（无语言或 `json`，大小写兼容），但原始输出仍至多 64 KiB；不从前后说明、多个对象或多个代码块中猜选结论。判定项必须包含 `id/status/reason/evidence`，仅额外容忍与该项冻结规则同类型、同值的 `requirement/allow_candidate_evidence`，后者省略的默认值为 false；返回前移除这两个冗余字段。重复键、未知字段、身份摘要错配、缺项、非法证据及与程序事实矛盾仍拒绝，证据权限只读原包。
+- `ProjectsVerification._review` 在同一 180 秒调用预算内最多首次加一次协议错误重评；只在 `parse_review` 抛出 `ValueError` 时重评。原包、候选和已通过程序报告保持，第二次仅领取单调时钟剩余量，并将相同剩余量传给 SDK 配置和 Python 运行时。合法 fail/uncertain 直接返回；SDK 传输失败、取消及预算用尽不增开格式重试。原始会话分别保存在提交私有目录 `private-review` 和 `private-review-retry-2`，各次真实用量独立去重，重评前发布 `review/attempt=2`；全部协议校验通过后才写 `private-review.json`。场景调度器继续使用其既有持久重评与分层预算，不叠加此 Pi 重试循环。
 - 三次业务失败或同一候选连续两次失败后暂存；已持久提交参与计数，不因重启或换控制代次重置。基础设施错误仍先本地重验两次，失败后自动暂存；验证器抛错也须先确认严格释放。连续两轮指挥超时同样暂存，防止未提交而无限续跑。
 - 第一次冷却六小时，再次十二小时，以后二十四小时；只在冷却后新尝试重新计算本段返工上限，历史与累计退避次数保留。冷却不占 CLI 或模型调用；到期按原计划及账号门禁自动恢复同一 work/session。
 - 同一项目共享累计工作区；存在待复验修改时不开放该项目的其他目标，优先处理其他项目，防止半成品污染新需求。待复验仍计未完成，不满足前置，不触发养号完整工程池清零。全池无可执行项时自动等最早 retry_at，无需人工确认验收错误。
@@ -730,6 +734,10 @@ runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
 | 新能力边界失败 | 单列 feature_coverage；不污染第一个原测试的 setup |
 | 三次业务失败／相同候选第二次失败／两轮超时 | 安全暂存，后续处理其他可执行项目 |
 | 基础设施本地重验仍失败 | 暂存并低频自动复验，不要求模型重新实现 |
+| 单个 JSON 代码块，或抄回与冻结规则相同的判定元数据 | 归一化展示后执行全部原校验，不因冗余表示失败 |
+| 冗余元数据改变规则／布尔类型，未知字段、身份错配或证据越权 | 协议错误，不接受该结论；Pi 最多在剩余预算内重评一次 |
+| Pi 第一次协议错误后剩余 40 秒／已取消或预算用尽 | 只领取 40 秒／不再调用；不重跑业务、原生或历史检查 |
+| 合法 fail／uncertain／两次协议错误 | 返回业务失败／环境 error／环境 error，按原反馈及暂存规则处理，不重抽直到通过 |
 | 全池冷却或依赖待复验 | 持久安排下一次检查，不启动空模型循环 |
 | 取消、代次变化、未知投递、无法确认释放 | 沿用原保护，不发布正常收尾证明或新目标 |
 | 冻结脚本摘要未知 | 拒绝推测适配，按验收环境故障自动暂存 |
@@ -745,6 +753,7 @@ runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
 
 - 正常：目标 A 失败后依据具体事实返工，三次仍失败则保留原目标，下一轮选择其他项目 B；A 冷却到期使用原 work/session 续做。
 - 边界：无其他可执行目标时等待六小时后的复验，不将剩余数量归零或宣称全部通过。
+- 评审兼容：冻结判定允许 `allow_candidate_evidence=true`，模型在合法 pass 的判定项中抄回相同布尔值时自动移除冗余字段并通过完整校验。错误是把未知字段全丢弃或信任模型新增权限；正确是仅兼容已确认元数据，证据始终核对原包。无法归一化的协议错误仅有限重评，原始输出留档。
 - 错误：只收到“1903 passed、1 error”便反复猜测时区，或改 TypeError 以迎合未声明的异常子类。正确：核对公开合同、修复精确版本的验收误判，提供可靠阶段事实并有界自动推进。
 - attrs 正常：宽松真值实现和严格 bool 实现均按相同公开功能矩阵验收；若旧目标命中已核验来源，使用可信副本执行，原报告留档。错误：要求候选为了隐藏的 `raise_errors=1` 断言改代码；正确：移除未公布要求，同时用原生回归与独立错误反例证明没有放宽真实业务合同。
 - Babel 边界：可用 `en_US/fr` 时，对未明确的冲突偏好分别接受两种现有解释；错误是因此跳过所有排除检查，正确是另用 `en;q=0, *` 等明确用例继续拒绝选回被排除语言的实现。
@@ -758,6 +767,8 @@ runtime_adapter = {name, scope, original_runner_sha256, effective_runner_sha256,
 - `test_project_attrs_adapter`：新旧字节与分发副本一致、未知来源环境错误、真实入口临时暂存/只读挂载、严格结果协议、严格 bool 与真值两种合法实现、八类真实错误反例、历史嵌套反馈和私有内容边界。真实候选另经离线 Docker 业务、公开六项及冻结原生回归验证；业务通过不能替代语义审查或历史回归。
 - `test_project_contract_observers`：Babel、页码和批检测参考实现及合理变体通过业务与公开示例；批检测覆盖两种编号与三种错误表示。错误权重/顺序/排除/输入边界/重复消费、页码未规范化/未知格式被改/原值丢失/输入或其它字段被改、批检测错误结果/编号/预读/错误隔离/策略/上游异常/检测缓存等真实反例失败并有具体类别。核对新旧摘要、未来副本一致、真实入口只读挂载、严格三键协议、历史嵌套反馈与私有内容过滤；真实冻结候选另经禁网产品入口业务及原生回归，不能把离线结果直接写成线上通过。
 - `test_projects_verification_recovery`：三次不同候选、重复相同候选、双空间冷却、服务重启后的同 work/session、验证器抛错、连续两轮超时、取消竞争、人工停止及一次纠错上下文隔离。
+- `test_project_evaluation`：冗余规则归一化且原包不变、单 JSON 代码块兼容；前后说明、多对象、重复键、缺项、输出超限、未知字段、布尔伪装、越权证据及程序失败反例仍拒绝。真实原失败输出另用新旧解析器离线重放，不能改写历史提交或直接替线上标记通过。
+- `test_projects_verification_review` 与 `test_projects_verification_history`：同包仅一次格式重评、两份会话和用量、180 秒累计余量、取消／耗尽不增开、合法 fail/uncertain 不重抽、传输失败不叠加重试；完整提交只执行一次各程序阶段，同一冻结候选完成最终核对。
 - `host.test.mjs`：待复验与 passed 均只在真实 project_submit 和布尔收尾标记下结束；普通失败或其他工具不能终止；原结果先持久化。
 
 ### 6. Tests Required

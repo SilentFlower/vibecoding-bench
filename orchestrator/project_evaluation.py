@@ -88,6 +88,7 @@ def review_prompt(package: dict, *, input_file: str | None = None) -> str:
         'branch_id (a valid branch or null), criteria (each criterion exactly once, with fields id/status/reason/evidence; '
         'status is satisfied/violated/unknown, reason is a brief explanation, and evidence is a list of evidence identifier strings declared by the rubric; '
         'only when that criterion has allow_candidate_evidence=true may evidence also reference candidate:<path> actually supplied in candidate_files), '
+        'do not copy rubric metadata such as requirement or allow_candidate_evidence into the output criteria, '
         'and feedback_codes (use only the allowlist).'
         + ('\nRead the complete private frozen review data file: ' + input_file if input_file else '\nFrozen review data:\n' + canonical_json(package).decode()))
 
@@ -102,7 +103,7 @@ def _unique_pairs(pairs: list[tuple]) -> dict:
 
 
 def parse_review(raw: str, package: dict) -> dict:
-    """校验严格身份、逐项证据、合法分支及可公开反馈。
+    """兼容无歧义的展示差异，校验严格身份、逐项证据和合法结论。
 
     :param raw: 私有原生会话提取的最终文本。
     :param package: 原冻结输入包。
@@ -110,6 +111,10 @@ def parse_review(raw: str, package: dict) -> dict:
     """
     if not isinstance(raw, str) or len(raw.encode()) > MAX_REVIEW_OUTPUT:
         raise ValueError('评审输出缺失或超出大小上限')
+    # 只剥离包住完整 JSON 的单个展示代码块，避免从说明或多个答案中猜选结论。
+    fenced = re.fullmatch(r'\s*```(?:json)?[ \t]*\r?\n(.*?)\r?\n```\s*', raw, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        raw = fenced.group(1)
     result = json.loads(raw, object_pairs_hook=_unique_pairs)
     canonical_json(result)
     expected_keys = set(REVIEW_IDENTITY) | {'decision', 'outcome', 'branch_id', 'criteria', 'feedback_codes'}
@@ -126,12 +131,20 @@ def parse_review(raw: str, package: dict) -> dict:
         raise ValueError('评审判定项数量不完整')
     seen = set()
     for item in values:
-        if (not isinstance(item, dict) or set(item) != {'id', 'status', 'reason', 'evidence'}
+        if (not isinstance(item, dict) or not {'id', 'status', 'reason', 'evidence'} <= item.keys()
+                or not item.keys() <= {'id', 'status', 'reason', 'evidence', 'requirement', 'allow_candidate_evidence'}
                 or not isinstance(item['id'], str) or item['id'] not in criteria or item['id'] in seen
                 or item['status'] not in ('satisfied', 'violated', 'unknown')
                 or not isinstance(item['reason'], str) or not 1 <= len(item['reason']) <= 2000):
             raise ValueError('评审逐项判定或说明不合法')
         seen.add(item['id'])
+        # 模型偶尔会抄回输入规则；仅接受与冻结依据同类型、同值的元数据，权限仍由原包决定。
+        for key in ('requirement', 'allow_candidate_evidence'):
+            if key in item:
+                expected = criteria[item['id']].get(key, False if key == 'allow_candidate_evidence' else None)
+                if type(item[key]) is not type(expected) or item[key] != expected:
+                    raise ValueError('评审冗余规则字段与冻结依据不一致')
+                del item[key]
         allowed = criteria[item['id']].get('evidence', [])
         candidate_allowed = criteria[item['id']].get('allow_candidate_evidence') is True
         if (not isinstance(item['evidence'], list) or any(not isinstance(reference, str)
