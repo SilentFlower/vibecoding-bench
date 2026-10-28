@@ -9357,6 +9357,10 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
                 conn.close()
         if quota_guard:
             quota_guard._publish(_projects_account(aid))
+        if any(field in body.model_fields_set for field in threshold_fields):
+            for service in (projects_service, warmup_pi_service):
+                if isinstance(service, ProjectsService):
+                    service.recheck_waiting(aid)
         return {'ok': True, 'engine': 'projects'}
     with _oauth_owner_lock(str(account["name"])):
         with _cc2api_binding_lock:

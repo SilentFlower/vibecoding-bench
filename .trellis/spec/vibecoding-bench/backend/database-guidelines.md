@@ -595,7 +595,7 @@ if "model_override" not in task:
 ### 2. Signatures
 
 ```text
-PUT /api/accounts/{aid}/warmup -> {ok, enabled, next_run_at}
+PUT /api/accounts/{aid}/warmup -> 旧 runner {ok, enabled, next_run_at} / v3 {ok, engine: "projects"}
 POST /api/accounts/{aid}/quota -> 标准化 usage
 GET /api/accounts -> quota_policy / warmup_quota
 GET /api/task-batches, GET /api/runs[/{rid}] -> quota_policy
@@ -603,6 +603,7 @@ accounts.warmup_quota_5h_limit_percent INTEGER NULL
 accounts.warmup_quota_7d_limit_percent INTEGER NULL
 QuotaGuard.record_manual_usage(account: dict, usage: dict, source: str = "manual") -> dict
 QuotaGuard.policy_snapshot(account, workload, source=None, *, quota_state=None) -> dict
+ProjectsService.recheck_waiting(account_id: int) -> None
 _public_quota_policy(account, workload="normal") -> dict
 statusline_quota_observation(rate_limits: object, observed_at: float) -> dict
 collect_statusline(payload: object, configuration: dict, now: float) -> bool
@@ -616,6 +617,8 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 ### 3. Contracts
 
 - 阈值是 1～100 的已用整数百分比，两个窗口独立，默认 NULL；省略保留，null 关闭，StrictInt 拒绝 bool／字符串／小数。保存不隐式改绑。
+- v3 保存请求显式包含任一阈值时，先落库并发布额度快照，再分别通知项目迭代和养号迭代重查。`recheck_waiting` 只把已启用、`schedule_state='waiting'`、没有在途控制者的计划移到当前本地检查时间，保留控制代次、原工作及会话；保存接口不调用模型。正常轮间 `scheduled`、人工关闭及服务退出不重新排期。
+- 重查仍通过原 `start(..., scheduled=True)` 核对模型／运行故障冷却、账号身份、输入对账及实时门禁，未解除限制时继续等待。成功认领控制者时清空旧 `schedule_message`，避免运行中继续显示旧额度等待原因。
 - 未绑定账号有完整本地 OAuth 时可以启用定时养号；绑定账号核实身份与 active OAuth，只由 cc2api 刷新。未绑定配置缺凭据返回 409，不调用 cc2api；NULL 绑定的调度写入用 IS ?。
 - 首次额度未知不写成 0%，也不因无样本、进程重启或 300 秒缓存年龄而等待主动查询；没有真实拒绝或有效命中时可启动已有正常任务，由正式响应更新。任一有效窗口已用等于或高于启用阈值时，只阻止下一轮；已启动的普通任务／养号按冻结计划完成本轮，包括原定补充、收尾和超时。运行中降低阈值同样只影响后续入场，本轮可能越过自设百分比。
 - Docker exec 等待循环只等待原执行退出并返回真实退出码，不再接受百分比强停回调。Scheduler 在发布终态之前消费最后的本地观察，保证下一轮门禁看到本轮用量；不因百分比写 stopping/stopped，不提前注入收尾。缺失、非法或过期窗口不构成有效阈值命中。
@@ -640,6 +643,8 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 | 本轮完成后窗口恢复 | 持久单次更新机会仍生效；下一未执行工作仍等原投放时间，不重跑已完成轮次 |
 | 真正共同耗尽的 quota_wait 在 reset 到期 | 持久认领一次已有执行，沿原题／session 恢复 |
 | 运行中提高／降低／关闭阈值 | 当前轮次不受百分比停止；下一轮使用最新配置 |
+| Pi 已因阈值等待，再保存较高阈值或关闭阈值 | 下一次本地扫描按最新配置重查，不等旧 reset；仍超阈值或处于故障冷却时不调用模型 |
+| 保存阈值时处于正常轮间间隔或人工关闭状态 | 保留原排期及关闭状态，不提前启动 |
 | 已自然结束／用户停止／历史停止意图 | 保留实际终态和停止原因，不因额度更新复活 |
 | 真实清理失败或明确认证失败 | 保留原清理/永久认证门禁，不被百分比策略掩盖 |
 | 恢复机会已使用、并发 tick 或服务重启 | 等待被动更新，不再新增探测 |
@@ -658,6 +663,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 - 边界：只启用 7d=80% 时，养号观察到 5h=55%／7d=80% 仍完成本轮；下一轮等待。关闭两个阈值不取消共同耗尽或认证保护。
 - 基础：600 题批次尚无 run，未知状态可创建第一条正常工作；已有持久投放时间仍须等待，不能补发历史 item。
 - 基础：未绑定账号持本地 OAuth 独立养号；明确绑定后才移交刷新权，不必为养号创建网关账号。
+- 正常：7d 已用80%、旧阈值80%时 Pi 计划等待窗口重置；保存90%后，下一次本地扫描重新核对门禁并接续原计划，启动后清除旧额度等待提示。错误：只更新额度展示而保留旧检查时间；应同时通知两个迭代空间的等待计划重查。
 - 错误用法：前置／后置／失败 tick 自动请求 usage，或用同一缓存状态栏不断刷新 observed_at。正确做法：仅消费正式响应／本地新响应观察，usage 留给手动按钮。
 - 错误用法：取消阈值后让多个 CLI 同时试探耗尽窗口，或重启清掉恢复机会。正确做法：共同耗尽加入同一持久周期认领，真实新观察确认恢复。
 - 错误用法：owner 锁内再次调用 _sync_bound_account_credentials。正确做法：调用 locked 入口，并用真实不可重入锁回归。
@@ -671,6 +677,8 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 - 隔离官方 CLI＋本地 SSE 验证：采集命中 5h／7d，启用前后模型请求相同、usage 为零；安装在镜像中的 collector 被实际执行，测试替身和无真实账号边界明确。
 - 重启批次回归：只注册 active 且账号启用未删除；未来 next_launch_at 必须等待，取消时不创建 run 或清空时间；终态 item 保持。
 - test_warmup_quota.py/test_quota.py 保留旧 runner、Recorder 单次许可、停止／删除／永久异常、字段校验与历史合并回归。
+- test_projects_schedule.py：80%→90% 后在旧 reset 前重新认领；保存本身不调用模型，仍超阈值时继续等待，正常轮间间隔／人工暂停／模型冷却保留，启动后旧等待文案清除。
+- test_warmup_quota.py/test_projects_engine_cycles.py：真实阈值落库后通知两个空间，省略阈值时不重排；两个空间只更新各自计划，养号随机间隔配置保持。
 - test_quota_completion.py：等值／跨阈值、5h／7d、普通／养号、运行中降低阈值、下一轮及批次原间隔、真实超时/认证/用户停止、历史停止收口与原 exec 实际退出码。
 - run_local_verification.py --manifest <本轮联合清单> --quota-completion-only：真实 driver／tmux 和正式 statusLine 验证 5h=60／68、7d=80 后完成原两条补充与收尾，下一轮等待；关闭阈值成功。旧 --quota-hard-stop-only 保留为参数别名，行为采用新契约。
 - verify_stack.py --manifest <本轮联合清单> --browser --quota-completion：真实页面配置、当前说明、历史 stopped API／SQLite 原因不变、XSS 和 1280／390px 明暗主题；旧 --quota-hard-stop 参数保留为别名。

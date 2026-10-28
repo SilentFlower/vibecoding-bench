@@ -208,6 +208,23 @@ class ProjectsEngineCycleTests(unittest.TestCase):
             self.primary.start(1)
         self.assertEqual(1, self.agent(self.primary)['cycle_no'])
 
+    def test_threshold_recheck_keeps_the_two_schedule_spaces_separate(self):
+        """两个空间分别重查自己的等待计划，固定和随机间隔配置保留。:return: None。"""
+        deadline = time.time() + 86400
+        self.primary.configure_schedule(1, True, 20)
+        self.service.configure_schedule(1, True, 180, 300)
+        for service in (self.primary, self.service):
+            service._write("UPDATE projects_agents SET schedule_state='waiting',schedule_next_at=? WHERE account_id=1", (deadline,))
+        warmup_before = self.agent(self.service)
+        self.primary.recheck_waiting(1)
+        self.assertLess(self.agent(self.primary)['schedule_next_at'], deadline)
+        self.assertEqual(warmup_before, self.agent(self.service))
+        self.service.recheck_waiting(1)
+        warmup_after = self.agent(self.service)
+        self.assertLess(warmup_after['schedule_next_at'], deadline)
+        self.assertEqual((10800, 18000), (warmup_after['schedule_interval_sec'], warmup_after['schedule_interval_max_sec']))
+        self.assertFalse(self.primary.controllers or self.service.controllers)
+
     def test_previous_cycle_cannot_satisfy_new_dependencies(self):
         """本轮前置证据不能借上一轮的通过。:return: None。"""
         self.complete()

@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from projects import ProjectsService
+from quota_protocol import warmup_quota_decision
 import test_projects_agent as fixtures
 
 
@@ -54,6 +55,80 @@ class ProjectsScheduleTests(unittest.TestCase):
         self.service.tick(now + 301)
         self.assertTrue(self.pi.entered.wait(1))
         provider.assert_called_once()
+
+    def test_raising_threshold_rechecks_before_the_old_reset(self):
+        """已用80%时把阈值提高到90%，本地重查接续计划，不再等待旧窗口。:return: None。"""
+        now, reset = time.time(), time.time() + 86400
+        limits = {'five_hour': None, 'seven_day': 80}
+        quota = {'windows': {'seven_day': {'utilization': 80, 'reset_at': reset}}}
+
+        def admission(account, work):
+            """读取当前阈值的真实决策。:param account: 合成账号。:param work: 原工作。:return: 准入结果。"""
+            policy = warmup_quota_decision(quota, limits, time.time())
+            return {'allowed': not policy['blocked'], 'retryable': True, 'reason': 'quota',
+                'retry_at': policy['resume_at'], 'message': policy['message']}
+
+        self.service.admission = admission
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 20)
+        self.service.tick(now + 1)
+        self.assertEqual(reset, self.service.state(1)['agents'][0]['schedule']['next_run_at'])
+        provider = Mock(wraps=self.service.provider)
+        self.service.provider = provider
+        limits['seven_day'] = 90
+        self.service.recheck_waiting(1)
+        provider.assert_not_called()
+        self.assertLess(self.service.state(1)['agents'][0]['schedule']['next_run_at'], reset)
+        self.service.tick(now + 2)
+        self.assertTrue(self.pi.entered.wait(1))
+        provider.assert_called_once()
+        self.assertIsNone(self.service.state(1)['agents'][0]['schedule']['message'])
+
+    def test_threshold_recheck_still_respects_a_blocked_gate(self):
+        """阈值保存后仍不满足门禁时恢复真实等待，不启动模型。:return: None。"""
+        now, reset = time.time(), time.time() + 86400
+        self.service.admission = lambda *_: {'allowed': False, 'retryable': True,
+            'reason': 'quota', 'retry_at': reset, 'message': '额度仍达到新阈值'}
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 20)
+        self.service.tick(now + 1)
+        self.service.recheck_waiting(1)
+        self.service.tick(now + 2)
+        agent = self.service.state(1)['agents'][0]
+        self.assertEqual(reset, agent['schedule']['next_run_at'])
+        self.assertEqual('额度仍达到新阈值', agent['schedule']['message'])
+        self.assertFalse(self.pi.entered.is_set())
+
+    def test_threshold_recheck_preserves_regular_interval_and_manual_pause(self):
+        """正常轮间休息和人工关闭计划不会被保存阈值提前唤醒。:return: None。"""
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 20)
+        self.service._write('UPDATE projects_agents SET schedule_next_at=? WHERE account_id=1', (time.time() + 1200,))
+        before = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.service.recheck_waiting(1)
+        self.assertEqual(before, self.service._one('SELECT * FROM projects_agents WHERE account_id=1'))
+        self.service.pause(1)
+        before = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.service.recheck_waiting(1)
+        self.assertEqual(before, self.service._one('SELECT * FROM projects_agents WHERE account_id=1'))
+        self.assertFalse(self.pi.entered.is_set())
+
+    def test_threshold_recheck_keeps_model_recovery_cooldown(self):
+        """额度等待解除后的重查仍经过原模型冷却，不提前发起付费请求。:return: None。"""
+        now, retry = time.time(), time.time() + 600
+        self.service.configure(1, ['example'])
+        self.service.configure_schedule(1, True, 20)
+        self.service._write("UPDATE projects_agents SET status='waiting',schedule_state='waiting',schedule_next_at=? WHERE account_id=1",
+            (now + 86400,))
+        self.service._event(1, 'recovery', {'phase': 'scheduled', 'attempt': 1, 'reason': 'model_unavailable',
+            'retry_at': retry, 'generation': 0, 'source': 'schedule'}, key='model-recovery:1:0:scheduled')
+        provider = Mock(wraps=self.service.provider)
+        self.service.provider = provider
+        self.service.recheck_waiting(1)
+        self.service.tick(now + 2)
+        self.assertEqual(retry, self.service.state(1)['agents'][0]['schedule']['next_run_at'])
+        provider.assert_not_called()
+        self.assertFalse(self.pi.entered.is_set())
 
     def test_manual_pause_disables_due_plan_and_late_controller_cannot_rearm(self):
         """人工暂停同时撤销计划，迟到收尾不能重新排程。:return: None。"""

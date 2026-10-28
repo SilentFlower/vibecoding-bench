@@ -303,6 +303,22 @@ class ProjectsService:
             self._event(account_id, 'schedule', {'enabled': enabled, 'interval_minutes': interval_minutes})
         return self.state(account_id)
 
+    def recheck_waiting(self, account_id: int) -> None:
+        """额度策略保存后唤醒等待中的自动计划，由原启动流程重新核对全部门禁。
+
+        :param account_id: 修改额度阈值的账号。
+        :return: None；正常间隔、人工暂停及在途控制者不重新排期。
+        """
+        with self.lock:
+            agent = self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
+            if (self.closed or not agent or not agent['schedule_enabled']
+                    or agent['schedule_state'] != 'waiting' or account_id in self.controllers):
+                return
+            # 只安排本地重查；原 start 仍检查故障冷却、身份、输入对账和实时额度，保存接口不调用模型。
+            now = time.time()
+            self._write('UPDATE projects_agents SET schedule_next_at=?,updated_at=? WHERE account_id=? AND generation=?',
+                (now, now, account_id, agent['generation']))
+
     @staticmethod
     def _next_interval(agent: dict) -> float:
         """按当前空间自己的计划计算等待时长，固定计划不引入随机偏移。:param agent: 持久计划。:return: 秒数。"""
@@ -1373,7 +1389,7 @@ class ProjectsService:
                                         'reason': 'model_unavailable', 'delay_ms': 0, 'generation': generation, 'source': 'schedule'}).decode(),
                                         f'model-recovery:{account_id}:{generation}:reset', now))
                             updated = connection.execute("UPDATE projects_agents SET generation=?,status='running',message=NULL,updated_at=?,schedule_next_at=NULL,"
-                                "schedule_last_started_at=?,schedule_state=CASE WHEN schedule_enabled=1 THEN 'running' ELSE 'off' END WHERE account_id=? AND generation=?",
+                                "schedule_last_started_at=?,schedule_state=CASE WHEN schedule_enabled=1 THEN 'running' ELSE 'off' END,schedule_message=NULL WHERE account_id=? AND generation=?",
                                 (generation, now, now, account_id, agent['generation']))
                             if updated.rowcount != 1:
                                 raise ValueError('Pi 控制代次已变化，请重新核对后启动')

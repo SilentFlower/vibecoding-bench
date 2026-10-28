@@ -12,6 +12,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 import main
+from projects import ProjectsService
 from quota_protocol import warmup_quota_decision, warmup_sample_used
 import test_quota
 from test_quota import quota_headers
@@ -336,6 +337,26 @@ class WarmupQuotaTests(unittest.TestCase):
             main.update_account_warmup(1, main.WarmupConfigIn(enabled=True))
         self.assertEqual(409, error.exception.status_code)
         self.assertIn("同步并绑定", error.exception.detail)
+
+    def test_v3_threshold_save_notifies_both_pi_schedules(self) -> None:
+        """阈值落库后通知两个空间重查，省略阈值时不改排期。:return: None。"""
+        projects, warmup = Mock(spec=ProjectsService), Mock(spec=ProjectsService)
+        with patch.object(main, 'projects_service', projects), patch.object(main, 'warmup_pi_service', warmup):
+            main.update_account_warmup(1, main.WarmupConfigIn(warmup_quota_7d_limit_percent=90))
+            connection = main.get_db()
+            try:
+                self.assertEqual(90, connection.execute('SELECT warmup_quota_7d_limit_percent FROM accounts WHERE id=1').fetchone()[0])
+            finally:
+                connection.close()
+            projects.recheck_waiting.assert_called_once_with(1)
+            warmup.recheck_waiting.assert_called_once_with(1)
+            projects.start.assert_not_called()
+            warmup.start.assert_not_called()
+            projects.recheck_waiting.reset_mock()
+            warmup.recheck_waiting.reset_mock()
+            main.update_account_warmup(1, main.WarmupConfigIn())
+            projects.recheck_waiting.assert_not_called()
+            warmup.recheck_waiting.assert_not_called()
 
     def test_actual_start_rechecks_threshold_for_warmup_and_normal_task(self) -> None:
         """排队后新额度命中时，养号和普通任务都不创建 worker。@return None。"""
