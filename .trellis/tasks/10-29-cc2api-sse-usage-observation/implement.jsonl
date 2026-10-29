@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/cc2api/backend/index.md", "reason": "后端模块规范与现有接口核实入口"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "正式用量、部分费用、安全诊断、根和尝试终态及一次性收口合同"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "Rust 格式和全量测试、热路径、采样与敏感信息边界"}
+{"file": ".trellis/spec/cc2api/protocol/index.md", "reason": "请求身份、画像、CCH 与既有响应行为回归边界"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "复用累计用量和观察入口，避免两套事件与压缩实现"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "实际响应至用量和独立诊断的双向完整性及持久化检查"}
+{"file": ".trellis/tasks/10-29-cc2api-sse-usage-observation/research/sse-lifecycle.md", "reason": "SSE 官方规则、真实入口、EOF 末帧 Drop 生命周期和验证定位"}
+{"file": ".trellis/tasks/10-29-cc2api-sse-usage-observation/research/incremental-codecs.md", "reason": "既有库真实增量接口、持久 Write 链、结束检查、deflate 例外与工作区预算"}
