@@ -956,6 +956,7 @@ Gateway 在既有 admission 后调用 `ensure_ready`；共享 client factory 负
 - billing 缺失时使用共享 Claude Code API billing builder 插入 billing 并计算有效 CCH；已有 billing 且包含 CCH 时按最终请求体刷新 CCH；已有 billing 但没有 CCH 时保留原 block，不擅自增加 CCH。最终 system 顺序固定为 billing、identity、classifier，CCH 只能基于最终序列化正文计算。
 - 归因补齐只允许账号 metadata、upstream session identity、billing、identity 和 CCH 变化，不运行 expansion、缓存断点、TTL、thinking、字段顺序或其它通用正文改写；结构异常时失败开放并返回原正文。
 - 独立的 `message_top_field_filter_enabled` 默认开启，三条 Messages 转发分支在本函数前统一清理固定根键，实际删除后在最终输出刷新已有唯一 CCH；这是旁路合同的有限例外，不扩展 detector 或其它通用改写。此处失败开放的“原正文”指传入函数的正文；无删除时仍保持原字节。具体范围、设置与测试见 [Messages 固定顶层字段清理开关](../protocol/claude-code-profile-upgrade.md#scenario-messages-固定顶层字段清理开关)。
+- 账号 `allow_fast_mode=false` 的 Fast 策略在三条真实转发分支汇合后统一执行：只删除根级精确 `speed: "fast"`，并继续过滤完整 Fast beta；实际删除后刷新已有唯一合法 CCH，包含 Strip 旁路。该策略独立于根键清理和身份注入开关，不运行其它通用正文改写；允许或无删除时保留原字节行为。换号从公共原文重新按当前账号判断，不能沿用前次删除结果。详见 [Fast 账号控制](../protocol/claude-code-profile-upgrade.md#scenario-claude-fast-mode-账号级透传控制)。
 - 窄 detector 命中 `passthrough` 且未执行归因补齐时，继续使用 identity-only 改写。所有 passthrough 请求仍走账号选择、sticky、RPM/concurrency、OAuth、2.1.257 header、账号代理/TLS、Session Hello、401、signature/429 retry 和响应透传；不得因为识别成 classifier 而跳过 Session Hello。
 - classifier 命中后全文请求、429 请求和非流式响应捕获全部禁用，只保留尺寸、短 hash、重试次数与 `proxy_configured` 等脱敏摘要。`mock` 必须在 session hash、账号选择、RPM 和并发槽之前返回，不访问上游或消耗账号额度。
 - mock 分类优先级固定为：API/auth/infra 错误 -> blocked；Agent 明确自动复查/继续执行 -> working；无自动复查的用户门槛 -> blocked；明确 failed/done；最后回退 `Current state`，未知值保守返回 working。
