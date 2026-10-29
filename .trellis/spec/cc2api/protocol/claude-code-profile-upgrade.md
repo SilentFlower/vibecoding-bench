@@ -1755,3 +1755,56 @@ Hello/eval 的 Accept 为 `*/*`、Accept-Encoding 为 `gzip, deflate, br, zstd`�
 - `gateway_beta_headers_preserve_empty_invalid_and_single_value_semantics`：实际区分空 beta 与缺头／非法值，验证其它单值头和入站认证过滤策略。
 - R2 清理／Session（含边缘 SP／HTAB）、stream 三态与 CCH 回归、Rust 格式及全量测试通过；仅使用本地合成上游。
 - 抓包事实仅保证已读取的 592 条原生 Messages，均为唯一 beta=true；280 已用七份原件复核，293 原件未读，不外推。
+
+## Scenario: Git 用户名提醒替换的边界与字面量
+
+### 1. Scope / Trigger
+
+- Trigger：修改 Claude Code 原生消息的 Git 用户名提醒脱敏、匹配正则或账号显示名称替换时适用。
+- 目标是只替换已有提醒内的用户名文本，保留提醒结束标签、相邻结构及账号名称原文；不扩大消息位置或日期 normalize 的处理范围。
+
+### 2. Signatures
+
+```rust
+fn scrub_git_user_in_reminders(body: &mut serde_json::Value, replacement_name: &str)
+```
+
+- `rewrite_messages` 的 `ClientType::ClaudeCode` 分支传入 `Account.name: String`，API 注入分支不调用该处理。
+- `SYSTEM_REMINDER_REGEX` 匹配完整 `<system-reminder>...</system-reminder>`；内部 `GIT_USER_REGEX` 为 `r"Git user:[ \t]*[^\r\n<]+"`。
+- 使用现有 regex 依赖的 `NoExpand` 写入替换字符串，没有新依赖、配置或数据库字段。
+
+### 3. Contracts
+
+- 仅处理顶层 `system` 字符串及数组文本块；数组块存在 `cache_control` 键即跳过，包括值为 null 的情况。messages、tools 和提醒外文本保持原有边界。
+- `Git user:` 后的可选空白限定为 SP／HTAB，用户名匹配遇到 CR、LF 或 `<` 即结束；不能吞掉同行结束标签、内嵌其它标签或下一行环境字段。
+- 账号名称按字面量替换，`$1`、`$0`、`${name}`、`$$` 及 Unicode 不得按正则捕获组语义解释；不新增账号名称转义或字段校验策略。
+- 替换仍发生在现有最终序列化与 CCH 封口之前；版本化 CCH 算法、请求编码、缓存、Session 和响应处理不变。
+- 匹配仍按既有顶层位置与提醒标签进行，不额外推断文本来源；日期规范化模式及候选识别保持原有逻辑，R14-04 另行评估。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 用户名与 `</system-reminder>` 同行 | 替换名称，结束标签保留 |
+| 相邻两段提醒或用户名后存在其它标签 | 每段仅替换用户名，邻接结构不丢失 |
+| LF／CRLF／CR 换行、用户名为空并紧跟换行 | 保留原换行，不把下一行当作用户名 |
+| 账号名包含 `$1`、`$0`、`${name}` 或 `$$` | 保留全部原字符 |
+| 缓存块、提醒外文本、messages 或工具描述 | 不扩大替换 |
+| 280／293 原生正文改写 | 提醒标签及名称正确，最终已有 CCH 有效 |
+
+### 5. Scenarios and Examples
+
+- 正常：`<system-reminder>Git user: caller</system-reminder>` 使用账号名 `合成$1账号` 后，得到 `<system-reminder>Git user: 合成$1账号</system-reminder>`。
+- 边界：`Git user:` 后立即换行时，不消费下一行；缓存块继续保留其原文。
+- 错误：`[^\n]+` 吞掉同行闭合标签；直接把账号名作为正则替换模板会展开美元表达式。
+- 正确：将用户名匹配限制到行或标签边界，并按字面量传给替换函数：
+
+```rust
+GIT_USER_REGEX.replace_all(&caps[0], NoExpand(replacement.as_str()))
+```
+
+### 6. Tests Required
+
+- `cargo test git_user`：同行闭合标签、相邻提醒、其它标签、美元表达式及 Unicode 名称、三种换行、空用户名、非目标位置及缓存块。
+- `git_user_scrub_keeps_profile_cch_valid`：实际 Rewriter 正文链路验证 280／293 的完整提醒和最终 CCH，不以字符串局部断言代替封口校验。
+- `cargo fmt --check`、`cargo test cch`、完整 `cargo test` 和 `git diff --check`；仅使用合成身份与资料，不新增正式抓包或模型效果结论。
