@@ -917,7 +917,7 @@ capture-status.json: source, state, updated_at, recorder_graceful?, message?
 - 捕获使用 pi-capture 监督角色，仍凭 source/PID/started、逐作业 tmux、启动许可和租约控制。保存并恢复 settings_override、network_inspection_mode、capture_flows；不能将独占租约伪装成 shared_cli 或 project-review。Recorder 按当前来源 ACK 后才启动 CLI，仅捕获进程显式信任 CA。
 - 收尾先停止本作业，再恢复 passthrough 并释放租约。网络 ACK 返回 previous_listener_graceful；本代 capture-status.json 状态为 stopping/closed/partial/error，强制收口或未知优雅状态不能冒充完整。重启时可凭原环境行定位网络角色；不能确认收口则保留证据与 cli_reconcile，不停止健康独立 API。
 - 工作读取从本空间 work、账号与固定环境派生 `group-<hash(namespace/work)>`；不接受任意宿主路径，不把 work ID 当 run ID。运行与双迭代共用脱敏聚合，保留旧平铺、分代及同账号受管续聊组链接。摘要含 files、index、index_available、sample_count、status 和 message，状态为 empty/collecting/partial/complete/error；索引缺失但已有数据仍列文件。
-- `/capture/file` 只预览本组清单中的脱敏 capture_index.json 和收尾摘要；原始 HTTP、.flow 与凭据正文不公开。停止或关闭开关不删除旧数据，新代输出不覆盖原代。Recorder 的追加阶段及协议研究边界见 [正式抓包契约](../deploy/official-protocol-capture.md#35-条件标识正文归因与-tls-的采集边界)。
+- `/capture/file` 只预览本组清单中的脱敏 capture_index.json、收尾摘要及 TLS 白名单；原始 HTTP、.flow、握手字节与凭据正文不公开。停止或关闭开关不删除旧数据，新代输出不覆盖原代。Recorder 的追加阶段及协议研究边界见 [正式抓包契约](../deploy/official-protocol-capture.md#35-条件标识正文归因与-tls-的采集边界)，TLS 存储与摘要遵循下方 ClientHello 场景。
 - 配置和查看窗口在切账号、切空间、关闭时使旧回执失效，不覆盖新页面或未保存输入。工作抓包通过手动刷新读取，关闭不新增常驻轮询；运行详情沿原生命周期。
 
 ### 4. Validation & Error Matrix
@@ -1003,3 +1003,67 @@ docker image rm <已核对属于同一旧镜像的仓库@sha256引用>
 - 计划核验：当前批次、最近两个完整历史批次、显式恢复依赖及运行/已停止容器的镜像均不进入删除清单；额外未知引用拒绝删除。
 - 执行核验：逐项删除前重查部署和占用，引用变化及 Docker 拒绝时不强删；确认批次标签和已核对的 digest 引用均已移除，目标镜像实际不存在。
 - 生产复核：清理前后 `df` 字节差、保留镜像身份、全部原容器 ID/镜像/启动时间/重启次数、网关健康、页面 200 及未登录管理 API 401；数据库只读 `quick_check=ok`。审计不得含凭据，不调用真实模型作为探针。
+
+## Scenario: 客户端 ClientHello 私有证据与安全摘要
+
+### 1. Scope / Trigger
+
+- 修改 Recorder TLS hook、任一完整抓包入口、网络 context、抓包摘要或预览时适用。普通 run／续聊、Projects 与 warmup 共用；没有完整抓包时不增加 TLS 文件或握手。
+- 本契约仅覆盖客户端到 Recorder 的 TCP ClientHello；官方 CLI 归因须结合真实 HTTP。cc2api TLS 模板、JA4、无解密透传对照、DTLS／QUIC／ECH 内层及 HRR 二次事件完整覆盖另行验证。
+
+### 2. Signatures
+
+```python
+Recorder.tls_clienthello(data: tls.ClientHelloData) -> None
+parse_clienthello(raw: bytes) -> dict[str, Any]
+capture_context_snapshot(raw: str, quota_source: str) -> tuple[dict[str, Any], str, str | None]
+append_private_jsonl(path: Path, record: dict[str, Any]) -> None
+capture_context_json(source: str, version: str, *, run_id: str | None = None,
+    namespace: str | None = None, work_id: str | None = None,
+    version_source: str | None = None) -> str
+capture_summary(base: Path, *, running: bool = False) -> dict
+capture_file_preview(base: Path, relative: str) -> dict
+CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
+```
+
+### 3. Contracts
+
+- 固定 mitmproxy 11.1.3 的 `data.client_hello.raw_bytes(wrap_in_record=False)` 返回 **ClientHello 本体**；不含 handshake／record 头。`raw_format=clienthello_body`、`tls_record_preserved=false`；默认 SDK 合成 record 不能当原始 wire／pcap。
+- 新文件为 `Path(CAPTURE_FILE).with_name('tls_clienthello.jsonl')`，仅 `CAPTURE_FULL_HTTP=1` 时追加；沿实际分代目录，不覆盖同 source 的前次字节。逐级 `dir_fd+O_NOFOLLOW` 打开父目录，目标必须是单链接普通文件，以 `0600` 创建／追加；拒绝文件、父目录链接、硬链接和 FIFO。
+- 每行 `schema=1/event=tls_clienthello/ts/direction=client_to_recorder/transport=tcp/client_connection_id`；连接键取 `data.context.client.id`。HTTP 原始记录和轻量索引使用 `flow.client_conn.id` 的同名键及同一上下文，允许一条握手对应多个 flow；不能用 server ID 或猜未来 flow ID。
+- 私有原始字段 `raw_base64/raw_bytes/raw_saved_bytes/raw_sha256/raw_truncated` 表示保存本体、全长、保存长度、完整本体 SHA256 和截断事实；最多保存 256 KiB（覆盖合法本体）。超限为 `parse_status=oversize`，明确截断且 JA3 为 null。正常／结构错误／SDK 不支持分别为 `ok/error/unsupported`，固定 `parse_error` 不含异常原文。
+- 保留原序 `legacy_version/cipher_suites/extensions/signature_algorithms/supported_groups/supported_versions/ec_point_formats/key_share/sni/alpn_protocols`。扩展为 `{type,length,data_base64}`，key_share 为 `{group,key_exchange_length}`，ALPN 为 `{text,base64}`；缺扩展用 null，合法空 client_shares 用 `[]`。验证长度、偶数向量、重复扩展和 key_share 边界；未知 ID／GREASE 留在原始字段，不按名字表丢弃。
+- `ja3={string,md5}` 使用 legacy_version 与原序 cipher／扩展／组／点格式五字段，仅在 JA3 投影中过滤标准 GREASE。TLS1.3 的 legacy_version 仍为771；签名算法、ALPN 和 key_share 具体值不能由 JA3 推出，JA3 不作为安全身份。
+- TLS 目标范围沿 `CAPTURE_SCOPE/CAPTURE_TARGETS`：all 全收；显式非目标 SNI 跳过，缺 SNI／尚不可归因保留为 unclassified，不据目录或 IP 推断官方 CLI。此策略不改变 HTTP `_should_record`。采集／解析／写入异常只写固定 TLS 诊断，不更改握手参数或取消 TLS／HTTP 转发。
+- `CAPTURE_CONTEXT` 在 Recorder 初始化时冻结并逐字段筛选；`source/claude_code_version` 必需，可选真实 `claude_code_version_source`。run／continue 填原 run_id，Projects／warmup 填 namespace/work_id，不能把 Pi 兼容 job.run_id 冒充 runs.id。五个入口必须取本次实际装载的版本，并通过 network-context 环境允许列表；缺失、非法、source 冲突分别为 missing／invalid／source_mismatch，版本未知，不查当前默认值猜测。现有 ACK 只核原模式／来源，元数据另核实际环境和产物。HTTP `analysis.cc_version` 仍表示 HTTP 观察结果。
+- `capture_summary.tls_clienthello` 和双空间既有 `/capture/file` 共用逐层白名单；普通 run 沿既有摘要，不新增文件路由。只公开时间、方向、连接、受支持上下文、数值 offer、扩展类型／长度、key_share 组／长度、SNI、文本 ALPN、JA3 和状态。raw_*、扩展 payload、session/ticket/PSK/binder、未知字段及异常原文不公开。
+- 全组共用最多4MiB、256行、64条有效记录预算，单行512KiB、公开向量4096项。半行、坏记录、非法公开字段或向量截减、读取异常及未读完必须报告 partial／issues／truncated；不完整时 `count_exact=false,total_records=null`，不能将有界扫描数称为精确总量。旧目录无TLS正常为 unavailable。共用 `renderCaptureDetail` 展示最多8条安全记录及 HTTP 连接键；动态值经 escapeHTML，保留原切换／关闭请求失效逻辑，更新 app.js URL 版本。
+- v3 COPY 整个 sidecar，旧 sidecar Dockerfile 显式 COPY helper；两条打包路径必须均可导入，不能仅本地 PYTHONPATH 通过。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 关闭完整抓包／历史无TLS | 不读握手；无新文件，读取正常为空 |
+| 上下文缺失／非法／source不同 | 明确未知状态；不猜版本，不阻断业务 |
+| 截断、向量错误、重复扩展／超限 | 保留可用私有证据与固定错误；不生成完整 JA3 |
+| 合法空 key_share／未知组或 GREASE | 保留原事实；只在 JA3 投影过滤 GREASE |
+| 文件或父目录链接、硬链接、FIFO、写失败 | 拒绝写入、固定诊断，HTTPS 继续 |
+| 非清单、跨空间、绝对或上跳预览路径 | 沿既有404，不扩展原始 HTTP／flow 权限 |
+| 半行、坏JSON、嵌套材料、预算不足 | 白名单丢弃私有值，明确 partial 与非精确计数 |
+
+### 5. Scenarios and Examples
+
+- 正常：`projects:work:3` 实际装载2.1.303，同一客户端连接两次 messages；TLS 与两个 HTTP flow 使用同一连接键和 namespace/work_id。账号默认版本随后改变，不改 Recorder 的固定快照。
+- 边界：旧TLS1.2无extensions仍可算五字段 JA3；TLS1.3提供空 client_shares 合法。未知ALPN字节留私有base64，公开显示非文本协议。
+- 错误用法：把 `TLSv1.3` 写成772算JA3，或把默认 raw_bytes() 的合成record当原始抓包。正确处理：独立解码已保存本体，使用本体legacy_version及原序有序扩展，另核支持版本和采集方向。
+- 错误用法：将整个 TLS JSON 原样返回，或把64条扫描结果当全部握手。正确处理：逐层重建已定义字段，受预算时保留非精确计数及部分状态。
+
+### 6. Tests Required
+
+- `images/sidecar/test_tls_clienthello.py`：官方JA3向量、GREASE／未知ID／非文本ALPN、每字节截断、错误向量／重复扩展、合法空key_share、超限、上下文未知及私有追加／链接／硬链接／FIFO。
+- `images/sidecar/test_recorder.py`：hook方向与scope、不改握手策略、同连接多HTTP及索引、固定快照、写失败继续转发、部分／中断阶段和原额度回归。
+- `test_capture_settings_runtime.py`、`test_main.py`、`test_account_cli_settings.py` 与 `images/account/test_network_context.py`：五入口实际冻结版本、原run与work分离、真实子进程环境、源允许列表、关闭／收尾保留及三入口摘要权限。
+- `test_tls_capture_artifacts.py`：嵌套canary、全组预算、半行／损坏／缺指纹／链接／读错误、旧数据、合法空值、共用渲染和XSS。已有账号运行生命周期定向回归覆盖独立API及历史目录。
+- 将 `deploy/v3/verify_tls_clienthello.py` 挂入固定11.1.3隔离账号镜像，仅回环模拟上游：TLS1.2／1.3各同socket两GET，独立BytesIO／struct核全部字段和JA3，核HTTP/index连接；真实写失败后另两GET成功。此结果标 synthetic，不能充作官方CLI样本。
+- 上线核同批Actions／镜像源码、真实项目新文件0600、执行版本／来源及成功Claude HTTP连接，独立复算并验证真实鉴权页面的安全展示；目标版本完整对齐仍需无解密透传对照。

@@ -1,6 +1,7 @@
 """用轻量 mitmproxy 替身验证上游归属和即时额度拦截。"""
 
 import hashlib
+import base64
 import json
 import os
 import sys
@@ -24,6 +25,7 @@ class ResponseFactory:
 
 mitmproxy = ModuleType("mitmproxy")
 mitmproxy.http = SimpleNamespace(Response=ResponseFactory)
+mitmproxy.tls = SimpleNamespace()
 with patch.dict(sys.modules, {"mitmproxy": mitmproxy}):
     import recorder
 
@@ -253,6 +255,128 @@ class RecorderQuotaTests(unittest.TestCase):
         self.addon.requestheaders(flow)
         self.assertEqual(503, flow.response.status_code)
         self.assertEqual("failed", json.loads(self.signal.read_text())["status"])
+
+
+class RecorderTLSCaptureTests(unittest.TestCase):
+    """真实观察 hook 的落盘、来源快照和 HTTP 一对多连接关联。"""
+
+    def setUp(self) -> None:
+        """准备私有执行目录及冻结版本，不连接外部服务。:return: None。"""
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name)
+        self.capture, self.index = self.base / "http_capture.jsonl", self.base / "capture_index.json"
+        self.tls_path = self.base / "tls_clienthello.jsonl"
+        self.context = {"schema": 1, "source": "projects:work:3", "claude_code_version": "2.1.303",
+                        "namespace": "projects", "work_id": "work", "claude_code_version_source": "account"}
+        patcher = patch.dict(os.environ, {"CAPTURE_CONTEXT": json.dumps(self.context),
+            "QUOTA_SOURCE": self.context["source"], "QUOTA_WARMUP": "0", "V3_ACCOUNT": "0"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        patcher = patch.multiple(recorder, CAPTURE_FULL_HTTP=True, CAPTURE_FILE=str(self.capture),
+            CAPTURE_INDEX_FILE=str(self.index), CAPTURE_SCOPE="anthropic", STATS_FILE=str(self.base / "stats.jsonl"))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addon = recorder.Recorder()
+
+    def _event(self, sni="api.anthropic.com", raw=None):
+        body = b"\x03\x03" + b"R" * 32 + b"\x00\x00\x02\x13\x01\x01\x00"
+        if sni:
+            name = sni.encode("ascii")
+            names = b"\x00" + len(name).to_bytes(2, "big") + name
+            payload = len(names).to_bytes(2, "big") + names
+            extension = b"\x00\x00" + len(payload).to_bytes(2, "big") + payload
+            body += len(extension).to_bytes(2, "big") + extension
+
+        def raw_bytes(wrap_in_record=True):
+            self.assertFalse(wrap_in_record)
+            return body if raw is None else raw
+
+        return SimpleNamespace(context=SimpleNamespace(client=SimpleNamespace(id="client-connection")),
+                               client_hello=SimpleNamespace(raw_bytes=raw_bytes))
+
+    def _flow(self, flow_id):
+        return SimpleNamespace(id=flow_id, client_conn=SimpleNamespace(id="client-connection", sni="api.anthropic.com"),
+            server_conn=SimpleNamespace(sni="api.anthropic.com"), request=SimpleNamespace(
+                method="GET", scheme="https", host="api.anthropic.com", pretty_host="api.anthropic.com",
+                path="/v1/mock", query={}, headers={}, raw_content=b"", get_text=lambda strict=False: ""),
+            response=ResponseFactory.make(200, b"{}", {"content-type": "application/json"}))
+
+    def test_client_hello_and_multiple_http_flows_share_frozen_connection_and_context(self) -> None:
+        """一条握手关联多个流；后续环境变化不能改写本执行版本。:return: None。"""
+        with patch.dict(os.environ, {"CAPTURE_CONTEXT": "{}", "QUOTA_SOURCE": "warmup:other:4"}):
+            self.addon.tls_clienthello(self._event())
+            for flow_id in ("one", "two"):
+                flow = self._flow(flow_id)
+                self.addon.request(flow)
+                self.addon.response(flow)
+        tls_record = json.loads(self.tls_path.read_text())
+        self.assertEqual("client_to_recorder", tls_record["direction"])
+        self.assertEqual("target", tls_record["target_status"])
+        self.assertEqual("ok", tls_record["parse_status"])
+        self.assertEqual(self.context, tls_record["capture_context"])
+        self.assertEqual("ok", tls_record["capture_context_status"])
+        self.assertIsNone(tls_record["capture_context_error"])
+        self.assertEqual(0o600, self.tls_path.stat().st_mode & 0o777)
+        records = [json.loads(line) for line in self.capture.read_text().splitlines()]
+        self.assertEqual(4, len(records))
+        entries = json.loads(self.index.read_text())["entries"]
+        self.assertEqual(2, len(entries))
+        for record in [*records, *entries]:
+            self.assertEqual(tls_record["client_connection_id"], record["client_connection_id"])
+            self.assertEqual(self.context, record["capture_context"])
+        self.assertNotIn("raw_base64", self.index.read_text())
+        self.assertTrue(all(item["analysis"]["cc_version"] is None for item in entries))
+
+    def test_target_scope_and_capture_off_do_not_change_http_scope(self) -> None:
+        """非目标 SNI 被跳过，无 SNI 明确待归因；关闭抓包不读握手。:return: None。"""
+        self.addon.tls_clienthello(self._event("example.invalid"))
+        self.assertFalse(self.tls_path.exists())
+        self.addon.tls_clienthello(self._event(None))
+        self.assertEqual("unclassified", json.loads(self.tls_path.read_text())["target_status"])
+        with patch.object(recorder, "CAPTURE_SCOPE", "all"):
+            self.addon.tls_clienthello(self._event("example.invalid"))
+        records = [json.loads(line) for line in self.tls_path.read_text().splitlines()]
+        self.assertEqual("non_target", records[1]["target_status"])
+        old = self.tls_path.read_bytes()
+        with patch.object(recorder, "CAPTURE_FULL_HTTP", False):
+            self.addon.tls_clienthello(None)
+        self.assertEqual(old, self.tls_path.read_bytes())
+
+    def test_bad_vector_keeps_raw_without_blocking_or_fake_ja3(self) -> None:
+        """解析失败仍追加可复核本体，握手配置和连接对象均不修改。:return: None。"""
+        event = self._event(raw=b"\x03\x03incomplete")
+        self.addon.tls_clienthello(event)
+        result = json.loads(self.tls_path.read_text())
+        self.assertEqual("error", result["parse_status"])
+        self.assertIsNone(result["ja3"])
+        self.assertEqual(b"\x03\x03incomplete", base64.b64decode(result["raw_base64"]))
+        self.assertEqual({"context", "client_hello"}, set(vars(event)))
+
+    def test_tls_write_failure_has_fixed_diagnostic_and_http_still_completes(self) -> None:
+        """观察写盘故障不会拒绝 HTTP；统计中不能泄漏底层异常原文。:return: None。"""
+        with patch.object(recorder, "append_private_jsonl", side_effect=OSError("private-error-canary")):
+            self.addon.tls_clienthello(self._event())
+        self.assertFalse(self.tls_path.exists())
+        flow = self._flow("after-error")
+        self.addon.requestheaders(flow)
+        self.addon.request(flow)
+        self.addon.response(flow)
+        self.assertEqual(200, flow.response.status_code)
+        self.assertEqual("complete", json.loads(self.index.read_text())["entries"][0]["capture_state"])
+        stats = (self.base / "stats.jsonl").read_text()
+        self.assertIn("tls_clienthello_capture_failed", stats)
+        self.assertNotIn("private-error-canary", stats)
+
+    def test_unsupported_sdk_transport_is_explicit(self) -> None:
+        """SDK 不支持的传输不伪造原始封装或成功指纹。:return: None。"""
+        event = self._event()
+        event.client_hello.raw_bytes = lambda wrap_in_record=False: (_ for _ in ()).throw(NotImplementedError())
+        self.addon.tls_clienthello(event)
+        record = json.loads(self.tls_path.read_text())
+        self.assertEqual("unsupported", record["parse_status"])
+        self.assertIsNone(record["ja3"])
+        self.assertNotIn("raw_base64", record)
 
 
 class RecorderWarmupTests(unittest.TestCase):

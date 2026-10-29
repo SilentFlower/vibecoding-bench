@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 import main
 import test_main
+from test_tls_capture_artifacts import clienthello_record
 
 
 class AccountCliSettingsTests(unittest.TestCase):
@@ -107,6 +108,30 @@ class AccountCliSettingsTests(unittest.TestCase):
         self.sql("UPDATE accounts SET claude_code_version='2.1.293' WHERE id=1")
         value = self.sql("SELECT * FROM runs WHERE id='legacy'")[0]
         self.assertEqual('2.1.303', main._ensure_run_claude_code_version(value))
+
+    def test_capture_run_existing_summary_exposes_safe_tls_and_keeps_route_visibility(self) -> None:
+        """普通抓包沿原鉴权摘要展示握手，不扩大原始文件下载或已删除运行权限。:return: None。"""
+        capture = main.start_capture_run(main.CaptureRunIn(account_id=1, topic_id=1, claude_code_version='2.1.293'))
+        directory = main.FLOWS_DIR / 'main' / str(capture['task_id']) / capture['run_id']
+        directory.mkdir(parents=True)
+        self.sql('UPDATE runs SET flows_dir=? WHERE id=?', (str(directory), capture['run_id']))
+        record = clienthello_record('real-client-connection')
+        record['capture_context'] = {'schema': 1, 'source': f'run:{capture["run_id"]}:0',
+            'run_id': capture['run_id'], 'claude_code_version': '2.1.293'}
+        (directory / 'tls_clienthello.jsonl').write_text(json.dumps(record) + '\n')
+        (directory / 'capture_index.json').write_text(json.dumps({'entries': [{'flow_id': 'http-flow',
+            'client_connection_id': 'real-client-connection', 'capture_state': 'complete'}]}))
+        response = self.client.get(f'/api/runs/{capture["run_id"]}/capture')
+        self.assertEqual(200, response.status_code)
+        value = response.json()
+        self.assertEqual('real-client-connection', value['tls_clienthello']['entries'][0]['client_connection_id'])
+        self.assertEqual(value['index']['entries'][0]['client_connection_id'],
+            value['tls_clienthello']['entries'][0]['client_connection_id'])
+        self.assertEqual('2.1.293', value['tls_clienthello']['entries'][0]['capture_context']['claude_code_version'])
+        self.assertNotIn('PRIVATE_TLS_CANARY', response.text)
+        self.assertEqual(404, self.client.get(f'/api/runs/{capture["run_id"]}/capture/file?path=tls_clienthello.jsonl').status_code)
+        self.sql('UPDATE runs SET deleted_at=1 WHERE id=?', (capture['run_id'],))
+        self.assertEqual(404, self.client.get(f'/api/runs/{capture["run_id"]}/capture').status_code)
 
     def test_batch_and_warmup_use_current_account_at_creation(self) -> None:
         """长期调度持有旧账号对象时，新执行仍采用创建事务中的当前配置。:return: None。"""

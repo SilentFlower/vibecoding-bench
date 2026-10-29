@@ -26,6 +26,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
+from capture_artifacts import capture_context_json
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
@@ -1415,6 +1416,9 @@ class AccountRuntime:
                     CAPTURE_FULL_HTTP="1" if task.get("capture_full_http") else "0",
                     SAVE_FULL_FLOWS="1" if task.get("capture_full_http") else "0",
                     NETWORK_INSPECTION_MODE=inspection_mode)
+                if task.get("capture_full_http"):
+                    context['CAPTURE_CONTEXT'] = capture_context_json(source, worker_env['CLAUDE_CODE_VERSION'],
+                        run_id=run_id, version_source=task.get('claude_code_version_source'))
                 original_controls = self.data / "quota-controls" / run_id / handle
                 self._link_directory(original_controls, controls)
                 for key in ("QUOTA_STATE_FILE", "QUOTA_SIGNAL_FILE", "QUOTA_OBSERVATIONS_FILE"):
@@ -2494,6 +2498,8 @@ class AccountRuntime:
                 if run.get("capture_full_http"):
                     context.update(CAPTURE_FULL_HTTP="1", SAVE_FULL_FLOWS="1",
                         CAPTURE_FILE=f"{flow_path}/http_capture.jsonl", CAPTURE_INDEX_FILE=f"{flow_path}/capture_index.json")
+                    context['CAPTURE_CONTEXT'] = capture_context_json(context['QUOTA_SOURCE'], version,
+                        run_id=run['id'], version_source=run.get('claude_code_version_source'))
                 atomic_json(self._network_runtime(row) / "context.json", context)
                 self._configure_network_context(container, context)
                 job.update(run_id=run["id"], handle=handle, version=version, cwd=cwd,

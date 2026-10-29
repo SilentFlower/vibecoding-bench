@@ -187,9 +187,12 @@ prompt、响应正文、组织 ID 或账号身份。
   结合 `.flow`、stats、`capture-status.json` 和采集错误判断保存范围。
   `CAPTURE_SCOPE=all` 不免除当前 `response()` 的目标域名判断；
   v3 也须检查实际账号网络 context，不能只套用旧每-run sidecar 的 scope 默认值。
-- 当前 recorder 未输出完整 ClientHello、JA3 / JA4、签名算法或 key_share。MITM 出口的握手
-  可能来自代理，不能当作原生 CLI TLS 画像。TLS 对照需补充客户端侧握手证据，标明接口、方向、
-  目标和 run 关联，并与相同版本无解密透传条件对照；`.flow` 的部分 TLS 元数据不能替代完整握手。
+- 开启完整抓包后，Recorder 在客户端 `tls_clienthello` 保存私有 `tls_clienthello.jsonl`，
+  含 ClientHello 本体、有序扩展／算法／组／key_share 和 JA3；字节封装、版本／执行／HTTP 连接关联、
+  私有文件与安全摘要遵循 [ClientHello 契约](../backend/account-runtime-v3.md#scenario-客户端-clienthello-私有证据与安全摘要)。
+  JA4 未实现；历史 `.flow` 的部分 TLS 元数据不能替代新握手。MITM 出口可能来自代理，不能当作
+  原生 CLI offer；执行版本也不能独自证明发起进程。正式 TLS 对齐仍需关联实际 Claude HTTP，
+  标明接口、方向、目标与运行条件，并与相同版本无解密透传条件对照。
 - vm2api 改造 CLI 对本地模拟上游的结果和外部逆向文章只作为研究线索，不直接写成原版 303
   的正式画像。后缀文本源、Unicode 取样和线程续轮规则有冲突时，沿用旧版本已验证契约，
   对新版本单独安排正式样本。详见 [303 对照研究与采样清单](../../../../doc/claude-code-2.1.303-protocol-study.md)。

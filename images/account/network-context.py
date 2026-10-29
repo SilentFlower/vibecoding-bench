@@ -191,7 +191,7 @@ def main() -> None:
             # 默认路由切到 tun 后不能再递归解析代理主机；复用启动阶段固化的 IP。
             environment["UPSTREAM_SOCKS5_HOST"] = proxy_ip.read_text().strip()
         permitted = {"STATS_FILE", "CAPTURE_FILE", "CAPTURE_INDEX_FILE", "CAPTURE_FULL_HTTP",
-            "CAPTURE_MAX_BODY_BYTES", "CAPTURE_SCOPE", "CAPTURE_MODE", "CAPTURE_TARGETS", "QUOTA_SOURCE", "QUOTA_IDENTITY", "QUOTA_STATE_FILE",
+            "CAPTURE_MAX_BODY_BYTES", "CAPTURE_SCOPE", "CAPTURE_MODE", "CAPTURE_TARGETS", "CAPTURE_CONTEXT", "QUOTA_SOURCE", "QUOTA_IDENTITY", "QUOTA_STATE_FILE",
             "QUOTA_SIGNAL_FILE", "QUOTA_OBSERVATIONS_FILE", "QUOTA_CREDENTIALS_FILE", "QUOTA_WARMUP",
             "NETWORK_INSPECTION_MODE"}
         environment.update({key: str(value) for key, value in context.items() if key in permitted})

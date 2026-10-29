@@ -36,6 +36,7 @@ WORKDIR /sidecar
 COPY start.sh /sidecar/start.sh
 COPY recorder.py /sidecar/recorder.py
 COPY quota_protocol.py /sidecar/quota_protocol.py
+COPY tls_clienthello.py /sidecar/tls_clienthello.py
 RUN chmod +x /sidecar/start.sh
 
 EXPOSE 8080

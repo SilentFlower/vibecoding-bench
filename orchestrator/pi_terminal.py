@@ -14,6 +14,7 @@ from threading import RLock
 from uuid import uuid4
 
 from account_runtime import AccountRuntime, atomic_json
+from capture_artifacts import capture_context_json
 from project_library import read_document, safe_relative
 from project_scenario_usage import aggregate_usage, source_usage
 
@@ -122,7 +123,9 @@ class PiTerminal:
                         QUOTA_STATE_FILE=f"/quota-accounts/{account['id']}/state.json",
                         QUOTA_SIGNAL_FILE=f'/controls/{handle}/pause.json',
                         QUOTA_OBSERVATIONS_FILE=flow_path + '/passive-quota.jsonl',
-                        QUOTA_CREDENTIALS_FILE='/run/v3/access/.credentials.json')
+                        QUOTA_CREDENTIALS_FILE='/run/v3/access/.credentials.json',
+                        CAPTURE_CONTEXT=capture_context_json(source, version, namespace=self.namespace,
+                            work_id=work['id'], version_source=settings.get('claude_code_version_source')))
                     job['capture_flows'] = str(flows.relative_to(root / 'flows'))
                     runtime._save_execution(job)
                     atomic_json(context_path, context)

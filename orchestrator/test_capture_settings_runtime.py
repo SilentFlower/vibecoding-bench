@@ -17,6 +17,7 @@ from pi_terminal import PiTerminal
 from projects import ProjectsService
 from projects_api import projects_router
 from projects_store import ProjectsDatabase
+from test_tls_capture_artifacts import clienthello_record
 import test_account_runtime
 
 
@@ -39,7 +40,7 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
         for namespace in ('projects', 'warmup'):
             for enabled in (False, True):
                 with self.subTest(namespace=namespace, enabled=enabled):
-                    account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7}
+                    account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7, 'claude_code_version': '2.1.293'}
                     if enabled:
                         account[namespace + '_capture_enabled'] = True
                     generation = 2 if enabled else 1
@@ -52,7 +53,7 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
                     terminal = PiTerminal(self.runtime, None, lambda *args: {}, namespace=namespace)
                     work = {'id': work_id, 'generation': generation, 'session_id': 'fixture-session',
                         'remaining_sec': 60, 'settings_json': json.dumps({
-                            'claude_code_version': '2.1.303', 'claude_effort_level': 'high'})}
+                            'claude_code_version': '2.1.303', 'claude_code_version_source': 'account', 'claude_effort_level': 'high'})}
                     container = Mock(id='capture-fixture')
                     self.runtime.client.api.exec_create.return_value = {'Id': 'capture-exec'}
 
@@ -76,6 +77,9 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
                     context = configure.call_args.args[1]
                     self.assertEqual('capture' if enabled else 'passthrough', context['NETWORK_INSPECTION_MODE'])
                     if enabled:
+                        self.assertEqual({'schema': 1, 'source': source, 'claude_code_version': '2.1.303',
+                            'claude_code_version_source': 'account', 'namespace': namespace, 'work_id': work_id},
+                            json.loads(context['CAPTURE_CONTEXT']))
                         self.assertEqual(source, context['QUOTA_SOURCE'])
                         self.assertEqual('1', context['SAVE_FULL_FLOWS'])
                         self.assertEqual('pi-capture', job['execution_role'])
@@ -83,7 +87,38 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
                         self.assertFalse(saved['shared_cli'])
                         self.assertIn('capture_flows', saved)
                         self.assertIn('settings_override', saved)
+                    else:
+                        self.assertNotIn('CAPTURE_CONTEXT', context)
                     self.runtime._remove_job(job)
+
+    def test_normal_and_continue_capture_context_use_actual_frozen_run_identity(self) -> None:
+        """固定环境的两个捕获入口取实际版本，续聊 sid 不能冒充原 run ID。:return: None。"""
+        account = {'id': 1, 'name': 'synthetic', 'claude_code_version': '2.1.303'}
+        with self.fixture.database() as connection:
+            connection.execute('CREATE TABLE runs(id TEXT,environment_id TEXT,environment_generation INTEGER,execution_source TEXT,runtime_release TEXT)')
+            connection.execute("INSERT INTO runs(id) VALUES('original-run')")
+        container = Mock(id='capture-fixture')
+        job = {'row': self.row, 'token': 'capture-token', 'source': 'run:original-run:4'}
+        worker = {'CLAUDE_CODE_VERSION': '2.1.293', 'QUOTA_SOURCE': job['source']}
+        self.runtime.client.api.exec_create.return_value = {'Id': 'capture-exec'}
+        source = self.fixture.root / 'minimal-driver.sh'
+        source.write_text('#!/bin/bash\ntrue\n')
+        with patch.object(self.runtime, '_cli_setup', return_value=nullcontext((self.row, container, job))) as setup, \
+                patch.object(self.runtime, 'sync_credentials'), patch.object(self.runtime, '_save_execution'), \
+                patch.object(self.runtime, 'render_driver', return_value=source.read_text()), \
+                patch.object(self.runtime, '_configure_network_context') as configure:
+            self.runtime.start_run(account, {'id': 1, 'capture_full_http': True, 'claude_code_version_source': 'explicit'},
+                'original-run', worker, {'QUOTA_SOURCE': job['source']})
+            self.assertEqual('2.1.293', setup.call_args.args[2])
+            self.assertEqual({'schema': 1, 'source': 'run:original-run:4', 'claude_code_version': '2.1.293',
+                'run_id': 'original-run', 'claude_code_version_source': 'explicit'},
+                json.loads(configure.call_args.args[1]['CAPTURE_CONTEXT']))
+            self.runtime.begin_continue(account, {'id': 'original-run', 'capture_full_http': True,
+                'claude_code_version': '2.1.293'}, 'different-sid', {'QUOTA_SOURCE': 'continue:different-sid:5'},
+                self.runtime.data / 'flows/synthetic/1/original-run/continue-different-sid')
+            self.assertEqual('2.1.293', setup.call_args.args[2])
+            self.assertEqual({'schema': 1, 'source': 'continue:different-sid:5', 'claude_code_version': '2.1.293',
+                'run_id': 'original-run'}, json.loads(configure.call_args.args[1]['CAPTURE_CONTEXT']))
 
     def test_repeated_start_uses_current_proof_and_preserves_previous_attempt(self) -> None:
         """同代恢复等待本次证明，不能误用旧 PID 或覆盖原会话和证据。:return: None。"""
@@ -212,17 +247,22 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
         raw = directory / 'http_capture.jsonl'
         raw.write_bytes(b'{"flow_id":"saved"}\n')
         original = raw.read_bytes()
+        tls = directory / 'tls_clienthello.jsonl'
+        tls.write_bytes(b'{"raw_base64":"private-test-fixture"}\n')
+        original_tls = tls.read_bytes()
         job = {'row': self.row, 'source': 'projects:fixture:1',
             'capture_flows': str(directory.relative_to(self.root / 'flows'))}
         with patch.object(self.runtime, '_configure_network_context', return_value={'previous_listener_graceful': False}):
             self.runtime._finish_capture(job, Mock())
         self.assertEqual('partial', json.loads((directory / 'capture-status.json').read_text())['state'])
         self.assertEqual(original, raw.read_bytes())
+        self.assertEqual(original_tls, tls.read_bytes())
         with patch.object(self.runtime, '_configure_network_context', side_effect=ValueError('synthetic failure')):
             with self.assertRaises(ValueError):
                 self.runtime._finish_capture(job, Mock())
         self.assertEqual('error', json.loads((directory / 'capture-status.json').read_text())['state'])
         self.assertEqual(original, raw.read_bytes())
+        self.assertEqual(original_tls, tls.read_bytes())
 
     def test_summary_lists_partial_files_without_index_and_never_follows_file_links(self) -> None:
         """索引缺失不冒充文件丢失，外部链接不会进入可读清单。:return: None。"""
@@ -252,7 +292,13 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
             directory = self.root / 'flows' / ('group-' + hashlib.sha256(f'{namespace}/{work_id}'.encode()).hexdigest()[:20])
             directory.mkdir(parents=True)
             atomic_json(directory / 'capture_index.json', {'entries': [{'flow_id': namespace,
+                'client_connection_id': namespace + '-connection',
                 'request': {'headers': {'authorization': 'private'}}, 'capture_state': 'complete'}]})
+            tls = clienthello_record(namespace + '-connection')
+            tls['capture_context'] = {'schema': 1, 'source': f'{namespace}:{work_id}:1',
+                'namespace': namespace, 'work_id': work_id, 'claude_code_version': '2.1.303',
+                'unknown': {'ticket': 'PRIVATE_TLS_CANARY'}}
+            (directory / 'tls_clienthello.jsonl').write_text(json.dumps(tls) + '\n')
             service = object.__new__(ProjectsService)
             service.database = ProjectsDatabase(self.fixture.database, namespace)
             service.data, service.namespace = self.fixture.root, namespace
@@ -265,9 +311,18 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
             self.assertEqual(namespace, value['index']['entries'][0]['flow_id'])
             self.assertEqual('[redacted]', value['index']['entries'][0]['request']['headers']['authorization'])
             self.assertEqual('2.1.303', value['claude_code_version'])
+            handshake = value['tls_clienthello']['entries'][0]
+            self.assertEqual(namespace + '-connection', handshake['client_connection_id'])
+            self.assertEqual(value['index']['entries'][0]['client_connection_id'], handshake['client_connection_id'])
+            self.assertEqual(namespace, handshake['capture_context']['namespace'])
+            self.assertNotIn('PRIVATE_TLS_CANARY', json.dumps(value))
+            preview = client.get(path + '/file?path=tls_clienthello.jsonl')
+            self.assertEqual(200, preview.status_code)
+            self.assertEqual(value['tls_clienthello'], preview.json())
             self.assertEqual(200, client.get(path + '/file?path=capture_index.json').status_code)
             self.assertEqual(404, client.get(path + '/file?path=../../secret').status_code)
             self.assertEqual(404, client.get(path + '/file?path=http_capture.jsonl').status_code)
+            self.assertEqual(404, client.get(path + '/file?path=capture.flow').status_code)
             self.assertEqual(404, client.get(prefix + '/work/missing/capture').status_code)
 
 

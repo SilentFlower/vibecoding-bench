@@ -2007,6 +2007,36 @@ function setRunDetailText(selector, html) {
   if (el && el.innerHTML !== html) el.innerHTML = html;
 }
 
+/** 渲染有界 TLS 白名单摘要。@param {object} tls 公开握手摘要。@return {string} 转义后的 HTML。 */
+function renderCaptureTls(tls) {
+  const records = Array.isArray(tls?.entries) ? tls.entries : [];
+  const rows = records.slice(-8).map(record => {
+    const context = record.capture_context || {};
+    const fingerprint = record.ja3 || {};
+    const fields = {
+      direction: record.direction, client_connection_id: record.client_connection_id,
+      capture_context: context, capture_context_status: record.capture_context_status,
+      parse_status: record.parse_status, target_status: record.target_status,
+      legacy_version: record.legacy_version, supported_versions: record.supported_versions,
+      cipher_suites: record.cipher_suites,
+      extensions: Array.isArray(record.extensions) ? record.extensions.map(item => ({type: item.type, length: item.length})) : null,
+      signature_algorithms: record.signature_algorithms, supported_groups: record.supported_groups,
+      ec_point_formats: record.ec_point_formats,
+      key_share: Array.isArray(record.key_share) ? record.key_share.map(item => ({group: item.group, key_exchange_length: item.key_exchange_length})) : null,
+      sni: record.sni, alpn_protocols: Array.isArray(record.alpn_protocols) ? record.alpn_protocols.map(item => item.text ?? '非文本协议') : null,
+      ja3: {string: fingerprint.string, md5: fingerprint.md5}, fields_incomplete: record.fields_incomplete,
+    };
+    return `<details>
+      <summary>${escapeHTML(context.claude_code_version || '版本未知')} · JA3 <code>${escapeHTML(fingerprint.md5 || '未生成')}</code> · ${escapeHTML(record.client_connection_id || '连接未知')}</summary>
+      <pre class="transcript-pre">${escapeHTML(JSON.stringify(fields, null, 2))}</pre>
+    </details>`;
+  }).join('');
+  const count = tls?.count_exact ? `共 ${tls.total_records ?? records.length} 条握手` : `已扫描 ${tls?.scanned_records ?? records.length} 条有效握手，数量非全量`;
+  return `<h4>TLS ClientHello</h4>
+    <p class="hint" role="status">${escapeHTML(tls?.message || '该抓包尚未保存 ClientHello 记录')} ${tls?.available ? escapeHTML(count) : ''}</p>
+    ${rows || '<div class="muted">暂无可展示的握手</div>'}`;
+}
+
 /** 渲染三个入口共用的抓包索引和状态。@param {object} capture 公开抓包摘要。@return {string} 已脱敏 HTML。 */
 function renderCaptureDetail(capture) {
   if (!capture || capture.error) {
@@ -2024,6 +2054,7 @@ function renderCaptureDetail(capture) {
     return `
       <tr>
         <td><code>${escapeHTML(e.flow_id || '-')}</code></td>
+        <td><code>${escapeHTML(e.client_connection_id || '-')}</code></td>
         <td>${escapeHTML(path)}</td>
         <td>${escapeHTML(resp.status ?? '-')} ${escapeHTML({pending: '响应中', interrupted: '中断', complete: '完成'}[e.capture_state] || '')}</td>
         <td>${escapeHTML(req.body_bytes ?? 0)} / ${escapeHTML(resp.body_bytes ?? 0)}</td>
@@ -2034,6 +2065,7 @@ function renderCaptureDetail(capture) {
   const fileRows = files.map(f => `
     <div class="file">${escapeHTML(f.path)}<span class="size">${formatSize(f.size || 0)}</span></div>
   `).join('') || '<div class="muted">暂无抓包文件</div>';
+  const tlsHTML = renderCaptureTls(capture.tls_clienthello);
   const captureStats = `
     <p class="hint" role="status">${escapeHTML(capture.message || '仅展示已落盘数据')}</p>
     <div class="stats-grid capture-stats">
@@ -2051,15 +2083,17 @@ function renderCaptureDetail(capture) {
       ${captureStats}
       <div class="muted">${escapeHTML(capture.message || '尚未采到目标流量')}</div>
       <div class="file-tree capture-files">${fileRows}</div>
+      ${tlsHTML}
     `;
   }
   return `
     ${captureStats}
     <div class="hint inline">完整请求体和响应体保存在 flows 目录；此处只展示脱敏索引。</div>
     <div class="file-tree capture-files">${fileRows}</div>
+    ${tlsHTML}
     <table class="data capture-table">
-      <thead><tr><th>flow</th><th>请求</th><th>状态</th><th>请求/响应字节</th><th>cc_version</th></tr></thead>
-      <tbody>${entryRows || '<tr><td colspan="5" class="muted empty-cell">暂无目标请求</td></tr>'}</tbody>
+      <thead><tr><th>flow</th><th>客户端连接</th><th>请求</th><th>状态</th><th>请求/响应字节</th><th>cc_version</th></tr></thead>
+      <tbody>${entryRows || '<tr><td colspan="6" class="muted empty-cell">暂无目标请求</td></tr>'}</tbody>
     </table>
   `;
 }

@@ -51,7 +51,7 @@ from starlette.websockets import WebSocketState
 from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
 from cli_quota import statusline_quota_observation
-from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_summary
+from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_context_json, capture_summary
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
 from physical_features import physical_features_summary
@@ -4056,6 +4056,9 @@ class Runner:
         quota_env, quota_sidecar_volumes, quota_worker_volumes = self._quota_mounts(
             account, run_id, source, FLOWS_DIR / acc_name / str(task["id"]) / run_id, warmup=bool(task.get("warmup")))
         sidecar_env.update(quota_env)
+        if capture_full_http:
+            sidecar_env['CAPTURE_CONTEXT'] = capture_context_json(source, claude_code_version,
+                run_id=run_id, version_source=task.get('claude_code_version_source'))
         worker_env.update({key: value for key, value in quota_env.items() if key in ("QUOTA_SOURCE", "QUOTA_SIGNAL_FILE", "QUOTA_WARMUP")})
         if task.get("resume_session_id"):
             worker_env["RESUME_SESSION_ID"] = task["resume_session_id"]
@@ -4427,6 +4430,9 @@ fs.renameSync(tmp, dst);
         claude_code_version = _resolve_run_claude_code_version(
             run.get("claude_code_version")
         )
+        if continue_capture_dirs:
+            sidecar_env['CAPTURE_CONTEXT'] = capture_context_json(source, claude_code_version,
+                run_id=run['id'], version_source=run.get('claude_code_version_source'))
         claude_effort_level = _resolve_run_claude_effort_level(
             run.get("claude_effort_level")
         )

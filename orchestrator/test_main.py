@@ -585,11 +585,19 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                             "timeout_sec": 60,
                             "capture_full_http": capture_full_http,
                             "claude_code_version": "2.1.260",
+                            "claude_code_version_source": "explicit",
                             "claude_effort_level": effort_level,
                             "capture_permission_mode": permission_mode,
                         },
                     )
                     self._assert_worker_version(calls, label)
+                    recorder_env = next(kwargs['environment'] for image, kwargs in calls if image == main.SIDECAR_IMAGE)
+                    if capture_full_http:
+                        self.assertEqual({'schema': 1, 'source': f'run:{label}-run:0',
+                            'claude_code_version': '2.1.260', 'run_id': f'{label}-run',
+                            'claude_code_version_source': 'explicit'}, json.loads(recorder_env['CAPTURE_CONTEXT']))
+                    else:
+                        self.assertNotIn('CAPTURE_CONTEXT', recorder_env)
                     self._assert_worker_effort(
                         calls,
                         label,
@@ -619,6 +627,9 @@ class ClaudeCodeVersionTests(unittest.TestCase):
                 "claude-session",
             )
             self._assert_worker_version(calls, "continue")
+            recorder_env = next(kwargs['environment'] for image, kwargs in calls if image == main.SIDECAR_IMAGE)
+            self.assertEqual({'schema': 1, 'source': 'continue:continue-session:0',
+                'claude_code_version': '2.1.260', 'run_id': 'continue-run'}, json.loads(recorder_env['CAPTURE_CONTEXT']))
             self._assert_worker_effort(calls, "continue", "xhigh")
             self._assert_worker_permission_mode(calls, "continue", "auto")
 

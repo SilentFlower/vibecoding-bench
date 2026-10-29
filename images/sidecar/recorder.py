@@ -13,8 +13,9 @@ import time
 from pathlib import Path
 from typing import Any
 
-from mitmproxy import http
+from mitmproxy import http, tls
 from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, warmup_quota_decision, warmup_sample_used
+from tls_clienthello import append_private_jsonl, capture_context_snapshot, parse_clienthello
 
 STATS_FILE = os.environ.get("STATS_FILE", "/flows/stats.jsonl")
 CAPTURE_FILE = os.environ.get("CAPTURE_FILE", "/flows/http_capture.jsonl")
@@ -280,13 +281,14 @@ def _extract_analysis(flow: http.HTTPFlow, body: str) -> dict[str, Any]:
 
 
 def _capture_record(flow: http.HTTPFlow) -> dict[str, Any]:
-    """构造完整 HTTP 抓包记录。"""
+    """构造完整 HTTP 抓包记录。:param flow: 当前流。:return: 私有完整记录。"""
     host = _record_host(flow)
     response_body = _capture_body(flow.response)
     response_text = response_body.get("body_text") or ""
     return {
         "ts": time.time(),
         "flow_id": flow.id,
+        "client_connection_id": getattr(flow.client_conn, "id", None),
         "request": {
             "method": flow.request.method,
             "scheme": flow.request.scheme,
@@ -318,6 +320,10 @@ def _capture_index_entry(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "ts": record.get("ts"),
         "flow_id": record.get("flow_id"),
+        "client_connection_id": record.get("client_connection_id"),
+        "capture_context": record.get("capture_context"),
+        "capture_context_status": record.get("capture_context_status"),
+        "capture_context_error": record.get("capture_context_error"),
         "capture_state": record.get("capture_state", "complete"),
         "capture_message": record.get("capture_message"),
         "request": {
@@ -423,6 +429,55 @@ class Recorder:
         self.capture_pending: dict[str, http.HTTPFlow] = {}
         self.capture_closing = False
         self.capture_interrupted: set[str] = set()
+        self.capture_context, self.capture_context_status, self.capture_context_error = capture_context_snapshot(
+            os.environ.get("CAPTURE_CONTEXT", ""), self.quota_source)
+
+    def tls_clienthello(self, data: tls.ClientHelloData) -> None:
+        """仅观察客户端到 Recorder 的 offer，采集故障不改变 TLS 转发。
+
+        :param data: mitmproxy 11.1.3 的客户端握手事件。
+        :return: None；不修改握手策略、连接或上游 TLS。
+        """
+        if not CAPTURE_FULL_HTTP:
+            return
+        connection_id = None
+        try:
+            connection_id = data.context.client.id
+            hello = data.client_hello
+            try:
+                parsed = parse_clienthello(hello.raw_bytes(wrap_in_record=False))
+            except NotImplementedError:
+                # 固定 SDK 尚不支持 DTLS 本体提取，不能用合成 TLS record 冒充原文。
+                parsed = {"transport": "unsupported", "parse_status": "unsupported",
+                          "parse_error": "clienthello_transport_unsupported", "ja3": None}
+            sni = parsed.get("sni")
+            target_status = ("target" if any(keyword in sni.lower() for keyword in CAPTURE_TARGETS)
+                             else "non_target") if sni else "unclassified"
+            if CAPTURE_SCOPE != "all" and target_status == "non_target":
+                return
+            record: dict[str, Any] = {
+                "schema": 1, "event": "tls_clienthello", "ts": time.time(),
+                "direction": "client_to_recorder", "transport": "tcp",
+                "client_connection_id": connection_id,
+                "capture_context": self.capture_context, "capture_context_status": self.capture_context_status,
+                "capture_context_error": self.capture_context_error,
+                "capture_scope": CAPTURE_SCOPE, "target_status": target_status,
+            }
+            record.update(parsed)
+            append_private_jsonl(Path(CAPTURE_FILE).with_name("tls_clienthello.jsonl"), record)
+            if record["parse_status"] != "ok":
+                self._capture_tls_diagnostic("tls_clienthello_parse_failed", connection_id)
+        except Exception:
+            # hook 是观察者：磁盘、解析或 SDK 属性故障都不能取消已接受的业务握手。
+            self._capture_tls_diagnostic("tls_clienthello_capture_failed", connection_id)
+
+    def _capture_tls_diagnostic(self, code: str, connection_id: str | None) -> None:
+        """仅写固定 TLS 诊断，不把原始异常和恢复材料放进统计。"""
+        try:
+            _jsonl_append(STATS_FILE, {"ts": time.time(), "event": "tls_clienthello_error",
+                                      "client_connection_id": connection_id, "error": code})
+        except Exception:
+            pass
 
     def running(self) -> None:
         """启动养号状态观察；普通作业不增加后台任务。@return None。"""
@@ -454,6 +509,8 @@ class Recorder:
             self.capture_interrupted.add(flow.id)
         try:
             record = _capture_record(flow)
+            record.update(capture_context=self.capture_context, capture_context_status=self.capture_context_status,
+                          capture_context_error=self.capture_context_error)
             record.update(capture_state=state, capture_message=message)
             _jsonl_append(CAPTURE_FILE, record)
             _write_capture_index(_capture_index_entry(record))
