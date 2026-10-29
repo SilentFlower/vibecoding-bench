@@ -35,6 +35,67 @@ src/tlsfp/
 - 上游非成功响应如果要重试，必须保留原有错误体兼容性和敏感信息边界。
 - SSE 流式响应只能插入明确允许的 keepalive/comment，不要重排上游 chunk。
 
+## Scenario: Gateway 压缩请求编解码
+
+### 1. Scope / Trigger
+
+- Trigger：修改通用 Gateway／count_tokens 入站读体、Content-Encoding、请求正文改写与发送、signature／认证／换号重试时适用。
+- 通用转发包含 Messages、event_logging 及既有其它 JSON／非 JSON 路径；不据编码新增端点、放宽 v3 路径许可或改变各端点正文校验。响应编解码与保活沿用独立链路。
+
+### 2. Signatures
+
+- 请求专用模块：`service/request_body_codec.rs`；`REQUEST_BODY_LIMIT: usize = 10 * 1024 * 1024`。
+- `RequestBodyEncoding` 实现 Clone／Default；`from_headers(&HeaderMap) -> Result<Self, RequestBodyCodecError>`、`is_encoded(&self) -> bool`、`content_encoding(&self) -> Option<String>`。
+- async `decode(&self, body: Bytes) -> Result<Bytes, RequestBodyCodecError>`；async `encode<'a>(&self, body: &'a [u8]) -> Result<Cow<'a, [u8]>, RequestBodyCodecError>`。
+- `RequestBodyCodecError` 为无字段分类：`InvalidEncoding`／`UnsupportedEncoding`／`TooLarge`／`InvalidBody`／`Internal`；Gateway 的 `request_body_codec_error_response` 映射为 Anthropic error object。
+- 普通 `forward_request`、`forward_count_tokens_request` 与 `maybe_retry_signature_error` 接收同一冻结的 `&RequestBodyEncoding`；`request_headers_for_encoding(&HashMap<String, String>, &RequestBodyEncoding) -> HashMap<String, String>` 清理出站传输头。没有新 setting、环境变量、依赖、数据库或 bridge 字段。
+
+### 3. Contracts
+
+- Router API token 鉴权、count_tokens POST 检查和 Gateway 原始 UA 准入／画像快照保持既有优先级；编码解析和解码必须先于正文策略、账号选择、slot／RPM、Session 池、Hello 及自动遥测。
+- 编码源是原始 `HeaderMap::get_all(Content-Encoding)`，不使用有损的 `extract_headers` 结果。按字段顺序及逗号列表收集，仅去 SP／HTAB，完整 ASCII token 大小写无关；容忍空项／identity，累计最多 32 个列表片段、4 个实际编码层。先验证完整声明，再逆序解码；出站省略空项／identity、小写化并保留有效顺序和 x-gzip 别名。
+- 支持 gzip／x-gzip、zlib／raw-deflate 兼容、标准 br、zstd。原始字节及每层解码结果各不超过 10 MiB；标准 br 不接 large-window 扩展，zstd 首次读取前设 `window_log_max(24)`，后续 frame 同样受 16 MiB 窗口限制。窗口和输出上限不是总内存或可取消 CPU 时限。
+- gzip 必须完整校验所有 member 的 CRC／ISIZE；deflate 必须 StreamEnd 且耗尽输入，zlib 格式失败才尝试严格 raw，超限不回退；br 必须严格结束且耗尽输入；zstd 支持完整多 frame／skippable frame。恰好上限仍读取并验证结尾，不能只取第一 member、宽松 EOF 或前 10 MiB。请求不复用宽松响应 helper。
+- 解码后的原始逻辑字节用于客户端识别、策略、真实 Session、调度和缓存。现有身份、根键清理、池映射、有限 Session 头对齐及最终 CCH 的顺序保持；count_tokens 仍严格验证 JSON object／model，通用非 JSON 继续按原规则处理，不新增全局 schema 校验。
+- 实际 codec 工作进入 blocking worker；无有效编码的 decode 保留原 Bytes，encode 借用原字节，不嗅探 magic、不根据 Accept-Encoding、UA 或画像版本主动压缩。无编码读体／非法 JSON 的原状态及错误形状保留。
+- CCH 完成后，每次真正发送前按有效链正序重编码。gzip 容器可以重建，deflate 统一标准 zlib；不承诺原压缩字节、member 数量或容器参数相同。编码结果容许容器膨胀超过入站 10 MiB 读取上限，所有 encoder 完整成功后才提交。
+- 出站头副本移除 Content-Length／Transfer-Encoding／Content-Encoding 的全部大小写变体，再写入唯一规范 Content-Encoding；无编码不写该头。长度由现有 transport 依据最终 bytes 自动生成，保留既有 HTTP/1 头名机制和画像顺序，不用未经抓包的新版头序替换。
+- 诊断、日志、usage、缓存与 signature repair 持续使用逻辑正文；冻结编码链贯穿首次、401、signature 各阶段及换号发送，每次编码当前正文，不能复用首包压缩体。缓存不按压缩容器分裂，不新增上游 400／415 后改明文的回退重试。
+- 入站拒绝没有账号相关副作用或上游请求。发送阶段本地编码失败只保证本次业务请求不提交，不回滚此前已有 admission／Hello／自动遥测。PreparedRequest 与 v3 sender 继续传最终原始 bytes，既有 origin／路径许可及内部接收上限不变。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 无编码／合理空列表／identity；仅 Accept-Encoding | 保留原业务及读体路径，不推断或新增压缩 |
+| 已支持编码、重复头、有序叠加 | 解码后执行业务，按同一有效链发送 |
+| 非法 token／不可转字符串／超过 32 片段 | 400 `invalid_request_error` |
+| 未知合法编码／超过 4 个实际层 | 415 `invalid_request_error` |
+| 损坏、截断、尾随内容、超支持窗口或扩展 | 400 `invalid_request_error`，不使用部分解码结果 |
+| 压缩原字节或任一层结果超过 10 MiB | 413 `invalid_request_error`，先于账号副作用 |
+| worker／本地编码异常 | 500 `api_error`，本次业务请求不提交 |
+| 合法编码的非 JSON | 通用转发沿用原字节语义，count_tokens 保留原严格拒绝 |
+| 上游返回 415 | 沿用原上游错误，不增加明文回退发送 |
+
+错误体不回显原始编码值、正文、凭据或库内部错误；不靠不稳定库错误字符串细分窗口失败。
+
+### 5. Scenarios and Examples
+
+- 正常：入站 `Content-Encoding: gzip, br`，先 br 再 gzip 解码，完成身份与 CCH 后先 gzip 再 br 编码；最终长度对应双层压缩字节。
+- 边界：raw-deflate 入站在 10 MiB 内，改写后按标准 zlib 包装略超 10 MiB，仍发送并使用实际长度；空项／identity 不增加压缩层。
+- 错误：在 signature 修复前压缩 `final_body`，随后 JSON 修复失效；或重建头丢掉 Content-Encoding 后继续发旧压缩体。
+- 正确：业务始终处理逻辑正文，在每次网络提交边界单独生成匹配的 wire body 和头；真实上游编码支持由响应决定，不用本地合成成功冒充真实推理。
+
+### 6. Tests Required
+
+- `request_body_codec::tests`：完整 token／多值／32 片段与 4 层边界、无编码存储保留、各 codec 与链顺序、raw 转标准 zlib、截断／尾随、每段校验、多 member／frame、窗口、原字节及各层精确大小、实际编码膨胀。
+- `gateway_compressed_request_messages_match_plaintext`、`gateway_compressed_request_other_endpoints_match_plaintext`：实际 Gateway 比较 CC／API、stream 三态、过滤开关、各入口和编码的最终逻辑字节、身份／Session／CCH；通用二进制路径为合成样例。
+- `gateway_compressed_request_rejections_have_no_account_side_effects`、`gateway_compressed_request_read_errors_and_count_json_boundaries`、`gateway_compressed_request_router_authentication_precedes_decoding`：实际入口错误状态／形状、零账号副作用及上游请求、鉴权／方法优先级和原无编码行为。
+- `gateway_compressed_request_tcp_headers_and_near_limit`：真实 TCP 验证唯一 CE／CL、无旧 TE、实际 wire 长度与近上限膨胀；不以内部 Map 断言代替线上字节。
+- `gateway_compressed_request_auth_and_account_retries`、`gateway_compressed_request_signature_stages_reencode_current_body`、`gateway_compressed_request_does_not_retry_unsupported_upstream_encoding`：401 双入口、429 换号、两阶段修复的本次正文及 CCH、不新增编码回退。
+- `gateway_compressed_request_cache_and_local_intercepts_are_equivalent`：不同编码共用逻辑缓存、cache hit 无 attempt、本地 prefill／warmup／classifier 等价且不多发包。
+- Rust 格式／全量／CCH 与差异检查通过；复用既有 transport 原始字节／证书／主机名回归。新增测试只证明本地合成 Gateway／TCP 与既有 transport 合同，不宣称新原生抓包、生产 v3 或真实账号推理验证。
+
 ## Scenario: 账号级上游 session 池
 
 ### 1. Scope / Trigger
