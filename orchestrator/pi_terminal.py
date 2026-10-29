@@ -11,6 +11,7 @@ from pathlib import Path
 from socket import SHUT_WR
 from stat import S_ISREG
 from threading import RLock
+from uuid import uuid4
 
 from account_runtime import AccountRuntime, atomic_json
 from project_library import read_document, safe_relative
@@ -87,11 +88,12 @@ class PiTerminal:
                 workspace, prepared_environment = self._prepare_execution(root, row, account, work)
                 alias = workspace.name
                 cwd = '/home/node/projects/' + alias
-                handle = hashlib.sha256(source.encode()).hexdigest()[:20]
+                # 同一工作同代次可以多次恢复；本次握手必须独占目录，不能读取旧 PID 的证明或许可。
+                handle = uuid4().hex[:20]
                 runtime_job = root / 'runtime/jobs' / handle
                 controls = root / 'controls' / handle
                 for path in (runtime_job, controls):
-                    path.mkdir(parents=True, exist_ok=True, mode=0o750)
+                    path.mkdir(parents=True, exist_ok=False, mode=0o750)
                     os.chown(path, 1000 if path == runtime_job else 0, 1000, follow_symlinks=False)
                     path.chmod(0o750)
                 os.chown(root / 'controls', 0, 1000, follow_symlinks=False)
@@ -134,7 +136,8 @@ class PiTerminal:
                 native = root / 'home/.claude/projects' / cwd.replace('/', '-') / (work['session_id'] + '.jsonl')
                 if work.get('resume_required') and not native.is_file():
                     raise ValueError('原 Claude 会话缺失，不能用新会话替代已有输入')
-                cursor = root / 'runtime' / (self.namespace + '-quota') / (handle + '.json')
+                # 额度补证仍按逻辑 source 读取，不能随本次握手目录变化而重放旧会话错误。
+                cursor = root / 'runtime' / (self.namespace + '-quota') / (hashlib.sha256(source.encode()).hexdigest()[:20] + '.json')
                 # 恢复沿用原 JSONL，但旧错误不属于新执行；从启动前的精确字节边界开始。
                 observed = native.stat() if native.is_file() else None
                 atomic_json(cursor, {'source': source, 'session_id': work['session_id'],

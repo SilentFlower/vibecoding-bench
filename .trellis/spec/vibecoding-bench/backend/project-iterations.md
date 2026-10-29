@@ -977,3 +977,50 @@ ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
 - 两个 `deploy/v3/verify_*pi*browser.py` 既有入口：API／SQLite／SSE 驱动真实 Chrome，核明暗主题、390／1280、刷新、次数／阶段／实际版本、恢复解除、XSS、旧历史不借当前时间和未保存配置保护。
 - 实际核对为 3.12.16 的本地禁网容器：冻结 Cerberus 环境准备及缓存复用，原版失败、参考和完整原生回归通过；显式 exact 返回带期望／实际版本的环境错误。不以 mock 版本函数代替此证据。
 - 同版禁网容器另核 ConfigObj 冻结原版及原线上候选：业务检查通过、79 个原生节点及 524 个补充示例全部匹配原合同；改变标准库源码摘要仍返回环境 error。`test_project_native_regression` 在补丁版本不同的真实 unittest 子进程中继续拒绝错误候选、跳过漂移和空集合。
+
+## Scenario: Pi CLI 同代次恢复的启动尝试隔离
+
+### 1. Scope / Trigger
+
+- 修改 PiTerminal 的 Projects／工程养号启动、抓包监督、证明／许可／退出结果位置或原生额度补证游标时适用。
+- 同一工作、同一控制代次可能恢复多次；稳定逻辑来源不能同时充当一次进程启动的文件身份。
+
+### 2. Signatures
+
+- PiTerminal.start(account: dict, work: dict) -> dict：返回原有 token/source/workspace/native 及交互、额度信号定位；不新增公开字段。
+- PiTerminal.passive_status(work: dict) -> dict：按已核对的逻辑 source 读取原生额度补证。
+- job.handle 是本次启动独立的 20 位小写十六进制标识，沿既有执行记录保存；source 仍为 namespace:work_id:generation。
+
+### 3. Contracts
+
+- 每次 start 独立分配 handle，runtime/jobs/<handle> 与 controls/<handle> 必须独占创建，任一路径已存在就拒绝；不得覆盖旧证明、许可、结果或设置覆盖。
+- tmux socket、driver、process.json、start.json、process-result.json、交互及暂停信号都绑定本次 handle，后续读写从现有 job 定位。
+- _attach_process 继续核 schema、source、PID、内核启动时刻、parent、UID 及真实进程存活；核验并登记后才发布匹配许可。新目录不能成为放宽进程校验或解除隔离的理由。
+- 原工作 ID、Claude session、cwd、冻结版本／设置、累计预算、source 和额度归因不变；恢复仍依据原会话文件选择 resume。
+- 原生补证游标维持 runtime/<namespace>-quota/<sha256(source)前20位>.json；启动时从原会话当时的字节末尾开始。游标不能跟随随机 handle 改名，否则 passive_status 会重读旧错误。
+- Projects 和工程养号、capture 开启／关闭共用本合同；捕获模式继续使用 pi-capture 独立监督与既有 CA／Recorder 配置。
+- 旧执行记录按原 schema 与已保存 handle 读取，不批量改写历史。未知启动、清理结果不确定和未对账输入继续保留原门禁，不能仅凭可写结果中的 cleaned=true 自动清除。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 同一工作同代次第二次启动，旧证明／许可／结果均存在 | 仅确认本次新进程，旧文件字节不变 |
+| 同一会话已有认证或限额错误 | 从本次启动时字节边界观察，不把旧错误当新补证 |
+| 随机标识碰撞已有目录 | 在创建 Docker exec 前拒绝，旧证明不改 |
+| 证明来源、UID、parent、PID／启动时刻不符 | 保留原拒绝与隔离，不发放许可 |
+| 新监督器尚未发布证明 | 等待本次位置的证明，不提前消费前一次文件 |
+| 无法证明执行及输入已收口 | 保留现场，不能标记目标通过或重发未知输入 |
+
+### 5. Scenarios and Examples
+
+- 正常：同一个 projects 工作第一次结束后恢复，逻辑 source 和 session 相同，第二次 handle、证明与许可位置不同，匹配本次内核 PID 后启动。
+- 边界：旧许可和新证明指向不同 PID 时，保留旧证据；新尝试只等待自己的许可。标识冲突则明确拒绝。
+- 错误：把 sha256(source) 同时用于可复用的额度游标和每次启动证明目录。修正：额度游标保持稳定，运行目录按尝试独立，分别遵循各自生命周期。
+
+### 6. Tests Required
+
+- test_capture_settings_runtime.CaptureSettingsRuntimeTests.test_repeated_start_uses_current_proof_and_preserves_previous_attempt：两空间×两捕获模式，延迟发布新证明，确认旧 PID 不被采用、旧证明／许可／结果不被覆盖、原 session 续接且旧认证错误不重放。
+- test_attempt_directory_collision_does_not_overwrite_old_proof：已有目录保持原字节，Docker exec 不创建。
+- test_projects_quota、test_pi_interaction、test_projects_terminal、test_account_runtime 和运行环境／准入回归：原来源、会话、额度、交互与失败保护保持。
+- 真实本地 Docker 监督器与合成 driver：重复启动的内核身份、许可、退出和定向清理均核对；测试无真实模型请求。捕获网络配置替身不能宣称验证完整生产 MITM 链路。
