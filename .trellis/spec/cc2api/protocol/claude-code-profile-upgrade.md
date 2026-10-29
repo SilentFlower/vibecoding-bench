@@ -1595,3 +1595,48 @@ Hello/eval 的 Accept 为 `*/*`、Accept-Encoding 为 `gzip, deflate, br, zstd`�
 - `gateway.rs`：三版本交错/并发、401/签名重试保持冻结画像、同快照先准入后选择、目标规则放行280/293并拒绝边界版本、count_tokens/bootstrap、共享身份/容量与现有版本缓存隔离。
 - 管理页本地实际验证：预设不自动保存、保存/刷新回显、其它UA保留、260选项保留、账号模式范围只读、账号页基础版本及默认回退来自真实配置。
 - 执行 `cargo fmt --check`、`cargo test`、`cargo test cch`、`npm run build`；PostgreSQL场景以临时本地库显式运行 `postgres_profile_settings_and_rollback`，默认忽略不等于已验证。
+
+## Scenario: Messages 保留调用方流式选择
+
+### 1. Scope / Trigger
+
+- Trigger：修改 `/v1/messages` 的 API mimicry、原生 CC 正文改写或最终响应转发时适用。
+- 同一请求的流式选择必须贯穿最终上游正文，不能因软件画像而把非流请求强制变成 SSE。
+
+### 2. Signatures
+
+- 入口：`POST /v1/messages`，JSON 顶层 `stream` 为可选布尔值。
+- `detect_client_type` 按原始 UA 的 `claude-cli/`／`claude-code/` 前缀识别 CC，其余为 API；使用 cc2api APIKey 不决定客户端类型。
+- 正文改写位于 `Rewriter`；响应由 `GatewayService` 转发实际上游协议，不新增聚合器、设置项或数据库字段。
+
+### 3. Contracts
+
+- API 与 CC 均保留 `stream=false`、`stream=true` 和字段缺省三种状态；缺省不补 true。
+- API 画像的系统提示词、tools、默认模型参数与顶层字段排序继续执行，但排序不能额外生成 stream。
+- false／缺省交给上游按非流默认处理，true 请求流式；Gateway 转发上游实际返回的 Content-Type 和正文，不自行把 JSON 转为 SSE。
+- `Body::from_stream` 只描述 HTTP 字节传输，不能据此判断应用协议为 SSE。
+- 最终 CCH 仍基于实际序列化正文计算。本项不增加 stream 类型纠正或非法值处理，沿用上游校验。
+
+### 4. Validation & Error Matrix
+
+| 调用方 stream | 最终上游字段 | 本地协议感知上游的响应 | 下游结果 |
+| --- | --- | --- | --- |
+| false | false | application/json | 完整 JSON Message |
+| true | true | text/event-stream | 保留 SSE，包含 message_stop |
+| 缺省 | 缺省 | application/json | 完整 JSON Message |
+
+上述矩阵同时覆盖 API 与 CC。协议感知上游是 loopback 合成服务，不等于已对真实账号完成推理验证。
+
+### 5. Scenarios and Examples
+
+- 正常：普通 SDK 发送 `{"stream":false}`，改写后仍为 false，Gateway 返回上游完整 Message。
+- 边界：请求省略 stream，最终正文仍无此字段；Haiku probe 的顶层顺序断言也不得要求额外 stream。
+- 错误用法：因为 API 请求需要 CLI 画像就无条件补 `stream=true`，使非流调用方收到 SSE。
+- 正确处理：软件画像适配与流式选择独立，直接保留调用方字段，让上游选择对应响应形式。
+
+### 6. Tests Required
+
+- `messages_rewrite_preserves_explicit_stream_preference`：260／280／293 × API／CC × false／true，通过公共改写入口断言最终序列化值。
+- `messages_rewrite_preserves_missing_stream_preference`：相同版本与客户端矩阵断言缺省 stream 未被新增。
+- `gateway_preserves_stream_preference_through_upstream_and_response`：真实 Gateway + loopback 上游，按上游实际接收参数选择 JSON／SSE；覆盖 API／CC × 三种状态，断言最终参数、Content-Type、完整 JSON 的内容和结束原因或 SSE 结束帧。
+- Rust 格式检查与完整 `cargo test --locked` 必须通过；不以仅检查内部 Map 的测试替代出站／返回契约。
