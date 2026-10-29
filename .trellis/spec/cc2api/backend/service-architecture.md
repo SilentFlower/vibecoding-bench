@@ -64,7 +64,7 @@ src/tlsfp/
 - `mapped_request` 会刷新被借用 upstream session 的 `last_seen`；`owner_only` 只在真实 session 自己是池成员且发起请求时刷新。
 - Redis 或 cache 解析异常必须失败开放：记录脱敏 warn，保持真实 session 发上游，不阻断用户请求。
 - 本地 stateful message cache key 必须优先使用真实 session；共享 upstream session 不能让多个真实 session 共用本地 cache 状态。
-- 只有池解析结果满足 `real_session_id != upstream_session_id`、即 body session 确实改变时，才覆盖 `X-Claude-Code-Session-Id`；admitted/owner-hit 和 warmup 特殊路径不得被无条件规范化。
+- 池映射专用分支只在 `real_session_id != upstream_session_id`、即 body session 确实改变时覆盖或补入 `X-Claude-Code-Session-Id`。随后普通 CC 消息可按[有限对齐规则](#scenario-普通-cc-messages-session-header-对齐)更新已有非空头；探针和异常目标仍有明确豁免，不能无条件规范化 admitted/owner-hit。
 - 自动 message telemetry 必须从改写后的最终 body 构造 context，使 request/result event 与实际覆盖后的 body/header 使用同一 upstream session。
 - 客户端原生 event_logging 只能只读复用已保存且目标仍活跃的 session 映射，`allow_insert=false`，不得创建成员、刷新 TTL 或按当前成员集合临时重新取模；找不到映射、池为空或 cache 出错时失败开放。
 - 日志只能输出短 session hash、账号 id、容量、动作和原因，不得输出完整 `metadata.user_id`、完整 session id 或完整请求体。
@@ -105,7 +105,7 @@ src/tlsfp/
 
 - `src/store/memory.rs` 单测覆盖：容量上限、LRU 缩容、显式映射在其他成员变化时稳定、目标失效、只读 lookup 不创建/不刷新/不重哈希、两种刷新策略和 TTL 懒清理。
 - Redis Lua 变更需人工核对原子脚本，必要时补集成测试；至少确认并发入池不超容量、缩容后不返回被淘汰目标、只读遥测不写状态。
-- Gateway/Rewriter 单测覆盖：JSON/legacy `metadata.user_id.session_id` 改写、只在池实际改变 session 时对齐 `X-Claude-Code-Session-Id`、自动 telemetry 与最终 body/header 一致、无改写时保留 header、stateful cache key 使用真实 session、event_logging 递归只读映射和无 `events` 数组路径。
+- Gateway/Rewriter 单测覆盖：JSON/legacy `metadata.user_id.session_id` 改写、池实际改变 session 时的专用补入／覆盖优先级、普通已有头有限对齐及探针／异常目标豁免、自动 telemetry 的最终 body 来源、stateful cache key 使用真实 session、event_logging 递归只读映射和无 `events` 数组路径。
 - `src/store/account_store.rs` / integration 测试覆盖账号字段 create/update/list round trip。
 - 管理端变更必须跑 `cd cc2api/web && npm run build`，确认 TypeScript 类型和 `Accounts.vue` 同步。
 - 完整检查至少跑 `cd cc2api && cargo fmt --check && cargo test`；协议改写触碰 CCH 顺序时额外跑 `cargo test cch`。
@@ -158,6 +158,55 @@ account_svc
     .resolve_upstream_session_pool(&account, telemetry_session_id, false)
     .await?;
 ```
+
+## Scenario: 普通 CC Messages Session header 对齐
+
+### 1. Scope / Trigger
+
+- Trigger：修改普通 CC Messages 出站 Session header、探针豁免或与池映射的先后关系时适用。
+- 这是普通 CC 不一致输入的有限一致性规则，不重建 body 身份、设备、账号或会话；无新增 setting、存储状态或重试。
+
+### 2. Signatures
+
+- `is_session_header_alignment_probe(body: &serde_json::Value) -> bool` 使用原始请求体。
+- `align_claude_code_session_header(headers: &mut HashMap<String, String>, path: &str, client_type: ClientType, original_body: &serde_json::Value, rewritten_body: &serde_json::Value)` 只修改出站头。
+- 最终会话沿用 `extract_session_id_from_body` 的 JSON-string／legacy 合同；既有 `align_mapped_upstream_session_header` 先执行。
+
+### 3. Contracts
+
+- 仅精确 `/v1/messages`、`ClientType::ClaudeCode`、原始 body 不属于豁免探针时进入普通对齐。
+- 最终 body 可提取非空白 session、已有规范头 `X-Claude-Code-Session-Id` 非空白且不同、目标可安全且保真表示为 HTTP header 时，以最终 body 为准更新已有头；不补头、不 trim 写回、不新增 UUID 门槛。
+- HTTP/1 会去掉头值边缘 SP／HTAB，因此目标 session 前后带这些字符时跳过普通对齐；全空白、LF／CR／NUL 或其它 HeaderValue 拒绝的目标也保留已有头。不要通过改 body 或提取器掩盖不一致。
+- 探针四项同时满足才豁免：`max_tokens` 为整数 1、既有 stream 布尔解释不为 true、tools 缺失或为空数组、messages 恰好一条且 role=user。tools=null／异常类型、stream=true 不豁免；不依赖模型名、文本或拦截开关。合法同形业务请求也保守豁免。
+- 既有 mapped 专用分支保持补入／覆盖能力，先处理真正的 body session 映射；新增探针或异常目标 gate 不撤销此前映射结果。API 既有规则、count_tokens 和其它路径不扩大。
+- 原始 body 仍用于调度、sticky、RPM、并发、池与诊断；最终 body 只作为新增头的目标来源。不得额外 resolve、刷新 TTL、改变 Hello 去重、重序列化正文或增加 CCH 刷新；R2 根键清理开／关不影响嵌套会话来源。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 普通 CC 已有非空头与最终 body 会话不同 | 只改已有头，body 字节不因本规则改变 |
+| 原本一致／缺头／空白头／无可用 body 会话 | 保持既有头状态，不补会话 |
+| 非空目标前后 SP／HTAB 或不安全控制字符 | 跳过新增对齐，原 body 与原已有头保留 |
+| 原始单 token 豁免探针，无实际映射 | 保留允许的差异 |
+| 池已实际改变 body session，包括缺头探针 | 保留旧 mapped 补入／覆盖优先级 |
+| 非精确路径／API | 新 helper 不改写，沿用各自既有规则 |
+
+### 5. Scenarios and Examples
+
+- 正常：原 header 为 A、最终 body 会话为 B，普通请求仅将已有 header 设为 B；不改变设备或 billing/CCH。
+- 边界：173 最小 warmup 的差异继续保留；池将该探针实际映射到 C 时，旧 mapped 分支仍让 body/header 使用 C。
+- 错误：将带前后空格的 body session 直接写进 HTTP 头，接收端会剥离空白，仍不一致；或先 trim 再改 body，扩大身份与 CCH 改写。
+- 正确：对不能保真为头值的目标跳过新增普通分支；正常不带边缘空白的非 UUID 会话继续按原提取合同对齐。
+
+### 6. Tests Required
+
+- `gateway_session_header_alignment_ordinary_messages`：实际 Gateway 覆盖 JSON／legacy、三种 stream、清理开／关、头名大小写和原本一致／不一致；最终 CCH 保持有效，仅头不同时 body 字节相同。
+- `gateway_session_header_alignment_input_and_path_boundaries`：缺失／空白／损坏会话、LF／CR／NUL、缺头／空头、API 补头和其它路径；断言实际上游最终头与 body。
+- `gateway_session_header_alignment_probe_shape`：173／280 合成探针及 stream、tools、消息数、token 类型等反例；不能只测试 helper 或扩大 detector。
+- `gateway_session_header_alignment_pool_precedence`：池关闭、admitted、owner_hit、mapped 与失败开放；resolve 次数、owner_only TTL、真实 sticky／诊断维度、Hello 去重。
+- `gateway_session_header_alignment_preserves_sessions_with_edge_ows`：JSON／legacy × 清理开／关 × 前后 SP／HTAB，保留原 body 与已有头；正常及内部空白正例仍进入对齐。
+- Rust 格式、全量与 CCH 回归通过；仅使用合成 loopback，不把它称为真实 Anthropic 推理或新抓包验证。
 
 ## Scenario: Gateway 账号槽位与 RPM Admission 顺序
 
@@ -845,6 +894,7 @@ Gateway 在既有 admission 后调用 `ensure_ready`；共享 client factory 负
 - 归因补齐仅在 `mode=passthrough`、`identity_injection_enabled=true`、通用 detector 命中且模型不是 Haiku 时执行。开关关闭时必须完整保留既有链路；Haiku 在开关切换前后的上游请求体必须一致，也不得新增身份块。
 - billing 缺失时使用共享 Claude Code API billing builder 插入 billing 并计算有效 CCH；已有 billing 且包含 CCH 时按最终请求体刷新 CCH；已有 billing 但没有 CCH 时保留原 block，不擅自增加 CCH。最终 system 顺序固定为 billing、identity、classifier，CCH 只能基于最终序列化正文计算。
 - 归因补齐只允许账号 metadata、upstream session identity、billing、identity 和 CCH 变化，不运行 expansion、缓存断点、TTL、thinking、字段顺序或其它通用正文改写；结构异常时失败开放并返回原正文。
+- 独立的 `message_top_field_filter_enabled` 默认开启，三条 Messages 转发分支在本函数前统一清理固定根键，实际删除后在最终输出刷新已有唯一 CCH；这是旁路合同的有限例外，不扩展 detector 或其它通用改写。此处失败开放的“原正文”指传入函数的正文；无删除时仍保持原字节。具体范围、设置与测试见 [Messages 固定顶层字段清理开关](../protocol/claude-code-profile-upgrade.md#scenario-messages-固定顶层字段清理开关)。
 - 窄 detector 命中 `passthrough` 且未执行归因补齐时，继续使用 identity-only 改写。所有 passthrough 请求仍走账号选择、sticky、RPM/concurrency、OAuth、2.1.257 header、账号代理/TLS、Session Hello、401、signature/429 retry 和响应透传；不得因为识别成 classifier 而跳过 Session Hello。
 - classifier 命中后全文请求、429 请求和非流式响应捕获全部禁用，只保留尺寸、短 hash、重试次数与 `proxy_configured` 等脱敏摘要。`mock` 必须在 session hash、账号选择、RPM 和并发槽之前返回，不访问上游或消耗账号额度。
 - mock 分类优先级固定为：API/auth/infra 错误 -> blocked；Agent 明确自动复查/继续执行 -> working；无自动复查的用户门槛 -> blocked；明确 failed/done；最后回退 `Current state`，未知值保守返回 working。
