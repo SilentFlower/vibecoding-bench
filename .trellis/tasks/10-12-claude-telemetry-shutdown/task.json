@@ -3,7 +3,7 @@
   "name": "claude-telemetry-shutdown",
   "title": "Claude 遥测收尾与原会话状态保留",
   "description": "修复现有临时 worker 的 Claude 退出、代理关闭顺序及原会话遥测状态保留；不改为账号固定容器。",
-  "status": "planning",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,10 +11,10 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-10-12",
-  "completedAt": null,
+  "completedAt": "2026-10-29",
   "closeout": {
-    "status": "pending",
-    "closedAt": null,
+    "status": "closed",
+    "closedAt": "2026-10-29T03:55:12Z",
     "blockers": []
   },
   "branch": null,
@@ -26,7 +26,7 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "2026-10-29 用户明确要求将三个旧任务一并归档；结束针对旧临时 worker 的遥测正常退出与原会话待发送状态保留计划。原实现与 A1–A5 验收未完成，剩余范围不再继续。",
   "meta": {
     "intentRouting": {
       "autoCreated": true,
@@ -194,6 +194,24 @@
         "fingerprint": "f1be7d336564ad63b3f3cc355c78fbe9b3ad821d71dc6d84741a7955d12599be"
       }
     },
-    "deferral": "{\"requested\":true,\"date\":\"2026-10-12\",\"reason\":\"用户明确要求遥测先不管，保留规划，转为讨论 vibecoding-bench 的账号接入和使用方式；未启动实现。\"}"
+    "deferral": "{\"requested\":true,\"date\":\"2026-10-12\",\"reason\":\"用户明确要求遥测先不管，保留规划，转为讨论 vibecoding-bench 的账号接入和使用方式；未启动实现。\"}",
+    "retirement": {
+      "disposition": "ended-by-user",
+      "reason": "2026-10-29 用户明确要求将三个旧任务一并归档；结束针对旧临时 worker 的遥测正常退出与原会话待发送状态保留计划。原实现与 A1–A5 验收未完成，剩余范围不再继续。",
+      "retiredAt": "2026-10-29T03:55:12Z",
+      "businessAcceptancePassed": false,
+      "decisionDigest": "",
+      "reviewVerdict": null,
+      "pendingChangeIds": []
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-10-29T03:55:12Z",
+    "completedSteps": [
+      "按用户决定结束旧遥测修复计划，保留既有规划与研究材料"
+    ],
+    "partialStep": null,
+    "nextStep": "任务已结束；按用户要求物理归档。",
+    "notes": "2026-10-29 用户明确要求将三个旧任务一并归档；结束针对旧临时 worker 的遥测正常退出与原会话待发送状态保留计划。原实现与 A1–A5 验收未完成，剩余范围不再继续。"
   }
 }

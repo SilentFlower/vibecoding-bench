@@ -3,7 +3,7 @@
   "name": "project-catalog-expansion",
   "title": "真实项目内容库扩容至10项目",
   "description": "从已上线3项目13场景20任务出发，先研究和接入2至3个真实项目，再规划扩至10项目约150至200任务；覆盖真实问答、诊断、方案与修改，不强制20步；英文模型指令、中文展示，沿用固定提交、离线依赖、独立验收与模拟验证，不调用真实模型。",
-  "status": "planning",
+  "status": "completed",
   "dev_type": "backend",
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,10 +11,10 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-10-21",
-  "completedAt": null,
+  "completedAt": "2026-10-29",
   "closeout": {
-    "status": "pending",
-    "closedAt": null,
+    "status": "closed",
+    "closedAt": "2026-10-29T03:55:12Z",
     "blockers": []
   },
   "branch": null,
@@ -29,7 +29,7 @@
   ],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "2026-10-29 用户明确要求将三个旧任务一并归档；保留已完成的十项目接入和两个已关闭子任务，结束原十项目继续深化至 150～200 个独立任务及剩余母任务汇总计划，未完成深化不记作验收通过。",
   "meta": {
     "intentRouting": {
       "autoCreated": true,
@@ -3304,6 +3304,26 @@
         ],
         "fingerprint": "7d6c3eb781e2e914b9e3e3337bae31c932576d9d5234eb927f60cb38105911ba"
       }
+    },
+    "retirement": {
+      "disposition": "ended-by-user",
+      "reason": "2026-10-29 用户明确要求将三个旧任务一并归档；保留已完成的十项目接入和两个已关闭子任务，结束原十项目继续深化至 150～200 个独立任务及剩余母任务汇总计划，未完成深化不记作验收通过。",
+      "retiredAt": "2026-10-29T03:55:12Z",
+      "businessAcceptancePassed": false,
+      "decisionDigest": "",
+      "reviewVerdict": null,
+      "pendingChangeIds": []
     }
+  },
+  "progress": {
+    "updatedAt": "2026-10-29T03:55:12Z",
+    "completedSteps": [
+      "首批三项目与第二批四项目内容包均已交付并关闭",
+      "保留十项目、45 场景、107 任务的历史阶段成果",
+      "按用户决定结束原十项目的剩余深化计划并收尾"
+    ],
+    "partialStep": null,
+    "nextStep": "任务已结束；按用户要求物理归档。",
+    "notes": "2026-10-29 用户明确要求将三个旧任务一并归档；保留已完成的十项目接入和两个已关闭子任务，结束原十项目继续深化至 150～200 个独立任务及剩余母任务汇总计划，未完成深化不记作验收通过。"
   }
 }

@@ -3,7 +3,7 @@
   "name": "v3-passive-quota-only",
   "title": "v3 手动额度查询与被动采集统一",
   "description": "v3 保留用户手动额度查询，CLI 与网关统一被动采集，移除自动 usage 轮询及失败重试，保留阈值与原任务恢复。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "fullstack",
   "scope": "v3 CLI 被动额度、网关后台轮询边界、任务调度与页面",
   "package": "vibecoding-bench",
@@ -11,10 +11,10 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-10-14",
-  "completedAt": null,
+  "completedAt": "2026-10-29",
   "closeout": {
-    "status": "pending",
-    "closedAt": null,
+    "status": "closed",
+    "closedAt": "2026-10-29T03:55:12Z",
     "blockers": []
   },
   "branch": "v3",
@@ -26,7 +26,7 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "",
+  "notes": "2026-10-29 用户明确要求归档。复用 implement.md 记录的 2026-10-14 隔离检查与验收；主仓 c14e4b7f 和 cc2api 121bf81 均已包含于当前分支，规范及业务代码已交付。旧记录的“未提交”是当时快照，本次补齐完成状态；未追加真实模型或生产验证。",
   "meta": {
     "intentRouting": {
       "autoCreated": true,
@@ -326,5 +326,16 @@
         "fingerprint": "ff33c404cba0c0f29625ceca210be3e4112a475c843b7d78d39f632c433f8ce9"
       }
     }
+  },
+  "progress": {
+    "updatedAt": "2026-10-29T03:55:12Z",
+    "completedSteps": [
+      "完成 v3 CLI 与 API 被动额度采集及共享状态合并",
+      "取消自动 usage 轮询并保留手动查询、阈值等待与恢复",
+      "复核历史隔离验收、规范和主子仓交付提交，补齐完成与关闭记录"
+    ],
+    "partialStep": null,
+    "nextStep": "任务已结束；按用户要求物理归档。",
+    "notes": "2026-10-29 用户明确要求归档。复用 implement.md 记录的 2026-10-14 隔离检查与验收；主仓 c14e4b7f 和 cc2api 121bf81 均已包含于当前分支，规范及业务代码已交付。旧记录的“未提交”是当时快照，本次补齐完成状态；未追加真实模型或生产验证。"
   }
 }
