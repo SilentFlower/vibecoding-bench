@@ -122,7 +122,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 ### 3. Contracts
 
 - 只采集实际成功转发的 `/v1/messages`，独立于自动遥测开关；普通 JSON、SSE、压缩与提前断开都通过同一一次性上下文收口。EOF、末帧、body error 与 Drop 不得重复写入。首次实际非流探针调用计入，本地缓存命中、mock、count_tokens 和手动 usage 查询不计入。
-- 共用 `merge_message_usage` 的累计最大值语义；输入、输出、缓存读与缓存写总量分别累加，5m／1h 写入只是总写量明细，不能再次加入总 Token。采样和解码限长；未知模型、无用量、损坏响应和中断使用未定价／部分记录状态，不能假装免费且完整。
+- 共用 `merge_message_usage` 的累计最大值语义；输入、输出、缓存读与缓存写总量分别累加，5m／1h 写入只是总写量明细，不能再次加入总 Token。采样和解码遵循[有界响应观察](#scenario-messages-响应的有界事件观察)；未知模型、无用量、损坏响应和中断使用未定价／部分记录状态，不能假装免费且完整。
 - Claude 价格由 `src/service/claude-pricing.json` 内置，版本来自本机 sub2api 快照及其明确兜底规则。已记录费用不随目录更新回算；不在业务热路径访问远程价格或参考仓库。该资源随现有 Docker `COPY src` 进入构建。
 - `usage_records` 只保存数值摘要，不保存正文、凭据和会话明文。时间统一为 UTC RFC3339 毫秒字符串；按时间至少保留完整周窗口，当前为八天，禁止按固定条数裁剪。已成功落库的记录重启后可读，异步尚未落盘的调用不承诺崩溃恢复。
 - 两个窗口分别采用有效未来 reset 减去 5h／7d 作为开始时间，且 reset 不得超过该窗口长度；按请求开始时间的左闭右开区间汇总，查询上限不超过本次 now。reset 缺失、非法或到期时返回明确标为 `rolling` 的最近窗口。
@@ -187,7 +187,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
 - session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
 - 不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
-- 有界异步队列容量 1024，热路径不等待数据库；每个摘要上限 16 KiB，响应解析/压缩采样上限 1 MiB。`health.dropped_records` 统计丢弃写入事件，`write_failures` 统计写入/清理失败，`observation_failures` 统计采样/解码/解析失败尝试；均为进程内计数，重启清零，日志只输出固定文案、计数及内部 UUID。
+- 有界异步队列容量 1024，热路径不等待数据库；每个摘要上限 16 KiB。响应观察按完整 JSON／单行／单事件各限 1 MiB，压缩 SSE 增量解码，不限制整流累计长度；编码层数、窗口及失败边界见[有界响应观察](#scenario-messages-响应的有界事件观察)。`health.dropped_records` 统计丢弃写入事件，`write_failures` 统计写入/清理失败，`observation_failures` 统计采样/解码/解析失败尝试；均为进程内计数，重启清零，日志只输出固定文案、计数及内部 UUID。
 - 按请求开始时间保留至少八天，后台每小时清理，列表 GET 不删除。已提交记录跨重启可查，进程崩溃前未提交缓冲不承诺恢复；`in_progress` 不能被直接当作仍在运行。追加表支持回滚旧程序后保留，不影响原费用表。
 - 请求与尝试分别 upsert，迟到的进行中快照不得覆盖终态。SQLx Any 0.7 将无类型 NULL 参数编码为 i32；同一缓存 SQL 的可空字段先空后有值时须保持绑定类型稳定。内部非空标识/时间用字符串绑定再 `NULLIF($n,'')`，正整数账号 ID 用 i64 绑定再 `NULLIF($n,0)`；不得把这些占位约定用于允许真实空字符串或零值的业务字段。
 - 分页默认 1/50，每页 1..=200；账号 ID 为正整数。关联条件最多 128 字节，并执行与写入相同的规范化。时间为 RFC3339，统一 UTC 毫秒，筛选区间左闭右开。无新环境变量或 setting。
@@ -220,6 +220,71 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `diagnostics_overload_and_write_failures_are_observable` 与 `diagnostics_routes_require_admin_and_expose_committed_requests`：队列立即返回、健康计数、管理员鉴权、分页错误和详情查询。
 - Gateway 现有真实 HTTP 回归：`gateway_usage_records_real_responses_once_without_telemetry` 验证 JSON/SSE/gzip/取消、缓存/count_tokens 与费用次数；签名重试、OAuth 恢复、setup 换号及 `gateway_hello_probe_reuses_resolved_upstream_session` 核对独立尝试、实际画像和会话归属。
 - `raw_body_header_order_and_upstream_error_survive_bridge`：sender 证据保留尝试 UUID，上游业务 headers 不泄漏该 UUID，原字节/头顺序不变。执行 `cargo fmt --check` 与完整 `cargo test --locked`；协议改写变化复用完整测试中的 CCH 回归或补定向验证。
+
+## Scenario: Messages 响应的有界事件观察
+
+### 1. Scope / Trigger
+
+- 修改 `UsageCapture`、响应统计解码、`AttemptTrace`／`SlotGuardBody` 接线或缓冲响应观察时适用；正式用量与独立诊断共用解析和解码实现，各自持有终结责任。
+- 只观察响应副本，不改下游原始 frame、状态、编码头、重试或调度；不扩展为响应保活、补 message_stop、TTFT、请求 codec／CCH、stateful 锚点或自动遥测改造。
+
+### 2. Signatures
+
+- `UsageCapture::configure_codings(&mut self, codings: &[String])`：首块响应前配置既有头解析所得编码；无编码可直接调用 `observe`。
+- `UsageCapture::observe(&mut self, bytes: &[u8])`：逐块输入原始响应；`observe_encoded(&mut self, bytes: &[u8], codings: &[String])` 供已有整包缓冲入口一次性配置并 feed。
+- `UsageCapture::observation(self, complete: bool) -> MessageObservation` 同步返回诊断摘要；`finish(self, complete: bool)` 生成正式用量并异步记录，不等待数据库。
+- 内部 `ResponseBodyDecoder<W: Write>`：`configure(&mut self, &[String])`、`feed(&mut self, &[u8])`、`finish(&mut self)` 均返回 `Result<(), ResponseDecodeError>`；`take_sink(&mut self) -> Option<W>` 一次性移交末端解析状态。
+- `ResponseDecodeError::{InvalidData, SamplingLimit}` 映射为既有 `decode_error`／`sampling_limit`；事件／JSON 语法或 usage 字段非法沿用 `invalid_payload`，不新增 HTTP 错误或设置。
+
+### 3. Contracts
+
+- 流首一个 UTF-8 BOM 可跨 chunk；明文首个非空白字符决定 JSON／SSE，前导空白受采样预算限制。JSON 与 SSE 缓冲互斥。
+- SSE 识别 LF、CRLF、CR，跨 chunk 的 CRLF 只结束一行；字段名大小写敏感，按首个冒号划分并去掉值首至多一个 ASCII 空格。注释及无 data 的块忽略，同一事件的多 data 用 LF 连接，空行才派发并做一次 JSON 解析。
+- EOF 不派发残缺 data，缺 message_stop 仍 partial，不主动补帧。完整未知事件忽略非摘要字段，保留 [DONE] 兼容、既有累计最大值、缓存分项和部分费用语义；未知 token 与真实零值分别为 None 与 Some(0)。
+- `USAGE_BUFFER_LIMIT=1 MiB` 分别约束完整 JSON、单个原始 SSE 行和合并后 data；大行／事件丢弃整个事件至下个空行再同步。字节缓冲容量也封顶，SSE 行与事件合计最多 2 MiB；此值不包含解析树、摘要字符串和 allocator 开销。
+- gzip／x-gzip、zlib／raw-deflate、标准 br、zstd 按 Content-Encoding 逆序解码，最多 4 个有效层，identity 不计。支持完整多 gzip member 和多 zstd frame／skippable frame；deflate／br 第二条流作为尾随输入失败。
+- 持久递归 Write 下游直接消费每层输出，末端拥有解析状态，不使用整流 Vec sink／自引用回调／后台无界队列。普通 codec 输出块 8 KiB，gzip 库内暂存 32 KiB；HTTP chunk、gzip member、zstd frame 和 flush 均不等于 SSE 事件或请求终点。
+- 标准 br 拒绝 large-window 扩展；zstd 在首次输入前设置 WindowLogMax(24)，后续 frame 同样限制 16 MiB 窗口。窗口不是总内存或 CPU 时限；两套观察器各四层最大标准 br 时，codec 工作区按源码约 160 MiB，另有解析等开销。
+- deflate 以有限 zlib 头分流兼容普通 zlib／raw 长流；合法 raw 可与 zlib 头冲突，晚期失败不重放整流为 raw，只标 partial／decode_error。此兼容边界不能描述成无条件保留旧整包 fallback。
+- 正常结束从外到内校验所有 codec 的真实完成、输入耗尽及 checksum；后续 footer 错误不能因已见 message_stop 而忽略。失败后停止该链观察，保留此前完整事件中的摘要；取走末端后，隐式 Drop 不得再观察、落库或运行失败内层 codec。
+- 用量 EOF／确定末帧为 complete，body error／Drop 为不完整；仍由 Option::take 保证一次写入。诊断先同步终结 attempt 再传播根结果，observation_failures 每个失败尝试计一次；TTFT 仍计到响应头。
+- 统计不再依赖 stateful 的 16 MiB 压缩副本，但该副本的锚点用途和自动遥测规则保持。首次真实探针、缓存命中及 count_tokens 的费用边界遵守前述窗口费用合同。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 观察结果与转发 |
+| --- | --- |
+| 多 data／三种换行／跨块 BOM，预算内合法编码链 | 与紧凑明文得到相同 token／模型／完整性，客户端原字节和编码头不变 |
+| 常规长度事件组成的长 SSE，decoded 或原始压缩字节 >1 MiB | 不按整流长度丢弃头尾 usage，内存不随事件总数累计 |
+| JSON／行／事件超限，或有效编码 >4 层 | sampling_limit／partial；大事件重新同步，不接受残余 data 为新事件 |
+| 未知编码、截断、CRC／Adler／已声明 checksum 错误、非法尾随、超窗口 | decode_error／partial，保留已观察摘要，业务响应继续原样转发 |
+| deflate zlib 头碰撞／晚期失败 | 保守 partial，不新发上游请求或伪造完整 raw 结果 |
+| 缺结束帧／尾空行、body error、下游取消 | 不补事件，不派发残缺 data；已有部分用量仍可折算费用，未知不伪装完整零值 |
+| EOF／末帧后 Drop／重复终结 | 每次正式调用只记一条用量，根与 attempt 终态不被迟到快照覆盖 |
+
+### 5. Scenarios and Examples
+
+- 正常：流式 gzip 回复总长超过 1 MiB，但每个事件约 2 KiB，头部 input 与尾部 output 均保留；客户端仍收到同一 gzip 字节。
+- 边界：完整 JSON 或合并后 data 恰好 1 MiB 可观察，SSE 各行仍须在行上限内；多一字节标 partial。gzip 多 member 和 zstd 多 frame 的每个结尾都要验证。
+- 错误用法：每条 data 行独立解析 JSON、把整个压缩响应塞入 Vec，或看到 message_stop 就跳过 footer。正确处理：一次配置、逐块 feed、空行派发完整事件、传输收口时验证整个 codec 链。
+
+```rust
+let mut capture = UsageCapture::observer(&request);
+capture.configure_codings(&codings);
+for bytes in response_chunks {
+    capture.observe(&bytes);
+}
+let observed = capture.observation(complete);
+```
+
+### 6. Tests Required
+
+- `sse_events_follow_all_line_endings_and_merge_multiple_data_fields`、`eof_does_not_dispatch_unterminated_data_or_hide_it_after_message_stop`、`parser_bounds_json_lines_and_combined_events_then_resynchronizes`：真实零、累计 max、BOM／CRLF 跨字节、非法字段、准确边界与事件重新同步。
+- `service::response_body_codec::tests`：各种分块的长输出 hash、固定小出口、四层逆序链、多 member／frame、checksum／截断／尾随、首帧及后续超窗、层数／未知编码、deflate 真实头碰撞；错误也可取回摘要。
+- `gateway_usage_observes_all_sse_layouts_and_response_codings`、`gateway_usage_long_compressed_responses_keep_head_and_tail`：实际 Gateway＋本地上游＋SQLite／DiagnosticsStore，API／CC、JSON／SSE、两类 >1 MiB 长流，响应逐字节和头匹配，六类 token 与一次计数一致。
+- `gateway_usage_response_failures_preserve_bytes_and_partial_semantics`、`gateway_usage_compressed_cancellation_and_body_error_finalize_once`：CRC／截断／未知／大 JSON／缺 message_stop、已收到前缀后的取消与上游读错、partial／费用／诊断终态及原错误传播。
+- `diagnostics_buffered_compression_uses_the_same_event_observer`：缓冲入口的多 data／CR-only gzip 与 complete=false，原字节不变、一次 attempt、根终态正确。
+- 完整 Rust 回归继续覆盖请求压缩、CCH、keepalive、定价与历史汇总；改动本规则不需要前端构建或新增数据库迁移。
 
 ## Common Mistakes
 
