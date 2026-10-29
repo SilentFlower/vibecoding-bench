@@ -1,0 +1,404 @@
+{
+  "schema": 1,
+  "phase": "delivered",
+  "unit_commands": [
+    {
+      "cwd": ".",
+      "command": "python3 -m unittest discover -s images/sidecar -p 'test*.py'",
+      "tests": 42,
+      "exit_code": 0,
+      "runner": "collector-agent",
+      "python": "3.12.3"
+    },
+    {
+      "cwd": "orchestrator",
+      "command": "../.venv/bin/python -m unittest test_tls_capture_artifacts test_capture_settings_runtime test_account_cli_settings test_main.ClaudeCodeVersionTests.test_run_workers_use_snapshot_and_ephemeral_workers_use_effective_version test_account_runtime.AccountRuntimeTests.test_execution_flows_preserves_flat_history_and_rejects_wrong_binding test_account_runtime.AccountRuntimeTests.test_shared_cleanup_and_restart_leave_api_container_running test_account_runtime.AccountRuntimeTests.test_shared_recorder_failure_preserves_api_and_fences_next_cli test_account_runtime.AccountRuntimeTests.test_api_transport_never_installs_cli_and_preserves_cli_reconciliation",
+      "tests": 28,
+      "exit_code": 0,
+      "runner": "integration-agent",
+      "python": "3.12.3"
+    },
+    {
+      "cwd": ".",
+      "command": ".venv/bin/python images/account/test_network_context.py",
+      "tests": 3,
+      "exit_code": 0,
+      "runner": "integration-agent",
+      "python": "3.12.3"
+    }
+  ],
+  "unit_tests": 73,
+  "syntax_and_format": {
+    "node_check": "passed",
+    "changed_python_compile": "passed",
+    "git_diff_check": "passed"
+  },
+  "real_tls": {
+    "status": "passed",
+    "evidence_kind": "local_synthetic_tls_clients",
+    "mitmproxy_version": "11.1.3",
+    "client_results": [
+      {
+        "label": "tls12",
+        "negotiated_tls": "TLSv1.2",
+        "requests": 2,
+        "same_client_socket": true
+      },
+      {
+        "label": "tls13",
+        "negotiated_tls": "TLSv1.3",
+        "requests": 2,
+        "same_client_socket": true
+      },
+      {
+        "label": "write-failure",
+        "negotiated_tls": "TLSv1.3",
+        "requests": 2,
+        "same_client_socket": true
+      }
+    ],
+    "tls_records": 2,
+    "http_flows": 6,
+    "fixed_ja3_vectors": 2,
+    "private_mode": "0600",
+    "write_failure_http_continues": true,
+    "frozen_context_verified": true,
+    "raw_independent_parse": [
+      {
+        "raw_bytes": 186,
+        "ja3": {
+          "string": "771,49196-49200-49195-49199-52393-52392-49188-49192-49187-49191-159-158-107-103-255,0-11-10-35-16-22-23-13,29-23-30-25-24,0-1-2",
+          "md5": "104774240db569f8f87b1a28206b25e5"
+        },
+        "supported_versions": null,
+        "signature_algorithms": [
+          1027,
+          1283,
+          1539,
+          2055,
+          2056,
+          2057,
+          2058,
+          2059,
+          2052,
+          2053,
+          2054,
+          1025,
+          1281,
+          1537,
+          771,
+          769,
+          770,
+          1026,
+          1282,
+          1538
+        ],
+        "supported_groups": [
+          29,
+          23,
+          30,
+          25,
+          24
+        ],
+        "key_share": null,
+        "label": "tls12",
+        "correlated_http_flows": 2
+      },
+      {
+        "raw_bytes": 249,
+        "ja3": {
+          "string": "771,4866-4867-4865-255,0-11-10-35-16-22-23-13-43-45-51,29-23-30-25-24-256-257-258-259-260,0-1-2",
+          "md5": "9dffdb8b608a430b774a2ff7d36c1a0c"
+        },
+        "supported_versions": [
+          772
+        ],
+        "signature_algorithms": [
+          1027,
+          1283,
+          1539,
+          2055,
+          2056,
+          2057,
+          2058,
+          2059,
+          2052,
+          2053,
+          2054,
+          1025,
+          1281,
+          1537
+        ],
+        "supported_groups": [
+          29,
+          23,
+          30,
+          25,
+          24,
+          256,
+          257,
+          258,
+          259,
+          260
+        ],
+        "key_share": [
+          {
+            "group": 29,
+            "key_exchange_length": 32
+          }
+        ],
+        "label": "tls13",
+        "correlated_http_flows": 2
+      }
+    ],
+    "limitations": [
+      "不是官方 CLI 样本",
+      "不覆盖 DTLS/QUIC/ECH 内层及 HRR 二次派发"
+    ],
+    "source_hashes": {
+      "recorder.py": "ba7b5d9405e1a94e03e5c12b18874172441426876cd558a0af1e68e3efe0470f",
+      "tls_clienthello.py": "db082d745e0612a2fb7798933072edb73334654d89496e88ca3aa63bf83da154",
+      "quota_protocol.py": "fe0ca18824c8889b67c012cc9f4282f700c6f9a78df20241bf111f64c42eccf0",
+      "verify_tls_clienthello.py": "e539fa94a4d518602f1de37a29ebf76967172631708adbcbccdf12df547c6a0c"
+    }
+  },
+  "prior_synthetic_comparison": {
+    "status": "passed",
+    "sample_count": 6,
+    "evidence_kind": "prior_synthetic_handshake",
+    "records": [
+      {
+        "source": "vm",
+        "body_length": 247,
+        "ja3_md5": "e97f5146a7009cc2918b50e903b6ff8d",
+        "independent_fields": "matched"
+      },
+      {
+        "source": "vm",
+        "body_length": 247,
+        "ja3_md5": "e97f5146a7009cc2918b50e903b6ff8d",
+        "independent_fields": "matched"
+      },
+      {
+        "source": "vm",
+        "body_length": 247,
+        "ja3_md5": "e97f5146a7009cc2918b50e903b6ff8d",
+        "independent_fields": "matched"
+      },
+      {
+        "source": "cc",
+        "body_length": 1574,
+        "ja3_md5": "a44663b9db6ccaa680f6174478197a2f",
+        "independent_fields": "matched"
+      },
+      {
+        "source": "cc",
+        "body_length": 1574,
+        "ja3_md5": "a44663b9db6ccaa680f6174478197a2f",
+        "independent_fields": "matched"
+      },
+      {
+        "source": "cc",
+        "body_length": 1574,
+        "ja3_md5": "a44663b9db6ccaa680f6174478197a2f",
+        "independent_fields": "matched"
+      }
+    ]
+  },
+  "source_hashes": {
+    "images/account/network-context.py": "fb85d7f0ebdf77b4652fd5e8700ae3e161e3bd1c99131c18cd400829ec363de4",
+    "images/account/test_network_context.py": "c1e235e1ef2cbd874f71964e366e483c101e3fa2eab63673e4da7d4c72f4a1a4",
+    "orchestrator/account_runtime.py": "d114ffa2cf332312571d0f4a17e5cc0c6158988253435a5f9b9d3e8c530674d4",
+    "orchestrator/capture_artifacts.py": "e0a2c4be9d031299e355f0a6e548199fcfafef9bee678b9484dba87f865cfa2a",
+    "orchestrator/main.py": "1d1cc5ed2ac511a22eaba601ea07bdb505b707a63fbfad0bd6decee7a204f25e",
+    "orchestrator/pi_terminal.py": "0b293cd7cafdd7b7915d1c0a797064d885a18340203084e874608ca11c164397",
+    "orchestrator/test_account_cli_settings.py": "335b12c22e018c6d4498b29e3e0e291603bc8503af7fe9e6b1925f88cff4b8bc",
+    "orchestrator/test_capture_settings_runtime.py": "6ad3558c06dc7e27b58ce683349861ac649933c652ae1a62c2a4f63398be1922",
+    "orchestrator/test_main.py": "5b4b28921e3c3649250502f4a86c52fddcbd3054418883bb3881c44367feac8b",
+    "orchestrator/test_tls_capture_artifacts.py": "fefacf3b92b78b95cd4436400f77ec12febe29cb9db829981d82ef6e3c4c04e8",
+    "webui/app.js": "4da019899799716f276c7e013098733fe7df69266624ee8ea61a1ec2596fd2ae",
+    "images/sidecar/tls_clienthello.py": "db082d745e0612a2fb7798933072edb73334654d89496e88ca3aa63bf83da154",
+    "images/sidecar/recorder.py": "ba7b5d9405e1a94e03e5c12b18874172441426876cd558a0af1e68e3efe0470f",
+    "images/sidecar/test_tls_clienthello.py": "0ae9a089924325b2e2916a7f583b800725e88571a242a189d4282f9b30b482f8",
+    "images/sidecar/test_recorder.py": "8c764fa5dfd60b5efee876d6b75a6748b1b5b2dc5cbf46fe6a4f81eb2de6f667",
+    "images/sidecar/Dockerfile": "780b34ba74b8977cef777a5cdb835d793e52710534498e5360938bd0ec39330d",
+    "deploy/v3/verify_tls_clienthello.py": "e539fa94a4d518602f1de37a29ebf76967172631708adbcbccdf12df547c6a0c",
+    "webui/index.html": "daf88d7755e6b004f8c12bf1035e67056ed34eaeacf797d2c511de439070af17"
+  },
+  "online_acceptance": "passed",
+  "delivery": {
+    "ci_run": 40947973262,
+    "attempt": 1,
+    "ci_url": "https://github.com/SilentFlower/vibecoding-bench/actions/runs/40947973262",
+    "release": "ci-40947973262-1",
+    "parent_revision": "814c69b7be5501ef64756ea54a4a61fde9c94c2a",
+    "gateway_revision": "d1388d5b44b3c23fada688e29aec770ef7a2e561",
+    "image_source_checks": 42,
+    "manifest_sha256": "338620fac550b00356371ef220d8b2bf47de57f6445ee6a66bbd7d11fdd587ac",
+    "health": {
+      "status": "passed",
+      "release": "ci-40947973262-1",
+      "parent_revision": "814c69b7be5501ef64756ea54a4a61fde9c94c2a",
+      "services": [
+        {
+          "role": "orchestrator",
+          "status": "running",
+          "matches_release": true
+        },
+        {
+          "role": "gateway",
+          "status": "running",
+          "matches_release": true
+        }
+      ],
+      "gateway_health": "healthy",
+      "runtime_source_hashes": "matched",
+      "observation_view": "passed",
+      "projects_and_warmup_api": "passed",
+      "verification_progress": {
+        "projects": {
+          "agents": 2,
+          "verification_field": true
+        },
+        "warmup": {
+          "agents": 3,
+          "verification_field": true
+        },
+        "phase_event": "passed",
+        "served_frontend": "matched"
+      },
+      "original_schedules_preserved": true,
+      "persistent_identity_preserved": true,
+      "requester_settings_preserved": true,
+      "database_integrity": "passed",
+      "legacy_services_unchanged": true,
+      "model_probe_requests": 0,
+      "runtime_compatibility_and_failure_api": {
+        "python_runtime": {
+          "expected_python": "3.12.15",
+          "actual_python": "3.12.16",
+          "python_compatibility": "minor"
+        },
+        "cross_minor_rejected": true,
+        "spaces": {
+          "projects": {
+            "agents": 2,
+            "work_failure_projections": 2
+          },
+          "warmup": {
+            "agents": 3,
+            "work_failure_projections": 1
+          }
+        }
+      },
+      "failure_schema_migrated": true,
+      "backup": false,
+      "resource_calculation": false
+    },
+    "image_cleanup": {
+      "status": "passed",
+      "release": "ci-40947973262-1",
+      "removed_images": [],
+      "before": {
+        "total_bytes": 105582346240,
+        "free_bytes": 12427341824
+      },
+      "after": {
+        "total_bytes": 105582346240,
+        "free_bytes": 12427329536
+      },
+      "freed_bytes": -12288,
+      "protected_releases": [
+        "ci-40932510922-1",
+        "ci-40938273833-1",
+        "ci-40947973262-1"
+      ],
+      "original_containers_preserved": true,
+      "running_containers_preserved": true,
+      "deployment_unchanged": true
+    }
+  },
+  "online_projects_tls": {
+    "status": "passed",
+    "file": "environments/4201ce3f913841d4b2a5a96bc996bb40/flows/group-aa0935a8d5f15334085f/executions/54d40942b8592ee60edd/tls_clienthello.jsonl",
+    "file_mode": "0600",
+    "tls_rows": 14,
+    "matched_claude_connections": 1,
+    "independent_raw_parse": "matched",
+    "actual_frozen_version": "matched",
+    "http_association": "matched",
+    "examples": [
+      {
+        "connection": "18f8dfb2-5ce9-48c2-b38b-9a2880fbe3b5",
+        "source": "projects:01510236a9d64349b634b3e00c28573e:9",
+        "version": "2.1.293",
+        "successful_message_flows": 1,
+        "ja3": {
+          "string": "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49161-49171-49162-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43,4588-29-23-24,0",
+          "md5": "1523504b38f0fae0d881d4b6554aac1b"
+        },
+        "signature_algorithms": [
+          1027,
+          2052,
+          1025,
+          1283,
+          2053,
+          1281,
+          2054,
+          1537,
+          513
+        ],
+        "supported_groups": [
+          4588,
+          29,
+          23,
+          24
+        ],
+        "key_share": [
+          {
+            "group": 4588,
+            "key_exchange_length": 1216
+          },
+          {
+            "group": 29,
+            "key_exchange_length": 32
+          }
+        ],
+        "extension_order": [
+          0,
+          23,
+          65281,
+          10,
+          11,
+          35,
+          16,
+          5,
+          13,
+          18,
+          51,
+          45,
+          43
+        ]
+      }
+    ]
+  },
+  "online_api": {
+    "status": "passed",
+    "work_id": "01510236a9d64349b634b3e00c28573e",
+    "version": "2.1.293",
+    "summary_records": 15,
+    "preview_records": 15,
+    "private_nested_fields_absent": true,
+    "raw_http_flow_refused": true,
+    "warmup_api": "passed"
+  },
+  "online_browser": {
+    "status": "passed",
+    "account_id": 10,
+    "tls_details": 8,
+    "safe_fields_visible": true,
+    "raw_fields_absent": true,
+    "text_chars": 19505,
+    "text_sha256": "ea409acccdf65c6b2a15af098c87a5a44f3beb38d8bc23983cc05855bb6ff897"
+  }
+}
