@@ -105,6 +105,8 @@ HeaderCaseMap::from_names<I, S>(names: I) -> Result<Self, InvalidHeaderName>
 
 - 算法：`sha256("59cf53e54c78" + text[4] + text[7] + text[20] + version).hex()[0:3]`。
 - 字符索引必须按 JavaScript UTF-16 code unit 语义。
+- 抽样码元先按顺序拼接，再统一转换为 UTF-8；拼接后组成的有效代理对必须还原为完整字符，仅仍孤立的代理项替换为 U+FFFD。缺失索引补字符 `0`，真实 NUL 码元必须保留。
+- `cc_version_suffix_matches_node_utf16_boundaries` 使用独立 Node.js 参考值覆盖有效/孤立/倒置代理项、最大 Unicode 码点、中文、ASCII、短/空文本及 NUL；合成文本 `abcd😀😀efghijklmnopqrstuvwxyz` 配版本参数 `2.1.283` 的后缀必须为 `0e9`。该参数仅用于纯函数复现，不表示新增版本画像。
 - `messages[0].content` 是数组时，Claude Code 主请求可能先放环境上下文 text block，再放真实用户 prompt text block；后缀文本源应取首条 user message 的最后一个 text block，而不是第一个 text block。
 - Haiku/title 这类只有一个 text block 的请求仍取唯一 text block。
 - `2.1.280` / `2.1.293` 带 `thread.previous_message_id` 的续轮请求复用入站 billing block 中已有的会话级
