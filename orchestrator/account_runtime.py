@@ -1169,7 +1169,7 @@ class AccountRuntime:
             "generation": job["row"]["generation"]}
         for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command",
                 "version", "process", "process_permitted", "run_id", "settings_override", "network_inspection_mode",
-                "execution_role", "review_container_id", "private_relative", "review_intent", "review_phase", "resource_mode"):
+                "execution_role", "review_container_id", "private_relative", "review_intent", "review_phase", "resource_mode", "capture_flows"):
             if key in job:
                 execution[key] = job[key]
         atomic_json(self._execution_path(job), execution)
@@ -1403,6 +1403,8 @@ class AccountRuntime:
                 script_path.chmod(0o750)
                 original_flows = self.data / "flows" / account["name"] / str(task["id"]) / run_id
                 flow_directory = self.execution_flows(account, source, original_flows)
+                if task.get("capture_full_http"):
+                    job["capture_flows"] = str(flow_directory.relative_to(root / "flows"))
                 if not task.get("capture_full_http"):
                     self._install_cli_quota(job, cwd, flow_directory, quota_env.get("QUOTA_IDENTITY"))
                 flow_path = "/flows/" + str(flow_directory.relative_to(root / "flows"))
@@ -1651,7 +1653,8 @@ class AccountRuntime:
         snapshot = job.get("statusline_before")
         if not snapshot:
             return
-        settings = self._root(job["row"]) / "home/.claude/settings.json"
+        root = self._root(job["row"])
+        settings = root / (job.get("settings_override") or "home/.claude/settings.json")
         value = _read_json(settings) if settings.is_file() else {}
         current = value.get("statusLine")
         if not isinstance(current, dict) or current.get("command") != job.get("statusline_command"):
@@ -1664,7 +1667,7 @@ class AccountRuntime:
         os.chown(settings, 1000, 1000, follow_symlinks=False)
 
     def _configure_network_context(self, container, context: dict, reuse_passthrough: bool = False,
-                                   require_reuse: bool = False) -> None:
+                                   require_reuse: bool = False, *, row: dict | None = None) -> dict:
         """
         切换 CLI 网络监听并核对当前执行的模式与来源。
 
@@ -1672,13 +1675,19 @@ class AccountRuntime:
         :param context: 当前执行的私有网络上下文
         :param reuse_passthrough: 是否先核对并复用已有透传监听
         :param require_reuse: 已有兄弟执行时禁止重启监听
-        :return: None
+        :param row: 恢复已停止 CLI 时使用已核对的环境行定位网络角色。
+        :return: 已核对模式、来源和监听进程的网络确认。
         """
         mode = str(context.get("NETWORK_INSPECTION_MODE") or "passthrough")
         if mode not in NETWORK_INSPECTION_MODES:
             raise ValueError("网络检查模式不合法")
-        network = (self._network_container(self._row_for_container(container))
-            if container.labels.get("vibebench.isolation-version") == str(ISOLATION_VERSION) else container)
+        if row is not None:
+            network = self._network_container(row) if row.get('isolation_version') == ISOLATION_VERSION else container
+            if network is None:
+                raise ValueError('原网络监听尚无法定位，需先对账')
+        else:
+            network = (self._network_container(self._row_for_container(container))
+                if container.labels.get("vibebench.isolation-version") == str(ISOLATION_VERSION) else container)
         command = ["/usr/local/bin/v3-network-context"]
         if reuse_passthrough:
             command.append("--reuse-passthrough")
@@ -1698,6 +1707,7 @@ class AccountRuntime:
                 or payload.get("NETWORK_INSPECTION_MODE") != mode
                 or payload.get("process") != ("passthrough" if mode == "passthrough" else "recorder")):
             raise ValueError("网络上下文确认不匹配")
+        return payload
 
     def wait_worker(self, container_id: str) -> int:
         """等待本次 exec，而非等待固定容器退出。
@@ -1710,7 +1720,7 @@ class AccountRuntime:
             state = self.client.api.exec_inspect(job["exec"])
             if not state.get("Running"):
                 return int(state.get("ExitCode") if state.get("ExitCode") is not None else -1)
-            if (job.get("shared_cli") or job.get('execution_role') == 'project-review') and job.get("handle"):
+            if (job.get("shared_cli") or job.get('execution_role') in ('project-review', 'pi-capture')) and job.get("handle"):
                 result = self._process_result(job)
                 if result is not None and not result.get("cleaned"):
                     raise ValueError("本执行子进程未能完成定向收口")
@@ -1747,7 +1757,7 @@ class AccountRuntime:
             raise ValueError("不支持的 CLI 作业控制操作")
         job = self.job_for_container(token)
         proof = job.get("process")
-        if (not job.get("shared_cli") and job.get('execution_role') != 'project-review') or not isinstance(proof, dict):
+        if (not job.get("shared_cli") and job.get('execution_role') not in ('project-review', 'pi-capture')) or not isinstance(proof, dict):
             raise ValueError("本执行缺少独立监督进程证明")
         container = self.reviews.container(job) if job.get('execution_role') == 'project-review' else self._container(job["row"])
         answer = container.exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", operation,
@@ -1809,6 +1819,32 @@ class AccountRuntime:
             job["exec"] = exec_id
             self._save_execution(job)
 
+    def _finish_capture(self, job: dict, container) -> None:
+        """收尾本代 Recorder 并保存真实结果，异常时保留证据和对账保护。
+
+        :param job: 已停止 CLI 的本代捕获作业。
+        :param container: 本账号固定 CLI 容器。
+        :return: None；网络收口未确认时抛出异常。
+        """
+        relative = Path(job['capture_flows'])
+        if relative.is_absolute() or '..' in relative.parts:
+            raise ValueError('捕获收尾目录不合法')
+        directory = self._root(job['row']) / 'flows' / relative
+        status = {'source': job['source'], 'state': 'stopping', 'updated_at': time.time()}
+        atomic_json(directory / 'capture-status.json', status)
+        try:
+            idle = {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''}
+            atomic_json(self._network_runtime(job['row']) / 'context.json', idle)
+            ack = self._configure_network_context(container, idle, row=job['row'])
+            graceful = ack.get('previous_listener_graceful')
+            status.update(state='closed' if graceful is True else 'partial', recorder_graceful=graceful)
+        except Exception:
+            status.update(state='error', message='Recorder 收尾尚未确认，已保留采集数据')
+            raise
+        finally:
+            status['updated_at'] = time.time()
+            atomic_json(directory / 'capture-status.json', status)
+
     def cleanup(self, container_id: str) -> None:
         """停止本代 driver/子进程并撤销诊断，保留固定容器。
 
@@ -1828,7 +1864,7 @@ class AccountRuntime:
                 raise ValueError("重授权提交结果尚未确认，必须先对账")
             container = self.reviews.container(job, missing_ok=True) if job.get('execution_role') == 'project-review' else self._container(job["row"])
             try:
-                if job.get("shared_cli") or job.get('execution_role') == 'project-review':
+                if job.get("shared_cli") or job.get('execution_role') in ('project-review', 'pi-capture'):
                     if job.get('execution_role') == 'project-review':
                         if container is not None:
                             container.reload()
@@ -1841,6 +1877,8 @@ class AccountRuntime:
                         self.reviews.stop_container(job)
                     elif container is not None:
                         self._cleanup_shared_job(job, container)
+                    if job.get('execution_role') == 'pi-capture' and job.get('capture_flows'):
+                        self._finish_capture(job, container)
                     self.release(job)
                     if job.get('execution_role') == 'project-review' and container is not None:
                         try:
@@ -1888,9 +1926,12 @@ class AccountRuntime:
                     container.exec_run(["pkill", "-KILL", "-u", "1000"])
                     if container.exec_run(["pgrep", "-u", "1000"]).exit_code == 0:
                         raise ValueError("账号子进程尚未完成收口，禁止下一 CLI 作业")
-                idle_context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": ""}
-                atomic_json(self._network_runtime(job["row"]) / "context.json", idle_context)
-                self._configure_network_context(container, idle_context)
+                if job.get('capture_flows'):
+                    self._finish_capture(job, container)
+                else:
+                    idle_context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": ""}
+                    atomic_json(self._network_runtime(job["row"]) / "context.json", idle_context)
+                    self._configure_network_context(container, idle_context)
                 if "hooks_before" in job:
                     settings = self._root(job["row"]) / "home" / ".claude" / "settings.json"
                     value = _read_json(settings) if settings.exists() else {}
@@ -2843,7 +2884,8 @@ class AccountRuntime:
                             "token": self.execution_token(row["container_id"] or row["environment_id"], execution["source"])}
                         for key in ("exec", "handle", "tmux", "tmux_socket", "hooks_before", "statusline_before", "statusline_command",
                                 "process", "process_permitted", "run_id", "version", "execution_role", "review_container_id",
-                                "private_relative", "review_intent", "review_phase", "resource_mode"):
+                                "private_relative", "review_intent", "review_phase", "resource_mode", "settings_override",
+                                "network_inspection_mode", "capture_flows"):
                             if key in execution:
                                 job[key] = execution[key]
                         with self.environment_lock(row["environment_id"]):
@@ -2858,6 +2900,8 @@ class AccountRuntime:
                                 self._update(row, state=settled_state or "ready")
                             else:
                                 job["exec"] = None
+                                if job.get('capture_flows'):
+                                    self._finish_capture(job, container)
                                 self.release(job)
                                 self._update(row, state=settled_state or "stopped")
                         continue

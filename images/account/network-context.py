@@ -51,48 +51,48 @@ def _owned_process_state(pid: int, started_at: str) -> str | None:
     return fields[2] if fields[21] == started_at else None
 
 
-def _terminate_listener(pid_file: Path) -> None:
+def _terminate_listener(pid_file: Path) -> bool:
     """
     停止上一网络监听进程并确认连接已经收口。
 
     :param pid_file: 保存监听进程 PID 的文件
-    :return: None
+    :return: 优雅退出或已无监听时为 True，使用强制退出时为 False。
     """
     if not pid_file.exists():
-        return
+        return True
     pid = int(pid_file.read_text())
     identity = _listener_identity(pid)
     if identity is None:
         pid_file.unlink(missing_ok=True)
-        return
+        return True
     state, started_at = identity
     if state == "Z":
         pid_file.unlink(missing_ok=True)
-        return
+        return True
     try:
         os.kill(pid, signal.SIGTERM)
     except ProcessLookupError:
         pid_file.unlink(missing_ok=True)
-        return
+        return True
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
         state = _owned_process_state(pid, started_at)
         if state is None or state == "Z":
             pid_file.unlink(missing_ok=True)
-            return
+            return True
         time.sleep(0.1)
     # relay/Recorder 已通过私有 PID 和 cmdline 双重确认；优雅退出失效时必须定向强制收口，不能让新旧模式并存。
     try:
         os.kill(pid, signal.SIGKILL)
     except ProcessLookupError:
         pid_file.unlink(missing_ok=True)
-        return
+        return False
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
         state = _owned_process_state(pid, started_at)
         if state is None or state == "Z":
             pid_file.unlink(missing_ok=True)
-            return
+            return False
         time.sleep(0.1)
     raise RuntimeError("旧网络监听进程未完成强制收口")
 
@@ -178,7 +178,7 @@ def main() -> None:
             raise RuntimeError("共享透传监听不可复用，拒绝影响在途 CLI")
         pid_file = root / "network.pid"
         legacy_pid = root / "mitm.pid"
-        _terminate_listener(pid_file if pid_file.exists() else legacy_pid)
+        graceful = _terminate_listener(pid_file if pid_file.exists() else legacy_pid)
         legacy_pid.unlink(missing_ok=True)
         (root / "context-ack.json").unlink(missing_ok=True)
         mode = str(context.get("NETWORK_INSPECTION_MODE") or "passthrough")
@@ -230,6 +230,7 @@ def main() -> None:
                         "process": process_kind,
                         "pid": process.pid,
                         "started_at": identity[1],
+                        "previous_listener_graceful": graceful is not False,
                     }))
                     temporary.replace(root / "context-ack.json")
                     return

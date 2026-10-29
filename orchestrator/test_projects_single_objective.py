@@ -267,10 +267,10 @@ class SingleObjectiveRoundTests(unittest.TestCase):
                 service._write("UPDATE projects_agents SET generation=1,status='running' WHERE account_id=1")
                 original, barrier = service.terminal.settings, threading.Barrier(2)
 
-                def settings():
+                def settings(account):
                     """在目标发布前同步两个调用。:return: 原配置。"""
                     barrier.wait(3)
-                    return original()
+                    return original(account)
 
                 service.terminal.settings = settings
                 results, failures = [], []

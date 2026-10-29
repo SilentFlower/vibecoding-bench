@@ -437,7 +437,7 @@ class ProjectPlans:
     def reserve(self, batch: dict, instance: dict, account: dict) -> None:
         """为固定计划建立一个新的 CLI Run，恢复时不扩大目标范围。@param batch 批次。@param instance 实例。@param account 账号。@return None。"""
         policy = json.loads(batch['policy_json'])
-        frozen = self.owner.settings()
+        frozen = self.owner.settings(account)
         report = self._failure_report(instance)
         now, run_id = time.time(),uuid.uuid4().hex[:12]
         with self.owner.write_lock:
@@ -486,9 +486,9 @@ class ProjectPlans:
                         (title['source_topic_no'],f"[Project iteration] {title['title']} / steps {plan['start_index']+1}-{plan['target_index']}",
                             '',batch['account_id'],policy['timeout_sec']))
                     task_id = task.lastrowid
-                    connection.execute('INSERT INTO runs(id,task_id,account_id,status,run_kind,claude_code_version,claude_effort_level,execution_model,quota_identity) '
-                        'VALUES(?,?,?,?,?,?,?,?,?)',(run_id,task_id,batch['account_id'],'queued','project_iteration',
-                            frozen['claude_code_version'],frozen['claude_effort_level'],frozen['execution_model'],batch['account_identity']))
+                    connection.execute('INSERT INTO runs(id,task_id,account_id,status,run_kind,claude_code_version,claude_code_version_source,claude_effort_level,execution_model,quota_identity) '
+                        'VALUES(?,?,?,?,?,?,?,?,?,?)',(run_id,task_id,batch['account_id'],'queued','project_iteration',
+                            frozen['claude_code_version'],frozen.get('claude_code_version_source'),frozen['claude_effort_level'],frozen['execution_model'],batch['account_identity']))
                     attempt_id,prompt = self._attempt(connection,current,plan,run_id,0,now,report)
                     connection.execute('UPDATE tasks SET prompt=? WHERE id=?',(prompt,task_id))
                     connection.execute('INSERT INTO project_plan_executions(plan_id,run_id,current_attempt_id,not_before,created_at) VALUES(?,?,?,?,?)',

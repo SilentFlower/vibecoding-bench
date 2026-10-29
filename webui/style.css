@@ -851,6 +851,7 @@ input[type=search]::-webkit-search-cancel-button { filter: invert(0.8) sepia(1) 
 .modal-close:hover { background: rgba(13, 14, 12, 0.18); border-color: var(--bg); }
 
 .modal-card > #modal-content,
+.modal-card > #work-capture-content,
 .modal-card > .form {
   padding: 20px 22px 22px;
   overflow: auto;

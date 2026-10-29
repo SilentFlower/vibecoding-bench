@@ -58,7 +58,7 @@ class TerminalFixture:
         self.root, self.started, self.sent, self.controls = root, [], [], []
         self.unknown, self.running, self.screen = False, True, '请选择：\n> 调查\n  实施'
 
-    def settings(self):
+    def settings(self, account=None):
         """返回合法冻结配置。:return: CLI 配置。"""
         return {'claude_code_version': '2.1.293', 'claude_effort_level': 'high', 'execution_model': None}
 
@@ -973,9 +973,9 @@ class ProjectsAgentTests(unittest.TestCase):
         """创建目标前停止时，不留下无法从控制者找到的唯一索引占用。:return: None。"""
         self.activate()
         settings = self.terminal.settings
-        def stop_before_creation():
+        def stop_before_creation(account):
             self.service.pause(1)
-            return settings()
+            return settings(account)
         self.terminal.settings = stop_before_creation
         self.assertEqual('rejected', self.start_work()['status'])
         self.assertEqual([], self.service.history(1))

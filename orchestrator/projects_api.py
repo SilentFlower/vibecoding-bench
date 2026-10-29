@@ -151,6 +151,22 @@ def projects_router(service, *, prefix: str = '/api/projects') -> APIRouter:
         except (ValueError, OSError) as error:
             raise HTTPException(404, '冻结成果不存在、损坏或路径不属于候选清单') from None
 
+    @router.get('/work/{work_id}/capture')
+    def work_capture(work_id: str) -> dict:
+        """读取工作历次抓包索引和文件。:param work_id: 工作 ID。:return: 脱敏抓包摘要。"""
+        try:
+            return owner().work_capture(work_id)
+        except (ValueError, OSError):
+            raise HTTPException(404, '工作抓包不存在或归属不符') from None
+
+    @router.get('/work/{work_id}/capture/file')
+    def work_capture_file(work_id: str, path: str = Query(min_length=1, max_length=512)) -> dict:
+        """读取受限脱敏文件。:param work_id: 工作 ID。:param path: 相对文件。:return: JSON 预览。"""
+        try:
+            return owner().work_capture(work_id, path)
+        except (ValueError, OSError):
+            raise HTTPException(404, '文件不存在或不支持预览') from None
+
     @router.post('/agents/{account_id}/reconcile')
     def reconcile(account_id: int, body: ProjectsReconcileIn) -> dict:
         """提交人工核对。:param account_id: 账号。:param body: 操作与结论。:return: 核对后状态。"""

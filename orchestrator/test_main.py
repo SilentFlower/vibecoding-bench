@@ -698,7 +698,7 @@ class ClaudeCodeVersionTests(unittest.TestCase):
             "NETWORK_INSPECTION_MODE": "passthrough",
             "QUOTA_SOURCE": "oauth-refresh:synthetic",
         })
-        runner._exec_oauth_refresh_probe.assert_called_once_with("fixed-token", use_mitm=False, force_refresh=False)
+        runner._exec_oauth_refresh_probe.assert_called_once_with("fixed-token", use_mitm=False, force_refresh=False, version="2.1.293")
         runtime.cleanup.assert_called_once_with("fixed-token")
         runner.client.containers.run.assert_not_called()
 
@@ -1370,7 +1370,7 @@ class ScheduledWarmupTests(unittest.TestCase):
         runner.client.api.exec_create.return_value = {"Id": "oauth-exec"}
         runner.client.api.exec_start.return_value = b'{"skipped":true}'
         runner.client.api.exec_inspect.return_value = {"ExitCode": 0}
-        runner._exec_oauth_refresh_probe("worker-id")
+        runner._exec_oauth_refresh_probe("worker-id", version=main.CLAUDE_CODE_VERSION)
         shell_script = runner.client.api.exec_create.call_args.args[1][2]
         orchestrator_match = re.search(
             r"node - <<'JS'\n(?P<script>.*?)\nJS\n?$",

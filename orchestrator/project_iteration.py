@@ -775,7 +775,7 @@ class ProjectIterationManager:
         if previous and previous['report_relative']:
             report = read_document(self.data/safe_relative(previous['report_relative']))
             prompt += '\nPrevious attempt failure evidence: '+canonical_json(report).decode()[:12000]
-        execution = self.settings()
+        execution = self.settings(account)
         run_id,now = uuid.uuid4().hex[:12],time.time()
         with self.write_lock:
             connection = self.database()
@@ -789,8 +789,8 @@ class ProjectIterationManager:
                     task = connection.execute('INSERT INTO tasks(topic_no,title,prompt,account_id,timeout_sec,repeat_n) VALUES(?,?,?,?,?,1)',
                         (manifest['source_topic_no'],f"[Project iteration] {manifest['title']} / {step['id']}",prompt,batch['account_id'],policy['timeout_sec']))
                     task_id = task.lastrowid
-                    connection.execute('INSERT INTO runs(id,task_id,account_id,status,run_kind,claude_code_version,claude_effort_level,execution_model,quota_identity) VALUES(?,?,?,?,?,?,?,?,?)',
-                        (run_id,task_id,batch['account_id'],'queued',PROJECT_RUN_KIND,execution['claude_code_version'],execution['claude_effort_level'],execution['execution_model'],batch['account_identity']))
+                    connection.execute('INSERT INTO runs(id,task_id,account_id,status,run_kind,claude_code_version,claude_code_version_source,claude_effort_level,execution_model,quota_identity) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                        (run_id,task_id,batch['account_id'],'queued',PROJECT_RUN_KIND,execution['claude_code_version'],execution.get('claude_code_version_source'),execution['claude_effort_level'],execution['execution_model'],batch['account_identity']))
                     connection.execute('INSERT INTO project_step_attempts(instance_id,step_id,attempt_no,generation,run_id,expected_checkpoint_digest,created_at) VALUES(?,?,?,?,?,?,?)',
                         (instance['id'],step['id'],attempt_no,batch['generation'],run_id,instance['checkpoint_digest'],now))
                     connection.execute("UPDATE project_instances SET status='ready',error=NULL,updated_at=? WHERE id=?",(now,instance['id']))

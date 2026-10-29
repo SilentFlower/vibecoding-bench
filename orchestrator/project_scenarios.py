@@ -1137,7 +1137,7 @@ class ProjectScenarios:
                      job: dict | None = None, review_attempt: int | None = None) -> bool:
         policy, now = json.loads(batch['policy_json']), time.time()
         run_id = uuid.uuid4().hex[:12]
-        frozen = json.loads(task['execution_json']) if task['execution_json'] else self.owner.settings()
+        frozen = json.loads(task['execution_json']) if task['execution_json'] else self.owner.settings(account)
         session = task['session_id'] if role == 'candidate' else str(uuid.uuid4())
         if job and job['review_resume']:
             previous = self.owner._one('SELECT session_id FROM project_task_executions WHERE evaluation_job_id=? ORDER BY id DESC LIMIT 1', (job['id'],))
@@ -1169,9 +1169,9 @@ class ProjectScenarios:
                     generic = connection.execute('INSERT INTO tasks(topic_no,title,prompt,account_id,timeout_sec,repeat_n) VALUES(?,?,?,?,?,1)',
                         (1, f"项目场景 / {task['task_key']} / {'回答' if role == 'candidate' else '独立评审'}", prompt, account['id'], timeout))
                     generic_id = generic.lastrowid
-                    connection.execute('INSERT INTO runs(id,task_id,account_id,status,run_kind,claude_code_version,claude_effort_level,execution_model,quota_identity) '
-                        'VALUES(?,?,?,?,?,?,?,?,?)', (run_id, generic_id, account['id'], 'queued',
-                            'project_iteration' if role == 'candidate' else 'project_review', frozen['claude_code_version'],
+                    connection.execute('INSERT INTO runs(id,task_id,account_id,status,run_kind,claude_code_version,claude_code_version_source,claude_effort_level,execution_model,quota_identity) '
+                        'VALUES(?,?,?,?,?,?,?,?,?,?)', (run_id, generic_id, account['id'], 'queued',
+                            'project_iteration' if role == 'candidate' else 'project_review', frozen['claude_code_version'],frozen.get('claude_code_version_source'),
                             frozen['claude_effort_level'], frozen['execution_model'], batch['account_identity']))
                     connection.execute('INSERT INTO project_task_executions(task_id,plan_id,run_id,role,evaluation_job_id,review_attempt,turn_no,generation,session_id,delivery_id,created_at) '
                         'VALUES(?,?,?,?,?,?,?,?,?,?,?)', (task['id'], plan_id, run_id, role, job['id'] if job else None, review_attempt,

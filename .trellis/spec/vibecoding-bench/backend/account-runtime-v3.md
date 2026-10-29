@@ -882,6 +882,72 @@ storage_backup.verify_backup_data(target: Path) -> dict
 - `deploy/v3/verify_storage.py --account-image <本地账号镜像> --output <全新回执>`：真实无网络Docker验证合成安装、共享、UID1000只读、失败/错版/重装、遗留暂存与缓存故障；不调用真实账号或模型。
 - 构建前后逐文件核对完整项目库、Docker COPY及安装摘要，运行代表性真实离线原生观察。生产另核对身份/历史记录/工具及文件系统空闲增量；镜像保留与回收按下方“v3 部署成功后的旧镜像回收”执行，不把本地通过宣称为已上线。
 
+## Scenario: 账号 CLI 版本与迭代抓包
+
+### 1. Scope / Trigger
+
+- 修改账号 CLI 设置、任一 CLI 启动入口、项目/养号抓包、停止收尾或历史读取时适用。账号默认值与执行身份分开：配置只影响后续新执行，已有运行、工作、会话与草稿保持原版本。
+
+### 2. Signatures
+
+```text
+accounts.claude_code_version TEXT NULL
+accounts.projects_capture_enabled INTEGER NOT NULL DEFAULT 0
+accounts.warmup_capture_enabled INTEGER NOT NULL DEFAULT 0
+runs.claude_code_version_source TEXT NULL
+GET/PUT /api/accounts/{aid}/cli-settings
+CaptureRunIn.claude_code_version: Optional[StrictStr]
+_resolve_account_cli_version(account: dict, value: Optional[str] = None) -> tuple[str, str]
+GET /api/projects/work/{work_id}/capture
+GET /api/projects/work/{work_id}/capture/file?path=<相对文件>
+GET /api/accounts/warmup/pi/work/{work_id}/capture
+GET /api/accounts/warmup/pi/work/{work_id}/capture/file?path=<相对文件>
+capture_artifacts.capture_summary(base: Path, *, running: bool = False) -> dict
+execution_role = pi-capture
+network ACK: previous_listener_graceful: bool
+capture-status.json: source, state, updated_at, recorder_graceful?, message?
+```
+
+### 3. Contracts
+
+- 新列用 `_ensure_column` 幂等补齐，旧账号两个开关均关闭。PUT 仅写显式字段；版本为可空严格字符串，trim 后空值清除覆盖，开关为严格布尔，未知字段拒绝。GET/PUT 返回 account_id、配置版本、effective_claude_code_version、claude_code_version_source 与两个布尔开关；来源为 account/global。读或保存不准备环境、启动模型或热切网络。
+- 精确版本解析优先级为单次显式值 > 账号配置 > 全局有效值，来源 explicit/account/global。账号页和两个迭代窗口读取同一权威版本；迭代窗口只提交本空间开关，缺失字段不覆盖另一空间。版本、安装准备、PATH 与 exec 环境必须一致，失败不能静默换版本。
+- 所有 CLI 入口采用账号继承：普通/批量、抓包、项目/养号、兼容项目及 CLI 评审、登录/重授权、续聊和实际 CLI 维护命令。新 run/work/session/draft 保存版本，恢复优先已有快照；旧空 run/work/草稿只回填一次并记录 legacy-* 来源，run 优先匹配原执行证明。只读进程/身份观察不能用当前默认值冒充实际已执行版本；选择版本不升级 cc2api 画像或已验证身份来源。
+- 项目和养号在新执行开始时读取账号的本空间开关，并在执行定位中记录 capture_enabled 和分代路径；既有 work 的版本快照不重写。关闭时沿共享 CLI/passthrough，兄弟作业存在时必须复用监听；开启时 `shared_cli=False, exclusive=False`，使用现有 `prepare-cli`，等待同账号 CLI 空闲，独立 API 继续可用。
+- 捕获使用 pi-capture 监督角色，仍凭 source/PID/started、逐作业 tmux、启动许可和租约控制。保存并恢复 settings_override、network_inspection_mode、capture_flows；不能将独占租约伪装成 shared_cli 或 project-review。Recorder 按当前来源 ACK 后才启动 CLI，仅捕获进程显式信任 CA。
+- 收尾先停止本作业，再恢复 passthrough 并释放租约。网络 ACK 返回 previous_listener_graceful；本代 capture-status.json 状态为 stopping/closed/partial/error，强制收口或未知优雅状态不能冒充完整。重启时可凭原环境行定位网络角色；不能确认收口则保留证据与 cli_reconcile，不停止健康独立 API。
+- 工作读取从本空间 work、账号与固定环境派生 `group-<hash(namespace/work)>`；不接受任意宿主路径，不把 work ID 当 run ID。运行与双迭代共用脱敏聚合，保留旧平铺、分代及同账号受管续聊组链接。摘要含 files、index、index_available、sample_count、status 和 message，状态为 empty/collecting/partial/complete/error；索引缺失但已有数据仍列文件。
+- `/capture/file` 只预览本组清单中的脱敏 capture_index.json 和收尾摘要；原始 HTTP、.flow 与凭据正文不公开。停止或关闭开关不删除旧数据，新代输出不覆盖原代。Recorder 的追加阶段及协议研究边界见 [正式抓包契约](../deploy/official-protocol-capture.md#35-条件标识正文归因与-tls-的采集边界)。
+- 配置和查看窗口在切账号、切空间、关闭时使旧回执失效，不覆盖新页面或未保存输入。工作抓包通过手动刷新读取，关闭不新增常驻轮询；运行详情沿原生命周期。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 账号/全局均空覆盖，旧账号无开关值 | 全局版本兜底、抓包关闭 |
+| PUT 只提交一个空间开关或版本 null | 仅改该字段；null 清版本，另一空间保持 |
+| 非法版本 / 非布尔开关 / 未知字段 | 400 / 422 / 422，不保存无效值 |
+| 账号不存在或已软删除 | 配置接口 404，不启动执行 |
+| 修改默认值后恢复排队运行、work、会话或草稿 | 已有非空快照保持；旧空值持久回填一次 |
+| 捕获遇同账号兄弟 CLI | 等待，不能重启兄弟监听或排空独立 API |
+| Recorder 强制收口、退出失败或响应中断 | 保留文件，报告 partial/error 或 interrupted，不假报完整 |
+| 工作/文件不属于当前空间或路径不受支持 | 404；无环境和文件时抓包摘要为空状态 |
+
+### 5. Scenarios and Examples
+
+- 正常：全局 293、账号 303，抓包显式 293 只影响本次；之后未显式覆盖的执行仍用 303。清空账号配置后新执行继承全局，历史仍展示冻结值。
+- 基础：项目开启捕获，养号仍关闭；保存不启动模型，下一次项目执行等 CLI 空闲后捕获，养号继续共享透传。关闭后旧抓包可查。
+- 错误用法：把单次版本输入放进 batch-form，只测试后端创建接口；抓包创建成功后清空不存在字段又报失败。正确处理：控件归属 capture-form，浏览器实际提交并检查请求、清空、详情和无错误弹窗。
+- 错误用法：Recorder 停止后的迟到 response 把 interrupted 改回 complete。正确处理：保留单调中断事实，仅追加实际收到的字节；合成流量通过不等于正式协议画像通过。
+
+### 6. Tests Required
+
+- `test_account_cli_settings.py`：真实 SQLite/API 验证严格类型、增量更新、旧库幂等升级、继承组合、创建事务重读账号、旧 run 执行证明优先及登录版本稳定。
+- `test_capture_settings_runtime.py` 与 `test_account_runtime.py`：两个空间共享/独占分支、精确版本/PATH/CA、监督记录、租约/代次保护、恢复字段、文件隔离和受限预览；关闭不影响共享执行。
+- `images/sidecar/test_recorder.py`：请求先落盘、索引同流去重、停止/错误为 interrupted、迟到 response 不覆盖中断；`images/account/test_network_context.py` 核对忽略 TERM 的监听器定向强停及 false 结果。
+- 实际浏览器提交三种版本来源，验证表单归属、成功重置、详情、账号/全局设置保持及无错误弹窗；两个空间配置默认关闭、切账号、旧 GET/PUT 回执、明暗和窄屏均覆盖。
+- 本地真实 HTTP/SSE + mitmdump 验证完整流后中断、JSONL/索引/stats/.flow 保留与新代不改旧文件哈希；真实账号和生产并行验证按发布授权单列，不以模型或 usage 请求探测配置。
+
 ## Scenario: v3 部署成功后的旧镜像回收
 
 ### 1. Scope / Trigger

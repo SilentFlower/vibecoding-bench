@@ -83,6 +83,50 @@ class RecorderQuotaTests(unittest.TestCase):
         self.assertEqual(1, len(self.observations.read_text().splitlines()))
         self.assertNotIn(self.token, self.observations.read_text())
 
+    def test_capture_persists_request_before_response_and_marks_interruption(self) -> None:
+        """先保存请求，异常及停止更新同一索引，JSONL 只追加真实阶段。:return: None。"""
+        capture = self.base / 'http_capture.jsonl'
+        index = self.base / 'capture_index.json'
+        with patch.multiple(recorder, CAPTURE_FULL_HTTP=True, CAPTURE_FILE=str(capture), CAPTURE_INDEX_FILE=str(index)):
+            flow = self._flow()
+            flow.request.scheme, flow.request.query = 'https', {}
+            flow.request.get_text = lambda strict=False: '{}'
+            flow.response = None
+            self.addon.request(flow)
+            self.assertEqual('pending', json.loads(index.read_text())['entries'][0]['capture_state'])
+            self.addon.error(flow)
+            entries = json.loads(index.read_text())['entries']
+            self.assertEqual(1, len(entries))
+            self.assertEqual('interrupted', entries[0]['capture_state'])
+            self.assertIsNone(entries[0]['response']['status'])
+            flow.response = ResponseFactory.make(200, b'partial response', {})
+            self.addon.response(flow)
+            self.assertEqual('interrupted', json.loads(index.read_text())['entries'][0]['capture_state'])
+            records = [json.loads(line) for line in capture.read_text().splitlines()]
+            self.assertEqual(['pending', 'interrupted', 'interrupted'], [item['capture_state'] for item in records])
+            flow.id = 'next-flow'
+            self.addon.request(flow)
+            self.addon.done()
+            entries = json.loads(index.read_text())['entries']
+            self.assertEqual(2, len(entries))
+            self.assertTrue(all(item['capture_state'] == 'interrupted' for item in entries))
+
+    def test_capture_response_updates_index_without_double_counting_request(self) -> None:
+        """响应完成覆盖同流索引状态，追加记录保留先前请求。:return: None。"""
+        capture, index = self.base / 'http_capture.jsonl', self.base / 'capture_index.json'
+        with patch.multiple(recorder, CAPTURE_FULL_HTTP=True, CAPTURE_FILE=str(capture), CAPTURE_INDEX_FILE=str(index)):
+            flow = self._flow()
+            flow.request.scheme, flow.request.query = 'https', {}
+            flow.request.get_text = lambda strict=False: '{}'
+            response, flow.response = flow.response, None
+            self.addon.request(flow)
+            flow.response = response
+            self.addon.response(flow)
+            value = json.loads(index.read_text())
+            self.assertEqual(1, value['total_flows'])
+            self.assertEqual('complete', value['entries'][0]['capture_state'])
+            self.assertEqual(2, len(capture.read_text().splitlines()))
+
     def test_successful_stream_at_100_finishes_but_next_request_is_blocked(self) -> None:
         """已接受流不发暂停信号，后续模型请求被挡住。"""
         flow = self._flow(200, self._headers(False))

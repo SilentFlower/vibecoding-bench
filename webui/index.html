@@ -78,6 +78,8 @@
         <div class="projects-overview-head">
           <div><span class="lbl">运行状态</span><h3 id="projects-state">请选择账号</h3><p id="projects-message" class="hint"></p></div>
           <div class="view-actions projects-controls">
+            <button class="btn" type="button" id="projects-cli-settings" disabled>配置</button>
+            <button class="btn" type="button" id="projects-capture" disabled>查看抓包</button>
             <button class="btn btn-primary" type="button" data-pi-action="start" disabled>启动 / 恢复 Pi</button>
             <button class="btn" type="button" data-pi-action="pause" disabled>暂停</button>
             <button class="btn" type="button" data-pi-action="stop" disabled>停止当前目标</button>
@@ -365,6 +367,10 @@
           <label><span class="lbl">$ topic</span>
             <select name="topic_id" required></select>
           </label>
+          <label><span class="lbl">$ Claude Code 版本</span>
+            <input name="claude_code_version" type="text" placeholder="留空继承账号 / 全局" />
+            <span class="hint inline">只覆盖本次抓包，不修改账号版本。</span>
+          </label>
           <label><span class="lbl">$ timeout_sec</span>
             <input name="timeout_sec" type="number" min="60" value="1800" />
           </label>
@@ -469,6 +475,32 @@
           <button type="submit" class="btn btn-primary">确认关联</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="cli-settings-modal">
+    <div class="modal-card modal-card-md">
+      <div class="modal-titlebar">
+        <span class="modal-titlebar-name" id="cli-settings-title">Claude Code 配置</span>
+        <button type="button" class="modal-close" data-close="#cli-settings-modal" aria-label="关闭 Claude Code 配置">×</button>
+      </div>
+      <form id="cli-settings-form" class="form">
+        <label><span class="lbl">账号 Claude Code 版本</span><input name="claude_code_version" type="text" placeholder="留空继承全局，例如 2.1.303" /></label>
+        <p class="hint">此账号的全部 CLI 入口共用此版本；已有运行和会话保留原版本。</p>
+        <p class="hint" id="cli-settings-effective" role="status"></p>
+        <label id="cli-settings-capture" class="toggle-line"><input name="capture_enabled" type="checkbox" /> 采集本空间的 Claude Code HTTP 请求与响应</label>
+        <p class="hint" id="cli-settings-capture-hint">默认关闭。保存后仅对后续新执行生效；开启时等待同账号其他 CLI 空闲，关闭后历史抓包保留。</p>
+        <p class="hint" id="cli-settings-feedback" role="status" aria-live="polite"></p>
+        <div class="row row-end"><button type="button" class="btn" data-close="#cli-settings-modal">关闭</button><button type="submit" class="btn btn-primary" disabled>保存</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="work-capture-modal">
+    <div class="modal-card">
+      <div class="modal-titlebar"><span class="modal-titlebar-name">Claude Code 抓包</span><button type="button" class="modal-close" data-close="#work-capture-modal" aria-label="关闭抓包详情">×</button></div>
+      <div class="view-actions"><button type="button" class="btn btn-sm" id="work-capture-refresh">刷新已采集数据</button></div>
+      <div id="work-capture-content" class="detail-section" role="status"></div>
     </div>
   </div>
 

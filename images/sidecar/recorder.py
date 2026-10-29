@@ -318,6 +318,8 @@ def _capture_index_entry(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "ts": record.get("ts"),
         "flow_id": record.get("flow_id"),
+        "capture_state": record.get("capture_state", "complete"),
+        "capture_message": record.get("capture_message"),
         "request": {
             "method": request.get("method"),
             "host": request.get("host"),
@@ -374,6 +376,8 @@ def _write_capture_index(entry: dict[str, Any]) -> None:
                 existing = [item for item in data["entries"] if isinstance(item, dict)]
         except Exception:
             existing = []
+    # 请求先落盘、响应后更新同一条索引；完整 JSONL 仍按事件追加，避免改写旧证据。
+    existing = [item for item in existing if item.get("flow_id") != entry.get("flow_id")]
     existing.append(entry)
     versions = sorted({
         item.get("analysis", {}).get("cc_version")
@@ -416,6 +420,9 @@ class Recorder:
         self._pending_quota: tuple[dict, str, bool] | None = None
         self._warmup_task: asyncio.Task | None = None
         self.quota_control_failed = False
+        self.capture_pending: dict[str, http.HTTPFlow] = {}
+        self.capture_closing = False
+        self.capture_interrupted: set[str] = set()
 
     def running(self) -> None:
         """启动养号状态观察；普通作业不增加后台任务。@return None。"""
@@ -426,6 +433,40 @@ class Recorder:
         """撤销本执行观察任务，避免上下文切换后沿用旧作业。@return None。"""
         if self._warmup_task is not None:
             self._warmup_task.cancel()
+        self.capture_closing = True
+        for flow in list(self.capture_pending.values()):
+            self._persist_capture(flow, "interrupted", "Recorder 已停止，响应未完成")
+
+    def _persist_capture(self, flow: http.HTTPFlow, state: str, message: str | None = None) -> None:
+        """追加真实已取得的 HTTP 内容，索引只保留当前流的最新阶段。
+
+        :param flow: 实际 HTTP 流。
+        :param state: pending、complete 或 interrupted。
+        :param message: 固定的中断说明，不含上游敏感错误原文。
+        :return: None；落盘失败另写统计错误，不能干扰转发。
+        """
+        if not CAPTURE_FULL_HTTP or not _should_capture_full_http(flow):
+            return
+        # mitmproxy 停止时仍可能派发迟到 response；新字节可以追加，中断事实不能被覆盖。
+        if state == 'complete' and (self.capture_closing or flow.id in self.capture_interrupted):
+            state, message = 'interrupted', '采集已中断，仅保留实际收到的响应内容'
+        if state == 'interrupted':
+            self.capture_interrupted.add(flow.id)
+        try:
+            record = _capture_record(flow)
+            record.update(capture_state=state, capture_message=message)
+            _jsonl_append(CAPTURE_FILE, record)
+            _write_capture_index(_capture_index_entry(record))
+            if state == "pending":
+                self.capture_pending[flow.id] = flow
+            else:
+                self.capture_pending.pop(flow.id, None)
+        except Exception:
+            # 保留先前成功落盘的记录，不以索引失败阻断账号请求。
+            try:
+                _jsonl_append(STATS_FILE, {"ts": time.time(), "flow_id": flow.id, "error": "HTTP 抓包落盘失败"})
+            except OSError:
+                pass
 
     async def _watch_warmup(self) -> None:
         """有界读取真实共享状态，API 更新也能让养号在收尾后暂停。"""
@@ -513,6 +554,7 @@ class Recorder:
         :return: None
         """
         self._finish_warmup_flow(flow)
+        self._persist_capture(flow, "interrupted", "HTTP 连接中断，响应未完成")
 
     def _quota_state(self) -> dict:
         try:
@@ -709,6 +751,7 @@ class Recorder:
         :param flow: 完整请求 body 已可读取的 CLI 流
         :return: None；缺少明确身份时保持未确认
         """
+        self._persist_capture(flow, "pending")
         if os.environ.get("V3_ACCOUNT") != "1" or not any(
                 host.rstrip(".") in ("api.anthropic.com", "api.anthropic.com:443")
                 for host in _flow_host_values(flow)):
@@ -784,10 +827,7 @@ class Recorder:
                 "usage": usage,
             }
             _jsonl_append(STATS_FILE, stat)
-            if CAPTURE_FULL_HTTP and _should_capture_full_http(flow):
-                record = _capture_record(flow)
-                _jsonl_append(CAPTURE_FILE, record)
-                _write_capture_index(_capture_index_entry(record))
+            self._persist_capture(flow, "complete")
         except Exception as e:
             # 记录失败但不影响转发
             try:

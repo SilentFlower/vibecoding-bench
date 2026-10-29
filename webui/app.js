@@ -47,12 +47,15 @@ const state = {
   viewGeneration: 0,
   runWindowConfig: null,
   warmupAccountId: null,
+  cliSettings: null,
+  workCapture: null,
 };
 
 // ===================== Pi 项目指挥 =====================
 /** 展示每账号 Pi 控制台。@return {Promise<void>} 页面加载完成。 */
 function renderProjects() {
-  return window.ProjectsUI.mount({api: API, prefix: RUNTIME_BASE});
+  return window.ProjectsUI.mount({api: API, prefix: RUNTIME_BASE,
+    configureCli: openCliSettingsConfig, showCapture: openWorkCapture, closePanels: closeProjectDialogs});
 }
 
 /**
@@ -70,7 +73,8 @@ function openWarmupAccount(accountId) {
 function renderWarmup() {
   const accountId = state.warmupAccountId;
   state.warmupAccountId = null;
-  return window.ProjectsUI.mount({api: API, prefix: RUNTIME_BASE, namespace: 'warmup', accountId});
+  return window.ProjectsUI.mount({api: API, prefix: RUNTIME_BASE, namespace: 'warmup', accountId,
+    configureCli: openCliSettingsConfig, showCapture: openWorkCapture, closePanels: closeProjectDialogs});
 }
 
 // ===================== 路由 =====================
@@ -93,6 +97,7 @@ function currentTab() {
 function navigate() {
   state.viewGeneration += 1;
   closeModal('#run-window-modal');
+  closeProjectDialogs();
   const tab = currentTab();
   $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === tab));
   const view = $('#view');
@@ -355,6 +360,7 @@ async function renderAccounts() {
       <td class="warmup-status">${renderWarmupStatus(a)}</td>
       <td>${a.enabled ? '✓' : '✗'}</td>
       <td><div class="op-actions account-actions">
+        <button type="button" class="btn btn-sm" data-cli-settings="${a.id}">Claude Code 配置</button>
         <button class="btn btn-sm" data-quota="${a.id}">额度</button>
         ${a.cc2api_account_id == null ? `<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">创建 cc2api 账号</button>
         <button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>` :
@@ -388,6 +394,10 @@ async function renderAccounts() {
   }).join('') || '<tr><td colspan="9" class="muted empty-cell">暂无账号</td></tr>';
 
   body.onclick = async (e) => {
+    if (e.target.dataset.cliSettings) {
+      await openCliSettingsConfig(Number(e.target.dataset.cliSettings));
+      return;
+    }
     const draftId = e.target.dataset.draftResume || e.target.dataset.draftRestart || e.target.dataset.draftCancel || e.target.dataset.draftDelete || e.target.dataset.draftReconcile;
     if (draftId) {
       const draft = state.loginDrafts.find(item => item.environment_id === draftId);
@@ -1997,6 +2007,7 @@ function setRunDetailText(selector, html) {
   if (el && el.innerHTML !== html) el.innerHTML = html;
 }
 
+/** 渲染三个入口共用的抓包索引和状态。@param {object} capture 公开抓包摘要。@return {string} 已脱敏 HTML。 */
 function renderCaptureDetail(capture) {
   if (!capture || capture.error) {
     return `<div class="muted">${escapeHTML(capture?.error || '等待抓包索引')}</div>`;
@@ -2014,7 +2025,7 @@ function renderCaptureDetail(capture) {
       <tr>
         <td><code>${escapeHTML(e.flow_id || '-')}</code></td>
         <td>${escapeHTML(path)}</td>
-        <td>${escapeHTML(resp.status ?? '-')}</td>
+        <td>${escapeHTML(resp.status ?? '-')} ${escapeHTML({pending: '响应中', interrupted: '中断', complete: '完成'}[e.capture_state] || '')}</td>
         <td>${escapeHTML(req.body_bytes ?? 0)} / ${escapeHTML(resp.body_bytes ?? 0)}</td>
         <td>${escapeHTML(ana.cc_version || '-')}</td>
       </tr>
@@ -2024,6 +2035,7 @@ function renderCaptureDetail(capture) {
     <div class="file">${escapeHTML(f.path)}<span class="size">${formatSize(f.size || 0)}</span></div>
   `).join('') || '<div class="muted">暂无抓包文件</div>';
   const captureStats = `
+    <p class="hint" role="status">${escapeHTML(capture.message || '仅展示已落盘数据')}</p>
     <div class="stats-grid capture-stats">
       <div class="stat-box"><div class="stat-label">flows</div><div class="stat-value">${escapeHTML(index.total_flows ?? entries.length)}</div></div>
       <div class="stat-box"><div class="stat-label">运行版本</div><div class="stat-value-sm">${escapeHTML(capture.claude_code_version || '-')}</div></div>
@@ -2037,7 +2049,7 @@ function renderCaptureDetail(capture) {
   if (capture.available === false) {
     return `
       ${captureStats}
-      <div class="muted">${escapeHTML(index.error || '等待抓包索引')}</div>
+      <div class="muted">${escapeHTML(capture.message || '尚未采到目标流量')}</div>
       <div class="file-tree capture-files">${fileRows}</div>
     `;
   }
@@ -2333,6 +2345,7 @@ function bindCaptureForm() {
       prompt_mode: fd.get('prompt_mode') || 'canonical',
       model_override: (fd.get('model_override') || '').trim() || null,
       effort_level: (fd.get('effort_level') || '').trim() || null,
+      claude_code_version: (fd.get('claude_code_version') || '').trim() || null,
       permission_mode: fd.get('permission_mode') || 'bypassPermissions',
     };
     btn.disabled = true;
@@ -2343,6 +2356,7 @@ function bindCaptureForm() {
       });
       form.prompt.value = '';
       form.model_override.value = '';
+      form.claude_code_version.value = '';
       form.effort_level.value = '';
       form.permission_mode.value = 'bypassPermissions';
       await Promise.all([
@@ -2566,11 +2580,104 @@ function openModal(sel) { $(sel).classList.remove('hidden'); }
  * @return {void}
  */
 function closeModal(sel) {
+  if (sel === '#cli-settings-modal') state.cliSettings = null;
+  if (sel === '#work-capture-modal') state.workCapture = null;
   if (sel === '#run-window-modal') {
     state.runWindowConfig = null;
     $('#run-window-form button[type="submit"]').disabled = false;
   }
   $(sel).classList.add('hidden');
+}
+
+/** 关闭工程配置与抓包窗口，使换账号、换空间前的回执失效。@return {void} */
+function closeProjectDialogs() {
+  closeModal('#cli-settings-modal');
+  closeModal('#work-capture-modal');
+}
+
+/**
+ * 打开统一账号版本配置，迭代页只编辑本空间的抓包开关。
+ * @param {number} accountId 当前账号。
+ * @param {string|null} namespace projects、warmup 或账号页的 null。
+ * @return {Promise<void>} 配置读取完成。
+ */
+async function openCliSettingsConfig(accountId, namespace = null) {
+  closeModal('#cli-settings-modal');
+  const request = {accountId, namespace, generation: state.viewGeneration, loaded: false};
+  state.cliSettings = request;
+  const form = $('#cli-settings-form'), submit = form.querySelector('[type=submit]');
+  const current = () => state.cliSettings === request && request.generation === state.viewGeneration;
+  const field = namespace === 'warmup' ? 'warmup_capture_enabled' : 'projects_capture_enabled';
+  const fill = value => {
+    form.elements.claude_code_version.value = value.claude_code_version || '';
+    form.elements.capture_enabled.checked = value[field] === true;
+    $('#cli-settings-effective').textContent = `当前有效版本：${value.effective_claude_code_version} · 来源：${value.claude_code_version_source === 'account' ? '账号配置' : '全局配置'}`;
+  };
+  $('#cli-settings-title').textContent = `账号 #${accountId} · ${namespace === 'projects' ? '项目迭代配置' : namespace === 'warmup' ? '养号迭代配置' : 'Claude Code 版本'}`;
+  $('#cli-settings-capture').classList.toggle('hidden', namespace == null);
+  $('#cli-settings-capture-hint').classList.toggle('hidden', namespace == null);
+  $('#cli-settings-effective').textContent = '';
+  $('#cli-settings-feedback').textContent = '正在读取配置…';
+  form.reset(); submit.disabled = true;
+  form.elements.claude_code_version.disabled = true;
+  form.elements.capture_enabled.disabled = true;
+  openModal('#cli-settings-modal');
+  form.onsubmit = async event => {
+    event.preventDefault();
+    if (!current() || !request.loaded || submit.disabled) return;
+    const payload = {claude_code_version: form.elements.claude_code_version.value.trim() || null};
+    if (namespace != null) payload[field] = form.elements.capture_enabled.checked;
+    submit.disabled = true;
+    try {
+      const saved = await API(`/accounts/${accountId}/cli-settings`, {method: 'PUT', body: JSON.stringify(payload)});
+      if (!current()) return;
+      fill(saved);
+      $('#cli-settings-feedback').textContent = '配置已保存，后续新执行生效。';
+    } catch (error) {
+      if (current()) $('#cli-settings-feedback').textContent = `保存失败：${error.message}`;
+    } finally { if (current()) submit.disabled = false; }
+  };
+  try {
+    const value = await API(`/accounts/${accountId}/cli-settings`);
+    if (!current()) return;
+    fill(value); request.loaded = true;
+    form.elements.claude_code_version.disabled = false;
+    form.elements.capture_enabled.disabled = false;
+    submit.disabled = false;
+    $('#cli-settings-feedback').textContent = '';
+  } catch (error) {
+    if (current()) $('#cli-settings-feedback').textContent = `读取失败：${error.message}`;
+  }
+}
+
+/**
+ * 查看当前或历史工作的抓包；手动刷新只读取已落盘内容。
+ * @param {string} workId 已登记的工作标识。
+ * @param {string} namespace 项目或养号空间。
+ * @return {Promise<void>} 首次详情读取完成。
+ */
+async function openWorkCapture(workId, namespace) {
+  closeModal('#work-capture-modal');
+  const request = {workId, namespace, revision: 0};
+  state.workCapture = request;
+  const prefix = namespace === 'warmup' ? '/accounts/warmup/pi' : '/projects';
+  const button = $('#work-capture-refresh');
+  const refresh = async () => {
+    const revision = ++request.revision;
+    button.disabled = true;
+    try {
+      const capture = await API(`${prefix}/work/${encodeURIComponent(workId)}/capture`);
+      if (state.workCapture === request && revision === request.revision)
+        $('#work-capture-content').innerHTML = renderCaptureDetail(capture);
+    } catch (error) {
+      if (state.workCapture === request && revision === request.revision)
+        $('#work-capture-content').textContent = `读取抓包失败：${error.message}`;
+    } finally { if (state.workCapture === request && revision === request.revision) button.disabled = false; }
+  };
+  $('#work-capture-content').textContent = '正在读取抓包…';
+  button.onclick = refresh;
+  openModal('#work-capture-modal');
+  await refresh();
 }
 
 document.addEventListener('click', (e) => {

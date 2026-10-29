@@ -51,6 +51,7 @@ from starlette.websockets import WebSocketState
 from quota_protocol import merge_quota_observation, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
 from cli_quota import statusline_quota_observation
+from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_summary
 from login_terminal import authorization_url
 from login_drafts import LoginDraftStore
 from physical_features import physical_features_summary
@@ -1257,11 +1258,13 @@ def _claude_exec_env(use_sidecar: bool, extra: Optional[dict[str, str]] = None) 
 
     entrypoint 里 export 的变量不会自动进入 docker exec 创建的新进程；走
     sidecar MITM 时必须重复传 CA 路径，否则登录 TUI 可能不信 MITM 证书。
+
+    :param use_sidecar: 本次子命令是否需要显式信任抓包 CA。
+    :param extra: 本次已冻结的版本及其他执行环境。
+    :return: 子命令应使用的完整附加环境。
     """
-    try:
-        claude_code_version = effective_claude_code_version()
-    except Exception:
-        claude_code_version = CLAUDE_CODE_VERSION
+    # 已冻结的版本优先，不能在 exec 阶段因可变全局设置改用另一个版本。
+    claude_code_version = _resolve_run_claude_code_version((extra or {}).get("CLAUDE_CODE_VERSION"))
     env = {
         "HOME": WORKER_HOME,
         "CLAUDE_CODE_VERSION": claude_code_version,
@@ -1341,6 +1344,9 @@ CREATE TABLE IF NOT EXISTS accounts (
   upstream_socks5_pass TEXT,
   timezone TEXT,
   run_window_json TEXT,
+  claude_code_version TEXT,
+  projects_capture_enabled INTEGER NOT NULL DEFAULT 0,
+  warmup_capture_enabled INTEGER NOT NULL DEFAULT 0,
   cc2api_account_id INTEGER,
   warmup_enabled INTEGER DEFAULT 0,
   warmup_interval_min_hours INTEGER DEFAULT 3,
@@ -1447,6 +1453,7 @@ CREATE TABLE IF NOT EXISTS runs (
   capture_model_override TEXT,
   capture_permission_mode TEXT DEFAULT 'bypassPermissions',
   claude_code_version TEXT,
+  claude_code_version_source TEXT,
   claude_effort_level TEXT,
   execution_model TEXT,
   quota_attempt INTEGER NOT NULL DEFAULT 0,
@@ -1515,6 +1522,9 @@ def init_db() -> None:
             _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
             _ensure_column(conn, "accounts", "timezone", "TEXT")
             _ensure_column(conn, "accounts", "run_window_json", "TEXT")
+            _ensure_column(conn, "accounts", "claude_code_version", "TEXT")
+            _ensure_column(conn, "accounts", "projects_capture_enabled", "INTEGER NOT NULL DEFAULT 0")
+            _ensure_column(conn, "accounts", "warmup_capture_enabled", "INTEGER NOT NULL DEFAULT 0")
             _ensure_column(conn, "runs", "window_wait_until", "REAL")
             _ensure_column(conn, "task_batches", "window_wait_until", "REAL")
             _ensure_column(conn, "accounts", "deleted_at", "REAL")
@@ -1558,6 +1568,7 @@ def init_db() -> None:
                 "TEXT DEFAULT 'bypassPermissions'",
             )
             _ensure_column(conn, "runs", "claude_code_version", "TEXT")
+            _ensure_column(conn, "runs", "claude_code_version_source", "TEXT")
             _ensure_column(conn, "runs", "claude_effort_level", "TEXT")
             _ensure_column(conn, "runs", "execution_model", "TEXT")
             _ensure_column(conn, "runs", "quota_attempt", "INTEGER NOT NULL DEFAULT 0")
@@ -1959,6 +1970,35 @@ def effective_claude_code_version() -> str:
     return get_runtime_claude_code_version_setting() or CLAUDE_CODE_VERSION
 
 
+def _resolve_account_cli_version(account: dict, value: Optional[str] = None) -> tuple[str, str]:
+    """解析一次执行的精确版本及来源，不修改账号或全局设置。
+
+    :param account: 已核对归属的账号；新账号草稿允许仅包含名称。
+    :param value: 本次显式版本，空值表示继承账号配置。
+    :return: 精确版本与 explicit/account/global 来源。
+    """
+    explicit = _normalize_claude_code_version(value, "claude_code_version")
+    if explicit:
+        return explicit, "explicit"
+    configured = _normalize_claude_code_version(account.get("claude_code_version"), "account.claude_code_version")
+    if configured:
+        return configured, "account"
+    return effective_claude_code_version(), "global"
+
+
+def _account_cli_settings(account: dict) -> dict:
+    """生成账号 CLI 配置的公开快照，不准备环境或启动执行。
+
+    :param account: 当前账号行。
+    :return: 权威配置、有效版本、来源及两个空间独立的抓包开关。
+    """
+    version, source = _resolve_account_cli_version(account)
+    return {"account_id": account["id"], "claude_code_version": account.get("claude_code_version"),
+        "effective_claude_code_version": version, "claude_code_version_source": source,
+        "projects_capture_enabled": bool(account.get("projects_capture_enabled", 0)),
+        "warmup_capture_enabled": bool(account.get("warmup_capture_enabled", 0))}
+
+
 def _resolve_run_claude_code_version(value: Optional[str]) -> str:
     """
     解析 run 已保存的 Claude Code 版本，兼容缺少快照的旧内部调用。
@@ -1986,13 +2026,32 @@ def _ensure_run_claude_code_version(run: dict) -> str:
     if version:
         return version
 
-    fallback_version = effective_claude_code_version()
+    recorded_version = None
+    if account_runtime and run.get('environment_id') and run.get('execution_source'):
+        connection = get_db()
+        try:
+            environment = connection.execute('SELECT * FROM account_environments WHERE environment_id=? AND account_id=?',
+                (run['environment_id'], run['account_id'])).fetchone()
+        finally:
+            connection.close()
+        if environment:
+            root = account_runtime._root(dict(environment)) / 'runtime'
+            source = run['execution_source']
+            for path in (root / 'execution.json', root / 'executions' / (hashlib.sha256(source.encode()).hexdigest() + '.json')):
+                if not path.is_file() or path.is_symlink():
+                    continue
+                proof = json.loads(path.read_text())
+                if (proof.get('source') == source and proof.get('generation') == run.get('environment_generation')
+                        and proof.get('container_id') == environment['container_id']):
+                    recorded_version = _normalize_claude_code_version(proof.get('version'), 'execution.claude_code_version')
+                    if recorded_version:
+                        break
     with _db_lock:
         conn = get_db()
         try:
             with conn:
                 row = conn.execute(
-                    "SELECT claude_code_version FROM runs WHERE id=?",
+                    "SELECT claude_code_version, claude_code_version_source, account_id FROM runs WHERE id=?",
                     (run["id"],),
                 ).fetchone()
                 if not row:
@@ -2003,12 +2062,20 @@ def _ensure_run_claude_code_version(run: dict) -> str:
                 )
                 if not version:
                     # 历史行没有快照时只补写一次，避免后续页面配置变化再次影响该会话。
-                    version = fallback_version
+                    account = conn.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
+                    if recorded_version:
+                        version, source = recorded_version, 'legacy-execution'
+                    else:
+                        version, source = _resolve_account_cli_version(dict(account) if account else {})
+                        source = "legacy-" + source
                     conn.execute(
-                        "UPDATE runs SET claude_code_version=? "
-                        "WHERE id=? AND claude_code_version IS NULL",
-                        (version, run["id"]),
+                        "UPDATE runs SET claude_code_version=?, claude_code_version_source=? "
+                        "WHERE id=? AND (claude_code_version IS NULL OR trim(claude_code_version)='')",
+                        (version, source, run["id"]),
                     )
+                    run["claude_code_version_source"] = source
+                else:
+                    run["claude_code_version_source"] = row["claude_code_version_source"]
         finally:
             conn.close()
     run["claude_code_version"] = version
@@ -4475,7 +4542,7 @@ fs.renameSync(tmp, dst);
         temp_home = temp_workspace / ".claude-home"
         temp_workspace.mkdir(parents=True, exist_ok=True)
         CA_DIR.mkdir(parents=True, exist_ok=True)
-        claude_code_version = effective_claude_code_version()
+        claude_code_version, _ = _resolve_account_cli_version(account)
 
         sidecar_id: Optional[str] = None
         worker_id: Optional[str] = None
@@ -4531,7 +4598,7 @@ fs.renameSync(tmp, dst);
                     },
                 )
                 worker_id = worker.id
-                raw = self._exec_oauth_refresh_probe(worker_id)
+                raw = self._exec_oauth_refresh_probe(worker_id, version=claude_code_version)
                 if raw.get("refreshed"):
                     refreshed_credentials = temp_home / ".credentials.json"
                     if refreshed_credentials.exists():
@@ -4539,7 +4606,7 @@ fs.renameSync(tmp, dst);
                     else:
                         raw = {"error": "OAuth token 刷新后未生成 .credentials.json"}
                 if not raw.get("error"):
-                    raw = self._exec_quota_probe(worker_id)
+                    raw = self._exec_quota_probe(worker_id, version=claude_code_version)
                 workspace_top_config = temp_workspace / ".claude.json"
                 if workspace_top_config.exists():
                     shutil.copy2(workspace_top_config, temp_home / ".claude.json")
@@ -4549,11 +4616,13 @@ fs.renameSync(tmp, dst);
             self.cleanup(sidecar_id, worker_id)
             shutil.rmtree(temp_workspace, ignore_errors=True)
 
-    def _exec_quota_probe(self, worker_id: str) -> dict:
+
+    def _exec_quota_probe(self, worker_id: str, version: Optional[str] = None) -> dict:
         """
         在 quota worker 中通过 OAuth usage API 读取额度。
 
         :param worker_id: quota worker 容器 ID
+        :param version: 本次启动时已冻结的 CLI 版本。
         :return: usage API 原始 JSON，失败时返回 raw/error
         """
         script = r'''
@@ -4677,6 +4746,8 @@ JS
             stderr=True,
             user="1000" if account_runtime else WORKER_USER,
             environment=_claude_exec_env(not account_runtime, {"V3_NATIVE_USAGE": "1" if account_runtime else "0",
+                "CLAUDE_CODE_VERSION": version or (_resolve_account_cli_version(account_runtime.job_for_container(worker_id)["account"])[0]
+                    if account_runtime else effective_claude_code_version()),
                 **(account_runtime.execution_environment(account_runtime.job_for_container(worker_id)["row"]) if account_runtime else {})}),
             workdir=WORKER_HOME,
         )
@@ -4709,7 +4780,7 @@ JS
             if not force_refresh and status["oauth_token_state"] == "valid" and int(status.get("oauth_expires_in_sec") or 0) > OAUTH_REFRESH_BUFFER_SEC:
                 return False
             if account_runtime:
-                version = effective_claude_code_version()
+                version, _ = _resolve_account_cli_version(account)
                 source = f"oauth-refresh:{uuid.uuid4().hex}"
                 row, container = account_runtime.ensure(account)
                 job = account_runtime.claim(row, account, source, exclusive=True)
@@ -4718,7 +4789,7 @@ JS
                     context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": source}
                     atomic_json(account_runtime._network_runtime(row) / "context.json", context)
                     account_runtime._configure_network_context(container, context)
-                    raw = self._exec_oauth_refresh_probe(job["token"], use_mitm=False, force_refresh=force_refresh)
+                    raw = self._exec_oauth_refresh_probe(job["token"], use_mitm=False, force_refresh=force_refresh, version=version)
                     if raw.get("skipped"):
                         return False
                     if raw.get("error"):
@@ -4738,7 +4809,7 @@ JS
             temp_workspace = WORKSPACES_DIR / temp_run_id
             temp_home = temp_workspace / ".claude-home"
             temp_workspace.mkdir(parents=True, exist_ok=True)
-            claude_code_version = effective_claude_code_version()
+            claude_code_version, _ = _resolve_account_cli_version(account)
             _copy_profile_whitelist_to_claude_home(PROFILES_DIR / acc_name, temp_home)
             top_config = temp_home / ".claude.json"
             if top_config.exists():
@@ -4794,7 +4865,7 @@ JS
                     },
                 )
                 worker_id = worker.id
-                raw = self._exec_oauth_refresh_probe(worker_id, force_refresh=force_refresh)
+                raw = self._exec_oauth_refresh_probe(worker_id, force_refresh=force_refresh, version=claude_code_version)
                 if raw.get("skipped"):
                     return False
                 if raw.get("error"):
@@ -4809,13 +4880,16 @@ JS
                 self.cleanup(sidecar_id, worker_id)
                 shutil.rmtree(temp_workspace, ignore_errors=True)
 
-    def _exec_oauth_refresh_probe(self, worker_id: str, use_mitm: bool = True, *, force_refresh: bool = False) -> dict:
+
+    def _exec_oauth_refresh_probe(self, worker_id: str, use_mitm: bool = True, *, force_refresh: bool = False,
+                                  version: Optional[str] = None) -> dict:
         """
         在临时 worker 内使用 refreshToken 刷新 accessToken。
 
         :param worker_id: refresh worker 容器 ID
         :param use_mitm: 是否为当前 exec 显式注入 Recorder CA
         :param force_refresh: 已确认401时绕过有效期预检查。
+        :param version: 本次维护启动时冻结的版本。
         :return: 刷新结果对象
         """
         script = r'''
@@ -4984,7 +5058,7 @@ JS
             environment = _claude_exec_env(use_mitm, {
                 "HOME": "/home/node",
                 **account_runtime.execution_environment(job["row"]),
-                "CLAUDE_CODE_VERSION": effective_claude_code_version(),
+                "CLAUDE_CODE_VERSION": version or job.get("version") or _resolve_account_cli_version(job["account"])[0],
                 "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
                 "OAUTH_FORCE_REFRESH": "1" if force_refresh else "0",
             })
@@ -4993,6 +5067,7 @@ JS
             actual_worker = worker_id
             command = ["sh", "-lc", script]
             environment = _claude_exec_env(use_mitm, {
+                "CLAUDE_CODE_VERSION": version or effective_claude_code_version(),
                 "OAUTH_REFRESH_BUFFER_SEC": str(OAUTH_REFRESH_BUFFER_SEC),
                 "OAUTH_FORCE_REFRESH": "1" if force_refresh else "0",
             })
@@ -5034,7 +5109,19 @@ class LoginSession:
 
     def __init__(self, sid: str, name: str, sidecar_id: Optional[str],
                  worker_id: str, proxy: dict, profile_dir: Path,
-                 force_reauth: bool) -> None:
+                 force_reauth: bool, version: Optional[str] = None) -> None:
+        """保存本次登录的归属及冻结版本，恢复时不重新读取账号默认。
+
+        :param sid: 登录会话标识。
+        :param name: 账号名称。
+        :param sidecar_id: 网络容器标识。
+        :param worker_id: CLI 容器标识。
+        :param proxy: 本次代理配置。
+        :param profile_dir: 本次受控配置目录。
+        :param force_reauth: 是否强制重新授权。
+        :param version: 创建或恢复时已选择的版本。
+        :return: None。
+        """
         self.sid = sid
         self.name = name
         self.sidecar_id = sidecar_id
@@ -5045,7 +5132,7 @@ class LoginSession:
         self.force_reauth = force_reauth
         self.committed = False
         self.home = WORKER_HOME
-        self.version = effective_claude_code_version()
+        self.version = _resolve_run_claude_code_version(version)
         self.account_id = None
         self.binding_id = None
         self.identity = {}
@@ -5213,7 +5300,7 @@ class LoginManager:
                     upstream_socks5_host=proxy.get("host"), upstream_socks5_port=proxy.get("port"),
                     upstream_socks5_user=proxy.get("user"), upstream_socks5_pass=proxy.get("pass"),
                     timezone=tz if timezone is not None else account.get("timezone"))
-                version = version or effective_claude_code_version()
+                version, _ = _resolve_account_cli_version(account, version)
                 if not existing:
                     drafts = _login_drafts()
                     draft_row = account_runtime._row(name, timezone=tz)
@@ -5224,7 +5311,7 @@ class LoginManager:
                         version=version, created_at=time.time(), home=f"/home/node/.v3-login/{sid}" if force_reauth else "/home/node")
                     draft_registered = True
                 row, container, profile, home = account_runtime.begin_login(sid, account, version, force_reauth)
-                session = LoginSession(sid, name, container.id, container.id, proxy, profile, force_reauth)
+                session = LoginSession(sid, name, container.id, container.id, proxy, profile, force_reauth, version)
                 session.home, session.version = home, version
                 if draft_row:
                     record = drafts.save(row, phase="authorizing")
@@ -5238,7 +5325,12 @@ class LoginManager:
                 return session
             actual_host_profile = HOST_BENCH_DATA / "profiles" / name
             actual_local_profile = BENCH_DATA / "profiles" / name
-            claude_code_version = effective_claude_code_version()
+            connection = get_db()
+            try:
+                existing = connection.execute("SELECT * FROM accounts WHERE name=?", (name,)).fetchone()
+            finally:
+                connection.close()
+            claude_code_version, _ = _resolve_account_cli_version(dict(existing) if existing else {}, version)
             actual_local_profile.mkdir(parents=True, exist_ok=True)
             _persist_default_claude_settings(actual_local_profile)
             _persist_default_claude_top_config(actual_local_profile)
@@ -5331,7 +5423,7 @@ class LoginManager:
 
             session = LoginSession(
                 sid, name, sidecar_id, worker.id, proxy, local_profile,
-                force_reauth,
+                force_reauth, claude_code_version,
             )
             with self._lock:
                 self.sessions[sid] = session
@@ -5368,7 +5460,7 @@ class LoginManager:
             s.worker_id, ["claude", "auth", "status"],
             stdout=True, stderr=True,
             user=WORKER_USER,
-            environment=_claude_exec_env(s.sidecar_id is not None),
+            environment=_claude_exec_env(s.sidecar_id is not None, {"CLAUDE_CODE_VERSION": s.version}),
             workdir=WORKER_HOME,
         )
         raw = api.exec_start(ex["Id"])
@@ -6186,122 +6278,6 @@ def _aggregate_claude_session_usage(run_id: str) -> dict[str, int | bool]:
     }
 
 
-_SENSITIVE_HEADER_RE = re.compile(
-    r"(authorization|cookie|set-cookie|x-api-key|token|secret|credential|key)",
-    re.IGNORECASE,
-)
-
-
-def _redact_capture_value(name: str, value: object) -> object:
-    """
-    对抓包索引预览里的敏感 header 值做脱敏。
-
-    :param name: header 或字段名
-    :param value: 原始值
-    :return: 可安全展示的值
-    """
-    if _SENSITIVE_HEADER_RE.search(name):
-        return "[redacted]"
-    return value
-
-
-def _redact_capture_headers(headers: object) -> dict[str, object]:
-    """
-    脱敏 header 对象，供 WebUI / API 预览使用。
-
-    :param headers: header dict
-    :return: 脱敏后的 header dict
-    """
-    if not isinstance(headers, dict):
-        return {}
-    return {
-        str(k): _redact_capture_value(str(k), v)
-        for k, v in headers.items()
-    }
-
-
-def _redact_capture_record(record: object) -> object:
-    """
-    对 capture_index.json 里的单条索引记录做浅层脱敏。
-
-    :param record: 索引记录
-    :return: 脱敏后的记录
-    """
-    if not isinstance(record, dict):
-        return record
-    out = dict(record)
-    for section in ("request", "response"):
-        value = out.get(section)
-        if not isinstance(value, dict):
-            continue
-        copied = dict(value)
-        copied["headers"] = _redact_capture_headers(copied.get("headers"))
-        out[section] = copied
-    analysis = out.get("analysis")
-    if isinstance(analysis, dict):
-        copied = dict(analysis)
-        if "cch_headers" in copied:
-            copied["cch_headers"] = _redact_capture_headers(copied.get("cch_headers"))
-        out["analysis"] = copied
-    return out
-
-
-def _read_capture_index(path: Path) -> dict[str, object]:
-    """
-    读取并脱敏抓包索引。
-
-    :param path: capture_index.json 路径
-    :return: 索引内容；不存在或解析失败时返回可展示状态
-    """
-    if not path.exists():
-        return {
-            "available": False,
-            "error": "capture_index.json not found",
-            "entries": [],
-        }
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return {
-            "available": False,
-            "error": f"failed to read capture index: {exc}",
-            "entries": [],
-        }
-    if not isinstance(data, dict):
-        return {
-            "available": False,
-            "error": "capture index is not an object",
-            "entries": [],
-        }
-    entries = data.get("entries")
-    if isinstance(entries, list):
-        data["entries"] = [_redact_capture_record(item) for item in entries]
-    data["available"] = True
-    return data
-
-
-def _capture_files(base: Path) -> list[dict[str, object]]:
-    """
-    返回抓包目录下的文件列表。
-
-    :param base: run flows 目录
-    :return: 文件元信息列表
-    """
-    if not base.exists():
-        return []
-    files: list[dict[str, object]] = []
-    paths = {p for p in base.rglob("*") if p.is_file()}
-    for directory in base.glob("continue-*"):
-        paths.update(p for p in directory.rglob("*") if p.is_file())
-    for path in sorted(paths):
-        rel = path.relative_to(base)
-        files.append({
-            "path": str(rel),
-            "size": path.stat().st_size,
-        })
-    return files
-
-
 # ============== 调度器：每账号 Semaphore(2) ==============
 class Scheduler:
     def __init__(self, runner: Runner) -> None:
@@ -6602,7 +6578,6 @@ class Scheduler:
         :param run_id: 新 run id
         :return: `(task_id, claude_code_version, claude_effort_level)`；批次不可执行时返回 None
         """
-        claude_code_version = effective_claude_code_version()
         claude_effort_level = effective_runtime_effort()
         candidates = item.get("followup_candidates_json")
         plan = encode_followups(sample_followups(decode_followups(candidates)))
@@ -6634,6 +6609,7 @@ class Scheduler:
                             (batch["id"],),
                         )
                         return None
+                    claude_code_version, version_source = _resolve_account_cli_version(dict(current_account))
                     cur = conn.execute(
                         "INSERT INTO tasks(topic_no, title, prompt, account_id, batch_id, "
                         "topic_id, timeout_sec, repeat_n, followup_candidates_json) VALUES(?,?,?,?,?,?,?,?,?)",
@@ -6652,7 +6628,7 @@ class Scheduler:
                     task_id = int(cur.lastrowid)
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status, "
-                        "claude_code_version, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_code_version_source, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                         (
                             run_id,
                             task_id,
@@ -6661,6 +6637,7 @@ class Scheduler:
                             item["topic_id"],
                             "queued",
                             claude_code_version,
+                            version_source,
                             claude_effort_level,
                             plan,
                             timing,
@@ -6674,6 +6651,8 @@ class Scheduler:
                     return task_id, claude_code_version, claude_effort_level
             finally:
                 conn.close()
+
+
 
     def _pause_batch_for_unavailable_account(self, batch_id: int) -> None:
         """
@@ -6871,6 +6850,7 @@ class Scheduler:
                 if (not current or current["status"] != "queued" or current.get("stop_requested_at")
                         or int(current.get("quota_attempt") or 0) != attempt):
                     return
+                task['claude_code_version'] = _ensure_run_claude_code_version(current)
                 if quota_guard and quota_guard._cancel_changed_identity(current, account):
                     return
                 if quota_guard and not current.get("quota_identity"):
@@ -7670,7 +7650,6 @@ class WarmupScheduler:
         :return: `(run_id, task_id, claude_code_version, claude_effort_level)`；不可创建时返回 None
         """
         run_id = uuid.uuid4().hex[:12]
-        claude_code_version = effective_claude_code_version()
         claude_effort_level = effective_runtime_effort()
         candidates = _topic_followup_candidates(topic, None, "natural")
         plan = encode_followups(sample_followups(decode_followups(candidates)))
@@ -7695,6 +7674,7 @@ class WarmupScheduler:
                     ).fetchone()
                     if active:
                         return None
+                    claude_code_version, version_source = _resolve_account_cli_version(dict(current))
                     cur = conn.execute(
                         "INSERT INTO tasks(topic_no, title, prompt, account_id, topic_id, "
                         "timeout_sec, repeat_n, followup_candidates_json) VALUES(?,?,?,?,?,?,?,?)",
@@ -7712,7 +7692,7 @@ class WarmupScheduler:
                     task_id = int(cur.lastrowid)
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, topic_id, status, run_kind, "
-                        "claude_code_version, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_code_version_source, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                         (
                             run_id,
                             task_id,
@@ -7721,6 +7701,7 @@ class WarmupScheduler:
                             "queued",
                             "warmup",
                             claude_code_version,
+                            version_source,
                             claude_effort_level,
                             plan,
                             timing,
@@ -7734,6 +7715,8 @@ class WarmupScheduler:
                     return run_id, task_id, claude_code_version, claude_effort_level
             finally:
                 conn.close()
+
+
 
     def _record_sync_failure(self, account: dict, exc: Exception) -> None:
         error = _redact_cc2api_error(exc)
@@ -7871,12 +7854,14 @@ def _project_admission(account: dict, run_id: str) -> bool:
     return not state.get("blocked") and not state.get("account_error") and not policy.get("blocked")
 
 
-def _project_execution_settings() -> dict:
+def _project_execution_settings(account: Optional[dict] = None) -> dict:
     """冻结新项目尝试的 CLI、思考等级和模型。
 
-    :return: 与既有调度器载荷一致的设置。
+    :param account: 已核对的执行账号；旧内部调用允许不提供。
+    :return: 与既有调度器载荷一致的版本及来源快照。
     """
-    return {"claude_code_version": effective_claude_code_version(),
+    version, source = _resolve_account_cli_version(account or {})
+    return {"claude_code_version": version, "claude_code_version_source": source,
         "claude_effort_level": effective_runtime_effort(), "execution_model": effective_runtime_model()}
 
 
@@ -8757,6 +8742,68 @@ class AccountIn(BaseModel):
     enabled: bool = True
 
 
+class AccountCliSettingsIn(BaseModel):
+    """账号 CLI 设置增量请求，省略字段保持不变。
+
+    :param claude_code_version: 精确版本，null 表示继承全局。
+    :param projects_capture_enabled: 当前账号在项目迭代空间的抓包开关。
+    :param warmup_capture_enabled: 当前账号在养号迭代空间的抓包开关。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    claude_code_version: Optional[StrictStr] = None
+    projects_capture_enabled: StrictBool = False
+    warmup_capture_enabled: StrictBool = False
+
+
+@app.get("/api/accounts/{aid}/cli-settings")
+def get_account_cli_settings(aid: int) -> dict:
+    """读取账号版本和抓包设置，不启动任何执行。
+
+    :param aid: 账号标识。
+    :return: 权威配置和当前有效版本来源。
+    """
+    connection = get_db()
+    try:
+        row = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (aid,)).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        raise HTTPException(404, "账号不存在")
+    return _account_cli_settings(dict(row))
+
+
+@app.put("/api/accounts/{aid}/cli-settings")
+def update_account_cli_settings(aid: int, body: AccountCliSettingsIn) -> dict:
+    """仅保存显式提交的设置，当前执行及已有快照保持原值。
+
+    :param aid: 账号标识。
+    :param body: 版本与两个空间开关的增量配置。
+    :return: 保存后的权威配置及有效版本来源。
+    """
+    values = body.model_dump(exclude_unset=True)
+    if "claude_code_version" in values:
+        try:
+            values["claude_code_version"] = _normalize_claude_code_version(values["claude_code_version"], "claude_code_version")
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from None
+    with _db_lock:
+        connection = get_db()
+        try:
+            with connection:
+                row = connection.execute("SELECT * FROM accounts WHERE id=? AND deleted_at IS NULL", (aid,)).fetchone()
+                if row is None:
+                    raise HTTPException(404, "账号不存在")
+                if values:
+                    columns = ", ".join(key + "=?" for key in values)
+                    connection.execute(f"UPDATE accounts SET {columns} WHERE id=?", (*values.values(), aid))
+                account = dict(row)
+                account.update(values)
+        finally:
+            connection.close()
+    return _account_cli_settings(account)
+
+
 class RunWindowIntervalIn(BaseModel):
     """单个账号当地时间段，跨午夜由开始星期归属。"""
 
@@ -9090,7 +9137,7 @@ def _v3_cli_identity(account: dict) -> dict:
     :return: 已核验的无凭据 CLI 身份载荷
     """
     with _profile_lock(account["name"]):
-        return account_runtime.identity_import(account, effective_claude_code_version())
+        return account_runtime.identity_import(account, _resolve_account_cli_version(account)[0])
 
 
 @app.post("/api/accounts/{aid}/cc2api/sync")
@@ -9164,7 +9211,7 @@ def update_account_process(aid: int) -> dict:
         _require_oauth_owner_transition_idle(account)
         try:
             with _profile_lock(account["name"]):
-                payload = account_runtime.process_identity_import(account, effective_claude_code_version())
+                payload = account_runtime.process_identity_import(account, _resolve_account_cli_version(account)[0])
             result = cc2api_client._request("POST",
                 f"/admin/accounts/{int(account['cc2api_account_id'])}/cli-process/import", payload)
         except ConnectionError as exc:
@@ -9978,12 +10025,15 @@ def resume_login_draft(environment_id: str, body: LoginDraftActionIn) -> dict:
             if not (profile / ".credentials.json").is_file():
                 raise ValueError("原登录已中断且没有凭据，请选择重新登录")
             account = drafts.account(row)
-            version = record.get("version") or effective_claude_code_version()
+            version, source = _resolve_account_cli_version(account, record.get("version"))
             if not _CLAUDE_CODE_VERSION_RE.fullmatch(version):
                 raise ValueError("草稿 CLI 版本无效")
+            if not record.get("version"):
+                # 先持久化旧草稿的兼容回填，即使恢复失败也不能随下次默认值漂移。
+                record = drafts.save(row, version=version, version_source="legacy-" + source)
             sid = uuid.uuid4().hex[:12]
             _, container = account_runtime.recover_login(sid, account, version, home)
-            session = LoginSession(sid, row["name"], container.id, container.id, {}, profile, home != "/home/node")
+            session = LoginSession(sid, row["name"], container.id, container.id, {}, profile, home != "/home/node", version)
             session.home, session.version = home, version
             session.environment_id, session.draft_generation = environment_id, uuid.uuid4().hex
             session.phase = "submitting" if pending else "ready_to_submit"
@@ -11032,6 +11082,7 @@ class CaptureRunIn(BaseModel):
     :param timeout_sec: 本次 run 超时时间
     :param model_override: 本次抓包 run 的 Claude Code `--model` 覆盖
     :param effort_level: 本次抓包 run 的思考预算；空值回退 `.env`
+    :param claude_code_version: 本次精确版本；空值继承账号及全局配置
     :param permission_mode: 本次抓包 run 的 Claude Code 权限模式
     """
 
@@ -11044,6 +11095,7 @@ class CaptureRunIn(BaseModel):
     timeout_sec: int = 1800
     model_override: Optional[str] = None
     effort_level: Optional[str] = None
+    claude_code_version: Optional[StrictStr] = None
     permission_mode: CapturePermissionMode = "bypassPermissions"
 
 
@@ -11395,7 +11447,6 @@ def start_capture_run(body: CaptureRunIn):
     timeout_sec = max(60, int(body.timeout_sec or 1800))
     model_override = normalize_claude_model_override(body.model_override)
     permission_mode = _resolve_capture_permission_mode(body.permission_mode)
-    claude_code_version = effective_claude_code_version()
     try:
         claude_effort_level = _resolve_run_claude_effort_level(body.effort_level)
     except ValueError as e:
@@ -11415,6 +11466,10 @@ def start_capture_run(body: CaptureRunIn):
         if not topic_row:
             raise HTTPException(404, "topic not found")
         account = dict(account_row)
+        try:
+            claude_code_version, version_source = _resolve_account_cli_version(account, body.claude_code_version)
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from None
         topic = dict(topic_row)
         recent_fingerprints = (
             _load_recent_topic_prompt_fingerprints(conn)
@@ -11453,8 +11508,8 @@ def start_capture_run(body: CaptureRunIn):
                 conn.execute(
                     "INSERT INTO runs(id, task_id, account_id, topic_id, status, "
                     "run_kind, capture_mode, capture_summary_path, capture_model_override, "
-                    "capture_permission_mode, claude_code_version, claude_effort_level) "
-                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "capture_permission_mode, claude_code_version, claude_code_version_source, claude_effort_level) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         run_id,
                         task_id,
@@ -11467,6 +11522,7 @@ def start_capture_run(body: CaptureRunIn):
                         model_override,
                         permission_mode,
                         claude_code_version,
+                        version_source,
                         claude_effort_level,
                     ),
                 )
@@ -11483,6 +11539,7 @@ def start_capture_run(body: CaptureRunIn):
         "model_override": model_override,
         "capture_permission_mode": permission_mode,
         "claude_code_version": claude_code_version,
+        "claude_code_version_source": version_source,
         "claude_effort_level": claude_effort_level,
     }
     scheduler.submit(run_id, account, task)
@@ -11493,8 +11550,10 @@ def start_capture_run(body: CaptureRunIn):
         "model_override": model_override,
         "permission_mode": permission_mode,
         "claude_code_version": claude_code_version,
+        "claude_code_version_source": version_source,
         "claude_effort_level": claude_effort_level,
     }
+
 
 
 # ---------- runs ----------
@@ -11530,7 +11589,7 @@ def run_task(tid: int):
         rid = uuid.uuid4().hex[:12]
         plan = encode_followups(sample_followups(decode_followups(task.get("followup_candidates_json"))))
         timing = sample_followup_timing(decode_followups(plan), task["timeout_sec"], TIMEOUT_WRAPUP_SEC)
-        claude_code_version = effective_claude_code_version()
+        claude_code_version, version_source = _resolve_account_cli_version(account)
         claude_effort_level = effective_runtime_effort()
         with _db_lock:
             conn = get_db()
@@ -11538,7 +11597,7 @@ def run_task(tid: int):
                 with conn:
                     conn.execute(
                         "INSERT INTO runs(id, task_id, account_id, batch_id, topic_id, status, "
-                        "claude_code_version, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                        "claude_code_version, claude_code_version_source, claude_effort_level, followup_plan_json, followup_timing_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                         (
                             rid,
                             tid,
@@ -11547,6 +11606,7 @@ def run_task(tid: int):
                             task.get("topic_id"),
                             "queued",
                             claude_code_version,
+                            version_source,
                             claude_effort_level,
                             plan,
                             timing,
@@ -11564,6 +11624,7 @@ def run_task(tid: int):
         scheduler.submit(rid, account, run_task_payload)
         run_ids.append(rid)
     return {"run_ids": run_ids}
+
 
 
 @app.get("/api/runs")
@@ -11878,24 +11939,9 @@ def get_capture(rid: str):
         capture_dirs = None
     flows_dir = capture_dirs[0] if capture_dirs else FLOWS_DIR / "_missing" / rid
     index_path = Path(run["capture_summary_path"]) if run.get("capture_summary_path") else flows_dir / "capture_index.json"
-    index = _read_capture_index(index_path)
-    # 分代索引只读聚合，原始 HTTP/flow 保持原目录，原平铺索引仍可读取。
-    indexes = [index] if index.get("available") else []
-    for path in sorted(flows_dir.glob("executions/*/capture_index.json")):
-        item = _read_capture_index(path)
-        if item.get("available"):
-            indexes.append(item)
-    for directory in sorted(flows_dir.glob("continue-*")):
-        for path in sorted(directory.glob("executions/*/capture_index.json")):
-            item = _read_capture_index(path)
-            if item.get("available"):
-                indexes.append(item)
-    if indexes:
-        index = dict(indexes[-1], entries=[entry for item in indexes for entry in item.get("entries", [])])
-        index["total_flows"] = len(index["entries"])
-        index["cc_versions"] = sorted({version for item in indexes for version in item.get("cc_versions", [])})
-        index["updated_at"] = max(float(item.get("updated_at") or 0) for item in indexes)
+    summary = capture_summary(flows_dir, running=run.get("status") in ("running", "stopping"))
     return {
+        **summary,
         "run_id": rid,
         "mode": run.get("capture_mode") or "full_http",
         "model_override": run.get("capture_model_override"),
@@ -11903,12 +11949,10 @@ def get_capture(rid: str):
             run.get("capture_permission_mode")
         ),
         "claude_code_version": run.get("claude_code_version"),
+        "claude_code_version_source": run.get("claude_code_version_source"),
         "claude_effort_level": run.get("claude_effort_level"),
-        "available": bool(index.get("available")),
         "flows_dir": str(flows_dir),
         "index_path": str(index_path),
-        "files": _capture_files(flows_dir),
-        "index": index,
     }
 
 

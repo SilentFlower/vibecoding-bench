@@ -12,6 +12,7 @@ from pathlib import Path
 
 from project_library import canonical_json, digest_json, read_document, safe_relative, snapshot_tree, write_document
 from account_runtime import RuntimeBusy
+from capture_artifacts import capture_file_preview, capture_summary
 from projects_pi import ProjectsPi
 from projects_store import ProjectsDatabase
 from projects_observation import screen_busy, screen_content, screen_menu
@@ -771,7 +772,9 @@ class ProjectsService:
             return None
         return {**{key: work[key] for key in ('id', 'project_key', 'objective_id', 'goal', 'status',
             'session_id', 'work_sec', 'created_at', 'started_at', 'ended_at', 'message')}, 'cycle_no': work.get('cycle_no', 1),
-            'failure': json.loads(work['failure_json']) if work.get('failure_json') else None}
+            'failure': json.loads(work['failure_json']) if work.get('failure_json') else None,
+            'claude_code_version': json.loads(work['settings_json']).get('claude_code_version'),
+            'claude_code_version_source': json.loads(work['settings_json']).get('claude_code_version_source')}
 
     def view(self, account_id: int | None = None) -> dict:
         """为控制台补充可读准入、真实任务进度与最近动作，不创建任务或调用模型。
@@ -1055,6 +1058,40 @@ class ProjectsService:
             raise ValueError('工作不存在')
         return {'work': self._public_work(work), 'submissions': self._rows(
             'SELECT id,status,digest,created_at,ended_at FROM projects_submissions WHERE work_id=? ORDER BY created_at DESC LIMIT 50', (work_id,))}
+
+    def work_capture(self, work_id: str, relative: str | None = None) -> dict:
+        """按服务端工作归属读取本空间抓包，历史读取不准备账号环境。
+
+        :param work_id: 本空间已登记的工作 ID。
+        :param relative: 可选的受限预览文件。
+        :return: 抓包摘要或脱敏文件内容。
+        """
+        work = self._one('SELECT * FROM projects_work WHERE id=?', (work_id,))
+        if not work or safe_relative(work_id) != Path(work_id).name:
+            raise ValueError('工作不存在')
+        connection = self.database()
+        try:
+            account = connection.execute('SELECT * FROM accounts WHERE id=?', (work['account_id'],)).fetchone()
+            environment = connection.execute('SELECT * FROM account_environments WHERE account_id=?', (work['account_id'],)).fetchone()
+        finally:
+            connection.close()
+        if account is None or environment is None:
+            if relative is not None:
+                raise ValueError('抓包文件不存在')
+            return {**capture_summary(self.data / 'flows/_missing' / work_id), 'work_id': work_id,
+                'namespace': self.namespace, 'claude_code_version': json.loads(work['settings_json']).get('claude_code_version')}
+        account = dict(account)
+        if safe_relative(account['name']) != Path(account['name']).name:
+            raise ValueError('账号目录不合法')
+        group_key = self.namespace + '/' + work_id
+        root = self.terminal.runtime._root(dict(environment))
+        base = root / 'flows' / ('group-' + hashlib.sha256(group_key.encode()).hexdigest()[:20])
+        if base.is_symlink() or root.is_symlink() or (root / 'flows').is_symlink():
+            raise ValueError('抓包目录归属异常')
+        if relative is not None:
+            return capture_file_preview(base, relative)
+        return {**capture_summary(base, running=work['status'] == 'running'), 'work_id': work_id,
+            'namespace': self.namespace, 'mode': 'full_http', **json.loads(work['settings_json'])}
 
     def submission(self, submission_id: str, relative: str | None = None) -> dict:
         """读取冻结源码清单或其白名单文件，私有审查包不在可读范围内。
@@ -1902,7 +1939,7 @@ class ProjectsService:
                     (account_id, key, objective_id, agent['cycle_no'])):
                 raise ValueError('该账号已经完成这个工程目标')
             work_id = uuid.uuid4().hex
-            settings = self.terminal.settings()
+            settings = self.terminal.settings(self.account(account_id))
             with self.lock:
                 self._current(account_id, generation)
                 # 选材期间另一调用可能已发布本轮目标，发布前再次核对，禁止创建第二项。
@@ -1940,6 +1977,21 @@ class ProjectsService:
             raise ValueError('本轮指挥时限已到，等待下一轮接续原目标')
         work.update(generation=generation, remaining_sec=remaining)
         work['resume_required'] = bool(self._one("SELECT id FROM projects_actions WHERE work_id=? AND status='sent' LIMIT 1", (work['id'],)))
+        if not json.loads(work['settings_json']).get('claude_code_version'):
+            with self.write_lock:
+                connection = self.database()
+                try:
+                    with connection:
+                        saved = connection.execute('SELECT settings_json FROM projects_work WHERE id=?', (work['id'],)).fetchone()
+                        frozen = json.loads(saved['settings_json'])
+                        if not frozen.get('claude_code_version'):
+                            resolved = self.terminal.settings(account)
+                            frozen['claude_code_version'] = resolved['claude_code_version']
+                            frozen['claude_code_version_source'] = 'legacy-' + resolved.get('claude_code_version_source', 'global')
+                            connection.execute('UPDATE projects_work SET settings_json=? WHERE id=?', (json.dumps(frozen), work['id']))
+                        work['settings_json'] = json.dumps(frozen)
+                finally:
+                    connection.close()
         preparation_error = None
         try:
             info = self.terminal.start(account, work)

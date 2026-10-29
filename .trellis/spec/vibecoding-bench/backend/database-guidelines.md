@@ -315,6 +315,7 @@ def handle_run_terminal(run_id, expected_cc2api_account_id):
 
 ```text
 runs.claude_code_version TEXT NULL
+runs.claude_code_version_source TEXT NULL
 runs.claude_effort_level TEXT NULL
 runs.capture_permission_mode TEXT DEFAULT 'bypassPermissions'
 init_db() -> _ensure_column(conn, "runs", "claude_code_version", "TEXT")
@@ -345,6 +346,7 @@ Runner.start_continue(
     session_id: str,
 ) -> tuple[str, str]
 CaptureRunIn.effort_level: Optional[str]
+CaptureRunIn.claude_code_version: Optional[StrictStr]
 CaptureRunIn.permission_mode: Literal[
     "manual",
     "acceptEdits",
@@ -371,8 +373,8 @@ GET  /api/settings/runtime-effort
 
 ### 3. Contracts
 
-- 普通、批量和养号入口创建每个 run 时，版本取 `effective_claude_code_version()`，思考预算取 `effective_runtime_effort()`；两个规范化结果都必须同时写入 `runs` 和该 run 的 scheduler task payload，新 run 的两个字段必须非空。
-- 抓包入口的版本仍取 `effective_claude_code_version()`；思考预算取 `CaptureRunIn.effort_level`，空值必须回退进程启动时的 `.env` 常量 `CLAUDE_CODE_EFFORT_LEVEL`，不得读取 WebUI 普通/批量 run 的运行时覆盖。
+- 普通、批量和养号入口创建每个 run 时，版本按账号配置优先、全局有效版本兜底解析，思考预算取 `effective_runtime_effort()`；版本及来源写入 `runs`，版本与预算同时传给 scheduler，新 run 的两个身份字段必须非空。批次和旧养号在创建事务内重读账号，不能沿用长期调度对象中的旧配置；全局函数仍只负责页面全局覆盖与 `.env`。完整配置契约见 [账号 CLI 版本与迭代抓包](./account-runtime-v3.md#scenario-账号-cli-版本与迭代抓包)。
+- 抓包入口的版本按 `CaptureRunIn.claude_code_version` 显式值 > 账号配置 > 全局有效版本解析，单次值不回写设置；思考预算取 `CaptureRunIn.effort_level`，空值必须回退进程启动时的 `.env` 常量 `CLAUDE_CODE_EFFORT_LEVEL`，不得读取 WebUI 普通/批量 run 的运行时覆盖。
 - 抓包入口的 `permission_mode` 只允许 Claude Code 2.1.280 CLI 暴露的 `manual`、`acceptEdits`、`plan`、`auto`、`dontAsk` 与 `bypassPermissions`，缺省为 `bypassPermissions`；选定值必须同时写入 `runs.capture_permission_mode` 和 scheduler task payload。普通、批量、养号、登录、quota 与 OAuth refresh 不提供单次模式入口。
 - 抓包页面必须从 `GET /api/settings/runtime-effort` 的 `allowed_efforts` 生成独立选择器，并提供“默认 `.env`”选项。该选择只覆盖当前抓包 run；窄屏布局必须换行，不能裁切选择器。
 - 抓包页面的权限模式选择器默认提交 `bypassPermissions`，抓包创建响应和抓包详情都返回实际 `permission_mode`；索引暂不可用时仍须展示该快照。
@@ -380,13 +382,13 @@ GET  /api/settings/runtime-effort
 - 同一 task 再次运行会创建新的 run；新 run 使用再次运行时的当前有效运行身份，不继承旧 run 快照，也不修改旧 run。
 - `POST /api/runs/{rid}/continue/start` 必须在启动 worker 前依次调用 `_ensure_run_claude_code_version(run)` 和 `_ensure_run_claude_effort_level(run)`；`Runner.start_continue()` 只使用 run 字典中的三个快照，不得无条件读取当前全局配置。
 - continue worker 使用 `WORKER_MODE=login` 空转，真正恢复会话的是 WebSocket 路径里的独立 `claude --resume`。因此权限模式既要保存到 `ContinueSession` 并传入 exec 环境，也要在该命令上显式追加 `--permission-mode "$CLAUDE_PERMISSION_MODE"`；只给容器设置环境变量并不会自动改变 Claude CLI 权限模式。
-- 历史 run 允许两个快照字段为 NULL。首次继续时，在 `_db_lock` 内重新读取数据库，并通过对应的 `WHERE id=? AND ... IS NULL` 条件各补写一次：版本取当前有效版本，思考预算取 `.env` 常量。后续继续必须复用已补写值，即使第一次 worker 启动失败或全局配置再次改变。
+- 历史 run 允许两个快照字段为 NULL。版本为空或空白时，优先核对原执行登记的 source、容器和环境代次，匹配则恢复其版本，否则按账号继承解析；在 `_db_lock` 内重读并条件写入版本及 `legacy-*` 来源一次。思考预算保留 `IS NULL` 条件补写 `.env` 常量。后续继续复用已补写值，即使第一次启动失败或默认配置改变；排队启动也不得重新解释非空快照。
 - 历史 run 的 `capture_permission_mode` 为空时解释为 `bypassPermissions`，无需把 Auto 推断或补写到旧会话。
 - `_resolve_run_claude_code_version()` 和 `_resolve_run_claude_effort_level()` 的空值回退只用于历史测试或旧内部调用兼容；所有生产 run 创建入口都必须显式传递两个快照，不能把回退当作正常调度路径。
 - run 列表/详情通过现有 `SELECT *` 返回三个快照；抓包创建响应和抓包详情必须显式返回 `claude_code_version`、`claude_effort_level` 与 `permission_mode`。抓包索引暂不可用时，详情仍必须展示这些运行身份字段。
 - worker 的 `CLAUDE_CODE_EFFORT_LEVEL` 必须使用 run 快照；`PROFILE_CLAUDE_CODE_EFFORT_LEVEL` 仍使用 `.env` 常量，二者不能混用。
 - 所选抓包模式只通过当前 Claude CLI 的 `--permission-mode <mode>` 生效。orchestrator 与 worker 写入账号 profile 的 `permissions.defaultMode` 必须继续保持 `bypassPermissions`，禁止把单次抓包模式持久化到后续普通 run。
-- 登录、额度查询和后台 OAuth refresh 是非 run 临时 worker，没有可恢复的 run 身份，应在各自启动时读取当前有效版本，不继承某个历史 run 的快照。
+- 新登录、重授权、额度查询和后台 OAuth refresh 按账号继承版本，不继承某个历史 run；登录会话与草稿在创建时冻结版本，后续 auth 子命令和恢复沿用原值，无账号记录的新草稿使用全局。API-only transport 不因版本配置安装或唤醒 CLI。
 - worker entrypoint 仍负责核对并安装精确版本；指定版本安装失败时 run 明确失败，不得静默退回镜像内版本。
 
 ### 4. Validation & Error Matrix
@@ -415,7 +417,7 @@ GET  /api/settings/runtime-effort
 - Good：普通 run 使用页面预算 `low`，抓包选择器留空且 `.env` 为 `max`；抓包 DB、响应和 worker 都使用 `max`。
 - Good：正式抓包选择 `plan` 后，首次 worker 和 WebSocket continue 的 Claude 命令都显式带 `--permission-mode plan`，账号 profile 仍保存 `bypassPermissions`。
 - Good：历史 NULL run 首次继续时补写版本 `2.1.260` 和 `.env` 预算 `high`；即使启动失败并在第二次继续前改为 `2.1.257/low`，第二次仍使用已补写的 `2.1.260/high`。
-- Base：页面没有覆盖值时，普通/批量/养号 run 使用 `.env` 的版本和预算；页面保存合法覆盖后，只有之后创建的新 run 使用覆盖值。
+- Base：账号和页面均没有覆盖值时，普通/批量/养号 run 使用 `.env` 的版本和预算；保存合法默认配置后，只有之后创建的新 run 使用新值。
 - Base：历史抓包 run 没有权限模式列值时按 `bypassPermissions` 恢复，不猜测为 Auto。
 - Bad：在 `Runner.start_run()` 或 `Runner.start_continue()` 中直接调用当前有效配置函数。排队等待或关闭后继续会把可变全局配置误当成 run 身份。
 - Bad：抓包预算留空时调用 `effective_runtime_effort()`。这会把普通 run 的页面覆盖错误泄漏到协议抓包。
@@ -436,7 +438,7 @@ GET  /api/settings/runtime-effort
 - 历史 NULL run 首次继续补写版本和 `.env` 预算，全局配置变化后再次调用，断言 DB 和返回值仍保持首次补写值。
 - 同一 task 在设置变化前后创建两个 run，断言旧 run 保留旧运行身份，新 run 保存新运行身份。
 - 前端静态契约测试必须覆盖抓包独立选择器、提交字段、run/抓包详情展示、索引不可用分支仍展示快照，以及 920px 以下表单换行规则。
-- 登录、额度查询和 OAuth refresh 测试断言它们使用各自启动时的当前有效版本，不受 run 快照约束。
+- 登录、额度查询和 OAuth refresh 测试断言账号版本优先；登录会话、草稿和后续子命令不因默认配置变化而改用另一版本。
 
 ### 7. Wrong vs Correct
 

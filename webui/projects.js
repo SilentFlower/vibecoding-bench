@@ -3,6 +3,7 @@ window.ProjectsUI = (() => {
   let api, prefix, source, accountId = null, agents = [], catalog = [], accounts = [], cursor = 0;
   let revision = 0, selection = 0, scheduleClock = null, recordPages = {};
   let namespace = 'projects', servicePath = '/projects';
+  let configureCli, showCapture, closePanels;
   let screenWorkId = null, screenEventId = 0;
   const pendingActions = new Map();
   const $ = selector => document.querySelector(selector);
@@ -43,6 +44,7 @@ window.ProjectsUI = (() => {
    */
   async function mount(options) {
     unmount();
+    ({configureCli, showCapture, closePanels} = options);
     const current = revision;
     namespace = options.namespace === 'warmup' ? 'warmup' : 'projects';
     servicePath = namespace === 'warmup' ? '/accounts/warmup/pi' : '/projects';
@@ -65,6 +67,11 @@ window.ProjectsUI = (() => {
     $('#projects-clear-all').onclick = () => paintCatalog([]);
     $('#projects-projects').onchange = paintSelectionCount;
     $('#projects-account').onchange = event => selectAccount(Number(event.target.value));
+    $('#projects-cli-settings').onclick = () => accountId && configureCli?.(accountId, namespace);
+    $('#projects-capture').onclick = () => {
+      const work = agents.find(item => item.account_id === accountId)?.work;
+      if (work) showCapture?.(work.id, namespace);
+    };
     fillSchedule();
     scheduleClock = setInterval(() => {
       paintSchedule(); paintVerification(); paintQuota(agents.find(item => item.account_id === accountId)?.admission);
@@ -107,6 +114,7 @@ window.ProjectsUI = (() => {
    * @return {void}
    */
   function unmount() {
+    closePanels?.();
     revision += 1;
     selection += 1;
     source?.close(); source = null;
@@ -198,6 +206,7 @@ window.ProjectsUI = (() => {
    * @return {Promise<void>} 账号历史加载完成。
    */
   async function selectAccount(id) {
+    closePanels?.();
     const request = ++selection;
     source?.close(); source = null;
     accountId = id || null; cursor = 0; resetRecords();
@@ -522,6 +531,8 @@ window.ProjectsUI = (() => {
   function paintState() {
     const agent = agents.find(item => item.account_id === accountId);
     const pending = pendingActions.get(accountId), schedule = agent?.schedule, work = agent?.work;
+    $('#projects-cli-settings').disabled = !accountId;
+    $('#projects-capture').disabled = !work;
     const unfinished = work && !['passed', 'stopped', 'deferred'].includes(work.status), admission = agent?.admission;
     const active = agent?.controller_active && ['running', 'waiting'].includes(agent.status);
     const currentFailure = work?.failure && !work.failure.resolved_at
@@ -761,7 +772,10 @@ window.ProjectsUI = (() => {
    */
   function paintHistory(rows) {
     const agent = agents.find(item => item.account_id === accountId);
-    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${namespace === 'warmup' ? `第 ${escape(Number.isInteger(item.cycle_no) && item.cycle_no > 0 ? item.cycle_no : 1)} 轮 · ` : ''}${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small>${failureDetails(item, agent?.work?.id === item.id ? agent.schedule : undefined)}</span><span>${escape(workStatus(item))}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
+    $('#projects-history').innerHTML = rows.map(item => `<div class="projects-history-row"><strong>${escape(item.project_key)}</strong><span>${escape(item.goal)}<small class="hint">${namespace === 'warmup' ? `第 ${escape(Number.isInteger(item.cycle_no) && item.cycle_no > 0 ? item.cycle_no : 1)} 轮 · ` : ''}${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))}</small>${failureDetails(item, agent?.work?.id === item.id ? agent.schedule : undefined)}</span><span>${escape(workStatus(item))}</span><span data-work-duration="${escape(item.id)}" title="按实际累计执行时间统计，暂停和计划等待不计入。">${escape(workDuration(item))}</span><div class="op-actions"><button type="button" class="btn btn-sm" data-work="${escape(item.id)}">查看交付</button><button type="button" class="btn btn-sm" data-work-capture="${escape(item.id)}">抓包</button></div></div>`).join('') || '<p class="hint">尚无新工作记录。</p>';
+    document.querySelectorAll('[data-work-capture]').forEach(button => {
+      button.onclick = () => showCapture?.(button.dataset.workCapture, namespace);
+    });
     document.querySelectorAll('[data-work]').forEach(button => {
       button.onclick = () => perform(async () => {
         const current = revision, selected = accountId;

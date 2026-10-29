@@ -28,7 +28,7 @@ class NetworkContextTests(unittest.TestCase):
                 time.sleep(0.01)
             pid_file = Path(temporary) / "network.pid"
             pid_file.write_text(str(process.pid))
-            network_context._terminate_listener(pid_file)
+            self.assertFalse(network_context._terminate_listener(pid_file))
             process.wait(timeout=2)
             self.assertEqual(-signal.SIGKILL, process.returncode)
             self.assertFalse(pid_file.exists())

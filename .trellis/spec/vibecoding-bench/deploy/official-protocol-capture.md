@@ -41,6 +41,7 @@ prompt: string | null
 prompt_mode: "natural" | "canonical"
 timeout_sec: int
 model_override: string | null
+claude_code_version: string | null   # 单次精确版本，留空继承账号及全局
 effort_level: "low" | "medium" | "high" | "xhigh" | "max" | null
 permission_mode:
   "manual" | "acceptEdits" | "plan" | "auto" | "dontAsk" | "bypassPermissions"
@@ -180,8 +181,11 @@ prompt、响应正文、组织 ID 或账号身份。
 - `body_text` 经 `get_text(strict=False)` 解码，`body_base64` 是文本读取失败时的回退；
   复算前检查 `body_truncated` 和 Content-Encoding，需要时从 `.flow` 恢复并解压原始内容。
   重复头与头名线序优先核对 `.flow`，不能只使用普通 dict 或重新序列化后的 JSON。
-- 完整 HTTP JSONL 在 `response()` 阶段写入；无完整响应或中断时，结合 `.flow`、stats 和
-  采集错误判断是否漏采。`CAPTURE_SCOPE=all` 不免除当前 `response()` 的目标域名判断；
+- HTTP JSONL 按事件追加：请求体可读时为 `capture_state=pending`，响应完成为 `complete`，
+  连接错误或 Recorder 停止为 `interrupted`。同一 flow 可能有多条阶段记录，索引按 flow_id
+  保留最新状态；停止后迟到 response 可以补写已收到字节，但不能覆盖中断事实。无完整响应时，
+  结合 `.flow`、stats、`capture-status.json` 和采集错误判断保存范围。
+  `CAPTURE_SCOPE=all` 不免除当前 `response()` 的目标域名判断；
   v3 也须检查实际账号网络 context，不能只套用旧每-run sidecar 的 scope 默认值。
 - 当前 recorder 未输出完整 ClientHello、JA3 / JA4、签名算法或 key_share。MITM 出口的握手
   可能来自代理，不能当作原生 CLI TLS 画像。TLS 对照需补充客户端侧握手证据，标明接口、方向、
@@ -249,6 +253,7 @@ prompt、响应正文、组织 ID 或账号身份。
 - scheduler、worker、continue 与 WebSocket resume 测试断言同一模式快照贯穿全链路。
 - worker shell 静态测试断言六种值都通过校验，其他值在启动 Claude 前失败。
 - WebUI 静态测试断言六个选项、缺省值、提交字段和详情展示。
+- 单次版本控件必须属于 `capture-form`；浏览器覆盖显式版本、账号继承和全局兜底的提交、成功清空及详情打开。确认没有错误弹窗、没有配置写请求，批次表单不能误含抓包专用字段。
 - 抓包验收记录每个 run 的版本、镜像 tag、账号、代理存在性、模型、effort、权限模式、开始/结束时间、
   worker/sidecar 清理状态和受限证据路径。
 - 协议分析必须输出逐请求 CCH 与 `cc_version` 复算结果、beta 有序差异、关键 body 字段和

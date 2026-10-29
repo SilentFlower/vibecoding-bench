@@ -80,7 +80,7 @@ class ProjectIterationFixture(unittest.TestCase):
         """构造不启动后台线程的推进器。@return 推进器。"""
         return ProjectIterationManager(self.data,self.library,main.get_db,main._db_lock,
             lambda rid,account,task:self.launches.append((rid,account,task)),
-            lambda:{'claude_code_version':'2.1.293','claude_effort_level':'xhigh','execution_model':'opus'},
+            lambda account:{'claude_code_version':'2.1.293','claude_effort_level':'xhigh','execution_model':'opus'},
             lambda account:'identity-'+str(account['id']),self.stop_fixture,LocalFixtureVerifier(),lambda rid,attempt:False)
 
     def stop_fixture(self, run_id: str) -> None:

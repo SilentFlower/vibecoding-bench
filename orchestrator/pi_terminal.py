@@ -69,15 +69,19 @@ class PiTerminal:
         runtime = self.runtime
         settings = json.loads(work['settings_json'])
         version = settings['claude_code_version']
+        capture = bool(account.get(self.namespace + '_capture_enabled', 0))
         source = f"{self.namespace}:{work['id']}:{work['generation']}"
         if self.credentials:
             self.credentials(account)
-        with runtime._cli_setup(account, source, version, idle_only=True, shared_cli=True,
+        with runtime._cli_setup(account, source, version, idle_only=True, shared_cli=not capture,
                 scenario_resources=self.scenario_resources) as (row, container, job):
             quota_admitted, launched = False, False
             try:
-                if not job.get('shared_cli'):
+                if not capture and not job.get('shared_cli'):
                     raise ValueError('Pi 终端需要支持逐作业监督的 v3 账号环境')
+                if capture:
+                    # 监督能力独立于租约类型，不能把独占捕获伪装成共享作业。
+                    job['execution_role'] = 'pi-capture'
                 runtime.sync_credentials(row, account)
                 root = runtime._root(row)
                 workspace, prepared_environment = self._prepare_execution(root, row, account, work)
@@ -100,7 +104,7 @@ class PiTerminal:
                 os.chown(override, 1000, 1000, follow_symlinks=False)
                 job.update(run_id=work['id'], handle=handle, cwd=cwd, version=version,
                     tmux=session, tmux_socket=socket, settings_override=str(override.relative_to(root)),
-                    network_inspection_mode='passthrough')
+                    network_inspection_mode='capture' if capture else 'passthrough')
                 runtime._save_execution(job)
                 flows = runtime.execution_flows(account, source,
                     runtime.data / 'flows' / account['name'] / self.namespace / work['id'])
@@ -108,9 +112,24 @@ class PiTerminal:
                 quota_admitted = True
                 runtime._install_cli_quota(job, cwd, flows, context.get('QUOTA_IDENTITY'))
                 context_path = runtime._network_runtime(row) / 'context.json'
-                atomic_json(context_path, {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''})
-                runtime._configure_network_context(container, {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''},
-                    reuse_passthrough=True)
+                if capture:
+                    flow_path = '/flows/' + str(flows.relative_to(root / 'flows'))
+                    context.update(NETWORK_INSPECTION_MODE='capture', QUOTA_SOURCE=source,
+                        STATS_FILE=flow_path + '/stats.jsonl', CAPTURE_FILE=flow_path + '/http_capture.jsonl',
+                        CAPTURE_INDEX_FILE=flow_path + '/capture_index.json', CAPTURE_FULL_HTTP='1', SAVE_FULL_FLOWS='1',
+                        QUOTA_STATE_FILE=f"/quota-accounts/{account['id']}/state.json",
+                        QUOTA_SIGNAL_FILE=f'/controls/{handle}/pause.json',
+                        QUOTA_OBSERVATIONS_FILE=flow_path + '/passive-quota.jsonl',
+                        QUOTA_CREDENTIALS_FILE='/run/v3/access/.credentials.json')
+                    job['capture_flows'] = str(flows.relative_to(root / 'flows'))
+                    runtime._save_execution(job)
+                    atomic_json(context_path, context)
+                    runtime._configure_network_context(container, context)
+                else:
+                    context = {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''}
+                    atomic_json(context_path, context)
+                    runtime._configure_network_context(container, context, reuse_passthrough=True,
+                        require_reuse=len(runtime.environment_jobs(row['environment_id'])) > 1)
                 signal = f'/controls/{handle}/pause.json'
                 native = root / 'home/.claude/projects' / cwd.replace('/', '-') / (work['session_id'] + '.jsonl')
                 if work.get('resume_required') and not native.is_file():
@@ -137,9 +156,14 @@ class PiTerminal:
                 script.chmod(0o750)
                 environment = {**runtime.execution_environment(row), 'HOME': '/home/node',
                     'PATH': f'/cli/{version}/node_modules/.bin:/usr/local/bin:/usr/bin:/bin',
+                    'CLAUDE_CODE_VERSION': version,
                     'CLAUDE_CODE_EFFORT_LEVEL': settings['claude_effort_level'],
                     'DISABLE_AUTOUPDATER': '1', 'CC2API_MANAGED_OAUTH': '1' if account.get('cc2api_account_id') is not None else '0',
                     **prepared_environment}
+                if capture:
+                    ca = '/etc/mitm/mitmproxy-ca-cert.pem'
+                    environment.update(NODE_EXTRA_CA_CERTS=ca, SSL_CERT_FILE=ca,
+                        REQUESTS_CA_BUNDLE=ca, CURL_CA_BUNDLE=ca, GIT_SSL_CAINFO=ca)
                 execution = runtime.client.api.exec_create(container.id,
                     ['python3', '-I', '/usr/local/bin/v3-cli-control', 'supervise', '--source', source,
                         '--proof', f'/run/v3/jobs/{handle}/process.json', '--ready', f'/controls/{handle}/start.json',
@@ -154,6 +178,8 @@ class PiTerminal:
                 atomic_json(controls / 'start.json', job['process'], 0o640)
                 os.chown(controls / 'start.json', 0, 1000, follow_symlinks=False)
                 return {'token': job['token'], 'source': source, 'workspace': str(workspace.relative_to(runtime.data)),
+                    'capture_enabled': capture,
+                    'capture_flows': str(flows.relative_to(runtime.data)),
                     'native': str((root / 'home/.claude/projects' / cwd.replace('/', '-')).relative_to(runtime.data)),
                     'interaction_signal': str((runtime_job / 'interaction.json').relative_to(runtime.data)),
                     'quota_signal': str((controls / 'pause.json').relative_to(runtime.data))}
