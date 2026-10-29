@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/cc2api/backend/index.md", "reason": "后端分层与实施前必读入口"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "可解析错误、敏感信息、热路径和全量测试约束"}
+{"file": ".trellis/spec/cc2api/protocol/index.md", "reason": "协议、CCH 和真实抓包证据边界"}
+{"file": ".trellis/tasks/10-29-cc2api-compressed-request-decoding/research/backend-context.md", "reason": "Gateway、真实 Session、池／Hello 副作用与普通头对齐规范原文"}
+{"file": ".trellis/tasks/10-29-cc2api-compressed-request-decoding/research/protocol-context.md", "reason": "最终 CCH、长度、stream 三态和已交付 R2／beta 规范原文"}
+{"file": ".trellis/tasks/10-29-cc2api-compressed-request-decoding/research/findings.md", "reason": "当前依赖的实际严格解码／重编码 API、实验与支持限制"}
+{"file": ".trellis/tasks/10-29-cc2api-compressed-request-decoding/research/integration.md", "reason": "两个入口、重试、缓存／诊断及 transport 最后编码边界"}
+{"file": ".trellis/tasks/10-29-cc2api-compressed-request-decoding/research/native-gzip-public-evidence.md", "reason": "官方 300 gzip 证据、通用转发范围及响应问题隔离"}
+{"file": ".trellis/spec/guides/index.md", "reason": "按需读取代码复用和跨边界思考指南"}
