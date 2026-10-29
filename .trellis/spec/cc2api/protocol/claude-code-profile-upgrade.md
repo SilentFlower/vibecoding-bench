@@ -28,6 +28,10 @@ src/store/settings_store.rs
 web/src/components/Settings.vue
 ```
 
+CCH 内部定位函数 `find_cch_value(body: &[u8]) -> Option<usize>` 返回原始 JSON 中五位值的起点。
+公开刷新入口为 `Rewriter::refresh_cch_attestation(body: Vec<u8>, account: &Account, client_type: ClientType) -> Vec<u8>`，
+由 Gateway 在签名修复改变正文后调用。
+
 关键 wire 字段：
 
 ```text
@@ -178,6 +182,14 @@ Fable 5.1 子画像。
 
 CCH 契约：
 
+- 占位化、初始封口与重试刷新只定位唯一受管理的根级 `system` billing：支持字符串和直接
+  `type=text` 块，首个非空白位置须是 billing attribution 行，可跟多行普通上下文。普通文档后续引用、
+  messages、tools、metadata 或嵌套 system 中的 CCH 字面量不得被这三步改写。
+- attribution 行按独立分号字段识别唯一合法五位 hex CCH；保留既有入口值、附加归因键和原始顺序，
+  不要求恰好三个字段或固定字段顺序。`note=cch=12345` 和 `xcch=fedcb` 不构成 CCH 字段。
+- 在最终原始字节上只回填该五位值；解码字符串偏移不能直接当作 JSON 字节偏移。目标缺失、非法、
+  重复或无法可靠回填时保持 CCH 处理函数的输入，不回退全文搜索、不新增合并或拒绝策略。
+  前置占位化继续沿用 cache_control 键存在即跳过的既有规则，包括 null。
 - seed 不是默认可变项；升级时先用旧 seed 复算，不命中再尝试找 seed。
 - `2.1.156`、`2.1.169`、`2.1.172`、`2.1.173`、`2.1.185`、`2.1.187`、
   `2.1.195`、`2.1.197`、`2.1.220`、`2.1.257`、`2.1.260`、`2.1.280`、`2.1.293` 使用 seed
@@ -494,6 +506,9 @@ Telemetry 契约：
 | 条件 | 期望 |
 |------|------|
 | 新版本抓包 CCH 不命中旧 seed | 先尝试输入规范化差异；只有多组样本都不命中时再逆向 seed |
+| 用户／工具／metadata 的 CCH 出现在 billing 之前 | 保持示例原文，只更新根级受管理 billing；刷新使用相同定位规则 |
+| 唯一 billing 包含附加归因键或字段变序 | 保留字段与顺序，正常重置、封口及刷新独立 CCH 字段 |
+| billing／CCH 缺失、非法、重复或编码无法可靠定位 | CCH 处理保持输入，不全文回退；其它既有 body 改写及缓存规则独立执行 |
 | `cc_version` 主请求按第一个 text block 计算不命中 | 检查首条 user message 是否有多个 text block；按最后一个 text block 复算 |
 | `cc_version` 在线程续轮按当前 text 复算不命中 | 检查 `thread.previous_message_id`；存在时校验三位小写十六进制形状、同 run 稳定性，并在网关改写时保留入站后缀 |
 | Fable 带 `[1m]` 时 beta 顺序与抓包不同 | 先按目标版本抓包判断是否应有 `context-1m-2025-08-07`；若应有，再整理到 `oauth` 后面 |
@@ -533,6 +548,10 @@ Telemetry 契约：
 ### 5. Good/Base/Bad Cases
 
 **Good**：升级版本前先收集 baseline 和目标版本的 Opus/Fable/Haiku 抓包，离线复算 `cc_version` 与 CCH，确认 beta 顺序，再改 profile 和测试。
+
+**Good**：普通正文里的 `cch=00000` 作为真实内容参与哈希并保持原文；billing 内唯一 CCH 单独占位并回填。
+**Base**：重复 billing 没有唯一目标时保持 CCH 输入，不擅自合并 system 块。
+**Bad**：搜索全文首个 `cch=00000` 或任意五位 CCH。应改为定位唯一受管理 billing，附加归因键仍保留。
 
 **Good**：Fable 5 与 Fable 5.1 使用两个精确子画像，只在共享周配额判断中把已知 ID 和
 `[suffix]` 形式归到 `seven_day_fable`。
@@ -584,6 +603,13 @@ watchdog 前后报 `No response from API`。
 
 ### 6. Tests Required
 
+- `cch_initial_seal_preserves_user_placeholder_before_billing`、
+  `cch_retry_refresh_preserves_user_hex_before_billing` 与
+  `cch_placeholder_reset_preserves_system_document_and_reminder` 覆盖三处污染。
+- `cch_billing_location_matches_independent_reference_and_exact_bytes` 使用合成夹具
+  `cch-billing-location.json` 的独立 XXH64 期望断言五位值之外字节不变；
+  `cch_billing_extra_fields_and_field_order_preserve_existing_compatibility` 覆盖附加字段与变序，
+  相关回归另覆盖 API／CC、特殊路径、非法／重复目标、转义与缓存前置跳过条件。
 - 280 非遥测请求头：messages 的 request-class/tool-duration 仅在精确 messages 路径
   透传；Frame/MCP 专用头、后台 UA/beta、近似路径排除、旧版本 capabilities 均有正反例。
 - Sonnet 4.5：客户端带/不带 token、重复 token、正文有/无 thread、API 默认值，以及
@@ -1503,7 +1529,7 @@ oauth-2025-04-20,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,thin
 
 293 顶层已知字段顺序为 `model,messages,system,tools,metadata,max_tokens,thinking,context_management,fallbacks,safeguards,output_config,thread,diagnostics,stream`；缺省字段不因排序而插入，未知字段保持相对顺序，SSE 与 safeguard_results 保持字节透传。
 
-CCH 使用 `0x4D659218E32A3268`：在最终序列化字节上将首个 CCH 替为占位值、删除顶层 max_tokens、清空全层级精确字符串 model 值，保留 fallback，再取 xxhash64 低 20 bits。禁止 JSON 往返重排。初始后缀仍以 salt `59cf53e54c78`、首条 user 的最后一个 text block、UTF-16 code units `[4,7,20]` 与版本计算 SHA256 前三位；缺失索引按既有 `0` 规则，孤立代理项按既有替换字符语义处理。续轮使用当前入站 billing 后缀；审计通过 previous_message_id 对应前一 SSE message_start.id 逐链检查，同 run/model 不构成唯一会话键，也不新增全局后缀缓存。
+CCH 使用 `0x4D659218E32A3268`：在最终序列化字节上将唯一受管理根级 system billing 的 CCH 替为占位值、删除顶层 max_tokens、清空全层级精确字符串 model 值，保留 fallback，再取 xxhash64 低 20 bits。禁止 JSON 往返重排。初始后缀仍以 salt `59cf53e54c78`、首条 user 的最后一个 text block、UTF-16 code units `[4,7,20]` 与版本计算 SHA256 前三位；缺失索引按既有 `0` 规则，孤立代理项按既有替换字符语义处理。续轮使用当前入站 billing 后缀；审计通过 previous_message_id 对应前一 SSE message_start.id 逐链检查，同 run/model 不构成唯一会话键，也不新增全局后缀缓存。
 
 **后台端点**
 
