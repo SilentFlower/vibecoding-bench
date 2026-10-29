@@ -1,0 +1,6 @@
+{"file":".trellis/spec/cc2api/backend/index.md","reason":"Rust 后端必读入口与最低检查命令"}
+{"file":".trellis/spec/cc2api/backend/service-architecture.md","reason":"最终正文、封口顺序和 Gateway 业务边界"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"全量测试、历史版本回归与合成夹具要求"}
+{"file":".trellis/spec/cc2api/protocol/index.md","reason":"CCH 协议画像上下文"}
+{"file":".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md","reason":"现有 seed、版本投影、字节顺序和后缀契约"}
+{"file":".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/alignment-review/round-01.md","reason":"F01 冻结反例及与 F03/F04/F05 的范围边界"}

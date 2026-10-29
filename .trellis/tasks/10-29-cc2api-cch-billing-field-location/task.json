@@ -1,0 +1,3712 @@
+{
+  "id": "cc2api-cch-billing-field-location",
+  "name": "cc2api-cch-billing-field-location",
+  "title": "修复 CCH 封口与刷新误改正文（F01）",
+  "description": "修复 F01：限定根级 system billing 的 CCH 占位化、封口与重试刷新，保护用户与工具正文。",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": "cc2api",
+  "package": "cc2api",
+  "priority": "P1",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-29",
+  "completedAt": "2026-10-29",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-29T06:28:34Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "cc2api/src/service/rewriter.rs",
+    "cc2api/tests/fixtures/cch-billing-location.json",
+    ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md"
+  ],
+  "notes": "F01 及附加 billing 字段兼容修正已完成，两个业务仓库已提交并推送。全量 690 项、CCH 36 项、full Check-All 和格式检查通过；3 项既有 PostgreSQL 用例默认忽略。协议 Spec 已更新，本批同步最终任务记录。F03/F05 仅讨论，F04 保留现状。",
+  "meta": {
+    "intentRouting": {
+      "autoCreated": true,
+      "createdAt": "2026-10-29T05:33:50Z",
+      "contextKey": "codex_01a185ab-74b5-7bd1-b00a-db80d3dbd148",
+      "implementationStarted": false,
+      "baseline": {
+        "head": "bf9a83725e7e78a5115f20c8562c99288dd0ca24",
+        "status": [
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/known-findings.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/utf16-evidence.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-per-run-version/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/design.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/task.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/check.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/implement.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/prd.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/alignment-review/README.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/alignment-review/round-01.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analysis-refresh.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analyze.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/capture-tls.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/case-checks-refresh.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/case-checks.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.lock"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.toml"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/src/main.rs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/generate-corpus.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health-refresh.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/independent-verification.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/local-harness.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results-refresh.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/cancel.rs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/capture-tls.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/local-socks.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/tls-count-evidence.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-build-info.txt"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke-socks.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke-tls.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/projection.repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results-projection.instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results-projection.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/asset-requests-recheck.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/asset-requests.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/assets.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/corpus-recheck.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/recheck-cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/recheck.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/repository-recheck-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results-recheck.instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results-recheck.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/documentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/helper-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/connection-records.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/header-profiles.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/helper-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analyze-boundary.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-run-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/documentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/kernel-boundary.json.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/observe-boundary.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results-boundary.instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results-boundary.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/smoke-results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/cc2api-wire-research-probe.stderr.log"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/cc2api-wire-round2-gateway.stderr.log"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/corpus-ownership.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-probe/Cargo.toml"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-probe/src/main.rs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/prepare-gateway.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results-ownership.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results-truncated-recheck.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/corpus-json-keepalive.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/events-json-keepalive.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/events.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/gateway-probe/Cargo.toml"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/gateway-probe/src/main.rs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/results-json-keepalive.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/results.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/gateway-probe/Cargo.toml"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/gateway-probe/src/main.rs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/assemble.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/execution.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/gateway-probe/Cargo.toml"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/gateway-probe/src/main.rs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-html.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-initial.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-pool.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-supplement.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/sources.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/assemble.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/execution.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-controls.instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-controls.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-modes.instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-modes.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-primary.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/sources.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/sources.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/.gitignore"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/REPORT.md"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/analysis.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/analyze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/baseline.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/cases.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/corpus.jsonl"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/fingerprint-recheck.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/fingerprint-recheck.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/freeze.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/prepare.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck.repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/repository-instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results-fingerprint.instrumentation.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results-fingerprint.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results.jsonl.gz"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/run.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/run-differential.mjs"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/tls-evidence.json"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/verify-evidence.py"
+          },
+          {
+            "status": "??",
+            "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/task.json"
+          },
+          {
+            "status": " M",
+            "path": "doc/claude-code-2.1.303-protocol-study.md"
+          }
+        ],
+        "repositories": [
+          {
+            "root": ".",
+            "head": "bf9a83725e7e78a5115f20c8562c99288dd0ca24",
+            "status": [
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/known-findings.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/utf16-evidence.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/design.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/task.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/check.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/implement.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/prd.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/alignment-review/README.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/alignment-review/round-01.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analysis-refresh.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analyze.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/capture-tls.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/case-checks-refresh.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/case-checks.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.lock"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.toml"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/src/main.rs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/generate-corpus.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health-refresh.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/independent-verification.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/local-harness.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results-refresh.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/cancel.rs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/capture-tls.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/local-socks.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/tls-count-evidence.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-build-info.txt"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke-socks.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke-tls.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/projection.repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results-projection.instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results-projection.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/asset-requests-recheck.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/asset-requests.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/assets.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/corpus-recheck.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/recheck-cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/recheck.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/repository-recheck-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results-recheck.instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results-recheck.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/documentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/helper-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/connection-records.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/header-profiles.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/helper-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analyze-boundary.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-run-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/documentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/kernel-boundary.json.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/observe-boundary.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results-boundary.instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results-boundary.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/smoke-results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/cc2api-wire-research-probe.stderr.log"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/cc2api-wire-round2-gateway.stderr.log"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/corpus-ownership.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-probe/Cargo.toml"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-probe/src/main.rs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/prepare-gateway.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results-ownership.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results-truncated-recheck.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/corpus-json-keepalive.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/events-json-keepalive.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/events.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/gateway-probe/Cargo.toml"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/gateway-probe/src/main.rs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/results-json-keepalive.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/results.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/gateway-probe/Cargo.toml"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/gateway-probe/src/main.rs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/assemble.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/execution.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/gateway-probe/Cargo.toml"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/gateway-probe/src/main.rs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-html.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-initial.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-pool.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-supplement.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/sources.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/assemble.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/execution.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-controls.instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-controls.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-modes.instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-modes.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-primary.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/sources.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/sources.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/.gitignore"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/REPORT.md"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/analysis.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/analyze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/baseline.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/cases.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/corpus.jsonl"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/fingerprint-recheck.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/fingerprint-recheck.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/freeze.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/prepare.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck.repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/repository-instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results-fingerprint.instrumentation.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results-fingerprint.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results.jsonl.gz"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/run.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/run-differential.mjs"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/tls-evidence.json"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/verify-evidence.py"
+              },
+              {
+                "status": "??",
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/task.json"
+              },
+              {
+                "status": " M",
+                "path": "doc/claude-code-2.1.303-protocol-study.md"
+              }
+            ],
+            "worktreeDiffSha256": "7996b1a9584b851dfe0397abfce662de5d8a83ffab0c2e7074320a1e9b1f6c93",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/check.jsonl",
+                "sha256": "a5d8d3261aa6e3f893868e9a8d4b27da187614d10a40c7cdeef689f995a453e3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/implement.jsonl",
+                "sha256": "cf7f285666799d558d9ee38ceba0a272e3b655b059db3748dc278be569c9f37b"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/prd.md",
+                "sha256": "8ae4877a56474c1b0f2ae8cb271113c1179658b039067d1e1f5ed11c6ee0e45b"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/baseline.json",
+                "sha256": "43774118a7f58d2bd9a7d8001a62ed2c06520bb2cd9fd174fe6037293e7d711c"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/research/known-findings.md",
+                "sha256": "12760a0ad7f55a73cc0ece76565ed65fe5c9893cf7ad5682d39f07a658419565"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-303-tls-body-alignment/task.json",
+                "sha256": "ac60b4f3e9837bc920b69a8c0618de99c5ad3814cc450de32612e20ac2627aa0"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/check.jsonl",
+                "sha256": "94ce057560791db170bb71ce04887a35d9d55bc1b4cf5141965b915ca086c2f3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/implement.jsonl",
+                "sha256": "9fde1d60b50f11666f633103f332767313fe09d67ed4489de99e232d6dfa2121"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/prd.md",
+                "sha256": "527491c5257a70d388525ff67d9e594736b4dd4d06e954469c43f3cc5cab372f"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/task.json",
+                "sha256": "7e2dfb8e30cabbbc92e0fe41f96fe05d50fca11b06193290f37a391dd31618f5"
+              },
+              {
+                "path": ".trellis/tasks/10-28-cc2api-billing-utf16-surrogate-pair/utf16-evidence.json",
+                "sha256": "c8f6fb3d1fe01771541e5bff97e2e96826be1592e353a6bf375744b6695c90dd"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/check.jsonl",
+                "sha256": "3c610c524aa90d722afd57847d434ac086aa2b2499e62157ebd0dda72184c6e3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/design.md",
+                "sha256": "95f40b7deafecff534e8a295591324f58067c58a47392a494c3cac329936f721"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.jsonl",
+                "sha256": "4ecdde4c717b748bc246c903b29048142bcf9e60d4f0ab06e79ac1d2d07dcf12"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/implement.md",
+                "sha256": "7e43a4a646cb5d37e6abb1288895970fed35ce0efab965d1239902c972814219"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/prd.md",
+                "sha256": "1e9d74a2ba70e96f1f5694dcc1765022f8290addf44011d4f390070efe669f1d"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-per-run-version/task.json",
+                "sha256": "3ef8959a2ca1bb4922ace40bdc509d59ce794e37dc29835b5019497af604507f"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/check.jsonl",
+                "sha256": "3c610c524aa90d722afd57847d434ac086aa2b2499e62157ebd0dda72184c6e3"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/design.md",
+                "sha256": "a34f86f1cd1262d225d0e5379a2b68c72819d2400c9e7a60078c9aa9e8b4f89f"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.jsonl",
+                "sha256": "4ecdde4c717b748bc246c903b29048142bcf9e60d4f0ab06e79ac1d2d07dcf12"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/implement.md",
+                "sha256": "4ed4e6ca6e4dd16b099c22945b0b601f94285963963ff5fc35d5d36820456560"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/prd.md",
+                "sha256": "2523d088d647d78cc7a465a460d5777e6cb4ab135f22542d8c8cdad0c2a1d63e"
+              },
+              {
+                "path": ".trellis/tasks/10-28-v3-capture-stop-retain-artifacts/task.json",
+                "sha256": "dac129724529a7cbd7bbb262ad4e8ba57d48a06b949acde648b3ee8b1be696b2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/check.jsonl",
+                "sha256": "265856114686764198e9fb614ea2acd62ac854dd097c800269207dcdbc5a81b2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/implement.jsonl",
+                "sha256": "265856114686764198e9fb614ea2acd62ac854dd097c800269207dcdbc5a81b2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/prd.md",
+                "sha256": "f86f5994aedd661b18cf94bf63d171036ed7c9a8a7722b3e6bc0d66e83a088d8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/REPORT.md",
+                "sha256": "051a567d983288dc6f11378d2951551531182be5cc2eeb7e788587c105d71d37"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/alignment-review/README.md",
+                "sha256": "6abd56cf75d128c1aab10aeeb68e4bbe1ee7a73be87197fc321e8b2318e3ed34"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/alignment-review/round-01.md",
+                "sha256": "2a697cbd561effd5c4c2b56f9c956a3eefbe894e287098d17e1373160ed51a5b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analysis-refresh.json",
+                "sha256": "c028f2e7f66ca5f4029fcd518cf821b611a1b1b9c85292cbce9a772d0c800842"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analysis.json",
+                "sha256": "e01ee850e9d601538339d879764c755aa25410edf78407edb1760f164149ec10"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/analyze.mjs",
+                "sha256": "10925632c79a54f6cc0a15bf1871f79a39bc7b682756cf70c4e0cff1b77a59b1"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/baseline.json",
+                "sha256": "17f0009ece6fada854a2fb76c0a84db696ead3fe2e2611b520658c494d296406"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/capture-tls.mjs",
+                "sha256": "a675a84c92825904b265f6613232510cfad54bcc680d7d55f540a32aba5a8621"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/case-checks-refresh.jsonl",
+                "sha256": "f2e8666ed4313d5c1b1dd2a7a9d11c9ea74eccc33c5f158165f5dee4e0eb643a"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/case-checks.jsonl",
+                "sha256": "337aa6016f19df736b316c936cc6cea7dee4c3565ba1919b5436c34d67320cfd"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.lock",
+                "sha256": "f0661d319d6aa15eca8b5e4d038b2984c23f58bea0038e7f4e938f2f7ee686cc"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/Cargo.toml",
+                "sha256": "b8f4d43382145685a438768e0b36d25bb69d01a36f1d7776707fcd2ac6c61a86"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/cc-probe/src/main.rs",
+                "sha256": "1d6a4ebb38bd18c3fb46f5c4285c94a538a3561e8e80b5526aa7a0bd942fb5e8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/corpus.jsonl",
+                "sha256": "b72bbb8f7aa52d614a04090c2fca49433e94d2d378a98b6ad2b227035ed0cb82"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/generate-corpus.mjs",
+                "sha256": "4aba7817d1e5cc37fa5019c103ec448b69b59e8dc9ab078f954b84f20555f5a2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health-refresh.json",
+                "sha256": "de6d06fca6bc85cf105a5450f52710ebc83a511b54a0c4cf7f559cecab1fd383"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/health.json",
+                "sha256": "6a80b83fc26a0692180d6ee4a88006057093be1cc8e00c98d5df0347476fda0b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/independent-verification.json",
+                "sha256": "9b6d10531c2e4056690d277c6547b223abc24d5e073fbe26d19d68027b4d5521"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/local-harness.mjs",
+                "sha256": "cf137602623c1c5444b0bdcb0fe9507ddc1755ffa5986692cff2fc5195a0382a"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results-refresh.jsonl",
+                "sha256": "f87279c26613d9b91e731fe4b34e497cb9e4235c3cc6ea8d0548b89559ebbb07"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/results.jsonl",
+                "sha256": "c47a2b74983fcfbe4f7dd71c550d025604ad67563202ec81e2102210b500a956"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/.gitignore",
+                "sha256": "03d485d039f9e623bf20d8a6b1c036534598454ff4a5d799f5e08756513007c8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/REPORT.md",
+                "sha256": "0201c28a249986172f3a3aee816c6b1335b4f6dcaa79a4ca25614c5b16d85d7d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/analysis.json",
+                "sha256": "d3ba85f76ebd6b0ad97b14dfaa3b38f76d1a3f280549dedbdf9e16bc5a7cee0a"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/analyze.py",
+                "sha256": "786e7e6a2310a7152c3dba810d323135f7bc2fd95accd2c80def004d4ab294e8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/baseline.json",
+                "sha256": "907bc1b3416a90730d3f70d9ecd02e13f3b38d76c088adab3e5ce8d8a5e473f2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/cancel.rs",
+                "sha256": "d8e74ff1ba126b3750c7df19af1dc8d4457317a85e960ce3f7565291939d2915"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/capture-tls.mjs",
+                "sha256": "60886b57effaac83c3f1bc3fdc2427203b16425afa73028553208f01a917e3f9"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/cases.mjs",
+                "sha256": "226f07d020c38f8580737fba28f6ec9bd47fcae28093c728d28daa45685de44d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/corpus.jsonl",
+                "sha256": "c24329ab57327678fd9f36ab308e289e361e01a219c41db2b3132d1c7b260726"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/freeze.py",
+                "sha256": "cd106c60b48eec78133f12447039548163fe6eacfaae2208be1361ddb91a2b93"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/local-socks.mjs",
+                "sha256": "12f873e3e66a948920da62d9d529dddd09c2c08a1c4260bf7498aa7379cda5d4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/prepare.py",
+                "sha256": "a0a79f06dc9a0ba8174299b8977cda0fbed769e9330bc046fbe28b4d3d0f7f2b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/results.jsonl.gz",
+                "sha256": "5d23f09dfc8f89283edbfef248e45dca8a9cb2a5e539868fed804f6059c06601"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/run.mjs",
+                "sha256": "90922eea64915aca92255032b64cf87261edc6c11bd73bddbf28ef313aae5180"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/tls-count-evidence.json",
+                "sha256": "f94b0073e37ca25162070db88849b0b06268c630f224c04ba9a22018860a04b2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-build-info.txt",
+                "sha256": "9e11e6c71059ce5348b7a6cdcc92afbec7375761b69df443bb4af1246a3b57ee"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke-socks.json",
+                "sha256": "c9b3f7993d4f850639772510dd776a0b05e2a4598ce959e6bfef1c278696a51f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke-tls.json",
+                "sha256": "8319ba88d2797f4208cbbeb007a62780dbaea5aa010bb4773a6c57e8d9913fae"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke.json",
+                "sha256": "6428efb97e6f0594b63ee3116b809bb2151761b953e0bd0db44f228252877e64"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker-smoke.mjs",
+                "sha256": "bf10e8bea927d3ae87a41e77c5fb7a6213cece70dec2e25cc0baa1d90769a907"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round10/worker.mjs",
+                "sha256": "08044a1884338c975b1212041b9fe0e000d1f36b421e18ea76d15281a6ecedf0"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/.gitignore",
+                "sha256": "8bd57fb685842cbea44acbbf6116c82d516bd21822d44dec823d68444d68bcf2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/REPORT.md",
+                "sha256": "b09af691c55458c947c0f2b2c57d3a2d9fa70baf6fc8cf83587a8e16deaed3c8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/analysis.json",
+                "sha256": "010cae290e29226181b44b583526dba07c80dd71ed694c3e6e82dc28495f929e"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/analyze.py",
+                "sha256": "215391d1db68c43560c62e54831cc22e417f6bec8a741a92655ca8a198eb63df"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/baseline.json",
+                "sha256": "76c56901cf9277f0c190fbcf25b68dbcf772a46d81fd1811f4eb9bf751cde128"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/cases.mjs",
+                "sha256": "bb4c017cb20a984f2f8155fa894cb68419d370ee8f6d1c144fd7fef64fdd0b30"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/corpus.jsonl",
+                "sha256": "794f5b5b3d0b6c51721b363ef7cd84bbd3aed26e6ecdb48eb79817cd8ab39cef"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/freeze.py",
+                "sha256": "3269222e00945fb0cc042bf17ab259b2e16766f5a8766bfa8adeb36fd8791317"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/instrumentation.json",
+                "sha256": "95ad2e899b64d7aa69037597a777e9e47a8213073af20a43ed144ec9ffe7aa70"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/prepare.py",
+                "sha256": "687327327317d7c21a75e49d9df231e820aee680ef011a6a9b2c400e0d7eef3e"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/projection.repository-instrumentation.json",
+                "sha256": "a64dd9281ab5a476bf5299d63bac4888637c0fbac0a964d9bca8b401e2f726f7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/repository-instrumentation.json",
+                "sha256": "a64dd9281ab5a476bf5299d63bac4888637c0fbac0a964d9bca8b401e2f726f7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results-projection.instrumentation.json",
+                "sha256": "9f9196e8293446e3c79d3c1a22936b3f3f1eca8cf612276c8b726403363e5635"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results-projection.jsonl.gz",
+                "sha256": "5f8b6cbf46087aedbf50c621bba7c6ba1011419c307de52927957d91e2475dc8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/results.jsonl.gz",
+                "sha256": "f1b6ad069bfd01d6e679932f085ef74c3d1083825a6032cbad506fb66e2c5a4a"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round11/run.mjs",
+                "sha256": "b9e623a76c76d9afeec5843cc37b51baa1c3cc40ca5bb7865d87d48ee6cd3149"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/.gitignore",
+                "sha256": "8bd57fb685842cbea44acbbf6116c82d516bd21822d44dec823d68444d68bcf2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/REPORT.md",
+                "sha256": "38139b475e3311f87d3c35c447cbb1b67b154eb1e6157dc7ffdb9dc11b81fd7f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/analysis.json",
+                "sha256": "2e0d3f2cd20c736945b59dc1fd7f47d6c53a213f78345a8a9e6fe383723afa06"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/analyze.py",
+                "sha256": "ad9cb13c4e4b60e6bf56fefd5620fe51ad47b516798661291cd56d83afd2dfb4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/asset-requests-recheck.json",
+                "sha256": "7ea036f0d190a074091b68837a15ec5f619ec15127863c71f4906b3d8357712a"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/asset-requests.json",
+                "sha256": "922f6de9460f7d3f683eb11bdc228b5373a14cf222a5d27541b1c783de542fe8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/assets.mjs",
+                "sha256": "ffedbf7464fa8af2cfde628cc97da51831eed54b6eb7fc2606c6daab317779eb"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/baseline.json",
+                "sha256": "f95af932247c14ed5ed9f624d770c147c74f3d5cbcf00fa0b3ba9f319875646f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/cases.mjs",
+                "sha256": "2317bfb1b95e98432d9e55e373eb282e6eadee6f700795c5fb1652ef1c6f86e7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/corpus-recheck.jsonl",
+                "sha256": "bff1c82faf01eff5cfb16f606939aad546407893b6272c852444950be939744a"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/corpus.jsonl",
+                "sha256": "12fcce9a831e5a1b749ec4cf6d10866c92a7fe40a068bd643a3981a27d3ae775"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/freeze.py",
+                "sha256": "2b9131cbc1bbcc9b321df10109040d6e235e54cef0789625f06af5d6542959b1"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/instrumentation.json",
+                "sha256": "56dd118205d57f93b42f693911427ddabeb259f1dd083795f368f50c7aba2be8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/prepare.py",
+                "sha256": "8fccea4c965f6936b3da7e939ea0a76ca149576a908c990363ab7037b969ddf0"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/recheck-cases.mjs",
+                "sha256": "1ca20c35960a76d34e9b31615c9bbb8335ed224b801953d76fe9edb3ff799a45"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/recheck.mjs",
+                "sha256": "0f6d38ce78313425064afbaf3f05ee84f063e95acde8d194f6c6a244e39abf77"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/repository-instrumentation.json",
+                "sha256": "67de435447967e3a8b8c4da8bfb74406026f362c2da9ba9718d7cc2c7d1b86ae"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/repository-recheck-instrumentation.json",
+                "sha256": "592c1026dd33e6dbe6e9f2b00be079a2070fa31ad12c17c1fcd561805bf67d39"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results-recheck.instrumentation.json",
+                "sha256": "f8209eb43598ca2165c798e2268a85143a570fcb569beb75ec343b36a734345c"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results-recheck.jsonl.gz",
+                "sha256": "43f7bc074a30c88f940d15aef07a8628d30edcc1c849079311305c18e4221764"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/results.jsonl.gz",
+                "sha256": "bc713a9fd6bbb00dcbaf12bbb701eea06eb65b6461d31b4a93cbe8cb54617941"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round12/run.mjs",
+                "sha256": "6bd3821a081f8c3347b4e6176d859d4705554955b1572c6f11e561d068aaf6b6"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/.gitignore",
+                "sha256": "6267d57883289ef86c7009fc6d6bdc8473743fb610cbe2ab4b821a435a690fc7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/REPORT.md",
+                "sha256": "bfab49ac13b228c13178910e506ece8e234bb763ec7952f33cdc35f0a70cee7b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/analysis.json",
+                "sha256": "836e5960212823de48f59a98470ec168633c9e3ba61de5dcb9df488a0a54ab1d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/analyze.py",
+                "sha256": "2f0eb5e09fb57bb693e7e3d9912577d1e5e9c9614d9078b1eccf0f6fb643c398"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/baseline.json",
+                "sha256": "db10bf4ab818a6c6ed422c639e02634617e2d69b580add1266a2ef4719a1ab55"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/cases.mjs",
+                "sha256": "b8fd01ca9102e19cafb579bb136d02f8ec431f35d3ba59a1441f41b52c32b149"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/corpus.jsonl",
+                "sha256": "11dc3323e99e2ae492dd9637d416db974c5d01b04b54bc02d23d4585383da7bb"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/documentation.json",
+                "sha256": "54cd8c03bea2719c586de5f2bcdd2342f7284a470a0f2858260ac40569c090d7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/freeze.py",
+                "sha256": "502216c0a0ae11352c1ba9c3e7f9a6ff8842c3b3c12998a651d0b755a22d7810"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/helper-instrumentation.json",
+                "sha256": "dea0836206b6e4b1d7e9086058726200d7fdc1f8e623a87984b077a9b949ac4f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/instrumentation.json",
+                "sha256": "e5a06abe284d9d0993fd5058df38136c7dda7e25057c779d025d136769829951"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/repository-instrumentation.json",
+                "sha256": "18c3ea753ca8b6bcbee6f21be6026d004f03979eaa514486faf2767adb2cf888"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/results.jsonl.gz",
+                "sha256": "14cb64a0f019cee9a8eb77021a172a603209bf1352cc8e008f4d73f43f4a57dc"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round13/run.mjs",
+                "sha256": "88a1a6b1b70da349e8eb21a19d9a93dd0aee2259b38d27e6104b368894bdb80f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/.gitignore",
+                "sha256": "8bd57fb685842cbea44acbbf6116c82d516bd21822d44dec823d68444d68bcf2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/REPORT.md",
+                "sha256": "d56c786e086f44bc0e79babaea19bff03ea92e28c309030b955e56506092d879"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/analysis.json",
+                "sha256": "26dd17ec499f2e87208aef9fe4368e9efa5661ad8ba4b5bb8f017787843590f8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/analyze.py",
+                "sha256": "c0e3f47247fb6bf30658749b05905e8d10853b0e459585fd5150d4e5eb706806"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/baseline.json",
+                "sha256": "4801728e484ea5352daa082244f6eb01a4550030649beb62a4f76730573bdb72"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/cases.mjs",
+                "sha256": "28ada78941d58715260e5aafaee0e6fc94b638e9f67c1bb099fc6faaf5f0ce63"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/corpus.jsonl",
+                "sha256": "6b33e3c0c1db4b15065439d8c7eebabea24e5eb7b02a598feec6b33539b62963"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/freeze.py",
+                "sha256": "fdbc8021a7ea6f64e6b041f60d2ac23a26c86122ced1b3f39875608f41864343"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/instrumentation.json",
+                "sha256": "f115d0c3422a0b6f18c05011f25a338da2a2f853576c5c3292b590b1a6f44fc2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/prepare.py",
+                "sha256": "d765f2f5d84b6b769a437517c672f9c0a31ba13efaeb41deab4678ba01b21f9f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/repository-instrumentation.json",
+                "sha256": "a7a68792e609aedbccfac11e2c699f255768de04e66e5a7cd90ceb35cd564f04"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/results.jsonl.gz",
+                "sha256": "8ac3a07ef1c93a34357a9dcea1c81ce7b6616eada9672cb10a6c670eba903fdf"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round14/run.mjs",
+                "sha256": "bc090eeb881b0989316f9a426d3034dd9e1d3e648b3a387bca0608cf2fe3b64f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/.gitignore",
+                "sha256": "8bd57fb685842cbea44acbbf6116c82d516bd21822d44dec823d68444d68bcf2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/REPORT.md",
+                "sha256": "1f09239b393fafc63923a22cd8ae8c1a3d540777a5ee8f9ee4520b66e5d17c11"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/analysis.json",
+                "sha256": "e26e5755ff4dadc7a43cf3ee2d433ed977d0cd37e84e8ec83b3255b527aea3b3"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/analyze.py",
+                "sha256": "a78e13a73991603024e1d2625a4b75ee36b490e779410d518422067f5a36bc10"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/baseline.json",
+                "sha256": "b3b0b67988752d404f594d166b48b516eb94a81f919f27ce449a29b401c6b835"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/cases.mjs",
+                "sha256": "ddea34c8fb8bb4d91736d03596a1f5dd7478aa1795ccb89937a1439b01414700"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/connection-records.json",
+                "sha256": "e6f4d4a9ed372935161bb8b2250a3414af3e1112508c938881f34f1568aec3bb"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/corpus.jsonl",
+                "sha256": "7b78d729e9b08f25afcd4aeb812e75cdb5d73a7f8f141a7aab5e097381a50668"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/freeze.py",
+                "sha256": "bc0874631f0c257dea0a42cf35560876c14387b90053cf4c70a9e9ea3c5418a4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/header-profiles.json",
+                "sha256": "58fa9cb8da0a2631d3c3a84397b523f398c752b703f4b58f22a33aa9a2cda81f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/helper-instrumentation.json",
+                "sha256": "8374b0fdf0d8ef6d7e46eb212abd94090b58fcbe3d389af08d040f0f4c691c05"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/instrumentation.json",
+                "sha256": "e06ace67d4ac95567d5b3f6e55476183bc9f66b60eed7080f883706eadd92ba4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/prepare.py",
+                "sha256": "93b505adf82ca415fc9f089c90092ded467fe45e9ec862b82d8f3615002eb209"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/repository-instrumentation.json",
+                "sha256": "c5af3759beaff55887a598f6f2ba656cf9694b6d9e7dc01bb95cfb99e480621b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/results.jsonl.gz",
+                "sha256": "bfe880fd7b27be7b95f66a95b2f601c0374158f6ed986c849d6edf06a0ed32be"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round15/run.mjs",
+                "sha256": "d0e4da857c2c44dc042d4bdf2181e0e66144e1b582dafad2f7027de4206f6163"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/.gitignore",
+                "sha256": "6267d57883289ef86c7009fc6d6bdc8473743fb610cbe2ab4b821a435a690fc7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/REPORT.md",
+                "sha256": "4c0d37d39ea69ab1e834d725d89768879b578d78e1d3873fd5db94bddc163d99"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analysis.json",
+                "sha256": "86fbcce2f795b2090cc95bf6b2201aa3f5d4944f78036a8e48fabce350456f75"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analyze-boundary.py",
+                "sha256": "d8bc761574baa767e6b6dee6de9d4fdcc254f44466c6395f278bd78b929ca578"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/analyze.py",
+                "sha256": "4bf18a097725f0a0296bec34bf0046348cb50c7c6f609b056eaf4ac64b820ebe"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/baseline.json",
+                "sha256": "bea126fbde36d11bf6d3cd7b0eec8124519d5e6dbb2fa879f1ad1019f0b57424"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-analysis.json",
+                "sha256": "959a9470bcfc6c63f258cf1974eb7daa12201a9506e043ae346212b94dc835b2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-corpus.jsonl",
+                "sha256": "d48c84a14cea19f022eba572b0890140dbfff91323a9f8b6b9f486b218fc2ea9"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-repository-instrumentation.json",
+                "sha256": "d581d80c46cf1ad67beeec6c9e0dfc03d2512c61bf9cd82441401e3025aca3d8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/boundary-run-instrumentation.json",
+                "sha256": "6814f7567f207185a901d8fc01abd7cd6b6e01ce31fe23dc43c617450e182cc6"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/cases.mjs",
+                "sha256": "78a9bbcef3117ff3d8508d031626320bf40ab83ae09fa2a811514d88fe949de4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/corpus.jsonl",
+                "sha256": "5a213010816b41c419e3f6ac39d62852ed4038bfd43b543f9e7715f7c4764221"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/documentation.json",
+                "sha256": "2636ee3bf09654ea2ea84627603d1c01e56209a796fb688af7f93e4a39d9ecc3"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/freeze.py",
+                "sha256": "ec9d0fc394c0d15ad20a6e010b6ed33e62d8a97d1d2422f3c9d6fc2be124d720"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/instrumentation.json",
+                "sha256": "a89886bb9fcc9f2976af5f75c2b11046514bc3cd12a5be0e170f8cbdcbda531e"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/kernel-boundary.json.gz",
+                "sha256": "39965107bd23c6becc9efe4f575918c0727e28be134896bc14769f80c54bcee6"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/observe-boundary.mjs",
+                "sha256": "03e28148d09ddf3655782639b7a4156a6716fbe8db2f1b403f741fe7283309a5"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/repository-instrumentation.json",
+                "sha256": "1e5b864a82c6b9cf77708c57b1b55311db13dd62eeac188bc85eae3b761bc320"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results-boundary.instrumentation.json",
+                "sha256": "a78fca088f465b670906a448fdb902729f54ec51b622fafeb0fd75ec093dd5c6"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results-boundary.jsonl.gz",
+                "sha256": "1b16269f6c590ce050bdc689a4d8ef417bc61e76a762c1a75e8d57b4d740c594"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/results.jsonl.gz",
+                "sha256": "eb582db254098bab23f0963521dd6e0db55ecb0978ffca2511ebf70476a8936b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/run.mjs",
+                "sha256": "1d74b66e4789c29e374cde1902faf0b734382be44da452f1987dfbda8bf5e80c"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round16/smoke-results.jsonl.gz",
+                "sha256": "9d6d0aaff9f257c0bd449d3b4300273f95e418723d2bc345688e71ea2c5578de"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/.gitignore",
+                "sha256": "5c43c48a12026b85bb6e7255207eeada9f5d6809ed85348cc5bea3a7d7c3c5b9"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/REPORT.md",
+                "sha256": "c519c2499a101ca81c5553cce46603e4bee987b5969fdc1697d94e04aca1fcca"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/analysis.json",
+                "sha256": "aabe31c2bb5a617bc476856923ef0a2e57f19e97a8ec52e13b7f03a370e1f278"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/analyze.py",
+                "sha256": "60f03d18c9e4dac0db0647c184fcf2b8ceabf642a14c79b1958ecd3bb0926241"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/baseline.json",
+                "sha256": "0c1cd0be69f89de937ae8c34d25389ca447c064c6ee6d7d2f3e9665a31799203"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/cc2api-wire-research-probe.stderr.log",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/cc2api-wire-round2-gateway.stderr.log",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/corpus-ownership.jsonl",
+                "sha256": "2cb20724e533d96a00b68e46ccd925e39335ddd8fdec81437747fc46ecae0ebe"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/corpus.jsonl",
+                "sha256": "380fc43c8e84e30069417f9cae8ab537b66ffb09d8cebf2fc8a535fd1cd3f651"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-instrumentation.json",
+                "sha256": "af057d43f68e2710a5958e973485cdd565e0fe0a4048114e87be9415ad6d5a03"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-probe/Cargo.toml",
+                "sha256": "db7c44598ad4113577eafdf44a5c52e66bcbf954dd819cccb033ac98de24be6d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/gateway-probe/src/main.rs",
+                "sha256": "b5f31a6556304d59017932b53084d8e0928c0d4a85aa93c8c0197302a774c77e"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/prepare-gateway.py",
+                "sha256": "30ae298d9cb1d941fdf6dfdb0321da39840086e8b402a4c479d8648202143c9e"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results-ownership.jsonl",
+                "sha256": "8cadecf516ebb8d5417e1192c3bce954f4e7944ae70fe154605c47fe3db3612b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results-truncated-recheck.jsonl",
+                "sha256": "6ab95bac884709e8ea60fe0cb3a3d7a332f5675a824b24028b6be952c8db7f61"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/results.jsonl",
+                "sha256": "3156cef41754a586cbd72194fb774c29c41dab0601030285f0c9ad792f218dd4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round2/run.mjs",
+                "sha256": "a8c056cb280cf11fb865d694235da4f5285397cfb781a7b6350f989223789fa0"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/.gitignore",
+                "sha256": "416a6033abaf67a2673a87efc2161a587266334c695fc2cce79e4477e26c33c6"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/REPORT.md",
+                "sha256": "2868c2a885d058e147d77ba79e25f1f3e6e51d3b48aa420ad1bd624c3278923f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/analysis.json",
+                "sha256": "9a01d1eb964db9b6f8772c895cfd75c5cfafca2dafd9afe878891990b897bb21"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/analyze.py",
+                "sha256": "657a914f648a448388b463cade1974de3fadcc4b9f3c62932a50f92963ecc9b4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/baseline.json",
+                "sha256": "0900628fa9f1fd687b6ca82156141803e6963494219fb056d7389d685228cc06"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/corpus-json-keepalive.jsonl",
+                "sha256": "4d48ef6e84a569e72803fab10567a77138f5af98023ef7b76c5173654ddc5631"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/corpus.jsonl",
+                "sha256": "d43d7713f32a5306353dbfc65c0eb137d7356948deb87f5bc6df9ed36538071d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/events-json-keepalive.jsonl",
+                "sha256": "d479bad4cd3962b563fd70069ee164b48f27abcdb21d95001911d126649e5b15"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/events.jsonl",
+                "sha256": "136916b5bbc7ad6772cb41188c5f21e48ba1ea62f2d254ab1eafd7f1e424e255"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/gateway-probe/Cargo.toml",
+                "sha256": "b945198665b65538dbe3648e6c041b0d11a45c45dd15286db7c196291ac44a13"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/gateway-probe/src/main.rs",
+                "sha256": "c7680539fb12f128f4db4f40878283ec0933730331db794ba53fb647276a832f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/prepare.py",
+                "sha256": "0583564dd5093ae455883d177ce088985a0139d7fb6fb31fc7ab2030f9e6f09e"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/results-json-keepalive.jsonl",
+                "sha256": "cb01e1d19af950033f99d00868b48d89ee4c21bd6db6c9d86a5117cfdcd14f48"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/results.jsonl",
+                "sha256": "044c2a41df3736740478e67eec34c7d8565fa27c56660909f47163905318513d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round3/run.mjs",
+                "sha256": "f4b99ba75ad47fcacedbe6f642d4cb66fc9786eef274279c0574fe1f56c6e39c"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/.gitignore",
+                "sha256": "416a6033abaf67a2673a87efc2161a587266334c695fc2cce79e4477e26c33c6"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/REPORT.md",
+                "sha256": "b7f6f58bb87ff484ea4716c5d031cfe872da27626674e6dc01cd0b2c2c2e2143"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/analysis.json",
+                "sha256": "9a2f328b5a564213c5c778756bccc59122056ead937a427b66de49995d1c77a9"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/analyze.py",
+                "sha256": "4a7da42bd3814dbfd4086630aec93a209d5b1ef7657315d0fab3d348984cc164"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/baseline.json",
+                "sha256": "f5519465f7959403802cd6083284616bf388a24d5063c3790e36443233d17b57"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/corpus.jsonl",
+                "sha256": "634a919bace04659a0ca71a287edeaf99b9e3808f06727070b1ae3d0f0a4be68"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/gateway-probe/Cargo.toml",
+                "sha256": "955a2b780e76b551d719278c0da21675c28301c49e80da1acbf17ae826bc6452"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/gateway-probe/src/main.rs",
+                "sha256": "53ca17ef46d370c9f34392457e06c6bd9c3a40839ca834e2802853073384b658"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/prepare.py",
+                "sha256": "78e53373171ad38feb7ed1c120589b67d319f25815dbd150044dc30ea13088af"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/results.jsonl.gz",
+                "sha256": "be127a1d82b08ebce70d6114b9218f6ba17cab5f660f3bc98b95869bb5e162f3"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round4/run.mjs",
+                "sha256": "5824c9e06f00d5387cc1a6fb90436563a54f62ea1749550423070e678b3db205"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/.gitignore",
+                "sha256": "f1c86ae22fc4c2d8476bdecfbc0708f5262afd0ef56e11c0135a24b03d40ab7b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/REPORT.md",
+                "sha256": "28a001f65fd8cf2104e4e0ec04b12289dd7c92e677c447747a67d22441811a46"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/analysis.json",
+                "sha256": "0abb68335e23ce525d073c3957922a411f4241fbdba04414e28a0bf84bcf9ffe"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/analyze.py",
+                "sha256": "c9c9ac22cd97493f5c95b013439c321f639d61df1f82aba489b0f97f434dd5a0"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/assemble.py",
+                "sha256": "2144d8e41b39e5d7979d502fea066616b013bdac94c9cb6e755476cb9aab8e79"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/baseline.json",
+                "sha256": "0ee472bfa1a9c251834f6881049399f5c80e3917a090d1dae38b920002246034"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/corpus.jsonl",
+                "sha256": "38632265f5dabfc9200099ffda61733e2adb5aefd0e7ef3e92bb2909532540d9"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/execution.json",
+                "sha256": "c1bf0e5a6cb7a71ae4b364dc1469402a10eafefc124eb1547366091e20eaf28c"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/freeze.py",
+                "sha256": "8be4f0eeb230f64c955e7fc01c12b5dd0e809b968bfce2301b07de377af020eb"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/gateway-probe/Cargo.toml",
+                "sha256": "11ee364d2308ebb19e6ea752d682d8228ee972a1d1ab9cf532fb9d21aeb6e9c2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/gateway-probe/src/main.rs",
+                "sha256": "09c3aa51f8b59944a780e75adaf2f5ed8c5eb72f7914a68c9f8906af9cc703b5"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/prepare.py",
+                "sha256": "cef9f8748c907cf4f71b9fa7fa077390bf18e7be1424e19f35de890f4571b488"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-html.jsonl.gz",
+                "sha256": "36bf08351637a47f0036e6b408645028e43c3b50db6757d40683b4375fbc001c"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-initial.jsonl.gz",
+                "sha256": "bc0a1353caf8c0b153f33610cb0318ecfbcd63a40fe10acd82f453519d1f12e7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-pool.jsonl.gz",
+                "sha256": "860bcc2713114f9691260c7aaabf6879bdaaf1c7c89b591de561edcb4b21b265"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results-supplement.jsonl.gz",
+                "sha256": "e3989e44b6da9bb97af2fd8fd132f477f6c1fb9d26a35a62bf2f636e25ef7a12"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/results.jsonl.gz",
+                "sha256": "3730c7fdbea7451f5a1361f2944823e576cfb1e370237cef963f195e56410d37"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round5/run.mjs",
+                "sha256": "285e28468f8cfc3763359e1a788f436e332557bec712d03c8caba8d017e0d939"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/.gitignore",
+                "sha256": "8bd57fb685842cbea44acbbf6116c82d516bd21822d44dec823d68444d68bcf2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/REPORT.md",
+                "sha256": "05e957c66fb6f8109dc378485b3246fe2281d378597a576411ef2fa5f347e9b4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/analysis.json",
+                "sha256": "dd80763bb4c80e7adea50aaae1fb8a3d879f4989d4b1a906ab9594a93cf1e33c"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/analyze.py",
+                "sha256": "4645c3f72e90f5c8d963074412facb11e9e88d314fe74487043b6a259f420f79"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/baseline.json",
+                "sha256": "4432217637fbb46b051a70322382174f9769706820580ba47af29b607444e723"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/cases.mjs",
+                "sha256": "c8fba08cc017d3ddc4bb91a84a046eabcd47e1c8263312b5171ca6637bcb096d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/corpus.jsonl",
+                "sha256": "0cf75563a4f4a6becd43e82c262963d3013088e09607d3c2c80e0d3467500377"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/freeze.py",
+                "sha256": "157a0bc06bdfe9e777ad10f67b772268b447c040eef8f2da3f9bdfd766b3df94"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/instrumentation.json",
+                "sha256": "ea0a3de7ecd2978dfdb5328918e65e455f13539dcc4670a0bd77705dc464a89e"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/prepare.py",
+                "sha256": "07c9c93b606bf275b3a0ed5b79849a771c161d99b9571ee6fd1927a8be4997a4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/results.jsonl.gz",
+                "sha256": "e36e499238156e30c3e401611c08f6b2ce7bdcecdf9d5ef9001367622b8cbfdd"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/run.mjs",
+                "sha256": "69a3f7b180fa5296976f5c33e63a629862a6b0009992f1493ffddc635e71d6a7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round6/sources.json",
+                "sha256": "01422039402e794db1e17370814b62349eaab805450f2e785cebfdfa0b3815fe"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/.gitignore",
+                "sha256": "6267d57883289ef86c7009fc6d6bdc8473743fb610cbe2ab4b821a435a690fc7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/REPORT.md",
+                "sha256": "c134bbdaa6dc962ee8646a8c79d7bdc19534b0b1a2f581f7bb83fd0e18f9a78f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/analysis.json",
+                "sha256": "0ff3fc630b4fa6e92b7c99b1e659845676fc425e468b28131f3bc5fcb6ebe58f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/analyze.py",
+                "sha256": "2688c78150696d956c2633b827c1d15c379b53d51feaeae5d2e3dcd75d0cbaf3"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/assemble.py",
+                "sha256": "c74cc49321db3ee7980cbe820beb9acab05d536cbfb18f15c14e523feece09f4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/baseline.json",
+                "sha256": "a799e3ca2ee0f752c39ea76644dfc821c799353915f245748ef9b64312224787"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/cases.mjs",
+                "sha256": "175f5ae67eb2c4e3aaa760b94e59c46942f2394ec5361ce53c4052f33c3b8693"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/corpus.jsonl",
+                "sha256": "fa36ea126484265935e988cbc16939e7460b99787361582713c312d6f7974317"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/execution.json",
+                "sha256": "3ff93b215fedcde947dfceee038065fb95efc1823702f9d812569be4bd708e2a"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/freeze.py",
+                "sha256": "a647088fd05ef2cd5da627f16a99f0715eeb8633bdcd7b75251aeacc0c482d35"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/instrumentation.json",
+                "sha256": "a4c9c380a359e24f5cd25e9e0aece114dbb81800feef6793ccab7e54dad288a8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-controls.instrumentation.json",
+                "sha256": "d5d00a687394a63ec665f904ae50fbab8d48b300d04686e1a92b7548474f391f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-controls.jsonl.gz",
+                "sha256": "19ca7d10772adcb5672497176a4d27c4fa452d96eea3632ce79809353061ad23"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-modes.instrumentation.json",
+                "sha256": "c022400af6296c1d392c60c2b42902309be26fe625224244d5a03ad3d6c43123"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-modes.jsonl.gz",
+                "sha256": "b781039775c1ec3a3cdfb7f24ab6e490b9e5076b5f2a36415711c6d785adba78"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results-primary.jsonl.gz",
+                "sha256": "f93a00d22f0a5f857ffbd7270aaa404513c2c56990bb4b1a3111458d64c88045"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/results.jsonl.gz",
+                "sha256": "cf06b6ad035e6514b4485ecdb3f88527c6dba37afb45e8bf6c85f9023c3a59cb"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/run.mjs",
+                "sha256": "35cd846865e69921061d068b0c8a1f0270d01c622e75885f68aad28710cf9b97"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round7/sources.json",
+                "sha256": "7087299ccd20a077839931f86621747388e96abaf65e8f3cd5cf1baf1d62f9fc"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/.gitignore",
+                "sha256": "6267d57883289ef86c7009fc6d6bdc8473743fb610cbe2ab4b821a435a690fc7"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/REPORT.md",
+                "sha256": "8f885ab651ba386eef1e5994a1744507792cf4aab78848d82aed31adaa1cf7e3"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/analysis.json",
+                "sha256": "f36de2bcb44022f9d5ec6780b40cfb672c840a7b493c65a361cfcfa2b92521a8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/analyze.py",
+                "sha256": "52c1d09cf108614e6869ea3914aca694a534032311aa0a6fa90ebe0120feaf8f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/baseline.json",
+                "sha256": "6ba6290869bc8dc2fdb63bebd73b97d016a0a8194b5b18b557bc217d426db78f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/cases.mjs",
+                "sha256": "085b7c8398ca3449b79c8497f5d390898b2f640dd083b2fca04922023ac84892"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/corpus.jsonl",
+                "sha256": "e5dd2153edf9af5d8fde1f1ee980242fcc26447cd7cac7ae828dcf9a18ee003d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/freeze.py",
+                "sha256": "d49501026a028721942341a2de182dfc26dba3b536c01167e453bf500061cc25"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/instrumentation.json",
+                "sha256": "0e6a20563845fdbcc1ac4979cca666bc7f2c0f3eed97bd7e461d91877f0c4289"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/results.jsonl.gz",
+                "sha256": "f8a2495ddc15f64c631af9ec61046fe1cebc2d8688d374663b0a23c82dcc7900"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/run.mjs",
+                "sha256": "14188c4a2550369e1a0919c40482566c11e75ad13b29d54bf06c78d08067ec6c"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round8/sources.json",
+                "sha256": "ffb3e8e55f485a5099ca36508403f4494c12ad49f593825d14a7bf03b7d8aed8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/.gitignore",
+                "sha256": "8bd57fb685842cbea44acbbf6116c82d516bd21822d44dec823d68444d68bcf2"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/REPORT.md",
+                "sha256": "4b53523e10be9c838b650354a07709c149f763497252d018fa765e7c955a7342"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/analysis.json",
+                "sha256": "7e32d9dcd3e0324ab634d7baf4b6d97233baf91bb55146fdc55e7dc1628ac527"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/analyze.py",
+                "sha256": "b010472025939d5412d811be88d8a3fe190d0d311d4f9cb72cfcbaeb6cfa28eb"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/baseline.json",
+                "sha256": "b87a444ec26aea1d6debfb88a4258afe31d85ffd83d6f052a47a84c636494a05"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/cases.mjs",
+                "sha256": "b9403ea7c1400fba1049ba197da7d96ce130a6a4ef09c3284911c3bf7af6ffae"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/corpus.jsonl",
+                "sha256": "04141726f44a2bb9e4b172fcc8b76dee25bc6eefdc891501b43c4c9af9e5995d"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/fingerprint-recheck.json",
+                "sha256": "99adb0a1e9bbc7b0f7d1eb106a0a9175b811a039434567cc851f160778d64c87"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/fingerprint-recheck.mjs",
+                "sha256": "09abc13cfe706032828da719d7daa1ebe1b07a65d679e146aa648be4797830e4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/freeze.py",
+                "sha256": "a34c9d0e2a8daae116e59579992a5153fc41b7ade9032b94403faf3688b4cf02"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/instrumentation.json",
+                "sha256": "2146c50051a97bc469059f156b4d7b712d8ba46f0ef7221a79eeea422ad44e57"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/prepare.py",
+                "sha256": "6d8861eb327d02ffde169af693bf1e7faddab11c05914a887ae9ec6fba5859f8"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck-instrumentation.json",
+                "sha256": "4c40fec6b4c6a0ef7423ecc4da1cb2fd6f7fe6ad635377da596279f066088989"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck.mjs",
+                "sha256": "cd31daefc18475bd169b0d5f3077a67dfc84ecfc72fd38ff1733cb89ae50375f"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/recheck.repository-instrumentation.json",
+                "sha256": "0dc99780aac0bfb8b01d6a9292ecc4b028e3a62a54be07225c8789fb7b4c2774"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/repository-instrumentation.json",
+                "sha256": "78595f4e928715c7ab4d8a2209843ba0403485704196e1c7156f4f6fe2b2e6bc"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results-fingerprint.instrumentation.json",
+                "sha256": "4cf47decb997fb41ceb682248965a351e16b5100310dc045c25de2af90d570c4"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results-fingerprint.jsonl.gz",
+                "sha256": "1620ae67e3bd14ac2c38e05349492f54af479804a97e6ab74ff7b5f57de6866a"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/results.jsonl.gz",
+                "sha256": "4ef4ac4fee89269cb166191830db1272b89edbf8ee2d29709bb01181f142fd7b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/round9/run.mjs",
+                "sha256": "a313987d0c82c260608173874921df323a848fe3e3762be1c09a43e51be18dfa"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/run-differential.mjs",
+                "sha256": "4d8ef13b2bc15fc00dc2ddf05d00a9bdf3a7700c65c19f042494f4f1afcaee8b"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/tls-evidence.json",
+                "sha256": "2c0389eec1f1fdb85b343e0b87337746a889904b4f81961123053ae9bc7180b9"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/research/verify-evidence.py",
+                "sha256": "6e6633893626b14ccadabc32781627fbd78737fe3740ba0148e4f930dad67208"
+              },
+              {
+                "path": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study/task.json",
+                "sha256": "dc71e0f74e2bbde8c4736f50c36ad084b97434099aa26e4ca0a7fafe7d6d36c7"
+              }
+            ],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "e33efc2f705e7c9226d67fd32abe6b768af949569178fc8aa471194417c1b54e"
+          },
+          {
+            "root": "cc2api",
+            "head": "d5749d923e997fd3c01dde31248b5af8dde906ee",
+            "status": [],
+            "worktreeDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "indexDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "untracked": [],
+            "conflicts": [],
+            "integration": [],
+            "fingerprint": "f56b0cf4c8562ffad31abd7fb000a1041dc791ae6e84217c52c62d73e0d21911"
+          }
+        ],
+        "fingerprint": "b8576c5a2081dd3be79f53943a9759d2bb07e07ef1aa12fa885bfe0af055ba3c"
+      }
+    },
+    "source_research": {
+      "task": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study",
+      "finding": "F01",
+      "round": 1,
+      "review": "research/alignment-review/round-01.md",
+      "baseline_cc2api": "d5749d923e997fd3c01dde31248b5af8dde906ee"
+    }
+  },
+  "progress": {
+    "updatedAt": "2026-10-29T06:28:34.468196+00:00",
+    "completedSteps": [
+      "完成 F01 前置占位化、初始封口和重试刷新修复，保留附加 billing 字段",
+      "完成 690 项全量和 36 项 CCH 验证、full Check-All 与协议 Spec 更新",
+      "完成 cc2api 与 vibecoding-bench 的业务提交和推送"
+    ],
+    "partialStep": null,
+    "nextStep": "F01 完成；返回 vm2api 差分研究的逐轮讨论",
+    "notes": "F03/F05 尚无产品修改；F04 按用户决定保留。其它 302 个文件保留未提交。"
+  }
+}
