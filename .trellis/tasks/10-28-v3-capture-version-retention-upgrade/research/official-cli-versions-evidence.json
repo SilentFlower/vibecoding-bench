@@ -1,0 +1,49 @@
+{
+  "result": "passed",
+  "version_checks": [
+    {
+      "requested_version": "2.1.293",
+      "actual_version": "2.1.293 (Claude Code)",
+      "native_package_version": "2.1.293",
+      "binary_sha256": "8968405e26db478af44eabc4635ab5ca557057b702a54460a59c13e1b253e978",
+      "auth_status_exit_code": 1,
+      "logged_in": false,
+      "config_fields": [
+        "firstStartTime",
+        "firstStartVersion",
+        "machineID",
+        "opusProMigrationComplete",
+        "sonnet1m45MigrationComplete",
+        "seenNotifications",
+        "hasResetAutoModeOptInForDefaultOffer",
+        "migrationVersion"
+      ],
+      "userID_present": false,
+      "machineID_present": true
+    },
+    {
+      "requested_version": "2.1.303",
+      "actual_version": "2.1.303 (Claude Code)",
+      "native_package_version": "2.1.303",
+      "binary_sha256": "375988f457756524234695cf2d8f64ace99c5f68682e47ea24862a843c191450",
+      "auth_status_exit_code": 1,
+      "logged_in": false,
+      "config_fields": [
+        "firstStartTime",
+        "firstStartVersion",
+        "machineID",
+        "opusProMigrationComplete",
+        "sonnet1m45MigrationComplete",
+        "seenNotifications",
+        "hasResetAutoModeOptInForDefaultOffer",
+        "migrationVersion"
+      ],
+      "userID_present": false,
+      "machineID_present": true
+    }
+  ],
+  "isolation": "unshare 独立网络与私有 mount namespace；空目录绑定到 /root；未继承宿主凭据环境",
+  "identity_boundary": "仅验证精确 CLI 加载及新配置字段，不根据字段名猜测请求 device_id；非既有映射仍要求真实来源证明",
+  "model_requests": 0,
+  "real_account_used": false
+}

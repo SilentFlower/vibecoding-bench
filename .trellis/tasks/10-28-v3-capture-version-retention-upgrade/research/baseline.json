@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-28",
+  "vibecoding_bench_commit": "b0e27444f77921487ad301f906fd50c11564c17e",
+  "source_sha256": {
+    "orchestrator/main.py": "89045bdc43184cd92886fc8dd34823654c36a0464971a5a0c82d0dc170000f17",
+    "orchestrator/account_runtime.py": "e3bf5facff15714fe292020dbe75d97d3b680cc7542599d9dc3768d7d328cdda",
+    "images/account/cli-version.sh": "5975a2cd6b802f5d11e1b53e9fcec467791f2f7192c5cac563e429a2e71f275d",
+    "images/account/network-context.py": "dddea1aeca37fc99292e0cc0471451bddf7c1c856b1ebc6161d549562a1cc537",
+    "images/sidecar/recorder.py": "2adceca7a314e83c4ce83fc55a67a96711576d78d9d5c88ed518301261b7d64a",
+    "webui/app.js": "75270b89f614e47e60ba690f4b619a7db9721d60fee00416ea4505a62fad0927",
+    "webui/index.html": "3f329892c9466c7829e01babb35b2d2007ac9d3391bcd738d05a34d2fc97c462",
+    "images/v3/Dockerfile": "9a349f49f837a0115e6b3918ab2c958fa5135b6c09330fc59b9a378081e08593",
+    ".github/workflows/v3-build.yml": "1dc62649d2e51f1ecb126c693f85b99f8fe03c1868b732800381786d05645f6c"
+  },
+  "accepted_scope": {
+    "version_selection": "每次抓包单独选版本，留空采用创建时全局值",
+    "interruption": "提前停止并保留已采集数据",
+    "resume_required": false
+  },
+  "implementation_started": false,
+  "live_capture_executed": false,
+  "image_build_executed": false
+}

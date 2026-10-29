@@ -1,0 +1,100 @@
+{
+  "id": "v3-capture-version-retention-upgrade",
+  "name": "v3-capture-version-retention-upgrade",
+  "title": "V3：统一运行、项目与养号迭代抓包及账号版本配置",
+  "description": "统一运行与双迭代抓包及账号版本配置；已确认单次指定 > 账号配置 > 全局、迭代抓包默认关闭、账号版本覆盖全部 CLI 入口。统一 Brief 已确认，实施与本地验证进行中。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-28",
+  "completedAt": "2026-10-29",
+  "closeout": {
+    "status": "blocked",
+    "closedAt": null,
+    "blockers": [
+      {
+        "code": "open-children",
+        "owner": "task.py",
+        "message": "child 尚未完成：10-28-v3-capture-per-run-version"
+      },
+      {
+        "code": "open-children",
+        "owner": "task.py",
+        "message": "child 尚未完成：10-28-v3-capture-stop-retain-artifacts"
+      }
+    ]
+  },
+  "branch": null,
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "10-28-v3-capture-per-run-version",
+    "10-28-v3-capture-stop-retain-artifacts"
+  ],
+  "parent": null,
+  "relatedFiles": [
+    "orchestrator/main.py",
+    "orchestrator/account_runtime.py",
+    "images/account/cli-version.sh",
+    "images/account/network-context.py",
+    "images/sidecar/recorder.py",
+    "webui/app.js",
+    "webui/index.html",
+    "images/v3/Dockerfile",
+    ".github/workflows/v3-build.yml",
+    "orchestrator/test_main.py",
+    "orchestrator/test_account_runtime.py",
+    "images/sidecar/test_recorder.py",
+    ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/current-state.md",
+    ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/baseline.json",
+    "orchestrator/projects_api.py",
+    "orchestrator/projects.py",
+    "orchestrator/pi_terminal.py",
+    "orchestrator/projects_runtime.py",
+    "orchestrator/projects_warmup.py",
+    "webui/projects.js",
+    "orchestrator/test_projects_agent.py",
+    "orchestrator/test_projects_terminal.py",
+    "orchestrator/test_projects_runtime_resilience.py",
+    ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/merged-settings-scope.md",
+    "orchestrator/project_iteration.py",
+    "orchestrator/project_scenarios.py",
+    "orchestrator/project_plans.py",
+    "orchestrator/project_review_runtime.py",
+    "orchestrator/login_drafts.py",
+    "orchestrator/login_terminal.py",
+    "orchestrator/test_login_reauth.py",
+    "orchestrator/test_login_drafts.py",
+    "orchestrator/test_project_plans.py",
+    "orchestrator/test_project_iterations.py",
+    "orchestrator/test_project_scenarios.py",
+    ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/execution-boundaries.md",
+    ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/cli-version-callers.json",
+    "orchestrator/capture_artifacts.py",
+    "orchestrator/test_account_cli_settings.py",
+    "orchestrator/test_capture_settings_runtime.py",
+    "images/account/test_network_context.py",
+    "webui/style.css"
+  ],
+  "notes": "2026-10-28：当前只规划。用户已确认每次抓包独立选择版本、不改全局；最终选择简化为提前停止并保留抓包数据，不要求暂停后继续。保持 planning，不激活、不运行真实账号任务或部署。\n2026-10-29：用户要求合并运行抓包、项目迭代/养号迭代配置按钮与账号 CLI 版本继承。沿用原主任务和两个已有实施子项，不新增重复任务。Q1～Q3 待收敛，旧 brief 对应合并前范围，不作为实施依据；保持 planning，不启动实施或真实抓包。\n2026-10-29：用户选择前者，确认版本优先级为单次显式指定 > 账号配置 > 全局。单次值只作用于本次执行，不回写账号或全局；Q2 抓包默认行为及 Q3 入口范围继续规划。\n2026-10-29：用户确认抓包默认关闭。新配置与缺少抓包字段的旧配置按关闭处理；手动开启并保存后对后续新执行生效，当前执行不热切换、旧证据保留。产品问题仅剩 Q3 账号版本的其他 CLI 入口范围。\n2026-10-29：用户确认账号版本统一覆盖所有 CLI 入口，已有运行、会话及登录草稿保留原版本。三个产品问题已全部收敛，抓包采用现有 CLI 专用独占并保留逐作业监督；规划已更新，仍为 planning，待完整 Brief 初次实施评审。\n2026-10-29：用户确认完整统一 Brief，主任务已启动；两个原子项随主任务统一实施和验收，不重复进行产品或完整 Brief 确认。已接入账号 CLI 配置、全部版本入口与冻结、双迭代捕获和查看、Recorder 停止保留；本地回归及真实合成 HTTP/SSE、浏览器验证进行中，未部署。",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-10-29T00:17:05.077Z",
+    "completedSteps": [
+      "统一账号 CLI 版本、执行快照与三入口抓包实现",
+      "CHK-001 修复及三种版本来源的浏览器提交重检通过",
+      "358 项后端和网络回归、真实本地 HTTP/SSE 与官方 CLI 精确版本验证通过",
+      "规范同步完成，业务代码已提交推送"
+    ],
+    "partialStep": null,
+    "nextStep": "按本轮授权发布 v3 联合镜像并验收 us 环境",
+    "notes": "真实账号及生产部署验证由本轮后续发布流程完成；保留原两个实施子项和其他研究任务的未提交记录。"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "result": "passed",
+  "transport": "本地真实 HTTP/SSE + mitmdump 子进程",
+  "samples": 3,
+  "interrupted_state": "partial",
+  "interrupted_callback_states": [
+    "pending",
+    "interrupted",
+    "interrupted",
+    "interrupted"
+  ],
+  "old_artifact_sha256": {
+    "http_capture.jsonl": "00a80ee0ed42fe4eca917c8e11bab21ad94b091783898d9334a8160bb73ca0fb",
+    "capture.flow": "857f4c8eb40674d23066ef262ee8af2169667a746b1798c40c92c72c6d59a2de",
+    "stats.jsonl": "5a252c673e6e6ba564a6b0e5d3f9186dd41db1d062f5bd06ba92c4bbfac5caae",
+    "proxy.log": "d00d451aa48ab4ee405c6ad95dc76d8ac50ef10460d0897262ef5b2b5c3cafc1",
+    "capture_index.json": "4fa39a6733d49d513e12ac7d90a69a3029e2009d1e2b4c83642bbcdf5cda05fb"
+  },
+  "new_execution_preserves_old_files": true,
+  "real_account_used": false,
+  "model_requests": 0
+}

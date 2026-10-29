@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/root/project/vibecoding-bench/.trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/verify_settings_browser.py", line 245, in <module>
+    result = asyncio.run(verify())
+             ^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+    return future.result()
+           ^^^^^^^^^^^^^^^
+  File "/root/project/vibecoding-bench/.trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/verify_settings_browser.py", line 200, in verify
+    assert await page.locator('#capture-form [name=claude_code_version]').count() == 1, '单次版本输入必须属于抓包表单'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 单次版本输入必须属于抓包表单

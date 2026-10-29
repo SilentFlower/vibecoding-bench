@@ -1,0 +1,99 @@
+test_all_run_creators_freeze_account_version_and_single_override (test_account_cli_settings.AccountCliSettingsTests.test_all_run_creators_freeze_account_version_and_single_override)
+普通、批次、旧养号与抓包同规则，单次值不回写账号和全局。:return: None。 ... ok
+test_existing_login_uses_account_version_and_keeps_it_for_auth_status (test_account_cli_settings.AccountCliSettingsTests.test_existing_login_uses_account_version_and_keeps_it_for_auth_status)
+账号版本控制登录实际容器与后续子命令，旧会话不读取新配置。:return: None。 ... ok
+test_legacy_snapshot_prefers_matching_execution_evidence (test_account_cli_settings.AccountCliSettingsTests.test_legacy_snapshot_prefers_matching_execution_evidence)
+旧空快照优先恢复来源和容器代次均匹配的版本证明。:return: None。 ... ok
+test_old_empty_snapshot_is_filled_once_with_source (test_account_cli_settings.AccountCliSettingsTests.test_old_empty_snapshot_is_filled_once_with_source)
+兼容回填先持久化，之后即使默认改变或启动失败也不漂移。:return: None。 ... ok
+test_old_schema_upgrade_keeps_data_and_defaults (test_account_cli_settings.AccountCliSettingsTests.test_old_schema_upgrade_keeps_data_and_defaults)
+真实旧 schema 连续升级保持旧配置及运行数据。:return: None。 ... ok
+test_settings_default_off_partial_updates_and_validation (test_account_cli_settings.AccountCliSettingsTests.test_settings_default_off_partial_updates_and_validation)
+两个空间独立更新，清空版本继承全局，错误不落库。:return: None。 ... ok
+test_capture_effort_defaults_to_env_and_rejects_invalid_value (test_main.ClaudeCodeVersionTests.test_capture_effort_defaults_to_env_and_rejects_invalid_value)
+抓包留空应忽略页面覆盖并回退 `.env`，非法值不得产生新记录。 ... ok
+test_capture_webui_exposes_independent_effort_selector_and_details (test_main.ClaudeCodeVersionTests.test_capture_webui_exposes_independent_effort_selector_and_details)
+抓包表单与详情页必须提交并展示独立预算和权限模式字段。 ... ok
+test_continue_endpoint_passes_run_identity_snapshot (test_main.ClaudeCodeVersionTests.test_continue_endpoint_passes_run_identity_snapshot)
+继续接口应补写历史预算，并把原 run 的权限模式快照交给 manager。 ... ok
+test_continue_manager_keeps_permission_mode_for_resume_command (test_main.ClaudeCodeVersionTests.test_continue_manager_keeps_permission_mode_for_resume_command)
+continue manager 与 WebSocket resume 命令都必须复用原 run 权限模式。 ... ok
+test_continue_without_session_reports_actionable_error (test_main.ClaudeCodeVersionTests.test_continue_without_session_reports_actionable_error)
+首次启动失败且无 JSONL 时，应明确提示重新运行而不是暴露内部文件名。 ... ok
+test_entrypoint_has_workspace_trust_gate_fallback (test_main.ClaudeCodeVersionTests.test_entrypoint_has_workspace_trust_gate_fallback)
+profile 预置未生效时，entrypoint 仍应识别并通过目录信任菜单。 ... ok
+test_entrypoint_keeps_strict_version_fallback_and_install (test_main.ClaudeCodeVersionTests.test_entrypoint_keeps_strict_version_fallback_and_install)
+entrypoint 的 shell/Node fallback 必须一致，非法或安装不匹配仍失败。 ... ok
+test_first_run_gates_include_workspace_trust_without_overwriting_profile (test_main.ClaudeCodeVersionTests.test_first_run_gates_include_workspace_trust_without_overwriting_profile)
+补齐目录信任时应保留身份字段、其他项目和 `/workspace` 既有状态。 ... ok
+test_historical_run_identity_is_backfilled_only_once (test_main.ClaudeCodeVersionTests.test_historical_run_identity_is_backfilled_only_once)
+历史 NULL 快照首次继续时应补写，之后不再受全局配置变化影响。 ... ok
+test_new_run_after_setting_change_uses_new_snapshot (test_main.ClaudeCodeVersionTests.test_new_run_after_setting_change_uses_new_snapshot)
+同一任务再次运行时应使用新设置，同时保留前一个 run 的旧快照。 ... ok
+test_old_database_upgrade_adds_run_identity_snapshot_columns (test_main.ClaudeCodeVersionTests.test_old_database_upgrade_adds_run_identity_snapshot_columns)
+旧 runs 表重复升级后应幂等补齐执行快照及额度列，保留历史数据。 ... ok
+test_run_creation_paths_persist_and_submit_runtime_identity_snapshot (test_main.ClaudeCodeVersionTests.test_run_creation_paths_persist_and_submit_runtime_identity_snapshot)
+普通、抓包、批次和养号 run 都应保存并提交创建时的运行身份。 ... ok
+test_run_workers_use_snapshot_and_ephemeral_workers_use_effective_version (test_main.ClaudeCodeVersionTests.test_run_workers_use_snapshot_and_ephemeral_workers_use_effective_version)
+run/continue worker 应使用身份快照，临时 worker 应使用启动时有效配置。 ... ok
+test_runtime_version_setting_override_and_reset (test_main.ClaudeCodeVersionTests.test_runtime_version_setting_override_and_reset)
+无覆盖、保存覆盖和清空覆盖应按既定优先级返回版本。 ... ok
+test_v3_oauth_refresh_uses_fixed_passthrough_environment (test_main.ClaudeCodeVersionTests.test_v3_oauth_refresh_uses_fixed_passthrough_environment)
+v3 未绑定账号刷新必须复用固定容器，且不注入 Recorder CA。@return None。 ... ok
+test_worker_image_generates_all_fingerprint_locales (test_main.ClaudeCodeVersionTests.test_worker_image_generates_all_fingerprint_locales)
+worker 镜像应生成账号指纹池可能选中的全部 locale。 ... ok
+test_oauth_refresh_scripts_normalize_or_omit_scope (test_main.ScheduledWarmupTests.test_oauth_refresh_scripts_normalize_or_omit_scope)
+空值和重复 scope 应归一化，没有有效 scope 时必须省略字段。 ... ok
+test_oauth_refresh_scripts_redact_token_endpoint_error (test_main.ScheduledWarmupTests.test_oauth_refresh_scripts_redact_token_endpoint_error)
+token endpoint 失败输出不得包含响应描述中的敏感值。 ... ok
+test_oauth_refresh_scripts_reuse_existing_scopes_and_write_tokens (test_main.ScheduledWarmupTests.test_oauth_refresh_scripts_reuse_existing_scopes_and_write_tokens)
+两个刷新入口都只能发送已有 scope，并正确写回服务端结果。 ... ok
+test_capture_persists_request_before_response_and_marks_interruption (test_recorder.RecorderQuotaTests.test_capture_persists_request_before_response_and_marks_interruption)
+先保存请求，异常及停止更新同一索引，JSONL 只追加真实阶段。:return: None。 ... ok
+test_capture_response_updates_index_without_double_counting_request (test_recorder.RecorderQuotaTests.test_capture_response_updates_index_without_double_counting_request)
+响应完成覆盖同流索引状态，追加记录保留先前请求。:return: None。 ... ok
+test_dummy_keys_other_hosts_and_oauth_do_not_update_account (test_recorder.RecorderQuotaTests.test_dummy_keys_other_hosts_and_oauth_do_not_update_account)
+项目自测及非模型路径不污染账号额度。 ... ok
+test_first_rejection_signals_before_retry_and_future_request_is_local (test_recorder.RecorderQuotaTests.test_first_rejection_signals_before_retry_and_future_request_is_local)
+第一次拒绝发暂停信号，下一次请求产生本地响应。 ... ok
+test_hold_body_writes_only_safe_error_code (test_recorder.RecorderQuotaTests.test_hold_body_writes_only_safe_error_code)
+明确封号写有限分类，不保存任意敏感错误正文。 ... ok
+test_hold_survives_observation_write_failure_and_blocks_next_request (test_recorder.RecorderQuotaTests.test_hold_survives_observation_write_failure_and_blocks_next_request)
+封号分类随控制信号保存，日志故障也不会再转发模型请求。 ... ok
+test_identity_observation_accepts_ip_host_with_verified_domain_and_rejects_other_domain (test_recorder.RecorderQuotaTests.test_identity_observation_accepts_ip_host_with_verified_domain_and_rejects_other_domain)
+透明代理 IP 不能丢失身份采集；相似域名不得作为有效来源。@return None。 ... ok
+test_observation_write_failure_preserves_reset_in_control (test_recorder.RecorderQuotaTests.test_observation_write_failure_preserves_reset_in_control)
+日志故障不丢 reset，下一条模型请求仍被本地阻断。 ... ok
+test_only_recovery_owner_can_pass_expired_shared_window (test_recorder.RecorderQuotaTests.test_only_recovery_owner_can_pass_expired_shared_window)
+窗口到期不同时放行其它执行。 ... ok
+test_rotated_local_access_token_remains_attributable (test_recorder.RecorderQuotaTests.test_rotated_local_access_token_remains_attributable)
+既有刷新更换 AT 后仍能被动采集，不请求刷新。 ... ok
+test_successful_stream_at_100_finishes_but_next_request_is_blocked (test_recorder.RecorderQuotaTests.test_successful_stream_at_100_finishes_but_next_request_is_blocked)
+已接受流不发暂停信号，后续模型请求被挡住。 ... ok
+test_unreadable_shared_state_does_not_forward_owned_model_request (test_recorder.RecorderQuotaTests.test_unreadable_shared_state_does_not_forward_owned_model_request)
+门禁文件失效停止当前执行，不标成可用额度或继续转发。 ... ok
+test_v3_identity_accepts_only_explicit_device_and_keeps_conflict (test_recorder.RecorderQuotaTests.test_v3_identity_accepts_only_explicit_device_and_keeps_conflict)
+userID/machineID 不推测映射；设备或账号归属变化后保持冲突。 ... ok
+test_control_io_failure_cannot_forward_and_stays_closed (test_recorder.RecorderWarmupTests.test_control_io_failure_cannot_forward_and_stays_closed)
+控制落盘故障仍生成本地拒绝，不能因异常跳过请求门禁。@return None。 ... ok
+test_malformed_window_is_an_execution_error (test_recorder.RecorderWarmupTests.test_malformed_window_is_an_execution_error)
+身份匹配但窗口结构损坏时拒绝，不能当作未知机会直接发送。@return None。 ... ok
+test_marker_survives_recorder_restart_and_corruption_fails_closed (test_recorder.RecorderWarmupTests.test_marker_survives_recorder_restart_and_corruption_fails_closed)
+重启不得再次发送未知请求，损坏标记按执行故障处理。@return None。 ... ok
+test_normal_execution_does_not_inherit_warmup_policy (test_recorder.RecorderWarmupTests.test_normal_execution_does_not_inherit_warmup_policy)
+同一账号正常任务忽略养号阈值与已用标记。@return None。 ... ok
+test_shared_api_update_pauses_without_another_cli_request (test_recorder.RecorderWarmupTests.test_shared_api_update_pauses_without_another_cli_request)
+共享 API 更新达到阈值时，也能等待当前 CLI 响应后暂停。@return None。 ... ok
+test_threshold_defers_until_all_parallel_streams_finish (test_recorder.RecorderWarmupTests.test_threshold_defers_until_all_parallel_streams_finish)
+多个已接受流都结束才暂停，新的请求立即在本地阻断。@return None。 ... ok
+test_unknown_allows_one_request_then_waits_for_actual_proxy_end (test_recorder.RecorderWarmupTests.test_unknown_allows_one_request_then_waits_for_actual_proxy_end)
+未知仅一次，response 钩子时仍 live 的成功请求不会被提前杀掉。@return None。 ... ok
+test_unrelated_request_does_not_consume_one_opportunity (test_recorder.RecorderWarmupTests.test_unrelated_request_does_not_consume_one_opportunity)
+其它域名和项目假 key 不消费当前账号的单次正式机会。@return None。 ... ok
+test_valid_first_response_permits_normal_followup (test_recorder.RecorderWarmupTests.test_valid_first_response_permits_normal_followup)
+第一次正式请求拿到低于阈值的真实额度后继续，不另做探测。@return None。 ... ok
+
+----------------------------------------------------------------------
+Ran 47 tests in 9.019s
+
+OK

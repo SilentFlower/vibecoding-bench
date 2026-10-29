@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/vibecoding-bench/deploy/official-protocol-capture.md", "reason": "正式抓包 API、run 身份、代理链路、已有产物与完整/部分记录边界。"}
+{"file": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/current-state.md", "reason": "原运行抓包及停止保留的源码记录；最新合并范围与决定以PRD、执行边界核对为准。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/quality-guidelines.md", "reason": "WebUI 零构建、escapeHTML、运行详情刷新和模态关闭的资源释放。"}
+{"file": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/baseline.json", "reason": "核对当前版本和源码哈希；区分规划、合成验证与尚未执行的真实采集。"}
+{"file": ".trellis/tasks/10-28-v3-capture-version-retention-upgrade/research/execution-boundaries.md", "reason": "全部CLI版本入口、快照与身份兼容、CLI独占及逐作业监督/恢复的最新核查与设计边界。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/database-guidelines.md", "reason": "账号字段幂等升级、条件写入、执行快照及现有门禁，按改动读取相关章节。"}
+{"file": ".trellis/spec/vibecoding-bench/frontend/component-guidelines.md", "reason": "配置模态、表单回填、账号/空间切换及关闭收口的现有组件方式。"}

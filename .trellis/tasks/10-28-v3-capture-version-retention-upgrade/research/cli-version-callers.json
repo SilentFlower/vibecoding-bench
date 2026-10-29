@@ -1,0 +1,168 @@
+{
+  "revision": "b92a12234f8635317abb6ed515a2fdaccabc61bb",
+  "source_sha256": {
+    "orchestrator/main.py": "89045bdc43184cd92886fc8dd34823654c36a0464971a5a0c82d0dc170000f17",
+    "orchestrator/project_iteration.py": "c69836c3d30d038d7de5edd7deb5fbf00507a4422f8ef4f31a78d20907acb3ab",
+    "orchestrator/project_plans.py": "375253cb1ac76d90954399b63457ca89c8d0927ef214d1c93d9e5ab63b52d065",
+    "orchestrator/project_scenarios.py": "17402f69bbb996bcc29ce3bfe049173dae73389c3416e5cd0963a4b2b4ad36b7"
+  },
+  "callers": [
+    {
+      "file": "orchestrator/main.py",
+      "line": 1262,
+      "scope": "_claude_exec_env",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 1971,
+      "scope": "_resolve_run_claude_code_version",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 1989,
+      "scope": "_ensure_run_claude_code_version",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 3953,
+      "scope": "Runner.start_run",
+      "call": "_resolve_run_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 4374,
+      "scope": "Runner.start_continue",
+      "call": "_resolve_run_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 4478,
+      "scope": "Runner.query_quota",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 4712,
+      "scope": "Runner.refresh_account_oauth_token",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 4741,
+      "scope": "Runner.refresh_account_oauth_token",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 4987,
+      "scope": "Runner._exec_oauth_refresh_probe",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 5048,
+      "scope": "LoginSession.__init__",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 5216,
+      "scope": "LoginManager.start",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 5241,
+      "scope": "LoginManager.start",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 6605,
+      "scope": "Scheduler._create_batch_task_and_run",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 7673,
+      "scope": "WarmupScheduler._create_task_and_run",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 7879,
+      "scope": "_project_execution_settings",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 9093,
+      "scope": "_v3_cli_identity",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 9167,
+      "scope": "update_account_process",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 9981,
+      "scope": "resume_login_draft",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 11398,
+      "scope": "start_capture_run",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 11533,
+      "scope": "run_task",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 12074,
+      "scope": "continue_run_start",
+      "call": "_ensure_run_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 12476,
+      "scope": "v3_transport",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/main.py",
+      "line": 12525,
+      "scope": "v3_environments",
+      "call": "effective_claude_code_version"
+    },
+    {
+      "file": "orchestrator/project_iteration.py",
+      "line": 778,
+      "scope": "ProjectIterationManager._reserve",
+      "call": "self.settings"
+    },
+    {
+      "file": "orchestrator/project_plans.py",
+      "line": 440,
+      "scope": "ProjectPlans.reserve",
+      "call": "self.owner.settings"
+    },
+    {
+      "file": "orchestrator/project_scenarios.py",
+      "line": 1140,
+      "scope": "ProjectScenarios._reserve_run",
+      "call": "self.owner.settings"
+    }
+  ],
+  "evidence": "只读源码调用索引，不代表运行验收或实施批准"
+}

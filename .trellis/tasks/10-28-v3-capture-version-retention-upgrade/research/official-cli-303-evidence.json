@@ -1,0 +1,28 @@
+{
+  "version": "2.1.303 (Claude Code)",
+  "version_exit_code": 0,
+  "auth_status_exit_code": 1,
+  "auth_status": "{\n  \"loggedIn\": false,\n  \"authMethod\": \"none\",\n  \"apiProvider\": \"firstParty\",\n  \"analyticsDisabled\": false,\n  \"projectsDirectory\": \"/root/.claude/projects\",\n  \"configDirectory\": \"/root/.claude\"\n}",
+  "auth_error": "",
+  "network_namespace": "无外部网络",
+  "home_isolation": "私有 mount namespace 将空目录绑定到 /root",
+  "config_files": [
+    {
+      "path": ".claude.json",
+      "fields": [
+        "firstStartTime",
+        "firstStartVersion",
+        "machineID",
+        "opusProMigrationComplete",
+        "sonnet1m45MigrationComplete",
+        "seenNotifications",
+        "hasResetAutoModeOptInForDefaultOffer",
+        "migrationVersion"
+      ],
+      "userID_sha256": null
+    }
+  ],
+  "binary_sha256": "375988f457756524234695cf2d8f64ace99c5f68682e47ea24862a843c191450",
+  "model_requests": 0,
+  "real_account_used": false
+}
