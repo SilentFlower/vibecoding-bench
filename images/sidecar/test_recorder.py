@@ -307,6 +307,65 @@ class RecorderWarmupTests(unittest.TestCase):
         self.assertTrue(json.loads(self.signal.read_text())["warmup_wait"])
         self.assertFalse(self.signal.with_name("warmup-draining.json").exists())
 
+    def test_v3_idle_window_without_reset_keeps_terminal_and_requests_available(self) -> None:
+        """v3 空闲窗口没有 reset 时正常启动，不套用旧 runner 的未知单次许可。@return None。"""
+        windows = {"five_hour": {"utilization": 0, "reset_at": None, "usage_idle": True},
+            "seven_day": {"utilization": 0, "reset_at": time.time() + 86400}}
+        self._write_state({"windows": windows, "warmup_quota": {
+            "limits": {"five_hour": 55, "seven_day": 90}, "policy_key": "v3-passive-recovery",
+            "sample_required": False, "admission": None}})
+        self.addon._check_warmup_pause()
+        self.assertFalse(self.signal.exists())
+        for _ in range(2):
+            flow = self._flow()
+            self.addon.requestheaders(flow)
+            self.assertEqual(200, flow.response.status_code)
+        self.assertFalse(self.signal.with_name("warmup-sample.json").exists())
+
+    def test_v3_expired_threshold_recovery_is_once_across_recorder_restart(self) -> None:
+        """已命中的旧窗口到期只放行其持久许可，重启不能再次发放。@return None。"""
+        reset = time.time() - 10
+        windows = {"five_hour": {"utilization": 80, "reset_at": reset}}
+        admission = {"identity": "identity", "source": "run:original:0", "policy_key": "v3-passive-recovery",
+            "window_key": json.dumps({"five_hour": [reset, True, 30]}, sort_keys=True)}
+        self._write_state({"windows": windows, "warmup_quota": {
+            "limits": self.limits, "policy_key": "v3-passive-recovery", "admission": admission}})
+        first = self._flow()
+        self.addon.requestheaders(first)
+        self.assertEqual(200, first.response.status_code)
+        self.assertTrue(self.signal.with_name("warmup-sample.json").exists())
+        restarted = recorder.Recorder()
+        denied = self._flow()
+        restarted.requestheaders(denied)
+        self.assertEqual(429, denied.response.status_code)
+
+    def test_v3_common_exhaustion_recovery_stays_once_with_thresholds_disabled(self) -> None:
+        """关闭百分比阈值不能取消真实共同耗尽到期的单次恢复约束。@return None。"""
+        reset = time.time() - 10
+        admission = {"identity": "identity", "source": "run:original:0", "policy_key": "v3-passive-recovery",
+            "window_key": json.dumps({"common:unknown": [reset]}, sort_keys=True)}
+        self._write_state({"windows": {"unknown": {"exhausted": True, "reset_at": reset}},
+            "recovery_source": "run:original:0", "warmup_quota": {"limits": {"five_hour": None, "seven_day": None},
+                "policy_key": "v3-passive-recovery", "admission": admission}})
+        first = self._flow()
+        self.addon.requestheaders(first)
+        self.assertEqual(200, first.response.status_code)
+        self.assertTrue(self.signal.with_name("warmup-sample.json").exists())
+        second = self._flow()
+        self.addon.requestheaders(second)
+        self.assertEqual(429, second.response.status_code)
+
+    def test_v3_published_policy_does_not_hide_a_new_threshold_hit(self) -> None:
+        """管理端旧快照未命中时，抓包的最新真实用量仍能阻止后续请求。@return None。"""
+        self._write_state({"windows": {"five_hour": {"utilization": 10, "reset_at": time.time() + 600}},
+            "warmup_quota": {"limits": self.limits, "policy_key": "v3-passive-recovery", "admission": None,
+                "blocked": False, "sample_required": False}})
+        self.addon.quota_local = {"windows": {"five_hour": {"utilization": 40,
+            "reset_at": time.time() + 600, "observed_at": time.time()}}}
+        flow = self._flow()
+        self.addon.requestheaders(flow)
+        self.assertEqual(429, flow.response.status_code)
+
     def test_valid_first_response_permits_normal_followup(self) -> None:
         """第一次正式请求拿到低于阈值的真实额度后继续，不另做探测。@return None。"""
         first = self._flow()

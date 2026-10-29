@@ -48,7 +48,7 @@ from requests.exceptions import RequestException
 from sse_starlette.sse import EventSourceResponse
 from starlette.websockets import WebSocketState
 
-from quota_protocol import merge_quota_observation, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
+from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
 from cli_quota import statusline_quota_observation
 from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_summary
@@ -3088,27 +3088,13 @@ class QuotaGuard:
         :param admission: 同一时点读取的养号单次许可
         :return: 指定工作负载的阈值判定
         """
-        decision = warmup_quota_decision(state, limits, time.time())
+        decision = (passive_recovery_decision(state, limits, time.time()) if account_runtime
+            else warmup_quota_decision(state, limits, time.time()))
         if account_runtime:
-            windows = state.get("windows") or {}
-            renewal = [key for key in decision["unknown"] if limits.get(key) is not None
-                and (windows.get(key, {}).get("reset_at") or float("inf")) <= time.time()
-                and (windows.get(key, {}).get("utilization") or 0) >= limits[key]]
-            periods = json.loads(decision["window_key"])
-            for key, period in periods.items():
-                period.append(limits[key])
-            for key in ("five_hour", "seven_day", "unknown"):
-                window = windows.get(key, {})
-                reset = window.get("reset_at")
-                if window.get("exhausted") and reset is not None and reset <= time.time():
-                    renewal.append("common:" + key)
-                    periods["common:" + key] = [reset]
-            # 共同耗尽不受阈值开关影响；持久周期键也覆盖尚未取得新观察的恢复。
-            decision.update(policy_key="v3-passive-recovery", window_key=json.dumps(periods, sort_keys=True))
             # 已命中阈值的旧窗口到期后，只让一个已有执行更新；首次未知不制造人工查询门禁。
-            used = bool(renewal) and warmup_sample_used({**decision, "unknown": renewal}, admission)
+            used = decision["sample_required"] and warmup_sample_used(decision, admission)
             label = "普通任务" if workload == "normal" else "养号"
-            decision.update(admission=admission, sample_used=bool(used), sample_required=bool(renewal),
+            decision.update(admission=admission, sample_used=bool(used),
                 blocked=bool(decision["hit"]) or bool(used and (source is None or admission["source"] != source)),
                 refresh_retry_at=None)
             if decision["hit"]:

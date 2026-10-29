@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from mitmproxy import http
-from quota_protocol import merge_quota_observation, quota_decision, quota_observation, warmup_quota_decision, warmup_sample_used
+from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, warmup_quota_decision, warmup_sample_used
 
 STATS_FILE = os.environ.get("STATS_FILE", "/flows/stats.jsonl")
 CAPTURE_FILE = os.environ.get("CAPTURE_FILE", "/flows/http_capture.jsonl")
@@ -491,7 +491,10 @@ class Recorder:
         policy = state.get("warmup_quota")
         if not isinstance(policy, dict) or not isinstance(policy.get("limits"), dict):
             raise ValueError("养号策略上下文缺失")
-        decision = warmup_quota_decision(state, policy["limits"], time.time())
+        # v3 与控制端共用被动恢复规则；空闲窗口没有 reset 不代表耗掉旧 runner 的单次许可。
+        decision = (passive_recovery_decision(state, policy["limits"], time.time())
+            if policy.get("policy_key") == "v3-passive-recovery"
+            else warmup_quota_decision(state, policy["limits"], time.time()))
         if not decision["sample_required"]:
             return decision
         admission = policy.get("admission")

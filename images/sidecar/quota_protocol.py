@@ -232,10 +232,39 @@ def warmup_quota_decision(state: dict, limits: dict, now: float) -> dict:
             "window_key": dumps(periods, sort_keys=True)}
 
 
+def passive_recovery_decision(state: dict, limits: dict, now: float) -> dict:
+    """计算 v3 正常执行的被动恢复机会，与抓包侧共用周期身份。
+
+    :param state: 当前身份已合并的真实窗口
+    :param limits: five_hour/seven_day 的整数阈值，None 表示关闭
+    :param now: 当前 UTC 秒数
+    :return: 阈值判定及仅针对已到期旧命中窗口的恢复周期
+    """
+    decision = warmup_quota_decision(state, limits, now)
+    limits = decision["limits"]
+    windows = state.get("windows") or {}
+    renewal = [key for key in decision["unknown"] if limits.get(key) is not None
+        and (windows.get(key, {}).get("reset_at") or float("inf")) <= now
+        and (windows.get(key, {}).get("utilization") or 0) >= limits[key]]
+    periods = loads(decision["window_key"])
+    for key, period in periods.items():
+        period.append(limits[key])
+    for key in ("five_hour", "seven_day", "unknown"):
+        window = windows.get(key, {})
+        reset = window.get("reset_at")
+        if window.get("exhausted") and reset is not None and reset <= now:
+            renewal.append("common:" + key)
+            periods["common:" + key] = [reset]
+    # 首次未知不消耗机会；共同耗尽到期即使关闭阈值仍要保留持久的单次恢复约束。
+    decision.update(policy_key="v3-passive-recovery", window_key=dumps(periods, sort_keys=True),
+        sample_required=bool(renewal), sample_windows=renewal)
+    return decision
+
+
 def warmup_sample_used(decision: dict, admission: dict | None) -> bool:
     """判断仍未知的窗口是否已经使用本策略的单次更新机会。
 
-    :param decision: 最新养号判定
+    :param decision: 最新养号判定；v3 的 sample_windows 仅包含实际需要恢复的窗口
     :param admission: 当前身份的持久许可，不存在时为 None
     :return: 任一仍需更新的窗口已经使用机会时返回 True
     """
@@ -244,4 +273,5 @@ def warmup_sample_used(decision: dict, admission: dict | None) -> bool:
     previous = loads(admission["window_key"])
     current = loads(decision["window_key"])
     # 部分窗口刚得到数据不能为仍未知的另一个窗口重新发放机会。
-    return any(key in previous and previous[key] == current[key] for key in decision["unknown"])
+    return any(key in previous and previous[key] == current[key]
+               for key in decision.get("sample_windows", decision["unknown"]))

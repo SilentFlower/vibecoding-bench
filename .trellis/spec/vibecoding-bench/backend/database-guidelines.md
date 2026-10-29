@@ -605,6 +605,8 @@ accounts.warmup_quota_5h_limit_percent INTEGER NULL
 accounts.warmup_quota_7d_limit_percent INTEGER NULL
 QuotaGuard.record_manual_usage(account: dict, usage: dict, source: str = "manual") -> dict
 QuotaGuard.policy_snapshot(account, workload, source=None, *, quota_state=None) -> dict
+passive_recovery_decision(state: dict, limits: dict, now: float) -> dict
+warmup_sample_used(decision: dict, admission: dict | None) -> bool
 ProjectsService.recheck_waiting(account_id: int) -> None
 _public_quota_policy(account, workload="normal") -> dict
 statusline_quota_observation(rate_limits: object, observed_at: float) -> dict
@@ -626,6 +628,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 - Docker exec 等待循环只等待原执行退出并返回真实退出码，不再接受百分比强停回调。Scheduler 在发布终态之前消费最后的本地观察，保证下一轮门禁看到本轮用量；不因百分比写 stopping/stopped，不提前注入收尾。缺失、非法或过期窗口不构成有效阈值命中。
 - 真实额度耗尽、认证失败、用户停止、删除、原超时和清理失败保留各自处理。既有用户停止和自然终态不被百分比重新分类，明确 account_on_hold／invalid_grant 保留永久门禁。历史停止意图只完成旧轮收口；已持久化停止终态仅补实际退出码，不改原因或结束时刻，不改为 quota_wait 或再次提交。
 - 旧命中窗口 reset 到期只给一个已有执行正常恢复机会。共同耗尽到期同样参与认领，即使百分比阈值关闭；普通任务／养号／续聊／抓包共用 `policy_key="v3-passive-recovery"`，周期键包含阈值与 reset，以及已耗尽通用窗口的 reset。同周期并发、失败和重启不能再发探测；真实允许的新周期事实才能继续推进。
+- v3 管理端和 Recorder 必须共用 `passive_recovery_decision`。`warmup_quota.policy_key="v3-passive-recovery"` 选择该规则；内部 `sample_windows` 仅列实际到期的旧命中／共同耗尽窗口，`warmup_sample_used` 据此匹配同一持久周期。空闲 0% 且 reset 为空仍可正常启动，不能因缺少旧 runner 的未知单次许可就写 `pause.json`；旧 runner 继续使用原 `warmup_quota_decision`。Recorder 仍合并当前实际响应，不能直接信任发布快照中的旧 `blocked` 值跳过最新阈值或真实耗尽保护。
 - 真正额度耗尽的 quota_wait 仍保留原 run／批次、prompt、workspace/session 与版本／effort／模型快照并按既有恢复流程续跑。百分比命中后，已完成本轮保持实际终态；下一未执行 run／item 等待额度和原 next_launch_at，不重新执行已完成或历史 stopped item，不清空随机间隔。定时养号按既有间隔安排新一轮；零 run 活动批次依本地事实和恢复机会创建首个正常工作，后台不补查。
 - API 继续消费发送器白名单响应头；CLI 在普通任务、养号、原任务恢复和非抓包续聊临时包装 statusLine，stdin 的 `rate_limits.five_hour/seven_day.used_percentage` 为 0～100，`resets_at` 为 UTC 秒。bool、非有限值、越界值、非未来 reset、超过观察时间 6 小时／8 天的 reset 或缺失窗口不写入；缺失不补零，不删除其它窗口。
 - collector 校验 cwd、主会话目录／文件名、非链接 transcript，最多读取尾部 512 KiB；仅使用本代开始后且不超过当前时间 5 秒的正常主 assistant 响应，排除子会话、synthetic/API 错误和会话冲突。ts 使用响应时间；flock 去重 session／response ID／窗口内容，重复缓存不伪造新观察时间。
@@ -641,6 +644,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 | 条件 | 结果 |
 | --- | --- |
 | 首次未知且无真实拒绝 | 正常启动，页面显示未知，不请求 usage |
+| v3 抓包启动，5h=0% 且 reset=null、无 admission | 不生成暂停信号或单次标记，终端及正常请求可继续 |
 | 运行中任一有效窗口等于／跨过启用阈值 | 完成原轮次及补充/收尾，按实际结果收口，下一轮等待 |
 | 本轮完成后窗口恢复 | 持久单次更新机会仍生效；下一未执行工作仍等原投放时间，不重跑已完成轮次 |
 | 真正共同耗尽的 quota_wait 在 reset 到期 | 持久认领一次已有执行，沿原题／session 恢复 |
@@ -668,6 +672,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 - 正常：7d 已用80%、旧阈值80%时 Pi 计划等待窗口重置；保存90%后，下一次本地扫描重新核对门禁并接续原计划，启动后清除旧额度等待提示。错误：只更新额度展示而保留旧检查时间；应同时通知两个迭代空间的等待计划重查。
 - 错误用法：前置／后置／失败 tick 自动请求 usage，或用同一缓存状态栏不断刷新 observed_at。正确做法：仅消费正式响应／本地新响应观察，usage 留给手动按钮。
 - 错误用法：取消阈值后让多个 CLI 同时试探耗尽窗口，或重启清掉恢复机会。正确做法：共同耗尽加入同一持久周期认领，真实新观察确认恢复。
+- 错误用法：调度器按 v3 被动规则放行，Recorder 又按旧未知窗口规则要求许可，导致进程退出 43、页面只显示终端已释放。正确做法：两端使用同一纯函数、策略及周期键；真正旧窗口到期仍核精确来源与落盘单次标记，重启不再发放。
 - 错误用法：owner 锁内再次调用 _sync_bound_account_credentials。正确做法：调用 locked 入口，并用真实不可重入锁回归。
 - 错误用法：运行中百分比命中就 cleanup，或先发布 success 再消费最后额度。正确处理：完成原轮次，先消费最后观察再发布实际终态，由下一轮准入处理等待；真实耗尽仍沿原 quota_wait 恢复。
 
@@ -679,6 +684,7 @@ runs.status / stop_requested_at / error / exit_code / ended_at -> 现有停止�
 - 隔离官方 CLI＋本地 SSE 验证：采集命中 5h／7d，启用前后模型请求相同、usage 为零；安装在镜像中的 collector 被实际执行，测试替身和无真实账号边界明确。
 - 重启批次回归：只注册 active 且账号启用未删除；未来 next_launch_at 必须等待，取消时不创建 run 或清空时间；终态 item 保持。
 - test_warmup_quota.py/test_quota.py 保留旧 runner、Recorder 单次许可、停止／删除／永久异常、字段校验与历史合并回归。
+- images/sidecar/test_recorder.py：v3 空闲无 reset 不误停；旧命中到期的许可跨重启仅一次；关闭阈值仍限制共同耗尽恢复；最新响应命中不被旧发布快照掩盖。真实隔离 Recorder＋tmux＋监督器验证旧版退出 43、修复后终端保持就绪；合成 CLI 不等于真实业务对话验证。
 - test_projects_schedule.py：80%→90% 后在旧 reset 前重新认领；保存本身不调用模型，仍超阈值时继续等待，正常轮间间隔／人工暂停／模型冷却保留，启动后旧等待文案清除。
 - test_warmup_quota.py/test_projects_engine_cycles.py：真实阈值落库后通知两个空间，省略阈值时不重排；两个空间只更新各自计划，养号随机间隔配置保持。
 - test_quota_completion.py：等值／跨阈值、5h／7d、普通／养号、运行中降低阈值、下一轮及批次原间隔、真实超时/认证/用户停止、历史停止收口与原 exec 实际退出码。

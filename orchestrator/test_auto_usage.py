@@ -218,7 +218,8 @@ class AutoUsageTests(unittest.TestCase):
         runner.client.api.exec_start.return_value = json.dumps(self._usage()).encode()
         runner.client.api.exec_inspect.return_value = {"ExitCode": 0}
         row = self.runtime._row(self.account["name"], self.account["id"])
-        with patch.object(self.runtime, "job_for_container", return_value={"row": {**row, "container_id": "container"}}):
+        with patch.object(self.runtime, "job_for_container", return_value={"row": {**row, "container_id": "container"},
+                "account": self.account}):
             result = runner._exec_quota_probe("container")
         self.assertTrue(result["ok"])
         environment = runner.client.api.exec_create.call_args.kwargs["environment"]
