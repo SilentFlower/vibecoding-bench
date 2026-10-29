@@ -1,0 +1,5 @@
+{"file":".trellis/spec/cc2api/backend/index.md","reason":"后端分层、完整验证与协议入口要求"}
+{"file":".trellis/tasks/10-29-cc2api-fast-mode-account-policy/research/spec-context.md","reason":"带来源与摘要校验的未截断规范原文：Fast、CCH、压缩与状态分类旁路，避免超长文件注入丢失相关合同"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"实际Gateway、最终CCH、敏感数据及完整Rust验证规则"}
+{"file":".trellis/spec/cc2api/frontend/frontend-guidelines.md","reason":"已有Accounts控件说明、字段权威来源和构建要求"}
+{"file":".trellis/tasks/10-29-cc2api-fast-mode-account-policy/research/findings.md","reason":"本任务代码锚点、用户决定、VM对照和公开API证据边界"}
