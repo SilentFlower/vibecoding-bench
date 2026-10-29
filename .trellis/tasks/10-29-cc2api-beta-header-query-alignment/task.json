@@ -1,0 +1,44 @@
+{
+  "id": "cc2api-beta-header-query-alignment",
+  "name": "cc2api-beta-header-query-alignment",
+  "title": "cc2api：beta 请求头与查询参数对齐",
+  "description": "按用户选择处理R3-02重复beta头丢值，并依据原生抓包收敛R3-04 URL参数修复；两项由子agent执行，不占用正在实施的R2任务。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-29",
+  "completedAt": "2026-10-29",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-29T09:39:00Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "completedSteps": [
+      "beta多值请求头合并及账号/画像回归",
+      "唯一beta query归一与原始参数保真",
+      "6项专项175次实际出站，Rust全量717/CCH40通过",
+      "完整Check-All与权威Spec更新",
+      "业务提交与推送完成"
+    ],
+    "partialStep": null,
+    "nextStep": "本任务完成，无后续实现步骤",
+    "notes": "只记录本任务；R3-01/03按本轮决定保持原状态，其它任务记录和冻结研究保持未提交。",
+    "updatedAt": "2026-10-29T09:39:00Z"
+  }
+}

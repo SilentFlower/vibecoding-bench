@@ -1,0 +1,48 @@
+{
+  "date": "2026-10-29",
+  "sources": [
+    "data/flows",
+    "data/evidence",
+    "data/captures/2.1.280"
+  ],
+  "unique_messages": 592,
+  "messages_by_version": {
+    "2.1.156": 17,
+    "2.1.169": 26,
+    "2.1.172": 80,
+    "2.1.173": 74,
+    "2.1.185": 13,
+    "2.1.187": 25,
+    "2.1.220": 74,
+    "2.1.257": 147,
+    "2.1.260": 116,
+    "2.1.280": 20
+  },
+  "query_keys": [
+    "beta"
+  ],
+  "query_values": {
+    "beta": [
+      "true"
+    ]
+  },
+  "beta_entries_per_request": 1,
+  "other_query_keys_observed": [],
+  "request_content_encoding_present": 0,
+  "accept_encoding_is_response_negotiation": true,
+  "jsonl_query_representation": "MultiDictView repr，安全literal解析，零解析失败",
+  "flow_id_overlaps": 0,
+  "native_280_raw_flow_recheck": {
+    "files": 7,
+    "http_flows": 293,
+    "messages": 20,
+    "query_mismatches": 0,
+    "parse_failures": 0
+  },
+  "native_293": {
+    "raw_read": false,
+    "reason": "按既有部署定位只读SSH连接失败；同一目标TCP确认5秒超时，远端读取未成功",
+    "local_archived_reports_have_full_messages_query": false
+  },
+  "scope": "只对已读取样本作保证；不包含293原件，不保存认证或真实query标识值"
+}
