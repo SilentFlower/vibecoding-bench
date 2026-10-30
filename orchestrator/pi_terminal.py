@@ -17,6 +17,8 @@ from account_runtime import AccountRuntime, atomic_json
 from capture_artifacts import capture_context_json
 from project_library import read_document, safe_relative
 from project_scenario_usage import aggregate_usage, source_usage
+from project_runtime_policy import ProjectRuntimeError
+from runtime_diagnostics import runtime_failure, write_runtime_failure
 
 
 KEYS = {'Enter', 'Escape', 'Up', 'Down', 'Left', 'Right', 'Tab', 'BTab', 'Space',
@@ -189,8 +191,17 @@ class PiTerminal:
                     'native': str((root / 'home/.claude/projects' / cwd.replace('/', '-')).relative_to(runtime.data)),
                     'interaction_signal': str((runtime_job / 'interaction.json').relative_to(runtime.data)),
                     'quota_signal': str((controls / 'pause.json').relative_to(runtime.data))}
-            except Exception:
-                runtime.cleanup(job['token'])
+            except Exception as error:
+                context = {'namespace': self.namespace, 'account_id': account['id'], 'work_id': work['id'],
+                    'generation': work['generation'], 'source': source, 'handle': job.get('handle')}
+                diagnostics = runtime.data / self.namespace / 'startup-failures'
+                write_runtime_failure(diagnostics, runtime_failure(error, 'preparing', context))
+                try:
+                    runtime.cleanup(job['token'])
+                except Exception as cleanup_error:
+                    write_runtime_failure(diagnostics, runtime_failure(cleanup_error, 'cleanup', context))
+                    raise ProjectRuntimeError('startup_unknown', '启动失败且执行收口尚未确认，请人工核对原现场',
+                        phase='cleanup', details={'exception_type': type(cleanup_error).__name__}) from error
                 if quota_admitted and self.quota_release:
                     self.quota_release(account, source, not launched)
                 raise

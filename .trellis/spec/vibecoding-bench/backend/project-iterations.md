@@ -927,11 +927,15 @@ python_plugins_match(expected: list[dict], actual: list[dict], policy: str = 'mi
 check_python_runtime(profile: dict, actual: str) -> dict
 ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
                     phase: str = 'preparing', details: dict | None = None)
+runtime_failure(error: BaseException, phase: str, context: dict | None = None) -> dict
+write_runtime_failure(directory: Path, record: dict) -> Path | None
+ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 ```
 
 - `projects_work.failure_json TEXT` 为可空新增列，初始化幂等升级；原 SQL 命名空间映射同样升级 `warmup_projects_work`。旧记录为 NULL，不追溯造数。
 - 原状态、snapshot、历史列表／分页、work 详情和 SSE 的 work 投影增加 `failure: object | null`。既有前缀为 `/api/projects` 与 `/api/accounts/warmup/pi`；详情仍为 `GET <prefix>/work/{work_id}`，不增设错误 API。
 - 真实启动故障的 `claude_start` 回执为 `{status:'waiting'|'rejected', message, controller_yield:true, failure}`；这不是 `project_submit` 的目标通过标志。
+- 网络入口 `/usr/local/bin/v3-network-context` 的实际切换异常返回状态 1 和 `VIBEBENCH_NETWORK_ERROR_V1 <JSON>`；管理端仅接收匹配本次 `QUOTA_SOURCE` 的固定字段记录，以 `NetworkContextError(ValueError)` 保留私有事实，不透传任意 stderr。
 
 ### 3. Contracts
 
@@ -946,6 +950,11 @@ ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
 - 实际终端启动、基线及启动后门禁均确认后才设置 `resolved_at`、清空故障 retry_at 并记录 `runtime_recovered`。启动 Pi、开始准备或 Pi settled 均不算恢复。未解决故障优先于正常收尾，但后续明确的模型阻断、人工暂停／停止和新代次继续优先。
 - 宿主仅对 `claude_start` 的 waiting／rejected、严格布尔 `controller_yield === true` 及字符串 `failure.code` 结束当前循环；先让 SDK 持久化原工具回执，同批后续工具及额外推理停止，不声明目标已通过。
 - 页面当前目标、工程历史和详情读取同一事实，按 started_at 区分启动／恢复失败。自动重试时间使用当前工作对应账号的真实 `schedule.next_run_at`，历史工作不能借用当前计划；已停止先显示停止。所有外部文本转义，未保存配置不被 SSE 回填，旧记录正常展示。
+- 私有启动诊断使用 schema1：`at/phase/context/exceptions`，可嵌套一层 `network`；仅保留固定账号／工作／代次／handle／source、异常类型、可用 errno 和栈的文件名／函数／行号。因果链最多 4 项、每项最多 32 帧、单记录最多 64 KiB；不读取异常正文、源码行、局部变量或任意上下文字段。网络端记录在 `/run/v3/diagnostics/<随机ID>.json`，管理端记录在 `<数据根>/<projects|warmup>/startup-failures/<随机ID>.json`，目录 0700、文件 0600、原子发布并拒绝链接；保存失败不覆盖原异常或放行执行。
+- 原准备错误须在 cleanup 前留证；cleanup 再失败时独立记录并保留原因果链，公开阶段为 cleanup 时继续阻塞。`runtime_files.py` 共用原安全目录／原子发布实现，`account_runtime` 保留 `atomic_json/atomic_text` 导出；control 与 account 同批镜像都必须包含诊断及文件模块。
+- 只有现有人工 start、`scheduled=False` 且 `recovering=False` 可以核对 `startup_unknown` 的未启动工作。须为 preparing，原 `started_at/segment_started_at/runtime_json` 为空、没有任何输入动作；在环境锁内重读环境，确认布局2、ready、三角色归属且运行、无内存／持久执行登记和评审交接、累计工作区注册唯一且合法、原生会话不存在，实际 `v3-cli-control orphans` 成功且为空。缺失／损坏／未知证据均拒绝，不创建环境或改写现场。
+- 人工恢复仍核对原身份、授权、冻结合同、前置、额度与控制权，沿原事务重读工作／最近错误并原子保存 manual_retry 和新控制代次；不先清空 failure 或在事务外把工作改成 paused。自动扫描及服务 recover 不核发该许可；已开始过的工作、已有输入、未知收口和旧错误不能借本分支恢复。
+- 监听进程的 `/proc` 文件已打开后退出可能返回 `ProcessLookupError / ESRCH`，与路径消失一样表示原进程已结束；未知 PID／内核启动时刻核验和定向 TERM／KILL 仍保持。socket 重试只包建连探测，CA 发布或 ACK 写入的 OSError 必须按原步骤失败并留证，不能被重试吞成监听超时。
 
 ### 4. Validation & Error Matrix
 
@@ -958,6 +967,10 @@ ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
 | 缓存证明冲突、制品摘要不符或离线安装失败 | `python_cache_invalid`／`artifact_invalid`／`offline_install_failed`，处理后显式重试 |
 | 工作区归属冲突 | `workspace_conflict`，保留原现场，仍核对身份及未知输入 |
 | 未知启动、基线或收口结果 | `startup_unknown`；固定说明和异常类型，先人工核对，不自动重发 |
+| preparing 未启动、无输入，实际环境／工作区／进程证明全部通过 | 仅明确人工 start 接续原工作；真实启动成功前保留故障 |
+| 已有输入／会话／运行时、曾启动、收口或归属未知、自动扫描／recover | 保留 blocked，不能以空运行时或旧清理回执放行 |
+| `/proc` 打开后原进程退出／CA 或 ACK 写盘失败 | 前者按已结束继续；后者保存原阶段和 errno，不能伪装为连接重试 |
+| 诊断路径为链接、他人可写或保存失败 | 不越界写入，不覆盖原故障，不解除执行门禁 |
 | 迟到旧代次、已结束工作或账号身份变化 | 拒绝写入；不能复活计划或清除新状态 |
 | Pi 正常结束、刷新或服务重启 | 保留未解决故障和真实次数；不覆盖后续明确模型错误 |
 
@@ -968,10 +981,16 @@ ProjectRuntimeError(code: str, message: str, *, retryable: bool = False,
 - 边界：旧缓存只有 profile_digest，实测兼容后补齐证明；原工作较旧代次可恢复，重启不增加尝试次数。显式 `{"python":"3.12.15","python_compatibility":"exact"}` 在 3.12.16 返回明确环境拒绝。
 - 错误：Pi settled 后改写成“正常结束”、把历史任务显示为当前计划的下次重试，或在每次计划到期重新请求模型解释同一确定故障。正确：读取持久 failure，历史停止任务保留停止说明，确定问题处理后从原入口恢复同一工作。
 - 错误：把普通工具参数拒绝或未知执行结果加入自动重试白名单。正确：仅真实启动边界记录故障；显式恢复仍经过原身份、输入、额度、工作区及清理门禁。
+- 正常：网络准备失败且没有发过输入，人工 start 取得实际空闲证明后接续原 work/session/cwd 和冻结设置；API/SSE 在实际启动确认后才展示故障已解除。
+- 基础：`/proc/<pid>/cmdline` 已打开后，进程在读取前退出并返回 ESRCH；只移交原监听生命周期，不杀同 PID 的未知进程。CA 磁盘故障则保存 publish_ca／errno，而非反复探测端口。
+- 错误：为排障保存 `str(error)`、完整 traceback 源码／locals，或把全部 startup_unknown 加入人工白名单。正确：使用固定字段私有记录，只对满足全部未启动证明的原目标开放人工恢复。
 
 ### 6. Tests Required
 
 - `test_projects_runtime_resilience`：版本／策略边界、标准库兼容补丁及源码摘要／第三方版本／插件元数据漂移拒绝、输入不变、全部已核冻结来源及篡改拒绝、缓存实测、两空间故障投影、无模型空转、真实计数、成功才解除、重启截止、迟到取消、启动后异常脱敏及后续模型错误优先。
+- `test_runtime_diagnostics`、`test_capture_settings_runtime`：原故障与清理故障独立、类型／errno／栈位置保持且合成敏感值不入记录，权限／拒绝链接／写入失败、网络协议来源和两空间 handle 归属；`test_startup_recovery` 以真实环境表和注册核对实际角色、原生会话、孤儿、执行登记和未知状态拒绝。
+- `test_projects_runtime_resilience`、`test_projects_agent`：人工未启动恢复保留 work/session/冻结设置且只审计一次，自动扫描／recover、任何输入动作、已启动、运行时、cleanup／starting 和代次不符均拒绝；沿原身份／合同／授权门禁，不提前解除故障。
+- `images/account/test_network_context.py` 用真实内核进程验证 stat/cmdline 已打开后的退出竞争，保留未知 PID 拒绝和定向强停；故障注入核 CA 错误只发布一次且保留阶段。`deploy/v3/verify_network_context.py --image <本地account镜像> --cycles 3` 在禁网合成容器内执行 7 次真实透传／抓包切换，核监听确认、持久 CA 和优雅收口，记录当前源码摘要；该底座覆盖测试不代替正式联合镜像和生产恢复验收。
 - `test_project_native_verifier`、`test_project_duplicate_adapter`、`test_project_arrow_adapter`：环境错误分类与版本事实、组合适配、原文件不改及可信内层只读挂载；`test_project_native_regression` 继续核冻结节点与结果约束。
 - `test_projects_pi_round` 和 `images/pi-agent/host.test.mjs`：真实 Python／Node／SDK 回执先落盘，故障交接仅一次上游请求，伪造／非布尔标志无效，混合批次及下一轮边界正确。
 - 两个 `deploy/v3/verify_*pi*browser.py` 既有入口：API／SQLite／SSE 驱动真实 Chrome，核明暗主题、390／1280、刷新、次数／阶段／实际版本、恢复解除、XSS、旧历史不借当前时间和未保存配置保护。

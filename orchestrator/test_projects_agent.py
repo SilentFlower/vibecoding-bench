@@ -62,6 +62,10 @@ class TerminalFixture:
         """返回合法冻结配置。:return: CLI 配置。"""
         return {'claude_code_version': '2.1.293', 'claude_effort_level': 'high', 'execution_model': None}
 
+    def startup_recovery_ready(self, account, work):
+        """夹具默认不提供真实收口证明。:param account: 账号。:param work: 原工作。:return: False。"""
+        return False
+
     def start(self, account, work):
         """创建保留修改的物理目录。:param account: 账号。:param work: 工作。:return: 定位。"""
         self.started.append((account['id'], dict(work)))

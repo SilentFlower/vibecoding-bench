@@ -11,7 +11,7 @@ from pathlib import Path
 from stat import S_ISREG
 from tempfile import TemporaryDirectory
 
-from account_isolation import role_container
+from account_isolation import ISOLATION_VERSION, role_container
 from account_runtime import AccountRuntime, atomic_json
 from pi_terminal import KEYS, PiTerminal
 from project_library import PROJECT_KEY, digest_json, materialize_snapshot, read_document, safe_relative, snapshot_tree
@@ -45,6 +45,73 @@ class ProjectsTerminal(PiTerminal):
         super().__init__(runtime, settings, quota_context, quota_release, credentials, driver,
             quota_observation=quota_observation, namespace=namespace, scenario_resources=True)
         self.catalog = catalog
+
+    def startup_recovery_ready(self, account: dict, work: dict) -> bool:
+        """只读证明未启动原工作的环境、源码和输入现场已具备人工恢复条件。
+
+        :param account: 当前可用账号。
+        :param work: 尚未成功启动的原工作。
+        :return: 全部证据明确且原会话不存在时为 True，未知或读取失败时为 False。
+        """
+        try:
+            runtime = self.runtime
+            connection = runtime.database()
+            try:
+                saved = connection.execute('SELECT * FROM account_environments WHERE account_id=? AND name=?',
+                    (account['id'], account['name'])).fetchone()
+            finally:
+                connection.close()
+            if not saved:
+                return False
+            with runtime.environment_lock(saved['environment_id']):
+                connection = runtime.database()
+                try:
+                    current = connection.execute('SELECT * FROM account_environments WHERE environment_id=? AND account_id=? AND name=?',
+                        (saved['environment_id'], account['id'], account['name'])).fetchone()
+                finally:
+                    connection.close()
+                if not current:
+                    return False
+                row = dict(current)
+                if (row['state'] != 'ready' or row.get('isolation_version') != ISOLATION_VERSION
+                        or runtime.environment_jobs(row['environment_id']) or runtime.reviews.serial_state(row)
+                        or runtime.role_status(row) != {'cli': 'running', 'sender': 'running', 'network': 'running'}):
+                    return False
+                root = runtime._root(row)
+                for relative in ('', 'runtime', 'projects', 'home', 'home/.claude', 'home/.claude/projects'):
+                    path = root / relative
+                    if path.is_symlink() or not path.is_dir():
+                        return False
+                execution, shared = root / 'runtime/execution.json', root / 'runtime/executions'
+                if execution.exists() or execution.is_symlink() or shared.is_symlink():
+                    return False
+                if shared.exists() and (not shared.is_dir() or any(shared.iterdir())):
+                    return False
+                assets = self.catalog.for_work(work)
+                project, _ = assets.objective(work['project_key'], work['objective_id'])
+                registered = self._workspace_registrations(root, account, row, self.namespace)
+                matches = [alias for alias, (cycle, identity, _) in registered.items()
+                    if cycle == work.get('cycle_no', 1) and identity['project_key'] == work['project_key']
+                    and identity['seed_digest'] == project.manifest['seed_digest']]
+                if len(matches) != 1:
+                    return False
+                workspace = root / 'projects' / matches[0]
+                if workspace.is_symlink() or not workspace.is_dir():
+                    return False
+                for directory in (root / 'home/.claude/projects').iterdir():
+                    if directory.is_symlink() or not directory.is_dir():
+                        return False
+                    native = directory / (work['session_id'] + '.jsonl')
+                    if native.exists() or native.is_symlink():
+                        return False
+                container = role_container(runtime, row, 'cli')
+                observed = container.exec_run(['python3', '-I', '/usr/local/bin/v3-cli-control', 'orphans'])
+                if observed.exit_code or len(observed.output) > 64 * 1024:
+                    return False
+                # 私有登记为空仍须核对实际进程，不能把一次清理回执当作无遗留的证明。
+                return json.loads(observed.output).get('orphans') == []
+        except Exception:
+            return False
 
     def _workspace_identity(self, account: dict, row: dict, project_key: str, seed_digest: str, cycle_no: int,
                             *, naming_version: int = 2, namespace: str | None = None) -> tuple[str, dict]:

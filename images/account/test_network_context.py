@@ -1,5 +1,6 @@
 """账号网络上下文进程收口测试。"""
 import importlib.util
+import io
 import json
 import signal
 import subprocess
@@ -10,6 +11,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from runtime_diagnostics import NETWORK_FAILURE_PREFIX
+
 
 SPEC = importlib.util.spec_from_file_location("network_context", Path(__file__).with_name("network-context.py"))
 network_context = importlib.util.module_from_spec(SPEC)
@@ -18,6 +21,33 @@ SPEC.loader.exec_module(network_context)
 
 class NetworkContextTests(unittest.TestCase):
     """验证已知监听器可强制收口，未知 PID 不会被误杀。"""
+
+    def test_process_exiting_after_proc_open_is_already_stopped(self) -> None:
+        """真实进程在读取前退出时，ESRCH 与路径消失都表示原进程已结束。:return: None。"""
+        original_open = Path.open
+        for filename in ('cmdline', 'stat'):
+            with self.subTest(proc_file=filename):
+                process = subprocess.Popen(['sleep', '30'])
+                try:
+                    started = Path(f'/proc/{process.pid}/stat').read_text().split()[21]
+                    target = Path(f'/proc/{process.pid}/{filename}')
+
+                    def open_then_exit(path, *args, **kwargs):
+                        """让内核返回已退出进程的真实读取错误，而非模拟异常。:return: 已打开文件。"""
+                        stream = original_open(path, *args, **kwargs)
+                        if path == target:
+                            process.terminate()
+                            process.wait(timeout=2)
+                        return stream
+
+                    with patch.object(Path, 'open', open_then_exit):
+                        result = (network_context._listener_identity(process.pid) if filename == 'cmdline'
+                            else network_context._owned_process_state(process.pid, started))
+                    self.assertIsNone(result)
+                finally:
+                    if process.poll() is None:
+                        process.terminate()
+                    process.wait(timeout=2)
 
     def test_listener_ignoring_term_is_killed(self) -> None:
         """已知 relay 忽略 SIGTERM 时升级为 SIGKILL。@return None。"""
@@ -48,6 +78,32 @@ class NetworkContextTests(unittest.TestCase):
             self.assertIsNone(process.poll())
             process.terminate()
             process.wait(timeout=2)
+
+    def test_ca_failure_is_reported_before_cleanup_without_socket_retries(self) -> None:
+        """CA 写盘错误不能被连接重试吞掉，私有记录保留 errno 且不含秘密。:return: None。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'context.json').write_text(json.dumps({'NETWORK_INSPECTION_MODE': 'capture',
+                'QUOTA_SOURCE': 'projects:fixture:2'}))
+            stream = io.StringIO()
+            process = type('ProcessFixture', (), {'pid': 42, 'poll': lambda self: None})()
+            with patch.object(network_context, 'Path', side_effect=lambda value: root if value == '/run/v3' else Path(value)), \
+                    patch.object(network_context, 'open', side_effect=lambda name, mode: (root / 'listener.log').open(mode), create=True), \
+                    patch.object(network_context, '_restore_capture_ca'), \
+                    patch.object(network_context.subprocess, 'Popen', return_value=process), \
+                    patch.object(network_context.socket, 'create_connection') as connect, \
+                    patch.object(network_context, '_publish_capture_ca', side_effect=OSError(28, 'synthetic-secret')) as publish, \
+                    patch.object(sys, 'stderr', stream), patch.object(sys, 'argv', ['network-context.py']):
+                with self.assertRaises(SystemExit) as raised:
+                    network_context.main()
+            self.assertEqual(1, raised.exception.code)
+            self.assertEqual(1, publish.call_count)
+            self.assertEqual(1, connect.call_count)
+            record = json.loads(next((root / 'diagnostics').glob('*.json')).read_text())
+            self.assertEqual('publish_ca', record['phase'])
+            self.assertEqual(28, record['exceptions'][0]['errno'])
+            self.assertNotIn('synthetic-secret', stream.getvalue())
+            self.assertTrue(stream.getvalue().startswith(NETWORK_FAILURE_PREFIX))
 
     def test_capture_metadata_reaches_actual_child_environment_only_via_allowlist(self) -> None:
         """真实子进程收到冻结 JSON；不支持的上下文不能混入环境。:return: None。"""

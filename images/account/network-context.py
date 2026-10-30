@@ -8,8 +8,11 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 import time
 from pathlib import Path
+
+from runtime_diagnostics import NETWORK_FAILURE_PREFIX, runtime_failure, write_runtime_failure
 
 
 _NETWORK_MODES = {"passthrough", "quota", "capture"}
@@ -26,7 +29,8 @@ def _listener_identity(pid: int) -> tuple[str, str] | None:
     try:
         fields = (process / "stat").read_text().split()
         command = (process / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", errors="replace")
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
+        # /proc 已打开后原进程退出会返回 ESRCH，仍然表示无需再收口该进程。
         return None
     state, started_at = fields[2], fields[21]
     if state == "Z":
@@ -46,7 +50,7 @@ def _owned_process_state(pid: int, started_at: str) -> str | None:
     """
     try:
         fields = Path(f"/proc/{pid}/stat").read_text().split()
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         return None
     return fields[2] if fields[21] == started_at else None
 
@@ -157,20 +161,15 @@ def _reuse_passthrough(root: Path, context: dict) -> bool:
     return False
 
 
-def main() -> None:
-    """停止旧监听，启动新网络上下文并写入确认。
-
-    :return: None，失败以非零退出码报告
-    """
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--reuse-passthrough", action="store_true")
-    parser.add_argument("--require-reuse", action="store_true")
-    arguments = parser.parse_args()
-    root = Path("/run/v3")
+def _switch_context(root: Path, arguments, attempt: dict) -> None:
+    """执行串行切换，并更新仅供失败定位的固定步骤。:param root: 私有目录。:param arguments: 参数。:param attempt: 步骤事实。:return: None。"""
     with (root / "network.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         context_file = root / "context.json"
         context = json.loads(context_file.read_text()) if context_file.exists() else {}
+        attempt['context'] = {'source': context.get('QUOTA_SOURCE', ''),
+            'mode': context.get('NETWORK_INSPECTION_MODE', 'passthrough')}
+        attempt['phase'] = 'reuse_listener'
         if arguments.reuse_passthrough and _reuse_passthrough(root, context):
             return
         if arguments.require_reuse:
@@ -178,6 +177,7 @@ def main() -> None:
             raise RuntimeError("共享透传监听不可复用，拒绝影响在途 CLI")
         pid_file = root / "network.pid"
         legacy_pid = root / "mitm.pid"
+        attempt['phase'] = 'stop_listener'
         graceful = _terminate_listener(pid_file if pid_file.exists() else legacy_pid)
         legacy_pid.unlink(missing_ok=True)
         (root / "context-ack.json").unlink(missing_ok=True)
@@ -203,6 +203,7 @@ def main() -> None:
             # Recorder 是 root 网络服务；CA 生成目录不能随 CLI HOME 改到账号用户目录。
             environment["HOME"] = "/root"
             environment.setdefault("STATS_FILE", "/run/v3/idle-stats.jsonl")
+            attempt['phase'] = 'restore_ca'
             _restore_capture_ca()
             command = ["proxychains4", "-q", "mitmdump", "--mode", "socks5",
                 "--listen-host", "127.0.0.1", "--listen-port", "8080", "-s", "/sidecar/recorder.py"]
@@ -210,34 +211,65 @@ def main() -> None:
                 command += ["--save-stream-file", str(Path(context["STATS_FILE"]).parent / "capture.flow")]
             process_kind = "recorder"
             log_path = "/var/log/mitmdump.log"
+        attempt['phase'] = 'start_listener'
         with open(log_path, "ab") as log:
             process = subprocess.Popen(command, env=environment, stdout=log, stderr=log)
         pid_file.write_text(str(process.pid))
+        attempt['phase'] = 'wait_listener'
         for _ in range(80):
             if process.poll() is not None:
                 raise RuntimeError("新网络监听进程启动失败")
             try:
-                with socket.create_connection(("127.0.0.1", 8080), timeout=0.1):
-                    if process_kind == "recorder":
-                        _publish_capture_ca(process)
-                    temporary = root / "context-ack.tmp"
-                    identity = _listener_identity(process.pid)
-                    if identity is None:
-                        raise RuntimeError("新网络监听已退出")
-                    temporary.write_text(json.dumps({
-                        "QUOTA_SOURCE": context.get("QUOTA_SOURCE", ""),
-                        "NETWORK_INSPECTION_MODE": mode,
-                        "process": process_kind,
-                        "pid": process.pid,
-                        "started_at": identity[1],
-                        "previous_listener_graceful": graceful is not False,
-                    }))
-                    temporary.replace(root / "context-ack.json")
-                    return
+                connection = socket.create_connection(("127.0.0.1", 8080), timeout=0.1)
             except OSError:
                 time.sleep(0.1)
+                continue
+            with connection:
+                # 只重试连接探测；CA 或确认写入故障必须保留真实原因，不能伪装成监听超时。
+                if process_kind == "recorder":
+                    attempt['phase'] = 'publish_ca'
+                    _publish_capture_ca(process)
+                attempt['phase'] = 'confirm_listener'
+                temporary = root / "context-ack.tmp"
+                identity = _listener_identity(process.pid)
+                if identity is None:
+                    raise RuntimeError("新网络监听已退出")
+                temporary.write_text(json.dumps({
+                    "QUOTA_SOURCE": context.get("QUOTA_SOURCE", ""),
+                    "NETWORK_INSPECTION_MODE": mode,
+                    "process": process_kind,
+                    "pid": process.pid,
+                    "started_at": identity[1],
+                    "previous_listener_graceful": graceful is not False,
+                }))
+                temporary.replace(root / "context-ack.json")
+                return
         process.terminate()
         raise RuntimeError("新网络监听未就绪")
+
+
+def main() -> None:
+    """切换网络并以固定错误协议返回私有诊断，避免输出任意异常正文。
+
+    :return: None；失败保存受限记录并以状态 1 退出。
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--reuse-passthrough', action='store_true')
+    parser.add_argument('--require-reuse', action='store_true')
+    arguments = parser.parse_args()
+    root = Path('/run/v3')
+    attempt = {'phase': 'read_context', 'context': {}}
+    try:
+        _switch_context(root, arguments, attempt)
+    except Exception as error:
+        record = runtime_failure(error, attempt['phase'], attempt['context'])
+        write_runtime_failure(root / 'diagnostics', record)
+        try:
+            sys.stderr.write(NETWORK_FAILURE_PREFIX + json.dumps(record, separators=(',', ':')) + '\n')
+        except OSError:
+            # 回执管道已关闭时仍保留原故障退出码，私有记录已尽力发布。
+            pass
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

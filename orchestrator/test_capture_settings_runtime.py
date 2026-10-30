@@ -17,6 +17,8 @@ from pi_terminal import PiTerminal
 from projects import ProjectsService
 from projects_api import projects_router
 from projects_store import ProjectsDatabase
+from project_runtime_policy import ProjectRuntimeError
+from runtime_diagnostics import NETWORK_FAILURE_PREFIX, NetworkContextError, runtime_failure
 from test_tls_capture_artifacts import clienthello_record
 import test_account_runtime
 
@@ -90,6 +92,73 @@ class CaptureSettingsRuntimeTests(unittest.TestCase):
                     else:
                         self.assertNotIn('CAPTURE_CONTEXT', context)
                     self.runtime._remove_job(job)
+
+    def test_start_and_cleanup_failures_keep_separate_private_diagnostics(self) -> None:
+        """两空间在收口前保存网络根因，后续清理错误不会覆盖或公开原始内容。:return: None。"""
+        for namespace in ('projects', 'warmup'):
+            for cleanup_fails in (False, True):
+                with self.subTest(namespace=namespace, cleanup_fails=cleanup_fails):
+                    work_id = ('c' if cleanup_fails else 'b') * 32
+                    source = f'{namespace}:{work_id}:1'
+                    account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7,
+                        namespace + '_capture_enabled': True}
+                    job = {'row': self.row, 'account': account, 'source': source, 'lease': None,
+                        'exclusive': False, 'shared_cli': False, 'token': 'capture-fixture@' + source}
+                    work = {'id': work_id, 'generation': 1, 'session_id': 'fixture-session', 'remaining_sec': 60,
+                        'settings_json': json.dumps({'claude_code_version': '2.1.293', 'claude_effort_level': 'high'})}
+                    terminal = PiTerminal(self.runtime, None, lambda *args: {}, namespace=namespace)
+                    error = NetworkContextError(runtime_failure(RuntimeError('synthetic-secret'),
+                        'stop_listener', {'source': source}))
+                    with patch.object(self.runtime, '_cli_setup', return_value=nullcontext((self.row, Mock(), job))), \
+                            patch.object(self.runtime, 'sync_credentials'), \
+                            patch.object(terminal, '_prepare_execution', return_value=(self.root / 'projects/synthetic', {})), \
+                            patch.object(self.runtime, '_configure_network_context', side_effect=error), \
+                            patch.object(self.runtime, 'cleanup', side_effect=OSError('synthetic-secret') if cleanup_fails else None):
+                        with self.assertRaises(ProjectRuntimeError if cleanup_fails else NetworkContextError) as raised:
+                            terminal.start(account, work)
+                    records = [json.loads(path.read_text()) for path in
+                        (self.runtime.data / namespace / 'startup-failures').glob('*.json')]
+                    records = [value for value in records if value['context'].get('work_id') == work_id]
+                    original = next(value for value in records if value['phase'] == 'preparing')
+                    self.assertEqual('stop_listener', original['network']['phase'])
+                    self.assertEqual(job['handle'], original['context']['handle'])
+                    self.assertEqual(cleanup_fails, any(value['phase'] == 'cleanup' for value in records))
+                    self.assertNotIn('synthetic-secret', json.dumps(records))
+                    if cleanup_fails:
+                        self.assertEqual('cleanup', raised.exception.phase)
+                    self.runtime.client.api.exec_create.assert_not_called()
+
+    def test_cli_setup_preserves_initial_error_when_cleanup_also_fails(self) -> None:
+        """外层准备上下文保留首个异常及清理因果链，不改变未知执行门禁。:return: None。"""
+        account = {'id': 1, 'name': 'synthetic'}
+        job = {'token': 'fixture-token'}
+        first, cleanup = ValueError('initial-private'), OSError('cleanup-private')
+        with patch.object(self.runtime, 'ensure', return_value=(self.row, Mock())), \
+                patch.object(self.runtime, 'check_system_profile'), patch.object(self.runtime, 'claim', return_value=job), \
+                patch.object(self.runtime, '_ensure_version', side_effect=first), \
+                patch.object(self.runtime, 'cleanup', side_effect=cleanup):
+            with self.assertRaises(ValueError) as raised:
+                with self.runtime._cli_setup(account, 'projects:fixture:1', '2.1.293'):
+                    self.fail('版本准备失败时不应进入执行')
+        self.assertIs(first, raised.exception)
+        self.assertIs(cleanup, raised.exception.__cause__)
+
+    def test_network_error_protocol_reaches_runtime_without_raw_stderr(self) -> None:
+        """网络进程错误协议经实际管理端方法保留步骤，任意标准错误不透传。:return: None。"""
+        source = 'projects:' + 'a' * 32 + ':2'
+        record = runtime_failure(OSError(3, 'synthetic-secret'), 'stop_listener', {'source': source})
+        network = Mock()
+        network.exec_run.return_value = SimpleNamespace(exit_code=1,
+            output=('unsafe synthetic-secret\n' + NETWORK_FAILURE_PREFIX + json.dumps(record)).encode())
+        container = Mock(labels={'vibebench.isolation-version': '2'})
+        with patch.object(self.runtime, '_row_for_container', return_value=self.row), \
+                patch.object(self.runtime, '_network_container', return_value=network):
+            with self.assertRaises(NetworkContextError) as raised:
+                self.runtime._configure_network_context(container, {'NETWORK_INSPECTION_MODE': 'capture', 'QUOTA_SOURCE': source})
+        value = runtime_failure(raised.exception, 'preparing')
+        self.assertEqual('stop_listener', value['network']['phase'])
+        self.assertEqual(3, value['network']['exceptions'][0]['errno'])
+        self.assertNotIn('synthetic-secret', json.dumps(value))
 
     def test_normal_and_continue_capture_context_use_actual_frozen_run_identity(self) -> None:
         """固定环境的两个捕获入口取实际版本，续聊 sid 不能冒充原 run ID。:return: None。"""

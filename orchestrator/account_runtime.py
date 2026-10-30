@@ -31,6 +31,8 @@ from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_proc
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, isolated_account_limits
+from runtime_diagnostics import NetworkContextError, network_failure
+from runtime_files import atomic_json, atomic_text, directory_fd as _directory_fd
 from storage_maintenance import deduplicate_immutable_tree
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
     render_computer_profile, render_system_profile, validate_computer_profile, validate_system_profile,
@@ -84,27 +86,6 @@ def derive_v3_fingerprint(timezone: str | None = None) -> dict[str, object]:
     }
 
 
-def _directory_fd(path: Path, create: bool = False) -> int:
-    absolute = path.absolute()
-    if '..' in absolute.parts:
-        raise ValueError('账号文件路径不能包含上级目录')
-    directory = os.open(absolute.anchor, os.O_DIRECTORY)
-    try:
-        for part in absolute.parts[1:]:
-            if create:
-                try:
-                    os.mkdir(part, dir_fd=directory)
-                except FileExistsError:
-                    pass
-            following = os.open(part, os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
-            os.close(directory)
-            directory = following
-        return directory
-    except Exception:
-        os.close(directory)
-        raise
-
-
 def _read_json(path: Path):
     directory = _directory_fd(path.parent)
     try:
@@ -119,47 +100,6 @@ def _read_json(path: Path):
             return json.loads(raw)
     finally:
         os.close(directory)
-
-
-def atomic_json(path: Path, value: dict, mode: int = 0o600) -> None:
-    """原子保存受限 JSON。
-
-    :param path: 目标路径
-    :param value: JSON object
-    :param mode: 文件权限
-    :return: None
-    """
-    atomic_text(path, json.dumps(value, ensure_ascii=False), mode)
-
-
-def atomic_text(path: Path, value: str, mode: int = 0o600) -> None:
-    """通过受控目录 fd 原子保存文本，供 JSON 和只读画像共同使用。
-
-    :param path: 目标文件。
-    :param value: 完整 UTF-8 文本。
-    :param mode: 文件权限。
-    :return: None。
-    """
-    directory = _directory_fd(path.parent, create=True)
-    temporary = path.name + "." + uuid.uuid4().hex
-    try:
-        # 目录逐级以 fd 固定；不能先检查链接、随后再沿可被业务进程替换的路径写入。
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-            mode, dir_fd=directory)
-        with os.fdopen(descriptor, "w") as output:
-            os.fchmod(output.fileno(), mode)
-            output.write(value)
-            output.flush()
-            os.fsync(output.fileno())
-        os.replace(temporary, path.name, src_dir_fd=directory, dst_dir_fd=directory)
-        os.fsync(directory)
-    finally:
-        try:
-            os.unlink(temporary, dir_fd=directory)
-        except FileNotFoundError:
-            pass
-        finally:
-            os.close(directory)
 
 
 class RuntimeBusy(ValueError):
@@ -1317,8 +1257,12 @@ class AccountRuntime:
                 atomic_json(settings, value)
                 os.chown(settings, 1000, 1000, follow_symlinks=False)
                 yield row, container, job
-        except Exception:
-            self.cleanup(job["token"])
+        except Exception as error:
+            try:
+                self.cleanup(job["token"])
+            except Exception as cleanup_error:
+                # 原启动失败仍是主异常，收口失败通过因果链保留，不能覆盖首个故障。
+                raise error from cleanup_error
             raise
 
     def start_run(self, account: dict, task: dict, run_id: str, worker_env: dict, quota_env: dict) -> tuple[str, str]:
@@ -1699,10 +1643,8 @@ class AccountRuntime:
             command.append("--require-reuse")
         result = network.exec_run(command)
         if result.exit_code != 0:
-            output = result.output.decode("utf-8", errors="replace") if isinstance(result.output, bytes) else str(result.output or "")
-            detail = output.strip().splitlines()
-            suffix = f"：{detail[-1][:240]}" if detail else ""
-            raise ValueError("网络上下文切换失败，执行未启动" + suffix)
+            diagnostic = network_failure(result.output or '', str(context.get('QUOTA_SOURCE', '')))
+            raise NetworkContextError(diagnostic)
         acknowledgement = network.exec_run(["cat", "/run/v3/context-ack.json"])
         if acknowledgement.exit_code != 0:
             raise ValueError("网络上下文确认不匹配")

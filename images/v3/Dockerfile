@@ -87,6 +87,7 @@ RUN case "$(uname -m)" in x86_64) arch=x86_64;; aarch64) arch=arm64;; *) exit 1;
 COPY images/sidecar /sidecar
 COPY images/account/init.py /usr/local/bin/v3-account-init
 COPY images/account/network-context.py /usr/local/bin/v3-network-context
+COPY orchestrator/runtime_files.py orchestrator/runtime_diagnostics.py /usr/local/bin/
 COPY images/account/cli-version.sh /usr/local/bin/v3-cli-version
 COPY images/account/passthrough.py /usr/local/bin/v3-passthrough
 COPY images/account/network-guard.py /usr/local/bin/v3-network-guard

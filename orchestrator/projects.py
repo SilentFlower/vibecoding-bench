@@ -19,6 +19,7 @@ from projects_observation import screen_busy, screen_content, screen_menu
 from pi_owners import AccountPiOwners
 from projects_runtime import KEYS
 from project_runtime_policy import ProjectRuntimeError
+from runtime_diagnostics import runtime_failure, write_runtime_failure
 
 
 PROJECTS_SCHEMA = '''
@@ -1283,8 +1284,14 @@ class ProjectsService:
             finally:
                 connection.close()
 
-    def _manual_retry_event(self, agent: dict, work: dict | None) -> dict | None:
-        """只识别原工作最近一次已确认的模型故障。:param agent: 当前控制者。:param work: 原工作。:return: 可人工重试的错误事件或 None。"""
+    def _manual_retry_event(self, agent: dict, work: dict | None, *, unstarted: bool = False) -> dict | None:
+        """核对原工作最近一次故障及明确人工恢复的边界。
+
+        :param agent: 当前控制者。
+        :param work: 原工作。
+        :param unstarted: 是否由人工启动核对从未开始的原工作，自动恢复保持关闭。
+        :return: 可人工重试的原错误事件或 None。
+        """
         if (not work or work['status'] != 'blocked' or agent['status'] != 'blocked'
                 or work['runtime_json'] or work['segment_started_at'] is not None):
             return None
@@ -1295,10 +1302,17 @@ class ProjectsService:
         payload = json.loads(event['payload_json'])
         if payload.get('reason') == 'runtime_preparation':
             failure = json.loads(work['failure_json']) if work.get('failure_json') else None
-            if (not failure or failure.get('resolved_at') or failure.get('code') not in
-                    ('python_incompatible', 'python_probe_failed', 'python_cache_invalid', 'artifact_invalid',
-                        'offline_install_failed', 'workspace_conflict', 'runtime_busy')
+            if (not failure or failure.get('resolved_at')
                     or payload.get('generation') != failure.get('generation')):
+                return None
+            if failure.get('code') == 'startup_unknown':
+                # 此分支只服务明确人工启动；空运行时本身不能证明没有输入或遗留执行。
+                if (not unstarted or failure.get('phase') != 'preparing' or work['started_at'] is not None
+                        or self._one('SELECT id FROM projects_actions WHERE work_id=? LIMIT 1', (work['id'],))
+                        or not self.terminal.startup_recovery_ready(self.account(agent['account_id']), work)):
+                    return None
+            elif failure.get('code') not in ('python_incompatible', 'python_probe_failed', 'python_cache_invalid',
+                    'artifact_invalid', 'offline_install_failed', 'workspace_conflict', 'runtime_busy'):
                 return None
         elif payload.get('reason') not in ('provider_content_filter', 'provider_conflict', 'model_unavailable', 'context_limit'):
             return None
@@ -1364,7 +1378,7 @@ class ProjectsService:
                 self._write("UPDATE projects_agents SET status='paused',message=?,schedule_next_at=NULL WHERE account_id=?",
                     ('本轮全部工程已验收，自动计划已关闭，等待显式启动下一轮', account_id))
                 return self.state(account_id)
-            retry_event = self._manual_retry_event(agent, current_work) if not scheduled else None
+            retry_event = self._manual_retry_event(agent, current_work, unstarted=not recovering) if not scheduled else None
             # 人工重试只在内存中放行这一项故障，其他门禁失败时不能提前解除原工作阻塞。
             eligible_work = {**current_work, 'status': 'paused'} if retry_event else current_work
             unavailable, message = self._eligibility(agent, eligible_work)
@@ -1992,18 +2006,24 @@ class ProjectsService:
                         work['settings_json'] = json.dumps(frozen)
                 finally:
                     connection.close()
-        preparation_error = None
+        preparation_error, preparation_cause = None, None
         try:
             info = self.terminal.start(account, work)
         except ProjectRuntimeError as error:
             preparation_error = error
-        except RuntimeBusy:
+        except RuntimeBusy as error:
+            preparation_cause = error
             preparation_error = ProjectRuntimeError('runtime_busy', '账号环境暂被其他执行占用，稍后恢复', retryable=True)
         except Exception as error:
+            preparation_cause = error
             # 未知启动错误不能公开原始异常，也不能推断进程从未写入而自动重发。
             preparation_error = ProjectRuntimeError('startup_unknown', '启动结果未确认，请检查运行环境后人工核对',
                 details={'exception_type': type(error).__name__})
         if preparation_error:
+            write_runtime_failure(self.data / self.namespace / 'startup-failures',
+                runtime_failure(preparation_cause or preparation_error, preparation_error.phase, {'namespace': self.namespace,
+                    'account_id': account_id, 'work_id': work['id'], 'generation': generation,
+                    'source': f"{self.namespace}:{work['id']}:{generation}"}))
             failure = self._record_start_failure(account_id, generation, preparation_error)
             return {'status': 'waiting' if failure['retryable'] else 'rejected', 'message': failure['message'],
                 'controller_yield': True, 'failure': failure}
@@ -2040,11 +2060,16 @@ class ProjectsService:
                     '旧验收结论若缺少具体失败事实，不得继续猜测；严禁用覆盖率豁免或删测试迎合误判。'}
         except Exception as error:
             phase = 'starting'
+            diagnostic_context = {'namespace': self.namespace, 'account_id': account_id, 'work_id': work['id'],
+                'generation': generation, 'source': f"{self.namespace}:{work['id']}:{generation}"}
+            diagnostics = self.data / self.namespace / 'startup-failures'
+            write_runtime_failure(diagnostics, runtime_failure(error, phase, diagnostic_context))
             try:
                 self.terminal.control({**work, 'runtime_json': json.dumps(info)}, 'stop')
-            except Exception:
+            except Exception as cleanup_error:
                 # 收口失败保留账号运行时的原登记，不能以一次启动重试解除未知占用。
                 phase = 'cleanup'
+                write_runtime_failure(diagnostics, runtime_failure(cleanup_error, phase, diagnostic_context))
             failure = self._record_start_failure(account_id, generation,
                 ProjectRuntimeError('startup_unknown', '启动准备或执行收口未能确认，请人工核对原现场',
                     phase=phase, details={'exception_type': type(error).__name__}))

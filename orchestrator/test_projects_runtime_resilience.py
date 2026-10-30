@@ -111,11 +111,12 @@ class StartupFailureTests(unittest.TestCase):
             self.assertEqual(before, marker.read_bytes())
         self.assertEqual(2, network.exec_run.call_count)
 
-    def failing_round(self, namespace='projects', retryable=False):
+    def failing_round(self, namespace='projects', retryable=False, failure=None):
         """通过真实服务线程执行一个确定失败后正常结束的 Pi。
 
         :param namespace: 固定工程空间。
         :param retryable: 是否为暂时故障。
+        :param failure: 显式启动异常，省略时使用版本故障。
         :return: 控制端保存的工作。
         """
         if namespace == 'warmup':
@@ -126,7 +127,7 @@ class StartupFailureTests(unittest.TestCase):
             self.addCleanup(self.service.close)
         self.service.configure(1, ['example'])
         self.service.configure_schedule(1, True, 30)
-        self.terminal.start = Mock(side_effect=ProjectRuntimeError('python_probe_failed' if retryable else 'python_incompatible',
+        self.terminal.start = Mock(side_effect=failure or ProjectRuntimeError('python_probe_failed' if retryable else 'python_incompatible',
             'Python 版本不兼容：验证版本 3.12.15，实际版本 3.13.0', retryable=retryable,
             details={'expected_python': '3.12.15', 'actual_python': '3.13.0', 'private_path': '/private/token'}))
 
@@ -143,6 +144,87 @@ class StartupFailureTests(unittest.TestCase):
         self.assertFalse(self.service.controllers)
         agent = self.service.state(1)['agents'][0]
         return agent['work']
+
+    def test_manual_unknown_startup_retry_requires_proof_and_preserves_original_work(self):
+        """两空间的未启动工作经明确人工恢复后保持原身份，成功才解除故障。:return: None。"""
+        for namespace in ('projects', 'warmup'):
+            with self.subTest(namespace=namespace):
+                work = self.failing_round(namespace, failure=ValueError('synthetic-secret'))
+                settings = self.service._one('SELECT settings_json FROM projects_work WHERE id=?', (work['id'],))['settings_json']
+                proof = Mock(return_value=True)
+                self.terminal.startup_recovery_ready = proof
+                self.terminal.start = lambda account, row: fixtures.TerminalFixture.start(self.terminal, account, row)
+                self.pi = fixtures.ResumingPiFixture()
+                self.service.pi = self.pi
+                self.service.start(1)
+                self.assertTrue(self.pi.entered.wait(2))
+                self.service.start(1)
+                current = self.service.state(1)['agents'][0]['work']
+                self.assertEqual('running', self.pi.result['status'])
+                self.assertEqual(work['id'], current['id'])
+                self.assertEqual(work['session_id'], current['session_id'])
+                self.assertEqual(settings, self.service._one('SELECT settings_json FROM projects_work WHERE id=?', (work['id'],))['settings_json'])
+                self.assertEqual(1, current['failure']['attempt_count'])
+                self.assertIsNotNone(current['failure']['resolved_at'])
+                self.assertEqual(1, proof.call_count)
+                self.assertEqual([], self.terminal.sent)
+                audit = [event for event in self.service.events(1) if event['kind'] == 'manual_retry']
+                self.assertEqual(1, len(audit))
+                controller = self.service.controllers[1][0]
+                self.service.pause(1)
+                controller.join(2)
+
+    def test_unknown_startup_never_recovers_automatically(self):
+        """计划扫描和服务恢复不能代替人工确认未知启动现场。:return: None。"""
+        work = self.failing_round(failure=ValueError('synthetic-secret'))
+        self.terminal.startup_recovery_ready = Mock(return_value=True)
+        self.service.start(1, scheduled=True, now=time.time() + 1)
+        self.service.tick(time.time() + 86400)
+        with self.assertRaises(ValueError):
+            self.service.start(1, recovering=True)
+        self.assertEqual('blocked', self.service.state(1)['agents'][0]['work']['status'])
+        self.assertEqual(work['failure'], self.service.state(1)['agents'][0]['work']['failure'])
+        self.assertEqual(1, self.pi.run.call_count)
+        self.terminal.startup_recovery_ready.assert_not_called()
+
+    def test_unknown_startup_retry_rejects_any_input_or_unconfirmed_execution(self):
+        """输入、旧执行、收口故障、代次或实际证明变化均保留原阻塞。:return: None。"""
+        work = self.failing_round(failure=ValueError('synthetic-secret'))
+        original = self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+        proof = Mock(return_value=True)
+        self.terminal.startup_recovery_ready = proof
+        conditions = ('intent', 'sent', 'unknown', 'not_sent', 'started', 'segment', 'runtime',
+            'cleanup', 'starting', 'failure_generation', 'environment')
+        for condition in conditions:
+            with self.subTest(condition=condition):
+                failure = dict(work['failure'])
+                started, segment, runtime = None, None, None
+                if condition in ('intent', 'sent', 'unknown', 'not_sent'):
+                    self.service._write('INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)',
+                        ('unsafe-input', work['id'], original['generation'], '{}', condition, time.time()))
+                elif condition == 'started':
+                    started = 0
+                elif condition == 'segment':
+                    segment = 0
+                elif condition == 'runtime':
+                    runtime = '{}'
+                elif condition in ('cleanup', 'starting'):
+                    failure['phase'] = condition
+                elif condition == 'failure_generation':
+                    failure['generation'] += 1
+                else:
+                    proof.return_value = False
+                self.service._write('UPDATE projects_work SET started_at=?,segment_started_at=?,runtime_json=?,failure_json=? WHERE id=?',
+                    (started, segment, runtime, json.dumps(failure), work['id']))
+                before = self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],))
+                with self.assertRaises(ValueError):
+                    self.service.start(1)
+                self.assertEqual(before, self.service._one('SELECT * FROM projects_work WHERE id=?', (work['id'],)))
+                self.assertFalse(self.service.controllers)
+                self.assertEqual([], [event for event in self.service.events(1) if event['kind'] == 'manual_retry'])
+                self.service._write('DELETE FROM projects_actions WHERE id=?', ('unsafe-input',))
+                proof.return_value = True
+        self.assertEqual(1, self.pi.run.call_count)
 
     def test_settled_failure_remains_visible_and_blocks_model_spinning_in_both_spaces(self):
         """正常轮次结束和定时到期不能吞掉故障，两个空间一致。:return: None。"""
