@@ -1,0 +1,58 @@
+{
+  "status": "passed",
+  "cycles": 3,
+  "switches": 7,
+  "external_network": "none",
+  "model_requests": 0,
+  "results": [
+    {
+      "mode": "passthrough",
+      "process": "passthrough",
+      "graceful": true
+    },
+    {
+      "mode": "capture",
+      "process": "recorder",
+      "graceful": true
+    },
+    {
+      "mode": "passthrough",
+      "process": "passthrough",
+      "graceful": true
+    },
+    {
+      "mode": "capture",
+      "process": "recorder",
+      "graceful": true
+    },
+    {
+      "mode": "passthrough",
+      "process": "passthrough",
+      "graceful": true
+    },
+    {
+      "mode": "capture",
+      "process": "recorder",
+      "graceful": true
+    },
+    {
+      "mode": "passthrough",
+      "process": "passthrough",
+      "graceful": true
+    }
+  ],
+  "base_image_id": "sha256:943ecef29346447036ec35e2156cc1e4a2f32153e483311531794057a8e18216",
+  "tested_source": "current-worktree",
+  "source_sha256": {
+    "network-context.py": "12fc46b2ba6602e5c47705100b5f73f5af7a448ca5fb2c5615174580d79ea776",
+    "passthrough.py": "3f6633e351c689b315a93e4d05740216e08f2e29936a85bf6f0d59e79a8e4ab5",
+    "runtime_files.py": "73b835bcc5786f6826ae6aa798528104b74fa99766e35ccb7c12eec8e0c6f05f",
+    "runtime_diagnostics.py": "1b1cc6f297721934bbd7016fbb2736ecf09bb944dcbabb125f22273d0705ef25",
+    "verify.py": "aa1a50deab1182311963e0f3679013d4612c64825450d170c95cdb9d1e972e04"
+  },
+  "sidecar_sha256": {
+    "recorder.py": "ba7b5d9405e1a94e03e5c12b18874172441426876cd558a0af1e68e3efe0470f",
+    "quota_protocol.py": "fe0ca18824c8889b67c012cc9f4282f700c6f9a78df20241bf111f64c42eccf0",
+    "tls_clienthello.py": "db082d745e0612a2fb7798933072edb73334654d89496e88ca3aa63bf83da154"
+  }
+}
