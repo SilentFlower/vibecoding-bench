@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "完整Rust回归与敏感边界"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "TLS工厂与辅助调用失败关闭"}
+{"file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md", "reason": "原子选择及293真实TLS"}
+{"file": ".trellis/spec/cc2api/deploy/deploy-guidelines.md", "reason": "子仓到父仓精确交付"}
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "真实sender与内部传输合同"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "请求快照贯通及兼容"}
+{"file": ".trellis/tasks/10-29-cc2api-native-tls-fingerprint-alignment/research/alignment-findings.md", "reason": "真实原生基线与未验证范围"}

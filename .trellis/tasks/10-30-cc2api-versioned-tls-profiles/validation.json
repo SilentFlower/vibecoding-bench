@@ -1,0 +1,273 @@
+{
+  "status": "passed",
+  "check_all": {
+    "depth": "full",
+    "result": "strict_pass",
+    "CHK": 0,
+    "FBK": 0,
+    "DOC": 0
+  },
+  "tests": {
+    "command": "cargo test -- --test-threads=4",
+    "exit_code": 0,
+    "passed": 782,
+    "ignored": 3,
+    "ignored_reason": "3项既有PostgreSQL测试缺独立临时DSN；本轮无数据库改动",
+    "cargo_fmt": "passed",
+    "diff_check": "passed",
+    "actual_gateway_cases": 12,
+    "actual_sender_profile_cases": [
+      "native",
+      "test_only_distinct",
+      "legacy_missing",
+      "unknown_rejected_before_send"
+    ],
+    "resumption_by_profile": [
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "source_sha256": {
+    "src/service/gateway.rs": "2322c03e9e2e7b8f7fa5e267a180c0150192c12ce4733d3b21d0c44cfb341d3a",
+    "src/service/oauth.rs": "2932406acc7b614870bdfd443b2e6439bafd970b55bb1f6bf3b564ec2515a772",
+    "src/service/prime_poller.rs": "978ad80bf42a1620f26ae7de562f88b77903ebf6ac22d7bcc37a3170b0bb0b8a",
+    "src/service/runtime_transport.rs": "a380b43012fb9c3c92fdf3e2029b2a882b09447c5cde7176baf28b41b6e4a60a",
+    "src/service/session_hello_probe.rs": "40bef3e2313484f66af9113a48d4e312522db50ca6a3786447d04d820fe48dc4",
+    "src/service/telemetry.rs": "b54e7054d5b2f6b5319e79162f1f33e10c6b2a42d83facc5a060fd859d757ecf",
+    "src/service/version_profile.rs": "9dbd97dbb0928974f68556015b0c8ba6746d387ca6158473e8bf327471e2645e",
+    "src/tlsfp/mod.rs": "7d2958b5881908128f046e2301f6d1f6f94e6aa17717a1762f9802e126664f91",
+    "src/tlsfp/tlsfp.rs": "0b0d751848cf1aec56828b7c871964f291e09a7d6c2bcd49e37e927aa9ab1d3b",
+    "tests/runtime_transport_test.rs": "302da48dcab7e4ae206caf20615b586908a1c6bfa25f81bb3f1a76035f8912f1",
+    "src/tlsfp/profile.rs": "2ecae84656a07f35d8d807ba55715801944aec860eacb721e5f2340c78c73671"
+  },
+  "spec_update": {
+    "status": "written",
+    "files": [
+      ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md",
+      ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md"
+    ]
+  },
+  "deployment": {
+    "status": "passed",
+    "release": "ci-40985412708-1",
+    "ci_run": 40985412708,
+    "ci_conclusion": "success",
+    "parent_revision": "0769fb5b663de0fd92119605e773b27d29079c3b",
+    "gateway_revision": "a907b5de042ec2e00054b7b59733b6da7258b5c7",
+    "manifest_sha256": "0d6782b457eb5334caae93e2a70a261d469bc3fa59afd3b08384d1d12e4e418c",
+    "images": {
+      "control": {
+        "reference": "ghcr.io/silentflower/vibebench-v3-control:v3-ci-40985412708-1",
+        "digest": "sha256:a13f70db6a1326f3ed365f88342ad196ae48a17984a1968494bd414b8e6b0585",
+        "config_digest": "sha256:a13f70db6a1326f3ed365f88342ad196ae48a17984a1968494bd414b8e6b0585",
+        "platform": "linux/amd64",
+        "registry_digest": "sha256:bab691bcfa08211d3f53c1e28bc0c0970d1025049a5232581a11dde3511e76bd"
+      },
+      "account": {
+        "reference": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-40985412708-1",
+        "digest": "sha256:899f06fad49d460a63c663c68a70901abd967075d538d4677b23f4d2c08f675d",
+        "config_digest": "sha256:899f06fad49d460a63c663c68a70901abd967075d538d4677b23f4d2c08f675d",
+        "platform": "linux/amd64",
+        "registry_digest": "sha256:c8cdc90c652eab0da5b8936abab7e44dc6e2d57030b95d901f1b19b5c5b1625d"
+      }
+    },
+    "formal_sender": {
+      "sender_binary_sha256": "fd50e4ea031452ca4656630d484940005e9802a845c85ce842df6a51b04337fc",
+      "actual_image_id": "sha256:c8cdc90c652eab0da5b8936abab7e44dc6e2d57030b95d901f1b19b5c5b1625d",
+      "actual_proxy_connect": true,
+      "independent_fingerprint": "matched",
+      "external_network": false,
+      "model_requests": 0,
+      "profile_cases": [
+        {
+          "mode": "explicit_registered",
+          "observed": true
+        },
+        {
+          "mode": "legacy_missing",
+          "observed": true
+        },
+        {
+          "mode": "unknown",
+          "rejected_before_send": true
+        },
+        {
+          "mode": "test_only_rejected",
+          "rejected_before_send": true
+        }
+      ]
+    },
+    "formal_sender_fields": {
+      "legacy_version": 771,
+      "cipher_suites": [
+        4865,
+        4866,
+        4867,
+        49195,
+        49199,
+        49196,
+        49200,
+        52393,
+        52392,
+        49161,
+        49171,
+        49162,
+        49172,
+        156,
+        157,
+        47,
+        53
+      ],
+      "session_id_length": 32,
+      "compression_methods": [
+        0
+      ],
+      "signature_algorithms": [
+        1027,
+        2052,
+        1025,
+        1283,
+        2053,
+        1281,
+        2054,
+        1537,
+        513
+      ],
+      "supported_groups": [
+        4588,
+        29,
+        23,
+        24
+      ],
+      "supported_versions": [
+        772,
+        771
+      ],
+      "ec_point_formats": [
+        0
+      ],
+      "key_share": [
+        {
+          "group": 4588,
+          "key_exchange_length": 1216
+        },
+        {
+          "group": 29,
+          "key_exchange_length": 32
+        }
+      ],
+      "sni": "api.anthropic.com",
+      "alpn_protocols": [
+        {
+          "text": "http/1.1",
+          "base64": "aHR0cC8xLjE="
+        }
+      ],
+      "extensions": [
+        {
+          "type": 0,
+          "length": 22
+        },
+        {
+          "type": 23,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 65281,
+          "length": 1,
+          "public_payload_hex": "00"
+        },
+        {
+          "type": 10,
+          "length": 10
+        },
+        {
+          "type": 11,
+          "length": 2,
+          "public_payload_hex": "0100"
+        },
+        {
+          "type": 35,
+          "length": 0
+        },
+        {
+          "type": 16,
+          "length": 11
+        },
+        {
+          "type": 5,
+          "length": 5,
+          "public_payload_hex": "0100000000"
+        },
+        {
+          "type": 13,
+          "length": 20,
+          "public_payload_hex": "0012040308040401050308050501080606010201"
+        },
+        {
+          "type": 18,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 51,
+          "length": 1258
+        },
+        {
+          "type": 45,
+          "length": 2,
+          "public_payload_hex": "0101"
+        },
+        {
+          "type": 43,
+          "length": 5,
+          "public_payload_hex": "0403040303"
+        }
+      ],
+      "ja3": {
+        "string": "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49161-49171-49162-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43,4588-29-23-24,0",
+        "md5": "1523504b38f0fae0d881d4b6554aac1b"
+      }
+    },
+    "acceptance": {
+      "gateway_health": "healthy",
+      "runtime_source_hashes": "matched",
+      "projects_and_warmup_api": "passed",
+      "original_schedules_preserved": true,
+      "persistent_identity_preserved": true,
+      "requester_settings_preserved": true,
+      "database_integrity": "passed",
+      "legacy_services_unchanged": true,
+      "backup": false,
+      "resource_calculation": false
+    },
+    "stage_initial_result": "预检阻止数据挂载重叠；服务未切换。随后只读核查无非归属挂载，原定时项目自然结束、真实空闲后刷新验收基线，重试通过。",
+    "model_probe_requests": 0,
+    "image_cleanup": {
+      "status": "passed",
+      "release": "ci-40985412708-1",
+      "removed_images": [],
+      "before": {
+        "total_bytes": 105582346240,
+        "free_bytes": 4990324736
+      },
+      "after": {
+        "total_bytes": 105582346240,
+        "free_bytes": 4990144512
+      },
+      "freed_bytes": -180224,
+      "protected_releases": [
+        "ci-40947973262-1",
+        "ci-40979130989-1",
+        "ci-40985412708-1"
+      ],
+      "original_containers_preserved": true,
+      "running_containers_preserved": true,
+      "deployment_unchanged": true
+    }
+  }
+}
