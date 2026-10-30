@@ -96,6 +96,54 @@ src/tlsfp/
 - `gateway_compressed_request_cache_and_local_intercepts_are_equivalent`：不同编码共用逻辑缓存、cache hit 无 attempt、本地 prefill／warmup／classifier 等价且不多发包。
 - Rust 格式／全量／CCH 与差异检查通过；复用既有 transport 原始字节／证书／主机名回归。新增测试只证明本地合成 Gateway／TCP 与既有 transport 合同，不宣称新原生抓包、生产 v3 或真实账号推理验证。
 
+## Scenario: 响应观察的 SSE 与有界解码
+
+### 1. Scope / Trigger
+
+- Trigger：修改 `UsageCapture`、`ResponseBodyDecoder`、SSE 用量解析、压缩响应观察或诊断摘要时适用。
+- 观察器只影响本地用量与诊断，不改变客户端收到的响应字节、响应头、重试和调度。
+
+### 2. Signatures
+
+```rust
+UsageCapture::observe(&mut self, bytes: &[u8])
+UsageCapture::configure_codings(&mut self, codings: &[String])
+UsageCapture::observation(self, complete: bool) -> MessageObservation
+ResponseBodyDecoder<W>::configure(&mut self, codings: &[String])
+ResponseBodyDecoder<W>::finish(&mut self) -> Result<(), ResponseDecodeError>
+```
+
+### 3. Contracts
+
+- SSE 识别前的空格、制表、CR、LF 逐行消费，不把任意长度的初始空白存入单行缓冲；JSON 观察仍按原始字节总长执行 `USAGE_BUFFER_LIMIT`。
+- 初始空白后的首个非空白字节决定 SSE／JSON；JSON 前出现非 JSON 空白或控制字节时标记 `invalid_payload`，不把正文强行当作合法 JSON。
+- SSE 的单行和组合事件仍各受 `USAGE_BUFFER_LIMIT` 限制；事件只有在空行派发，多 `data:` 行按 LF 拼接。压缩链先增量解码，再使用同一解析器，不因压缩率改变完整性结论。
+- 编码层、CRC、尾随字节、窗口和结束帧必须完整验证；观察失败只标记 `partial`／`observation_error`，不得把缺失数据记成精确零用量，也不得阻断响应转发。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 初始大量空行后为合法 SSE | 明文、gzip、br、zstd 与不同分块得到相同 usage，`partial=false` |
+| 初始空白后 JSON 总字节超过上限 | `sampling_limit`，不解析部分 JSON |
+| JSON 前出现非法控制字节 | `invalid_payload`，不宣称完整用量 |
+| SSE 单行／事件超过上限 | 丢弃当前行／事件，后续事件仍可观察，最终标记 `partial` |
+| 压缩流截断、校验失败或缺结束帧 | 保留已观察摘要并标记部分，响应原字节继续透传 |
+
+### 5. Scenarios and Examples
+
+- 正常：首帧前有较长合法空行，明文与压缩响应都能观察到 `input_tokens`、`output_tokens` 和 `message_stop`。
+- 边界：超大事件之后仍有合法事件，超大事件不污染后续事件，但整次观察保留部分标记。
+- 错误用法：把初始空白全部放进 JSON 缓冲，导致明文触发上限而 gzip 因压缩率较小正常。
+- 正确处理：初始空白按 SSE 行消费，JSON 另计原始字节预算，所有编码共享同一完整性状态机。
+
+### 6. Tests Required
+
+- `long_initial_blank_lines_preserve_usage_across_codings_and_chunks`：LF／CRLF／CR、是否有 `event:`、明文及所有支持编码、1 字节／中等／整包分块，断言 tokens、`partial` 和错误均一致。
+- `initial_whitespace_preserves_json_limit_and_validation`：恰好上限、超过上限、非法控制前缀及全空白响应，断言不使用部分 JSON。
+- 响应解码器继续覆盖多 member／frame、截断、尾随和窗口边界；完整 `cargo test -- --test-threads=4`、`cargo fmt --check` 与 `git diff --check` 必须通过。
+
+
 ## Scenario: 账号级上游 session 池
 
 ### 1. Scope / Trigger

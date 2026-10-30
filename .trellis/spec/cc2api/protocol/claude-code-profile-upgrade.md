@@ -1538,7 +1538,7 @@ oauth-2025-04-20,interleaved-thinking-2025-05-14,redact-thinking-2026-02-12,thin
 
 293 顶层已知字段顺序为 `model,messages,system,tools,metadata,max_tokens,thinking,context_management,fallbacks,safeguards,output_config,thread,diagnostics,stream`；缺省字段不因排序而插入，未知字段保持相对顺序，SSE 与 safeguard_results 保持字节透传。
 
-CCH 使用 `0x4D659218E32A3268`：在最终序列化字节上将唯一受管理根级 system billing 的 CCH 替为占位值、删除顶层 max_tokens、清空全层级精确字符串 model 值，保留 fallback，再取 xxhash64 低 20 bits。禁止 JSON 往返重排。初始后缀仍以 salt `59cf53e54c78`、首条 user 的最后一个 text block、UTF-16 code units `[4,7,20]` 与版本计算 SHA256 前三位；缺失索引按既有 `0` 规则，孤立代理项按既有替换字符语义处理。续轮使用当前入站 billing 后缀；审计通过 previous_message_id 对应前一 SSE message_start.id 逐链检查，同 run/model 不构成唯一会话键，也不新增全局后缀缓存。
+CCH 使用 `0x4D659218E32A3268`：在最终序列化字节上将唯一受管理根级 system billing 的 CCH 替为占位值、删除顶层 max_tokens、清空全层级精确字符串 model 值，保留 fallback，再取 xxhash64 低 20 bits。禁止 JSON 往返重排。初始后缀仍以 salt `59cf53e54c78`、首条 user 的最后一个 text block、UTF-16 code units `[4,7,20]` 与版本计算 SHA256 前三位；缺失索引按既有 `0` 规则，孤立代理项按既有替换字符语义处理。续轮使用当前入站 billing 后缀；审计通过 previous_message_id 对应前一 SSE message_start.id 逐链检查，同 run/model 不构成唯一会话键，也不新增全局后缀缓存。 CCH 原始 JSON 字符串中的目标偏移必须单次扫描映射，不能为每个同名示例重复解析完整前缀；转义边界无法安全映射时失败开放并保留原字节。
 
 **后台端点**
 
@@ -1893,6 +1893,7 @@ PreparedRequest::tls_profile: TlsProfileId
 - 系统默认版本未绑定时，由 `default_tls_profile` 集中沿内置默认版本的已验证绑定兼容。未来默认版本绑定新 TLS 后，所有未绑定版本自动跟随；调用点不得硬编码293或自行选最近版本。
 - messages/count_tokens 在准入快照的同一读锁内冻结 HTTP 选择和默认 TLS。选账号后按请求级账号副本解析绑定；401、signature、429及换号沿同一入口默认。配置 reload 仅影响后续请求；后台 telemetry 的后续轮次可换客户端，不中断正在发送的响应。
 - `reload_access_profile_config` 在写锁内解析成功后同步工厂默认并替换选择快照；解析失败保留旧值。没有版本的 OAuth 使用该配置默认；TokenTester、Prime 和 Hello 沿实际版本或账号绑定。Hello 接收业务冻结的 TLS，其缓存/singleflight key 同时包含 HTTP profile 和 TLS ID；旧 v2 key 不复用，自然到期。
+- TokenTester 的 TLS 选择读取 `canonical_env.version` 原始字符串；空值、`null`、未知或未绑定版本沿调用方冻结的配置默认，HTTP 请求头仍可单独使用归一化后的默认版本。不得先调用 HTTP 版本归一化再选择 TLS。
 - `REQUEST_CLIENT_CACHE` key 为 `(proxy_url, TlsProfileId)`；每个客户端构建独立 rustls 会话存储。相同 ID 的不同版本可共享同代理连接，ID 不同必须隔离连接和恢复票据；关闭池每次新建，非法代理继续失败关闭。
 - 网关将确定的 ID 放入认证保护的 `x-v3-request` 元信息，最终 body 原字节独立传递。直连 `send_direct` 与 sender 都使用该 ID，不从 body／HTTP UA 重选；调用方提供的同名入站头不能替换网关构造的元信息。
 - `PreparedRequest.tls_profile` 使用枚举反序列化和 `serde(default)`：旧报文缺字段沿内置兼容默认，显式未知／null 拒绝。sender 先鉴权再解析，错误发生在递增 active/submitted 前，返回400和 `x-v3-transport-error: before-send`，不接触上游；未知ID不能静默兜底。
