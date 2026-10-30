@@ -1265,7 +1265,7 @@ allowed_user_agents=<管理员自定义值，版本切换不得覆盖>
 
 ### 3. Contracts
 
-- `src/service/version_profile.rs` 是唯一画像注册表。新增版本必须声明 `identity`、`access_policy`、`request`、`billing`、`telemetry`、`endpoints` 子画像。
+- `src/service/version_profile.rs` 是唯一版本画像注册表。新增版本必须声明 `identity`、`access_policy`、`request`、`billing`、`telemetry`、`endpoints` 及可选 `tls_profile` 绑定；TLS 未采样时留空并按下方默认规则兼容，不宣称已验证。
 - `claude_code_version_profile` 保存时必须校验为内置 profile key；未知 key 返回 `BadRequest`，不能落库。
 - 切换 profile 必须在同一事务中完成：
   - 写入 `settings.claude_code_version_profile`。
@@ -1406,7 +1406,7 @@ TelemetryService::get_session_expires_at(&self, account_id: i64) -> Option<DateT
 | 状态 | key 契约 |
 |------|----------|
 | Stateful blocks | `<account_id>:<profile_key>:<real_session_id>`，保留真实下游 Session，不改成上游池 Session |
-| Hello 状态和 singleflight | `session_hello_probe:v2:<account_id>:<profile_key>:<sha256(upstream_session_id)>:<sha256(proxy_url)>` |
+| Hello 状态和 singleflight | `session_hello_probe:v3:<account_id>:<profile_key>:<tls_profile_id>:<sha256(upstream_session_id)>:<sha256(proxy_url)>` |
 | 非流式探针 | 既有 JSON key 增加 `profile` 字段，即使两版 headers/body 相同也隔离 |
 
 sticky、RPM、并发与上游 Session 池容量不得因 profile 增加独立配额。
@@ -1815,7 +1815,7 @@ GIT_USER_REGEX.replace_all(&caps[0], NoExpand(replacement.as_str()))
 
 - 修改 `src/tlsfp/tlsfp.rs` 或 `craftls/rustls` 的 ClientHello、密钥交换和会话恢复时适用。共享工厂同时服务正式网关与 v3 account-sender，TLS 模板独立于 HTTP 版本画像。
 - 当前基线为原版 2.1.293 主 messages：58 条 HTTP 关联握手中有新建／恢复主请求各 6 条；原版精确二进制在无外网、空 HOME、合成凭据、无 MITM 的回环监听中再次确认 offer。证据见[任务研究](../../../tasks/10-29-cc2api-native-tls-fingerprint-alignment/research/alignment-findings.md)。
-- 保持现有单一模板与按代理 URL 缓存接口。辅助接口另有两种实测形状，280／303 尚未纳入本轮对齐；不得把该基线当作所有版本或全部端点的保证。
+- 当前唯一正式 TLS 模板为原生293主请求，版本按下方绑定规则选择，客户端按代理及 TLS ID 隔离。辅助接口另有两种实测形状，280／303 尚无正式绑定；不得把兼容使用该基线宣称为原生已验证。
 
 ### 2. Signatures
 
@@ -1827,7 +1827,7 @@ CraftOptions::initial_key_share_group(&self) -> Option<NamedGroup>
 ```
 
 - 统一定义为 `CLAUDE_CODE_293_CIPHERS`、`CLAUDE_CODE_293_EXTENSIONS` 与 `CLAUDE_CODE_293_FINGERPRINT`；生产与测试均经 `build_tls_config_with_roots` 构建。
-- 不新增设置、环境变量、数据库字段或按版本／端点选模接口。
+- 不新增设置、环境变量或数据库字段。版本绑定入口见下方「TLS 画像版本绑定与冻结传输」；本轮没有按辅助端点选模。
 
 ### 3. Contracts
 
@@ -1862,3 +1862,64 @@ CraftOptions::initial_key_share_group(&self) -> Option<NamedGroup>
 - `hybrid_exchange_matches_independent_server_and_rejects_invalid_peers`：真实 ML-KEM 封装及独立 X25519，秘密一致；错误长度和全零 peer 拒绝。
 - 保留 `runtime_transport::tests::local_https_*` 的字节、证书／主机名失败与流取消，以及代理池回归；完整 `cargo test`、`cargo fmt --check` 和 `git diff --check`。SQLite 夹具发生高并发锁冲突时可用 `cargo test -- --test-threads=4` 完整重跑，不能忽略失败。
 - 发布后用同批真实 account-sender 镜像在 `network=none` 容器经回环 CONNECT 取得 ClientHello 并独立解析；此操作只验证正式二进制 offer，完整 TLS 可用性由上述 HTTPS 测试证明。
+
+## Scenario: TLS 画像版本绑定与冻结传输
+
+### 1. Scope / Trigger
+
+- 修改 TLS 选择、版本绑定、默认回退、客户端缓存或 gateway → sender 元信息时适用。流程固定为实际采样确认 → 新增或复用 TLS 模板 → 绑定版本，不能从版本号推导模板。
+- 不改变现有客户端 UA／账号两种 HTTP 画像规则；普通网关和 v3 sender 使用同一 TLS 工厂，原生 CLI 仍自行发起握手。
+
+### 2. Signatures
+
+```rust
+ClaudeCodeProfile::tls_profile: Option<TlsProfileId>
+ClaudeCodeProfileSelectionConfig::default_tls_profile(self) -> TlsProfileId
+tls_profile_for_version(version: &str, fallback: TlsProfileId) -> TlsProfileId
+tls_profile_for_account(account: &Account, fallback: TlsProfileId) -> TlsProfileId
+get_request_client_for_profile(proxy_url: &str, profile: TlsProfileId)
+    -> Result<reqwest::Client, reqwest::Error>
+configured_default_tls_profile() -> TlsProfileId
+set_configured_default_tls_profile(profile: TlsProfileId)
+PreparedRequest::tls_profile: TlsProfileId
+```
+
+- `src/tlsfp/profile.rs::TlsProfileId` 是模板 ID 注册表；正式枚举目前仅 `ClaudeCode293`，传输字符串 `claude-code-2.1.293`。`TestReordered` 仅 `cfg(test)`，正式报文不能选择它。
+- 原 `get_request_client(proxy_url)`／`make_request_client(proxy_url)` 保持兼容，使用当前配置默认 TLS。
+
+### 3. Contracts
+
+- 版本293显式绑定原生293；其他既有版本留空。解析先使用版本的显式绑定，再用请求入口冻结的系统默认版本 TLS；未知、空版本和未绑定版本都沿该兜底，空版本不能先被 HTTP 的归一化函数补成293。
+- 系统默认版本未绑定时，由 `default_tls_profile` 集中沿内置默认版本的已验证绑定兼容。未来默认版本绑定新 TLS 后，所有未绑定版本自动跟随；调用点不得硬编码293或自行选最近版本。
+- messages/count_tokens 在准入快照的同一读锁内冻结 HTTP 选择和默认 TLS。选账号后按请求级账号副本解析绑定；401、signature、429及换号沿同一入口默认。配置 reload 仅影响后续请求；后台 telemetry 的后续轮次可换客户端，不中断正在发送的响应。
+- `reload_access_profile_config` 在写锁内解析成功后同步工厂默认并替换选择快照；解析失败保留旧值。没有版本的 OAuth 使用该配置默认；TokenTester、Prime 和 Hello 沿实际版本或账号绑定。Hello 接收业务冻结的 TLS，其缓存/singleflight key 同时包含 HTTP profile 和 TLS ID；旧 v2 key 不复用，自然到期。
+- `REQUEST_CLIENT_CACHE` key 为 `(proxy_url, TlsProfileId)`；每个客户端构建独立 rustls 会话存储。相同 ID 的不同版本可共享同代理连接，ID 不同必须隔离连接和恢复票据；关闭池每次新建，非法代理继续失败关闭。
+- 网关将确定的 ID 放入认证保护的 `x-v3-request` 元信息，最终 body 原字节独立传递。直连 `send_direct` 与 sender 都使用该 ID，不从 body／HTTP UA 重选；调用方提供的同名入站头不能替换网关构造的元信息。
+- `PreparedRequest.tls_profile` 使用枚举反序列化和 `serde(default)`：旧报文缺字段沿内置兼容默认，显式未知／null 拒绝。sender 先鉴权再解析，错误发生在递增 active/submitted 前，返回400和 `x-v3-transport-error: before-send`，不接触上游；未知ID不能静默兜底。
+- v3 按联合清单同批更新 gateway/sender；保留账号、generation、release、origin及路径校验。原生293算法、双share、PSK末尾、HRR、证书、代理、长流和取消合同保持。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 生效293，配置默认另有已验证绑定 | 使用293明确绑定 |
+| 生效280／未知／空版本未绑定 | 使用配置默认 TLS；默认也无绑定时沿内置兼容值 |
+| 默认在请求读体期间变化 | 本次仍用冻结 TLS，后续请求使用新默认 |
+| 账号模式且UA版本不同 | 按最终账号版本绑定，缺失时用入口默认 |
+| 同代理不同TLS ID | 不同实际ClientHello与独立恢复存储 |
+| sender收到注册ID／缺字段 | 使用指定ID／历史兼容默认 |
+| sender收到未知显式ID或null | 鉴权后400、before-send，active不增加，无上游提交 |
+
+### 5. Scenarios and Examples
+
+- 正常：293已采样并绑定；未来版本经过验证可绑定已有ID或新增模板。相同模板无需复制cipher和扩展列表。
+- 边界：280未采样、系统默认暂选280时，仍沿内置293兼容；未来默认版本有新绑定后，280随默认切换，不能继续在工厂写死293。
+- 错误用法：sender按自己的CLI版本重选，或切换默认后仍按代理单维度复用旧连接。正确处理：网关冻结ID、跨进程原样传递，工厂按代理与ID隔离。
+
+### 6. Tests Required
+
+- `tls_bindings_use_configured_default_without_inventing_native_versions` 和 `tls_default_snapshot_survives_change_and_shared_profiles_reuse_id`：绑定、空／未知／未绑定、默认变化及共享ID；正式模板不含测试ID。
+- `gateway_messages_and_count_tokens_select_actual_tls_by_effective_profile`：两个入口、客户端／账号模式，读体期间切默认后的本次与下一次实际ClientHello。
+- `sender_preserves_tls_profile_legacy_default_and_rejects_unknown_before_submission`：真实HTTP传输、不同ID实际wire、缺字段默认，以及未知ID400、before-send和active=0。
+- `same_proxy_different_tls_profiles_emit_distinct_actual_clienthellos`、`distinct_tls_configs_keep_resumption_tickets_separate`：实际工厂分池及真实恢复状态 `[false,true,false,true,true]`，禁止只断言常量或缓存条目数量。
+- 原293完整握手／恢复／HRR和Hello去重、代理、证书、流取消及改写回归；`cargo fmt --check`、完整 `cargo test -- --test-threads=4`、`git diff --check`。正式镜像无外网验证显式ID、旧报文与未知ID拒绝，不能用测试替身冒充模型成功。

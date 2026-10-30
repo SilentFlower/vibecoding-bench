@@ -43,7 +43,7 @@ NetworkInspectionMode = "passthrough" | "quota" | "capture"
 
 管理租约输入为 `operation: string`、`owner: string`、`generation: string | null`；操作为 `prepare-cli-shared`、`prepare-cli`、`prepare`、`claim`、`heartbeat`、`fence`、`release`。查询返回 `lease,holders,cli_capacity,active,waiting,importing`；`lease` 保留为旧占用提示，新调用按 `holders` 核对具体 owner／generation。租约包含 `owner,generation,expires_at,phase,exclusive,shared_cli`，TTL 为 30 秒。持久状态 schema 2 保存全部 holder，旧单租约保守读入；旧记录缺少 `exclusive` 时默认 `true`。fence 与在途导入保护见下方重授权场景。
 
-发送绑定 `TransportBinding`：`account_id: i64`、`environment_id: string`、`generation: u64`、`endpoint: string`、`secret: string`、`release_id: string`。`PreparedRequest` 增加 `request_id`（UUID）、`deadline_unix_ms`、`method`、`target_url`、有序 `headers` 及 `preserve_header_casing`；最终 body 独立传原始字节。秘密只在服务间传递。
+发送绑定 `TransportBinding`：`account_id: i64`、`environment_id: string`、`generation: u64`、`endpoint: string`、`secret: string`、`release_id: string`。`PreparedRequest` 包含 `request_id`（UUID）、`deadline_unix_ms`、`method`、`target_url`、有序 `headers`、`preserve_header_casing` 和网关冻结的 `tls_profile` 注册ID；最终 body 独立传原始字节。sender不自行重选版本，缺字段沿历史兼容默认，显式未知ID在上游提交前拒绝；完整选择、连接池和错误行为见[版本TLS合同](../../cc2api/protocol/claude-code-profile-upgrade.md#scenario-tls-画像版本绑定与冻结传输)。秘密只在服务间传递。
 
 ```text
 scripts/v3-stack build --release <唯一批次> --manifest <新清单>
