@@ -1808,3 +1808,57 @@ GIT_USER_REGEX.replace_all(&caps[0], NoExpand(replacement.as_str()))
 - `cargo test git_user`：同行闭合标签、相邻提醒、其它标签、美元表达式及 Unicode 名称、三种换行、空用户名、非目标位置及缓存块。
 - `git_user_scrub_keeps_profile_cch_valid`：实际 Rewriter 正文链路验证 280／293 的完整提醒和最终 CCH，不以字符串局部断言代替封口校验。
 - `cargo fmt --check`、`cargo test cch`、完整 `cargo test` 和 `git diff --check`；仅使用合成身份与资料，不新增正式抓包或模型效果结论。
+
+## Scenario: 统一出站 TLS 对齐原生 293 主请求
+
+### 1. Scope / Trigger
+
+- 修改 `src/tlsfp/tlsfp.rs` 或 `craftls/rustls` 的 ClientHello、密钥交换和会话恢复时适用。共享工厂同时服务正式网关与 v3 account-sender，TLS 模板独立于 HTTP 版本画像。
+- 当前基线为原版 2.1.293 主 messages：58 条 HTTP 关联握手中有新建／恢复主请求各 6 条；原版精确二进制在无外网、空 HOME、合成凭据、无 MITM 的回环监听中再次确认 offer。证据见[任务研究](../../../tasks/10-29-cc2api-native-tls-fingerprint-alignment/research/alignment-findings.md)。
+- 保持现有单一模板与按代理 URL 缓存接口。辅助接口另有两种实测形状，280／303 尚未纳入本轮对齐；不得把该基线当作所有版本或全部端点的保证。
+
+### 2. Signatures
+
+```rust
+get_request_client(proxy_url: &str) -> Result<reqwest::Client, reqwest::Error>
+make_request_client(proxy_url: &str) -> Result<reqwest::Client, reqwest::Error>
+// craftls 内部：仅显式覆盖 key_share 时优先模板首个真实组。
+CraftOptions::initial_key_share_group(&self) -> Option<NamedGroup>
+```
+
+- 统一定义为 `CLAUDE_CODE_293_CIPHERS`、`CLAUDE_CODE_293_EXTENSIONS` 与 `CLAUDE_CODE_293_FINGERPRINT`；生产与测试均经 `build_tls_config_with_roots` 构建。
+- 不新增设置、环境变量、数据库字段或按版本／端点选模接口。
+
+### 3. Contracts
+
+- 有序 cipher：`4865,4866,4867,49195,49199,49196,49200,52393,52392,49161,49171,49162,49172,156,157,47,53`。
+- 新连接有序扩展：`0,23,65281,10,11,35,16,5,13,18,51,45,43`；签名算法：`1027,2052,1025,1283,2053,1281,2054,1537,513`；groups：`4588,29,23,24`；版本：`772,771`；legacy version：`771`；点格式：`0`；ALPN：`http/1.1`。
+- 初始和恢复连接 key_share 均为 `4588:1216` 后接 `29:32`。SNI 使用真实目标，随机和密钥每次真实生成；JA3 新连接为 `1523504b38f0fae0d881d4b6554aac1b`，实际 TLS1.3 恢复时末尾增加 PSK 41，为 `ae5f2d34331c18f27df379f7d4b72e35`。票据、binder、Cookie 仅保留协议实际生成的值，不硬编码票据长度。
+- 混合组 4588 的 client 为 ML-KEM768 公钥 1184 字节接 X25519 公钥 32 字节；server 为密文 1088 字节接公钥 32 字节；秘密为 ML-KEM 32 字节接 X25519 32 字节。实际 Provider 只保留可执行的 4588、X25519、P256、P384。
+- 显式覆盖 key_share 时初始组优先模板，不能因缓存 hint 改变顺序；关闭覆盖时沿用 hint。HRR 明确请求组时仅发送该组，不强行重发初始双 share；PSK 保持最后，binder 由 rustls 计算。
+- 保持公有根和主机名验证、30 秒建连、30 秒 TCP 保活、无整体长流超时。同代理复用、异代理隔离，非空非法代理错误向上传播，不回退直连。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+|---|---|
+| 无恢复材料的新连接 | 13 项扩展、双 share 和新连接 JA3 匹配基线 |
+| 服务端实际发票据后的 TLS1.3 第二连接 | 真实 `session_reused`，PSK 最后，双 share 顺序保持 |
+| 缓存 hint 为 X25519 或 P256 | 显式模板仍先 4588；关闭覆盖的配置沿用 hint |
+| HRR 请求 P256 | 单一 P256 share 65 字节，完整 HTTPS 成功 |
+| 混合 server share 长度不为 1120 或 X25519 秘密全零 | 返回错误，不产生可用共享秘密 |
+| 非信任证书、错误主机名、非法代理 | 明确失败，不绕过验证或切直连 |
+
+### 5. Scenarios and Examples
+
+- 正常：生产工厂经代理向 `api.anthropic.com` 建连，独立解析实际字节对照 fixture 全部字段；现代 TLS1.2／1.3 完成 HTTPS，同连接可复用。
+- 边界：第一连接协商 X25519 后，新连接仍发原生双 share；服务端要求 P256 时按 HRR 完成交换。混合交换另以独立服务端封装验证双方 64 字节秘密一致。
+- 错误用法：仅把 JA3 字符串改成目标值、填充相同长度的假 key_share，或从 MITM 出口推断原生 CLI。正确处理：核对真实发送字节、真实密钥交换与成功握手，保留方向／版本和来源证据；原生回环 offer 对照本身不冒充完整 HTTPS 成功。
+
+### 6. Tests Required
+
+- `cargo test --lib tlsfp`：独立 `tests/fixtures/tls_clienthello.py` 对照脱敏 `claude_code_293_tls.json`，验证完整字段、公开扩展内容、缓存 hint 与关闭覆盖兼容分支。
+- `local_https_native_fingerprint_tls12_tls13_resumption_and_hrr`：TLS1.2／1.3、同连接复用、第二 TCP 真实恢复、末尾 PSK，以及 P256 HRR 完成 HTTPS。
+- `hybrid_exchange_matches_independent_server_and_rejects_invalid_peers`：真实 ML-KEM 封装及独立 X25519，秘密一致；错误长度和全零 peer 拒绝。
+- 保留 `runtime_transport::tests::local_https_*` 的字节、证书／主机名失败与流取消，以及代理池回归；完整 `cargo test`、`cargo fmt --check` 和 `git diff --check`。SQLite 夹具发生高并发锁冲突时可用 `cargo test -- --test-threads=4` 完整重跑，不能忽略失败。
+- 发布后用同批真实 account-sender 镜像在 `network=none` 容器经回环 CONNECT 取得 ClientHello 并独立解析；此操作只验证正式二进制 offer，完整 TLS 可用性由上述 HTTPS 测试证明。
