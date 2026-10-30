@@ -1,0 +1,64 @@
+{
+  "id": "cc2api-native-tls-fingerprint-alignment",
+  "name": "cc2api-native-tls-fingerprint-alignment",
+  "title": "cc2api：依据原生抓包对齐 TLS 指纹",
+  "description": "依据已上线ClientHello采集和原版2.1.293无MITM对照，修正cc2api统一TLS主请求模板并完整验证、推送和部署。",
+  "status": "completed",
+  "dev_type": "backend",
+  "scope": "cc2api",
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-10-29",
+  "completedAt": "2026-10-30",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-10-30T00:42:07Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "cc2api/src/tlsfp/tlsfp.rs",
+    "cc2api/craftls/rustls/src/craft/mod.rs",
+    "cc2api/craftls/rustls/src/client/tls13.rs",
+    "cc2api/tests/fixtures/claude_code_293_tls.json",
+    "cc2api/tests/fixtures/tls_clienthello.py",
+    "cc2api/tests/fixtures/tls_fingerprint_server.py",
+    ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md"
+  ],
+  "notes": "已按原生293主messages对齐并部署us v3，正式镜像握手、健康、身份与计划保留及旧镜像清单核查通过；证据见release.md和validation.json。",
+  "meta": {
+    "deferred": {
+      "requested_by": "user",
+      "reason": "待抓包能力升级和原生 TLS 证据就绪",
+      "prerequisites": [
+        "已完成：tls_clienthello.jsonl与冻结版本/HTTP连接关联",
+        "已完成：2.1.293成功主请求与原版CLI直接本地握手对照；280及303另待正式样本"
+      ],
+      "source_finding": "F05",
+      "related_research_task": ".trellis/tasks/10-29-cc2api-vm2api-wire-differential-study"
+    }
+  },
+  "progress": {
+    "completedSteps": [
+      "原生HTTP关联样本与无MITM基线确认",
+      "统一TLS模板、真实混合交换、恢复及HRR实现",
+      "完整回归、Check-All和权威Spec更新",
+      "子仓与父仓精确推送、联合镜像构建发布",
+      "us v3部署及正式镜像握手、健康、身份与计划验收",
+      "旧镜像精确清单收尾"
+    ],
+    "partialStep": null,
+    "nextStep": "无；本任务已交付，280/303及辅助端点多模板属于后续范围",
+    "notes": "统一基线为293主messages。776项测试通过，3项既有PostgreSQL测试缺独立DSN而忽略；无真实模型验收请求，沿用不备份和不重算资源的部署选择。",
+    "updatedAt": "2026-10-30T00:42:07Z"
+  }
+}

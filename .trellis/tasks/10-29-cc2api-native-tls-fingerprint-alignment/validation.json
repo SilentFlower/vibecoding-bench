@@ -1,0 +1,242 @@
+{
+  "status": "passed",
+  "target": "Claude Code 2.1.293 main messages",
+  "check_all": {
+    "depth": "full",
+    "result": "strict_pass",
+    "CHK": 0,
+    "FBK": 0,
+    "DOC": 0
+  },
+  "tests": {
+    "full_command": "cargo test -- --test-threads=4",
+    "exit_code": 0,
+    "passed": 776,
+    "ignored": 3,
+    "ignored_reason": "3项既有PostgreSQL测试须独立临时DSN，本轮无数据库改动",
+    "tls_tests": 8,
+    "cargo_fmt": "passed",
+    "python_ast": "passed",
+    "native_fixture_fields": 11,
+    "native_fixture_extensions": 13,
+    "default_parallel_first_attempt": "702 passed, 6 failed, 1 ignored; SQLite锁冲突及超时；保留原日志",
+    "default_parallel_second_attempt": "完整776通过，3忽略"
+  },
+  "source_sha256": {
+    "src/tlsfp/tlsfp.rs": "c0b24e6934055d47230ce5587b0c30320107b1992b5e801be7257ce5f98180d8",
+    "craftls/rustls/src/craft/mod.rs": "19337ee9886dcbac1c7713d53ca8efea0ce37769e4843c2b745b61d3ce396432",
+    "craftls/rustls/src/client/tls13.rs": "37af814e04e13d05aea7347bfa52959768446055a941b38b146300014973468a",
+    "tests/fixtures/claude_code_293_tls.json": "7131077741b261a98d5346053c10ec949f043e232a746513373fc4e01bd9d94c",
+    "tests/fixtures/tls_clienthello.py": "80250e1323281173fd9a4518ebb8347b6003bcd710c1ee039b0e001f93900329",
+    "tests/fixtures/tls_fingerprint_server.py": "3a66837edcf328979e2efe92c648d97d3ab783c6586899dd4db7eebf5aaa4aa3"
+  },
+  "ja3": {
+    "fresh": "1523504b38f0fae0d881d4b6554aac1b",
+    "resumed": "ae5f2d34331c18f27df379f7d4b72e35"
+  },
+  "spec_update": {
+    "status": "written",
+    "file": ".trellis/spec/cc2api/protocol/claude-code-profile-upgrade.md"
+  },
+  "deployment": {
+    "status": "passed",
+    "release": "ci-40979130989-1",
+    "ci_run": 40979130989,
+    "ci_conclusion": "success",
+    "parent_revision": "d3f41fb635cde88c543a9a3c4d72f28680e1a3a9",
+    "gateway_revision": "71997e7562875dda35b00e2b267c7d6ccd1ed5f7",
+    "manifest_sha256": "1a2f0b0b78dae8612c5cb139ea3244101ebda640629b67b214ab76edd3b0e4ba",
+    "images": {
+      "control": {
+        "reference": "ghcr.io/silentflower/vibebench-v3-control:v3-ci-40979130989-1",
+        "digest": "sha256:afe3e61f3a3390aea718a6e5d2aaf13a973232ef16b7757d3c7b880922b6d067",
+        "config_digest": "sha256:afe3e61f3a3390aea718a6e5d2aaf13a973232ef16b7757d3c7b880922b6d067",
+        "platform": "linux/amd64",
+        "registry_digest": "sha256:ec30cfdde9f92f9232533e38f4d0975d1d25ef381dd491990a89b8e3a292382a"
+      },
+      "account": {
+        "reference": "ghcr.io/silentflower/vibebench-v3-account:v3-ci-40979130989-1",
+        "digest": "sha256:c402d8a5f1680376d550bc5f9c8c8c0082409740a78fe1c9372c3085b267f20d",
+        "config_digest": "sha256:c402d8a5f1680376d550bc5f9c8c8c0082409740a78fe1c9372c3085b267f20d",
+        "platform": "linux/amd64",
+        "registry_digest": "sha256:d4810e73b7e9b19c44c69ccc6a48203fe29a1e8ef0549696ee5bd383fe03fd60"
+      }
+    },
+    "formal_sender": {
+      "sender_binary_sha256": "7c3242d0731527d58b05e22c0c4b647c5ebadf9953fd8d02674bf29da16a5fd7",
+      "actual_image_id": "sha256:d4810e73b7e9b19c44c69ccc6a48203fe29a1e8ef0549696ee5bd383fe03fd60",
+      "actual_proxy_connect": true,
+      "independent_fingerprint": "matched",
+      "external_network": false,
+      "model_requests": 0
+    },
+    "formal_sender_fields": {
+      "legacy_version": 771,
+      "cipher_suites": [
+        4865,
+        4866,
+        4867,
+        49195,
+        49199,
+        49196,
+        49200,
+        52393,
+        52392,
+        49161,
+        49171,
+        49162,
+        49172,
+        156,
+        157,
+        47,
+        53
+      ],
+      "session_id_length": 32,
+      "compression_methods": [
+        0
+      ],
+      "signature_algorithms": [
+        1027,
+        2052,
+        1025,
+        1283,
+        2053,
+        1281,
+        2054,
+        1537,
+        513
+      ],
+      "supported_groups": [
+        4588,
+        29,
+        23,
+        24
+      ],
+      "supported_versions": [
+        772,
+        771
+      ],
+      "ec_point_formats": [
+        0
+      ],
+      "key_share": [
+        {
+          "group": 4588,
+          "key_exchange_length": 1216
+        },
+        {
+          "group": 29,
+          "key_exchange_length": 32
+        }
+      ],
+      "sni": "api.anthropic.com",
+      "alpn_protocols": [
+        {
+          "text": "http/1.1",
+          "base64": "aHR0cC8xLjE="
+        }
+      ],
+      "extensions": [
+        {
+          "type": 0,
+          "length": 22
+        },
+        {
+          "type": 23,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 65281,
+          "length": 1,
+          "public_payload_hex": "00"
+        },
+        {
+          "type": 10,
+          "length": 10
+        },
+        {
+          "type": 11,
+          "length": 2,
+          "public_payload_hex": "0100"
+        },
+        {
+          "type": 35,
+          "length": 0
+        },
+        {
+          "type": 16,
+          "length": 11
+        },
+        {
+          "type": 5,
+          "length": 5,
+          "public_payload_hex": "0100000000"
+        },
+        {
+          "type": 13,
+          "length": 20,
+          "public_payload_hex": "0012040308040401050308050501080606010201"
+        },
+        {
+          "type": 18,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 51,
+          "length": 1258
+        },
+        {
+          "type": 45,
+          "length": 2,
+          "public_payload_hex": "0101"
+        },
+        {
+          "type": 43,
+          "length": 5,
+          "public_payload_hex": "0403040303"
+        }
+      ],
+      "ja3": {
+        "string": "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49161-49171-49162-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43,4588-29-23-24,0",
+        "md5": "1523504b38f0fae0d881d4b6554aac1b"
+      }
+    },
+    "acceptance": {
+      "gateway_health": "healthy",
+      "runtime_source_hashes": "matched",
+      "projects_and_warmup_api": "passed",
+      "original_schedules_preserved": true,
+      "persistent_identity_preserved": true,
+      "requester_settings_preserved": true,
+      "database_integrity": "passed",
+      "legacy_services_unchanged": true,
+      "backup": false,
+      "resource_calculation": false
+    },
+    "model_probe_requests": 0,
+    "image_cleanup": {
+      "status": "passed",
+      "release": "ci-40979130989-1",
+      "removed_images": [],
+      "before": {
+        "total_bytes": 105582346240,
+        "free_bytes": 8588427264
+      },
+      "after": {
+        "total_bytes": 105582346240,
+        "free_bytes": 8588406784
+      },
+      "freed_bytes": -20480,
+      "protected_releases": [
+        "ci-40938273833-1",
+        "ci-40947973262-1",
+        "ci-40979130989-1"
+      ],
+      "original_containers_preserved": true,
+      "running_containers_preserved": true,
+      "deployment_unchanged": true
+    }
+  }
+}

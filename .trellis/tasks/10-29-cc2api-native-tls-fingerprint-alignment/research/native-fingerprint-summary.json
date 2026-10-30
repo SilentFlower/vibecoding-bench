@@ -1,0 +1,592 @@
+{
+  "schema": 1,
+  "version": "2.1.293",
+  "capture_sdk": "11.1.3",
+  "direction": "client_to_recorder",
+  "http_correlated_records": 58,
+  "profiles": {
+    "1523504b38f0fae0d881d4b6554aac1b": {
+      "count": 6,
+      "successful_messages": 151,
+      "fingerprint": {
+        "legacy_version": 771,
+        "cipher_suites": [
+          4865,
+          4866,
+          4867,
+          49195,
+          49199,
+          49196,
+          49200,
+          52393,
+          52392,
+          49161,
+          49171,
+          49162,
+          49172,
+          156,
+          157,
+          47,
+          53
+        ],
+        "signature_algorithms": [
+          1027,
+          2052,
+          1025,
+          1283,
+          2053,
+          1281,
+          2054,
+          1537,
+          513
+        ],
+        "supported_groups": [
+          4588,
+          29,
+          23,
+          24
+        ],
+        "supported_versions": [
+          772,
+          771
+        ],
+        "ec_point_formats": [
+          0
+        ],
+        "key_share": [
+          {
+            "group": 4588,
+            "key_exchange_length": 1216
+          },
+          {
+            "group": 29,
+            "key_exchange_length": 32
+          }
+        ],
+        "alpn_protocols": [
+          {
+            "text": "http/1.1",
+            "base64": "aHR0cC8xLjE="
+          }
+        ],
+        "ja3": {
+          "string": "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49161-49171-49162-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43,4588-29-23-24,0",
+          "md5": "1523504b38f0fae0d881d4b6554aac1b"
+        },
+        "session_id_length": 32,
+        "compression_methods": [
+          0
+        ]
+      },
+      "extension_layout": [
+        {
+          "type": 0,
+          "length": 22
+        },
+        {
+          "type": 23,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 65281,
+          "length": 1,
+          "public_payload_hex": "00"
+        },
+        {
+          "type": 10,
+          "length": 10
+        },
+        {
+          "type": 11,
+          "length": 2,
+          "public_payload_hex": "0100"
+        },
+        {
+          "type": 35,
+          "length": 0
+        },
+        {
+          "type": 16,
+          "length": 11
+        },
+        {
+          "type": 5,
+          "length": 5,
+          "public_payload_hex": "0100000000"
+        },
+        {
+          "type": 13,
+          "length": 20,
+          "public_payload_hex": "0012040308040401050308050501080606010201"
+        },
+        {
+          "type": 18,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 51,
+          "length": 1258
+        },
+        {
+          "type": 45,
+          "length": 2,
+          "public_payload_hex": "0101"
+        },
+        {
+          "type": 43,
+          "length": 5,
+          "public_payload_hex": "0403040303"
+        }
+      ],
+      "evidence_hashes": [
+        "23da4c75960efc1b23f4b7531df3dd65678008b5cb34eb6f59775d3795e88ed0",
+        "3ba2a7be4ec9653d3dcaf390ffac04433bf959c687b458040b918e9372f83896",
+        "e888c27876cc24ff5122aaf5295e57233f8d4fee6fff8f3cf1b241091df88414",
+        "d1d2cb8c499fc052713d4bb3c9e932864d07c70fc27b41d5419c782f50f08a8a",
+        "73405db409ce91b1e93fdf18f13d7f11ea28c909bee4e9b80b1bf39a119a7d13",
+        "f73a05f1872eb947db471c52cef69ea49f789bb3574e1365460676c13874751f"
+      ]
+    },
+    "5355e3851d76d069ab8a98fdb51cf1b4": {
+      "count": 33,
+      "successful_messages": 0,
+      "fingerprint": {
+        "legacy_version": 771,
+        "cipher_suites": [
+          4865,
+          4866,
+          4867,
+          49199,
+          49195,
+          49200,
+          49196,
+          49191,
+          52393,
+          52392,
+          49161,
+          49171,
+          49162,
+          49172,
+          156,
+          157,
+          47,
+          53
+        ],
+        "signature_algorithms": [
+          1027,
+          2052,
+          1025,
+          1283,
+          2053,
+          1281,
+          2054,
+          1537,
+          513
+        ],
+        "supported_groups": [
+          4588,
+          29,
+          23,
+          24
+        ],
+        "supported_versions": [
+          772,
+          771
+        ],
+        "ec_point_formats": [
+          0
+        ],
+        "key_share": [
+          {
+            "group": 4588,
+            "key_exchange_length": 1216
+          },
+          {
+            "group": 29,
+            "key_exchange_length": 32
+          }
+        ],
+        "alpn_protocols": null,
+        "ja3": {
+          "string": "771,4865-4866-4867-49199-49195-49200-49196-49191-52393-52392-49161-49171-49162-49172-156-157-47-53,0-23-65281-10-11-35-13-51-45-43,4588-29-23-24,0",
+          "md5": "5355e3851d76d069ab8a98fdb51cf1b4"
+        },
+        "session_id_length": 32,
+        "compression_methods": [
+          0
+        ]
+      },
+      "extension_layout": [
+        {
+          "type": 0,
+          "length": 22
+        },
+        {
+          "type": 23,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 65281,
+          "length": 1,
+          "public_payload_hex": "00"
+        },
+        {
+          "type": 10,
+          "length": 10
+        },
+        {
+          "type": 11,
+          "length": 2,
+          "public_payload_hex": "0100"
+        },
+        {
+          "type": 35,
+          "length": 0
+        },
+        {
+          "type": 13,
+          "length": 20,
+          "public_payload_hex": "0012040308040401050308050501080606010201"
+        },
+        {
+          "type": 51,
+          "length": 1258
+        },
+        {
+          "type": 45,
+          "length": 2,
+          "public_payload_hex": "0101"
+        },
+        {
+          "type": 43,
+          "length": 5,
+          "public_payload_hex": "0403040303"
+        }
+      ],
+      "evidence_hashes": [
+        "0b3c3dea9a5e5668ae60bba7bc45fe4fba5c34dc572694e115d7a9d8cb5fa2dd",
+        "e3908dc2bd95ccfa1a8afcef456b5f492180c7d4a0fdf49acb25f05fbcd7211a",
+        "c5e27c2e5e7990f419fc1392c45b1e6380eba967450e225abc68d3bcf7e28550",
+        "ef9141e650f5356ca98cc87a802adcc06428f4659e7da90850d263dd5e28ccf9",
+        "63ef674b7ad2e06e7057c7ad5bcc936e557d0f91a1e26d23ee5de5fca68f554f",
+        "9872c8ea5af726aa4e01ba0cd91d23f15b1cd21f4a76fc5c83b857bf2a37bec5",
+        "8487a7599784e78c7dd23f927958b2ed9baccd4bb746a59e796cf6b5cb0310c6",
+        "b207ba88623db3809dbb0f1828ceafdf7b2519ba6d1e1f42a5aaf8d097ac1a74",
+        "c35976c92dc917187daecff7928d1e99c7fbd3e71fac433453fe2e51d6e1070b",
+        "8fdfdda221f0d5a45590f272db30d9f596d18c95ade5cb531c588db88eb349aa",
+        "0d7570ca35adaf9ade42d1383eee973748abd612131e3ba72d2096071872c526",
+        "56f025811a29778001d807d5ac15136664b3ea033620c65c71c7b90f03ac850b",
+        "c5f02982f5cdf7df6352c44d120113b33943f723302224e154ba98cb2a928c5a",
+        "516cd8b0d968840a19e74f234d0db3cb301c523aa8210bf0a9ccdbcbc005d59d",
+        "e1f1d10ae8e352ef44f94d9d92a0762386851925db085c9c4d084c94a72741eb",
+        "eac278a400353767772c8fb609d242bdbbd563c5096097e1338fde32d1a3fad4",
+        "83ddbfc6a9a2e97b1a398629a85e53098ef9234becb9253e93bccb8df5242ccc",
+        "ee34a1bca2f79c5b686ebc18162ebe1c894b6634950716353923ac3a80fe1ce8",
+        "59c206eeac76a03d975f31357809eb00cab81fb6a6436aee1b7ca53a368f773c",
+        "58fd1a7290abc3788b5e32afd2e79026d7f34adac02027b19cccf3b66b3c9f76",
+        "563204fcb06c3e63a198ad4f32ab86bc45450ffffedb5342c5d20fa7828e1bbf",
+        "df48f3e2dc1fec0a3c2ebfdc885258742f04da05e115bd1f5e1f042899a5d8df",
+        "047db60d0e2774aa5327ac42154030c1bcb55ddfcc167ad4ae9514153e7b6ec7",
+        "6e326099d902326235b8a3a78ca1cd05b5fbb6e07885ad69ccaf39299306bae0",
+        "8d14323e33d69be8e09065a3721906985866f03d2093279df3000bf06e242599",
+        "0e46c3a4237eda3ca429d80d9bdce4a68714bb926a49cb7eb24b5197d6c92eb8",
+        "3620a3d0bc7d15e9ea76f0ddf032d098ae4d1fead13fdbad65355a17aa0a001e",
+        "4507928b3dc9ff4966f7209a3a3c7acfbd05612d6c3f343db1df0a4c85daf652",
+        "5e7e9f20e22363d608a74759e0fe7bb4ca23477dd7cad1fd8022763e379fbc0b",
+        "aa454080aa8bf9e83f878400a68c6c34cd6c84cc819d7c474c6191f973b416e1",
+        "61717f54c76df6350d64fb1944a01e170a3dc5a8398e5cdfe119a025eac87df9",
+        "f4729a41c8fc30fb306fae4515a9a86b614feb1c091abad340778bbb2549e388",
+        "b16f0a0960a0f25a8262e17db51b7eeaffabd0c9fa3fa4cafd711988b40b7e5f"
+      ]
+    },
+    "f692ab6e3ffc6d9558b71841ac52ee67": {
+      "count": 13,
+      "successful_messages": 0,
+      "fingerprint": {
+        "legacy_version": 771,
+        "cipher_suites": [
+          4865,
+          4866,
+          4867,
+          49199,
+          49195,
+          49200,
+          49196,
+          49191,
+          52393,
+          52392,
+          49161,
+          49171,
+          49162,
+          49172,
+          156,
+          157,
+          47,
+          53
+        ],
+        "signature_algorithms": [
+          1027,
+          2052,
+          1025,
+          1283,
+          2053,
+          1281,
+          2054,
+          1537,
+          513
+        ],
+        "supported_groups": [
+          4588,
+          29,
+          23,
+          24
+        ],
+        "supported_versions": [
+          772,
+          771
+        ],
+        "ec_point_formats": [
+          0
+        ],
+        "key_share": [
+          {
+            "group": 4588,
+            "key_exchange_length": 1216
+          },
+          {
+            "group": 29,
+            "key_exchange_length": 32
+          }
+        ],
+        "alpn_protocols": null,
+        "ja3": {
+          "string": "771,4865-4866-4867-49199-49195-49200-49196-49191-52393-52392-49161-49171-49162-49172-156-157-47-53,0-23-65281-10-11-35-13-51-45-43-41,4588-29-23-24,0",
+          "md5": "f692ab6e3ffc6d9558b71841ac52ee67"
+        },
+        "session_id_length": 32,
+        "compression_methods": [
+          0
+        ]
+      },
+      "extension_layout": [
+        {
+          "type": 0,
+          "length": 22
+        },
+        {
+          "type": 23,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 65281,
+          "length": 1,
+          "public_payload_hex": "00"
+        },
+        {
+          "type": 10,
+          "length": 10
+        },
+        {
+          "type": 11,
+          "length": 2,
+          "public_payload_hex": "0100"
+        },
+        {
+          "type": 35,
+          "length": 0
+        },
+        {
+          "type": 13,
+          "length": 20,
+          "public_payload_hex": "0012040308040401050308050501080606010201"
+        },
+        {
+          "type": 51,
+          "length": 1258
+        },
+        {
+          "type": 45,
+          "length": 2,
+          "public_payload_hex": "0101"
+        },
+        {
+          "type": 43,
+          "length": 5,
+          "public_payload_hex": "0403040303"
+        },
+        {
+          "type": 41,
+          "length": 267
+        }
+      ],
+      "evidence_hashes": [
+        "061390f8625bfb76a102c6a1acd87258e0aaf78a1db0e72471bc061d095881af",
+        "dbb7e8811c8e160f3705de06ea226a3d235cd0bb25ffbbed355f126bc83efc45",
+        "0ae6fc90c99a9b6fde4cca0bc87eec7b39d5a7c4a33829a567867a0f2ebbe64a",
+        "905264d7eeefae32fcd289ef9fb17b707f9b597a3008876d23aa3b17f1e10501",
+        "b26abd0fd8e007581222dbffaf849cd0dc6e623fe2dee6646ddd23f87fa086d4",
+        "464a132ee2423d2a8d84977adcd07c78915127430ea897c5043000adeaefb094",
+        "bdeffd5b8385e3400c6f06abf18bc70964fd4e2010ea7b9402aa9a094947b243",
+        "8ab705ec20ecaf0123719f245e951efa97807b72e4c3fc0b8dc6a90816f2df3e",
+        "66d4d7a78dd8ce383bb6d90d845d4aa71cb1290b4e8cd6134c59d70b7de0140a",
+        "3adf134a4fff61729b055c28c4b2171264ddde4bf4aa8ff09c1d8a5b3e03dbca",
+        "678dbf0530218161a35d4af3864be52cd9d538afb6dd76376a70b2e20901aff8",
+        "0337a86eecf1787aee4285c5fb8ecd97c9878954eef39dcdf55c37beb5d72021",
+        "2dbb9dfa31a083910687a2bfe4f2f96d4e96f55f40654b379e31b5a280eed199"
+      ]
+    },
+    "ae5f2d34331c18f27df379f7d4b72e35": {
+      "count": 6,
+      "successful_messages": 6,
+      "fingerprint": {
+        "legacy_version": 771,
+        "cipher_suites": [
+          4865,
+          4866,
+          4867,
+          49195,
+          49199,
+          49196,
+          49200,
+          52393,
+          52392,
+          49161,
+          49171,
+          49162,
+          49172,
+          156,
+          157,
+          47,
+          53
+        ],
+        "signature_algorithms": [
+          1027,
+          2052,
+          1025,
+          1283,
+          2053,
+          1281,
+          2054,
+          1537,
+          513
+        ],
+        "supported_groups": [
+          4588,
+          29,
+          23,
+          24
+        ],
+        "supported_versions": [
+          772,
+          771
+        ],
+        "ec_point_formats": [
+          0
+        ],
+        "key_share": [
+          {
+            "group": 4588,
+            "key_exchange_length": 1216
+          },
+          {
+            "group": 29,
+            "key_exchange_length": 32
+          }
+        ],
+        "alpn_protocols": [
+          {
+            "text": "http/1.1",
+            "base64": "aHR0cC8xLjE="
+          }
+        ],
+        "ja3": {
+          "string": "771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49161-49171-49162-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43-41,4588-29-23-24,0",
+          "md5": "ae5f2d34331c18f27df379f7d4b72e35"
+        },
+        "session_id_length": 32,
+        "compression_methods": [
+          0
+        ]
+      },
+      "extension_layout": [
+        {
+          "type": 0,
+          "length": 22
+        },
+        {
+          "type": 23,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 65281,
+          "length": 1,
+          "public_payload_hex": "00"
+        },
+        {
+          "type": 10,
+          "length": 10
+        },
+        {
+          "type": 11,
+          "length": 2,
+          "public_payload_hex": "0100"
+        },
+        {
+          "type": 35,
+          "length": 0
+        },
+        {
+          "type": 16,
+          "length": 11
+        },
+        {
+          "type": 5,
+          "length": 5,
+          "public_payload_hex": "0100000000"
+        },
+        {
+          "type": 13,
+          "length": 20,
+          "public_payload_hex": "0012040308040401050308050501080606010201"
+        },
+        {
+          "type": 18,
+          "length": 0,
+          "public_payload_hex": ""
+        },
+        {
+          "type": 51,
+          "length": 1258
+        },
+        {
+          "type": 45,
+          "length": 2,
+          "public_payload_hex": "0101"
+        },
+        {
+          "type": 43,
+          "length": 5,
+          "public_payload_hex": "0403040303"
+        },
+        {
+          "type": 41,
+          "length": 267
+        }
+      ],
+      "evidence_hashes": [
+        "7c3a43e5729c51c9969ddf3c3c43c5f17457fec151dcb173d42aacff7e8e640f",
+        "14c469f1e265e5d99dbd27c3c9183a7a9e73eba017885ab717b1bb8d0a48a169",
+        "187df0ebe25d98d9d65f1f6a40771308984f5a2607904bf01f71b26f28517366",
+        "100e09187cea2b90f3459736c9a724c10877b88cd196fcda2cadc4ecbf611674",
+        "ca202ba36990e05702203f3460a5253c5e90d3a45fe091ae29af466ee0ca8957",
+        "e730749940f0510f41eece07f220e2226ec768081e6157b43e92fe71b11f5b9c"
+      ]
+    }
+  },
+  "redaction": "仅数值字段、公开扩展和摘要；不含raw、票据、身份、正文或私有路径"
+}
