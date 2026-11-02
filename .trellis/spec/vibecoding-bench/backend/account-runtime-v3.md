@@ -414,6 +414,7 @@ CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt,
 
 - 官方 2.1.293 经无外网实际请求验证：`metadata.user_id.device_id` 等于 `.claude.json.userID`，与独立 `machineID` 区分。只有该精确版本开放本地来源；新版本须另做隔离验证，不根据同名字段猜测。
 - 固定 HOME 的 userID 必须为 64 位小写 hex，账号 UUID 必须非空且与管理 profile 一致。不能生成新设备、只按邮箱匹配或回退 Linux machine-id。已完成登录无需额外模型任务或完整抓包。
+- 外部既有 profile 迁入新固定环境时，`identity_import` 只 ensure 并读取身份，不替代登录对 HOME 的初始化。只允许对本次新建、未绑定且无任务历史的环境在空闲停止后创建缺失的 `home/.claude.json` 与 `home/.claude/.credentials.json`，保留原 userID/UUID；已有内容不匹配时拒绝覆盖。随后仍经正式创建/关联校验，绑定后三份运行快照只保留 AT。不能为让校验通过而生成新设备或削弱冲突检查。
 - 已有 `runtime/identity.json` 的 JSON、来源、冲突标记、设备格式及账号归属均须校验；已验证版本的本地设备与旧观察不同仍阻止同步，不能覆盖证据。未知版本只接受已有正式请求观察。
 - 同步按 owner → profile → environment 锁序读取；环境 GET 尝试非阻塞取得同序锁，维护时返回待核对状态，不创建／唤醒环境、不生成证据文件。身份状态必须反映实际校验，不只检查文件存在。
 - cc2api 仍要求内部服务证明及合法环境；本地来源必须与 canonical_env.version 和 version_base 均为 2.1.293 精确匹配。已有设备不自动替换。
@@ -424,6 +425,7 @@ CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt,
 | 条件 | 结果 |
 |---|---|
 | 2.1.293 登录产物齐全，无任务／无 Recorder 文件 | 可导出原设备并同步 |
+| 只有管理 profile、固定 HOME 登录文件缺失 | 409；新建空环境按迁移前置初始化，已有环境拒绝盲目覆盖 |
 | userID 缺失／类型错误／非 64 位小写 hex，或 UUID 不符 | 409，准确错误，不替代身份 |
 | 历史观察损坏、未知来源、冲突或账号不符 | 409，保留原观察 |
 | 未验证版本且无请求观察 | 409，提示版本身份来源未验证 |
@@ -433,6 +435,7 @@ CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt,
 ### 5. Scenarios and Examples
 
 - 正常：官方 2.1.293 登录后按原生 TLS 模式显式创建或关联，cc2api 保存同一 userID；旧 sync API 保持兼容，已绑定重授权更新原账号凭据。
+- 迁移：先关闭源调度/刷新入口并完成锁屏障，再把最终权威登录态与原 CLI 身份放入目标 profile；新建空 HOME 补齐必要文件后走正式绑定。旧任务、会话和工作目录不随账号迁入。
 - 基础：未绑定账号重授权仅保存本地，页面明确尚未关联；未知版本有历史请求观察时沿用旧来源。
 - 错误用法：为了补身份让用户反复跑普通任务，或直接用 machineID 兜底。正确处理：对已验证版本读取官方持久 userID，并保留所有冲突保护。
 
@@ -441,6 +444,7 @@ CLI payload: device_id, environment_id, source, canonical_env, canonical_prompt,
 - `test_account_runtime.py`：无任务／无抓包导出、缺失及错误类型、UUID 不符、损坏／冲突观察、未知版本、GET 不唤醒及维护锁释放。
 - `verify_cli_quota.py`：真实官方 2.1.293、不同的合成 userID／machineID、两条本地请求身份相符；采集前后请求完全一致且零 usage，Docker network=none。
 - `verify_reauth_stack.py`：空 runs 表、无 identity.json，经正式同步 API 创建及绑定后核对网关 device_id；真实页面重授权后检查两端 DB、profile、AT-only HOME、回执、原账号／设备／策略和可见结果提示。
+- 既有登录态迁移验收：读取源版本真实 DTO；resolve 的有效期必须满足该版 handler（当前 60–7200 秒），不能把参数校验返回的 400 当作刷新锁屏障。核对停用后的锁内 inactive、唯一所有者、原身份/代理/策略、三份 AT-only、原生用户可读与 API Token 范围复原；不运行真实模型压力探针。
 - `test_login_drafts.py` 与 `verify_login_drafts.py`：未绑定提交返回明确 false/null，页面显示仅本地保存。官方 CLI 实证与合成成功链分别报告，不以替身冒充官方验证。
 
 ## Scenario: v3 独立账号动作、真实进程指标与完整转发验收
