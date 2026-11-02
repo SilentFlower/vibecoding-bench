@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "US 生产运行环境、迁移交接、镜像保护与严格资源释放契约"}
+{"file": ".trellis/spec/cc2api/deploy/deploy-guidelines.md", "reason": "旧服务 Compose、端口和数据卷所有权"}

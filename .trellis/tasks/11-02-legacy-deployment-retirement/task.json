@@ -1,0 +1,43 @@
+{
+  "id": "legacy-deployment-retirement",
+  "name": "legacy-deployment-retirement",
+  "title": "旧版退役：迁移验收后删除旧服务、镜像与挂载数据",
+  "description": "9-17迁移验收及消费者切换后，按用户明确授权永久删除旧版两服务、无引用旧镜像、旧data目录与网关卷，不归档。",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-02",
+  "completedAt": null,
+  "closeout": {
+    "status": "pending",
+    "closedAt": null,
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-02-claude-ultra-account-migration",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-02T17:51:34.524291+00:00",
+    "completedSteps": [
+      "9-17迁移收据与当前目标健康已验证",
+      "NewAPI渠道80等价切流且旧入口引用为零",
+      "冻结2容器、70路径、1卷、8镜像及v3保护集",
+      "来源配置与退役规范已提交推送"
+    ],
+    "partialStep": "Worker生产部署、旧Secret移除与物理退役尚未执行",
+    "nextStep": "部署Worker后完成精确删除和生产复核",
+    "notes": "无旧数据或凭据归档；任务保持in_progress。"
+  }
+}
