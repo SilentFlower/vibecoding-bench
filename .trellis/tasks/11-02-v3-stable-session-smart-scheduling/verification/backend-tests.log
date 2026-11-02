@@ -1,0 +1,1388 @@
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/lib.rs:242:11
+    |
+242 | #[cfg(all(feature = "http3", not(reqwest_unstable)))]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition name: `reqwest_unstable`
+   --> vendor/reqwest-0.12.4/src/lib.rs:242:34
+    |
+242 | #[cfg(all(feature = "http3", not(reqwest_unstable)))]
+    |                                  ^^^^^^^^^^^^^^^^
+    |
+    = help: expected names are: `docsrs`, `feature`, and `test` and 31 more
+    = help: consider using a Cargo feature instead
+    = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+             [lints.rust]
+             unexpected_cfgs = { level = "warn", check-cfg = ['cfg(reqwest_unstable)'] }
+    = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(reqwest_unstable)");` to the top of the `build.rs`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+ --> vendor/reqwest-0.12.4/src/async_impl/h3_client/mod.rs:1:8
+  |
+1 | #![cfg(feature = "http3")]
+  |        ^^^^^^^^^^-------
+  |                  |
+  |                  help: there is a expected value with a similar name: `"http2"`
+  |
+  = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+  = help: consider adding `http3` as a feature in `Cargo.toml`
+  = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:30:7
+   |
+30 | #[cfg(feature = "http3")]
+   |       ^^^^^^^^^^-------
+   |                 |
+   |                 help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:32:7
+   |
+32 | #[cfg(feature = "http3")]
+   |       ^^^^^^^^^^-------
+   |                 |
+   |                 help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:51:7
+   |
+51 | #[cfg(feature = "http3")]
+   |       ^^^^^^^^^^-------
+   |                 |
+   |                 help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:53:7
+   |
+53 | #[cfg(feature = "http3")]
+   |       ^^^^^^^^^^-------
+   |                 |
+   |                 help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:86:11
+   |
+86 |     #[cfg(feature = "http3")]
+   |           ^^^^^^^^^^-------
+   |                     |
+   |                     help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:159:11
+    |
+159 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:161:11
+    |
+161 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:163:11
+    |
+163 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:165:11
+    |
+165 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:167:11
+    |
+167 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1204:11
+     |
+1204 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1800:11
+     |
+1800 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1812:11
+     |
+1812 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1825:11
+     |
+1825 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1838:11
+     |
+1838 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1850:11
+     |
+1850 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:258:23
+    |
+258 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:260:23
+    |
+260 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:262:23
+    |
+262 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:264:23
+    |
+264 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:266:23
+    |
+266 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:293:15
+    |
+293 |         #[cfg(feature = "http3")]
+    |               ^^^^^^^^^^-------
+    |                         |
+    |                         help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:321:23
+    |
+321 |             #[cfg(all(feature = "http3", feature = "__rustls"))]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:472:27
+    |
+472 |                     #[cfg(feature = "http3")]
+    |                           ^^^^^^^^^^-------
+    |                                     |
+    |                                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:611:27
+    |
+611 |                     #[cfg(feature = "http3")]
+    |                           ^^^^^^^^^^-------
+    |                                     |
+    |                                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:598:31
+    |
+598 |                         #[cfg(feature = "http3")]
+    |                               ^^^^^^^^^^-------
+    |                                         |
+    |                                         help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:734:23
+    |
+734 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2031:19
+     |
+2031 |             #[cfg(feature = "http3")]
+     |                   ^^^^^^^^^^-------
+     |                             |
+     |                             help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2264:15
+     |
+2264 |         #[cfg(feature = "http3")]
+     |               ^^^^^^^^^^-------
+     |                         |
+     |                         help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2279:11
+     |
+2279 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2366:11
+     |
+2366 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2554:23
+     |
+2554 |                 #[cfg(feature = "http3")]
+     |                       ^^^^^^^^^^-------
+     |                                 |
+     |                                 help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2681:43
+     |
+2681 | ...                   #[cfg(feature = "http3")]
+     |                             ^^^^^^^^^^-------
+     |                                       |
+     |                                       help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/tls.rs:505:48
+    |
+505 |         #[cfg(all(feature = "default-tls", not(feature = "http3")))]
+    |                                                ^^^^^^^^^^-------
+    |                                                          |
+    |                                                          help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/tls.rs:512:13
+    |
+512 |             feature = "http3"
+    |             ^^^^^^^^^^-------
+    |                       |
+    |                       help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: function `into_io` is never used
+   --> vendor/reqwest-0.12.4/src/error.rs:290:15
+    |
+290 | pub(crate) fn into_io(e: BoxError) -> io::Error {
+    |               ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: type alias `PeekableIoStream` is never used
+  --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:77:6
+   |
+77 | type PeekableIoStream = Peekable<IoStream>;
+   |      ^^^^^^^^^^^^^^^^
+
+warning: struct `Pending` is never constructed
+   --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:118:8
+    |
+118 | struct Pending(PeekableIoStream, DecoderType);
+    |        ^^^^^^^
+
+warning: struct `IoStream` is never constructed
+   --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:120:19
+    |
+120 | pub(crate) struct IoStream<B = ResponseBody>(B);
+    |                   ^^^^^^^^
+
+warning: enum `DecoderType` is never used
+   --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:122:6
+    |
+122 | enum DecoderType {
+    |      ^^^^^^^^^^^
+
+warning: function `empty` is never used
+   --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:379:4
+    |
+379 | fn empty() -> ResponseBody {
+    |    ^^^^^
+
+warning: `reqwest` (lib) generated 44 warnings
+   Compiling claude-code-gateway v1.6.0 (/root/project/vibecoding-bench/cc2api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 42.54s
+warning: the following packages contain code that will be rejected by a future version of Rust: redis v0.25.4, sqlx-postgres v0.7.4
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/lib.rs (target/debug/deps/claude_code_gateway-5a5201ff8e8c4589)
+
+running 728 tests
+test handler::router::tests::context_sanitizer_mode_accepts_only_known_values ... ok
+test handler::router::tests::cli_identity_sources_require_verified_version ... ok
+test handler::router::tests::hello_get_returns_capture_compatible_json ... ok
+test handler::router::tests::model_id_list_allows_empty_and_valid_ids ... ok
+test handler::router::tests::hello_head_returns_length_without_body ... ok
+test handler::router::tests::model_id_list_rejects_unsafe_chars ... ok
+test handler::router::tests::oauth_credential_validity_uses_default_and_rejects_out_of_range ... ok
+test handler::router::tests::cli_identity_import_requires_internal_service_proof ... ok
+test handler::router::tests::assembled_router_keeps_hello_public_and_fallback_authenticated ... ok
+test handler::router::tests::settings_return_cli_bg_status_classifier_default ... ok
+test handler::router::tests::settings_reject_invalid_cli_bg_status_classifier_models ... ok
+test handler::router::tests::diagnostics_routes_require_admin_and_expose_committed_requests ... ok
+test handler::router::tests::settings_return_fable_weekly_usage_limit_default ... ok
+test handler::router::tests::account_list_reports_base_version_and_effective_profile_configuration ... ok
+test handler::router::tests::accounts_list_exposes_both_usage_windows_without_triggering_usage_refresh ... ok
+test handler::router::tests::settings_message_top_field_filter_rejects_invalid_values_atomically ... ok
+test model::identity::tests::account_and_device_fallback_ids_are_stable ... ok
+test model::identity::tests::generated_identity_uses_consistent_profile ... ok
+test model::identity::tests::legacy_env_and_process_are_normalized_without_storage_writeback ... ok
+test model::identity::tests::normalize_env_aligns_legacy_false_bun_to_current_profile ... ok
+test model::identity::tests::observed_cli_process_keeps_unknown_metrics_out_of_telemetry ... ok
+test model::identity::tests::profile_presets_are_platform_consistent ... ok
+test model::identity::tests::run_profile_and_process_snapshot_are_stable_and_bounded ... ok
+test handler::router::tests::scheduling_settings_merge_validate_and_apply_atomically ... ok
+test service::access_policy::tests::access_policy_error_response_uses_standard_error_object ... ok
+test service::access_policy::tests::blocked_version_validation_reports_blocked_setting ... ok
+test model::identity::tests::same_second_profile_runs_are_distinct_without_splitting_device_identity ... ok
+test service::access_policy::tests::blocked_versions_apply_when_allowed_versions_are_empty ... ok
+test service::access_policy::tests::blocked_versions_do_not_apply_to_non_claude_user_agents ... ok
+test service::access_policy::tests::blocked_versions_reject_exact_range_and_wildcard ... ok
+test service::access_policy::tests::blocked_versions_take_priority_over_allowed_versions ... ok
+test service::access_policy::tests::claude_code_version_rejection_keeps_allowed_range ... ok
+test service::access_policy::tests::default_policy_allows_configured_claude_code_range ... ok
+test service::access_policy::tests::empty_policy_keeps_backward_compatibility ... ok
+test service::access_policy::tests::ua_patterns_only_apply_to_non_claude_code_clients ... ok
+test service::access_policy::tests::rejected_non_claude_user_agent_response_hides_allowed_patterns ... ok
+test service::access_policy::tests::version_range_validation_rejects_reversed_range ... ok
+test service::access_policy::tests::wildcard_version_rules_match_numeric_prefix ... ok
+test service::account::tests::account_queue_mixed_requests_use_internal_units ... ok
+test handler::router::tests::scheduling_routes_are_admin_only_bounded_and_read_only ... ok
+test handler::router::tests::settings_message_top_field_filter_normalizes_get_and_hot_reloads_put ... ok
+test service::account::tests::account_queue_regular_request_uses_full_standard_slot ... ok
+test service::account::tests::account_queue_two_haiku_requests_share_one_standard_slot ... ok
+test service::account::tests::account_queue_waiting_capacity_stays_request_count_based ... ok
+test service::account::tests::allowed_rollover_accepts_usage_that_dropped_in_new_period ... ok
+test service::account::tests::allowed_rollover_clears_stale_high_usage_for_all_passive_windows ... ok
+test service::account::tests::cancelled_runtime_gate_wait_releases_capacity_and_load ... ok
+test service::account::tests::check_window_above_threshold_returns_some ... ok
+test service::account::tests::account_queue_shrink_does_not_cancel_existing_requests ... ok
+test service::account::tests::check_window_at_threshold_returns_some ... ok
+test service::account::tests::check_window_below_threshold_returns_none ... ok
+test service::account::tests::check_window_integer_utilization_works ... ok
+test service::account::tests::check_window_invalid_rfc3339_returns_none ... ok
+test service::account::tests::check_window_missing_key_returns_none ... ok
+test service::account::tests::check_window_missing_resets_at_returns_none ... ok
+test service::account::tests::check_window_missing_utilization_returns_none ... ok
+test service::account::tests::check_window_null_utilization_returns_none ... ok
+test service::account::tests::check_window_past_time_returns_none ... ok
+test service::account::tests::check_window_returns_parsed_reset_at ... ok
+test service::account::tests::check_window_string_utilization_returns_none ... ok
+test service::account::tests::classify_all_below_threshold_returns_none ... ok
+test service::account::tests::classify_both_hit_prioritizes_seven_day ... ok
+test service::account::tests::classify_boundary_at_exactly_97 ... ok
+test service::account::tests::classify_boundary_just_below_97 ... ok
+test service::account::tests::classify_empty_usage_returns_none ... ok
+test service::account::tests::classify_invalid_json_structure_returns_none ... ok
+test service::account::tests::classify_only_five_hour_hit_returns_five_hour ... ok
+test service::account::tests::classify_only_seven_day_hit_returns_seven_day ... ok
+test service::account::tests::classify_only_sonnet_hit_is_ignored ... ok
+test service::account::tests::classify_seven_day_expired_reset_falls_through_to_five_hour ... ok
+test service::account::tests::classify_threshold_config_is_honored ... ok
+test service::account::tests::closed_runtime_gate_preserves_queue_capacity_and_waiting_load ... ok
+test service::account::tests::account_queue_keeps_fifo_when_head_needs_two_units ... ok
+test service::account::tests::credit_429_passes_through_without_backoff_or_quarantine ... ok
+test service::account::tests::current_allowed_windows_do_not_fall_back_to_stale_cached_quota ... ok
+test service::account::tests::fable_429_keeps_common_usage_quarantine_when_common_window_hit ... ok
+test service::account::tests::fable_429_with_cached_fable_quota_hit_retries_other_account_before_credit_passthrough ... ok
+test service::account::tests::fable_429_with_retry_after_stays_model_scoped ... ok
+test service::account::tests::fable_429_without_cached_quota_hit_still_retries_other_account ... ok
+test service::account::tests::fable_quota_model_ids_include_5_and_5_1_only ... ok
+test service::account::tests::fable_weekly_usage_limit_uses_configured_threshold ... ok
+test service::account::tests::five_hour_window_uses_later_retry_after_deadline ... ok
+test handler::router::tests::settings_return_session_hello_probe_defaults ... ok
+test handler::router::tests::settings_update_hot_reloads_fable_weekly_usage_limit ... ok
+test handler::router::tests::settings_update_hot_reloads_cli_bg_status_classifier_mode ... ok
+test service::account::tests::oauth_credential_snapshot_rejects_insufficient_final_validity ... ok
+test service::account::tests::rejected_rollover_only_keeps_explicitly_rejected_windows ... ok
+test service::account::tests::rejected_usage_filters_allowed_windows_for_rate_limit_classification ... ok
+test handler::router::tests::settings_update_hot_reloads_session_hello_probe_config ... ok
+test handler::router::tests::target_profile_settings_round_trip_and_invalid_rule_is_atomic ... ok
+test handler::router::tests::usage_limits_admin_rejects_invalid_values_before_any_write ... ok
+test handler::router::tests::usage_limits_bench_creation_and_partial_update_are_compatible ... ok
+test service::account::tests::same_period_follow_up_usage_is_accepted ... ok
+test service::account::tests::setup_token_fable_429_keeps_legacy_credit_passthrough ... ok
+test service::account::tests::setup_token_never_reaches_fable_weekly_usage_limit ... ok
+test service::account::tests::seven_day_window_is_not_truncated_by_retry_after_cap ... ok
+test service::account::tests::tiered_decay_boundary_values ... ok
+test service::account::tests::tiered_decay_high_ratio ... ok
+test service::account::tests::tiered_decay_low_ratio ... ok
+test service::account::tests::tiered_decay_mid_range ... ok
+test service::account::tests::transient_429_uses_request_backoff_without_account_quarantine ... ok
+test handler::router::tests::settings_selection_mode_validates_and_hot_reloads_with_default_profile ... ok
+test handler::router::tests::settings_reject_invalid_cli_bg_status_classifier_mode ... ok
+test handler::router::tests::settings_reject_session_hello_probe_ranges ... ok
+test service::account::tests::unknown_retry_after_remains_capped_at_five_hours ... ok
+test handler::router::tests::settings_reject_invalid_cli_bg_status_classifier_identity_injection_flag ... ok
+test service::diagnostics::tests::diagnostics_buffered_compression_uses_the_same_event_observer ... ok
+test service::diagnostics::tests::diagnostics_cover_early_cancellation_and_unavailable_storage ... ok
+test service::diagnostics::tests::diagnostics_preserve_bytes_and_correlate_anonymous_sessions ... ok
+test handler::router::tests::settings_reject_invalid_fable_weekly_usage_limits ... ok
+test service::diagnostics::tests::diagnostics_record_stream_errors_and_cancellation_once ... ok
+test service::diagnostics::tests::diagnostics_report_observation_failures_without_changing_bytes ... ok
+test service::account::tests::account_score_info_uses_internal_units_for_concurrency_load ... ok
+test service::account::tests::create_account_uses_selected_claude_code_profile ... ok
+test service::account::tests::cli_process_import_preserves_credentials_and_rejects_wrong_identity ... ok
+test service::gateway::tests::assistant_prefill_intercept_body_uses_stable_error_code ... ok
+test service::gateway::tests::assistant_prefill_intercept_ignores_disabled_unmatched_or_last_user ... ok
+test service::gateway::tests::assistant_prefill_intercept_matches_enabled_model_and_last_assistant ... ok
+test service::gateway::tests::auto_mode_classifier_detects_protocol_from_post_transcript_instruction ... ok
+test service::gateway::tests::auto_mode_classifier_detects_severity_stage1 ... ok
+test service::gateway::tests::auto_mode_classifier_detects_severity_stage2 ... ok
+test service::gateway::tests::auto_mode_classifier_detects_stage1_by_stop_sequence_without_suffix ... ok
+test service::gateway::tests::auto_mode_classifier_detects_stage1_by_xml_suffix ... ok
+test service::gateway::tests::auto_mode_classifier_detects_stage1_in_thinking_padding_range ... ok
+test service::gateway::tests::auto_mode_classifier_detects_stage2_by_xml_suffix ... ok
+test service::gateway::tests::auto_mode_classifier_detects_stage2_even_with_stop_sequence ... ok
+test service::gateway::tests::auto_mode_classifier_detects_stage2_without_exact_suffix ... ok
+test service::gateway::tests::auto_mode_classifier_error_response_uses_standard_error_object ... ok
+test service::gateway::tests::auto_mode_classifier_ignores_conflicting_trusted_protocol_markers ... ok
+test service::gateway::tests::auto_mode_classifier_ignores_numeric_lookalikes_without_suffix ... ok
+test service::gateway::tests::auto_mode_classifier_ignores_protocol_markers_only_inside_transcript ... ok
+test service::gateway::tests::auto_mode_classifier_ignores_stage1_above_padding_range ... ok
+test service::gateway::tests::auto_mode_classifier_mock_allow_returns_parseable_allow_block ... ok
+test service::gateway::tests::auto_mode_classifier_mock_allow_returns_parseable_severity ... ok
+test service::gateway::tests::auto_mode_classifier_mock_block_returns_parseable_block_reason ... ok
+test service::gateway::tests::auto_mode_classifier_mock_block_returns_parseable_severity ... ok
+test service::gateway::tests::auto_mode_classifier_uses_block_protocol_when_transcript_mentions_severity ... ok
+test service::gateway::tests::auto_mode_classifier_uses_severity_protocol_when_transcript_mentions_block ... ok
+test service::gateway::tests::bootstrap_patch_21257_uses_fable_5_1_sorrel_and_new_cedar_basin ... ok
+test service::gateway::tests::bootstrap_patch_21257_uses_marigold_for_fable_5 ... ok
+test service::gateway::tests::bootstrap_patch_21260_uses_exact_model_cwk_mapping ... ok
+test service::gateway::tests::bootstrap_patch_21280_uses_exact_model_cwk_mapping ... ok
+test service::gateway::tests::bootstrap_patch_configured_injects_fable_capture_shape ... ok
+test service::gateway::tests::bootstrap_patch_configured_uses_belladonna_for_opus_5 ... ok
+test service::gateway::tests::bootstrap_patch_hide_fable_preserves_opus_belladonna ... ok
+test service::gateway::tests::bootstrap_patch_hide_fable_removes_model_option_and_marigold ... ok
+test service::gateway::tests::bootstrap_patch_passthrough_keeps_response_unchanged ... ok
+test service::account::tests::login_import_checks_identity_and_rolls_back_stale_transaction ... ok
+test service::gateway::tests::bootstrap_rewrite_decodes_gzip_and_returns_plain_json ... ok
+test service::gateway::tests::buffered_error_body_decodes_gzip_before_removing_encoding_header ... ok
+test service::gateway::tests::buffered_error_body_keeps_encoding_header_for_unknown_encoding ... ok
+test service::gateway::tests::buffered_success_body_decodes_gzip_before_removing_encoding_header ... ok
+test service::account::tests::resolve_oauth_credentials_returns_valid_snapshot_without_refresh ... ok
+test service::gateway::tests::cached_non_stream_probe_body_rewrites_response_id ... ok
+test service::gateway::tests::cached_non_stream_probe_response_sets_single_json_content_type ... ok
+test service::gateway::tests::cli_bg_status_classifier_detector_matches_only_strong_shape ... ok
+test service::account::tests::resolve_oauth_credentials_rejects_non_oauth_account ... ok
+test service::account::tests::resolve_oauth_credentials_rejects_disabled_account ... ok
+test service::account::tests::login_import_retry_returns_latest_tokens_and_rejects_old_refresh_writes ... ok
+test service::account::tests::unauthorized_recovery_does_not_fallback_without_refresh_token ... ok
+test service::gateway::tests::cli_bg_status_classifier_mock_schema_matches_state_contract ... ok
+test service::gateway::tests::cli_bg_status_classifier_mode_accepts_only_supported_values ... ok
+test service::account::tests::transient_backoff_wait_count_is_in_memory_only ... ok
+test service::account::tests::valid_access_token_does_not_hide_missing_refresh_token ... ok
+test service::gateway::tests::cli_bg_status_classifier_uses_explicit_markers_then_current_state ... ok
+test service::gateway::tests::cli_bg_summary_only_policy_disables_full_capture ... ok
+test service::gateway::tests::account_admission_queue_full_does_not_consume_rpm ... ok
+test service::gateway::tests::account_admission_slot_timeout_does_not_consume_rpm ... ok
+test service::gateway::tests::count_tokens_beta_filters_context_1m_when_model_not_allowed ... ok
+test service::gateway::tests::count_tokens_beta_filters_fast_mode_by_default ... ok
+test service::gateway::tests::count_tokens_beta_injects_token_counting_and_preserves_client_beta ... ok
+test service::gateway::tests::count_tokens_beta_preserves_fast_mode_when_account_allows_it ... ok
+test service::gateway::tests::count_tokens_body_sanitizer_removes_generation_fields ... ok
+test service::gateway::tests::count_tokens_local_error_uses_anthropic_shape ... ok
+test service::gateway::tests::count_tokens_model_normalizer_maps_anthropic_short_ids_only ... ok
+test service::gateway::tests::count_tokens_path_does_not_enter_non_stream_probe_detector ... ok
+test service::account::tests::resolve_oauth_credentials_waits_for_lock_and_returns_latest_snapshot ... ok
+test service::gateway::tests::count_tokens_success_response_preserves_input_tokens_schema ... ok
+test service::account::tests::unauthorized_recovery_reuses_token_updated_by_lock_owner ... ok
+test service::gateway::tests::count_tokens_upstream_url_uses_native_endpoint_with_beta ... ok
+test service::gateway::tests::account_admission_waiting_slot_does_not_consume_rpm ... ok
+test service::gateway::tests::bootstrap_response_follows_request_profile_and_ua_less_default ... ok
+test service::gateway::tests::all_oauth_invalid_grant_accounts_return_generic_service_unavailable ... ok
+test service::gateway::tests::cli_bg_status_classifier_mock_accepts_configured_opus_without_account ... ok
+test service::gateway::tests::cli_bg_status_classifier_mock_returns_parseable_message_without_account ... ok
+test service::gateway::tests::cli_bg_status_classifier_injection_uses_account_proxy_and_completes_prefix ... ok
+test service::gateway::tests::cli_bg_status_classifier_invalid_proxy_fails_closed ... ok
+test service::gateway::tests::cli_bg_status_classifier_passthrough_keeps_session_hello_probe ... ok
+test service::gateway::tests::cli_bg_status_classifier_passthrough_uses_account_proxy ... ok
+test service::gateway::tests::cli_status_classifier_injection_does_not_duplicate_existing_identity_through_proxy ... ok
+test service::gateway::tests::cli_status_classifier_injection_does_not_change_haiku_proxy_body ... ok
+test service::gateway::tests::count_tokens_returns_service_unavailable_when_all_accounts_fail_authentication ... ok
+test service::gateway::tests::count_tokens_unauthorized_disables_and_switches_setup_account ... ok
+test service::gateway::tests::count_tokens_uses_client_default_and_legacy_account_profiles ... ok
+test service::gateway::tests::fable_weekly_usage_limit_setting_reloads_and_rejects_dirty_stored_value ... ok
+test service::gateway::tests::gateway_auxiliary_body_version_cannot_replace_ua_or_bypass_access_policy ... ok
+test service::gateway::tests::gateway_account_retry_probes_each_account_once_without_extra_rpm ... ok
+test service::gateway::tests::gateway_beta_headers_preserve_empty_invalid_and_single_value_semantics ... ok
+test service::gateway::tests::gateway_beta_query_preserves_non_target_paths ... ok
+test service::gateway::tests::gateway_beta_count_tokens_merges_before_account_filters ... ok
+test service::gateway::tests::gateway_compressed_request_does_not_retry_unsupported_upstream_encoding ... ok
+test service::gateway::tests::gateway_compressed_request_gzip_rewrites_before_sending ... ok
+test service::gateway::tests::gateway_compressed_request_cache_and_local_intercepts_are_equivalent ... ok
+test service::gateway::tests::gateway_compressed_request_read_errors_and_count_json_boundaries ... ok
+test service::gateway::tests::gateway_compressed_request_other_endpoints_match_plaintext ... ok
+test service::gateway::tests::gateway_compressed_request_router_authentication_precedes_decoding ... ok
+test service::gateway::tests::gateway_401_retry_keeps_profile_frozen_across_settings_reload ... ok
+test service::gateway::tests::gateway_compressed_request_preserves_admission_and_plaintext_semantics ... ok
+test service::gateway::tests::gateway_beta_headers_merge_before_account_filters ... ok
+test service::gateway::tests::gateway_compressed_request_signature_stages_reencode_current_body ... ok
+test service::gateway::tests::gateway_compressed_request_rejections_have_no_account_side_effects ... ok
+test service::gateway::tests::gateway_hello_probe_fail_open_and_strict_block_business_forwarding ... ok
+test service::gateway::tests::gateway_hello_probe_falls_back_to_real_session_when_pool_is_disabled ... ok
+test service::gateway::tests::gateway_fast_mode_policy_covers_classifier_bypasses ... ok
+test service::gateway::tests::gateway_compressed_request_auth_and_account_retries ... ok
+test service::gateway::tests::gateway_hello_probe_falls_back_to_real_session_when_pool_resolution_fails ... ok
+test service::gateway::tests::gateway_hello_probe_reuses_resolved_upstream_session ... ok
+test service::gateway::tests::gateway_beta_headers_preserve_special_and_api_profiles ... ok
+test service::gateway::tests::gateway_local_assistant_prefill_intercept_skips_hello_and_business_forwarding ... ok
+test service::gateway::tests::gateway_interleaved_and_concurrent_profile_requests_preserve_persistent_identity ... ok
+test service::gateway::tests::gateway_message_top_field_filter_excludes_other_paths ... ok
+test service::gateway::tests::gateway_message_top_field_filter_classifier_existing_cch ... ok
+test service::gateway::tests::business_forwarding_preserves_actual_http1_casing_and_telemetry_default ... ok
+test service::gateway::tests::gateway_message_top_field_filter_final_cch_profiles_and_modes ... ok
+test service::gateway::tests::gateway_message_top_field_filter_reload_defaults_and_read_failure ... ok
+test service::gateway::tests::gateway_message_top_field_filter_preserves_bypass_bytes_without_deletion ... ok
+test service::gateway::tests::gateway_beta_query_normalizes_keys_and_preserves_raw_fragments ... ok
+test service::gateway::tests::gateway_returns_service_unavailable_when_all_accounts_fail_authentication ... ok
+test service::gateway::tests::gateway_message_top_field_filter_freezes_retry_snapshot_and_hot_reloads ... ok
+test service::gateway::tests::gateway_preserves_stream_preference_through_upstream_and_response ... ok
+test service::account::tests::login_import_restores_only_auth_failures_and_preserves_limits ... ok
+test service::gateway::tests::gateway_messages_and_count_tokens_select_actual_tls_by_effective_profile ... ok
+test service::gateway::tests::gateway_fast_mode_policy_reencodes_final_wire_body ... ok
+test service::gateway::tests::gateway_fast_mode_policy_is_reapplied_after_account_switch ... ok
+test service::gateway::tests::gateway_message_top_field_filter_covers_classifier_bypasses_and_cch ... ok
+test service::gateway::tests::gateway_signature_retry_keeps_profile_and_recomputes_cch ... ok
+test service::gateway::tests::generic_status_classifier_detector_matches_supported_wire_shapes ... ok
+test service::gateway::tests::generic_status_classifier_detector_rejects_ambiguous_shapes ... ok
+test service::gateway::tests::gateway_fast_mode_policy_covers_clients_profiles_and_count_tokens ... ok
+test service::gateway::tests::mapped_upstream_session_overrides_client_session_header ... ok
+test service::gateway::tests::message_context_extracts_safe_counts_and_session_id ... ok
+test service::gateway::tests::message_context_ignores_removed_internal_session_marker ... ok
+test service::gateway::tests::message_telemetry_parser_reads_json_usage_and_stop_reason ... ok
+test service::gateway::tests::message_telemetry_parser_reads_sse_delta_usage_and_stop_reason ... ok
+test service::gateway::tests::gateway_unauthorized_disables_and_switches_setup_account ... ok
+test service::gateway::tests::non_stream_cache_keys_separate_profiles_even_when_payload_and_headers_match ... ok
+test service::gateway::tests::gateway_session_header_alignment_input_and_path_boundaries ... ok
+test service::gateway::tests::gateway_session_header_alignment_ordinary_messages ... ok
+test service::gateway::tests::non_stream_probe_cache_key_uses_body_hash_and_selected_headers_only ... ok
+test service::gateway::tests::non_stream_probe_cache_log_payloads_do_not_include_prompt_or_response_body ... ok
+test service::gateway::tests::late_oauth_unauthorized_preserves_new_credentials_and_manual_disable ... ok
+test service::gateway::tests::gateway_usage_records_real_responses_once_without_telemetry ... ok
+test service::gateway::tests::non_stream_probe_cache_hit_removes_expired_entry ... ok
+test service::gateway::tests::non_stream_probe_detects_known_single_message_prompts ... ok
+test service::gateway::tests::non_stream_probe_rejects_non_probe_shapes ... ok
+test service::gateway::tests::non_stream_probe_response_cacheability_requires_anthropic_message_json ... ok
+test service::gateway::tests::non_stream_probe_text_classifier_handles_bom_and_whitespace ... ok
+test service::gateway::tests::non_stream_request_capture_includes_redacted_headers_and_body ... ok
+test service::gateway::tests::missing_refresh_token_disables_and_switches_gateway_account ... ok
+test service::gateway::tests::gateway_usage_response_failures_preserve_bytes_and_partial_semantics ... ok
+test service::gateway::tests::non_stream_probe_cache_hit_returns_cached_response_without_upstream ... ok
+test service::gateway::tests::gateway_compressed_request_tcp_headers_and_near_limit ... ok
+test service::gateway::tests::non_stream_probe_cache_lookup_respects_global_switch ... ok
+test service::gateway::tests::gateway_session_header_alignment_preserves_sessions_with_edge_ows ... ok
+test service::gateway::tests::passive_usage_extracts_common_and_fable_windows ... ok
+test service::gateway::tests::passive_usage_ignores_incomplete_or_invalid_windows ... ok
+test service::gateway::tests::public_registry_paths_do_not_require_upstream_authorization ... ok
+test service::gateway::tests::rate_limit_request_body_limit_parser_falls_back_for_invalid_values ... ok
+test service::gateway::tests::rate_limit_request_capture_uses_actual_request_shape ... ok
+test service::gateway::tests::rate_limit_request_log_redacts_free_text_token_values ... ok
+test service::gateway::tests::rate_limit_request_log_redacts_sensitive_body_fields_and_truncates ... ok
+test service::gateway::tests::rate_limit_request_log_redacts_sensitive_headers ... ok
+test service::gateway::tests::non_stream_probe_cache_store_creates_entry_from_success_message ... ok
+test service::gateway::tests::rejected_passive_usage_windows_respect_explicit_window_status ... ok
+test service::gateway::tests::rejected_passive_usage_windows_support_numeric_surpassed_threshold ... ok
+test service::gateway::tests::non_stream_probe_cache_store_skips_non_message_response ... ok
+test service::gateway::tests::request_slot_units_counts_haiku_messages_as_half_slot ... ok
+test service::gateway::tests::response_capture_redacts_headers_body_and_extracts_error_message ... ok
+test service::gateway::tests::safe_body_summary_hides_raw_body ... ok
+test service::gateway::tests::safe_non_stream_probe_response_headers_removes_transport_and_gateway_headers ... ok
+test service::gateway::tests::session_hello_probe_only_accepts_real_claude_code_messages_session ... ok
+test service::gateway::tests::oauth_invalid_grant_disables_and_switches_count_tokens_account ... ok
+test service::gateway::tests::session_hello_probe_strict_decisions_use_anthropic_error_statuses ... ok
+test service::gateway::tests::oauth_invalid_grant_disables_and_switches_gateway_account ... ok
+test service::gateway::tests::signature_error_detector_matches_anthropic_and_structural_errors ... ok
+test service::gateway::tests::signature_error_detector_matches_compressed_upstream_body ... ok
+test service::gateway::tests::signature_retry_stages_run_from_thinking_to_tools ... ok
+test service::gateway::tests::stable_stream_keepalive_disabled_keeps_waiting_until_idle_timeout ... ok
+test service::gateway::tests::stable_stream_keepalive_emits_comment_after_first_chunk_idle ... ok
+test service::gateway::tests::oauth_invalid_grant_sticky_session_switches_gateway_account ... ok
+test service::gateway::tests::stable_stream_keepalive_is_not_emitted_before_first_upstream_chunk ... ok
+test service::gateway::tests::stable_stream_preserves_safeguard_results_event ... ok
+test service::gateway::tests::stateful_cache_usage_buffer_trims_on_utf8_boundary ... ok
+test service::gateway::tests::stateful_cache_usage_parser_keeps_split_sse_line ... ok
+test service::gateway::tests::stateful_cache_usage_parser_reads_gzip_side_tap ... ok
+test service::gateway::tests::stateful_cache_usage_parser_reads_json_usage ... ok
+test service::gateway::tests::stateful_cache_usage_parser_reads_nested_stream_usage ... ok
+test service::gateway::tests::stateful_cache_usage_parser_reads_sse_usage ... ok
+test service::gateway::tests::strip_signature_sensitive_retry_converts_tools_and_fills_empty_content ... ok
+test service::gateway::tests::strip_thinking_retry_converts_thinking_and_keeps_tools ... ok
+test service::gateway::tests::strip_thinking_retry_removes_thinking_dependent_context_strategy ... ok
+test service::gateway::tests::system_role_error_body_includes_model_and_allowed_list ... ok
+test service::gateway::tests::system_role_guard_detects_messages_role_system ... ok
+test service::gateway::tests::system_role_model_list_uses_exact_trimmed_matches ... ok
+test service::gateway::tests::stable_stream_keepalive_still_times_out_by_upstream_idle_deadline ... ok
+test service::gateway::tests::oauth_network_error_does_not_disable_or_switch_account ... ok
+test service::gateway::tests::truncate_log_text_handles_zero_limit ... ok
+test service::gateway::tests::unchanged_upstream_session_preserves_client_session_header ... ok
+test service::gateway::tests::upstream_request_id_prefers_request_id_and_hashes_unsafe_values ... ok
+test service::gateway::tests::upstream_url_adds_beta_query_only_for_messages_paths ... ok
+test service::gateway::tests::oauth_server_error_uses_valid_access_token_without_disabling ... ok
+test service::gateway::tests::oauth_unauthorized_refreshes_and_retries_same_gateway_account ... ok
+test service::gateway::tests::repeated_oauth_unauthorized_disables_account ... ok
+test service::gateway::tests::session_hello_probe_settings_reload_into_gateway_cache ... ok
+test service::gateway::tests::rate_limit_then_invalid_grant_returns_generic_service_unavailable ... ok
+test service::gateway::tests::warmup_intercept_detects_haiku_probe_from_flow_shape ... ok
+test service::gateway::tests::warmup_intercept_detects_json_title_prompt_from_flow_shape ... ok
+test service::gateway::tests::warmup_intercept_detects_legacy_title_and_warmup_prompts ... ok
+test service::gateway::tests::warmup_intercept_detects_structured_title_without_prompt_marker ... ok
+test service::gateway::tests::warmup_intercept_detects_suggestion_mode_last_user_message ... ok
+test service::gateway::tests::warmup_intercept_does_not_match_generic_title_words ... ok
+test service::gateway::tests::warmup_json_title_mock_uses_json_text_content ... ok
+test service::gateway::tests::warmup_stream_mock_contains_anthropic_sse_events ... ok
+test service::oauth::tests::invalid_grant_is_classified_as_permanent_without_description ... ok
+test service::oauth::tests::normalize_usage_response_adds_fable_from_scoped_limit ... ok
+test service::oauth::tests::normalize_usage_response_ignores_other_scoped_limits ... ok
+test service::oauth::tests::normalize_usage_response_keeps_existing_fable_window ... ok
+test service::oauth::tests::token_test_request_uses_selected_version_profile_headers ... ok
+test service::gateway::tests::gateway_session_header_alignment_pool_precedence ... ok
+test service::oauth::tests::transient_http_statuses_override_invalid_grant_code ... ok
+test service::oauth::tests::unclassified_oauth_error_remains_transient_and_sanitized ... ok
+test service::oauth::tests::v3_oauth_requires_proxy_even_when_runtime_configuration_is_partial ... ok
+test service::gateway::tests::setup_token_unauthorized_disables_account ... ok
+test service::oauth::tests::token_test_tls_uses_raw_version_and_configured_fallback ... ok
+test service::gateway::tests::transient_oauth_refresh_error_uses_valid_access_token_without_switching ... ok
+test service::gateway::tests::gateway_usage_compressed_cancellation_and_body_error_finalize_once ... ok
+test service::gateway::tests::target_access_rules_admit_280_293_before_selecting_default_profile ... ok
+test service::request_body_codec::tests::all_codecs_reject_truncated_prefixes_and_trailing_garbage ... ok
+test service::gateway::tests::usage_limits_gateway_filters_messages_and_preserves_count_tokens ... ok
+test service::request_body_codec::tests::deflate_verifies_adler_and_requires_complete_stream_end ... ok
+test service::request_body_codec::tests::gzip_accepts_all_members_and_verifies_each_crc_and_isize ... ok
+test service::request_body_codec::tests::headers_bound_fragments_across_fields_and_actual_coding_layers ... ok
+test service::request_body_codec::tests::headers_distinguish_invalid_grammar_from_unknown_complete_tokens ... ok
+test service::request_body_codec::tests::headers_ignore_only_identity_empty_lists_and_accept_encoding ... ok
+test service::request_body_codec::tests::headers_preserve_multiple_values_order_and_aliases ... ok
+test service::gateway::tests::v3_real_http_disconnect_releases_waiting_request ... ok
+test service::request_body_codec::tests::raw_deflate_input_is_reencoded_as_standard_zlib ... ok
+test service::gateway::tests::v3_real_http_stream_disconnect_releases_execution ... ok
+test service::request_body_codec::tests::supported_codecs_and_four_layer_chains_roundtrip ... ok
+test service::request_body_codec::tests::unencoded_body_keeps_storage_and_borrowing_without_sniffing ... ok
+test service::request_body_codec::tests::window_limits_apply_to_first_and_subsequent_frames ... ok
+test service::request_body_codec::tests::wire_size_limit_is_inclusive_and_checked_before_decoding ... ok
+test service::request_body_codec::tests::zstd_validates_all_frames_skippable_lengths_and_optional_checksums ... ok
+test service::gateway::tests::v3_sse_error_feedback_uses_existing_body_observation ... ok
+test service::response_body_codec::tests::ambiguous_raw_prefix_is_conservatively_incomplete ... ok
+test service::request_body_codec::tests::intermediate_layer_limit_is_enforced_even_when_final_body_is_empty ... ok
+test service::response_body_codec::tests::coding_limits_fail_only_the_observer_and_keep_its_sink ... ok
+test service::response_body_codec::tests::gzip_members_and_zstd_frames_validate_every_part ... ok
+test service::response_body_codec::tests::strict_windows_apply_to_first_and_later_frames ... ok
+test service::response_body_codec::tests::coding_chain_streams_in_reverse_order ... ok
+test service::rewriter::tests::api_293_model_limits_title_and_order_follow_capture ... ok
+test service::rewriter::tests::api_cch_refresh_ignores_account_billing_mode_after_retry_body_change ... ok
+test service::rewriter::tests::api_message_body_order_aligns_generated_haiku_title_profile ... ok
+test service::rewriter::tests::api_message_body_order_aligns_haiku_probe_profile ... ok
+test service::rewriter::tests::api_message_body_order_aligns_opus_main_profile_and_keeps_unknown_tail ... ok
+test service::rewriter::tests::api_message_body_order_happens_before_cch_attestation ... ok
+test service::rewriter::tests::api_message_body_order_keeps_2197_fable_legacy_position ... ok
+test service::rewriter::tests::api_message_body_order_switch_off_keeps_existing_top_level_order ... ok
+test service::rewriter::tests::api_message_body_order_uses_21220_fable_fallback_position ... ok
+test service::rewriter::tests::api_messages_21220_does_not_apply_unverified_fable_5_1_profile ... ok
+test service::rewriter::tests::api_messages_21257_fable_5_uses_corrected_capture_profile ... ok
+test service::rewriter::tests::api_messages_caps_oversized_max_tokens_to_capture_limit ... ok
+test service::rewriter::tests::api_messages_defaults_haiku_max_tokens_to_title_generation_value ... ok
+test service::rewriter::tests::api_messages_defaults_opus5_max_tokens_to_capture_value ... ok
+test service::rewriter::tests::api_messages_defaults_other_claude_models_to_standard_max_tokens ... ok
+test service::rewriter::tests::api_messages_fable_5_1_uses_21280_profile_without_forced_fallback ... ok
+test service::rewriter::tests::api_messages_haiku_main_uses_21280_capture_profile ... ok
+test service::rewriter::tests::api_messages_headers_use_current_profile ... ok
+test service::rewriter::tests::api_messages_keeps_existing_fable_fallbacks ... ok
+test service::rewriter::tests::api_messages_opus_5_5_uses_21280_capture_profile ... ok
+test service::rewriter::tests::api_messages_preserves_probe_and_capture_max_tokens ... ok
+test service::rewriter::tests::api_messages_rollback_profile_keeps_opus48_limits_and_fable_fallback ... ok
+test service::rewriter::tests::api_messages_sonnet_5_uses_21280_capture_profile ... ok
+test service::rewriter::tests::api_mode_cch_is_computed_from_final_body_without_internal_session_marker ... ok
+test service::rewriter::tests::api_mode_keeps_ttl_rewrite_without_creating_extra_breakpoints ... ok
+test service::rewriter::tests::api_mode_overwrites_client_metadata_user_id_and_aligns_session_header ... ok
+test service::rewriter::tests::api_mode_preserves_existing_tools_and_tool_choice ... ok
+test service::rewriter::tests::api_mode_rewrites_system_to_billing_banner_and_expansion ... ok
+test service::rewriter::tests::api_model_profile_adaptive_thinking_supports_forced_tools ... ok
+test service::rewriter::tests::api_model_profile_disabled_thinking_does_not_gain_defaults ... ok
+test service::rewriter::tests::api_model_profile_fix_keeps_rollback_and_claude_code_parameters ... ok
+test service::rewriter::tests::api_model_profile_haiku_budget_respects_output_limit ... ok
+test service::rewriter::tests::api_model_profile_haiku_tool_choice_keeps_compatible_thinking ... ok
+test service::rewriter::tests::api_model_profile_preserves_explicit_thinking_budget_and_display ... ok
+test service::response_body_codec::tests::truncated_and_trailing_streams_never_finish_successfully ... ok
+test service::rewriter::tests::auxiliary_endpoint_fix_preserves_unknown_paths_and_rollback ... ok
+test service::rewriter::tests::auxiliary_293_header_sets_match_captured_endpoints_and_keep_280_identity ... ok
+test service::rewriter::tests::business_21280_profiles_preserve_scoped_headers_and_exact_betas ... ok
+test service::rewriter::tests::auxiliary_endpoint_ua_and_beta_match_capture_in_both_client_modes ... ok
+test service::rewriter::tests::cache_control_ttl_rewrite_can_force_five_minutes ... ok
+test service::rewriter::tests::business_profiles_keep_rollback_and_versioned_mcp_capabilities ... ok
+test service::rewriter::tests::cache_control_ttl_rewrite_parse_accepts_known_values ... ok
+test service::rewriter::tests::cache_control_ttl_rewrite_parse_rejects_unknown_value ... ok
+test service::rewriter::tests::cache_control_ttl_rewrite_off_keeps_existing_ttl_values ... ok
+test service::rewriter::tests::cc_version_suffix_matches_2195_capture_samples ... ok
+test service::rewriter::tests::cc_version_suffix_matches_node_utf16_boundaries ... ok
+test service::rewriter::tests::cc_version_suffix_source_uses_last_user_text_block ... ok
+test service::rewriter::tests::cc_version_suffix_uses_string_indices ... ok
+test service::rewriter::tests::cc_version_thread_followup_preserves_existing_session_suffix ... ok
+test service::rewriter::tests::cch_21257_fable_5_1_keeps_top_level_default_fallback ... ok
+test service::rewriter::tests::cache_control_ttl_rewrite_updates_only_existing_ephemeral_breakpoints ... ok
+test service::rewriter::tests::cch_21257_non_fable_5_1_still_removes_top_level_fallbacks ... ok
+test service::rewriter::tests::cch_21280_clears_every_exact_string_model_value_only ... ok
+test service::rewriter::tests::cch_2169_keeps_full_body_profile ... ok
+test service::rewriter::tests::cch_2172_2173_2185_and_2187_fable_normalize_top_level_fallbacks_only ... ok
+test service::rewriter::tests::cch_2172_2173_2185_and_2187_opus_normalize_top_level_model_and_max_tokens ... ok
+test service::rewriter::tests::cch_293_fixture_matches_independent_bytes_and_interleaved_suffixes ... ok
+test service::rewriter::tests::cch_billing_location_matches_independent_reference_and_exact_bytes ... ok
+test service::rewriter::tests::cch_billing_extra_fields_and_field_order_preserve_existing_compatibility ... ok
+test service::rewriter::tests::cch_capture_fixture_matches_21280_nested_model_contract ... ok
+test service::rewriter::tests::cch_capture_fixture_matches_21260_and_21257_baseline_correction ... ok
+test service::rewriter::tests::cch_duplicate_json_fields_and_escaped_values_do_not_fall_back ... ok
+test service::rewriter::tests::cch_classifier_attribution_preserves_examples_when_adding_and_refreshing_billing ... ok
+test service::rewriter::tests::cch_initial_reset_keeps_cached_billing_and_rejects_duplicate_billing ... ok
+test service::rewriter::tests::cch_initial_seal_preserves_user_placeholder_before_billing ... ok
+test service::rewriter::tests::cch_full_rewrite_preserves_examples_across_clients_modes_and_caches ... ok
+test service::rewriter::tests::cch_missing_invalid_and_ambiguous_system_targets_preserve_input ... ok
+test service::rewriter::tests::cch_placeholder_reset_preserves_system_document_and_reminder ... ok
+test service::rewriter::tests::cch_raw_offset_preserves_json_escape_boundaries ... ok
+test service::rewriter::tests::cch_many_decoys_preserve_exact_bytes_and_unicode_offsets ... ok
+test service::rewriter::tests::cch_refresh_recomputes_existing_value_after_retry_body_change ... ok
+test service::rewriter::tests::cch_rewrite_keeps_legacy_seed_for_old_versions ... ok
+test service::rewriter::tests::cch_retry_refresh_preserves_user_hex_before_billing ... ok
+test service::rewriter::tests::cch_rewrite_uses_2169_seed ... ok
+test service::rewriter::tests::cch_seed_is_versioned ... ok
+test service::rewriter::tests::claude_code_json_metadata_user_id_rewrites_account_and_keeps_session ... ok
+test service::rewriter::tests::claude_code_legacy_metadata_user_id_rewrites_account_and_keeps_session ... ok
+test service::rewriter::tests::cch_string_system_rewrite_keeps_later_examples_and_public_refresh_gate ... ok
+test service::rewriter::tests::claude_code_messages_do_not_normalize_max_tokens ... ok
+test service::rewriter::tests::claude_code_message_body_order_keeps_original_top_level_order_when_switch_on ... ok
+test service::rewriter::tests::claude_code_rewrite_skips_cached_system_blocks ... ok
+test service::rewriter::tests::cli_bg_attribution_rewrite_adds_billing_identity_and_valid_cch ... ok
+test service::rewriter::tests::cli_bg_attribution_rewrite_keeps_existing_billing_without_cch ... ok
+test service::rewriter::tests::cli_bg_identity_only_rewrite_fails_open_for_non_json_body ... ok
+test service::rewriter::tests::cli_bg_attribution_rewrite_refreshes_existing_cch_and_is_idempotent ... ok
+test service::rewriter::tests::cli_bg_identity_only_rewrite_preserves_request_shape ... ok
+test service::rewriter::tests::client_type_uses_claude_code_ua_as_authoritative_signal ... ok
+test service::rewriter::tests::context_sanitizer_does_not_rewrite_plain_user_date_text ... ok
+test service::rewriter::tests::context_sanitizer_does_not_run_for_api_mode ... ok
+test service::rewriter::tests::context_sanitizer_normalize_rewrites_current_date_before_cch ... ok
+test service::prime_poller::tests::final_unauthorized_disables_account_and_clears_rate_limit ... ok
+test service::rewriter::tests::context_sanitizer_report_only_keeps_current_date_body ... ok
+test service::rewriter::tests::count_tokens_does_not_inherit_message_fallback_beta ... ok
+test service::rewriter::tests::context_sanitizer_normalize_handles_known_unicode_apostrophes ... ok
+test service::rewriter::tests::disabled_thinking_rewrite_keeps_unmatched_model ... ok
+test service::rewriter::tests::disabled_thinking_rewrite_updates_matched_model_before_output_body ... ok
+test service::rewriter::tests::endpoint_headers_use_distinct_profiles ... ok
+test service::rewriter::tests::endpoint_wire_order_matches_current_capture ... ok
+test service::rewriter::tests::event_logging_2187_env_preserves_bun_and_shell_profile ... ok
+test service::rewriter::tests::event_logging_session_fields_rewrite_without_events_array ... ok
+test service::rewriter::tests::event_logging_rewrite_uses_2173_shape ... ok
+test service::rewriter::tests::event_logging_session_fields_use_read_only_upstream_mapping ... ok
+test service::rewriter::tests::event_logging_v2_path_is_rewritten ... ok
+test service::rewriter::tests::fable_1m_model_without_incoming_context_1m_does_not_inject_beta ... ok
+test service::rewriter::tests::fable_21257_headers_use_corrected_fallback_beta_without_context_1m ... ok
+test service::rewriter::tests::fable_5_1_explicit_context_1m_obeys_account_allowlist ... ok
+test service::rewriter::tests::fable_5_1_headers_use_21280_profile_without_context_1m ... ok
+test service::rewriter::tests::fable_context_1m_beta_keeps_claude_code_order_when_allowed ... ok
+test service::rewriter::tests::fast_mode_beta_is_filtered_by_default_without_reordering_other_client_tokens ... ok
+test service::rewriter::tests::fast_mode_body_filter_only_matches_exact_root_string ... ok
+test service::rewriter::tests::fast_mode_beta_is_preserved_when_account_allows_it ... ok
+test service::rewriter::tests::fast_mode_body_filter_preserves_nested_fields_and_order ... ok
+test service::rewriter::tests::fast_mode_filter_uses_exact_beta_token_matching ... ok
+test service::rewriter::tests::git_user_scrub_keeps_non_target_and_cached_content ... ok
+test service::rewriter::tests::get_profile_omits_content_type_when_capture_has_none ... ok
+test service::rewriter::tests::disabled_thinking_rewrite_runs_before_cch_and_keeps_cache_breakpoints ... ok
+test service::rewriter::tests::git_user_scrub_preserves_inline_tags_and_adjacent_reminders ... ok
+test service::rewriter::tests::git_user_scrub_preserves_literal_account_names ... ok
+test service::rewriter::tests::git_user_scrub_keeps_profile_cch_valid ... ok
+test service::rewriter::tests::git_user_scrub_respects_line_boundaries ... ok
+test service::rewriter::tests::growthbook_rewrite_adds_current_attributes ... ok
+test service::rewriter::tests::growthbook_rewrite_uses_2173_payload_shape ... ok
+test service::rewriter::tests::haiku_main_request_uses_21280_beta ... ok
+test service::rewriter::tests::haiku_main_without_diagnostics_omits_claude_code_beta ... ok
+test service::rewriter::tests::haiku_non_stream_aux_uses_21257_narrow_beta ... ok
+test service::rewriter::tests::haiku_non_stream_probe_uses_capture_narrow_beta ... ok
+test service::rewriter::tests::haiku_streaming_title_uses_capture_narrow_beta ... ok
+test service::rewriter::tests::haiku_structured_title_uses_schema_without_prompt_marker ... ok
+test service::rewriter::tests::message_beta_tokens_include_cache_features_without_forcing_1m ... ok
+test service::rewriter::tests::integrated_safeguards_use_exact_beta_and_survive_body_rewrite ... ok
+test service::rewriter::tests::message_cache_control_auto_alias_applies_to_api_mode ... ok
+test service::rewriter::tests::message_cache_control_auto_applies_to_api_mode ... ok
+test service::rewriter::tests::message_cache_control_auto_avoids_assistant_tool_use_breakpoints ... ok
+test service::rewriter::tests::message_cache_control_auto_counts_blocks_without_using_tool_use_breakpoints ... ok
+test service::rewriter::tests::message_cache_control_api_modes_use_sub2api_style_breakpoints ... ok
+test service::rewriter::tests::message_cache_control_auto_clears_full_non_message_breakpoint_slots ... ok
+test service::rewriter::tests::message_cache_control_auto_keeps_multiline_skill_entries_intact ... ok
+test service::rewriter::tests::message_cache_control_auto_keeps_string_content_unchanged ... ok
+test service::rewriter::tests::message_cache_control_auto_marks_latest_tool_result_tail ... ok
+test service::rewriter::tests::message_cache_control_auto_does_not_steal_tail_slots_for_auto_boundary ... ok
+test service::rewriter::tests::message_cache_control_auto_marks_claude_code_auto_injected_boundary_when_slot_remains ... ok
+test service::rewriter::tests::message_cache_control_auto_rewrites_cache_breakpoints ... ok
+test service::rewriter::tests::message_cache_control_auto_root_cache_control_does_not_skip_short_tail ... ok
+test service::rewriter::tests::message_cache_control_auto_skips_uncacheable_tail_blocks ... ok
+test service::rewriter::tests::message_cache_control_auto_places_tail_breakpoints_within_lookback ... ok
+test service::rewriter::tests::message_cache_control_auto_stabilizes_adjacent_tool_use_and_results ... ok
+test service::rewriter::tests::message_cache_control_auto_recomputes_cch_after_final_body_changes ... ok
+test service::rewriter::tests::message_cache_control_auto_stabilizes_first_user_auto_injected_lists ... ok
+test service::rewriter::tests::message_cache_control_auto_stabilizes_tools_order_by_name ... ok
+test service::rewriter::tests::message_cache_control_auto_stabilizes_system_skills_and_deferred_tools_lists ... ok
+test service::rewriter::tests::message_cache_control_legacy_recomputes_cch_after_final_body_changes ... ok
+test service::rewriter::tests::message_cache_control_rewrite_parse_accepts_known_values ... ok
+test service::rewriter::tests::message_cache_control_rewrite_parse_rejects_unknown_value ... ok
+test service::prime_poller::tests::late_prime_unauthorized_preserves_reauthorized_credentials ... ok
+test service::rewriter::tests::message_cache_control_rolling_avoids_tool_use_but_allows_tool_result_breakpoints ... ok
+test service::rewriter::tests::message_cache_control_auto_ttl_rewrite_updates_created_breakpoints ... ok
+test service::rewriter::tests::message_cache_control_rolling_counts_blocks_without_using_tool_use_breakpoints ... ok
+test service::rewriter::tests::message_cache_control_rolling_stabilizes_adjacent_tool_use_and_results ... ok
+test service::rewriter::tests::message_cache_control_stable_alias_uses_auto_sorting ... ok
+test service::rewriter::tests::message_cache_control_rolling_prefers_text_before_tool_result_in_window ... ok
+test service::rewriter::tests::message_cache_control_rolling_falls_back_to_tool_result_when_window_has_no_text ... ok
+test service::rewriter::tests::message_cache_control_stateful_appended_neighbor_keeps_anchor_match ... ok
+test service::rewriter::tests::message_cache_control_stateful_applies_to_api_mode ... ok
+test service::rewriter::tests::message_cache_control_auto_takes_over_non_message_breakpoint_slots ... ok
+test service::rewriter::tests::message_cache_control_stateful_diagnostics_use_hashes_without_prompt_text ... ok
+test service::rewriter::tests::message_cache_control_stateful_cold_parallel_completion_without_shared_anchor_is_rejected ... ok
+test service::rewriter::tests::message_cache_control_stateful_does_not_persist_tool_result_anchors ... ok
+test service::rewriter::tests::message_cache_control_stateful_duplicate_blocks_require_context_match ... ok
+test service::gateway::tests::v3_pacing_timeout_preserves_binding_and_has_no_attempt ... ok
+test service::rewriter::tests::message_cache_control_stateful_bootstrap_promotes_past_tiny_first_request ... ok
+test service::rewriter::tests::message_cache_control_stateful_does_not_insert_auto_before_reused_anchor ... ok
+test service::rewriter::tests::message_cache_control_stateful_prefix_hash_changes_when_prefix_changes ... ok
+test service::rewriter::tests::message_cache_control_stateful_prefix_mismatch_rejects_anchor_match ... ok
+test service::rewriter::tests::message_cache_control_stateful_recomputes_cch_after_final_body_changes ... ok
+test service::rewriter::tests::message_cache_control_stateful_completion_is_delayed_until_upstream_finishes ... ok
+test service::rewriter::tests::message_cache_control_stateful_keeps_full_anchor_set_before_tail_rollover ... ok
+test service::rewriter::tests::message_cache_control_stateful_reuses_previous_normal_anchors ... ok
+test service::rewriter::tests::message_cache_control_stateful_parallel_sibling_without_anchor_does_not_overwrite ... ok
+test service::prime_poller::tests::oauth_unauthorized_refreshes_and_retries_prime_request ... ok
+test service::rewriter::tests::message_cache_control_stateful_ttl_rewrite_updates_created_breakpoints ... ok
+test service::rewriter::tests::message_cache_control_sub2api_applies_to_claude_code_mode ... ok
+test service::rewriter::tests::message_cache_control_stateful_stale_generation_without_shared_anchor_is_rejected ... ok
+test service::rewriter::tests::message_top_field_filter_preserves_order_and_no_change_boundary ... ok
+test service::rewriter::tests::messages_observed_headers_are_preserved_only_on_messages ... ok
+test service::rewriter::tests::messages_rewrite_preserves_explicit_stream_preference ... ok
+test service::rewriter::tests::messages_rewrite_preserves_missing_stream_preference ... ok
+test service::rewriter::tests::metadata_user_id_diagnostic_treats_json_session_as_present ... ok
+test service::rewriter::tests::message_cache_control_stateful_rolls_one_tail_anchor_after_lookback ... ok
+test service::rewriter::tests::observed_cli_process_removes_client_heap_and_internal_metadata ... ok
+test service::rewriter::tests::opus_5_5_fallback_beta_uses_21280_capture_order_in_both_client_modes ... ok
+test service::rewriter::tests::message_cache_control_stateful_miss_does_not_replace_existing_normal_anchors ... ok
+test service::rewriter::tests::opus_claude_code_headers_preserve_context_1m_when_allowed ... ok
+test service::rewriter::tests::message_top_field_filter_final_cch_covers_profiles_modes_and_fail_open ... ok
+test service::rewriter::tests::native_293_headers_match_every_observed_variant ... ok
+test service::rewriter::tests::random_cc_version_suffix_is_always_three_chars ... ok
+test service::rewriter::tests::sonnet_4_5_does_not_invent_message_threads_beta_without_safeguards ... ok
+test service::rewriter::tests::sonnet46_context_1m_beta_is_filtered_by_default ... ok
+test service::rewriter::tests::sonnet5_context_1m_beta_keeps_claude_code_order_when_allowed_by_default ... ok
+test service::rewriter::tests::strip_token_at_end ... ok
+test service::rewriter::tests::strip_token_at_start ... ok
+test service::rewriter::tests::strip_token_empty_header ... ok
+test service::rewriter::tests::strip_token_header_is_only_the_token ... ok
+test service::rewriter::tests::strip_token_ignores_empty_segments ... ok
+test service::rewriter::tests::strip_token_in_middle ... ok
+test service::rewriter::tests::strip_token_multiple_occurrences ... ok
+test service::rewriter::tests::strip_token_not_present ... ok
+test service::rewriter::tests::strip_token_with_whitespace ... ok
+test service::rewriter::tests::sonnet_4_5_threads_beta_follows_native_client_and_keeps_api_default ... ok
+test service::rewriter::tests::safeguard_293_context_beta_requires_incoming_token_and_account_permission ... ok
+test service::rewriter::tests::unobserved_haiku_main_uses_generic_21260_beta ... ok
+test service::rewriter::tests::title_fallback_beta_matches_capture_variants_in_both_client_modes ... ok
+test service::rewriter::tests::title_fallback_fix_keeps_probe_and_rollback_profiles_narrow ... ok
+test service::rewriter::tests::upstream_session_override_rewrites_json_metadata_session ... ok
+test service::rewriter::tests::upstream_session_override_rewrites_legacy_metadata_session ... ok
+test service::rewriter::tests::whitelist_default_matches_opus_and_sonnet5_models ... ok
+test service::rewriter::tests::whitelist_default_rejects_sonnet46_and_haiku ... ok
+test service::rewriter::tests::whitelist_empty_means_block_everyone ... ok
+test service::rewriter::tests::whitelist_ignores_whitespace_and_empty_segments ... ok
+test service::rewriter::tests::whitelist_multiple_patterns ... ok
+test service::rewriter::tests::whitelist_precise_model_id_match ... ok
+test service::runtime_bridge::tests::management_bridge_rejects_internal_and_encoded_paths ... ok
+test service::runtime_bridge::tests::project_iteration_resources_use_authenticated_management_bridge ... ok
+test service::runtime_lease::tests::damaged_shared_state_never_opens_maintenance_admission ... ok
+test service::rewriter::tests::upstream_session_override_keeps_stateful_cache_key_on_real_session ... ok
+test service::runtime_lease::tests::draining_blocks_new_admission_until_explicit_release ... ok
+test service::runtime_lease::tests::login_import_fences_late_calls_and_prevents_early_release ... ok
+test service::rewriter::tests::stateful_delayed_completions_keep_same_real_session_profiles_isolated ... ok
+test service::runtime_lease::tests::legacy_and_unreadable_leases_still_block_api_after_restart ... ok
+test service::runtime_lease::tests::two_cli_holders_share_capacity_and_release_only_their_own_slot ... ok
+test service::runtime_lease::tests::expired_lease_and_restart_require_explicit_reconciliation ... ok
+test service::runtime_transport::tests::gateway_accepts_short_account_dns_and_rejects_foreign_bindings ... ok
+test service::runtime_lease::tests::shared_cli_restart_keeps_each_holder_fenced_until_explicit_release ... ok
+test service::runtime_lease::tests::shared_cli_admits_api_and_keeps_cli_serial_even_after_expiry_and_restart ... ok
+test service::runtime_transport::tests::rejects_wrong_environment_and_arbitrary_target ... ok
+test service::rewriter::tests::message_cache_control_stateful_rejects_completion_when_usage_shows_rebuild ... ok
+test service::session_hello_probe::tests::cache_failure_opens_or_blocks_according_to_strict_mode ... ok
+test service::prime_poller::tests::prime_status_side_effects_preserve_forbidden_and_rate_limit_behavior ... ok
+test service::session_hello_probe::tests::config_rejects_values_outside_supported_ranges ... ok
+test service::session_hello_probe::tests::configured_proxy_carries_the_hello_request ... ok
+test service::session_hello_probe::tests::failure_cooldown_is_reused_when_switching_to_strict_mode ... ok
+test service::session_hello_probe::tests::first_request_sends_exact_anonymous_head_and_second_hits_cache ... ok
+test service::session_hello_probe::tests::hello_user_agent_follows_selected_account_profile ... ok
+test service::session_hello_probe::tests::invalid_configured_proxy_fails_without_direct_fallback ... ok
+test service::session_hello_probe::tests::redis_instances_share_one_network_probe_when_available ... ok
+test service::session_hello_probe::tests::state_key_changes_with_account_upstream_session_and_proxy_without_leaking_values ... ok
+test service::session_hello_probe::tests::concurrent_first_requests_share_one_network_probe ... ok
+test service::session_hello_probe::tests::timeout_is_cached_and_reused_in_strict_mode ... ok
+test service::telemetry::tests::correlation_fallback_uses_stable_run_session_key ... ok
+test service::telemetry::tests::event_batch_does_not_include_raw_prompt_or_token ... ok
+test service::telemetry::tests::event_batch_places_request_metadata_inside_additional_metadata ... ok
+test service::telemetry::tests::event_batch_uses_2173_legacy_telemetry_shape ... ok
+test service::telemetry::tests::event_batch_uses_unified_profile_and_bounded_process ... ok
+test service::telemetry::tests::event_queue_enforces_max_size ... ok
+test service::telemetry::tests::fable_message_telemetry_uses_request_model_and_betas_without_cli_flag ... ok
+test service::telemetry::tests::growthbook_eval_contains_current_attributes ... ok
+test service::telemetry::tests::growthbook_eval_uses_2173_shape_and_profile_version ... ok
+test service::runtime_transport::tests::sender_preserves_tls_profile_legacy_default_and_rejects_unknown_before_submission ... ok
+test service::telemetry::tests::message_events_fall_back_to_context_profile_model ... ok
+test service::telemetry::tests::message_events_omit_fixed_fake_metadata_fields ... ok
+test service::telemetry::tests::message_lifecycle_events_are_request_driven ... ok
+test service::telemetry::tests::metrics_uses_device_profile_env_and_subscription ... ok
+test service::telemetry::tests::interleaved_profile_sessions_preserve_renewal_and_delayed_result_ownership ... ok
+test service::telemetry::tests::simulated_payload_scan_removes_sensitive_fields_without_recording_values ... ok
+test service::telemetry::tests::startup_events_use_profile_default_model ... ok
+test service::telemetry::tests::telemetry_headers_match_current_wire_profile ... ok
+test service::telemetry::tests::telemetry_path_accepts_v2_and_legacy ... ok
+test service::telemetry::tests::telemetry_sanitizer_drops_proxy_gateway_keys_and_values ... ok
+test service::telemetry::tests::telemetry_shape_summary_contains_only_keys_types_and_drop_counts ... ok
+test service::usage::tests::buffered_json_uses_actual_response_model_and_speed ... ok
+test service::prime_poller::tests::repeated_oauth_unauthorized_disables_prime_account ... ok
+test service::usage::tests::eof_does_not_dispatch_unterminated_data_or_hide_it_after_message_stop ... ok
+test service::usage::tests::initial_blank_lines_keep_indented_sse_fields_ignored ... ok
+test service::gateway::tests::gateway_session_header_alignment_probe_shape ... ok
+test service::usage::tests::interrupted_and_malformed_responses_keep_only_observed_usage ... ok
+test service::gateway::tests::gateway_compressed_request_messages_match_plaintext ... ok
+test service::usage::tests::compressed_usage_is_bounded_and_never_turns_missing_data_into_zero_cost ... ok
+test service::usage::tests::real_zero_invalid_usage_and_gzip_footer_keep_distinct_completeness ... ok
+test service::usage::tests::split_sse_merges_cumulative_usage_without_double_counting ... ok
+test service::usage::tests::sse_events_follow_all_line_endings_and_merge_multiple_data_fields ... ok
+test service::runtime_transport::tests::cold_environment_ready_cohort_still_submits_smoothly ... ok
+test service::usage_pricing::tests::fast_aliases_and_long_context_use_reference_policies ... ok
+test service::usage_pricing::tests::known_prices_separate_cache_ttls_and_versions ... ok
+test service::version_profile::tests::apply_identity_to_env_json_preserves_other_fields ... ok
+test service::version_profile::tests::default_profile_matches_compat_constants ... ok
+test service::version_profile::tests::profile_declares_known_telemetry_differences ... ok
+test service::version_profile::tests::profile_lookup_rejects_unknown_key_and_falls_back_for_unknown_version ... ok
+test service::version_profile::tests::profiles_are_complete_and_unique ... ok
+test service::version_profile::tests::request_profile_matches_only_exact_supported_claude_ua_versions ... ok
+test service::version_profile::tests::request_profile_respects_explicit_default_and_account_mode ... ok
+test service::version_profile::tests::tls_bindings_use_configured_default_without_inventing_native_versions ... ok
+test service::version_profile::tests::tls_default_snapshot_survives_change_and_shared_profiles_reuse_id ... ok
+test store::account_store::tests::test_fmt_time_iso8601 ... ok
+test store::account_store::tests::test_is_pg ... ok
+test store::account_store::tests::test_now_expr_postgres ... ok
+test store::account_store::tests::test_now_expr_sqlite ... ok
+test store::account_store::tests::test_ts_postgres_casts_to_timestamptz ... ok
+test store::account_store::tests::test_ts_sqlite_plain_placeholder ... ok
+test service::usage_poller::tests::disabled_mode_does_not_poll_account_but_legacy_mode_does ... ok
+test service::usage::tests::parser_bounds_json_lines_and_combined_events_then_resynchronizes ... ok
+test service::runtime_transport::tests::local_https_stream_cancel_closes_connection_without_replay ... ok
+test service::runtime_transport::tests::local_https_preserves_bytes_and_rejects_untrusted_or_wrong_hostname ... ok
+test service::telemetry::tests::profile_ttl_cleanup_preserves_other_profile_container ... ok
+test service::usage::tests::initial_whitespace_preserves_json_limit_and_validation ... ok
+test service::request_body_codec::tests::reencoding_allows_actual_container_expansion_beyond_inbound_limit ... ok
+test service::session_hello_probe::tests::write_failure_does_not_trigger_follower_probe_and_recovers_after_lock_expiry ... ok
+test store::account_store::tests::update_all_canonical_env_identity_preserves_other_env_fields ... ok
+test store::db::tests::migrate_appends_fable_5_1_and_preserves_unrelated_model_settings ... ok
+test service::request_body_codec::tests::decoded_limit_is_inclusive_and_still_validates_stream_end ... ok
+test store::db::tests::migrate_inserts_default_blocked_claude_code_versions_setting ... ok
+test store::db::tests::migrate_backfills_selection_mode_without_overwriting_explicit_value ... ok
+test store::db::tests::migrate_creates_accounts_with_fast_mode_disabled_by_default ... ok
+test store::db::tests::migrate_inserts_default_claude_code_context_sanitizer_mode ... ok
+test store::db::tests::migrate_inserts_cli_bg_identity_injection_default_without_overwriting_custom_value ... ok
+test store::db::tests::migrate_inserts_cli_bg_status_classifier_default_without_overwriting_custom_value ... ok
+test service::rewriter::tests::message_cache_control_stateful_spike_does_not_pollute_normal_anchors ... ok
+test store::db::tests::migrate_inserts_default_claude_code_version_profile_setting ... ok
+test service::gateway::tests::gateway_usage_observes_all_sse_layouts_and_response_codings ... ok
+test store::db::tests::migrate_inserts_default_message_body_order_fingerprint_setting ... ok
+test store::db::tests::migrate_inserts_fable_sticky_quota_fallback_default ... ok
+test store::diagnostics_store::tests::postgres_diagnostics_storage_contract ... ignored, 须提供 CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN 指向独立临时数据库
+test store::db::tests::migrate_inserts_fable_weekly_usage_limit_percent_default ... ok
+test store::memory::tests::session_hello_probe_periodic_cleanup_removes_unvisited_expired_entries ... ok
+test store::memory::tests::session_hello_probe_success_renews_but_failure_does_not ... ok
+test store::memory::tests::upstream_session_pool_caps_and_maps_stably ... ok
+test store::memory::tests::upstream_session_pool_keeps_saved_mapping_when_other_members_change ... ok
+test store::memory::tests::upstream_session_pool_lookup_does_not_create_member ... ok
+test store::memory::tests::upstream_session_pool_mapped_request_refreshes_borrowed_member ... ok
+test store::memory::tests::upstream_session_pool_owner_only_does_not_refresh_borrowed_member ... ok
+test store::diagnostics_store::tests::sqlite_diagnostics_storage_contract ... ok
+test store::memory::tests::upstream_session_pool_read_only_lookup_does_not_rehash_missing_mapping ... ok
+test store::memory::tests::upstream_session_pool_shrink_evicts_oldest_member_and_invalidates_mapping ... ok
+test store::redis::tests::session_hello_probe_success_renews_but_failure_does_not_when_redis_available ... ok
+test store::db::tests::migrate_inserts_session_hello_probe_defaults_without_overwriting_custom_value ... ok
+test store::memory::tests::upstream_session_pool_read_only_lookup_does_not_refresh_member_ttl ... ok
+test store::db::tests::migrate_upgrades_existing_account_claude_code_profile ... ok
+test store::db::tests::migrate_removes_obsolete_non_stream_aux_settings ... ok
+test store::db::tests::migrate_message_top_field_filter_defaults_and_preserves_false ... ok
+test store::db::tests::migrate_upgrades_only_old_default_allow_1m_models ... ok
+test store::diagnostics_store::tests::diagnostics_overload_and_write_failures_are_observable ... ok
+test store::db::tests::migrate_upgrades_only_exact_old_default_model_lists ... ok
+test store::usage_store::tests::partial_window_estimates_use_known_cost_like_sub2api ... ok
+test store::usage_store::tests::refresh_keeps_records_and_each_reset_selects_its_own_cycle ... ok
+test store::db::tests::migrate_preserves_explicit_old_claude_code_profile_with_custom_allowed_versions ... ok
+test store::usage_store::tests::unpriced_data_without_positive_cost_never_produces_total_estimate ... ok
+test tlsfp::tlsfp::tests::different_proxy_uses_different_cached_client_entry ... ok
+test tlsfp::tlsfp::tests::disabled_pool_bypasses_cached_client_entry ... ok
+test service::response_body_codec::tests::all_codecs_stream_long_output_in_bounded_writes ... ok
+test tlsfp::tlsfp::tests::explicit_keyshare_override_disabled_preserves_cached_group_hint ... ok
+test tlsfp::tlsfp::tests::clienthello_wire_matches_native_293_even_after_cached_group_hint ... ok
+test tlsfp::tlsfp::tests::invalid_proxy_is_rejected_without_caching_direct_client ... ok
+test tlsfp::tlsfp::tests::hybrid_exchange_matches_independent_server_and_rejects_invalid_peers ... ok
+test store::db::tests::migrate_upgrades_only_old_default_bootstrap_model_option ... ok
+test tlsfp::tlsfp::tests::same_proxy_different_tls_profiles_emit_distinct_actual_clienthellos ... ok
+test tlsfp::tlsfp::tests::same_proxy_reuses_cached_client_entry ... ok
+test tlsfp::tlsfp::tests::distinct_tls_configs_keep_resumption_tickets_separate ... ok
+test service::usage::tests::long_initial_blank_lines_preserve_usage_across_codings_and_chunks ... ok
+test store::db::tests::migrate_upgrades_only_old_default_allowed_versions_setting ... ok
+test tlsfp::tlsfp::tests::local_https_native_fingerprint_tls12_tls13_resumption_and_hrr ... ok
+test store::settings_store::tests::default_blocked_versions_setting_is_empty ... ok
+test store::settings_store::tests::apply_profile_updates_accounts_and_allowed_versions ... ok
+test store::settings_store::tests::default_message_body_order_fingerprint_setting_is_enabled ... ok
+test store::settings_store::tests::default_claude_code_context_sanitizer_mode_is_report_only ... ok
+test store::settings_store::tests::default_profile_setting_is_current_profile_key ... ok
+test store::settings_store::tests::get_value_keeps_empty_string_as_configured_value ... ok
+test store::settings_store::tests::get_value_returns_default_for_missing_key ... ok
+test store::usage_store::tests::committed_records_survive_independent_connection_and_reopening ... ok
+test service::gateway::tests::gateway_usage_long_compressed_responses_keep_head_and_tail ... ok
+test service::gateway::tests::gateway_message_top_field_filter_covers_frozen_keys_and_nested_data ... ok
+
+test result: ok. 727 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 39.20s
+
+     Running unittests src/bin/account-sender.rs (target/debug/deps/account_sender-8e76b2454fff0cb3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/claude_code_gateway-b8955e2251bda02f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/account_scheduler_test.rs (target/debug/deps/account_scheduler_test-695bb2161b805008)
+
+running 33 tests
+test test_429_account_recovers_after_expiry ... ok
+test test_403_permanently_disables_account ... ok
+test test_403_during_429_does_not_escalate ... ok
+test test_429_disables_account_for_5h ... ok
+test test_disable_reason_updates_on_repeated_429 ... ok
+test test_enable_clears_everything ... ok
+test test_429_account_excluded_from_schedulable_list ... ok
+test test_enable_recovers_403_disabled_account ... ok
+test test_manual_disable_sets_reason ... ok
+test test_403_account_excluded_from_schedulable_list ... ok
+test test_403_after_429_expired_does_disable ... ok
+test test_fable_sticky_exhausted_without_alternative_keeps_binding ... ok
+test test_fable_limit_100_preserves_previous_exhaustion_boundary ... ok
+test test_fable_sticky_below_limit_keeps_original_account ... ok
+test test_fable_sticky_fallback_disabled_keeps_original_sticky ... ok
+test test_fable_sticky_at_limit_selects_alternative_account ... ok
+test test_select_account_fails_when_all_disabled ... ok
+test test_rpm_disabled_allows_repeated_admission ... ok
+test test_non_sticky_fable_selection_returns_429_when_all_accounts_reach_limit ... ok
+test test_select_account_skips_429_limited ... ok
+test test_select_account_skips_403_disabled ... ok
+test test_non_fable_sticky_ignores_fable_quota_exhaustion ... ok
+test test_non_sticky_fable_selection_filters_exhausted_accounts ... ok
+test test_sticky_selection_does_not_switch_when_rpm_saturated ... ok
+test test_non_sticky_selection_skips_rpm_saturated_account ... ok
+test usage_limits_service_rejects_out_of_range_without_writing ... ok
+test test_uncommitted_session_selection_does_not_pollute_rpm_retry ... ok
+test test_setup_token_sticky_ignores_fable_quota_usage_data ... ok
+test usage_limits_are_per_account_and_respect_token_scope ... ok
+test usage_limits_combine_with_fable_without_fallback_to_blocked_accounts ... ok
+test usage_limits_invalid_windows_reset_and_configuration_recovery ... ok
+test usage_limits_sticky_boundary_supports_both_windows_and_auth_types ... ok
+test test_sticky_rpm_saturation_rejects_instead_of_switching ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.09s
+
+     Running tests/account_store_timestamp_test.rs (target/debug/deps/account_store_timestamp_test-8e1766cf0dcd214f)
+
+running 16 tests
+test usage_limits_postgres_storage_and_legacy_migration ... ignored, 需要 CC2API_USAGE_LIMITS_TEST_POSTGRES_DSN 指向独立临时数据库
+test usage_limits_sqlite_storage_and_legacy_migration ... ok
+test test_create_is_committed_before_independent_read ... ok
+test test_set_rate_limit_timestamps ... ok
+test test_list_schedulable_excludes_rate_limited ... ok
+test test_update_usage_timestamp ... ok
+test test_create_account_with_null_timestamps ... ok
+test test_disable_account_with_rate_limit_timestamps ... ok
+test test_update_oauth_tokens_timestamps ... ok
+test test_create_account_with_oauth_timestamps ... ok
+test test_disable_account_without_rate_limit ... ok
+test test_account_upstream_session_pool_fields_round_trip ... ok
+test test_update_account_with_oauth_timestamps ... ok
+test test_list_schedulable_includes_expired_rate_limit ... ok
+test test_account_fast_mode_defaults_to_disabled_and_round_trips ... ok
+test test_disable_for_auth_failure_updates_reason_and_clears_rate_limit ... ok
+
+test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.81s
+
+     Running tests/gateway_429_retry_test.rs (target/debug/deps/gateway_429_retry_test-3981447af4610cd4)
+
+running 6 tests
+test test_retry_respects_allowed_ids_filter ... ok
+test test_slot_can_be_reacquired_after_release ... ok
+test test_retry_all_accounts_429_returns_last_error ... ok
+test test_retry_with_sticky_session_falls_back_on_429 ... ok
+test test_429_accounts_are_quarantined_for_5h ... ok
+test test_retry_excludes_429_account_and_picks_next ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running tests/http1_header_casing_test.rs (target/debug/deps/http1_header_casing_test-7bbb606647145f4a)
+
+running 4 tests
+test explicit_casing_rejects_invalid_names_before_network_io ... ok
+test explicit_casing_reaches_configured_http_proxy ... ok
+test explicit_casing_survives_clone_and_conversion_without_changing_default ... ok
+test explicit_casing_survives_redirect_and_keeps_sensitive_header_removal ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/redis_url_test.rs (target/debug/deps/redis_url_test-c3696f9d0a5c90d8)
+
+running 6 tests
+test build_url_with_password ... ok
+test build_url_with_non_zero_db ... ok
+test build_url_with_password_and_non_zero_db ... ok
+test build_url_without_password ... ok
+test url_contains_db_exactly_once ... ok
+test parsed_by_redis_client ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/runtime_transport_test.rs (target/debug/deps/runtime_transport_test-d0de82dddd8c9404)
+
+running 3 tests
+test raw_body_header_order_and_upstream_error_survive_bridge ... ok
+test stale_generation_is_rejected_before_contacting_upstream ... ok
+test sse_is_streamed_and_disconnect_closes_upstream_without_replay ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+
+     Running tests/v3_scheduling_test.rs (target/debug/deps/v3_scheduling_test-7abbe7b33446666b)
+
+running 17 tests
+test postgres_concurrent_binding_and_budget_rollback ... ignored, 需要 CC2API_SCHEDULING_TEST_POSTGRES_DSN 指向本任务独立临时数据库
+test scheduling_settings_validate_the_merged_snapshot ... ok
+test capacity_reason_matches_pending_work_and_wait_budget ... ok
+test near_optimal_new_sessions_rotate_without_rebinding_old_sessions ... ok
+test sqlite_smooth_pacing_survives_boundaries_and_restart ... ok
+test observation_does_not_renew_and_one_session_can_have_two_requests ... ok
+test tokens_are_isolated_and_sessionless_requests_have_no_binding ... ok
+test real_failures_reduce_health_and_user_errors_do_not_reward_latency ... ok
+test cancelling_pacing_wait_releases_fifo_and_current_state ... ok
+test storage_failure_stops_admission_without_fake_submission ... ok
+test active_binding_survives_expiry_cleanup_and_recovers_by_cas ... ok
+test hard_migration_updates_active_binding_counts_without_moving_old_execution ... ok
+test busy_bound_session_stays_and_new_session_uses_free_account ... ok
+test sqlite_concurrent_binding_and_budget_rollback ... ok
+test sqlite_write_lock_and_held_permit_cannot_bank_send_time ... ok
+test one_deadline_survives_config_reload_and_timeout_keeps_binding ... ok
+test waiting_requests_reload_current_rpm_without_resetting_deadline ... ok
+
+test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.03s
+
+     Running tests/version_profile_settings_test.rs (target/debug/deps/version_profile_settings_test-b08f1822554c9f0c)
+
+running 2 tests
+test postgres_profile_settings_and_rollback ... ignored, 需要通过 CC2API_PROFILE_TEST_POSTGRES_DSN 指定独立临时数据库
+test sqlite_profile_settings_and_rollback ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.55s
+
+   Doc-tests claude_code_gateway
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

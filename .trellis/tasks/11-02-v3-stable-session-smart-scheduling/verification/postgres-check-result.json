@@ -1,0 +1,5 @@
+{
+  "passed": true,
+  "database": "独立本机临时 PostgreSQL",
+  "test": "postgres_concurrent_binding_and_budget_rollback"
+}

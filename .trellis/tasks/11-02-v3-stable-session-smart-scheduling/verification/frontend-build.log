@@ -1,0 +1,26 @@
+
+> web@0.0.0 build
+> vue-tsc -b && vite build
+
+vite v8.0.3 building client environment for production...
+[2Ktransforming...✓ 2414 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                         0.82 kB │ gzip:  0.43 kB
+dist/assets/index-cxd1v1zh.css         45.87 kB │ gzip:  8.98 kB
+dist/assets/favicon-Bp6xYzkY.js         0.37 kB │ gzip:  0.28 kB
+dist/assets/Environments-BuPbkkb1.js    0.69 kB │ gzip:  0.50 kB
+dist/assets/Textarea-ThDu3dS3.js        1.02 kB │ gzip:  0.60 kB
+dist/assets/Login-B2LdmDG2.js           2.47 kB │ gzip:  1.29 kB
+dist/assets/badge-BZNU30kX.js           3.24 kB │ gzip:  1.31 kB
+dist/assets/Input-3H5NIQl-.js           4.54 kB │ gzip:  2.19 kB
+dist/assets/Dashboard-6VGGNvfX.js       4.66 kB │ gzip:  1.53 kB
+dist/assets/Tokens-sJOW7Uho.js         10.98 kB │ gzip:  3.59 kB
+dist/assets/dialog-D3Csav9n.js         28.01 kB │ gzip:  8.90 kB
+dist/assets/index-D-Z93Qcq.js          29.58 kB │ gzip: 11.60 kB
+dist/assets/Card-C0yEhyqi.js           29.93 kB │ gzip:  9.86 kB
+dist/assets/Settings-CRWN78y3.js       66.37 kB │ gzip: 15.77 kB
+dist/assets/Accounts-IoaZbF9h.js       76.90 kB │ gzip: 19.80 kB
+dist/assets/api-r3H2Rqle.js           111.19 kB │ gzip: 42.53 kB
+
+✓ built in 1.12s

@@ -1,0 +1,508 @@
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/lib.rs:242:11
+    |
+242 | #[cfg(all(feature = "http3", not(reqwest_unstable)))]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unexpected `cfg` condition name: `reqwest_unstable`
+   --> vendor/reqwest-0.12.4/src/lib.rs:242:34
+    |
+242 | #[cfg(all(feature = "http3", not(reqwest_unstable)))]
+    |                                  ^^^^^^^^^^^^^^^^
+    |
+    = help: expected names are: `docsrs`, `feature`, and `test` and 31 more
+    = help: consider using a Cargo feature instead
+    = help: or consider adding in `Cargo.toml` the `check-cfg` lint config for the lint:
+             [lints.rust]
+             unexpected_cfgs = { level = "warn", check-cfg = ['cfg(reqwest_unstable)'] }
+    = help: or consider adding `println!("cargo::rustc-check-cfg=cfg(reqwest_unstable)");` to the top of the `build.rs`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+ --> vendor/reqwest-0.12.4/src/async_impl/h3_client/mod.rs:1:8
+  |
+1 | #![cfg(feature = "http3")]
+  |        ^^^^^^^^^^-------
+  |                  |
+  |                  help: there is a expected value with a similar name: `"http2"`
+  |
+  = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+  = help: consider adding `http3` as a feature in `Cargo.toml`
+  = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:30:7
+   |
+30 | #[cfg(feature = "http3")]
+   |       ^^^^^^^^^^-------
+   |                 |
+   |                 help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:32:7
+   |
+32 | #[cfg(feature = "http3")]
+   |       ^^^^^^^^^^-------
+   |                 |
+   |                 help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:51:7
+   |
+51 | #[cfg(feature = "http3")]
+   |       ^^^^^^^^^^-------
+   |                 |
+   |                 help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:53:7
+   |
+53 | #[cfg(feature = "http3")]
+   |       ^^^^^^^^^^-------
+   |                 |
+   |                 help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+  --> vendor/reqwest-0.12.4/src/async_impl/client.rs:86:11
+   |
+86 |     #[cfg(feature = "http3")]
+   |           ^^^^^^^^^^-------
+   |                     |
+   |                     help: there is a expected value with a similar name: `"http2"`
+   |
+   = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+   = help: consider adding `http3` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:159:11
+    |
+159 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:161:11
+    |
+161 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:163:11
+    |
+163 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:165:11
+    |
+165 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:167:11
+    |
+167 |     #[cfg(feature = "http3")]
+    |           ^^^^^^^^^^-------
+    |                     |
+    |                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1204:11
+     |
+1204 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1800:11
+     |
+1800 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1812:11
+     |
+1812 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1825:11
+     |
+1825 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1838:11
+     |
+1838 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:1850:11
+     |
+1850 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:258:23
+    |
+258 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:260:23
+    |
+260 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:262:23
+    |
+262 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:264:23
+    |
+264 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:266:23
+    |
+266 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:293:15
+    |
+293 |         #[cfg(feature = "http3")]
+    |               ^^^^^^^^^^-------
+    |                         |
+    |                         help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:321:23
+    |
+321 |             #[cfg(all(feature = "http3", feature = "__rustls"))]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:472:27
+    |
+472 |                     #[cfg(feature = "http3")]
+    |                           ^^^^^^^^^^-------
+    |                                     |
+    |                                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:611:27
+    |
+611 |                     #[cfg(feature = "http3")]
+    |                           ^^^^^^^^^^-------
+    |                                     |
+    |                                     help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:598:31
+    |
+598 |                         #[cfg(feature = "http3")]
+    |                               ^^^^^^^^^^-------
+    |                                         |
+    |                                         help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/async_impl/client.rs:734:23
+    |
+734 |                 #[cfg(feature = "http3")]
+    |                       ^^^^^^^^^^-------
+    |                                 |
+    |                                 help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2031:19
+     |
+2031 |             #[cfg(feature = "http3")]
+     |                   ^^^^^^^^^^-------
+     |                             |
+     |                             help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2264:15
+     |
+2264 |         #[cfg(feature = "http3")]
+     |               ^^^^^^^^^^-------
+     |                         |
+     |                         help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2279:11
+     |
+2279 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2366:11
+     |
+2366 |     #[cfg(feature = "http3")]
+     |           ^^^^^^^^^^-------
+     |                     |
+     |                     help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2554:23
+     |
+2554 |                 #[cfg(feature = "http3")]
+     |                       ^^^^^^^^^^-------
+     |                                 |
+     |                                 help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+    --> vendor/reqwest-0.12.4/src/async_impl/client.rs:2681:43
+     |
+2681 | ...                   #[cfg(feature = "http3")]
+     |                             ^^^^^^^^^^-------
+     |                                       |
+     |                                       help: there is a expected value with a similar name: `"http2"`
+     |
+     = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+     = help: consider adding `http3` as a feature in `Cargo.toml`
+     = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/tls.rs:505:48
+    |
+505 |         #[cfg(all(feature = "default-tls", not(feature = "http3")))]
+    |                                                ^^^^^^^^^^-------
+    |                                                          |
+    |                                                          help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `http3`
+   --> vendor/reqwest-0.12.4/src/tls.rs:512:13
+    |
+512 |             feature = "http3"
+    |             ^^^^^^^^^^-------
+    |                       |
+    |                       help: there is a expected value with a similar name: `"http2"`
+    |
+    = note: expected values for `feature` are: `__internal_proxy_sys_no_cache`, `__rustls`, `__tls`, `blocking`, `brotli`, `charset`, `cookies`, `default`, `default-tls`, `deflate`, `futures-channel`, `gzip`, `h2`, `h3`, `h3-quinn`, `hickory-dns`, `http2`, `json`, `macos-system-configuration`, `multipart`, `native-tls`, `native-tls-alpn`, `native-tls-vendored`, `quinn`, `rustls-pki-types`, `rustls-tls`, `rustls-tls-manual-roots`, `rustls-tls-native-roots`, `rustls-tls-webpki-roots`, `socks`, `stream`, `trust-dns`, and `zstd`
+    = help: consider adding `http3` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: function `into_io` is never used
+   --> vendor/reqwest-0.12.4/src/error.rs:290:15
+    |
+290 | pub(crate) fn into_io(e: BoxError) -> io::Error {
+    |               ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: type alias `PeekableIoStream` is never used
+  --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:77:6
+   |
+77 | type PeekableIoStream = Peekable<IoStream>;
+   |      ^^^^^^^^^^^^^^^^
+
+warning: struct `Pending` is never constructed
+   --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:118:8
+    |
+118 | struct Pending(PeekableIoStream, DecoderType);
+    |        ^^^^^^^
+
+warning: struct `IoStream` is never constructed
+   --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:120:19
+    |
+120 | pub(crate) struct IoStream<B = ResponseBody>(B);
+    |                   ^^^^^^^^
+
+warning: enum `DecoderType` is never used
+   --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:122:6
+    |
+122 | enum DecoderType {
+    |      ^^^^^^^^^^^
+
+warning: function `empty` is never used
+   --> vendor/reqwest-0.12.4/src/async_impl/decoder.rs:379:4
+    |
+379 | fn empty() -> ResponseBody {
+    |    ^^^^^
+
+warning: `reqwest` (lib) generated 44 warnings
+   Compiling claude-code-gateway v1.6.0 (/root/project/vibecoding-bench/cc2api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.93s
+warning: the following packages contain code that will be rejected by a future version of Rust: redis v0.25.4, sqlx-postgres v0.7.4
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running tests/v3_scheduling_test.rs (target/debug/deps/v3_scheduling_test-7abbe7b33446666b)
+
+running 1 test
+test postgres_concurrent_binding_and_budget_rollback ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 2.21s

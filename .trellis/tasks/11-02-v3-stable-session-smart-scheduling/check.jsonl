@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "保留硬资格、加权 FIFO 和旧路径 RPM，明确新 v3 稳定绑定及发送边界。"}
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "双数据库迁移、字符串设置原子刷新、诊断与真实反馈边界。"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "调度行为测试、全量验证、敏感信息和错误体边界。"}
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "API-only、环境准备、冻结身份与未知提交不重放。"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "管理 API 可选字段兼容及设置页、账号页最小修改。"}
+{"file": ".trellis/tasks/11-02-v3-stable-session-smart-scheduling/research/scheduler-comparison.md", "reason": "当前源码和参考仓库的调度、亲和、等待机制对照。"}
+{"file": ".trellis/tasks/11-02-v3-stable-session-smart-scheduling/research/visualization-model.md", "reason": "发送时间轴、网关会话／请求／上游池口径及只读有界可视化的事实与规划边界。"}
