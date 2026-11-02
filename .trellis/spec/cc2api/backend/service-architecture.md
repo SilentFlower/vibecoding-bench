@@ -319,6 +319,8 @@ account_svc
 
 ## Scenario: Gateway 账号槽位与 RPM Admission 顺序
 
+本节固定分钟 RPM 的规则适用于非 v3 路径；v3 的精确 `/v1/messages` 使用下方「v3 API 稳定会话、智能准入与平滑发送」合同，继续保留加权槽位和 FIFO。
+
 ### 1. Scope / Trigger
 
 - Trigger：修改 `GatewayService::handle_request_inner` 中账号选择、账号级 FIFO 队列、请求槽位权重、RPM admission、429 重试或本地拦截顺序时适用。
@@ -1237,3 +1239,96 @@ AccountService::create_cli_account(&mut Account) -> Result<(), AppError>
 - `cli_identity_sources_require_verified_version`：精确版本通过，版本／version_base 不匹配、未来版本和 machineID 来源拒绝；旧观察兼容。
 - `cli_identity_import_requires_internal_service_proof`：只有管理 Bearer 的 HTTP 请求返回 401。
 - v3 隔离同步／重授权堆栈：正式同步请求创建后核对实际 SQLite 的 device_id 与持久 userID 相等，再验证重授权凭据和原账号保持；不访问真实 OAuth／模型。
+
+## Scenario: v3 API 稳定会话、智能准入与平滑发送
+
+### 1. Scope / Trigger
+
+- 修改 `v3_scheduling`、`SchedulingStore`、Gateway 最终发送准入或管理端调度可视化时适用。`main` 在 `V3_RUNTIME_URL` 或 `V3_DEPLOYMENT_ID` 非空时装配；部分配置缺失仍由传输层失败关闭。
+- 仅接管 API Gateway 的精确 `/v1/messages` 到账号 sender。原生 CLI、项目、养号、Hello、count_tokens 和后台独立请求不共享本预算；非 v3 保留原调度行为。
+
+### 2. Signatures
+
+```rust
+V3Scheduler::begin(self: &Arc<Self>, token_id: i64, session_id: Option<&str>) -> SchedulingRequest
+AccountService::select_v3_account(&self, request: &SchedulingRequest, exclude_ids: &[i64], allowed_ids: &[i64], context: &AccountSelectionContext, slot_units: u32) -> Result<SelectedAccount, AppError> // 异步
+SchedulingRequest::admit(&self, account: &Account) -> Result<SendPermit, AppError> // 异步
+SendPermit::submitted(self)
+SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expected: Option<&SessionBinding>, last_released_at: Option<Instant>) -> Result<SendClaim, AppError> // 异步
+```
+
+- `SchedulingStore::claim(account_id, interval_ms, now_ms, key, expected)` 是受控时钟验证入口；生产使用 `claim_current`，不能从选号快照传入旧 RPM／旧时间。
+- 持久表：`gateway_session_bindings(session_key PK, account_id FK, revision, created_at_ms, last_seen_at_ms, expires_at_ms)`；`gateway_account_send_state(account_id PK/FK, last_admitted_at_ms)`。时间为非空 BIGINT UTC 毫秒，账号删除与两表清理同事务。
+- 管理接口：`GET /admin/accounts/:id/scheduling` 返回 `{summary,snapshot}`；`GET /admin/accounts/:id/scheduling/sessions?page=1&page_size=20&state=all&prefix=` 返回 `{items,total,page,page_size,observed_at_ms}`。复用管理员认证。
+
+### 3. Contracts
+
+- 绑定 key 是固定域、Token ID 与改写前显式 SID 的 SHA256；不存原 SID／提示词／凭据，不与原协议 `session_hash` 混用。无 SID 不制造稳定会话；不同 Token 不串号。
+- 硬资格保留 Token 范围、账号状态、真实 5h／7d 控制线、Fable 门禁及既有故障排除。有效老绑定遇到本地并发繁忙、队满、发送等待或超时不迁移；新 v3 路径不再读写旧缓存绑定。
+- 新会话先剔除完全无有界容量的账号，再保留人工优先级，组内优先即时容量。没有即时候选时仅进入可容纳且预计等待不超预算的队列；最终真实许可裁决竞争，排队不扣发送名额。
+- 普通请求 2 单位、Haiku 1 单位及 `2 × concurrency` 个等待请求的 FIFO 保持。请求租约随并发许可和响应流存活，取消／结束 Drop 回收；不把长流与准入超时混为一类。
+- 配置和绝对准入期限在请求开始时冻结。默认 120 秒，可配置 1–120；并发、退避、凭据、池／Hello、环境准备、发送及既有重试共用期限，不重置。实际提交后使用原 TTFB／流生命周期。
+- 环境与身份验证完成后才进发送 FIFO；绑定 CAS 与当前发送许可同事务。CAS 冲突回滚预算、释放当前资源并跟随最新绑定；响应结束不把旧账号写回。
+- 取得发送行写锁后读取账号表当前 RPM 并采样时间。间隔 `ceil(60000/RPM)` 毫秒，非正值不限；绑定 CAS 后、提交事务前记录认领时间。等待不持数据库锁，不积攒空闲名额或分钟补发。
+- `SendPermit` 持有公平队首至真实提交记点，释放时保存单调时钟；下一裁决同时检查持久时间和真实已过间隔。不能把数据库／提交准备耗时抵扣后一个请求的间隔。已认领但取消／发送失败保守消耗名额，不生成假提交点；空闲队列至少保留最大间隔 60 秒后才可回收。
+- `AccountService::update_account` 成功保存后通知对应发送队首；等待者重新读取 RPM，支持调低和调高，但原截止时间、协议身份快照不变。仅重新传入旧 `Account` 不能覆盖当前 RPM。
+- SQLx Any 读取这些整数时使用 `CAST(... AS TEXT)` 再严格解析 i64，表中仍保存 BIGINT；SQLite 的运行时 INTEGER 可能经 Any 按 i32 映射，不能仅用 Rust `get::<i64>` 假定完整毫秒。分页排序使用底层数值列，不能按文本投影排序。
+- 绑定闲置 TTL 为 60 分钟。独立维护循环每分钟按当前 revision 批量续租活动绑定，不推进最近活动；读取不续租。过期清理批次上限 200、每轮最多 50 批；旧版本不能续租或覆盖新版本，重建 revision 不复用。
+- 智能因素为可用负载、有效剩余额度、真实健康、响应头延迟，均高分优先。未知额度／反馈为 0.5；只读未来有效的 5h／7d 窗口，不把未知当零用量优惠。真实请求终态反馈复用现有观察器，HTTP 200 SSE 错误不算成功，用户输入错误、取消、本地拒绝和采样缺失不污染健康，不主动探测模型。
+- 默认权重 `1/0.8/1/0.5`；健康普通 EWMA 0.2、容量拒绝 0.4、失败半衰期 15 分钟、延迟尺度 10 秒。智能近优差值 0.05 内按稳定账号 ID 轮转；`legacy_score` 只替换排序，旧低分优先字段不被智能高分覆盖，绑定与发送闸门继续生效。
+
+| 字符串 setting | 默认 | 校验 |
+| --- | --- | --- |
+| `v3_scheduling_mode` | `smart` | `smart`／`legacy_score` |
+| `v3_admission_wait_seconds` | `120` | 整数 1–120 |
+| `v3_smart_weight_load` | `1` | 有限数 0–10，至多一位小数 |
+| `v3_smart_weight_quota` | `0.8` | 同上 |
+| `v3_smart_weight_health` | `1` | 同上 |
+| `v3_smart_weight_latency` | `0.5` | 同上；四项不得全零 |
+
+- 默认值由 `V3_SCHEDULING_DEFAULTS` 共用；更新在设置锁内合并、整体校验、事务保存，再原子替换已校验快照，不能二次读库使并发更新回退。旧三项评分权重保留。
+- 账号列表新增可选 `v3_scheduling`／`v3_scheduling_error`，详情 `summary` 包含 config、factors、capacity、绑定／活跃会话、无当前绑定请求、各阶段及下一许可。`capacity.reason` 为 `ready/concurrency/pacing/queue_full/wait_budget/pending_submissions/account_unavailable`；无准入容量或前方有准备请求时不得显示 ready。
+- `snapshot` 含 observed/history_available_from、截断／丢失标记、独立 60 秒提交统计、当前请求与真实提交事件。事件最多 5 分钟、每账号 500、全局 10000；重启有历史缺口，不补造过去或未来点。实心点是 Gateway 发起 sender 提交，空心点是预计最早许可，不能宣称供应商已接收或未来已预订。
+- 会话分页 page≥1、page_size 默认 20／最大 100，state 为 all／active／idle，prefix 为最多 64 位十六进制。只返回匿名摘要及时间、阶段，不返回正文／原 SID／revision／凭据。绑定会话、不同活跃会话、请求及上游 Session 池槽位分别统计；同一会话可同时有多个阶段请求。
+- 管理读取无调度副作用，不续租、消费许可或唤醒环境。详情沿用 5 秒刷新，仅打开且页面可见时读取；关闭／隐藏取消，防重叠和旧响应覆盖。失败保留原快照并标记陈旧，倒计时在浏览器递减且标为预计。会话总数缩小致页码越界时，同轮最多回读一次第一页，成功后一起更新页码与数据；归零保持第一页。
+- 不改官方缓存参数、正文前缀、上游池、TLS／身份冻结或原始压缩／流字节；既有实际重试均过发送闸门，不新增重试次数／迁移条件。排序可退 `legacy_score`；完整回退使用旧构建并保留增量表。此合同不等于官方账号安全阈值或缓存命中保证，也不包含多实例全局并发调度。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 有效老绑定但并发繁忙／队满／等待到期 | 原账号等待或本地 429，保留绑定，`Retry-After: 1` |
+| 新会话没有有界容量 | 本地 429，不提前绑定或消费发送名额 |
+| 同 key 并发认领不同账号 | CAS 唯一赢家，失败事务预算回滚 |
+| 写锁／环境同批就绪／分钟切换／重启 | 不积攒许可；持久与单调时钟共同控制提交间隔 |
+| 等待中调整 RPM | 当前值参与下一裁决，唤醒等待但不重置期限 |
+| 调度状态不可读写／数值非法 | 固定 503，停止新增提交，不泄露底层错误 |
+| 本地 mock／缓存命中或提交前取消 | 不造实际提交事件／attempt，不污染上游健康 |
+| HTTP 200 内 SSE 错误 | 原字节透传，现有完整终态进入失败反馈 |
+| 管理未认证／参数越界 | 401／400，读取不改变绑定或发送状态 |
+| 页面隐藏／关闭、读取失败、会话骤减 | 停止刷新／保留陈旧快照／有界回读第一页 |
+
+### 5. Scenarios and Examples
+
+- 正常：A 已绑定且繁忙、B 空闲时，老会话留 A，新会话可进 B；50 RPM 的发送间隔至少 1200ms。
+- 基础：无显式 SID 只按新请求准入；网关重启恢复有效绑定与许可时间，时间轴从新进程采集起点开始。
+- 错误用法：在数据库等待前采样时间、用选号快照 RPM，或取得许可后立即丢弃再准备提交，会在写锁释放／限额调整时误放行。正确处理：生产调用 `claim_current`，并将许可持有到提交边界：
+
+```rust
+let permit = request.admit(account).await?;
+// 此处只做已准备请求的轻量提交收口，不再等待环境或解析大正文。
+permit.submitted();
+transport.submit(prepared, body, ttfb_timeout).await
+```
+
+- 错误用法：把同会话的两个请求算成两个会话、把池槽位当官方会话，或在绑定减少后只更新 total 而保留越界页码。正确处理：按 key 去重、阶段单独计数，页面越界回读第一页。
+
+### 6. Tests Required
+
+- `tests/v3_scheduling_test.rs`：SQLite／隔离 PG 共用 CAS、回滚、完整 UTC 毫秒、续租、清理、账号删除及跨分钟／重启合同；不得只用小于 i32 上限的模拟时间证明持久精度。
+- `sqlite_write_lock_and_held_permit_cannot_bank_send_time`：写锁延迟后才采样；持有许可时后续不抢跑，提交后仍符合间隔。
+- `waiting_requests_reload_current_rpm_without_resetting_deadline` 及 PG `current_rpm_contract`：300→60、1→300，旧快照不能绕过新 RPM，唤醒及时，期限不变。
+- `capacity_reason_matches_pending_work_and_wait_budget`：无容量时非 ready，前方请求和超期各有原因；原有绑定、Token 隔离、近优轮转、取消、状态故障与只读查询回归保持。
+- Gateway 的 `v3_real_http_disconnect_releases_waiting_request`／`v3_real_http_stream_disconnect_releases_execution`、`v3_pacing_timeout_preserves_binding_and_has_no_attempt`、`v3_sse_error_feedback_uses_existing_body_observation`；真实本地 HTTP 验证资源与原始字节。
+- `cold_environment_ready_cohort_still_submits_smoothly` 保留正式归属校验，以本地 sender 验证同批就绪后的真实提交间隔与压缩字节。
+- 管理路由覆盖鉴权、有界分页、读取不续租、设置合并校验与热刷新；前端构建之外验证单会话多请求、原因文案、三页缩为一页／归零、失败陈旧和隐藏／关闭暂停。完整 Rust 回归通过；本地合成数据不得描述为真实账号或生产验收。

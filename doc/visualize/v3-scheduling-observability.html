@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>v3 调度与会话可视化设计</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: system-ui, 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      margin-bottom: 2rem;
+    }
+    
+    .header-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      background: #22d3ee;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+    }
+    
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-left: 1.75rem;
+    }
+    
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    
+    svg {
+      width: 100%;
+      min-width: 900px;
+      display: block;
+    }
+    
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    
+    .card {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 0.75rem;
+      border: 1px solid #1e293b;
+      padding: 1.25rem;
+    }
+    
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .card-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    
+    .card h3 {
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    
+    .card ul {
+      list-style: none;
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+    
+    .card li {
+      line-height: 1.7;
+      margin-bottom: 0.375rem;
+    }
+    
+    .footer {
+      text-align: center;
+      margin-top: 1.5rem;
+      color: #475569;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>v3 调度与会话可视化</h1>
+      </div>
+      <p class="subtitle">规划示意 · 账号总览、发送时间轴、当前请求状态和会话分布 · 数值均为合成示例</p>
+    </div>
+
+    
+    <div class="diagram-container">
+      <svg viewBox="0 0 1120 1030" role="img" aria-labelledby="diagram-title diagram-desc">
+<title id="diagram-title">v3 平滑发送与账号会话可视化规划</title>
+<desc id="diagram-desc">合成账号的负载概览、请求等待状态、发送间隔和脱敏会话表。数值均为设计示例，不是线上数据。</desc>
+<defs>
+  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#34d399"/></marker>
+  <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#fb7185"/></marker>
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/></pattern>
+</defs>
+<rect width="100%" height="100%" fill="url(#grid)"/>
+
+<line x1="260" y1="329" x2="298" y2="329" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<line x1="540" y1="329" x2="578" y2="329" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<line x1="820" y1="329" x2="858" y2="329" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<path d="M140 367 V385 H700 M420 367 V385 M700 367 V385 M560 385 V404" fill="none" stroke="#fb7185" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-rose)"/>
+<rect x="10" y="254" width="1100" height="212" rx="12" fill="none" stroke="#fbbf24" stroke-dasharray="7,4"/>
+
+<text x="20" y="30" fill="#e2e8f0" font-size="17" text-anchor="start" font-weight="600">① 账号总览：绑定、活跃、请求和槽位分别统计</text>
+<rect x="20" y="54" width="340" height="170" rx="10" fill="#020617"/><rect x="20" y="54" width="340" height="170" rx="10" fill="rgba(8,51,68,.4)" stroke="#22d3ee" stroke-width="1.3"/>
+<text x="36" y="82" fill="#22d3ee" font-size="15" text-anchor="start" font-weight="600">账号 A · 可接纳新会话</text>
+<text x="36" y="112" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">已绑定 8 个会话 · 活跃 2 个</text>
+<text x="36" y="139" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">执行 2 · 等槽 0 · 等发送 1</text>
+<text x="36" y="170" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">槽位 3/4 · 最近 60 秒提交 32 次</text>
+<text x="36" y="199" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">上限 50 RPM · 下一可发 0.8 秒</text>
+<rect x="390" y="54" width="340" height="170" rx="10" fill="#020617"/><rect x="390" y="54" width="340" height="170" rx="10" fill="rgba(120,53,15,.3)" stroke="#fbbf24" stroke-width="1.3"/>
+<text x="406" y="82" fill="#fbbf24" font-size="15" text-anchor="start" font-weight="600">账号 B · 暂缓新会话</text>
+<text x="406" y="112" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">已绑定 12 个会话 · 活跃 3 个</text>
+<text x="406" y="139" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">执行 2 · 等槽 4 · 等发送 2</text>
+<text x="406" y="170" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">槽位 4/4 · 最近 60 秒提交 47 次</text>
+<text x="406" y="199" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">等待容量释放 · 老会话保留绑定</text>
+<rect x="760" y="54" width="340" height="170" rx="10" fill="#020617"/><rect x="760" y="54" width="340" height="170" rx="10" fill="rgba(76,29,149,.4)" stroke="#a78bfa" stroke-width="1.3"/>
+<text x="776" y="82" fill="#a78bfa" font-size="15" text-anchor="start" font-weight="600">账号 C · 环境准备中</text>
+<text x="776" y="112" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">已绑定 3 个会话 · 活跃 1 个</text>
+<text x="776" y="139" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">执行 0 · 等槽 0 · 准备环境 1</text>
+<text x="776" y="170" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">槽位 1/4 · 当前采集不足 60 秒</text>
+<text x="776" y="199" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">历史从本次启动开始 · 不补造数据</text>
+<text x="26" y="278" fill="#fbbf24" font-size="13" text-anchor="start" font-weight="600">② 账号 A 的当前请求：同一会话可以同时等待和执行；准入共用一个截止时间</text>
+<rect x="20" y="294" width="240" height="73" rx="10" fill="#020617"/><rect x="20" y="294" width="240" height="73" rx="10" fill="rgba(251,146,60,.2)" stroke="#fb923c" stroke-width="1.3"/>
+<text x="140" y="321" fill="#fb923c" font-size="13" text-anchor="middle" font-weight="600">等并发槽 · 0 个请求</text>
+<text x="140" y="346" fill="#94a3b8" font-size="11" text-anchor="middle" font-weight="400">加权 FIFO · 队列有界</text>
+<rect x="300" y="294" width="240" height="73" rx="10" fill="#020617"/><rect x="300" y="294" width="240" height="73" rx="10" fill="rgba(120,53,15,.3)" stroke="#fbbf24" stroke-width="1.3"/>
+<text x="420" y="321" fill="#fbbf24" font-size="13" text-anchor="middle" font-weight="600">准备账号环境 · 0 个请求</text>
+<text x="420" y="346" fill="#94a3b8" font-size="11" text-anchor="middle" font-weight="400">验证账号、环境和代次</text>
+<rect x="580" y="294" width="240" height="73" rx="10" fill="#020617"/><rect x="580" y="294" width="240" height="73" rx="10" fill="rgba(251,146,60,.2)" stroke="#fb923c" stroke-width="1.3"/>
+<text x="700" y="321" fill="#fb923c" font-size="13" text-anchor="middle" font-weight="600">等发送间隔 · 1 个请求</text>
+<text x="700" y="346" fill="#94a3b8" font-size="11" text-anchor="middle" font-weight="400">未发送 · 不消耗提前预订名额</text>
+<rect x="860" y="294" width="240" height="73" rx="10" fill="#020617"/><rect x="860" y="294" width="240" height="73" rx="10" fill="rgba(6,78,59,.4)" stroke="#34d399" stroke-width="1.3"/>
+<text x="980" y="321" fill="#34d399" font-size="13" text-anchor="middle" font-weight="600">已提交／执行 · 2 个请求</text>
+<text x="980" y="346" fill="#94a3b8" font-size="11" text-anchor="middle" font-weight="400">记录真实提交 · 随流释放许可</text>
+<rect x="260" y="405" width="600" height="43" rx="8" fill="#020617"/><rect x="260" y="405" width="600" height="43" rx="8" fill="rgba(136,19,55,.4)" stroke="#fb7185" stroke-width="1.3"/>
+<text x="560" y="432" fill="#fda4af" font-size="13" text-anchor="middle" font-weight="400">任一准入阶段到期／队满 → 返回 429，既有会话仍绑定原账号</text>
+<text x="20" y="501" fill="#e2e8f0" font-size="17" text-anchor="start" font-weight="600">③ 提交时间轴：实心点已提交，空心点仅表示最早可发时刻</text>
+<text x="20" y="527" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">完整视图显示最近 5 分钟；下图用 6 秒局部示例说明 50 RPM 的 1.2 秒间隔</text>
+<line x1="130" y1="585" x2="1060" y2="585" stroke="#475569" stroke-width="2"/>
+<line x1="140" y1="580" x2="140" y2="594" stroke="#64748b"/>
+<text x="140" y="616" fill="#94a3b8" font-size="12" text-anchor="middle" font-weight="400">0.0 秒</text>
+<circle cx="140" cy="585" r="8" fill="#34d399" stroke="#020617" stroke-width="2"/>
+<text x="230" y="562" fill="#34d399" font-size="11" text-anchor="middle" font-weight="400">间隔 1.2 秒</text>
+<line x1="320" y1="580" x2="320" y2="594" stroke="#64748b"/>
+<text x="320" y="616" fill="#94a3b8" font-size="12" text-anchor="middle" font-weight="400">1.2 秒</text>
+<circle cx="320" cy="585" r="8" fill="#34d399" stroke="#020617" stroke-width="2"/>
+<text x="410" y="562" fill="#34d399" font-size="11" text-anchor="middle" font-weight="400">间隔 1.2 秒</text>
+<line x1="500" y1="580" x2="500" y2="594" stroke="#64748b"/>
+<text x="500" y="616" fill="#94a3b8" font-size="12" text-anchor="middle" font-weight="400">2.4 秒</text>
+<circle cx="500" cy="585" r="8" fill="#34d399" stroke="#020617" stroke-width="2"/>
+<text x="590" y="562" fill="#34d399" font-size="11" text-anchor="middle" font-weight="400">间隔 1.2 秒</text>
+<line x1="680" y1="580" x2="680" y2="594" stroke="#64748b"/>
+<text x="680" y="616" fill="#94a3b8" font-size="12" text-anchor="middle" font-weight="400">3.6 秒</text>
+<circle cx="680" cy="585" r="8" fill="#34d399" stroke="#020617" stroke-width="2"/>
+<text x="770" y="562" fill="#34d399" font-size="11" text-anchor="middle" font-weight="400">间隔 1.2 秒</text>
+<line x1="860" y1="580" x2="860" y2="594" stroke="#64748b"/>
+<text x="860" y="616" fill="#94a3b8" font-size="12" text-anchor="middle" font-weight="400">4.8 秒</text>
+<circle cx="860" cy="585" r="8" fill="#34d399" stroke="#020617" stroke-width="2"/>
+<line x1="1040" y1="580" x2="1040" y2="594" stroke="#64748b"/>
+<text x="1040" y="616" fill="#94a3b8" font-size="12" text-anchor="middle" font-weight="400">6.0 秒</text>
+<line x1="1040" y1="548" x2="1040" y2="635" stroke="#a78bfa" stroke-dasharray="5,4"/><circle cx="1040" cy="585" r="9" fill="#020617" stroke="#a78bfa" stroke-width="2"/>
+<line x1="920" y1="571" x2="920" y2="630" stroke="#22d3ee" stroke-dasharray="3,3"/>
+<text x="920" y="651" fill="#22d3ee" font-size="12" text-anchor="middle" font-weight="400">当前</text>
+<text x="1040" y="651" fill="#a78bfa" font-size="12" text-anchor="middle" font-weight="400">最早可发</text>
+<text x="20" y="680" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">不画未来请求预订；重启、丢失或截断的历史留空，并显示采集范围。</text>
+<text x="20" y="722" fill="#e2e8f0" font-size="17" text-anchor="start" font-weight="600">④ 账号 A 的网关会话：脱敏摘要、阶段请求数、活动时间和有效期</text>
+<rect x="20" y="743" width="1080" height="170" rx="8" fill="#020617"/><rect x="20" y="743" width="1080" height="170" rx="8" fill="rgba(76,29,149,.18)" stroke="#a78bfa" stroke-width="1.3"/>
+<text x="40" y="770" fill="#a78bfa" font-size="12" text-anchor="start" font-weight="600">会话摘要</text>
+<text x="250" y="770" fill="#a78bfa" font-size="12" text-anchor="start" font-weight="600">绑定账号</text>
+<text x="420" y="770" fill="#a78bfa" font-size="12" text-anchor="start" font-weight="600">等槽／等发送／执行</text>
+<text x="740" y="770" fill="#a78bfa" font-size="12" text-anchor="start" font-weight="600">最近活动</text>
+<text x="920" y="770" fill="#a78bfa" font-size="12" text-anchor="start" font-weight="600">闲置有效期</text>
+<line x1="32" y1="785" x2="1088" y2="785" stroke="#334155"/>
+<text x="40" y="811" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">a13f…7c2d</text>
+<text x="250" y="811" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">账号 A</text>
+<text x="420" y="811" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">0 ／ 1 ／ 1</text>
+<text x="740" y="811" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">刚刚</text>
+<text x="920" y="811" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">活动中续租</text>
+<text x="40" y="846" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">d204…aa81</text>
+<text x="250" y="846" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">账号 A</text>
+<text x="420" y="846" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">0 ／ 0 ／ 1</text>
+<text x="740" y="846" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">2 秒前</text>
+<text x="920" y="846" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">活动中续租</text>
+<text x="40" y="881" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">91ba…663e</text>
+<text x="250" y="881" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">账号 A</text>
+<text x="420" y="881" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">0 ／ 0 ／ 0</text>
+<text x="740" y="881" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">12 分钟前</text>
+<text x="920" y="881" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">剩余 48 分钟</text>
+<text x="20" y="938" fill="#94a3b8" font-size="12" text-anchor="start" font-weight="400">示例仅展示 3 行；实际分页查看。上游 Session 池槽位独立显示，不等于网关会话数。</text>
+<rect x="20" y="969" width="14" height="11" rx="3" fill="#a78bfa"/>
+<text x="43" y="979" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">绑定会话</text>
+<rect x="220" y="969" width="14" height="11" rx="3" fill="#fb923c"/>
+<text x="243" y="979" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">等待／准备</text>
+<rect x="440" y="969" width="14" height="11" rx="3" fill="#34d399"/>
+<text x="463" y="979" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">真实提交／执行</text>
+<rect x="720" y="969" width="14" height="11" rx="3" fill="#fb7185"/>
+<text x="743" y="979" fill="#cbd5e1" font-size="12" text-anchor="start" font-weight="400">拒绝但保留绑定</text>
+<text x="20" y="1014" fill="#64748b" font-size="12" text-anchor="start" font-weight="400">所有数值均为合成设计示例；当前未接入线上数据，实际界面沿用现有后台风格。</text>
+</svg>
+    </div>
+
+    
+    <div class="cards">
+  <div class="card"><div class="card-header"><div class="card-dot violet"></div><h3>关键口径：三个数量不能混用</h3></div><ul><li>绑定会话：当前未过期的账号绑定。</li><li>活跃会话：有效绑定中至少一个等待／执行请求的不同会话。</li><li>请求：一个会话可以同时发起多个请求。</li><li>上游池槽位独立展示，不等于上述数量。</li></ul></div>
+  <div class="card"><div class="card-header"><div class="card-dot emerald"></div><h3>关键判定：看真实提交和剩余等待</h3></div><ul><li>实际提交才落一个时间轴点，既有重试也计入。</li><li>倒计时表示最早许可，不是未来发送保证。</li><li>时间轴只覆盖最近短窗口，不补造缺失点。</li><li>健康和延迟来自真实请求，不发额外探测。</li></ul></div>
+  <div class="card"><div class="card-header"><div class="card-dot rose"></div><h3>异常与资源：只读观察不改变调度</h3></div><ul><li>本地超时返回 429，既有绑定保留。</li><li>采集失败显示未知／陈旧，不假装零负载。</li><li>详情可见时每 5 秒刷新，关闭或隐藏暂停。</li><li>事件缓冲有上限，截断和重启缺口明确提示。</li></ul></div>
+  <div class="card"><div class="card-header"><div class="card-dot amber"></div><h3>当前边界：设计示意</h3></div><ul><li>仅 v3 API 网关到账号发送器，不含独立 CLI 流量。</li><li>会话摘要脱敏，仅管理员可见，不读取官方聊天。</li><li>采用现有页面风格，图解的暗色不代表全站换肤。</li><li>图解为方案示意，实际功能以管理端运行状态为准。</li></ul></div>
+</div>
+
+
+    
+    <p class="footer">
+      v3 智能调度规划 · 中文图模型 · 离线 HTML / SVG · 无外部依赖
+    </p>
+  </div>
+</body>
+</html>

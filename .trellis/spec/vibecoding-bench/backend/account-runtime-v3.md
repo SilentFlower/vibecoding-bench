@@ -67,7 +67,7 @@ scripts/v3-stack stop --env <独立配置>
 
 - `prepare-cli-shared` 用于布局 2 的普通 Tasks／项目计划，账号至多两个 CLI holder，API 可同时入场。`PER_ACCOUNT_CONCURRENCY` 默认 2，合法较低配置继续限制 Tasks 与 Projects 总容量；API 容量独立。`prepare-cli` 仍为 CLI 专用排他，用于养号、抓包和续聊等既有操作，阻止其他 CLI 但允许 API；不能把旧调用自动解释成多 CLI。养号仍让位于正式工作。
 - `prepare` 创建排他维护门禁：重授权、代理修改、绑定切换、停止、重建检查或排空 API。配置 quiesce 验证排他 owner/generation、API 活动数和本环境 CLI/发送器状态。
-- CLI 安装在认领后执行，不持有环境生命周期锁；API 就绪不安装 CLI。原 weighted slot/FIFO/RPM/粘性请求和 SSE permit 规则保留，OAuth resolve 不等待 CLI 租约。
+- CLI 安装在认领后执行，不持有环境生命周期锁；API 就绪不安装 CLI。API 保留 weighted slot/FIFO 与 SSE permit，精确 Messages 的稳定绑定、当前 RPM 间隔准入及可视化遵守 [v3 API 调度合同](../../cc2api/backend/service-architecture.md#scenario-v3-api-稳定会话智能准入与平滑发送)；CLI 不共享该发送预算。OAuth resolve 不等待 CLI 租约。
 - 普通 `_cli_setup()` 的串行交接检查、画像探针与 `claim()` 共用同一个环境锁，评审不能在检查与认领之间停止 CLI；安装版本时释放该锁，由已认领作业阻止评审。坏画像仍在认领前拒绝，健康 API 保留。
 - driver 和续聊 wrapper 使用 `setsid --wait`，Docker exec 生命周期必须跟随实际进程。tmux 登录 shell 显式保留选定 CLI 缓存 PATH。
 - v3 生成 driver 时去除内部时间戳 Stop hook；UID1000 无权写 root 私有 runtime 树，该信号也没有消费者。完成仍由真实主会话 JSONL 的最新稳定最终 assistant 文本判定；配置业务补充时还需 [阶段契约](./topic-prompt-contract.md#scenario-自包含题库与冻结的有限业务补充) 核验全部选定轮次，不需要放宽控制目录权限。原 hooks 在作业收口时按快照恢复。
