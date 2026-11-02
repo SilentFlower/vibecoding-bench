@@ -1,0 +1,43 @@
+{
+  "id": "claude-ultra-plan-adaptation",
+  "name": "claude-ultra-plan-adaptation",
+  "title": "Claude Ultra：适配 v3 与 ai-fund 套餐和额度展示",
+  "description": "跨 v3 与 ai-fund 保留真实套餐分级元数据，识别 Ultra 并兼容可选 5h 窗口。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "cc2api",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-02",
+  "completedAt": "2026-11-02",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-02T16:43:48Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-02-claude-ultra-account-migration",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-02T16:43:48.121590+00:00",
+    "completedSteps": [
+      "三仓实现、完整验证与规范更新",
+      "三仓业务提交与推送",
+      "ai-fund 主版 Worker/Pages 发布验收",
+      "v3 联合批次部署验收及镜像回收核对"
+    ],
+    "partialStep": null,
+    "nextStep": "迁移 9-17；验收成功后永久退役旧部署",
+    "notes": "所有生产检查通过，无真实模型探针；不备份、不重算 us 资源配置。"
+  }
+}
