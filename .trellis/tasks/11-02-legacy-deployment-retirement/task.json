@@ -3,7 +3,7 @@
   "name": "legacy-deployment-retirement",
   "title": "旧版退役：迁移验收后删除旧服务、镜像与挂载数据",
   "description": "9-17迁移验收及消费者切换后，按用户明确授权永久删除旧版两服务、无引用旧镜像、旧data目录与网关卷，不归档。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,10 +11,10 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-11-02",
-  "completedAt": null,
+  "completedAt": "2026-11-02",
   "closeout": {
-    "status": "pending",
-    "closedAt": null,
+    "status": "closed",
+    "closedAt": "2026-11-02T17:56:47Z",
     "blockers": []
   },
   "branch": null,
@@ -29,15 +29,17 @@
   "notes": "",
   "meta": {},
   "progress": {
-    "updatedAt": "2026-11-02T17:51:34.524291+00:00",
+    "updatedAt": "2026-11-02T17:56:47.180950+00:00",
     "completedSteps": [
-      "9-17迁移收据与当前目标健康已验证",
-      "NewAPI渠道80等价切流且旧入口引用为零",
-      "冻结2容器、70路径、1卷、8镜像及v3保护集",
-      "来源配置与退役规范已提交推送"
+      "迁移验收与目标账号健康通过",
+      "NewAPI渠道80等价切流，完整分页无旧入口引用",
+      "ai-fund部署停用旧来源并移除旧Secret，其他绑定保持",
+      "永久删除2旧容器、70路径、1卷、8镜像，无归档",
+      "30保留容器、当前及最近两套发布、配置摘要保持",
+      "公网健康、鉴权、数据库与实际空间差验收通过"
     ],
-    "partialStep": "Worker生产部署、旧Secret移除与物理退役尚未执行",
-    "nextStep": "部署Worker后完成精确删除和生产复核",
-    "notes": "无旧数据或凭据归档；任务保持in_progress。"
+    "partialStep": null,
+    "nextStep": "父任务集成验收",
+    "notes": "实际可用空间净增8045395968字节，最终可用19876438016字节；没有真实模型探针。"
   }
 }
