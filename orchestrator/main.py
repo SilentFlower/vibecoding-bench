@@ -806,6 +806,15 @@ class Cc2ApiClient:
         """
         return self._request("POST", "/admin/accounts", payload)
 
+    def update_subscription_metadata(self, account_id: int, payload: dict) -> dict:
+        """局部同步官方套餐字段，不携带或覆盖轮换中的登录凭据。
+
+        :param account_id: 已验证身份的 cc2api 账号 ID
+        :param payload: 官方 profile 中实际存在的套餐元数据
+        :return: 更新后的账号
+        """
+        return self._request("PUT", f"/admin/accounts/{account_id}", payload)
+
     def resolve_credentials(
         self,
         account_id: int,
@@ -942,7 +951,8 @@ def _read_bench_profile_identity(account_name: str, profile_dir: Optional[Path] 
         "access_token": access_token,
         "refresh_token": refresh_token,
         "expires_at": int(expires_at),
-        "subscription_type": str(oauth.get("subscriptionType") or "").strip() or None,
+        "subscription_type": oauth["subscriptionType"].strip() or None if isinstance(oauth.get("subscriptionType"), str) else None,
+        "rate_limit_tier": oauth["rateLimitTier"].strip() or None if isinstance(oauth.get("rateLimitTier"), str) else None,
         "email": email.strip(),
         "account_uuid": str(oauth_account.get("accountUuid") or "").strip() or None,
         "organization_uuid": str(oauth_account.get("organizationUuid") or "").strip() or None,
@@ -5617,6 +5627,8 @@ class LoginManager:
                 "lease": context["lease"], "phase": "submitting", "auth_method": status.get("authMethod"),
                 "identity": {key: identity[key] for key in ("email", "account_uuid", "organization_uuid")}}
             session.import_payload = {key: identity[key] for key in ("email", "account_uuid", "organization_uuid", "access_token", "refresh_token", "expires_at")}
+            # 旧登录产物缺字段时不改变原导入摘要；真实元数据与新凭据在同一事务提交。
+            session.import_payload.update({key: identity[key] for key in ("subscription_type", "rate_limit_tier") if identity.get(key) is not None})
             session.import_payload.update(operation_id=operation_id, owner=context["lease"]["owner"], generation=context["lease"]["generation"])
             # 提交意图先落盘；HTTP 超时不能被误当成“尚未更新远端”。
             atomic_json(path, record)
@@ -9286,6 +9298,7 @@ def _associate_account_to_cc2api(aid: int, action: str, target_id: Optional[int]
                             "account_uuid": profile.get("account_uuid"),
                             "organization_uuid": profile.get("organization_uuid"),
                             "subscription_type": profile.get("subscription_type"),
+                            "rate_limit_tier": profile.get("rate_limit_tier"),
                             "allow_fast_mode": False,
                             "billing_mode": "rewrite",
                             "upstream_session_pool_enabled": True,
@@ -9305,6 +9318,9 @@ def _associate_account_to_cc2api(aid: int, action: str, target_id: Optional[int]
                 if cc2api_account_id <= 0:
                     raise ValueError("cc2api 账号 ID 无效")
                 _require_cc2api_binding_available(aid, cc2api_account_id)
+                metadata = {key: profile[key] for key in ("subscription_type", "rate_limit_tier") if profile.get(key) is not None}
+                if not created and metadata:
+                    matched = cc2api_client.update_subscription_metadata(cc2api_account_id, metadata)
                 _resolve_and_sync_cc2api_credentials(
                     account["name"],
                     cc2api_account_id,

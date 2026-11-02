@@ -2261,6 +2261,23 @@ global.fetch = async (_url, options) => {
             self.addCleanup(manager.stop)
         return client
 
+    def test_subscription_metadata_create_and_existing_binding_use_real_profile(self) -> None:
+        """真实分级贯通创建和局部同步，缺字段不伪造默认值。:return: None。"""
+        client = self._prepare_cc2api_action(False)
+        path = main.PROFILES_DIR / 'main/.credentials.json'
+        data = json.loads(path.read_text())
+        data['claudeAiOauth'].update(subscriptionType='max', rateLimitTier='default_claude_max_20x')
+        path.write_text(json.dumps(data))
+        main.create_account_in_cc2api(1)
+        payload = client.create_account.call_args.args[0]
+        self.assertEqual('max', payload['subscription_type'])
+        self.assertEqual('default_claude_max_20x', payload['rate_limit_tier'])
+        client.list_accounts.return_value = [client.create_account.return_value]
+        client.update_subscription_metadata.return_value = client.create_account.return_value
+        main._associate_account_to_cc2api(1, 'sync')
+        client.update_subscription_metadata.assert_called_once_with(7, {
+            'subscription_type': 'max', 'rate_limit_tier': 'default_claude_max_20x'})
+
     def test_explicit_create_rejects_existing_match_without_binding_or_refresh(self) -> None:
         """创建发现已有身份时不能自动关联或先覆盖本地凭据。
 

@@ -296,3 +296,48 @@ let observed = capture.observation(complete);
 | setting 写入后不 reload | UI 显示已保存但热路径不生效 | `update_settings` 后调用对应 reload |
 | 前端类型漏字段 | 构建或运行时展示异常 | 同步 `web/src/api.ts` |
 | 直接暴露 `access_token` / `refresh_token` | 凭据泄露 | 管理 API 和 UI 做脱敏或必要最小展示 |
+
+
+## Scenario: 官方套餐分级与 Ultra 展示
+
+### 1. Scope / Trigger
+
+- 修改套餐存储、管理接口、GrowthBook、bench profile 同步或账号页面时适用。
+
+### 2. Signatures
+
+- `accounts.rate_limit_tier TEXT NULL`；Account、DeviceProfile 与管理创建/更新 DTO 同步。
+- `PUT /admin/accounts/{id}` 可局部提交 `subscription_type/rate_limit_tier`。
+- `POST /admin/accounts/{id}/oauth-credentials/import` 可选同名字段，来自 CLI `claudeAiOauth.subscriptionType/rateLimitTier`。
+
+### 3. Contracts
+
+- 原始套餐与真实分级分别保存；显式 ultra 或 max + 真实 `default_claude_max_20x` 显示 Ultra；Max 5x、无分级 max 仍显示 Max。不可把协议兼容回退当作展示事实。
+- 协议优先真实分级；旧 max/pro 等回退保持兼容，ultra 无真实分级时省略 rateLimitTier，不拼造 `default_claude_ultra`。
+- 字段长度最多 256 字节，拒绝控制字符，修剪首尾空白。管理更新缺字段保持、null/空文本清除；类型改变且未提交分级时清除旧分级。
+- 只更新套餐的载荷使用 OAuth 刷新锁与局部 SQL，不回写 AT/RT。SQLx Any 空参数须显式 `CAST(... AS TEXT)`，避免 PostgreSQL 将空字符串解析成整数。
+- 重授权元数据与凭据同事务；新字段未提供时序列化省略且追加于旧 DTO 字段之后，旧幂等摘要保持。实际提供则参与摘要；相同操作不同元数据拒绝。
+- bench 创建、已有身份同步和重授权仅传官方实际提供的元数据，不覆盖并发/RPM/控制线。
+- 5h 显式 null 显示“当前未返回5小时窗口”；缺失/异常显示未知；真实窗口继续展示。套餐名称和 null 不代表无限制，不绕过 7d/Fable/429。
+
+### 4. Validation & Error Matrix
+
+| 输入或状态 | 结果 |
+| --- | --- |
+| 旧库/旧创建缺真实分级 | NULL，不批量猜测 |
+| 非文本、超过 256 字节或控制字符 | 400；状态快捷操作前拒绝 |
+| 同步期间凭据已轮换 | 保留最新 AT/RT，仅修改套餐列 |
+| 重授权重复提交/修改同操作分级 | 返回当前快照/冲突拒绝 |
+
+### 5. Scenarios and Examples
+
+- 正常：`max/default_claude_max_20x` 原样保存，页面显示 Ultra。
+- 边界：原始 `max` 缺真实分级只显示 Max；原始 `ultra` 缺分级不发送虚构协议字段。
+- 错误：读取旧 Account 后整行覆盖凭据来同步套餐。正确：只提交套餐字段，使用局部 SQL 与刷新锁。
+
+### 6. Tests Required
+
+- `account_store_timestamp_test`：双库旧列升级、重复迁移、读写、局部更新保留轮换凭据及类型改变清分级；PostgreSQL 使用独立临时测试库。
+- router/service/identity：创建与局部更新、先校验后写状态、旧导入序列化、幂等冲突和真实分级/Ultra 未知协议值。
+- Python `test_main/test_login_reauth`：真实 profile 创建、已有同步和重新授权载荷。
+- `web/tests/subscription.test.mjs`：套餐与 5h 语义矩阵；`node --experimental-strip-types --test tests/subscription.test.mjs`，并运行前端 build。

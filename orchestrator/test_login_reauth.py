@@ -203,6 +203,18 @@ class BoundReauthTests(unittest.TestCase):
         self.assertEqual(main.login_commit(session.sid, main.LoginStartIn(name="synthetic")), result)
         self.gateway.import_credentials.assert_called_once()
 
+    def test_bound_commit_imports_only_actual_subscription_metadata(self) -> None:
+        """官方分级随原绑定的新凭据提交，不从套餐名构造分级。@return None。"""
+        session = self.start_login()
+        path = session.profile_dir / '.credentials.json'
+        credentials = json.loads(path.read_text())
+        credentials['claudeAiOauth'].update(subscriptionType='max', rateLimitTier='default_claude_max_20x')
+        atomic_json(path, credentials)
+        main.login_commit(session.sid, main.LoginStartIn(name='synthetic', force_reauth=True))
+        payload = self.gateway.import_credentials.call_args.args[1]
+        self.assertEqual(payload['subscription_type'], 'max')
+        self.assertEqual(payload['rate_limit_tier'], 'default_claude_max_20x')
+
     def test_wrong_login_and_missing_uuid_do_not_overwrite_original_credentials(self) -> None:
         """身份不符时提交前拒绝，取消也保留旧 profile。@return None。"""
         session = self.start_login()
