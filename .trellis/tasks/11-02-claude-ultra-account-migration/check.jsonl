@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/cc2api/backend/settings-database.md", "reason": "实际套餐分级与持久化契约"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "OAuth导入和刷新所有权"}
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "固定身份、迁移及永久退役和发布保护契约"}
