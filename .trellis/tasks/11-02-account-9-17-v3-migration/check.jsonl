@@ -1,0 +1,2 @@
+{"file": ".trellis/spec/vibecoding-bench/backend/account-runtime-v3.md", "reason": "既有登录态迁移与原生身份前置"}
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "OAuth解析锁与正式配置门禁"}

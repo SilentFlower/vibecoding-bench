@@ -1,0 +1,43 @@
+{
+  "id": "account-9-17-v3-migration",
+  "name": "account-9-17-v3-migration",
+  "title": "账号迁移：将旧版 9-17 的登录态交接至 v3",
+  "description": "核对并交接旧版 9-17 的有效 OAuth 登录态、CLI 身份、代理和配置至 us v3，历史迁移范围待确认。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-02",
+  "completedAt": "2026-11-02",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-02T17:17:28Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-02-claude-ultra-account-migration",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-02T17:17:28.656743+00:00",
+    "completedSteps": [
+      "源端真实接口和占用核对",
+      "源退出、有效刷新锁屏障与最终凭据交接",
+      "新建空HOME原身份初始化、正式绑定和策略恢复",
+      "唯一所有权、三份AT-only、原生读取、额度和管理健康复核"
+    ],
+    "partialStep": null,
+    "nextStep": "永久退役旧容器、无引用旧镜像与挂载数据，退出旧消费入口",
+    "notes": "bench11 / gateway7，原CLI身份与代理、并发4/RPM40保持；养号关闭；无历史导入、无真实模型探针。"
+  }
+}
