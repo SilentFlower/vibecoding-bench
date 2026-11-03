@@ -101,7 +101,7 @@ src/tlsfp/
 ### 1. Scope / Trigger
 
 - Trigger：修改 `UsageCapture`、`ResponseBodyDecoder`、SSE 用量解析、压缩响应观察或诊断摘要时适用。
-- 观察器只影响本地用量与诊断，不改变客户端收到的响应字节、响应头、重试和调度。
+- 观察器不改变客户端收到的响应字节、响应头和重试；已完成诊断可按下方 v3 合同回灌健康与首输出延迟。
 
 ### 2. Signatures
 
@@ -1251,6 +1251,7 @@ AccountService::create_cli_account(&mut Account) -> Result<(), AppError>
 
 ```rust
 V3Scheduler::begin(self: &Arc<Self>, token_id: i64, session_id: Option<&str>) -> SchedulingRequest
+V3Scheduler::begin_with_parameters(self: &Arc<Self>, token_id: i64, session_id: Option<&str>, parameters: &DiagnosticParameters) -> SchedulingRequest
 AccountService::select_v3_account(&self, request: &SchedulingRequest, exclude_ids: &[i64], allowed_ids: &[i64], context: &AccountSelectionContext, slot_units: u32) -> Result<SelectedAccount, AppError> // 异步
 SchedulingRequest::admit(&self, account: &Account) -> Result<SendPermit, AppError> // 异步
 SendPermit::submitted(self)
@@ -1271,10 +1272,13 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 - 环境与身份验证完成后才进发送 FIFO；绑定 CAS 与当前发送许可同事务。CAS 冲突回滚预算、释放当前资源并跟随最新绑定；响应结束不把旧账号写回。
 - 取得发送行写锁后读取账号表当前 RPM 并采样时间。间隔 `ceil(60000/RPM)` 毫秒，非正值不限；绑定 CAS 后、提交事务前记录认领时间。等待不持数据库锁，不积攒空闲名额或分钟补发。
 - `SendPermit` 持有公平队首至真实提交记点，释放时保存单调时钟；下一裁决同时检查持久时间和真实已过间隔。不能把数据库／提交准备耗时抵扣后一个请求的间隔。已认领但取消／发送失败保守消耗名额，不生成假提交点；空闲队列至少保留最大间隔 60 秒后才可回收。
-- `AccountService::update_account` 成功保存后通知对应发送队首；等待者重新读取 RPM，支持调低和调高，但原截止时间、协议身份快照不变。仅重新传入旧 `Account` 不能覆盖当前 RPM。
+- `AccountService::update_account`／`update_account_options` 成功保存后通知对应发送队首；等待者重新读取 RPM，支持调低和调高，但原截止时间、协议身份快照不变。仅重新传入旧 `Account` 不能覆盖当前 RPM。
 - SQLx Any 读取这些整数时使用 `CAST(... AS TEXT)` 再严格解析 i64，表中仍保存 BIGINT；SQLite 的运行时 INTEGER 可能经 Any 按 i32 映射，不能仅用 Rust `get::<i64>` 假定完整毫秒。分页排序使用底层数值列，不能按文本投影排序。
 - 绑定闲置 TTL 为 60 分钟。独立维护循环每分钟按当前 revision 批量续租活动绑定，不推进最近活动；读取不续租。过期清理批次上限 200、每轮最多 50 批；旧版本不能续租或覆盖新版本，重建 revision 不复用。
-- 智能因素为可用负载、有效剩余额度、真实健康、响应头延迟，均高分优先。未知额度／反馈为 0.5；只读未来有效的 5h／7d 窗口，不把未知当零用量优惠。真实请求终态反馈复用现有观察器，HTTP 200 SSE 错误不算成功，用户输入错误、取消、本地拒绝和采样缺失不污染健康，不主动探测模型。
+- 智能因素为可用负载、有效剩余额度、真实健康、首输出延迟，均高分优先。未知额度／反馈为 0.5；只读未来有效的 5h／7d 窗口，不把未知当零用量优惠。真实请求终态反馈复用现有观察器，HTTP 200 SSE 错误不算成功，用户输入错误、取消、本地拒绝和采样缺失不污染健康，不主动探测模型。
+- 首输出从准入后真正提交的 `AttemptTrace::commit` 开始计时，取已有有界解码观察器第一次看到的非空文字／思考 delta、工具参数 delta、有效文本／思考块或带有效 id/name 的 tool_use／server_tool_use；忽略头部、心跳、元数据、空白和签名。非流式 message JSON 在完整解析后记点。仅成功且完整并观察到有效输出时更新延迟；失败、取消、不完整、无输出或无诊断不能用响应头补值。
+- 请求开始时冻结 `model/thinking_type/thinking_budget/effort/stream` 白名单事实，缺失保持未知；每账号最多 64 组成功延迟 EWMA，淘汰最近采样最旧组只恢复中性。实际选号只读取同组，管理页 `factors.latency` 为全部成功首输出的账号汇总，文案必须说明区别。健康继续按账号共享，5 分近优轮换不变。
+- `AttemptDiagnostic.first_output_ms: Option<u64>` 为新增可选 JSON 摘要；历史缺失为 None，不迁移、不回填。原 `ttft_ms` 保留响应头耗时语义，不改变历史与上游遥测载荷。
 - 默认权重 `1/0.8/1/0.5`；健康普通 EWMA 0.2、容量拒绝 0.4、失败半衰期 15 分钟、延迟尺度 10 秒。智能近优差值 0.05 内按稳定账号 ID 轮转；`legacy_score` 只替换排序，旧低分优先字段不被智能高分覆盖，绑定与发送闸门继续生效。
 
 | 字符串 setting | 默认 | 校验 |
@@ -1305,6 +1309,7 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 | 调度状态不可读写／数值非法 | 固定 503，停止新增提交，不泄露底层错误 |
 | 本地 mock／缓存命中或提交前取消 | 不造实际提交事件／attempt，不污染上游健康 |
 | HTTP 200 内 SSE 错误 | 原字节透传，现有完整终态进入失败反馈 |
+| 只有头部／心跳、无有效输出或仅有其它分组样本 | 首输出未知，不把头部或其它模型用作低延迟奖励 |
 | 管理未认证／参数越界 | 401／400，读取不改变绑定或发送状态 |
 | 页面隐藏／关闭、读取失败、会话骤减 | 停止刷新／保留陈旧快照／有界回读第一页 |
 
@@ -1312,6 +1317,7 @@ SchedulingStore::claim_current(&self, account_id: i64, key: Option<&str>, expect
 
 - 正常：A 已绑定且繁忙、B 空闲时，老会话留 A，新会话可进 B；50 RPM 的发送间隔至少 1200ms。
 - 基础：无显式 SID 只按新请求准入；网关重启恢复有效绑定与许可时间，时间轴从新进程采集起点开始。
+- 边界：头部 100ms、首个有效思考 3000ms 时，调度使用 3000ms；错误做法是沿用 `ttft_ms=100`，正确处理是读取成功终态的 `first_output_ms` 并写入请求冻结分组。
 - 错误用法：在数据库等待前采样时间、用选号快照 RPM，或取得许可后立即丢弃再准备提交，会在写锁释放／限额调整时误放行。正确处理：生产调用 `claim_current`，并将许可持有到提交边界：
 
 ```rust
@@ -1330,5 +1336,50 @@ transport.submit(prepared, body, ttfb_timeout).await
 - `waiting_requests_reload_current_rpm_without_resetting_deadline` 及 PG `current_rpm_contract`：300→60、1→300，旧快照不能绕过新 RPM，唤醒及时，期限不变。
 - `capacity_reason_matches_pending_work_and_wait_budget`：无容量时非 ready，前方请求和超期各有原因；原有绑定、Token 隔离、近优轮转、取消、状态故障与只读查询回归保持。
 - Gateway 的 `v3_real_http_disconnect_releases_waiting_request`／`v3_real_http_stream_disconnect_releases_execution`、`v3_pacing_timeout_preserves_binding_and_has_no_attempt`、`v3_sse_error_feedback_uses_existing_body_observation`；真实本地 HTTP 验证资源与原始字节。
+- `first_output_*` 覆盖有效内容／空白、完整 JSON、先头部后内容、旧诊断、成功 EWMA、失败和取消不更新、跨模型／思考／stream 隔离、实际选号和 64 组上限；`long_initial_blank_lines_preserve_usage_across_codings_and_chunks` 同时断言全部受支持编码与分块的首输出。
 - `cold_environment_ready_cohort_still_submits_smoothly` 保留正式归属校验，以本地 sender 验证同批就绪后的真实提交间隔与压缩字节。
 - 管理路由覆盖鉴权、有界分页、读取不续租、设置合并校验与热刷新；前端构建之外验证单会话多请求、原因文案、三页缩为一页／归零、失败陈旧和隐藏／关闭暂停。完整 Rust 回归通过；本地合成数据不得描述为真实账号或生产验收。
+
+## Scenario: 运行中账号普通配置热更新
+
+### 1. Scope / Trigger
+
+- 修改账号表单、`PUT /admin/accounts/:id`、普通配置 SQL 或队列缩扩容时适用。
+
+### 2. Signatures
+
+- `accountUpdateDelta(current: Record<string, unknown>, baseline: Record<string, unknown>): Record<string, unknown>`：相对打开编辑弹窗时的标量快照生成更新。
+- `AccountService::update_account_options(&self, account: &Account, fields: &[&str]) -> Result<(), AppError>`（异步）。
+- `AccountStore::update_options(&self, account: &Account, fields: &[&str]) -> Result<(), AppError>`（异步）。
+
+### 3. Contracts
+
+- 普通配置允许在 API／CLI 活动时更新：name、billing_mode、subscription_type、rate_limit_tier、concurrency、priority、rpm_limit、auto_telemetry、auto_poll_usage、allow_1m_models、allow_fast_mode、上游池 enabled/size/ttl/refresh_policy 与 5h/7d 控制线。SQL 只写提交白名单列和 updated_at，不能回写快照里的凭据、状态、身份、用量或进程指标。
+- 前端只发送实际变化；空凭据表示不改，可空身份／套餐字段以 null 清除，expires_at 比较数值等价，明确清空以 null 提交。认证、代理、凭据、邮箱／账号／组织身份、有效期和状态修改继续走维护门禁；不能因为普通配置可热更新而放开环境维护。
+- 管理更新 concurrency/priority 为正 i32 整数，rpm_limit 为非负 i32，0 不限；错类型／越界 400 且不部分保存。套餐改变且未提交真实 tier 时清旧 tier，不推断商业分级。
+- 配置成功写库与队列调整共用队列写锁；原地调整并发，旧 Account 快照与目标不一致时只按持久当前值调整，读失败保留当前容量。缩容不取消已有流；先扣空闲单位，余下差额在许可归还前销毁，防止已排队请求先于后台回收抢跑。门禁等待时取消／超时也归还同一容量许可；再次扩容按最新目标，不遗留槽位吞噬任务。
+- RPM 保存通知发送等待者重新读取当前限额；准入期限不重置，优先级影响后续新会话。套餐可空字段固定绑定文本并用 NULLIF 表达清除，避免 SQLx Any 的 NULL/文本在 PostgreSQL 预编译缓存中改变参数类型。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 活动 API／CLI，只改 RPM／并发／优先级 | 200，流与租约保持 |
+| 真正修改代理／凭据且运行繁忙 | 保留维护拒绝，不中断现有活动 |
+| 旧快照保存普通配置、期间 OAuth／状态已变化 | 只写提交列，保留新凭据与当前状态 |
+| 两个普通请求运行，并发从 2 降至 1，旧等待者已排队 | 第一条结束不放新请求，第二条结束才可进入 |
+| 数值非整数、负 RPM、非正并发／优先级或超 i32 | 400，原配置保持 |
+| 套餐文本／清除反复切换 | SQLite／PG 同一连接正常保存，不出现缓存参数类型错误 |
+
+### 5. Scenarios and Examples
+
+- 正常：只改 RPM 40→20，表单发送 `{"rpm_limit":20}`，不附带未改的 auth_type／proxy_url。
+- 边界：并发缩容期间已有请求自然结束；旧请求仍带旧 concurrency 时不能恢复旧上限。
+- 错误做法：移除维护锁后整行 UPDATE，旧 RT 可能覆盖新 RT。正确处理：普通配置按白名单提交列更新，身份变更继续维护保护。
+
+### 6. Tests Required
+
+- `account_options_hot_update_preserves_active_api_cli_and_credentials`：活动 API 和共享 CLI 下保存成功、缩容目标生效、旧快照不回退、代理／凭据仍拒绝、状态与令牌保持、非法数值不写入。
+- `account_queue_hot_shrink_*`：缩容前已排队请求不能抢跑、再次扩容无残留、门禁等待取消也正确归还；原加权 FIFO 与活动计数回归保持。
+- `account_store_timestamp_test` 的 SQLite／独立 PostgreSQL 共享合同：选列保存保留并行状态、凭据和指标，未知字段整次拒绝，可空套餐文本／清除反复切换。
+- `node --experimental-strip-types --test web/tests/accountUpdate.test.mjs` 验证增量载荷、凭据空值和清除；前端 build 与完整 Rust 回归通过。
