@@ -1,5 +1,49 @@
 # v3 固定账号运行环境契约
 
+## Scenario: US 宿主管理工具继承既有口令例外
+
+### 1. Scope / Trigger
+
+- 更新 `/opt/vibebench-v3-us/deploy/v3/manage.py` 时，核对该宿主已有 `server-password-override.json`。通用仓库管理工具保持全部秘密至少 32 字符；US 宿主覆盖继承其已批准的现有管理员口令。
+
+### 2. Signatures
+
+```text
+宿主覆盖函数：_existing_us_admin_password(values: dict, deployment: str) -> bool
+宿主记录：/opt/vibebench-v3-us/server-password-override.json
+预检：preflight(values) -> Path
+兼容检查：check_credential_compatibility(root, manifest) -> None
+```
+
+### 3. Contracts
+
+- 工具升级先核对旧宿主文件和部署配置摘要，使用确认 CI 的通用源文件，再继承已有服务器覆盖；运维记录保留来源、base_revision、original_sha256、override_sha256 和批准原因。服务配置与现有口令保持，不把秘密写入命令行、日志或任务记录。
+- 例外只对 `deployment=us`、`V3_DATA_ROOT=/srv/vibebench-v3-us` 生效。记录必须为非链接普通文件，kind 为“服务器管理密码运维调整”，override_file 为 deploy/v3/manage.py；私有 approved_admin_sha256 必须与当前已批准管理员口令一致。字段值留在宿主受保护记录，不在文档写入实际摘要。
+- 仅管理员口令可使用这项既有例外；V3_INTERNAL_TOKEN、V3_SESSION_SECRET 继续至少 32 字符，新口令或其它部署沿用通用长度检查。
+- 候选环境只改变 release/control image/account image/manifest 四项，其他配置逐值相等。按当前 US 选择跳过 RAM 重算时，仍保留此前的端口、归属、镜像能力及凭据所有权回退检查。
+- 发布只读验证包括同批实际镜像源文件、协议能力、两库、管理鉴权与接口响应；自建采样会话单独撤销，用户会话保持。是否等待 API 转发按本次用户授权执行，CLI/Pi 和未确认输入仍须收口。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| US 现有口令与受保护批准记录匹配 | 继承既有口令例外 |
+| 新短口令、其它部署或记录缺失/损坏/链接 | 不使用例外，沿通用长度检查 |
+| 内部服务或会话秘密不足 32 字符 | 预检拒绝 |
+| 工具/配置摘要漂移、镜像协议不匹配 | 停止发布，不覆盖当前配置 |
+
+### 5. Scenarios and Examples
+
+- 正常：从确认 CI 更新宿主工具，保留记录批准的现有管理员口令；新所有权回退保护与原内部秘密校验同时生效。
+- 基础：其它部署继续使用仓库通用管理工具，无 US 例外。
+- 错误用法：直接覆盖宿主工具后，发现旧口令不满足通用长度要求便换密码，或删除所有秘密检查。正确处理：核对已有批准记录，仅继承对应管理员口令，保留内部和会话秘密校验。
+
+### 6. Tests Required
+
+- 宿主定向检查：原已批准口令命中；替换为另一短口令、另一 deployment 均不命中；内部/会话秘密短值分别抛出对应长度错误，且尚未运行资源计算。
+- 正式 CI 镜像在断网空库启动，验证归属协议及迁移；同批预检和实际源文件摘要通过，环境候选仅四项变化。
+- 部署后健康、归属/导航、原持久身份/目标/设置、非目标容器和两库 quick_check 通过。真实供应商 OAuth、真实模型探针与这组检查分别记录。
+
 ## Scenario: v3 凭据单一所有者与交接协议 1
 
 ### 1. Scope / Trigger
