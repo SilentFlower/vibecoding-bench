@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/11-03-v3-oauth-ownership-handoff/prd.md","reason":"子任务 A 的凭据归属与交接验收范围"}
+{"file":".trellis/tasks/11-03-v3-iteration-console-tabs/prd.md","reason":"子任务 B 的导航与独立空间验收范围"}
+{"file":".trellis/spec/vibecoding-bench/deploy/index.md","reason":"同批交付、当前部署 SOP 的发现入口"}
+{"file":".trellis/tasks/11-03-v3-credential-handoff-iteration-console/research/joint_verify.py","reason":"双工程视图与真实关联重授权维护的联合场景，复用完整交接夹具"}

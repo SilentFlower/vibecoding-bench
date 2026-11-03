@@ -1,0 +1,46 @@
+{
+  "id": "v3-credential-handoff-iteration-console",
+  "name": "v3-credential-handoff-iteration-console",
+  "title": "V3：凭据交接与工程迭代入口整合",
+  "description": "统筹账号解绑、重绑与关联重授权的单一凭据所有权，以及项目/养号迭代统一导航；两个子任务独立验收，联合交付。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-03",
+  "completedAt": "2026-11-03",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-03T09:05:47Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "11-03-v3-iteration-console-tabs",
+    "11-03-v3-oauth-ownership-handoff"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-03T09:05:47.376020+00:00",
+    "completedSteps": [
+      "两个子任务实现、独立验收、Spec及提交推送完成",
+      "双工程空间与真实维护联合验证通过",
+      "正式同批CI发布、US部署与数据保留/健康/管理接口验收通过",
+      "父任务Check-All及US运维契约同步完成"
+    ],
+    "partialStep": null,
+    "nextStep": "全部工作已完成，无待办",
+    "notes": "沿用现有配置和口令；未强制停止CLI/Pi工作，未做生产备份、RAM重算或磁盘清理；真实OAuth/模型探针为零。"
+  }
+}
