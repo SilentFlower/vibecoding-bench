@@ -64,6 +64,56 @@ const state = {
 
 ---
 
+## Scenario: 工程迭代空间与账号 URL 状态
+
+### 1. Scope / Trigger
+
+- 修改工程迭代入口、ProjectsUI 的挂载/选择、空间切换或订阅生命周期时适用。顶层只有“工程迭代”，页内为“项目迭代 / 养号迭代”；不合并后台空间。
+
+### 2. Signatures
+
+```text
+#projects?account=<id>
+#warmup?account=<id>
+iterationAccount() -> number | null
+iterationUrl(mode, accountId) -> string
+ProjectsUI.mount({api, prefix, namespace, accountId, configureCli, showCapture, closePanels, onAccountChange})
+ProjectsUI.unmount()
+onAccountChange(accountId: number | null) -> void
+```
+
+### 3. Contracts
+
+- hash 页面名与查询参数分别解析。两个模式激活同一个顶层入口；统一入口默认 #projects。原 #projects/#warmup 无参链接继续沿用有效已配置账号的原默认规则。
+- account 仅接受一个正安全整数；重复、负数、文本、额外问号混入值及超安全范围返回内部哨兵 0，无参返回 null。显式无效/停用/删除账号保持未选择并提示，不自动换号；主动清空选择也通过 account=0 保留未选状态。
+- URL 是模式/账号的唯一持久来源，不再保存一次性 warmupAccountId 或 localStorage/currentTab 镜像。账号改变通过 history.replaceState 更新当前条目及页内链接，不重挂载；切空间使用正常 hash 导航，刷新、前进后退恢复当前选择。账号页直达养号使用带 account 的 #warmup 地址。
+- mount 固定 namespace 和 endpoint：projects 对应 /projects，warmup 对应 /accounts/warmup/pi。选择回调仅在本次 viewGeneration/模式仍有效时更新 URL。导航不保存表单、不配置/启动/暂停/停止工作，不复制计划或历史；只有明确操作按钮才能发业务写请求。
+- 切换前 unmount 先使 revision/selection 失效，关闭 SSE、时钟和配置/抓包窗口，清空分页。旧 HTTP/SSE 回包不得写入新空间；只保留当前空间的一个 SSE 和一个页面时钟。两个后台空间及其执行、工作区、会话与事实保持独立。
+- 页内使用原生链接、aria-current 与 focus-visible，Enter 可操作；保留终端/交互记录内页签。顶层数字快捷键和页脚同步为 1–6；主题颜色使用既有变量，修改 app/projects/CSS 时同步 index.html 的资源版本。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 页面结果 |
+| --- | --- |
+| 旧无参链接 | 沿原规则默认选择；实际选中后补 URL |
+| 明确有效账号 | 两空间往返、刷新及历史恢复同账号 |
+| 无效、重复或不可用账号 | 未选择并提示“该账号当前不可用”，不静默换号 |
+| 旧请求晚于切页返回 | 代次不符，丢弃旧响应 |
+| 切空间或离开页面 | 旧 SSE/时钟/弹窗释放，后台工作不启停 |
+
+### 5. Scenarios and Examples
+
+- 正常：#projects?account=7 → 点击养号 → #warmup?account=7，刷新仍为养号 7；返回后恢复项目 7。
+- 基础：首次访问 #projects 沿原默认规则；在选择框改成账号 9，replaceState 记录 9，不重建当前订阅页面。
+- 错误用法：账号 7 已被停用，自动退回账号 9，或把旧项目响应写入养号 DOM。正确处理：保持未选择并要求重选；按 revision/selection 丢弃旧回包。
+
+### 6. Tests Required
+
+- node --check webui/app.js、webui/projects.js；真实浏览器入口为 verify_stack.py --manifest <联合清单> --browser --project-iteration。
+- Chrome + HTTP + SQLite + SSE：单一顶层入口、Enter 键、账号 A/B、实际新 Document 刷新、浏览历史、旧链接与账号页直达；非法/重复/停用/删除账号不换号。
+- 两空间配置/计划/终端/记录/分页分别读取；导航阶段只有 GET，前后持久业务表一致。延迟旧快照并连续切换20次，最多一个当前 SSE、时钟不累积，卸载全部释放。
+- CLI 配置与工作抓包路径按本空间，切换关闭旧窗口；1280/720/390px 明暗主题无横向溢出。合成持久工作保持不等于真实模型已执行，部署后另核对现有工作事实。
+
 ## Server State
 
 **不引入** SWR / React Query / 任何"server state"框架。约定:

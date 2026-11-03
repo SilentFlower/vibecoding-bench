@@ -1720,6 +1720,10 @@ table.data tr.project-selected-row { background: var(--surface-3); }
 .projects-verification li > span:last-child { color: var(--text-dim); white-space: nowrap; }
 .projects-verification li[data-active="true"] { color: var(--running); }
 .projects-tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+.iteration-modes { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.iteration-modes a { padding: 8px 14px; border: 1px solid var(--border); color: var(--text-dim); text-decoration: none; }
+.iteration-modes a[aria-current="page"] { border-color: var(--amber); color: var(--amber); background: var(--bg-soft); }
+.iteration-modes a:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 .projects-tabs button { background: transparent; color: var(--text-dim); border: 0; border-bottom: 2px solid transparent; padding: 14px 0 12px; font: inherit; cursor: pointer; }
 .projects-tabs button[aria-selected="true"] { color: var(--amber); border-bottom-color: var(--amber); }
 .projects-settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; margin-bottom: 18px; }

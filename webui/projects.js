@@ -3,7 +3,7 @@ window.ProjectsUI = (() => {
   let api, prefix, source, accountId = null, agents = [], catalog = [], accounts = [], cursor = 0;
   let revision = 0, selection = 0, scheduleClock = null, recordPages = {};
   let namespace = 'projects', servicePath = '/projects';
-  let configureCli, showCapture, closePanels;
+  let configureCli, showCapture, closePanels, onAccountChange;
   let screenWorkId = null, screenEventId = 0;
   const pendingActions = new Map();
   const $ = selector => document.querySelector(selector);
@@ -39,12 +39,12 @@ window.ProjectsUI = (() => {
 
   /**
    * 进入账号控制页，旧连接和旧回调均在退出后失效。
-   * @param {object} options 既有鉴权 API、路径前缀、独立空间 namespace 和可选的只读预选 accountId。
+   * @param {object} options 既有鉴权 API、路径前缀、独立空间 namespace、只读预选 accountId 及 onAccountChange 选择回调。
    * @return {Promise<void>} 初始页面加载完成。
    */
   async function mount(options) {
     unmount();
-    ({configureCli, showCapture, closePanels} = options);
+    ({configureCli, showCapture, closePanels, onAccountChange} = options);
     const current = revision;
     namespace = options.namespace === 'warmup' ? 'warmup' : 'projects';
     servicePath = namespace === 'warmup' ? '/accounts/warmup/pi' : '/projects';
@@ -210,6 +210,7 @@ window.ProjectsUI = (() => {
     const request = ++selection;
     source?.close(); source = null;
     accountId = id || null; cursor = 0; resetRecords();
+    onAccountChange?.(accountId);
     screenWorkId = null; screenEventId = 0;
     const agent = agents.find(item => item.account_id === accountId);
     const form = $('#projects-agent-form');

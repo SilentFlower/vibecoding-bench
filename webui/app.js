@@ -46,16 +46,51 @@ const state = {
   runDetail: null,
   viewGeneration: 0,
   runWindowConfig: null,
-  warmupAccountId: null,
   cliSettings: null,
   workCapture: null,
 };
 
 // ===================== Pi 项目指挥 =====================
-/** 展示每账号 Pi 控制台。@return {Promise<void>} 页面加载完成。 */
+/**
+ * 从 URL 读取明确选择的账号，非法值保留未选择状态，避免静默改用其他账号。
+ * @return {number|null} 正整数账号、无参数 null，或无效参数 0。
+ */
+function iterationAccount() {
+  const query = location.hash.indexOf('?');
+  const values = new URLSearchParams(query < 0 ? '' : location.hash.slice(query + 1)).getAll('account');
+  if (!values.length) return null;
+  const id = Number(values[0]);
+  return values.length === 1 && /^[1-9]\d*$/.test(values[0]) && Number.isSafeInteger(id) ? id : 0;
+}
+
+/**
+ * 生成兼容旧路由的空间地址；0 表示明确保持未选择。
+ * @param {string} mode 项目或养号路由。
+ * @param {number|null} accountId 明确选择的账号。
+ * @return {string} 当前页面内地址。
+ */
+function iterationUrl(mode, accountId) {
+  return `#${mode}${accountId == null ? '' : `?account=${accountId}`}`;
+}
+
+/** 展示当前 URL 指定的独立工程空间。@return {Promise<void>} 页面加载完成。 */
 function renderProjects() {
-  return window.ProjectsUI.mount({api: API, prefix: RUNTIME_BASE,
-    configureCli: openCliSettingsConfig, showCapture: openWorkCapture, closePanels: closeProjectDialogs});
+  const mode = currentTab(), generation = state.viewGeneration;
+  const accountId = iterationAccount();
+  const updateLinks = id => $$('[data-iteration-mode]').forEach(link => {
+    link.href = iterationUrl(link.dataset.iterationMode, id);
+    if (link.dataset.iterationMode === mode) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+  updateLinks(accountId);
+  return window.ProjectsUI.mount({api: API, prefix: RUNTIME_BASE, namespace: mode, accountId,
+    configureCli: openCliSettingsConfig, showCapture: openWorkCapture, closePanels: closeProjectDialogs,
+    onAccountChange: id => {
+      if (generation !== state.viewGeneration || currentTab() !== mode) return;
+      // 选择账号只更新地址，不重建组件；切空间继续使用正常浏览历史。
+      history.replaceState(history.state, '', iterationUrl(mode, id ?? 0));
+      updateLinks(id ?? 0);
+    }});
 }
 
 /**
@@ -64,17 +99,9 @@ function renderProjects() {
  * @return {void}
  */
 function openWarmupAccount(accountId) {
-  state.warmupAccountId = accountId;
-  if (currentTab() === 'warmup') renderWarmup();
-  else location.hash = '#warmup';
-}
-
-/** 展示独立养号工程空间，复用工程组件并重新加载本空间状态。@return {Promise<void>} 页面加载完成。 */
-function renderWarmup() {
-  const accountId = state.warmupAccountId;
-  state.warmupAccountId = null;
-  return window.ProjectsUI.mount({api: API, prefix: RUNTIME_BASE, namespace: 'warmup', accountId,
-    configureCli: openCliSettingsConfig, showCapture: openWorkCapture, closePanels: closeProjectDialogs});
+  const target = iterationUrl('warmup', accountId);
+  if (location.hash === target) navigate();
+  else location.hash = target;
 }
 
 // ===================== 路由 =====================
@@ -85,11 +112,12 @@ const ROUTES = {
   topics: renderTopics,
   tasks: renderTasks,
   runs: renderRuns,
-  warmup: renderWarmup,
+  warmup: renderProjects,
 };
 
+/** 读取 hash 中的页面名，查询参数不参与路由匹配。@return {string} 有效页面名。 */
 function currentTab() {
-  const hash = (location.hash || '#accounts').replace(/^#/, '');
+  const hash = (location.hash || '#accounts').replace(/^#/, '').split('?')[0];
   return ROUTES[hash] ? hash : 'accounts';
 }
 
@@ -98,8 +126,9 @@ function navigate() {
   state.viewGeneration += 1;
   closeModal('#run-window-modal');
   closeProjectDialogs();
+  window.ProjectsUI.unmount();
   const tab = currentTab();
-  $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === tab));
+  $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === (tab === 'warmup' ? 'projects' : tab)));
   const view = $('#view');
   view.innerHTML = '';
   // 两个空间共用 DOM 结构；组件每次挂载都会清理上一个空间的订阅、选择和分页。
@@ -112,7 +141,6 @@ function navigate() {
     state.runsEventSource = null;
   }
   if (tab !== 'runs') endRunDetail();
-  if (!['projects', 'warmup'].includes(tab)) window.ProjectsUI.unmount();
   ROUTES[tab]();
 }
 
@@ -2789,7 +2817,7 @@ function startClock() {
 }
 
 function bindShortcuts() {
-  const TAB_KEYS = { '1': 'accounts', '2': 'environments', '3': 'topics', '4': 'tasks', '5': 'runs', '6': 'projects', '7': 'warmup' };
+  const TAB_KEYS = { '1': 'accounts', '2': 'environments', '3': 'topics', '4': 'tasks', '5': 'runs', '6': 'projects' };
   document.addEventListener('keydown', (e) => {
     const inField = /^(INPUT|TEXTAREA|SELECT)$/i.test(e.target.tagName);
 

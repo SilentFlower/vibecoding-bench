@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-  <link rel="stylesheet" href="style.css?v=20261027-verification-progress" />
+  <link rel="stylesheet" href="style.css?v=20261103-iteration-console" />
   <script>
     // 防 FOUC: 在 CSS 应用前确定主题
     (function () {
@@ -37,8 +37,7 @@
       <a href="#topics"   data-tab="topics" class="nav-group-start" data-nav-group="普通任务" title="普通任务"><span class="tab-en">topics</span><span class="tab-cn">题库</span></a>
       <a href="#tasks"    data-tab="tasks"><span class="tab-en">tasks</span><span class="tab-cn">普通任务</span></a>
       <a href="#runs"     data-tab="runs"><span class="tab-en">runs</span><span class="tab-cn">运行记录</span></a>
-      <a href="#projects" data-tab="projects" class="nav-group-start" data-nav-group="工程迭代" title="工程迭代"><span class="tab-en">projects</span><span class="tab-cn">项目迭代</span></a>
-      <a href="#warmup" data-tab="warmup"><span class="tab-en">warmup</span><span class="tab-cn">养号迭代</span></a>
+      <a href="#projects" data-tab="projects" class="nav-group-start" data-nav-group="工程迭代" title="工程迭代"><span class="tab-en">projects</span><span class="tab-cn">工程迭代</span></a>
     </nav>
     <div class="statline">
       <button class="theme-toggle" id="theme-toggle" type="button" aria-label="toggle theme" title="switch theme">☀</button>
@@ -61,7 +60,7 @@
     <span class="hintbar-sep">│</span>
     <span><kbd>/</kbd> focus filter</span>
     <span class="hintbar-sep">│</span>
-    <span><kbd>1-7</kbd> switch tab</span>
+    <span><kbd>1-6</kbd> switch tab</span>
     <span class="hintbar-spacer"></span>
     <span class="hintbar-build">build · <span id="build-tag">p1</span></span>
   </footer>
@@ -69,6 +68,10 @@
   <!-- ====== 各视图模板 ====== -->
   <template id="tpl-projects">
     <section class="view project-view">
+      <nav class="iteration-modes" aria-label="工程迭代空间">
+        <a href="#projects" data-iteration-mode="projects">项目迭代</a>
+        <a href="#warmup" data-iteration-mode="warmup">养号迭代</a>
+      </nav>
       <header class="view-head projects-header">
         <div><h2 class="view-title"><span class="bracket">▌</span><span id="projects-title">项目迭代</span> <span class="muted">// Pi 指挥</span></h2>
           <p class="hint" id="projects-runtime">正在读取运行时</p></div>
@@ -853,7 +856,7 @@
     </div>
   </div>
 
-  <script src="projects.js?v=20261028-quota-deadline"></script>
-  <script src="app.js?v=20261103-credential-ownership"></script>
+  <script src="projects.js?v=20261103-iteration-console"></script>
+  <script src="app.js?v=20261103-iteration-console"></script>
 </body>
 </html>

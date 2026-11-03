@@ -129,8 +129,15 @@ def main() -> None:
         configuration = root / "v3.env"
         configuration.write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         configuration.chmod(0o600)
-        used = [ipaddress.ip_network(item['Subnet']) for existing in client.networks.list(greedy=True)
-            for item in existing.attrs.get('IPAM', {}).get('Config') or [] if item.get('Subnet')]
+        used = []
+        for existing in client.networks.list():
+            try:
+                existing.reload()
+            except docker.errors.NotFound:
+                # 上一套隔离验证可能刚好完成清理；已消失的网络不再占用子网。
+                continue
+            used.extend(ipaddress.ip_network(item['Subnet'])
+                for item in existing.attrs.get('IPAM', {}).get('Config') or [] if item.get('Subnet'))
         routes = json.loads(subprocess.check_output(['ip','-j','route','show']))
         used.extend(ipaddress.ip_network(item['dst']) for item in routes if item.get('dst') not in (None,'default'))
         subnet = next(candidate for index in range(200,250)
