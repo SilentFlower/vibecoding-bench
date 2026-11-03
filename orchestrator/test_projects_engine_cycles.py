@@ -114,6 +114,7 @@ class ProjectsEngineCycleTests(unittest.TestCase):
 
     def test_all_600_restart_only_warmup_and_preserve_deliveries(self):
         """完整六百项在下次认领重开，原Projects配置不变，历史交付保留。:return: None。"""
+        original_order = self.service.state(1)['agents'][0]['available_objectives']
         self.complete()
         self.service._write('UPDATE projects_agents SET session_file=? WHERE account_id=1', ('old-session.jsonl',))
         before = self.agent(self.primary)
@@ -123,11 +124,62 @@ class ProjectsEngineCycleTests(unittest.TestCase):
         self.terminal.cleanup_cycle.assert_called_once_with({'id': 1, 'name': '1'}, 1)
         self.assertEqual({'number': 2, 'completed': 0, 'total': 600, 'automatic': True}, result['cycle'])
         self.assertEqual([], result['passed'])
+        self.assertCountEqual(original_order, result['available_objectives'])
+        self.assertNotEqual(original_order, result['available_objectives'])
         self.assertIsNone(result['work'])
         self.assertIsNone(self.agent()['session_file'])
         self.assertEqual(600, self.service._one('SELECT COUNT(*) AS n FROM projects_work')['n'])
         self.assertEqual(before, self.agent(self.primary))
         self.assertEqual('warmup', self.owners.owner(1)['kind'])
+
+    def test_project_order_differs_between_accounts_and_spaces(self):
+        """项目按账号及空间打乱，同项目六个目标仍按原路线连续排列。:return: None。"""
+        expected = [(key, f'F-{index}') for key in self.catalog.keys for index in range(6)]
+        orders = []
+        for service in (self.primary, self.service):
+            for account_id in (1, 2):
+                with self.subTest(namespace=service.namespace, account_id=account_id):
+                    service.configure(account_id, self.catalog.keys)
+                    available = service.state(account_id)['agents'][0]['available_objectives']
+                    pairs = [(item['project_key'], item['objective_id']) for item in available]
+                    orders.append(tuple(pairs))
+                    self.assertCountEqual(expected, pairs)
+                    project_order = [pairs[offset][0] for offset in range(0, len(pairs), 6)]
+                    self.assertNotEqual(self.catalog.keys, project_order)
+                    for offset in range(0, len(pairs), 6):
+                        self.assertEqual([(pairs[offset][0], f'F-{index}') for index in range(6)], pairs[offset:offset + 6])
+        self.assertEqual(4, len(set(orders)))
+
+    def test_objective_order_survives_restart_pool_reorder_and_completion(self):
+        """同轮重启及目录重排保持项目顺序，已有项目完成首目标后继续原路线。:return: None。"""
+        original = self.service.state(1)['agents'][0]['available_objectives']
+        recovered = self.create('warmup', True, self.terminal)
+        self.assertEqual(original, recovered.state(1)['agents'][0]['available_objectives'])
+        recovered.configure(1, list(reversed(self.catalog.keys)))
+        self.assertEqual(original, recovered.state(1)['agents'][0]['available_objectives'])
+        self.complete(1)
+        remaining = [item for item in original
+            if (item['project_key'], item['objective_id']) != (self.catalog.keys[0], 'F-0')]
+        remaining.sort(key=lambda item: item['project_key'] != self.catalog.keys[0])
+        self.assertEqual(remaining, recovered.state(1)['agents'][0]['available_objectives'])
+
+    def test_completed_goals_keep_the_same_project_until_its_route_finishes(self):
+        """真实工具提交后继续同项目六个目标并保留累计代码，全部通过才换项目。:return: None。"""
+        project = self.service.state(1)['agents'][0]['available_objectives'][0]['project_key']
+        for index in range(6):
+            available = self.service.state(1)['agents'][0]['available_objectives']
+            self.assertEqual((project, f'F-{index}'), (available[0]['project_key'], available[0]['objective_id']))
+            generation = index + 1
+            self.service._write("UPDATE projects_agents SET generation=?,status='running' WHERE account_id=1", (generation,))
+            started = self.service.tool(1, generation, 'claude_start',
+                {'project_key': project, 'objective_id': f'F-{index}'}, f'start-{index}')
+            self.assertEqual('running', started['status'])
+            source = self.terminal.root / '1' / project / 'library/app.py'
+            self.assertEqual(f'VALUE = {index + 1}\n', source.read_text())
+            source.write_text(f'VALUE = {index + 2}\n')
+            result = self.service.tool(1, generation, 'project_submit', {'summary': '合成项目迭代通过'}, f'submit-{index}')
+            self.assertEqual('passed', result['status'])
+        self.assertNotEqual(project, self.service.state(1)['agents'][0]['available_objectives'][0]['project_key'])
 
     def test_599_and_missing_independent_proof_do_not_reset(self):
         """尚缺目标或缺少独立通过记录时不能清理。:return: None。"""

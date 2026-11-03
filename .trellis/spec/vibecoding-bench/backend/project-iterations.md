@@ -532,12 +532,13 @@ ProjectRequesterSettings.reset()
 
 ### 1. Scope / Trigger
 
-- 修改 `ProjectsService` 的目标创建、交付收口或 `images/pi-agent/host.mjs` 的工具结果与循环结束时适用。
+- 修改 `ProjectsService` 的候选排序、目标创建、交付收口或 `images/pi-agent/host.mjs` 的工具结果与循环结束时适用。
 - 一次指挥按账号、空间和控制者 `generation` 区分；养号的 `cycle_no` 是完整工程池轮次，两者不能混用。
 
 ### 2. Signatures
 
 ```python
+ProjectsService.state(account_id=None, *, summary_only=False, proof_metadata=False) -> dict
 ProjectsService._check_round_work(account_id: int, generation: int, work: dict | None) -> None
 ProjectsService.tool(account_id, generation, name, args, call_id, stop=None) -> dict
 # project_submit 完整通过并成功释放原执行后的工具结果：
@@ -550,6 +551,10 @@ ProjectsService.tool(account_id, generation, name, args, call_id, stop=None) -> 
 ### 3. Contracts
 
 - 每次指挥最多绑定一个工程目标；已有未完成工作优先恢复。后端按该账号及代次查询持久工作，已结束或已绑定其他工作时拒绝创建第二项。入口及选材后发布前均在服务锁内核对，不能仅依赖模型指南。
+- `available_objectives` 先排除已完成、前置未满足及冷却中的目标，再按 `digest_json([namespace, account_id, cycle_no, project_key])` 升序对项目分组作稳定伪随机排列。同项目使用相同排名，稳定排序保留目录中的原目标路线。随机单位是项目，不能把项目内多个目标拆散穿插到其他项目。
+- 当前工程轮次的最后工作不为 `stopped/deferred` 时，其项目的可执行目标优先于其他项目，包含上一目标已通过后的后续迭代；该项目没有可执行目标时才进入后续项目。Pi 指南要求从候选最前的项目选材；原工作恢复、前置依赖及冷却门禁仍由后端严格执行。
+- 项目排名不依赖控制代次、当前时间或目录位置。同轮重启、项目池重新排列或完成当前项目的部分目标后，项目排名及剩余组内路线保持；账号、空间及工程轮次分别进入排名输入。随机项目不保证不同账号的首项永不相同，不能把它解释为免封保证。
+- `account_state` 在完整候选池排序后才按 `offset/limit` 分页，默认页长 10、最大 20；候选集合不变时翻页不漏项、不重复。读取不消耗随机状态、不写库，运行间隔的固定／随机配置与候选排序相互独立。
 - 完整交付验收通过、通过事实保存且原 Claude 执行成功释放后，才返回布尔完成标志。失败返工仍属同一目标；超时、额度等待和重启按原门禁续原 work、工作区、会话与累计耗时，不重建 seed。
 - Pi 先让 SDK 保存真实工具结果，再结束本次循环。混合工具批次中完成后的工具不再交给控制端；`prepareNextTurn` 阻止后续推理。新进程的结束标志重新初始化，旧会话中的完成字段不能提前终止下一次指挥。
 - 可信目标完成后无需额外生成摘要或回复；此次收尾停止额外压缩／推理。同目标的 token 摘要策略见下文，模型重试和降级规则保持。SDK 因混合批次收尾生成的零用量本地 aborted 消息不计入上游调用。
@@ -567,17 +572,24 @@ ProjectsService.tool(account_id, generation, name, args, call_id, stop=None) -> 
 | 其他工具携带完成字段，或字段是数字等非布尔值 | 不触发 Pi 单目标收尾 |
 | 完成时人工暂停或取消 | 不重开计划，不把迟到结果覆盖新代次状态 |
 | 下一次合法启动 | 可选择下一目标；未完成工作则只恢复原目标 |
+| 同轮刷新、重启或调整项目池排列 | 保持项目排名与组内原路线，优先续做已开始的项目 |
+| 养号全部独立通过并合法进入下一工程轮次 | 使用新 `cycle_no` 的候选排名，保留历史交付 |
+| 目标前置未通过、冷却未结束或已有未完成工作 | 随机排名不提供绕过原门禁或切换原工作的许可 |
 
 ### 5. Scenarios and Examples
 
 - 正常：目标 A 通过后结束本次指挥；原计划间隔到期且门禁放行，再开始目标 B。
 - 边界：目标 A 多次片段超时，下一次指挥仍使用同一 work/session，累计耗时保留；单轮时限沿用当前配置，本契约不另设累计预算策略。
+- 选材：多个账号使用同一百项目目录时各自获得稳定打乱的项目排列；同账号项目与养号空间分别排名。项目 A 的多个目标按原路线连续执行，完成后再进入项目 B，暂停重启继续原工作和累计代码。
+- 错误：每次 `account_state` 都重新随机洗牌、先截第一页再打乱，或将同项目目标分别随机排名。正确：完整合法候选按项目分组排名并保留组内顺序，再分页，避免漏项、重复及项目内迭代被拆散。
 - 错误：修改提示词后仍允许本轮 `claude_start` 创建 B，或为了结束 Pi 丢掉 A 的真实工具结果。正确：后端限制目标，并在 SDK 保存通过结果后结束循环。
 - 错误：把“单目标已完成”当成养号全部工程已完成。正确：`cycle_no` 仅在全部独立通过后的后续认领推进。
 
 ### 6. Tests Required
 
 - `test_projects_single_objective`：两空间第二目标拦截、并发发布、失败返工、超时保留两个会话、人工暂停竞争、执行收口失败，以及养号重开后首目标仍单独收尾。
+- `test_projects_agent.test_six_hundred_objectives_are_fully_pageable_without_duplicate_payload`：600 项完整分页，分页顺序与全量视图一致，集合无遗漏或重复，单项目内保留原目标顺序。
+- `test_projects_engine_cycles`：多账号／两空间项目排列不同但组内连续，同轮重启及项目池重排保持排名，已开始的项目优先续做；通过真实工具连续完成六项目标并保留累计代码，全部通过才换项目，完整工程池验收后换轮产生新排列。
 - `test_projects_pi_round`：真实 Python→Node→SDK 管道中，通过结果持久化、父进程得到 settled、上游请求恰好一次。
 - Pi `host.test.mjs`：单工具及混合批次、完成字段严格校验、停止后的工具不执行、原会话重开不重放工具、取消优先和本地空用量不冒充上游调用。
 - 依赖、调度、命名空间和工程池回归须按真实跨轮代次构造；不能继续用同一代次连续完成多个目标的旧夹具来绕过新边界。

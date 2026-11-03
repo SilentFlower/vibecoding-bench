@@ -287,6 +287,8 @@ class ProjectsAgentTests(unittest.TestCase):
             page = self.tool('account_state', {'offset': offset, 'limit': 20})['agents'][0]
             seen.extend(item['objective_id'] for item in page['available_objectives'])
             offset = page['objective_page']['next_offset']
+        self.assertEqual([item['objective_id'] for item in full['available_objectives']], seen)
+        self.assertCountEqual([item['id'] for item in objectives], seen)
         self.assertEqual([item['id'] for item in objectives], seen)
         self.assertEqual(600, len(full['available_objectives']))
         self.assertEqual([], model['waiting_objectives'])

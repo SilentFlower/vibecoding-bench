@@ -81,6 +81,7 @@ AGENT_GUIDE = '''你是这个账号唯一的项目负责人和 Claude Code 操�
 先使用 account_state 了解现有工作及项目池，再通过 project_read 阅读公开研究和工程目标。
 account_state 中 remaining_objective_count 是全部未完成目标数量；available_objectives、waiting_objectives 和 passed 分页返回，以 objective_page 中的真实总数和 next_offset 判断是否还有内容。
 只从 available_objectives 中选择新目标；等待前置不代表完成，不能跳过工程依赖或根据少数项目的抽查结果宣称没有任务。
+项目先后顺序已按账号、迭代空间及工程轮次打乱；从候选列表最前的项目选择目标，按项目原路线连续迭代。
 project_read 默认读取概览；指定 objective_id 读取该目标的公开需求与材料，section=research 读取研究。content 是分段正文，按 next_offset 继续读取，不能把片段当成完整材料。若结果预览不完整，调小 limit 后从原 offset 重读。
 较早历史只供留档；每次启动先核对 account_state，原目标需要时重新读取材料并观察原 Claude 会话，不重发已确认投递的输入。
 先完成或恢复已有未完成工作；仅在没有未完成工作且 remaining_objective_count 为0时报告目标全部完成。
@@ -774,6 +775,12 @@ class ProjectsService:
                     agent['waiting_objectives'].append({**objective, 'missing_prerequisites': missing})
                 else:
                     agent['available_objectives'].append(objective)
+            # 只打乱项目分组，稳定排序保留组内原路线；已开始的项目优先续做，避免升级或刷新打断连续迭代。
+            current_project = work['project_key'] if (work and work['cycle_no'] == agent['cycle_no']
+                and work['status'] not in ('stopped', 'deferred')) else None
+            agent['available_objectives'].sort(key=lambda objective: (
+                objective['project_key'] != current_project,
+                digest_json([self.namespace, agent['account_id'], agent['cycle_no'], objective['project_key']])))
             usage = self._rows("SELECT payload_json FROM projects_events WHERE account_id=? AND kind='usage'", (agent['account_id'],))
             agent['pi_usage'] = {'input_tokens': 0, 'output_tokens': 0, 'cache_read_tokens': 0, 'cache_write_tokens': 0}
             for row in usage:
