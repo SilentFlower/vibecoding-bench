@@ -1,0 +1,42 @@
+{
+  "id": "v3-oauth-ownership-handoff",
+  "name": "v3-oauth-ownership-handoff",
+  "title": "V3：凭据所有权交接与关联重授权统一门禁",
+  "description": "解绑后本地接管且cc2api暂停该号的上游活动，重绑回交原记录；统一重授权维护、幂等回执、失败对账、旧记录兼容与原身份/环境保留。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-03",
+  "completedAt": "2026-11-03",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-03T07:39:37Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-03-v3-credential-handoff-iteration-console",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-03T07:39:37.244794+00:00",
+    "completedSteps": [
+      "持久归属、上游统一门禁、交接与关联重授权实现",
+      "O-S1–O-S7 跨层验证和 Check-All 通过",
+      "Spec 更新及两仓业务提交推送完成"
+    ],
+    "partialStep": null,
+    "nextStep": "进入子任务 B；最终联合发布与 US 验收由父任务承接",
+    "notes": "真实供应商 OAuth 未触发；生产无备份、无 RAM 重算，原保留文件 SHA256 均未变化。"
+  }
+}

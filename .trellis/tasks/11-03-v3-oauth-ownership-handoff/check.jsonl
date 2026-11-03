@@ -1,0 +1,4 @@
+{"file":".trellis/tasks/11-03-v3-oauth-ownership-handoff/research/code-map.md","reason":"刷新、导入、门禁和秘密发布的已核对代码定位"}
+{"file":".trellis/spec/vibecoding-bench/backend/index.md","reason":"固定环境、账号与数据库规范入口；实施前加载相关场景"}
+{"file":".trellis/spec/cc2api/backend/index.md","reason":"Rust 准入、OAuth、SQLite/PostgreSQL 与测试规范入口"}
+{"file":".trellis/spec/cc2api/backend/testing-quality.md","reason":"敏感数据、并发和回执的验证约束"}
