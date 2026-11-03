@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/cc2api/backend/service-architecture.md", "reason": "响应观察与v3调度共同合同"}
+{"file": ".trellis/spec/cc2api/backend/testing-quality.md", "reason": "完整Rust回归及敏感数据边界"}
+{"file": ".trellis/spec/cc2api/frontend/frontend-guidelines.md", "reason": "类型、文案和实际构建"}
+{"file": ".trellis/tasks/11-03-v3-first-output-scheduling-latency/research/findings.md", "reason": "已核对DTO、调用链、官方事件和部署边界"}
