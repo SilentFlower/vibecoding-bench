@@ -3,7 +3,7 @@
   "name": "v3-first-output-scheduling-latency",
   "title": "v3：首输出延迟与账号调度配置热更新",
   "description": "首个有效输出延迟分组评分，并修复API/CLI活动期间普通调度配置无法编辑的问题；保留身份维护门禁并部署。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": null,
   "scope": null,
   "package": "vibecoding-bench",
@@ -11,10 +11,10 @@
   "creator": "silentflower",
   "assignee": "silentflower",
   "createdAt": "2026-11-03",
-  "completedAt": null,
+  "completedAt": "2026-11-03",
   "closeout": {
-    "status": "pending",
-    "closedAt": null,
+    "status": "closed",
+    "closedAt": "2026-11-03T04:37:19Z",
     "blockers": []
   },
   "branch": null,
@@ -4074,12 +4074,14 @@
   "progress": {
     "completedSteps": [
       "首输出分组评分及普通配置热更新实现",
-      "完整回归、隔离PG、前端构建与Check-All通过",
-      "Spec同步与两仓代码推送"
+      "Rust完整回归、隔离PostgreSQL验证、前端构建及Check-All通过",
+      "Spec与代码提交推送",
+      "最终联合批次ci-41577136644-1部署并验收",
+      "页面与管理鉴权、数据库、持久身份和非目标容器核对通过"
     ],
-    "partialStep": "CI联合镜像构建中",
-    "nextStep": "核验CI清单并部署US，完成健康与旧镜像回收",
-    "notes": "任务保持in_progress，部署验收完成后再Close；无真实模型探针。",
-    "updatedAt": "2026-11-03T02:05:15Z"
+    "partialStep": null,
+    "nextStep": "已交付；磁盘清理按用户要求后置",
+    "notes": "无真实模型探针；最终批次同时包含管理接口性能修复，账号及原工程会话保持。",
+    "updatedAt": "2026-11-03T04:37:19Z"
   }
 }

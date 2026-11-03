@@ -7,9 +7,9 @@
 - [x] 更新Settings和调度详情文案，标明首输出和账号汇总，不增加不必要页面。
 - [x] 定向测试、完整cargo test -- --test-threads=4、cargo fmt --check、npm run build、git diff --check；复用有效结果，不重复扩围。
 - [x] 完成Pre-Check、Check-All、最小Spec更新，精确提交cc2api再父仓gitlink/Spec并推送；核验自动GC ahead归属。
-- [ ] 获取本次CI联合镜像清单，按US生产SOP部署；当前数据/身份、非目标容器和配置保持，只重建同部署服务与账号角色。
-- [ ] 页面200/管理未登录401/数据库quick_check与新代码、同批镜像验收，执行定向镜像回收并核对磁盘；记录无真实模型探针。
-- [ ] 真实交付完成后task_progress --complete与Close，精确提交并推送任务记录。
+- [x] 获取本次CI联合镜像清单，按US生产SOP部署；当前数据/身份、非目标容器和配置保持，只重建同部署服务与账号角色。
+- [x] 页面200/管理未登录401/数据库quick_check与新代码、同批镜像验收；记录无真实模型探针。磁盘处理按用户最新要求后置，不执行回收。
+- [x] 真实交付完成后task_progress --complete与Close，精确提交并推送任务记录。
 
 ## 停止与恢复点
 
@@ -24,3 +24,7 @@
 - `cargo fmt --package claude-code-gateway -- --check`、父/子仓 `git diff --check`通过。
 - Check-All full：三维通过，CHK/FBK均0；上线后版本、鉴权、数据库、身份与其他容器检查由本次部署执行者继续。Spec更新只改backend/service-architecture.md，核对实现与差异检查通过。
 - 自动GC历史91908eee已由verify_gc_commit验证；原有vibecoding-bench 334、ai-fund 14个dirty文件散列保持。
+
+## 最终交付
+
+首输出/热更新代码已随ci-41570950378-1首次运行，最终联合批次ci-41577136644-1验收通过。实际镜像清单、CLI参数源码、首输出后端字段及前端标签匹配；新管理路径鉴权、调度设置保持、持久账号/环境/原工程会话和非目标容器均核对通过，两库只读quick_check=ok。联合接口首次项目请求0.4527秒，SSE首帧0.3355秒，不发送真实模型探针。磁盘回收按用户最新要求后置，不属于本次剩余工作。
