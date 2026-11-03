@@ -2,6 +2,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from project_library import ProjectLibrary, read_document, write_document
 from projects_catalog import ProjectsCatalog
@@ -51,6 +52,56 @@ class ProjectsCatalogTests(unittest.TestCase):
         self.assertNotEqual(original['goal'], current.project('example')['objectives'][0]['goal'])
         with self.assertRaises(ValueError):
             current.for_work({'library_digest': 'outside', 'library_root': str(self.source)})
+
+    def test_history_metadata_reuses_only_this_request_without_loading_full_library(self):
+        """页面跨版本核对原合同但不扫描全库，下一请求仍重新读取元数据。:return: None。"""
+        definition = self.library.projects['example'].manifest['scenarios'][0]['tasks'][0]
+        work = {'library_digest': self.library.digest, 'library_root': str(self.library.root),
+            'project_key': 'example', 'objective_id': definition['id']}
+        document = read_document(self.source / 'catalog.json')
+        document['version'] = 'next-metadata-release'
+        write_document(self.source / 'catalog.json', document)
+        current = ProjectsCatalog(self.research, ProjectLibrary(self.source).install(self.root / 'data'))
+        snapshots = {}
+        with patch('projects_catalog.ProjectLibrary', side_effect=AssertionError('页面不能完整加载历史库')), \
+                patch('projects_catalog.read_document', wraps=read_document) as reader:
+            seed, contract = current.proof_contract(work, snapshots)
+            self.assertEqual(definition, contract)
+            self.assertEqual(self.library.projects['example'].manifest['seed_digest'], seed)
+            self.assertEqual(2, reader.call_count)
+            self.assertEqual((seed, contract), current.proof_contract(work, snapshots))
+            self.assertEqual(2, reader.call_count)
+            current.proof_contract(work, {})
+            self.assertEqual(4, reader.call_count)
+
+    def test_history_metadata_rejects_escape_links_and_reloads_repaired_contract(self):
+        """历史目录越界、符号链接和坏合同拒绝，失败仅在本次读取内复用。:return: None。"""
+        definition = self.library.projects['example'].manifest['scenarios'][0]['tasks'][0]
+        work = {'library_digest': self.library.digest, 'library_root': str(self.library.root),
+            'project_key': 'example', 'objective_id': definition['id']}
+        document = read_document(self.source / 'catalog.json')
+        document['version'] = 'next-boundary-release'
+        write_document(self.source / 'catalog.json', document)
+        current = ProjectsCatalog(self.research, ProjectLibrary(self.source).install(self.root / 'data'))
+        for changed in ({'library_root': str(self.source)}, {'project_key': '../example'}, {'project_key': 'missing'}):
+            with self.subTest(changed=changed), self.assertRaises((ValueError, KeyError)):
+                current.proof_contract({**work, **changed}, {})
+        path = self.library.root / 'projects/example/project.json'
+        original = read_document(path)
+        path.unlink()
+        path.symlink_to(self.source / 'projects/example/project.json')
+        with self.assertRaises(OSError):
+            current.proof_contract(work, {})
+        path.unlink()
+        write_document(path, {'schema': 3, 'scenarios': [{'tasks': [None]}]})
+        snapshots = {}
+        with patch('projects_catalog.read_document', wraps=read_document) as reader:
+            with self.assertRaises(ValueError): current.proof_contract(work, snapshots)
+            count = reader.call_count
+            with self.assertRaises(ValueError): current.proof_contract(work, snapshots)
+            self.assertEqual(count, reader.call_count)
+        write_document(path, original)
+        self.assertEqual(definition, current.proof_contract(work, {})[1])
 
 
 if __name__ == '__main__':

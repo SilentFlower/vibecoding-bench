@@ -1054,7 +1054,8 @@ ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 
 ```text
 ProjectsService(..., *, namespace='projects', auto_cycle=False, view_admission=None)
-ProjectsService.state(account_id=None, *, summary_only=False) -> dict
+ProjectsService.state(account_id=None, *, summary_only=False, proof_metadata=False) -> dict
+ProjectsCatalog.proof_contract(work: dict, snapshots: dict) -> tuple[str, dict]
 _projects_admission(account, work, *, snapshot_only=False) -> dict
 _warmup_projects_admission(account, work, *, snapshot_only=False) -> dict
 GET /runtime/api/projects
@@ -1068,6 +1069,9 @@ GET /runtime/api/accounts
 - 生产两空间通过 `view_admission=partial(..., snapshot_only=True)` 提供页面判定；省略该回调时沿用当前 `admission`。实际启动、恢复及输入仍调用严格 `admission`，不得用页面允许结果授权执行。
 - 快照跳过 `QuotaGuard.consume`，读取已有持久额度和当前策略；不缓存跨请求的允许结果。读取执行登记用非阻塞锁，拿不到时返回 `allowed=False, reason='unavailable', retryable=True, retry_at=None`，页面消息为“执行状态正在更新，请稍后刷新”。不伪造空闲或额度充足。
 - 完整状态保留原目标、进度、历史用量与校验信息。项目目录和自动轮次目标只在一次 `state()` 内复用；已传入当前身份时依赖检查不重复读取账号，未提供时仍读取。下一请求重新取事实。
+- `view()` 单独启用 `proof_metadata=True`：页面对照当前账号通过记录、冻结项目 seed 摘要及完整目标合同；历史目录仅读取受限 catalog/项目 JSON，不构造历史 `ProjectLibrary`，不扫描源码或离线制品。按冻结路径、版本和项目复用正／负合同快照，仅在本次读取内有效，不缓存账号通过判定。当前已验证内容可复用内存合同。
+- `proof_contract` 拒绝越界目录、符号链接、未登记项目、非法 schema/合同入口、损坏或重复目标。它只提供页面元数据；默认 `state()`、实际启动、恢复、输入和验收仍走原 `for_work` 及完整内容校验，不能把页面 ready 用作执行许可。
+- SSE 生成器通过 `asyncio.to_thread` 读取同步事件与视图，保留原 cursor、Last-Event-ID、字段及断线行为；慢磁盘读取不得阻塞认证或其他请求所在的事件循环。
 - 账号列表仅用 `state(..., summary_only=True)` 的 `status,message,controller_active,schedule,work`，包括已有工作纠错消息；该内部模式不计算卡片未使用的目标与历史统计，不改公开账号响应字段。
 - 管理桥共享无默认认证头／Cookie 的 reqwest 连接池，base/token 每次读取并按请求设置，保留禁代理、禁跳转和路径／方法白名单。连接与会话验证／创建期限为5秒；验证成功读完小响应体以归还连接。
 - 仅上列四个有限 JSON GET 转发具有10秒总请求期限；会话验证另计，不将10秒描述为整条浏览器请求总时限。SSE、WebSocket 和长写操作不套该状态期限；原退出与维护操作沿用自身期限。不新增环境键、数据库列或浏览器参数。
@@ -1079,6 +1083,8 @@ GET /runtime/api/accounts
 | 后台持有额度消费锁 | 页面读持久快照；真实执行仍消费新观察 |
 | 执行登记锁正忙 | 页面明确未知且不可放行；真实执行仍等待原锁 |
 | 后续请求额度发生变化 | 重新判定，不复用此前允许结果 |
+| 历史合同缺失、越界、链接或元数据损坏 | 不承认该前置证明；失败只在本次页面读取内复用，修复后下一请求重读 |
+| 历史源码损坏但已有通过合同仍可读取 | 页面保留已接受合同事实；默认状态及真实执行继续完整校验，损坏内容不能因此启动 |
 | 管理会话校验失败／网络超时 | 沿既有401／503错误，不泄露内部地址或凭据 |
 | 有限 JSON 上游超过期限 | 响应头前沿既有503；已开始响应体时终止流，不声称可以改写已发送状态码 |
 | SSE、长写操作或相似但未列入的路径 | 不加状态总期限，原鉴权及白名单继续生效 |
@@ -1087,10 +1093,13 @@ GET /runtime/api/accounts
 
 - 正常：页面读取 projects 和工程养号时不扫描消费日志；真正开始下一轮时继续消费观察并复核互斥与额度。
 - 边界：执行准备正在持锁，页面及时显示暂不可读取；释放后刷新重新判断。两个账号引用同项目时本次只展开一次目录，下次仍读取新目录。
+- 冷启动：首次打开历史较多的项目页，只核对冻结合同元数据；真正申请目标时再完整校验原冻结内容。不能让 SSE 在事件循环内同步扫描历史库。
 - 错误：给全部管理请求统一设置10秒，截断事件订阅，或把快照允许结果用于启动。修正：仅限定四个普通 GET，执行保留原严格准入。
 
 ### 6. Tests Required
 
 - `test_projects_admission`：真实线程持有额度／执行锁时快照及时完成且锁忙不可放行；严格执行等待并消费，后续请求看到新额度。
 - `test_projects_feed`：真实页面使用快照回调；卡片五字段等价；多账号目录请求内复用、跨请求重读，进度与历史读取保持。
+- `test_projects_catalog`、`test_projects_dependencies`：真实跨版本目录的合同元数据与完整合同等价、请求内复用、修复后重读、越界／链接／坏合同拒绝；破坏冻结源码后页面事实仍在，默认状态和真实启动拒绝。
+- `test_projects_feed.test_sse_slow_reads_keep_the_event_loop_responsive`：同步事件和状态分别阻塞时，真实流生成器仍允许事件循环解除门闩，事件内容和游标保持。
 - `runtime_bridge::tests`：本地 TCP 两次请求复用同一连接且无默认凭据；仅有限状态 GET 设置期限，SSE、长写及相似路径排除；既有路径白名单回归。

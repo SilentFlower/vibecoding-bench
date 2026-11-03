@@ -4,7 +4,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from project_library import ProjectLibrary, safe_relative
+from project_library import ProjectLibrary, read_document, safe_relative
 
 
 PROJECT_KEY = re.compile(r'^[a-z][a-z0-9-]{0,79}$')
@@ -45,6 +45,68 @@ class ProjectsCatalog:
             raise ValueError('原工作冻结内容损坏，保留现场并拒绝换用新合同')
         self._releases[digest] = ProjectsCatalog(self.research, library)
         return self._releases[digest]
+
+    def proof_contract(self, work: dict, snapshots: dict) -> tuple[str, dict]:
+        """为只读页面取得冻结合同元数据，不把页面结果作为执行授权。
+
+        :param work: 数据库中的原通过工作，包含冻结目录、项目及目标归属。
+        :param snapshots: 本次页面读取专用的合同快照，不能跨请求保留。
+        :return: 原项目 seed 摘要及完整目标合同；归属或元数据异常时拒绝。
+        """
+        digest, key = work['library_digest'], work['project_key']
+        if not self.library or not isinstance(key, str) or not PROJECT_KEY.fullmatch(key):
+            raise ValueError('历史工程合同归属不符')
+        cache_key = (work['library_root'], digest, key)
+        if cache_key not in snapshots:
+            try:
+                if digest == self.library.digest:
+                    manifest = self.library.projects[key].manifest
+                else:
+                    root = Path(work['library_root'])
+                    if (root.is_symlink() or root.name != digest
+                            or root.resolve().parent != self.library.root.resolve().parent):
+                        raise ValueError('历史工程目录归属不符')
+                    catalog = read_document(root / 'catalog.json')
+                    if (not isinstance(catalog, dict) or type(catalog.get('schema')) is not int
+                            or catalog['schema'] not in (2, 3) or not isinstance(catalog.get('projects'), list)
+                            or key not in catalog['projects']):
+                        raise ValueError('历史工程目录元数据不符')
+                    name = catalog.get('project_manifest', 'project.json')
+                    if name not in ('project.json', 'development.json') or catalog['schema'] != 3 and name != 'project.json':
+                        raise ValueError('历史工程合同入口不符')
+                    project = root / 'projects' / key
+                    if (project.is_symlink() or (root / 'projects').is_symlink()
+                            or not project.resolve().is_relative_to(root.resolve())):
+                        raise ValueError('历史工程项目目录归属不符')
+                    manifest = read_document(project / name)
+                    if not isinstance(manifest, dict) or manifest.get('schema') != catalog['schema']:
+                        raise ValueError('历史工程合同版本不符')
+                if not isinstance(manifest, dict) or not isinstance(manifest.get('scenarios'), list):
+                    raise ValueError('历史工程场景元数据不符')
+                tasks = {}
+                for scenario in manifest['scenarios']:
+                    if not isinstance(scenario, dict) or not isinstance(scenario.get('tasks'), list):
+                        raise ValueError('历史工程目标元数据不符')
+                    for task in scenario['tasks']:
+                        if not isinstance(task, dict):
+                            raise ValueError('历史工程目标元数据不符')
+                        if task.get('development_cycle') in ('feature', 'bug'):
+                            if (task['id'] in tasks or not isinstance(task.get('evaluation'), dict)
+                                    or not task['evaluation'].get('native')):
+                                raise ValueError('历史工程目标合同不符')
+                            tasks[task['id']] = task
+                seed = manifest['seed_digest']
+                if not isinstance(seed, str) or not seed:
+                    raise ValueError('历史工程缺少源码摘要')
+                # 页面核对已保存合同即可；全库源码及离线制品仍由真实执行的 for_work 校验。
+                snapshots[cache_key] = (seed, tasks)
+            except (ValueError, OSError, KeyError, TypeError):
+                snapshots[cache_key] = None
+                raise
+        snapshot = snapshots[cache_key]
+        if snapshot is None or work['objective_id'] not in snapshot[1]:
+            raise ValueError('历史工程合同暂不可读取')
+        return snapshot[0], snapshot[1][work['objective_id']]
 
     def listing(self) -> dict:
         """列出保留的研究项目，明确区分研究和可执行目标。

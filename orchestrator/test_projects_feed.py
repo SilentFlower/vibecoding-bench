@@ -358,6 +358,43 @@ class ProjectsFeedTests(unittest.TestCase):
         self.assertEqual(['快照后的第二条'], [item['payload']['text'] for item in resumed['events']])
         self.assertEqual(str(resumed['events'][-1]['id']), reconnected['id'])
 
+    def test_sse_slow_reads_keep_the_event_loop_responsive(self):
+        """真实流的事件或状态读取阻塞时，事件循环仍能执行释放与其它请求。:return: None。"""
+        router = projects_router(lambda: self.service)
+        endpoint = next(route.endpoint for route in router.routes if route.path == '/api/projects/stream')
+        for name in ('events', 'view'):
+            entered, release = threading.Event(), threading.Event()
+            original = getattr(self.service, name)
+
+            def delayed(*args):
+                """用真实线程门闩模拟较慢的磁盘读取。:param args: 原参数。:return: 原读取结果。"""
+                entered.set()
+                if not release.wait(1):
+                    raise AssertionError('SSE 同步读取阻塞了事件循环')
+                return original(*args)
+
+            async def receive():
+                """在读取未结束时从事件循环解除门闩。:return: 原SSE消息。"""
+                request = Mock(headers={})
+                request.is_disconnected = AsyncMock(return_value=False)
+                response = await endpoint(request, account_id=1, after=0)
+                pending = asyncio.create_task(anext(response.body_iterator))
+                try:
+                    self.assertTrue(await asyncio.to_thread(entered.wait, 0.5))
+                    self.assertFalse(pending.done())
+                    release.set()
+                    return await asyncio.wait_for(pending, 2)
+                finally:
+                    release.set()
+                    await response.body_iterator.aclose()
+
+            with self.subTest(reader=name), patch.object(self.service, name, side_effect=delayed):
+                update = asyncio.run(receive())
+            self.assertEqual('update', update['event'])
+            value = json.loads(update['data'])
+            self.assertEqual(self.work['id'], value['state']['agents'][0]['work']['id'])
+            self.assertEqual(str(value['events'][-1]['id']), update['id'])
+
     def test_routes_validate_pagination_and_hide_other_account_cursors(self):
         """新路由可达且参数有界，不存在和跨账号工作游标返回相同错误。:return: None。"""
         foreign = self._add_work('foreign-work', account_id=2)

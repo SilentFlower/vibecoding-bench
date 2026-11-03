@@ -288,6 +288,40 @@ class DevelopmentDependencyContentTests(unittest.TestCase):
         self.assertNotIn('PRIVATE_VERIFICATION_SENTINEL', str(objectives))
         self.assertNotIn('evaluation', str(objectives))
 
+    def test_page_uses_old_contract_metadata_but_execution_checks_real_frozen_content(self):
+        """页面保留原通过事实，损坏旧源码后真实启动仍不能借页面快照绕过校验。:return: None。"""
+        data = self.root.parent / 'registered'
+        original = self.load().install(data)
+        old_catalog = ProjectsCatalog(self.root / 'research', original)
+        fixture = agent_fixtures.ProjectsAgentTests('test_pause_rejects_old_generation_before_any_terminal_write')
+        fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        service = fixture.service
+        service.catalog = old_catalog
+        service.identity = lambda account: 'same-identity:' + str(account['id'])
+        fixture.verification = {'status': 'passed', 'feedback': []}
+        fixture.activate()
+        started = fixture.tool('claude_start', {'project_key': 'example', 'objective_id': 'Q1'})
+        self.assertEqual('running', started['status'])
+        self.assertEqual('passed', fixture.tool('project_submit', {'summary': '合成独立验收通过'})['status'])
+        service._write('UPDATE projects_agents SET generation=generation+1 WHERE account_id=1')
+        document = read_document(self.root / 'catalog.json')
+        document['version'] = 'next-history-release'
+        write_document(self.root / 'catalog.json', document)
+        service.catalog = ProjectsCatalog(self.root / 'research', ProjectLibrary(self.root).install(data))
+        with patch.object(service.catalog, 'for_work', side_effect=AssertionError('页面不能扫描旧库')):
+            state = service.view(1)['agents'][0]
+        self.assertEqual(['Q2'], [item['objective_id'] for item in state['available_objectives']])
+        seed = original.root / 'projects/example/seed/library/example.py'
+        seed.unlink()
+        seed.write_text('VALUE = 999\n')
+        self.assertEqual(['Q2'], [item['objective_id'] for item in service.view(1)['agents'][0]['available_objectives']])
+        self.assertEqual([], service.state(1)['agents'][0]['available_objectives'])
+        previous_starts = len(fixture.terminal.started)
+        denied = fixture.tool('claude_start', {'project_key': 'example', 'objective_id': 'Q2'})
+        self.assertEqual('rejected', denied['status'])
+        self.assertEqual(previous_starts, len(fixture.terminal.started))
+
     def test_project_cycle_or_missing_dependency_is_rejected(self):
         """跨场景不代表允许环、自依赖或不存在的目标。@return None。"""
         first = self.manifest['scenarios'][0]['tasks'][0]

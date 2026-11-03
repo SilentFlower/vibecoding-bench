@@ -194,10 +194,11 @@ def projects_router(service, *, prefix: str = '/api/projects') -> APIRouter:
         async def generate():
             cursor, previous = after, None
             while not await request.is_disconnected():
-                records = current.events(account_id, cursor)
+                # 历史合同和数据库读取可能较慢，不能让一个订阅阻塞整个服务的事件循环。
+                records = await asyncio.to_thread(current.events, account_id, cursor)
                 if records:
                     cursor = records[-1]['id']
-                state = current.view(account_id)
+                state = await asyncio.to_thread(current.view, account_id)
                 encoded = json.dumps(state, ensure_ascii=False)
                 if records or encoded != previous:
                     yield {'event': 'update', 'id': str(cursor),

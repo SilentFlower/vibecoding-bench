@@ -13,6 +13,7 @@ from pathlib import Path
 from project_library import canonical_json, digest_json, read_document, safe_relative, snapshot_tree, write_document
 from account_runtime import RuntimeBusy
 from capture_artifacts import capture_file_preview, capture_summary
+from projects_catalog import ProjectsCatalog
 from projects_pi import ProjectsPi
 from projects_store import ProjectsDatabase
 from projects_observation import screen_busy, screen_content, screen_menu
@@ -568,7 +569,8 @@ class ProjectsService:
         return self._one('SELECT * FROM projects_agents WHERE account_id=?', (account_id,))
 
     def _missing_prerequisites(self, account_id: int, assets, key: str, definition: dict,
-                               proofs: list[dict] | None = None, identity: str | None = None) -> list[str]:
+                               proofs: list[dict] | None = None, identity: str | None = None,
+                               *, proof_snapshots: dict | None = None) -> list[str]:
         """按冻结 DAG 核实完整前置闭包，旧全库版本可凭同一合同继续使用。
 
         :param account_id: 可信账号 ID。
@@ -577,6 +579,7 @@ class ProjectsService:
         :param definition: 当前完整工程目标。
         :param proofs: 页面批量读取的前置事实；启动时省略以重新查询。
         :param identity: 可复用的当前身份；启动时由账号权威状态读取。
+        :param proof_snapshots: 页面本次读取的合同元数据缓存；执行时省略以保留完整校验。
         :return: 缺少可信通过证明的前置目标 ID，包含传递依赖。
         """
         if not definition.get('requires'):
@@ -602,10 +605,14 @@ class ProjectsService:
                     or proof['account_identity'] != identity or task_id not in expected):
                 continue
             try:
-                frozen = assets.for_work(proof)
-                previous, contract = frozen.objective(key, task_id)
+                if proof_snapshots is not None and isinstance(assets, ProjectsCatalog):
+                    seed, contract = assets.proof_contract(proof, proof_snapshots)
+                else:
+                    frozen = assets.for_work(proof)
+                    previous, contract = frozen.objective(key, task_id)
+                    seed = previous.manifest['seed_digest']
                 # 新目录添加其他目标会改变全库摘要；同 seed、同原合同的既有通过仍可作前置。
-                if (previous.manifest['seed_digest'] == project.manifest['seed_digest']
+                if (seed == project.manifest['seed_digest']
                         and contract == expected[task_id] == json.loads(proof['definition_json'])):
                     satisfied.add(task_id)
             except (ValueError, OSError, KeyError, TypeError):
@@ -678,17 +685,20 @@ class ProjectsService:
             self._event(account_id, 'gate_wait', {'reason': gate.get('reason'), 'message': gate.get('message'),
                 'retry_at': gate.get('retry_at')}, work['id'] if work else None)
 
-    def state(self, account_id: int | None = None, *, summary_only: bool = False) -> dict:
+    def state(self, account_id: int | None = None, *, summary_only: bool = False,
+              proof_metadata: bool = False) -> dict:
         """取得控制者、工作和实际 Pi 用量，不返回私有路径或工具凭据。
 
         :param account_id: 可选账号 ID，省略时列出全部控制者。
         :param summary_only: 账号卡片只读基础状态和工作，不计算未使用的目标及历史统计。
+        :param proof_metadata: 仅页面使用合同元数据；执行入口默认仍校验完整冻结内容。
         :return: 新 Projects 公开视图。
         """
         agents = self._rows('SELECT * FROM projects_agents' + (' WHERE account_id=?' if account_id is not None else '')
             + ' ORDER BY account_id', (account_id,) if account_id is not None else ())
         result = []
         project_objectives, all_cycle_targets = {}, None
+        proof_snapshots = {} if proof_metadata else None
         for agent in agents:
             agent.pop('session_file', None)
             agent.pop('schedule_identity', None)
@@ -759,7 +769,7 @@ class ProjectsService:
                     account = self.account(agent['account_id'])
                     dependency_identity = self.identity(account) if account else None
                 missing = self._missing_prerequisites(agent['account_id'], self.catalog, key, definition,
-                    proofs, dependency_identity)
+                    proofs, dependency_identity, proof_snapshots=proof_snapshots)
                 if missing:
                     agent['waiting_objectives'].append({**objective, 'missing_prerequisites': missing})
                 else:
@@ -796,7 +806,7 @@ class ProjectsService:
         :param account_id: 可选账号范围。
         :return: 不含账号身份、内部来源或私有路径的页面摘要。
         """
-        result = self.state(account_id)
+        result = self.state(account_id, proof_metadata=True)
         for agent in result['agents']:
             account = self.account(agent['account_id'])
             work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
