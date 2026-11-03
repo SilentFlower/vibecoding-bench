@@ -1,0 +1,42 @@
+{
+  "id": "v3-iteration-console-tabs",
+  "name": "v3-iteration-console-tabs",
+  "title": "V3：合并项目与养号迭代导航",
+  "description": "顶层仅保留工程迭代，页内切换项目迭代和养号迭代；保留账号选择、独立空间、旧链接与订阅生命周期。",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": "vibecoding-bench",
+  "priority": "P2",
+  "creator": "silentflower",
+  "assignee": "silentflower",
+  "createdAt": "2026-11-03",
+  "completedAt": "2026-11-03",
+  "closeout": {
+    "status": "closed",
+    "closedAt": "2026-11-03T07:58:48Z",
+    "blockers": []
+  },
+  "branch": null,
+  "base_branch": "v3",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": "11-03-v3-credential-handoff-iteration-console",
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {},
+  "progress": {
+    "updatedAt": "2026-11-03T07:58:47.962654+00:00",
+    "completedSteps": [
+      "统一工程入口、URL 模式账号及订阅生命周期实现",
+      "真实浏览器 UA1–UA6 与 Check-All 通过",
+      "Spec 更新及业务提交推送完成"
+    ],
+    "partialStep": null,
+    "nextStep": "父任务联合维护场景、正式同批 CI 与 US 部署验收",
+    "notes": "不调用真实模型；两个空间业务事实保持，原保留文件未变。"
+  }
+}
