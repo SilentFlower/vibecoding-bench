@@ -30,6 +30,7 @@ import uuid
 from collections import deque
 from contextlib import ExitStack, asynccontextmanager, contextmanager
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from stat import S_ISREG
 from typing import Literal, Optional, Sequence
@@ -7964,18 +7965,20 @@ def _projects_account(account_id: int) -> dict | None:
         connection.close()
 
 
-def _pi_admission(account: dict, work: dict | None, *, admitted_round: bool = False) -> dict:
+def _pi_admission(account: dict, work: dict | None, *, admitted_round: bool = False, snapshot_only: bool = False) -> dict:
     """核对 Pi 工作共用门禁，已开始的养号轮可完成本轮但不能绕过真正耗尽。
 
     :param account: 当前账号。
     :param work: 当前新架构工作，可为空。
     :param admitted_round: 是否为已认领且开始的完整养号轮。
+    :param snapshot_only: 页面只读取已持久的观察，不等待全局消费锁或重写额度文件。
     :return: 是否放行、机器可读原因、是否可被动重试及可信恢复时间。
     """
     window = _account_run_window(account)
     public_quota = None
     if quota_guard:
-        quota_guard.consume(account)
+        if not snapshot_only:
+            quota_guard.consume(account)
         state = quota_guard.snapshot(account)
         source = json.loads(work['runtime_json']).get('source') if work and work.get('runtime_json') else None
         policy = quota_guard.policy_snapshot(account, 'warmup', source, quota_state=state)
@@ -8016,25 +8019,26 @@ def _pi_admission(account: dict, work: dict | None, *, admitted_round: bool = Fa
         'message': None, 'quota': public_quota, 'window': window}
 
 
-def _projects_admission(account: dict, work: dict | None) -> dict:
-    """保持工程 Pi 原有的每次输入额度策略。:param account: 账号。:param work: 当前工程工作。:return: 准入判定。"""
-    return _engineering_pi_admission(account, work, 'projects')
+def _projects_admission(account: dict, work: dict | None, *, snapshot_only: bool = False) -> dict:
+    """核对工程门禁。:param account: 账号。:param work: 原工作。:param snapshot_only: 是否仅供页面读取。:return: 准入判定。"""
+    return _engineering_pi_admission(account, work, 'projects', snapshot_only=snapshot_only)
 
 
-def _warmup_projects_admission(account: dict, work: dict | None) -> dict:
-    """为独立工程养号核对旧任务交接及账号共同门禁。:param account: 账号。:param work: 原工程。:return: 准入判定。"""
+def _warmup_projects_admission(account: dict, work: dict | None, *, snapshot_only: bool = False) -> dict:
+    """核对工程养号门禁。:param account: 账号。:param work: 原工作。:param snapshot_only: 是否仅供页面读取。:return: 准入判定。"""
     blocker = warmup_migration_blocker(get_db, account['id'])
     if blocker:
         return {'allowed': False, 'reason': 'legacy_warmup', 'retryable': False, 'retry_at': None, 'message': blocker}
-    return _engineering_pi_admission(account, work, 'warmup')
+    return _engineering_pi_admission(account, work, 'warmup', snapshot_only=snapshot_only)
 
 
-def _engineering_pi_admission(account: dict, work: dict | None, namespace: str) -> dict:
+def _engineering_pi_admission(account: dict, work: dict | None, namespace: str, *, snapshot_only: bool = False) -> dict:
     """从模型思考阶段就保护账号互斥，两个工程空间不能抢占旧执行或彼此。
 
     :param account: 当前账号。
     :param work: 当前空间的工作。
     :param namespace: 受控的 projects 或 warmup。
+    :param snapshot_only: 页面读取不等待运行时长锁；锁忙时明确返回状态暂不可读。
     :return: 共同门禁和独占运行判定。
     """
     source = json.loads(work['runtime_json']).get('source') if work and work.get('runtime_json') else None
@@ -8057,7 +8061,10 @@ def _engineering_pi_admission(account: dict, work: dict | None, namespace: str) 
         connection.close()
     quota_work, other_job = work, False
     if account_runtime:
-        with account_runtime.lock:
+        if not account_runtime.lock.acquire(blocking=not snapshot_only):
+            return {'allowed': False, 'reason': 'unavailable', 'retryable': True, 'retry_at': None,
+                'message': '执行状态正在更新，请稍后刷新'}
+        try:
             jobs = [job for job in account_runtime.jobs.values() if job['row']['account_id'] == account['id']]
             own_jobs = [job for job in jobs if preparing_source and job['source'] == preparing_source]
             if own_jobs:
@@ -8066,7 +8073,9 @@ def _engineering_pi_admission(account: dict, work: dict | None, namespace: str) 
                 if any(job.get('claimed') is True for job in own_jobs):
                     quota_work = {**work, 'runtime_json': json.dumps({'source': source})}
             other_job = any(job['source'] != source for job in jobs)
-    gate = _pi_admission(account, quota_work)
+        finally:
+            account_runtime.lock.release()
+    gate = _pi_admission(account, quota_work, snapshot_only=snapshot_only)
     if not gate['allowed']:
         return gate
     busy = bool(legacy) or other_job or bool(continue_manager and continue_manager.has_active_account(account['id']))
@@ -8274,7 +8283,7 @@ async def lifespan(app: FastAPI):
                 pi, project_requester_settings.agent_configuration)
             projects_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, terminal, _projects_account,
                 _projects_admission, project_requester_settings.agent_configuration, verification, pi, _quota_identity,
-                owners=pi_owners)
+                owners=pi_owners, view_admission=partial(_projects_admission, snapshot_only=True))
             verification.event = projects_service._event
             verification.accepted = projects_service.accepted_work
             projects_service.recover()
@@ -8286,7 +8295,8 @@ async def lifespan(app: FastAPI):
                 pi, project_requester_settings.agent_configuration)
             warmup_pi_service = ProjectsService(BENCH_DATA, get_db, _db_lock, catalog, warmup_terminal, _projects_account,
                 _warmup_projects_admission, project_requester_settings.agent_configuration, warmup_verification, pi, _quota_identity,
-                owners=pi_owners, namespace='warmup', auto_cycle=True)
+                owners=pi_owners, namespace='warmup', auto_cycle=True,
+                view_admission=partial(_warmup_projects_admission, snapshot_only=True))
             warmup_verification.event = warmup_pi_service._event
             warmup_verification.accepted = warmup_pi_service.accepted_work
             migrate_warmup_configuration(get_db, _db_lock)
@@ -9083,7 +9093,7 @@ def list_accounts():
             account['warmup_engine'] = 'projects' if isinstance(warmup_pi_service, ProjectsService) else 'worker'
             account['project_pi'] = None
             if isinstance(warmup_pi_service, ProjectsService):
-                agents = warmup_pi_service.state(account['id'])['agents']
+                agents = warmup_pi_service.state(account['id'], summary_only=True)['agents']
                 if agents:
                     account['project_pi'] = {key: agents[0].get(key) for key in
                         ('status', 'message', 'controller_active', 'schedule', 'work')}

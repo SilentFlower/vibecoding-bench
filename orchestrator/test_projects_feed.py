@@ -43,6 +43,40 @@ class ProjectsFeedTests(unittest.TestCase):
         """读取事件总数以核对页面请求没有业务写入。:return: 事件总数。"""
         return self.service._one('SELECT COUNT(*) AS total FROM projects_events')['total']
 
+    def test_account_summary_keeps_public_fields_without_expanding_history_or_objectives(self):
+        """账号摘要保持已有字段，但不做卡片未使用的目标和历史计算。:return: None。"""
+        fields = ('status', 'message', 'controller_active', 'schedule', 'work')
+        full = self.service.state(1)['agents'][0]
+        with patch.object(self.catalog, 'project', side_effect=AssertionError('摘要不应读取目录')), \
+                patch.object(self.service, '_dependency_proofs', side_effect=AssertionError('摘要不应展开依赖')):
+            summary = self.service.state(1, summary_only=True)['agents'][0]
+        self.assertEqual({key: full[key] for key in fields}, {key: summary[key] for key in fields})
+
+    def test_shared_project_directory_is_reused_only_within_one_read(self):
+        """多个账号复用本次目录读取，下一次查询重新读取而不是保留全局缓存。:return: None。"""
+        with patch.object(self.catalog, 'project', wraps=self.catalog.project) as project:
+            agents = self.service.state()['agents']
+            self.assertEqual(2, len(agents))
+            self.assertEqual(1, project.call_count)
+            self.service.state()
+            self.assertEqual(2, project.call_count)
+
+    def test_overview_uses_view_admission_without_changing_execution_callback(self):
+        """真实页面使用快照回调，执行回调保持原入口且现有进度字段继续返回。:return: None。"""
+        strict = Mock(side_effect=AssertionError('页面不得调用执行检查'))
+        snapshot = Mock(return_value={'allowed':False,'reason':'unavailable','message':'执行状态正在更新'})
+        self.service.admission = strict
+        self.service.view_admission = snapshot
+        application = FastAPI()
+        application.include_router(projects_router(lambda: self.service))
+        with TestClient(application) as client:
+            response = client.get('/api/projects')
+        self.assertEqual(200, response.status_code)
+        self.assertEqual('unavailable', response.json()['agents'][0]['admission']['reason'])
+        self.assertIn('progress', response.json()['agents'][0])
+        self.assertEqual(2, snapshot.call_count)
+        strict.assert_not_called()
+
     def test_inflight_verification_is_visible_before_the_verifier_returns(self):
         """验收尚未返回时页面可读取阶段，结束后保留固定耗时且读取不触发额外操作。:return: None。"""
         entered, finish = threading.Event(), threading.Event()

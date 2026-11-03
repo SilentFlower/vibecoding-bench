@@ -1043,3 +1043,54 @@ ProjectsTerminal.startup_recovery_ready(account: dict, work: dict) -> bool
 - test_attempt_directory_collision_does_not_overwrite_old_proof：已有目录保持原字节，Docker exec 不创建。
 - test_projects_quota、test_pi_interaction、test_projects_terminal、test_account_runtime 和运行环境／准入回归：原来源、会话、额度、交互与失败保护保持。
 - 真实本地 Docker 监督器与合成 driver：重复启动的内核身份、许可、退出和定向清理均核对；测试无真实模型请求。捕获网络配置替身不能宣称验证完整生产 MITM 链路。
+
+## Scenario: 项目与账号管理状态的有界只读查询
+
+### 1. Scope / Trigger
+
+- 修改项目、工程养号总览、账号卡片或 `runtime_bridge.rs` 的状态查询时适用。页面不得因复用执行准入而等待观察文件消费或执行准备长锁。
+
+### 2. Signatures
+
+```text
+ProjectsService(..., *, namespace='projects', auto_cycle=False, view_admission=None)
+ProjectsService.state(account_id=None, *, summary_only=False) -> dict
+_projects_admission(account, work, *, snapshot_only=False) -> dict
+_warmup_projects_admission(account, work, *, snapshot_only=False) -> dict
+GET /runtime/api/projects
+GET /runtime/api/projects/catalog
+GET /runtime/api/accounts/warmup/pi
+GET /runtime/api/accounts
+```
+
+### 3. Contracts
+
+- 生产两空间通过 `view_admission=partial(..., snapshot_only=True)` 提供页面判定；省略该回调时沿用当前 `admission`。实际启动、恢复及输入仍调用严格 `admission`，不得用页面允许结果授权执行。
+- 快照跳过 `QuotaGuard.consume`，读取已有持久额度和当前策略；不缓存跨请求的允许结果。读取执行登记用非阻塞锁，拿不到时返回 `allowed=False, reason='unavailable', retryable=True, retry_at=None`，页面消息为“执行状态正在更新，请稍后刷新”。不伪造空闲或额度充足。
+- 完整状态保留原目标、进度、历史用量与校验信息。项目目录和自动轮次目标只在一次 `state()` 内复用；已传入当前身份时依赖检查不重复读取账号，未提供时仍读取。下一请求重新取事实。
+- 账号列表仅用 `state(..., summary_only=True)` 的 `status,message,controller_active,schedule,work`，包括已有工作纠错消息；该内部模式不计算卡片未使用的目标与历史统计，不改公开账号响应字段。
+- 管理桥共享无默认认证头／Cookie 的 reqwest 连接池，base/token 每次读取并按请求设置，保留禁代理、禁跳转和路径／方法白名单。连接与会话验证／创建期限为5秒；验证成功读完小响应体以归还连接。
+- 仅上列四个有限 JSON GET 转发具有10秒总请求期限；会话验证另计，不将10秒描述为整条浏览器请求总时限。SSE、WebSocket 和长写操作不套该状态期限；原退出与维护操作沿用自身期限。不新增环境键、数据库列或浏览器参数。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 处理 |
+| --- | --- |
+| 后台持有额度消费锁 | 页面读持久快照；真实执行仍消费新观察 |
+| 执行登记锁正忙 | 页面明确未知且不可放行；真实执行仍等待原锁 |
+| 后续请求额度发生变化 | 重新判定，不复用此前允许结果 |
+| 管理会话校验失败／网络超时 | 沿既有401／503错误，不泄露内部地址或凭据 |
+| 有限 JSON 上游超过期限 | 响应头前沿既有503；已开始响应体时终止流，不声称可以改写已发送状态码 |
+| SSE、长写操作或相似但未列入的路径 | 不加状态总期限，原鉴权及白名单继续生效 |
+
+### 5. Scenarios and Examples
+
+- 正常：页面读取 projects 和工程养号时不扫描消费日志；真正开始下一轮时继续消费观察并复核互斥与额度。
+- 边界：执行准备正在持锁，页面及时显示暂不可读取；释放后刷新重新判断。两个账号引用同项目时本次只展开一次目录，下次仍读取新目录。
+- 错误：给全部管理请求统一设置10秒，截断事件订阅，或把快照允许结果用于启动。修正：仅限定四个普通 GET，执行保留原严格准入。
+
+### 6. Tests Required
+
+- `test_projects_admission`：真实线程持有额度／执行锁时快照及时完成且锁忙不可放行；严格执行等待并消费，后续请求看到新额度。
+- `test_projects_feed`：真实页面使用快照回调；卡片五字段等价；多账号目录请求内复用、跨请求重读，进度与历史读取保持。
+- `runtime_bridge::tests`：本地 TCP 两次请求复用同一连接且无默认凭据；仅有限状态 GET 设置期限，SSE、长写及相似路径排除；既有路径白名单回归。

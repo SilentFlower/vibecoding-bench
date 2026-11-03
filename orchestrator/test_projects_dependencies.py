@@ -210,7 +210,10 @@ class ProjectsDependencyTests(unittest.TestCase):
         with patch.object(self.fixture.terminal, 'start', side_effect=changed):
             result = self.start_work('extension')
         self.assertEqual('rejected', result['status'])
-        self.assertIn('环境准备期间', result['message'])
+        # 启动错误已统一脱敏；核对结构化故障及真实收口，不要求暴露原异常文案。
+        self.assertEqual('startup_unknown', result['failure']['code'])
+        self.assertEqual('starting', result['failure']['phase'])
+        self.assertEqual('ValueError', result['failure']['details']['exception_type'])
         child = self.service._one("SELECT * FROM projects_work WHERE objective_id='extension'")
         self.assertIsNone(child['baseline_json'])
         self.assertIn((child['id'], 'stop'), self.fixture.terminal.controls)

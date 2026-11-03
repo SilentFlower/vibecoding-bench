@@ -151,7 +151,7 @@ class ProjectsService:
 
     def __init__(self, data: Path, database, write_lock, catalog, terminal, account,
                  admission, provider, verifier, pi=None, identity=None, owners=None,
-                 *, namespace: str = 'projects', auto_cycle: bool = False) -> None:
+                 *, namespace: str = 'projects', auto_cycle: bool = False, view_admission=None) -> None:
         """初始化新数据表和进程登记，不启动任何真实账号。
 
         :param data: 数据根。
@@ -168,6 +168,7 @@ class ProjectsService:
         :param owners: 与养号共用的账号 Pi 控制者登记，省略时创建本服务登记。
         :param namespace: 服务端固定的项目迭代或养号迭代空间。
         :param auto_cycle: 全部工程验收通过后是否清理本轮工作区并重新开始。
+        :param view_admission: 可选的只读门禁快照回调；真实执行仍使用 admission。
         :return: None。
         """
         if namespace not in ('projects', 'warmup') or type(auto_cycle) is not bool:
@@ -176,6 +177,7 @@ class ProjectsService:
         self.data, self.database, self.write_lock = data, ProjectsDatabase(database, namespace), write_lock
         self.catalog, self.terminal, self.account = catalog, terminal, account
         self.admission, self.provider, self.verifier = admission, provider, verifier
+        self.view_admission = view_admission
         self.pi = pi or ProjectsPi()
         self.owners = owners if owners is not None else AccountPiOwners()
         self.controller_owner_tokens = {}
@@ -590,8 +592,9 @@ class ProjectsService:
             expected[task_id] = requirement
             pending.extend(requirement.get('requires', []))
         proofs = self._dependency_proofs(account_id) if proofs is None else proofs
-        account = self.account(account_id)
-        identity = self.identity(account) if identity is None and account else identity
+        if identity is None:
+            account = self.account(account_id)
+            identity = self.identity(account) if account else None
         satisfied = set()
         for proof in proofs:
             task_id = proof['objective_id']
@@ -675,15 +678,17 @@ class ProjectsService:
             self._event(account_id, 'gate_wait', {'reason': gate.get('reason'), 'message': gate.get('message'),
                 'retry_at': gate.get('retry_at')}, work['id'] if work else None)
 
-    def state(self, account_id: int | None = None) -> dict:
+    def state(self, account_id: int | None = None, *, summary_only: bool = False) -> dict:
         """取得控制者、工作和实际 Pi 用量，不返回私有路径或工具凭据。
 
         :param account_id: 可选账号 ID，省略时列出全部控制者。
+        :param summary_only: 账号卡片只读基础状态和工作，不计算未使用的目标及历史统计。
         :return: 新 Projects 公开视图。
         """
         agents = self._rows('SELECT * FROM projects_agents' + (' WHERE account_id=?' if account_id is not None else '')
             + ' ORDER BY account_id', (account_id,) if account_id is not None else ())
         result = []
+        project_objectives, all_cycle_targets = {}, None
         for agent in agents:
             agent.pop('session_file', None)
             agent.pop('schedule_identity', None)
@@ -700,6 +705,9 @@ class ProjectsService:
                 'ORDER BY id DESC LIMIT 1', (work['id'],)) if work else None
             if correction and agent['work']:
                 agent['work']['verification_correction'] = json.loads(correction['payload_json']).get('message', '')[:2000]
+            if summary_only:
+                result.append(agent)
+                continue
             usage_rows = self._rows('SELECT claude_usage_json FROM projects_work WHERE account_id=?', (agent['account_id'],))
             native = [json.loads(row['claude_usage_json']) for row in usage_rows]
             agent['claude_usage'] = {}
@@ -710,10 +718,15 @@ class ProjectsService:
             agent['passed'] = self._rows("SELECT project_key,objective_id,goal FROM projects_work WHERE account_id=? AND cycle_no=? AND status='passed'",
                 (agent['account_id'], agent['cycle_no']))
             completed = {(item['project_key'], item['objective_id']) for item in agent['passed']}
-            objectives = [(key, objective) for key in agent['project_keys']
-                for objective in self.catalog.project(key, detail=False)['objectives']]
+            # 仅在本次读取内复用目录，避免多个账号反复展开同一个项目；下一请求仍读取新事实。
+            for key in agent['project_keys']:
+                if key not in project_objectives:
+                    project_objectives[key] = self.catalog.project(key, detail=False)['objectives']
+            objectives = [(key, objective) for key in agent['project_keys'] for objective in project_objectives[key]]
             requirements = {(key, objective['id']): objective.get('requires', []) for key, objective in objectives}
-            cycle_targets = self._cycle_targets() if self.auto_cycle else set(requirements)
+            if self.auto_cycle and all_cycle_targets is None:
+                all_cycle_targets = self._cycle_targets()
+            cycle_targets = all_cycle_targets if self.auto_cycle else set(requirements)
             agent['cycle'] = {'number': agent['cycle_no'], 'completed': len(completed & cycle_targets),
                 'total': len(cycle_targets), 'automatic': self.auto_cycle}
             agent['remaining_objectives'] = [
@@ -788,7 +801,7 @@ class ProjectsService:
             account = self.account(agent['account_id'])
             work = self._one('SELECT * FROM projects_work WHERE id=?', (agent['current_work_id'],))
             try:
-                gate = self.admission(account, work) if account else {
+                gate = (self.view_admission or self.admission)(account, work) if account else {
                     'allowed': False, 'reason': 'account', 'retryable': False, 'message': '账号不可用'}
             except Exception:
                 gate = {'allowed': False, 'reason': 'unavailable', 'retryable': False, 'message': '执行条件暂不可读取'}

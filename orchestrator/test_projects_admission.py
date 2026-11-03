@@ -1,8 +1,10 @@
 """以真实 SQLite 和共享额度门禁核对 Pi 准入与原生错误补证。"""
 import json
 import os
+import threading
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from unittest.mock import Mock, patch
 
 import main
@@ -57,6 +59,77 @@ class ProjectsAdmissionTests(unittest.TestCase):
         self.guard._observe(self.account, main._quota_identity(self.account), {'observed_at': observed,
             'origin': 'cli', 'allowed': True, 'windows': {'five_hour': {'observed_at': observed,
                 'utilization': used, 'reset_at': reset or observed + 3600, 'exhausted': False, 'rejected': False}}})
+
+    def test_view_admission_does_not_wait_for_quota_consumption_and_reads_new_facts(self):
+        """页面不等待后台消费锁，后续读取仍看到新额度且真实执行继续消费。:return: None。"""
+        self.observe()
+        held, release = threading.Event(), threading.Event()
+
+        def hold_observations():
+            """模拟后台正在处理较长的观察文件。:return: None。"""
+            with self.guard._lock:
+                held.set()
+                release.wait(5)
+
+        holder = threading.Thread(target=hold_observations)
+        holder.start()
+        self.assertTrue(held.wait(1))
+        try:
+            with ThreadPoolExecutor(max_workers=1) as executor, patch.object(self.guard, 'consume', wraps=self.guard.consume) as consume:
+                try:
+                    snapshot = executor.submit(main._projects_admission, self.account, self.work, snapshot_only=True).result(1)
+                    self.assertTrue(snapshot['allowed'])
+                    consume.assert_not_called()
+                finally:
+                    release.set()
+        finally:
+            release.set()
+            holder.join(2)
+        self.assertFalse(holder.is_alive())
+        self.observe(used=35)
+        snapshot = main._projects_admission(self.account, self.work, snapshot_only=True)
+        self.assertFalse(snapshot['allowed'])
+        self.assertEqual('quota', snapshot['reason'])
+        with patch.object(self.guard, 'consume', wraps=self.guard.consume) as consume:
+            main._projects_admission(self.account, self.work)
+            consume.assert_called_once_with(self.account)
+
+    def test_view_admission_returns_unknown_while_execution_lock_is_held(self):
+        """锁忙的页面及时返回未知且不可放行；真正启动检查仍等待原锁。:return: None。"""
+        self.observe()
+        held, release, checking = threading.Event(), threading.Event(), threading.Event()
+
+        def hold_execution():
+            """模拟另一线程正在更新执行登记。:return: None。"""
+            with self.runtime.lock:
+                held.set()
+                release.wait(5)
+
+        def real_admission():
+            """从真实执行入口读取当前完整门禁。:return: 准入结果。"""
+            checking.set()
+            return main._projects_admission(self.account, self.work)
+
+        holder = threading.Thread(target=hold_execution)
+        holder.start()
+        self.assertTrue(held.wait(1))
+        try:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                snapshot = executor.submit(main._projects_admission, self.account, self.work, snapshot_only=True).result(1)
+                self.assertFalse(snapshot['allowed'])
+                self.assertEqual('unavailable', snapshot['reason'])
+                future = executor.submit(real_admission)
+                self.assertTrue(checking.wait(1))
+                try:
+                    with self.assertRaises(FutureTimeoutError):
+                        future.result(0.05)
+                finally:
+                    release.set()
+                self.assertTrue(future.result(2)['allowed'])
+        finally:
+            release.set()
+            holder.join(2)
+        self.assertFalse(holder.is_alive())
 
     def facts(self, **fields):
         """提供终端已核对的结构化补证。:param fields: 覆盖字段。:return: 不含正文的补证。"""
