@@ -97,10 +97,33 @@ def inspect_images(values: dict) -> dict:
             raise ValueError("镜像产品或角色不匹配")
         if manifest["layout_version"] == 2 and labels.get("vibebench.isolation-version") != "2":
             raise ValueError("联合镜像缺少三角色隔离能力")
+        if manifest.get('credential_ownership_protocol') == 1 and labels.get('vibebench.credential-ownership-protocol') != '1':
+            raise ValueError('联合镜像缺少凭据归属协议能力，禁止单侧更新')
         for label, key in (("release", "release"), ("parent-revision", "parent_revision"), ("gateway-revision", "gateway_revision")):
             if labels.get("vibebench." + label) != manifest[key]:
                 raise ValueError("镜像构建批次不匹配")
     return manifest
+
+
+def check_credential_compatibility(root: Path, manifest: dict) -> None:
+    """只读阻止受管凭据回退到不理解所有权的版本，不重新计算资源。
+
+    :param root: 已确认的独立数据根。
+    :param manifest: 本次完整联合镜像清单。
+    :return: None；有受管记录而能力不匹配时拒绝。
+    """
+    for relative, table in (('bench/db.sqlite', 'account_credential_ownerships'),
+            ('gateway/gateway.sqlite', 'oauth_account_ownerships')):
+        path = root / relative
+        if not path.is_file():
+            continue
+        if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
+            raise ValueError('凭据归属数据库不属于本部署')
+        with sqlite3.connect('file:' + quote(str(path), safe='/') + '?mode=ro', uri=True) as connection:
+            if (connection.execute('SELECT 1 FROM sqlite_master WHERE type=\'table\' AND name=?', (table,)).fetchone()
+                    and connection.execute('SELECT 1 FROM ' + table + ' LIMIT 1').fetchone()
+                    and manifest.get('credential_ownership_protocol') != 1):
+                raise ValueError('现有凭据已受所有权协议管理，禁止单侧降级或回退旧版')
 
 
 def preflight(values: dict) -> Path:
@@ -157,7 +180,8 @@ def preflight(values: dict) -> Path:
             # 允许复用已关闭连接的 TIME_WAIT，真实监听与外部 Docker 发布仍由原检查拒绝。
             probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind((address, port))
-    inspect_images(values)
+    manifest = inspect_images(values)
+    check_credential_compatibility(root, manifest)
     marker = root / ".v3-deployment.json"
     if marker.exists():
         if json.loads(marker.read_text()).get("deployment") != deployment:
@@ -437,7 +461,7 @@ def build(release: str, manifest_path: Path) -> None:
                 "platform": info["Os"] + "/" + info["Architecture"]}
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("x") as output:
-        json.dump({"schema": 3, "bridge_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",
+        json.dump({"schema": 3, "bridge_protocol": 1, "credential_ownership_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
             "dirty_worktree": dirty, "source_content_sha256": source_hash, "images": images}, output, indent=2)
         output.write("\n")

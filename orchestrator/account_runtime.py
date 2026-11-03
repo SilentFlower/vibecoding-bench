@@ -123,6 +123,7 @@ class AccountRuntime:
         self.client, self.data, self.host_data = client, data, host_data
         self.database, self.fingerprint, self.gateway = database, fingerprint, gateway
         self.quota_identity = quota_identity
+        self.credential_ownership = None
         self.project_iterations = None
         from project_review_runtime import ProjectReviewRuntime
         self.reviews = ProjectReviewRuntime(self)
@@ -582,7 +583,7 @@ class AccountRuntime:
 
     def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
                allow_login_recovery: bool = False, preserve_proxy: bool = False,
-               scenario_resources: bool = False) -> tuple[dict, object]:
+               scenario_resources: bool = False, ownership_source: str | None = None) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
@@ -591,9 +592,12 @@ class AccountRuntime:
         :param allow_login_recovery: 仅恢复原登录提交可进入本地保存门禁
         :param preserve_proxy: 指标读取只核对权威代理，不回写账号代理字段
         :param scenario_resources: 提前核验项目串行评审预算，新旧固定容器均保持原限额
+        :param ownership_source: 只有原受控登录会话可进入凭据维护阶段
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
+            if self.credential_ownership:
+                self.credential_ownership.guard(account, ownership_source)
             row = self._row(account["name"], account.get("id"), account.get("timezone"))
             # 历史画像门禁没有凭据失效证据；只迁移生命周期，不旋转画像或 HOME。
             if row["state"] in ("profile_reauth", "profile_reauth_reconcile"):
@@ -996,6 +1000,8 @@ class AccountRuntime:
         :return: 本代执行句柄
         """
         with self.environment_lock(row["environment_id"]):
+            if self.credential_ownership:
+                self.credential_ownership.guard(account, source)
             if self.reviews.serial_state(row):
                 raise RuntimeBusy("等待评审资源交接完成")
             if (not exclusive and self.reviews.pending(row.get('account_id'))
@@ -1235,7 +1241,8 @@ class AccountRuntime:
                    idle_only: bool = False, exclusive: bool = False, allow_inactive_login: bool = False,
                    shared_cli: bool = False, scenario_resources: bool = False):
         row, container = self.ensure(account, allow_inactive_login=allow_inactive_login,
-            allow_login_recovery=source.startswith("login:"), scenario_resources=scenario_resources)
+            allow_login_recovery=source.startswith("login:"), scenario_resources=scenario_resources,
+            ownership_source=source)
         with self.environment_lock(row["environment_id"]):
             # 检查至认领必须连续持锁，否则评审可在画像 exec 前停止尚未认领的 CLI。
             if self.reviews.serial_state(row):

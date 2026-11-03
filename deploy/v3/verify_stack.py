@@ -58,14 +58,19 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--browser", action="store_true")
+    parser.add_argument("--source-overlay", action="store_true", help="仅本地脏构建：只读挂载当前 Python/WebUI，Rust 仍来自联合镜像")
     parser.add_argument("--project-iteration", action="store_true")
     parser.add_argument("--run-boundaries", action="store_true")
     parser.add_argument("--warmup-quota", action="store_true")
     parser.add_argument("--reauth", action="store_true")
+    parser.add_argument("--ownership", action="store_true", help="隔离验证凭据归属、真实本地轮换与交接恢复")
     parser.add_argument("--deleted-binding", action="store_true")
     parser.add_argument("--topic-followups", action="store_true")
     parser.add_argument("--quota-completion", "--quota-hard-stop", dest="quota_completion", action="store_true")
     args = parser.parse_args()
+    if args.ownership and (not args.browser or any((args.reauth,args.deleted_binding,args.warmup_quota,
+            args.project_iteration,args.run_boundaries,args.topic_followups,args.quota_completion))):
+        parser.error('凭据归属验证需要 --browser，并单独执行')
     if args.warmup_quota and not args.browser:
         parser.error("养号页面验证需要同时指定 --browser")
     if args.reauth and (not args.browser or args.warmup_quota):
@@ -81,6 +86,9 @@ def main() -> None:
     if args.project_iteration and (not args.browser or any((args.warmup_quota,args.reauth,args.deleted_binding,args.topic_followups,args.quota_completion,args.run_boundaries))):
         parser.error("项目迭代页面验证需要 --browser，并单独执行")
     manifest = json.loads(args.manifest.read_text())
+    if args.source_overlay and manifest.get('dirty_worktree') is not True:
+        parser.error('源码覆盖仅限明确标记的本地脏构建，正式发布须验证镜像内产物')
+    minimal_library = any((args.project_iteration, args.ownership, args.reauth, args.deleted_binding))
     client = docker.from_env()
     deployment = "stack-verify-" + uuid.uuid4().hex[:10]
     filters = {"label": ["vibebench.product=v3", "vibebench.deployment=" + deployment]}
@@ -88,7 +96,7 @@ def main() -> None:
         root = Path(temporary)
         data = root / "v3-data"
         fixture_library = root / 'project-fixture-library'
-        if args.project_iteration:
+        if minimal_library:
             sys.path.insert(0,str(REPO/'orchestrator'))
             from project_test_content import create_project_fixture
             create_project_fixture(fixture_library)
@@ -116,12 +124,12 @@ def main() -> None:
             "V3_SESSION_SECRET": uuid.uuid4().hex + uuid.uuid4().hex}
         if args.reauth:
             values.update(V3_CLI_VERSION="9.9.9", V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="0")
-        if args.deleted_binding:
+        if args.deleted_binding or args.ownership:
             values.update(V3_CLI_VERSION="2.1.293", V3_ACCOUNT_MEMORY="1536m", V3_ACCOUNT_SWAP="0")
         configuration = root / "v3.env"
         configuration.write_text("".join(f"{key}={value}\n" for key, value in values.items()))
         configuration.chmod(0o600)
-        used = [ipaddress.ip_network(item['Subnet']) for existing in client.networks.list()
+        used = [ipaddress.ip_network(item['Subnet']) for existing in client.networks.list(greedy=True)
             for item in existing.attrs.get('IPAM', {}).get('Config') or [] if item.get('Subnet')]
         routes = json.loads(subprocess.check_output(['ip','-j','route','show']))
         used.extend(ipaddress.ip_network(item['dst']) for item in routes if item.get('dst') not in (None,'default'))
@@ -130,8 +138,8 @@ def main() -> None:
             if not any(candidate.overlaps(item) for item in used if item.version == 4))
         compose = root / 'compose.yml'
         compose_text = COMPOSE.read_text()
-        if args.project_iteration:
-            # 仅本次项目页面验证挂载临时夹具，正式 Compose 不提供合成内容兜底。
+        if minimal_library:
+            # 认证场景也复用小型合成库，避免无关的完整项目库首装遮住启动或凭据错误。
             environment_anchor = '      TOPICS_FILE: /repo/topics.md\n'
             volume_anchor = '      - ${V3_DATA_ROOT}/bench:/data\n'
             if compose_text.count(environment_anchor)!=1 or compose_text.count(volume_anchor)!=1:
@@ -140,6 +148,27 @@ def main() -> None:
                 environment_anchor+'      PROJECT_LIBRARY_DIR: /test-project-library\n')
             compose_text = compose_text.replace(volume_anchor,
                 volume_anchor+f'      - {fixture_library}:/test-project-library:ro\n')
+        if args.source_overlay:
+            overlay = [(path, '/app/' + path.name) for path in sorted((REPO / 'orchestrator').glob('*.py'))]
+            overlay.extend((path, '/webui/' + path.name) for path in sorted((REPO / 'webui').iterdir())
+                if path.is_file() and path.suffix in ('.js', '.html', '.css'))
+            # 与正式 Dockerfile 一致使用镜像内 vendor；Chrome 演练禁止外部网络。
+            index = root / 'index-overlay.html'
+            html = (REPO / 'webui/index.html').read_text()
+            for remote, local in (('https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css', 'vendor/xterm.css'),
+                    ('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js', 'vendor/xterm.js'),
+                    ('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js', 'vendor/xterm-addon-fit.js')):
+                html = html.replace(remote, local)
+            index.write_text(html)
+            overlay = [(index if target == '/webui/index.html' else path, target) for path, target in overlay]
+            anchor = '      - ${V3_DATA_ROOT}/bench:/data\n'
+            mounts = ''.join('      - ' + json.dumps(str(path) + ':' + target + ':ro') + '\n' for path, target in overlay)
+            compose_text = compose_text.replace(anchor, anchor + mounts)
+            digest = hashlib.sha256()
+            for path, target in overlay:
+                digest.update(target.encode())
+                digest.update(hashlib.sha256(path.read_bytes()).digest())
+            print('本地源码覆盖：', len(overlay), '个只读文件；sha256=', digest.hexdigest(), flush=True)
         compose.write_text(compose_text + f'    ipam:\n      config:\n        - subnet: {subnet}\n')
         wrapper = root / 'manage.py'
         wrapper.write_text(f'import sys\nfrom pathlib import Path\nsys.path.insert(0,{str(REPO / "deploy/v3")!r})\nimport manage\nmanage.COMPOSE=Path({str(compose)!r})\nmanage.main()\n')
@@ -219,6 +248,9 @@ def main() -> None:
                         if args.reauth:
                             from verify_reauth_stack import reauth_fixture
                             exercise = fixtures.enter_context(reauth_fixture(client, deployment, data, manifest, browser, base, authorization))
+                        if args.ownership:
+                            from verify_credential_ownership import ownership_fixture
+                            exercise = fixtures.enter_context(ownership_fixture(client, deployment, data, manifest, browser, base, authorization))
                         if args.deleted_binding:
                             from verify_deleted_binding import deleted_binding_fixture
                             exercise = fixtures.enter_context(deleted_binding_fixture(client, deployment, data, manifest, browser, base, authorization))

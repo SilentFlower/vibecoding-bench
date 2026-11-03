@@ -38,6 +38,23 @@ class PreflightTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "挂载"):
                 manage.preflight(self.values)
 
+    def test_credential_ownership_blocks_old_joint_manifest_without_writing_database(self) -> None:
+        """归属落库后不得单侧回退；只读检查不更改当前状态。@return None。"""
+        for relative, table in (('bench/db.sqlite', 'account_credential_ownerships'),
+                ('gateway/gateway.sqlite', 'oauth_account_ownerships')):
+            with self.subTest(relative=relative):
+                path = self.root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with sqlite3.connect(path) as database:
+                    database.execute('CREATE TABLE ' + table + '(account_id INTEGER PRIMARY KEY,record_json TEXT)')
+                    database.execute('INSERT INTO ' + table + ' VALUES(1,?)', ('{"phase":"ready","owner":"gateway"}',))
+                before = path.read_bytes()
+                with self.assertRaisesRegex(ValueError, '禁止单侧降级'):
+                    manage.check_credential_compatibility(self.root, {'schema': 3})
+                manage.check_credential_compatibility(self.root, {'credential_ownership_protocol': 1})
+                self.assertEqual(before, path.read_bytes())
+                path.unlink()
+
     def test_foreign_network_name_rejects(self) -> None:
         """同名网络缺少本部署标签时不能复用。@return None。"""
         with patch.object(manage, "command", side_effect=["", '{"Name":"vibebench-v3-test"}', '[{"Labels":{}}]']):

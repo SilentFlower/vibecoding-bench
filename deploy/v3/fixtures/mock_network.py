@@ -35,6 +35,25 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         """原样返回请求正文及来源地址，返回 None。"""
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        rotation = Path('/fixtures-data/ownership-oauth.json')
+        if self.path == '/v1/oauth/token' and rotation.exists():
+            # 只供隔离演练：逐次轮换合成 RT，证据仅记录序号和结果。
+            control = json.loads(rotation.read_text())
+            valid = json.loads(body).get('refresh_token') == control['expected_refresh']
+            number = control['number'] + 1
+            response = ({'access_token': f'ownership-local-at-{number}',
+                'refresh_token': f'ownership-local-rt-{number}', 'expires_in': 3600} if valid else {'error': 'invalid_grant'})
+            if valid:
+                rotation.write_text(json.dumps({'expected_refresh': response['refresh_token'], 'number': number}))
+            with Path('/fixtures-data/ownership-oauth-calls.jsonl').open('a') as output:
+                output.write(json.dumps({'number': number, 'accepted': valid, 'tls': isinstance(self.connection, ssl.SSLSocket)}) + '\n')
+            encoded = json.dumps(response).encode()
+            self.send_response(200 if valid else 400)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+            return
         if self.path == "/v1/v3-stream":
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")

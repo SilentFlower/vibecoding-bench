@@ -1,5 +1,67 @@
 # v3 固定账号运行环境契约
 
+## Scenario: v3 凭据单一所有者与交接协议 1
+
+### 1. Scope / Trigger
+
+- 修改创建/关联/解绑、关联重授权、OAuth 刷新、后台上游活动、归属展示或联合回退时适用。短期运行租约与长期刷新权分别持久管理，租约过期不能解除长期暂停。
+
+### 2. Signatures
+
+```text
+GET  /admin/runtime/credential-capabilities
+GET  /admin/accounts/{id}/oauth-ownership
+POST /admin/accounts/{id}/oauth-ownership
+POST /api/accounts/{aid}/cc2api/create
+POST /api/accounts/{aid}/cc2api/bind
+DELETE /api/accounts/{aid}/cc2api-binding
+POST /api/environments/{environment_id}/maintenance
+CredentialOwnership.record_local_authorization(account_id, version=None) -> None
+CredentialOwnership.guard(account, source=None) -> None
+check_credential_compatibility(root: Path, manifest: dict) -> None
+```
+
+- 网关表：`oauth_account_ownerships(account_id BIGINT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE, record_json TEXT NOT NULL)`；`oauth_handoff_operations(operation_id TEXT PRIMARY KEY, account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE, record_json TEXT NOT NULL)`。SQLite/PostgreSQL 同事务保存所有权、回执及交接凭据，按完整原所有权 JSON 条件更新。
+- bench 表：`account_credential_ownerships(account_id INTEGER PRIMARY KEY, record_json TEXT NOT NULL)`；`local_credential_authorizations(account_id INTEGER PRIMARY KEY, record_json TEXT NOT NULL)`。本地绑定与相应交接阶段用同一短事务保存；HTTP 在数据库锁外。
+
+### 3. Contracts
+
+- 内部接口同时要求管理 Bearer 与 `x-v3-service-token`；能力返回 `{credential_ownership_protocol:1}`。交接响应含 `protocol:1/ownership/receipt`，完整凭据快照只向受信任内部调用方返回。浏览器仅接收无身份秘密的 `owner/phase/message/remote_id/environment_id/direction` 摘要；列表批量读取，不逐账号刷新或扫描 HOME。
+- 输入为 `protocol/operation_id/action/direction/identity/expected_generation/source_refresh_sha256/lease_owner/credentials`，拒绝未知字段；action 为 prepare/commit/finish/cancel/status，direction 为 create/attach/return/authorize/detach/reauth/retire。操作和代次为 32 位小写十六进制；identity 固定 deployment_id、environment_id、bench_account_id、device_id、email、account_uuid、organization_uuid，device_id 为 64 位十六进制。凭据为 access_token/refresh_token/expires_at（UTC 毫秒），不保存到待办、回执或证明表。
+- owner 为 gateway/local；phase 为 ready/handoff/reauth/reconcile。仅 gateway/ready 允许网关新上游活动；无所有权记录的普通账号沿用原行为。坏记录只隔离所属账号，不影响整个账号列表或其他账号调度。
+- prepare 先关闭新准入、持久归属并排空最多 8 秒。活动许可必须覆盖实际网络发送至结束，SSE 持有到流释放；模型、count_tokens、Hello/bootstrap、预热、额度、测试、遥测、OAuth/401 共用门禁。作用域允许的原 sticky 账号暂停时返回维护，保留绑定；不跨号绕过。归属拒绝不应触发认证停用，RPM/并发/优先级等普通配置仍可热编辑。
+- detach 在本地空闲、网关排空后取当前权威快照，镜像/解绑并发布完整 HOME，远端提交 local/ready 后完成。return 必须有原本地接管回执、原 ID 与代次；由本地所有者按需刷新后交回当前 HOME，绑定并恢复 AT-only，再 finish 为 gateway/ready。root profile 落后时不能作为当前 HOME 的来源证明。
+- attach 仅在当前 RT 摘要及设备/账号证明一致时认可远端当前凭据；来源不明拒绝。成功本地强制重授权可记录无令牌证明：原环境/设备/身份、RT 摘要及本次登录冻结的 `session.version`；关联时再次按该版本核验当前 HOME 后使用 authorize。独立登录未具备设备来源时允许保存本地账号、清除旧证明；不能据此解除 retired/refresh_pending 或跳过后续关联校验。
+- reauth 保留原绑定及原 `login:` 租约；凭据导入回执 `import_operation_id` 与所有权回执关联，确认实际新授权导入后才允许 finish。回执保存 source_phase，取消返回原阶段，原 reconcile 不能被取消变 ready。普通执行不得冒用登录来源；未完成原操作不能开启另一个交接。
+- 受管刷新发送前落库待确认；确定结果保存且 HOME 收口后才恢复 ready。断线/解析失败/崩溃不重试未经确认的旧 RT。finish 已提交而响应丢失时查同操作回执；若同代已提交后又进入远端 reconcile，确认原绑定完成并保持 `gateway_refresh_pending`，允许明确重授权，仍不放开普通执行。
+- retire 无需有效 RT：先暂停原网关账号再本地删除，保留原 ID/HOME/历史；本地 retired 继续关闭普通执行，明确且身份核验成功的本地重授权才可恢复。远端明确删除仍须原绑定完整缺失证明，不能将新目标 404 当成成功。
+- 两角色镜像标签 `vibebench.credential-ownership-protocol=1`，联合清单 `credential_ownership_protocol:1`；已有任一所有权记录时，只读兼容检查拒绝旧清单回退。US 沿用现有资源参数、不做生产备份、不重新计算内存；最终同批发布及健康验收由部署流程承接。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 缺内部证明、协议不匹配、未知字段或代次/来源冲突 | 拒绝交接，原凭据与回执保持 |
+| 网关账号由本地管理或维护中 | 上游准入 503，不发请求、不按认证失败停用 |
+| 本地归属、绑定或固定环境不一致 | 拒绝执行并提示对账，不按空绑定降级 |
+| 交接超时、写入失败或回包未知 | 保留持久待办和维护，查同操作回执恢复 |
+| 历史 receipt 与当前代次不符 | 拒绝旧回执，不覆盖当前 RT、不释放维护 |
+| 独立未知版本登录 / 受管恢复身份未知 | 本地保存但无关联证明 / 继续维护并明确报错 |
+| 任一受管记录 + 旧版联合清单 | 部署兼容检查拒绝，不写数据库 |
+
+### 5. Scenarios and Examples
+
+- 正常：解绑原远端 7 → local/ready；本地连续轮换三次 → return 到原 7 → HOME 仅 AT → gateway/ready，设备、缓存、策略和历史保持。
+- 边界：commit 已生效而 HTTP 回包丢失，重启读取 status 的同代回执，再补镜像/绑定/finish，不能重复上传历史 RT。
+- 错误用法：用到期时间较大的副本覆盖远端，或本地强制授权按后来修改的默认 CLI 版本生成证明。正确处理：按所有者/回执确认来源，证明及重验均使用实际登录冻结版本；不能确认时保留维护或明确重授权。
+
+### 6. Tests Required
+
+- `test_credential_ownership` 与原 runtime/reauth/deleted-binding/publication/main 回归：六个落盘边界、回包丢失、当前 HOME 来源、坏记录隔离、未知刷新关闭、原绑定重授权、独立未知版本登录与冻结版本证明。
+- Rust 归属/活动许可/401/调度回归及 `account_store_timestamp_test` 的 SQLite、独立 PostgreSQL `credential_ownership_storage` 合同：双栈迁移幂等、凭据/回执原子性、条件失配、删除清理、旧 receipt 拒绝与其他账号继续准入。
+- `test_manage.py`：旧联合清单拒绝且数据库字节不变。`verify_stack.py --manifest <联合清单> --browser --ownership`、`--reauth`、`--deleted-binding`：真实 HTTP、两库、Chrome、Docker 和本地合成 TLS 刷新，暂停零上游、三次刷新交回原 ID、AT-only、故障对账及删除恢复。`--source-overlay` 仅本地 dirty 清单可用且记录只读覆盖摘要；生产仍用最终干净 CI。
+- 真实第三方 OAuth 可用性不以合成结果代替；部署后只读验证镜像协议、状态和既有工作，不擅自发起真实授权、解绑或模型请求。
+
 ## Scenario: 固定 Docker、API/CLI 独立调度及证据恢复
 
 ### 1. Scope / Trigger

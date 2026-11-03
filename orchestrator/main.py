@@ -51,6 +51,7 @@ from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
+from credential_ownership import CredentialOwnership
 from cli_quota import statusline_quota_observation
 from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_context_json, capture_summary
 from login_terminal import authorization_url
@@ -734,7 +735,8 @@ class Cc2ApiClient:
                 "Authorization": f"Bearer {self.admin_password}",
                 **({"x-v3-service-token": os.environ.get("V3_INTERNAL_TOKEN", "")} if
                     (path == "/admin/accounts" and body and body.get("cli_identity"))
-                    or re.fullmatch(r"/admin/accounts/[0-9]+/(?:oauth-credentials/import(?:/[a-f0-9]{32})?|cli-process/import)", path) else {}),
+                    or path == '/admin/runtime/credential-capabilities'
+                    or re.fullmatch(r"/admin/accounts/[0-9]+/(?:oauth-ownership|oauth-credentials/import(?:/[a-f0-9]{32})?|cli-process/import)", path) else {}),
             },
         )
         try:
@@ -1198,15 +1200,22 @@ def _sync_bound_account_credentials_locked(
     :param force_refresh: 是否要求 cc2api 强制刷新一次
     :return: cc2api 最终凭据快照
     """
+    if credential_ownership:
+        credential_ownership.guard(account)
     cc2api_account_id = account.get("cc2api_account_id")
     if cc2api_account_id is None:
         raise ValueError("bench 账号尚未绑定 cc2api")
-    snapshot = _resolve_and_sync_cc2api_credentials(
-        str(account["name"]),
-        int(cc2api_account_id),
-        min_validity_seconds,
-        force_refresh,
-    )
+    try:
+        snapshot = _resolve_and_sync_cc2api_credentials(
+            str(account["name"]),
+            int(cc2api_account_id),
+            min_validity_seconds,
+            force_refresh,
+        )
+    except (ValueError, ConnectionError):
+        if credential_ownership:
+            credential_ownership.observe_gateway_failure(account)
+        raise
     if account_runtime:
         row = account_runtime._row(account["name"], account["id"])
         account_runtime.sync_credentials(row, account)
@@ -1697,6 +1706,9 @@ def _account_reference_counts(conn: sqlite3.Connection, account_id: int) -> dict
     projects = conn.execute("SELECT COUNT(*) AS n FROM project_iteration_batches WHERE account_id=?", (account_id,)).fetchone()["n"]
     if projects:
         counts["project_iteration_batches"] = projects
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='account_credential_ownerships'").fetchone():
+        if conn.execute('SELECT 1 FROM account_credential_ownerships WHERE account_id=?', (account_id,)).fetchone():
+            counts['account_credential_ownerships'] = 1
     agents = conn.execute('SELECT COUNT(*) AS n FROM projects_agents WHERE account_id=?', (account_id,)).fetchone()['n']
     if agents:
         counts['projects_agents'] = agents
@@ -4787,12 +4799,17 @@ JS
                 source = f"oauth-refresh:{uuid.uuid4().hex}"
                 row, container = account_runtime.ensure(account)
                 job = account_runtime.claim(row, account, source, exclusive=True)
+                managed_refresh, refresh_known = False, False
                 try:
                     account_runtime.sync_credentials(row, account)
+                    if credential_ownership:
+                        managed_refresh = credential_ownership.begin_local_refresh(account['id'], source)
                     context = {"NETWORK_INSPECTION_MODE": "passthrough", "QUOTA_SOURCE": source}
                     atomic_json(account_runtime._network_runtime(row) / "context.json", context)
                     account_runtime._configure_network_context(container, context)
                     raw = self._exec_oauth_refresh_probe(job["token"], use_mitm=False, force_refresh=force_refresh, version=version)
+                    refresh_known = bool(raw.get('skipped') or raw.get('refreshed')
+                        or (type(raw.get('status')) is int and 400 <= raw['status'] < 500))
                     if raw.get("skipped"):
                         return False
                     if raw.get("error"):
@@ -4803,6 +4820,8 @@ JS
                     return True
                 finally:
                     account_runtime.cleanup(job["token"])
+                    if managed_refresh and refresh_known:
+                        credential_ownership.finish_local_refresh(account['id'], source)
             sid = uuid.uuid4().hex[:12]
             sidecar_name = f"bench-oauth-refresh-sidecar-{sid}"
             worker_name = f"bench-oauth-refresh-worker-{sid}"
@@ -5313,6 +5332,8 @@ class LoginManager:
                     drafts.save(draft_row, sid=sid, generation=uuid.uuid4().hex, phase="preparing",
                         version=version, created_at=time.time(), home=f"/home/node/.v3-login/{sid}" if force_reauth else "/home/node")
                     draft_registered = True
+                if binding_id is not None and credential_ownership:
+                    credential_ownership.begin_reauth(account, sid)
                 row, container, profile, home = account_runtime.begin_login(sid, account, version, force_reauth)
                 session = LoginSession(sid, name, container.id, container.id, proxy, profile, force_reauth, version)
                 session.home, session.version = home, version
@@ -5547,6 +5568,8 @@ class LoginManager:
                     if cc2api_client._request("GET", f"/admin/runtime/accounts/{s.binding_id}/lease").get("lease"):
                         raise ValueError("登录维护门禁仍需对账")
                 s.commit_context["path"].unlink(missing_ok=True)
+                if credential_ownership:
+                    credential_ownership.close_reauth(s.account_id, s.sid)
             if s.force_reauth:
                 # 未提交草稿取消保留已写入产物；完整删除走独立归属校验路径。
                 if not s.environment_id:
@@ -6151,6 +6174,18 @@ class OAuthRefreshScheduler:
                         continue
                 finally:
                     conn.close()
+                if credential_ownership:
+                    ownership = credential_ownership.state(current['id'])
+                    if ownership and ownership['phase'] != 'ready':
+                        try:
+                            if ownership['input']['direction'] == 'reauth':
+                                credential_ownership.close_reauth(current['id'])
+                            else:
+                                credential_ownership.resume(current)
+                        except Exception:
+                            # 结果不明仍保留持久维护；本轮不能降级为本地 RT 刷新。
+                            pass
+                        continue
                 if current.get("cc2api_account_id") is not None:
                     try:
                         _sync_bound_account_credentials_locked(
@@ -7925,6 +7960,7 @@ oauth_refresh_scheduler: Optional[OAuthRefreshScheduler] = None
 warmup_scheduler: Optional[WarmupScheduler] = None
 quota_guard: Optional[QuotaGuard] = None
 account_runtime: Optional[AccountRuntime] = None
+credential_ownership: Optional[CredentialOwnership] = None
 project_iterations: Optional[ProjectIterationManager] = None
 project_iteration_error: Optional[str] = None
 project_requester_settings: Optional[ProjectRequesterSettings] = None
@@ -7974,6 +8010,12 @@ def _pi_admission(account: dict, work: dict | None, *, admitted_round: bool = Fa
     :param snapshot_only: 页面只读取已持久的观察，不等待全局消费锁或重写额度文件。
     :return: 是否放行、机器可读原因、是否可被动重试及可信恢复时间。
     """
+    if credential_ownership:
+        try:
+            credential_ownership.guard(account)
+        except ValueError as error:
+            return {'allowed': False, 'reason': 'credential_ownership', 'retryable': False,
+                'retry_at': None, 'message': str(error)}
     window = _account_run_window(account)
     public_quota = None
     if quota_guard:
@@ -8226,7 +8268,7 @@ def _projects_credentials(account: dict) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, project_iterations, project_iteration_error, project_requester_settings, projects_service, warmup_pi_service, pi_owners
+    global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, credential_ownership, project_iterations, project_iteration_error, project_requester_settings, projects_service, warmup_pi_service, pi_owners
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -8235,6 +8277,14 @@ async def lifespan(app: FastAPI):
     runner = Runner()
     if V3_ENABLED:
         account_runtime = AccountRuntime(runner.client, BENCH_DATA, HOST_BENCH_DATA, get_db, derive_v3_fingerprint, cc2api_client, _quota_identity)
+        credential_ownership = CredentialOwnership(account_runtime, cc2api_client, get_db, _db_lock,
+            read_profile=_read_bench_profile_identity, mirror=_sync_cc2api_credentials_to_profile,
+            mirror_locked=_sync_cc2api_credentials_to_profile_locked, profile_lock=_profile_lock,
+            identity=_v3_cli_identity, read_identity=_v3_cli_identity_readonly,
+            validate=_validate_cc2api_identity, find=_find_cc2api_account_for_profile,
+            idle=_require_oauth_owner_transition_idle, available=_require_cc2api_binding_available,
+            creation_payload=_cc2api_creation_payload, refresh=runner.refresh_account_oauth_token)
+        account_runtime.credential_ownership = credential_ownership
         account_runtime.reconcile()
         account_runtime.start()
     scheduler = Scheduler(runner)
@@ -9080,6 +9130,7 @@ def create_account(body: AccountIn):
 @app.get("/api/accounts")
 def list_accounts():
     """返回账号列表，并补充 OAuth token 状态。"""
+    ownerships = credential_ownership.summaries() if credential_ownership else {}
     conn = get_db()
     try:
         rows = conn.execute(
@@ -9090,6 +9141,7 @@ def list_accounts():
             if _login_save_pending(conn, row["name"]):
                 continue
             account = dict(row)
+            account['credential_ownership'] = ownerships.get(account['id'])
             account['warmup_engine'] = 'projects' if isinstance(warmup_pi_service, ProjectsService) else 'worker'
             account['project_pi'] = None
             if isinstance(warmup_pi_service, ProjectsService):
@@ -9127,7 +9179,7 @@ def list_accounts():
 @app.get("/api/cc2api/accounts")
 def list_cc2api_accounts():
     """
-    返回可绑定的 active OAuth cc2api 账号脱敏摘要。
+    返回可关联账号，包含由本地接管且保留原停用状态的目标。
 
     :return: 不含任何凭据的账号摘要列表
     """
@@ -9137,10 +9189,15 @@ def list_cc2api_accounts():
         raise HTTPException(502, _redact_cc2api_error(exc))
     except ValueError as exc:
         raise HTTPException(400, _redact_cc2api_error(exc))
+    local_targets = {value['remote_id'] for value in credential_ownership.summaries().values()
+        if value['owner'] == 'local' and value['phase'] == 'ready'} if credential_ownership else set()
+    if credential_ownership:
+        local_targets.update(credential_ownership.authorized_targets(accounts))
     return [
         _cc2api_account_summary(account)
         for account in accounts
         if _cc2api_account_is_active_oauth(account)
+            or (account['id'] in local_targets and account.get('auth_type') == 'oauth')
     ]
 
 
@@ -9152,6 +9209,19 @@ def _v3_cli_identity(account: dict) -> dict:
     """
     with _profile_lock(account["name"]):
         return account_runtime.identity_import(account, _resolve_account_cli_version(account)[0])
+
+
+def _v3_cli_identity_readonly(account: dict, version: str | None = None) -> dict:
+    """核对已完成本地新授权的原设备，不唤醒或改写环境。
+
+    :param account: 原账号。
+    :param version: 原登录冻结的精确版本；未提供时沿用账号当前版本。
+    :return: 已核验设备身份及固定环境 ID。
+    """
+    with _profile_lock(account['name']):
+        row = account_runtime._row(account['name'], account['id'])
+        identity = account_runtime.read_cli_identity(row, version or _resolve_account_cli_version(account)[0])
+        return {**identity, 'environment_id': row['environment_id']}
 
 
 @app.post("/api/accounts/{aid}/cc2api/sync")
@@ -9236,6 +9306,25 @@ def update_account_process(aid: int) -> dict:
         "canonical_process": result["canonical_process"]}
 
 
+def _cc2api_creation_payload(account: dict, profile: dict, observed: Optional[dict]) -> dict:
+    """构造首次创建载荷，统一新旧入口的原有默认配置。
+
+    :param account: 本地账号。
+    :param profile: 已读取的身份与凭据。
+    :param observed: v3 已核验 CLI 身份，旧模式为 None。
+    :return: 只交给受信任管理端的创建载荷。
+    """
+    return {**({'cli_identity': observed} if observed is not None else {}),
+        'name': account['name'], 'email': profile['email'], 'auth_type': 'oauth',
+        'access_token': profile['access_token'], 'refresh_token': profile['refresh_token'],
+        'expires_at': profile['expires_at'], 'proxy_url': _account_proxy_url(account),
+        'account_uuid': profile.get('account_uuid'), 'organization_uuid': profile.get('organization_uuid'),
+        'subscription_type': profile.get('subscription_type'), 'rate_limit_tier': profile.get('rate_limit_tier'),
+        'allow_fast_mode': False, 'billing_mode': 'rewrite', 'upstream_session_pool_enabled': True,
+        'upstream_session_pool_size': 4, 'upstream_session_refresh_policy': 'owner_only',
+        'concurrency': 4, 'rpm_limit': 50}
+
+
 def _associate_account_to_cc2api(aid: int, action: str, target_id: Optional[int] = None) -> dict:
     """复用创建/关联的所有权保护，由入口显式限定动作。
 
@@ -9262,6 +9351,15 @@ def _associate_account_to_cc2api(aid: int, action: str, target_id: Optional[int]
                 account = dict(current_row)
             finally:
                 conn.close()
+            if credential_ownership:
+                try:
+                    result = credential_ownership.associate(account, action, target_id)
+                    result['cc2api_account'] = _cc2api_account_summary(result['cc2api_account'])
+                    return result
+                except ConnectionError:
+                    raise HTTPException(503, '凭据交接结果尚未确认，请重试原操作或在环境页对账') from None
+                except (ValueError, RuntimeError) as error:
+                    raise HTTPException(409, _redact_cc2api_error(error)) from None
             existing_binding = account.get("cc2api_account_id")
             if existing_binding is not None and action != "sync":
                 raise HTTPException(409, "账号已经关联 cc2api，无需再次创建或关联")
@@ -9296,27 +9394,8 @@ def _associate_account_to_cc2api(aid: int, action: str, target_id: Optional[int]
                             raise ValueError("已有匹配的 cc2api 账号，请使用“关联已有账号”")
                     created = matched is None
                     if matched is None:
-                        matched = cc2api_client.create_account({
-                            **({"cli_identity": _v3_cli_identity(account)} if account_runtime else {}),
-                            "name": account["name"],
-                            "email": profile["email"],
-                            "auth_type": "oauth",
-                            "access_token": profile["access_token"],
-                            "refresh_token": profile["refresh_token"],
-                            "expires_at": profile["expires_at"],
-                            "proxy_url": _account_proxy_url(account),
-                            "account_uuid": profile.get("account_uuid"),
-                            "organization_uuid": profile.get("organization_uuid"),
-                            "subscription_type": profile.get("subscription_type"),
-                            "rate_limit_tier": profile.get("rate_limit_tier"),
-                            "allow_fast_mode": False,
-                            "billing_mode": "rewrite",
-                            "upstream_session_pool_enabled": True,
-                            "upstream_session_pool_size": 4,
-                            "upstream_session_refresh_policy": "owner_only",
-                            "concurrency": 4,
-                            "rpm_limit": 50,
-                        })
+                        observed = _v3_cli_identity(account) if account_runtime else None
+                        matched = cc2api_client.create_account(_cc2api_creation_payload(account, profile, observed))
                 if not _cc2api_account_is_active_oauth(matched):
                     raise ValueError("匹配到的 cc2api 账号不是 active OAuth 账号")
                 _validate_cc2api_identity(profile, matched)
@@ -9440,6 +9519,18 @@ def update_account_warmup(aid: int, body: WarmupConfigIn):
             current_binding = account.get("cc2api_account_id")
             target_binding = int(body.cc2api_account_id) if body.cc2api_account_id is not None else current_binding
             binding_changes = body.cc2api_account_id is not None and current_binding != target_binding
+            if credential_ownership and binding_changes:
+                if current_binding is not None:
+                    raise HTTPException(409, '切换凭据所有者请先显式解绑，再关联已有账号')
+                try:
+                    credential_ownership.associate(account, 'bind', target_binding)
+                    account = credential_ownership._account(aid)
+                    current_binding = account.get('cc2api_account_id')
+                    binding_changes = False
+                except ConnectionError:
+                    raise HTTPException(503, '凭据交接结果尚未确认，请重试或对账') from None
+                except (ValueError, RuntimeError) as error:
+                    raise HTTPException(409, _redact_cc2api_error(error)) from None
             if binding_changes:
                 _require_oauth_owner_transition_idle(account)
 
@@ -9667,6 +9758,13 @@ def delete_account_cc2api_binding(aid: int):
         finally:
             conn.close()
         _require_oauth_owner_transition_idle(account)
+        if credential_ownership:
+            try:
+                return credential_ownership.detach(account)
+            except ConnectionError:
+                raise HTTPException(503, '解绑交接结果尚未确认，请重试解绑或在环境页对账') from None
+            except (ValueError, RuntimeError) as error:
+                raise HTTPException(409, _redact_cc2api_error(error)) from None
         with _runtime_owner_transition(account, None):
             with _db_lock:
                 conn = get_db()
@@ -9717,6 +9815,14 @@ def delete_account(aid: int):
         finally:
             conn.close()
         _require_oauth_owner_transition_idle(account)
+        if credential_ownership:
+            try:
+                credential_ownership.retire(account)
+                account = credential_ownership._account(aid)
+            except ConnectionError:
+                raise HTTPException(503, '删除前的凭据暂停结果尚未确认，请重试原操作或对账') from None
+            except ValueError as error:
+                raise HTTPException(409, _redact_cc2api_error(error)) from None
         with _runtime_owner_transition(account, None, handoff_credentials=False):
             with _db_lock:
                 conn = get_db()
@@ -10646,6 +10752,8 @@ def _login_commit_locked(sid: str, body: LoginStartIn):
         if session.environment_id:
             drafts.save(row, saved_account_id=account_id)
         account_runtime.commit_login(session, account_id)
+        if credential_ownership and session.force_reauth:
+            credential_ownership.record_local_authorization(account_id, session.version)
         if session.environment_id:
             cleanup_home = record.get("cleanup_home") or (session.home if session.force_reauth else None)
             # HOME 已原子镜像成功；先更新恢复入口，清理暂存失败也能从主 HOME 重试。
@@ -12559,7 +12667,9 @@ def v3_environments() -> list[dict]:
         )]
     finally:
         connection.close()
+    ownerships = credential_ownership.summaries() if credential_ownership else {}
     for row in rows:
+        row['credential_ownership'] = ownerships.get(row['account_id'])
         row["role_status"] = account_runtime.role_status(row)
         blocker = account_runtime.reprofile_blocker(row)
         row["fingerprint"] = json.loads(row.pop("fingerprint_json"))
@@ -12652,7 +12762,7 @@ def v3_environment_maintenance(environment_id: str, body: dict):
         raise HTTPException(404)
     connection = get_db()
     try:
-        environment = connection.execute("SELECT COALESCE(a.name,e.name) AS name FROM account_environments e "
+        environment = connection.execute("SELECT COALESCE(a.name,e.name) AS name,e.account_id FROM account_environments e "
             "LEFT JOIN accounts a ON a.id=e.account_id WHERE e.environment_id=?", (environment_id,)).fetchone()
     finally:
         connection.close()
@@ -12661,11 +12771,22 @@ def v3_environment_maintenance(environment_id: str, body: dict):
     try:
         # 对账会镜像已提交凭据，必须与提交/绑定共用 owner → profile → environment 锁顺序。
         with _oauth_owner_lock(environment["name"]):
+            ownership = credential_ownership.state(environment['account_id']) if credential_ownership and environment['account_id'] else None
+            if (body.get('operation') == 'reconcile' and ownership and ownership['phase'] != 'ready'
+                    and ownership['input']['direction'] != 'reauth'):
+                credential_ownership.resume(credential_ownership._account(environment['account_id']))
+                return {'ok': True}
+            if body.get('operation') == 'cancel-credential-return' and credential_ownership:
+                credential_ownership.cancel_return(credential_ownership._account(environment['account_id']))
+                return {'ok': True}
             with _profile_lock(environment["name"]):
                 account_runtime.maintenance(environment_id, body.get("operation", ""))
         # 该方法自行领取 owner 锁；不可在上面的非重入锁内调用。
         if body.get("operation") == "reconcile" and login_manager:
             login_manager.cleanup_reconciled(environment_id)
+        if body.get('operation') == 'reconcile' and credential_ownership and environment['account_id']:
+            with _oauth_owner_lock(environment['name']):
+                credential_ownership.close_reauth(environment['account_id'])
     except (ValueError, RuntimeError) as exc:
         if body.get("operation") == "reprofile":
             raise HTTPException(409, str(exc)) from None

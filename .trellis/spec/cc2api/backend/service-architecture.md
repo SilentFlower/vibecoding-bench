@@ -1099,6 +1099,8 @@ let client = get_request_client(&account.proxy_url)
 
 ## Scenario: v3 重授权凭据导入与迟到回包保护
 
+长期刷新权、上游活动排空、交接回执与双栈存储统一遵循 [凭据单一所有者与交接协议 1](../../vibecoding-bench/backend/account-runtime-v3.md#scenario-v3-凭据单一所有者与交接协议-1)。这里的短期登录租约、导入幂等与认证状态恢复不能绕过该门禁；已提交导入操作通过所有权回执的 `import_operation_id` 关联。
+
 ### 1. Scope / Trigger
 
 - 修改 CLI 重授权导入、OAuth 回执/锁、登录维护租约，或刷新/401 的认证状态写入时适用。bench 的暂存与恢复流程见 [固定账号环境](../../vibecoding-bench/backend/account-runtime-v3.md#scenario-v3-关联重授权提交与恢复)。

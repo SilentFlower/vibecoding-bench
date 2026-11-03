@@ -169,7 +169,7 @@ async function renderEnvironments() {
   if (currentTab() !== 'environments' || generation !== state.viewGeneration) return;
   const view = $('#view');
   view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。画像校正只适用于没有运行历史的未绑定账号，保留原 HOME 和登录凭据。</p>' +
-    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p><p>${escapeHTML(Object.entries(row.role_status || {}).map(([role, status]) => `${({cli:"CLI",network:"网络",sender:"API"})[role] || role}: ${status}`).join(" · "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : ''}${renderPhysicalFeatures(row)}</article>`).join('');
+    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${row.credential_ownership ? `<p role="status">${escapeHTML(row.credential_ownership.message)}</p>${row.credential_ownership.phase !== 'ready' && ['return', 'attach', 'authorize'].includes(row.credential_ownership.direction) ? `<button type="button" data-environment="${escapeHTML(row.environment_id)}" data-operation="cancel-credential-return" ${row.busy ? 'disabled' : ''}>取消未提交交接</button>` : ''}` : ''}<p>${escapeHTML(Object.entries(row.role_status || {}).map(([role, status]) => `${({cli:"CLI",network:"网络",sender:"API"})[role] || role}: ${status}`).join(" · "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : ''}${renderPhysicalFeatures(row)}</article>`).join('');
   $$('[data-physical-refresh]', view).forEach(button => {
     button.onclick = async () => {
       button.disabled = true;
@@ -356,12 +356,13 @@ async function renderAccounts() {
       <td><code>${escapeHTML(a.profile_path)}</code></td>
       <td>${renderProxyEndpoint(a)}</td>
       <td>${renderAccountTimezone(a)}</td>
-      <td>${renderOauthTokenStatus(a)}${renderPassiveQuota(a.passive_quota)}</td>
+      <td>${renderOauthTokenStatus(a)}${renderPassiveQuota(a.passive_quota)}${a.credential_ownership ? `<p class="muted" role="status">${escapeHTML(a.credential_ownership.message)}</p>` : ''}</td>
       <td class="warmup-status">${renderWarmupStatus(a)}</td>
       <td>${a.enabled ? '✓' : '✗'}</td>
       <td><div class="op-actions account-actions">
         <button type="button" class="btn btn-sm" data-cli-settings="${a.id}">Claude Code 配置</button>
         <button class="btn btn-sm" data-quota="${a.id}">额度</button>
+        ${a.credential_ownership?.phase && a.credential_ownership.phase !== 'ready' ? `<a class="btn btn-sm" href="#environments">凭据交接对账</a>` : ''}
         ${a.cc2api_account_id == null ? `<button type="button" class="btn btn-sm" data-cc2-create="${a.id}">创建 cc2api 账号</button>
         <button type="button" class="btn btn-sm" data-cc2-bind="${a.id}">关联已有账号</button>` :
           (RUNTIME_BASE ? `<button type="button" class="btn btn-sm" data-cc2-process="${a.id}">更新进程指标</button>` : '')}

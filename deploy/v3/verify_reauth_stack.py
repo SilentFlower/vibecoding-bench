@@ -116,7 +116,7 @@ def reauth_fixture(client, deployment, data, manifest, browser, base, authorizat
             await evaluate(f"{doc}.querySelector('[data-relogin=\"{account_id}\"]').click()")
             assert await evaluate(f"{doc}.querySelector('#acc-form').elements.timezone.disabled")
             await evaluate(f"{doc}.querySelector('#acc-form').requestSubmit()")
-            await wait_for(f"Boolean({state}?.sid && {state}?.connection && {state}?.authorizationURL)", timeout=ACCOUNT_STARTUP_TIMEOUT)
+            await wait_for(f"Boolean({state}?.sid && {state}?.connection && {state}?.authorizationURL && {state}?.ws?.readyState === 1)", timeout=ACCOUNT_STARTUP_TIMEOUT)
             sid = await evaluate(f"{state}.sid")
             url = await evaluate(f"{doc}.querySelector('#acc-auth-url').value")
             assert url.startswith("https://claude.ai/oauth/authorize?")
