@@ -416,8 +416,8 @@ Haiku 2.1.257 子画像契约：
 | `/api/oauth/organizations/{id}/marketplaces`、`plugins/list-plugins`、`skills/list-skills`、`skills/{id}/download` | 同上 | 无 beta |
 
 - 新端点规则仍按非空路径段和精确后缀匹配，近似路径不放宽；旧版本 UA/beta 不套 280 规则。
-- 原生 `/v1/messages` 透传 `x-claude-code-request-class` 和
-  `x-claude-code-prev-tool-durations`；其它端点丢弃这两项，不在 API 请求中伪造工具耗时。
+- 原生 `/v1/messages` 的分类、工具耗时及 agent/prompt 关联头按下方「原生 Messages
+  代理关联头透传」合同处理；其它端点不继承这些消息调用字段，API 请求不伪造工具耗时。
   Frame/MCP 新增专用头也只在对应端点放行。
 - `/v1/mcp_servers` 的 280 capabilities 为 Base64 编码的
   `{"roots":{"listChanged":true},"elicitation":{}}`；旧画像仍为 `roots:{}`。访问策略独立，不自动放行 axios。
@@ -610,8 +610,8 @@ watchdog 前后报 `No response from API`。
   `cch-billing-location.json` 的独立 XXH64 期望断言五位值之外字节不变；
   `cch_billing_extra_fields_and_field_order_preserve_existing_compatibility` 覆盖附加字段与变序，
   相关回归另覆盖 API／CC、特殊路径、非法／重复目标、转义与缓存前置跳过条件。
-- 280 非遥测请求头：messages 的 request-class/tool-duration 仅在精确 messages 路径
-  透传；Frame/MCP 专用头、后台 UA/beta、近似路径排除、旧版本 capabilities 均有正反例。
+- 280 非遥测请求头：messages 的 request-class/tool-duration 和代理关联头仅在精确 messages
+  路径透传；Frame/MCP 专用头、后台 UA/beta、近似路径排除、旧版本 capabilities 均有正反例。
 - Sonnet 4.5：客户端带/不带 token、重复 token、正文有/无 thread、API 默认值，以及
   Fast/1M 能力过滤分别断言；不得把 API 默认画像测试当作原生客户端透传测试。
 - `http1_header_casing_test` 与网关实际发送回归：混合大小写、相对顺序、自动长度、
@@ -1924,3 +1924,47 @@ PreparedRequest::tls_profile: TlsProfileId
 - `sender_preserves_tls_profile_legacy_default_and_rejects_unknown_before_submission`：真实HTTP传输、不同ID实际wire、缺字段默认，以及未知ID400、before-send和active=0。
 - `same_proxy_different_tls_profiles_emit_distinct_actual_clienthellos`、`distinct_tls_configs_keep_resumption_tickets_separate`：实际工厂分池及真实恢复状态 `[false,true,false,true,true]`，禁止只断言常量或缓存条目数量。
 - 原293完整握手／恢复／HRR和Hello去重、代理、证书、流取消及改写回归；`cargo fmt --check`、完整 `cargo test -- --test-threads=4`、`git diff --check`。正式镜像无外网验证显式ID、旧报文与未知ID拒绝，不能用测试替身冒充模型成功。
+
+## Scenario: 原生 Messages 代理关联头透传
+
+### 1. Scope / Trigger
+
+- 修改 `Rewriter::rewrite_headers` 的原生头白名单、大小写或发送边界时适用。
+- 根因是仅放行 request-class 会保留 subagent 分类，却丢失调用方提供的代理身份和 prompt 关联。本合同为现有透传的定向补全，不切换全局黑名单策略。
+
+### 2. Signatures
+
+- `Rewriter::rewrite_headers(&self, headers: &HashMap<String, String>, path: &str, account: &Account, client_type: ClientType, model_id: &str, body_map: &Value) -> HashMap<String, String>`。
+- `ordered_anthropic_headers(path: &str, headers: &HashMap<String, String>) -> Vec<(String, String)>` 继续组织发送头；`PreparedRequest.headers` 承载同一列表。
+- `path` 为已剥离 query 的路径；不新增设置、环境变量、数据库或 sender 协议字段。
+
+### 3. Contracts
+
+- 仅 `ClientType::ClaudeCode` 且 `path == "/v1/messages"` 时，保留调用方实际提供的 `x-claude-code-agent-id`、`x-claude-code-parent-agent-id`、`x-claude-code-agent-type`、`x-claude-code-prompt-id`。
+- 头名匹配大小写无关，输出使用以上小写拼写，值原样保留；与既有 request-class、prev-tool-durations 适用相同端点边界。
+- 这四项各自可选，缺失保持缺失。主请求可以只带 prompt-id；不能从正文的 subagent/Explore 字样、模型或父请求推断并补造身份。
+- `/v1/messages/count_tokens`、账号设置、hello 等其它端点不继承这些头；API 模拟入口沿用既有生成规则，不从这次修复补造代理关联。
+- 不改入站 request-class，也不把子代理强制转成 main；不重铸 agent、parent 或 prompt ID。现有 Session、正文 billing、metadata 与 CCH 改写规则继续各自生效，本次不新增身份映射。
+- 正常网关与账号 sender 共用改写后的 `PreparedRequest.headers`；不在 sender 再过滤这些合法字段。保持既有头序、HTTP/1 大小写机制及 HTTP/2 小写规则，不宣称新增了未采样的完整子代理头序画像。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 原生 messages 提供代理关联头，含大小写变体 | 对应字段和值保留，名称使用规范小写 |
+| 主请求只提供 prompt-id，或全部可选字段缺失 | 保留已提供项，缺失项不生成 |
+| 相同入站头用于 count_tokens、设置或 hello | 不透传这四项 |
+| API 模式收到这些头，或正文只提到 subagent | 沿用原 API 分类和生成行为，不据此注入代理身份 |
+
+### 5. Scenarios and Examples
+
+- 正常：原生请求带 `request-class=subagent`、合成 child/parent、`agent-type=Explore` 与 prompt UUID，出站仍保留这些字段和值。
+- 边界：`request-class=main` 只带 prompt-id，出站保持 main 和该 prompt-id，不增加 agent-id、parent-agent-id 或 agent-type。
+- 错误用法：只允许 request-class 后以“subagent 已透传”判断关联完整；正确处理是逐项核对四个关联头，并确认真实发送字节而非只看内部 HashMap。
+
+### 6. Tests Required
+
+- `messages_agent_context_headers_are_preserved_only_for_native_messages`：280/293、原生/API、messages/count_tokens/设置/hello 矩阵，大小写、值和端点隔离。
+- `native_main_prompt_id_is_preserved_without_inventing_agent_identity`：缺省和仅 prompt-id 的 main；正文标记不触发分类或身份猜测。
+- `business_forwarding_preserves_actual_http1_casing_and_telemetry_default`：保留原 280 主请求与其它端点回归，追加 293 子代理真实 TCP 验证，四个头各出现一次，count_tokens 不泄漏，原生大小写机制生效。
+- `cargo fmt --check`、完整 `cargo test`、`cargo test cch`、`git diff --check`；测试使用合成身份和本地模拟上游，不自动调用真实账号。
