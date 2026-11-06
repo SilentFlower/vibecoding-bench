@@ -5,6 +5,7 @@ import tempfile
 import threading
 import time
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -206,7 +207,7 @@ class ProjectsAgentTests(unittest.TestCase):
         work = self.service._one('SELECT * FROM projects_work WHERE id=?', (result['work_id'],))
         self.service._release(work, 'blocked')
         self.service._write('UPDATE projects_work SET work_sec=? WHERE id=?', (165.04067087173462, work['id']))
-        session_file = self.root / 'projects/agents' / str(account_id) / 'original.jsonl'
+        session_file = self.root / ('projects/agents' if self.service.namespace == 'projects' else 'warmup-projects/agents') / str(account_id) / 'original.jsonl'
         session_file.parent.mkdir(parents=True)
         session_file.write_text('{}\n')
         self.service._pi_event(account_id, generation, {'type': 'ready', 'session_file': str(session_file)})
@@ -238,6 +239,255 @@ class ProjectsAgentTests(unittest.TestCase):
         if controller:
             controller[0].join(2)
             self.assertFalse(controller[0].is_alive())
+
+    def prepare_legacy_stream(self):
+        """以原会话的完整 SDK 终态构造历史通用断流。:return: 原工作、错误和会话文件。"""
+        work, error, session_file = self.prepare_filter_blocked()
+        self.service._write('UPDATE projects_events SET payload_json=? WHERE id=?',
+            (json.dumps({'message': 'Pi 模型请求失败，请检查模型的流式响应及工具调用兼容性'}), error['id']))
+        session_file.write_text(json.dumps({'type': 'session', 'id': 'original-pi', 'cwd': str(session_file.parent)}) + '\n'
+            + json.dumps({'type': 'message', 'timestamp': datetime.fromtimestamp(error['created_at'], timezone.utc).isoformat(),
+                'message': {'role': 'assistant', 'provider': 'projects', 'stopReason': 'error',
+                    'errorMessage': 'Stream ended without finish_reason'}}) + '\n')
+        return work, error, session_file
+
+    def test_legacy_stream_diagnosis_automatically_resumes_original_work_in_both_spaces(self):
+        """原事件诊断幂等且两空间均自动续原会话，不重放已确认输入。:return: None。"""
+        original = self.service
+        for namespace in ('projects', 'warmup'):
+            with self.subTest(namespace=namespace):
+                if namespace == 'warmup':
+                    self.service = ProjectsService(self.root, self.database, threading.Lock(), self.catalog, self.terminal,
+                        original.account, original.admission, original.provider, original.verifier, namespace='warmup')
+                    self.addCleanup(self.service.close)
+                work, error, session_file = self.prepare_legacy_stream()
+                self.service._write("INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)",
+                    ('confirmed', work['id'], work['generation'], '{}', 'sent', time.time()))
+                pi = ResumingPiFixture()
+                self.service.pi = pi
+                self.service.recover()
+                self.assertFalse(pi.entered.is_set())
+                self.service.recover()
+                diagnoses = [item for item in self.service.events(1) if item['payload'].get('source') == 'session_diagnosis']
+                self.assertEqual(1, len(diagnoses))
+                self.assertEqual(error['id'], diagnoses[0]['payload']['diagnostic_of_event_id'])
+                agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+                self.assertIsNotNone(agent['schedule_next_at'])
+                self.service.tick(agent['schedule_next_at'] + 0.01)
+                self.assertTrue(pi.entered.wait(2))
+                self.assertEqual(work['id'], pi.result['work_id'])
+                self.assertEqual(work['session_id'], pi.result['session_id'])
+                self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
+                self.assertEqual([], self.terminal.sent)
+                self.assertEqual(1, len([item for item in self.service.events(1) if item['kind'] == 'auto_retry']))
+                self.service.pause(1)
+                self.join_controller()
+        self.service = original
+
+    def test_legacy_diagnosis_respects_closed_schedule_and_manual_start(self):
+        """计划关闭时诊断不自动运行，显式启动可以重检后恢复原工作。:return: None。"""
+        work, _, session_file = self.prepare_legacy_stream()
+        self.service.configure_schedule(1, False)
+        pi = ResumingPiFixture()
+        self.service.pi = pi
+        self.service.recover()
+        agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.assertEqual(0, agent['schedule_enabled'])
+        self.assertIsNone(agent['schedule_next_at'])
+        self.assertFalse(pi.entered.is_set())
+        self.service.start(1)
+        self.assertTrue(pi.entered.wait(2))
+        self.assertEqual(work['id'], pi.result['work_id'])
+        self.assertEqual(str(session_file), pi.calls[0][0]['session_file'])
+        self.service.pause(1)
+        self.join_controller()
+
+    def test_legacy_asset_read_failure_is_isolated_while_other_accounts_recover(self):
+        """两空间的旧资产读取失败只阻塞原目标，其他账号继续恢复且原会话不变。:return: None。"""
+        for namespace in ('projects', 'warmup'):
+            for exception_type in (ValueError, OSError):
+                with self.subTest(namespace=namespace, exception=exception_type.__name__):
+                    fixture = ProjectsAgentTests('test_pause_rejects_old_generation_before_any_terminal_write')
+                    fixture.setUp()
+                    try:
+                        if namespace == 'warmup':
+                            original = fixture.service
+                            fixture.service = ProjectsService(fixture.root, fixture.database, threading.Lock(),
+                                fixture.catalog, fixture.terminal, original.account, original.admission,
+                                original.provider, original.verifier, fixture.pi, namespace='warmup')
+                            fixture.addCleanup(fixture.service.close)
+                        broken, _, session_file = fixture.prepare_legacy_stream()
+                        session_before = session_file.read_bytes()
+                        healthy_generation = fixture.activate(2)
+                        healthy = fixture.start_work(2)
+                        original_for_work = fixture.catalog.for_work
+
+                        def read_assets(work):
+                            """仅注入原损坏工作，保留另一个账号的真实冻结合同。:param work: 工作。:return: 冻结目录。"""
+                            if work['id'] == broken['id']:
+                                raise exception_type('合成冻结内容不可读取')
+                            return original_for_work(work)
+
+                        with patch.object(fixture.catalog, 'for_work', side_effect=read_assets):
+                            fixture.service.recover()
+                            self.assertTrue(fixture.pi.entered.wait(2))
+                        saved = fixture.service._one('SELECT * FROM projects_work WHERE id=?', (broken['id'],))
+                        agent = fixture.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+                        other = fixture.service._one('SELECT * FROM projects_agents WHERE account_id=2')
+                        self.assertEqual('blocked', saved['status'])
+                        self.assertEqual(broken['session_id'], saved['session_id'])
+                        self.assertEqual(broken['work_sec'], saved['work_sec'])
+                        self.assertEqual(session_before, session_file.read_bytes())
+                        self.assertIsNone(agent['schedule_next_at'])
+                        self.assertIn('冻结内容暂不可读取', agent['message'])
+                        self.assertEqual(healthy['work_id'], other['current_work_id'])
+                        self.assertGreater(other['generation'], healthy_generation)
+                        self.assertEqual('running', other['status'])
+                        self.assertFalse(any(item['payload'].get('source') == 'session_diagnosis'
+                            for item in fixture.service.events(1)))
+                        fixture.service.pause(2)
+                        fixture.join_controller(2)
+                    finally:
+                        fixture.doCleanups()
+
+    def test_legacy_diagnosis_preserves_unknown_inputs_authorization_and_newer_errors(self):
+        """旧断流证据不能解除未知输入、撤权、当前占用或后来的错误。:return: None。"""
+        work, _, _ = self.prepare_legacy_stream()
+        self.service._write("INSERT INTO projects_actions(id,work_id,generation,request_json,status,created_at) VALUES(?,?,?,?,?,?)",
+            ('pending', work['id'], work['generation'], '{}', 'unknown', time.time()))
+        self.service.recover()
+        self.assertIsNone(self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at'])
+        self.service._write('DELETE FROM projects_actions WHERE id=?', ('pending',))
+        self.service._write('UPDATE projects_agents SET project_keys_json=? WHERE account_id=1', ('[]',))
+        self.service.recover()
+        self.assertIsNone(self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at'])
+        self.service._write('UPDATE projects_agents SET project_keys_json=? WHERE account_id=1', ('["example"]',))
+        self.service._event(1, 'error', {'message': '新执行结果尚未确认'}, work['id'])
+        self.service.recover()
+        self.assertEqual([], [item for item in self.service.events(1) if item['payload'].get('source') == 'session_diagnosis'])
+        self.assertEqual('blocked', self.service._one('SELECT status FROM projects_work WHERE id=?', (work['id'],))['status'])
+
+    def test_legacy_asset_failure_does_not_replace_a_newer_fault(self):
+        """内容读取期间到达更新故障时，旧诊断不能覆盖其具体原因。:return: None。"""
+        work, _, _ = self.prepare_legacy_stream()
+        agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+
+        def changed(_work):
+            """模拟内容读取失败前发生新的状态更新。:param _work: 原工作。:return: 不返回，抛出读取错误。"""
+            self.service._write('UPDATE projects_agents SET message=?,schedule_message=? WHERE account_id=1',
+                ('更新的执行收口问题', '更新的执行收口问题'))
+            self.service._event(1, 'error', {'message': '更新的执行收口问题'}, work['id'])
+            raise OSError('合成内容读取失败')
+
+        with patch.object(self.catalog, 'for_work', side_effect=changed):
+            self.assertFalse(self.service._diagnose_legacy_failure(agent, work, time.time()))
+        saved = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.assertEqual('更新的执行收口问题', saved['message'])
+        self.assertEqual('更新的执行收口问题', saved['schedule_message'])
+
+    def test_stream_recovery_exposes_safe_reason_and_preserves_release_failure(self):
+        """断流等待公开原因与次数；原终端收口失败时保留阻塞而不重试。:return: None。"""
+        work, pi, _ = self.prepare_model_unavailable()
+        pi.events[0]['code'] = 'stream_incomplete'
+        self.service._run(1, 1, self.service.provider(), threading.Event())
+        agent = self.service.state(1)['agents'][0]
+        self.assertEqual('stream_incomplete', agent['recovery']['code'])
+        self.assertEqual(1, agent['recovery']['attempt'])
+        self.assertIn('未收到正常结束标记', agent['message'])
+        self.assertIsNotNone(agent['schedule']['next_run_at'])
+        self.service._write("UPDATE projects_agents SET status='running' WHERE account_id=1")
+        self.service._write("UPDATE projects_work SET status='running',runtime_json='{}' WHERE id=?", (work['id'],))
+        with patch.object(self.terminal, 'control', side_effect=RuntimeError('收口未知')):
+            self.service._run(1, 1, self.service.provider(), threading.Event())
+        saved = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.assertEqual('blocked', saved['status'])
+        self.assertIsNone(saved['schedule_next_at'])
+        self.assertIn('执行收口未确认', saved['message'])
+
+    def test_release_uncertainty_takes_priority_over_retryable_preparation_failure(self):
+        """即使保存了可重试准备故障，收口失败也必须保留现场并停止自动调度。:return: None。"""
+        work, pi, _ = self.prepare_model_unavailable()
+        pi.events[0]['code'] = 'stream_incomplete'
+        failure = {'generation': 1, 'retryable': True, 'code': 'runtime_busy', 'message': '环境暂忙',
+            'attempt_count': 1, 'retry_at': time.time() + 60, 'resolved_at': None}
+        self.service._write("UPDATE projects_work SET status='running',runtime_json='{}',failure_json=? WHERE id=?",
+            (json.dumps(failure), work['id']))
+        with patch.object(self.terminal, 'control', side_effect=RuntimeError('执行仍未确认停止')):
+            self.service._run(1, 1, self.service.provider(), threading.Event())
+        saved = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.assertEqual('blocked', saved['status'])
+        self.assertIsNone(saved['schedule_next_at'])
+        self.assertIn('执行收口未确认', saved['message'])
+
+    def test_diagnosed_stream_keeps_waiting_for_quota_then_resumes_automatically(self):
+        """已核实旧断流遇到暂时额度门禁仍自动排期，条件恢复后无需人工再次启动。:return: None。"""
+        work, _, _ = self.prepare_legacy_stream()
+        self.allowed = False
+        pi = ResumingPiFixture()
+        self.service.pi = pi
+        self.service.recover()
+        due = self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at']
+        self.service.tick(due + 0.01)
+        waiting = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.assertEqual('waiting', waiting['status'])
+        self.assertIsNotNone(waiting['schedule_next_at'])
+        self.assertFalse(pi.entered.is_set())
+        self.allowed = True
+        self.service.tick(waiting['schedule_next_at'] + 0.01)
+        self.assertTrue(pi.entered.wait(2))
+        self.assertEqual(work['id'], pi.result['work_id'])
+        self.service.pause(1)
+        self.join_controller()
+
+    def test_legacy_diagnosis_cannot_overwrite_a_fault_arriving_during_file_read(self):
+        """文件证据核对后的事务复查保留更新的故障，不发布过时诊断。:return: None。"""
+        work, _, _ = self.prepare_legacy_stream()
+        agent = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+
+        def changed(*_):
+            """模拟只读核对期间到达新故障。:return: 合成断流诊断。"""
+            self.service._event(1, 'error', {'message': '更晚的执行结果未知'}, work['id'])
+            return 'stream_incomplete'
+
+        with patch('projects.diagnose_stream_failure', side_effect=changed):
+            self.assertFalse(self.service._diagnose_legacy_failure(agent, work, time.time()))
+        self.assertEqual([], [item for item in self.service.events(1) if item['payload'].get('source') == 'session_diagnosis'])
+        self.assertIsNone(self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at'])
+
+    def test_diagnosed_stream_waits_for_the_sibling_owner_then_resumes(self):
+        """兄弟空间占用只顺延实际启动，不能让旧断流再次永久失去自动计划。:return: None。"""
+        work, _, _ = self.prepare_legacy_stream()
+        token = self.service.owners.claim(1, 'warmup', 1)
+        pi = ResumingPiFixture()
+        self.service.pi = pi
+        self.service.recover()
+        due = self.service._one('SELECT schedule_next_at FROM projects_agents WHERE account_id=1')['schedule_next_at']
+        self.assertIsNotNone(due)
+        self.service.tick(due + 0.01)
+        waiting = self.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+        self.assertEqual('waiting', waiting['status'])
+        self.assertFalse(pi.entered.is_set())
+        self.service.owners.release(1, token)
+        self.service.tick(waiting['schedule_next_at'] + 0.01)
+        self.assertTrue(pi.entered.wait(2))
+        self.assertEqual(work['id'], pi.result['work_id'])
+        self.service.pause(1)
+        self.join_controller()
+
+    def test_corrected_model_request_can_be_manually_rechecked_without_replaying_inputs(self):
+        """明确模型请求故障保留具体原因，修正后可从同一入口受控重试。:return: None。"""
+        work, error, _ = self.prepare_filter_blocked()
+        self.service._write('UPDATE projects_events SET payload_json=? WHERE id=?',
+            (json.dumps({'reason': 'provider_request_error', 'code': 'model_authentication',
+                'generation': work['generation'], 'message': '模型认证需要修正'}), error['id']))
+        pi = ResumingPiFixture()
+        self.service.pi = pi
+        self.service.start(1)
+        self.assertTrue(pi.entered.wait(2))
+        self.assertEqual(work['id'], pi.result['work_id'])
+        self.assertEqual([], self.terminal.sent)
+        self.service.pause(1)
+        self.join_controller()
 
     def test_menu_and_multiline_input_use_actual_observation_and_never_replay(self):
         """菜单与中段粘贴正文无需固定回复匹配；重复调用不会重复发送。:return: None。"""

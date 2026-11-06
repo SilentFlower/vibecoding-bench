@@ -82,7 +82,7 @@ async def verify(evidence: Path) -> dict:
     evidence.mkdir(parents=True, exist_ok=True)
     started_at = time.time()
     source_paths = ('webui/projects.js', 'webui/index.html', 'webui/style.css',
-        'orchestrator/projects.py', 'orchestrator/projects_api.py', 'deploy/v3/verify_pi_projects_browser.py')
+        'orchestrator/projects.py', 'orchestrator/projects_pi.py', 'orchestrator/projects_api.py', 'deploy/v3/verify_pi_projects_browser.py')
     source_sha256 = {relative: hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() for relative in source_paths}
     fixture = ProjectsAgentTests('test_pause_rejects_old_generation_before_any_terminal_write')
     fixture.setUp()
@@ -627,6 +627,34 @@ async def verify(evidence: Path) -> dict:
                 fixture.service._write('UPDATE projects_work SET failure_json=? WHERE id=?', (json.dumps(failure), failed_id))
                 fixture.service._event(1, 'runtime_recovered', {'message': '原工作已成功启动'}, failed_id)
                 await until('document.querySelector("#projects-current .projects-failure.is-resolved") !== null')
+                # 使用真实恢复发布链路核对断流说明和低频冷却，浏览器本身不启动模型。
+                fixture.service._write("UPDATE projects_work SET status='paused' WHERE id=?", (failed_id,))
+                fixture.service._write("UPDATE projects_agents SET generation=generation+1,status='running',schedule_enabled=1 WHERE account_id=1")
+                recovery_agent = fixture.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+                recovery_work = fixture.service._one('SELECT * FROM projects_work WHERE id=?', (failed_id,))
+                fixture.service._finish_model_recovery(recovery_agent, recovery_work, recovery_agent['generation'],
+                    time.time() + 90, 'stream_incomplete')
+                await until('document.querySelector("#projects-state").textContent === "等待自动恢复" && document.querySelector("#projects-message").textContent.includes("未收到正常结束标记") && document.querySelector("#projects-next-action").textContent.includes("第 1 次自动恢复") && document.querySelector("#projects-schedule-next").textContent.includes("下次检查")')
+                recovery_display = {'scheduled': await evaluate('Object.fromEntries(["state","message","next-action","schedule-next"].map(key=>[key,document.querySelector("#projects-"+key).textContent]))')}
+                for _ in range(3):
+                    fixture.service._write("UPDATE projects_agents SET generation=generation+1,status='running' WHERE account_id=1")
+                    recovery_agent = fixture.service._one('SELECT * FROM projects_agents WHERE account_id=1')
+                    fixture.service._finish_model_recovery(recovery_agent, recovery_work, recovery_agent['generation'], None, 'stream_incomplete')
+                await until('document.querySelector("#projects-state").textContent === "冷却中 · 自动恢复" && document.querySelector("#projects-message").textContent.includes("低频自动检查") && document.querySelector("#projects-next-action").textContent.includes("到期后自动接续")')
+                recovery_display['cooling'] = await evaluate('Object.fromEntries(["state","message","next-action","schedule-next"].map(key=>[key,document.querySelector("#projects-"+key).textContent]))')
+                await evaluate('document.querySelector("#projects-account").value="2";document.querySelector("#projects-account").dispatchEvent(new Event("change"))')
+                await until('document.querySelector("#projects-current").textContent.includes("尚未开始工程目标")')
+                assert not await evaluate('document.querySelector("#projects-message").textContent.includes("未收到正常结束标记")')
+                await evaluate('document.querySelector("#projects-account").value="1";document.querySelector("#projects-account").dispatchEvent(new Event("change"))')
+                await until('document.querySelector("#projects-state").textContent === "冷却中 · 自动恢复"')
+                await reload()
+                await until('document.querySelector("#projects-state").textContent === "冷却中 · 自动恢复" && document.querySelector("#projects-schedule-next").textContent.includes("下次检查")')
+                for width, height, theme in ((1280, 900, 'dark'), (390, 844, 'light')):
+                    await rpc('Emulation.setDeviceMetricsOverride', {'width': width, 'height': height, 'deviceScaleFactor': 1, 'mobile': False}, session)
+                    await evaluate(f'document.documentElement.dataset.theme="{theme}";window.scrollTo(0,0)')
+                    assert await evaluate('document.documentElement.scrollWidth <= window.innerWidth')
+                    image = await rpc('Page.captureScreenshot', {'format': 'png', 'captureBeyondViewport': False}, session)
+                    (evidence / f'auto-recovery-{width}-{theme}.png').write_bytes(base64.b64decode(image['data']))
                 await evaluate('location.hash="#topics"')
                 await until('window.projectStreams.length > 0 && window.projectStreams.every(value => value.wasClosed)')
                 assert before_operations == (len(fixture.terminal.started), len(fixture.terminal.sent), len(fixture.terminal.controls)), '切账号或翻页意外操作了原生终端'
@@ -637,6 +665,7 @@ async def verify(evidence: Path) -> dict:
         assert source_sha256 == {relative: hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
             for relative in source_paths}, '受测源码在验证期间发生变化，请重新验证'
         result = {'status': 'passed', 'started_at': started_at, 'finished_at': time.time(), 'source_sha256': source_sha256,
+            'model_recovery': recovery_display,
             'turn_time_limit': {'elapsed_work_sec': 1804.6653017997742, 'budget_sec': 1800,
                 'pi_timeout_sec': fixture.pi.turn_timeouts[-1],
                 'active_remaining_work_sec': resumed_turn['progress']['remaining_work_sec'],
@@ -660,7 +689,9 @@ async def verify(evidence: Path) -> dict:
             '验收进度切账号不串用', '验收失败后停止计时', '阶段信息XSS与明暗窄屏布局',
             '待机倒计时及全部配置编辑保护', '折叠配置搜索快捷键',
             '模型密钥不回显', '研究与事件XSS', '冻结交付与源码预览', '启动故障持久展示及次数阶段与恢复解除',
-            '启动故障刷新及明暗窄屏与XSS', '历史停止任务不借用当前重试时间', '无旧历史入口及请求', '1280暗色与390亮色布局']}
+            '启动故障刷新及明暗窄屏与XSS', '历史停止任务不借用当前重试时间',
+            '断流自动恢复原因次数与倒计时', '连续故障低频自动检查', '恢复状态刷新及切账号不串',
+            '无旧历史入口及请求', '1280暗色与390亮色布局']}
         (evidence / 'report.json').write_text(json.dumps(result, ensure_ascii=False, indent=2) + '\n')
         return result
     finally:

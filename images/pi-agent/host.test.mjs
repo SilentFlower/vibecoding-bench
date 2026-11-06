@@ -879,6 +879,56 @@ test('单模型在已确认工具后遇到网络结束错误，真实续接且�
   } finally { server.closeAllConnections(); await new Promise(resolve=>server.close(resolve)); await rm(directory,{recursive:true,force:true}); }
 });
 
+test('缺少结束标记的真实流丢弃半截工具，原会话有界恢复且保留已确认结果', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-incomplete-stream-'));
+  const requests = [];
+  const server = createServer(async (request, response) => {
+    let body = ''; for await (const chunk of request) body += chunk;
+    requests.push(JSON.parse(body));
+    if (requests.length === 1) return stream(response, true);
+    if (requests.length === 2) {
+      response.writeHead(200, {'content-type': 'text/event-stream'});
+      response.write('data: ' + JSON.stringify({choices: [{index: 0, delta: {role: 'assistant',
+        tool_calls: [{index: 0, id: 'incomplete-tool', type: 'function',
+          function: {name: 'account_state', arguments: '{}'}}]}, finish_reason: null}]}) + '\n\n');
+      return response.end('data: [DONE]\n\n');
+    }
+    stream(response, false);
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`, tools: [{name: 'account_state',
+        description: '当前账号', parameters: {type: 'object', properties: {}}}]}, (event, send) =>
+      send({type: 'tool_result', id: event.id, result: {confirmed: '原工具已确认'}}));
+    assert.equal(records.at(-1).type, 'settled', JSON.stringify(records));
+    assert.equal(records.filter(value => value.type === 'tool').length, 1);
+    assert.equal(requests.length, 3);
+    assert.equal(requests[2].messages.filter(value => value.role === 'tool').length, 1);
+    assert.ok(JSON.stringify(requests[2]).includes('原工具已确认'));
+    assert.ok(!JSON.stringify(requests[2]).includes('incomplete-tool'));
+    const transcript = await readFile(records.find(value => value.type === 'ready').session_file, 'utf8');
+    assert.ok(transcript.includes('Stream ended without finish_reason'));
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
+test('持续不完整流交给持久冷却，并保留明确的断流原因', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'pi-incomplete-cooldown-'));
+  const server = createServer(async (request, response) => {
+    for await (const chunk of request) { /* 完整消费合成请求，避免连接悬挂。 */ }
+    response.writeHead(200, {'content-type': 'text/event-stream'});
+    response.end('data: [DONE]\n\n');
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    const records = await execute({session_dir: directory, timeout_sec: 2,
+      base_url: `http://127.0.0.1:${server.address().port}/v1`}, () => assert.fail('半截响应不能执行工具'));
+    assert.equal(records.at(-1).reason, 'model_unavailable', JSON.stringify(records));
+    assert.equal(records.at(-1).code, 'stream_incomplete');
+    assert.ok(records.at(-1).retry_at > Date.now() / 1000);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, {recursive: true, force: true}); }
+});
+
 test('跨轮遵守模型冷却且配置修订变化重新按配置顺序选模', async()=>{
   const directory=await mkdtemp(join(tmpdir(),'pi-self-heal-sticky-'));
   const models=[];

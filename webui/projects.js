@@ -380,6 +380,7 @@ window.ProjectsUI = (() => {
     const schedule = agent.schedule;
     const states = {off: '未启用', scheduled: '已安排', running: '本轮指挥中', waiting: '等待执行条件',
       blocked: '需要处理', completed: '项目池已完成'};
+    if (agent.recovery && schedule?.state === 'waiting') states.waiting = '等待自动恢复';
     const interval = schedule?.interval_max_minutes > schedule?.interval_minutes
       ? `${schedule.interval_minutes}～${schedule.interval_max_minutes} 分钟随机` : `${schedule?.interval_minutes} 分钟`;
     status.textContent = schedule?.enabled
@@ -392,7 +393,7 @@ window.ProjectsUI = (() => {
       const waiting = seconds ? `约 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒后检查` : '已到时间，等待核对执行条件';
       next.textContent = `下次检查：${new Date(timestamp * 1000).toLocaleString('zh-CN', {hour12: false})}（浏览器当地时间）· ${waiting}`;
     } else if (schedule?.enabled) {
-      next.textContent = schedule.state === 'blocked' ? '请处理原因后重新保存计划或手动启动。'
+      next.textContent = schedule.state === 'blocked' ? '请按具体原因处理，再点击“启动 / 恢复 Pi”重新核对执行条件。'
         : schedule.state === 'completed' ? namespace === 'warmup' && agent.cycle?.total > 0
           ? '本轮工程全部验收通过后，按原计划从固定种子开始下一轮。' : '暂无未完成目标，更新项目池后继续。'
         : agent.controller_active ? '当前一轮结束后安排下次检查。' : '等待执行条件变化后再检查。';
@@ -536,6 +537,7 @@ window.ProjectsUI = (() => {
     $('#projects-capture').disabled = !work;
     const unfinished = work && !['passed', 'stopped', 'deferred'].includes(work.status), admission = agent?.admission;
     const active = agent?.controller_active && ['running', 'waiting'].includes(agent.status);
+    const recovering = !active && agent?.recovery && schedule?.enabled && schedule.state === 'waiting';
     const currentFailure = work?.failure && !work.failure.resolved_at
       && (!agent?.message || agent.message === work.failure.message);
     let status = agent ? names[agent.status] || agent.status : '保存项目池后即可启动 Pi';
@@ -546,6 +548,7 @@ window.ProjectsUI = (() => {
       : unfinished ? 'Pi 指挥中' : 'Pi 指挥中 · 准备下一个目标';
     else if (schedule?.state === 'blocked' || agent?.status === 'blocked') status = '需要处理';
     else if (schedule?.state === 'completed') status = '项目池已完成';
+    else if (recovering) status = agent.recovery.phase === 'exhausted' ? '冷却中 · 自动恢复' : '等待自动恢复';
     else if (schedule?.enabled) status = schedule.state === 'waiting' ? '等待运行条件' : '待机 · 已安排自动启动';
     $('#projects-state').textContent = status;
     $('#projects-overview').dataset.state = pending ? 'pending' : active ? 'running' : schedule?.state || agent?.status || 'off';
@@ -560,7 +563,10 @@ window.ProjectsUI = (() => {
     if (agent) {
       if (pending) next = '控制操作已提交，请等待运行状态更新。';
       else if (active) next = work?.status === 'verifying' ? '等待独立验收结果，Pi 会依据事实决定是否返工。' : 'Pi 持续观察终端并推进；可在交互标签查看最近操作。';
-      else if (schedule?.state === 'blocked' || agent.status === 'blocked') next = '处理等待原因后，重新保存计划或手动启动。';
+      else if (schedule?.state === 'blocked' || agent.status === 'blocked') next = '请按具体阻塞原因处理，再点击“启动 / 恢复 Pi”重新检查。';
+      else if (recovering) next = agent.recovery.phase === 'exhausted'
+        ? '连续失败已转低频检查，到期后自动接续原目标和会话。'
+        : `正在等待第 ${agent.recovery.attempt} 次自动恢复；冷却及运行条件满足后接续原目标。`;
       else if (namespace === 'warmup' && agent.cycle?.total > 0 && agent.cycle.completed === agent.cycle.total)
         next = schedule?.enabled ? '本轮工程已全部验收通过，将按原计划从固定种子开始下一轮。'
           : '本轮工程已全部验收通过，下一次启动将从固定种子开始新一轮。';
@@ -748,7 +754,7 @@ window.ProjectsUI = (() => {
     const element = $('#projects-events');
     const labels = {pi: 'Pi', input: '发送到 Claude', started: '原生会话', error: '异常',
       verification: '独立验收', verification_progress: '验收进度', input_unknown: '输入待核对', reconciled: '人工核对', recovery: '模型恢复', manual_retry: '人工重试',
-      guide_loaded: '业务指南', runtime_recovered: '运行已恢复'};
+      guide_loaded: '业务指南', runtime_recovered: '运行已恢复', auto_retry: '自动恢复'};
     element.innerHTML = (recordPages.events.pages[recordPages.events.index]?.items || []).map(item => {
       const payload = item.payload;
       let message = payload.text || payload.message;
@@ -757,9 +763,10 @@ window.ProjectsUI = (() => {
         message = payload.message || {retry: `模型暂不可用，约 ${seconds} 秒后重试。`,
           fallback: `模型暂不可用，约 ${seconds} 秒后切换到 ${payload.model}。`,
           recovered: '模型已恢复，继续原会话。', reset: '已重置自动恢复次数，继续原会话。',
-          scheduled: '已安排自动恢复，原会话和目标累计耗时已保留。', exhausted: '自动恢复已用尽，请人工检查。',
+          scheduled: '已安排自动恢复，原会话和目标累计耗时已保留。', exhausted: '连续故障已转低频自动检查，原目标和会话已保留。',
           paused: '自动恢复已暂停，原会话已保留。'}[payload.phase] || '正在恢复模型，原会话已保留。';
       } else if (item.kind === 'manual_retry') message ||= '已人工确认重试，继续原目标和原会话。';
+      else if (item.kind === 'auto_retry') message ||= '原故障已核实，自动接续原目标和原会话。';
       else if (item.kind === 'guide_loaded') message = '本轮已将保存的追加业务指南与默认指南一起交给 Pi。';
       return `<li data-event-id="${escape(item.id)}"><small class="muted">${escape(new Date(item.created_at * 1000).toLocaleString('zh-CN', {hour12: false}))} · ${escape(labels[item.kind] || item.kind)}</small><pre>${escape(message || JSON.stringify(payload, null, 2))}</pre></li>`;
     }).join('')

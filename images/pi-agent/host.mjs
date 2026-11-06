@@ -153,7 +153,7 @@ function unavailable(message, response) {
   const error = message.errorMessage || '';
   const contentFilter = error === 'Provider finish_reason: content_filter';
   // 只放行 SDK 对真实过滤结束原因的固定映射，其它内容拒绝和硬错误仍须停止。
-  if (!contentFilter && /content[_ -]?(?:filter|policy)|safety|context.{0,24}(?:length|window|limit|overflow)|(?:maximum|exceed).{0,24}(?:token|context)|invalid.{0,12}request|unauthori[sz]ed|authentication|forbidden|(?:invalid|incorrect|missing|expired).{0,12}(?:api[_ -]?key|credentials|token)|(?:api[_ -]?key|credentials|token).{0,12}(?:invalid|incorrect|missing|expired)/i.test(error)
+  if (!contentFilter && /content[_ -]?(?:filter|policy)|safety|context.{0,24}(?:length|window|limit|overflow)|(?:maximum|exceed).{0,24}(?:token|context)|invalid.{0,12}request|bad[_ -]request|unauthori[sz]ed|authentication|forbidden|(?:invalid|incorrect|missing|expired).{0,12}(?:api[_ -]?key|credentials|token)|(?:api[_ -]?key|credentials|token).{0,12}(?:invalid|incorrect|missing|expired)/i.test(error)
       || response?.should_retry === false) return null;
   const reported = Number(error.match(/^\s*(?:Error:\s*)?(?:HTTP(?: error)?\s*)?(\d{3})(?:\s|:|$)/i)?.[1]);
   // 模型不存在可换用户已配置的模型；错误端点、权限和请求格式不能盲目重试。
@@ -172,8 +172,41 @@ function unavailable(message, response) {
     return [408, 425, 429].includes(status) || status >= 500 && status <= 599
       || response?.should_retry === true ? 'transient' : null;
   }
-  return /^(?:Provider finish_reason: network_error|Connection error\.?|Request timed out\.?|fetch failed|network error|NetworkError|APIConnectionError|APIConnectionTimeoutError|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND)(?:\b|$)|^(?:connect|read|connection|request|network|upstream|socket|fetch).{0,100}(?:timed? out|timeout|reset|refused|failed|closed)/i.test(error)
+  // SDK 已确认的断流及配置端点成功 HTTP 中的失败响应可有限恢复，不能把内部未知异常一概重试。
+  return error === 'Stream ended without finish_reason'
+    || /^(?:Provider finish_reason: network_error|Connection error\.?|Request timed out\.?|fetch failed|network error|NetworkError|APIConnectionError|APIConnectionTimeoutError|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|ENOTFOUND)(?:\b|$)|^(?:connect|read|connection|request|network|upstream|socket|fetch).{0,100}(?:timed? out|timeout|reset|refused|failed|closed)/i.test(error)
+    || response?.status >= 200 && response.status < 300 && /^Provider finish_reason: [a-z][a-z0-9_-]*$/i.test(error)
     ? 'transient' : null;
+}
+
+/**
+ * 将可恢复的模型失败投影为公开枚举，不复制上游错误正文。
+ * @param {object} message SDK 失败助手。
+ * @param {object|null} response 配置端点的响应元数据。
+ * @return {object} 可选的公开故障码。
+ */
+function recoveryDetail(message, response) {
+  if (message?.errorMessage === 'Stream ended without finish_reason') return {code: 'stream_incomplete'};
+  return response?.status >= 200 && response.status < 300 && unavailable(message, response) === 'transient'
+    ? {code: 'model_response_error'} : {};
+}
+
+/**
+ * 说明明确拒绝自动恢复的原因，供修正后显式重新检查。
+ * @param {object|null} response 配置端点的响应元数据。
+ * @return {object} 不含私有正文的固定错误事件。
+ */
+function requestFailure(response) {
+  const code = response?.status === 401 ? 'model_authentication'
+    : response?.status === 403 ? 'model_permission'
+    : response?.should_retry === false ? 'provider_retry_forbidden'
+    : response && !response.retry_after_valid ? 'provider_retry_invalid' : 'model_request_invalid';
+  const message = {model_authentication: 'Pi 模型认证失败，请检查模型 API 密钥后重新启动',
+    model_permission: 'Pi 模型权限不足，请核对模型权限后重新启动',
+    provider_retry_forbidden: 'Pi 上游明确禁止自动重试，请核对模型服务后重新启动',
+    provider_retry_invalid: 'Pi 上游重试等待时间无效，请检查模型服务后重新启动',
+    model_request_invalid: 'Pi 模型请求被拒绝或响应不兼容，请核对模型及工具调用配置后重新启动'}[code];
+  return {reason: 'provider_request_error', code, message};
 }
 
 /**
@@ -404,7 +437,7 @@ async function runSession(config, responses) {
       }
       attempts += 1;
       emit({type: 'recovery', phase: next === model ? 'retry' : 'fallback', attempt: attempts,
-        model: next, reason: 'transient', delay_ms: wait});
+        model: next, reason: 'transient', delay_ms: wait, ...recoveryDetail(message, response)});
       try { await delay(wait, undefined, {signal: cancellation.signal}); }
       catch (error) { if (error.name === 'AbortError') return false; throw error; }
       if (cancellation.signal.aborted || Date.now() >= deadline) return false;
@@ -457,9 +490,10 @@ async function runSession(config, responses) {
         await health.save();
         if (cancellation.signal.aborted || Date.now() >= deadline) return false;
         const retryable = summaryFailure && unavailable(summaryFailure.message, summaryFailure.response);
-        emit({type: 'error', ...(retryable ? {reason: 'model_unavailable', retry_at: deferredRetryAt ?? retryAt()}
+        emit({type: 'error', ...(retryable ? {reason: 'model_unavailable', retry_at: deferredRetryAt ?? retryAt(),
+          ...recoveryDetail(summaryFailure.message, summaryFailure.response)}
           : summaryFailure?.message.stopReason === 'error' && !isContextLimit(summaryFailure.message, summaryFailure.response)
-            ? {} : {reason: 'context_limit'}),
+            ? requestFailure(summaryFailure.response) : {reason: 'context_limit'}),
           message: 'Pi 摘要压缩未完成，原历史、目标与会话已保留；请检查模型配置或等待恢复'});
         return false;
       }
@@ -519,6 +553,7 @@ async function runSession(config, responses) {
           message: 'Pi 上下文摘要压缩后仍超过模型限制或当前响应禁止重试；原目标和会话已保留'});
       } else if (unavailable(message, responses.current())) {
         emit({type: 'error', reason: 'model_unavailable', model, retry_at: deferredRetryAt ?? retryAt(),
+          ...recoveryDetail(message, responses.current()),
           message: deferredRetryAt ? 'Pi 上游要求延后重试，已保留原会话和预算，等待自动恢复'
             : 'Pi 配置模型暂时不可用，有限重试与降级已结束，原会话和预算已保留'});
       } else if (message.errorMessage === 'Provider finish_reason: content_filter') {
@@ -528,7 +563,7 @@ async function runSession(config, responses) {
         emit({type: 'error', reason: 'provider_conflict', model,
           message: 'Pi 上游返回 409 冲突，当前响应不允许自动恢复，原会话和预算已保留'});
       } else {
-        emit({type: 'error', message: 'Pi 模型请求失败，请检查模型的流式响应及工具调用兼容性'});
+        emit({type: 'error', model, ...requestFailure(responses.current())});
       }
     } else {
       if (attempts) emit({type: 'recovery', phase: 'recovered', attempt: attempts,

@@ -74,3 +74,18 @@ test('网络及断流可恢复，取消、成功正文和未经HTTP响应补证�
   assert.equal(classify({stopReason: 'stop', errorMessage: '503'}, response(503)), null);
   assert.equal(classify({stopReason: 'aborted', errorMessage: 'Connection error.'}, null), null);
 });
+
+test('缺失流式结束标记和有真实成功响应的未知失败可恢复，硬拒绝优先', () => {
+  const incomplete = message('Stream ended without finish_reason');
+  assert.equal(classify(incomplete, null), 'transient');
+  assert.equal(classify(incomplete, response(200)), 'transient');
+  assert.equal(classify(message('Provider finish_reason: unexpected_provider_failure'), response(200)), 'transient');
+  assert.equal(classify(message('Unexpected SDK failure'), null), null);
+  assert.equal(classify(message('400 Bad Request'), response(200)), null);
+  for (const status of [400, 401, 403, 404, 422]) {
+    assert.equal(classify(incomplete, response(status)), null, String(status));
+  }
+  assert.equal(classify(incomplete, response(200, {should_retry: false})), null);
+  assert.equal(classify(incomplete, response(200, {retry_after_valid: false})), null);
+  assert.equal(classify({stopReason: 'stop', errorMessage: incomplete.errorMessage}, response(200)), null);
+});

@@ -630,7 +630,7 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 - 真正 400／413 上下文拒绝最多在强制摘要且确实缩减后续接一次；认证、明确内容拒绝、禁止重试、服务端等待及原预算优先。无法缩减或重复拒绝明确报 `context_limit`，不盲发相同超长请求给其他模型。
 - `account_state` 的 offset 默认 0、limit 默认 10 且范围 1..20；三个列表 `available_objectives/waiting_objectives/passed` 同步分页，`objective_page` 给出各自真实总数及公共 next_offset，保留全部未完成目标数量。模型视图去除重复指南，页面完整视图保持。
 - `project_read` 默认读取 overview，提供 objective_id 时默认读取 objective，research 读取研究；offset 默认 0、limit 默认 1000 且范围 1..2000，按字符返回 `content/offset/limit/total_chars/next_offset`。原工作继续使用冻结材料，仅提供公开正文，不向模型暴露私有验收。
-- 已确认 `context_limit` 可按既有显式启动入口恢复；旧通用错误须先追加绑定原错误的 `operator_diagnosis`，事件键为 `operator-diagnosis:context-limit:event-<原事件ID>`。身份、未知输入、合同及账号门禁仍须满足，不能泛化解锁。
+- 已确认 `context_limit` 可按既有显式启动入口恢复；旧通用上下文错误须先追加绑定原错误的 `operator_diagnosis`，事件键为 `operator-diagnosis:context-limit:event-<原事件ID>`。旧通用断流可使用下节的自动会话诊断。身份、未知输入、合同及账号门禁仍须满足，不能泛化解锁。
 - 镜像必须同时包含 host 与 `context-policy.mjs`，Docker COPY 与上下文白名单成对更新；发布后核对前后端字段和两空间运行版本。
 
 ### 4. Validation & Error Matrix
@@ -658,6 +658,70 @@ project_read({project_key: string, objective_id?: string, section?: string, offs
 ### 6. Tests Required
 
 - `cd images/pi-agent && npm test`：覆盖冷却期间继续使用备用、冷却到期后按配置顺序回切、三模型中仅恢复已过冷却的候选、兼容旧备用成功记录，以及同会话恢复不重放已确认工具；摘要、取消与有界重试回归继续通过。
+
+## Scenario: Pi 中断自动恢复与历史断流诊断
+
+### 1. Scope / Trigger
+
+- 修改 `images/pi-agent/host.mjs`、`ProjectsPi`、`ProjectsService` 的模型错误、子进程退出、持久恢复和旧阻塞兼容时适用；项目与工程养号共用该合同。
+- 修改页面恢复提示或增加故障字段时，必须核对 SDK → JSONL → 事件 JSON → 公开视图 → SSE／页面的完整链路。
+
+### 2. Signatures
+
+```text
+unavailable(message, response) -> string | null
+diagnose_stream_failure(directory: Path, session_file: str, error_at: float) -> str | None
+ProjectsService._finish_model_recovery(agent, work, generation, retry_at, code: str | None = None)
+GET /api/projects
+GET /api/accounts/warmup/pi
+```
+
+- 错误事件沿用 `reason=model_unavailable` 的调度语义，可选增加有限枚举 `code`；明确请求拒绝使用 `reason=provider_request_error`。不接受任意客户端 `retryable` 标记，也不保存原始供应商错误正文。
+- 公开账号视图可返回 `recovery=null|{phase,attempt,retry_at?,code?,message?}`。其来源为控制端持久恢复事件，不新增数据库列或环境键。
+- 历史诊断为 `kind=error`，包含 `reason=model_unavailable`、`code=stream_incomplete`、`source=session_diagnosis`、`generation`、`diagnostic_of_event_id` 与固定消息；唯一键为 `session-diagnosis:stream-incomplete:event-<原事件ID>`。
+- 已核实旧断流被自动认领时记录 `auto_retry`，人工认领仍记录 `manual_retry`；两者均保存原错误事件 ID、新代次和实际启动来源。
+
+### 3. Contracts
+
+- 先检查 SDK 失败终态，再检查真实 HTTP、认证／权限／请求／上下文拒绝、禁止恢复和非法等待。`Stream ended without finish_reason` 可恢复；成功 HTTP 中匹配 SDK 固定 `Provider finish_reason: <结束码>` 格式的未知结束码也可有限恢复。普通业务正文或没有响应补证的任意内部异常不能因此被重试。
+- 普通推理和摘要共享原有有界恢复、配置模型降级、取消信号和截止时间。失败助手及半截工具不执行，已确认工具结果不重放。服务端要求的等待、模型冷却和账号门禁取较晚时间。
+- `stream_incomplete`、`model_response_error`、`controller_interrupted` 用固定说明展示断流、响应错误和控制进程中断；认证、权限、请求不兼容、禁止重试、无效等待、坏管道及未就绪退出也各有固定故障码。Python 仅透传 `PI_FAILURE_MESSAGES` 内定义的码。
+- 只有 valid ready 之后的意外 EOF／BrokenPipe 才可归为控制进程中断；坏 JSON、超长或未知管道记录不能伪装为临时模型错误。停止与超时优先，取消时不追加自动恢复事件；所有退出路径关闭 stdin 并收口子进程。
+- 控制端必须先严格释放原 CLI 执行，再安排恢复。执行收口不确定使用 `execution_unconfirmed`，其优先级高于已保存的可重试准备故障；原运行定位和租约保留，不能继续自动排期。
+- 已开启计划按 60／120／300 秒进行三轮快速恢复，持续失败后转为 `max(900, schedule_interval_sec)` 秒的低频检查。计数、最早恢复时间及已确认事实跨重启保留；关闭计划或人工暂停／停止不能被恢复机制重新开启。
+- 历史自动诊断只面向当前原工作最近一次、无结构化原因的旧通用模型错误，且工作已 blocked、无 runtime／活动片段、无未解决启动故障。身份、授权、前置、未知输入与冻结合同必须核对；其他人工阻塞不因旧模型错误解除。
+- 会话路径必须属于本账号本空间目录，目录／文件不能是链接；文件以 `O_NOFOLLOW|O_NONBLOCK` 打开，只接受单链接普通文件。核对最多 8 KiB 的 session 头及其 cwd，并只读尾部最多 512 KiB 的完整 JSONL 记录。
+- 只接受最后一条 SDK message 为 `provider=projects`、`role=assistant`、`stopReason=error`、错误恰为 `Stream ended without finish_reason`；带时区时间与原错误事件相差不超过五秒。读取前后大小或修改时间变化、残缺行、错误目录、成功尾消息或证据不符均不建立诊断。
+- 文件读取不持数据库写锁。发布诊断前用原账号、工作完整快照和最近相关事件进行事务复查；诊断与计划同事务发布，工作仍保持 blocked，直到合法 start 在同事务解除本项阻塞、记录认领并更新控制代次。
+- 兄弟空间占用账号时可先保存诊断，实际启动必须认领共享所有者；占用或可重试额度门禁只顺延计划。不开启原本关闭的计划，不切换原 work、Claude/Pi 会话、工作区或累计耗时。
+- 历史内容读取的 `ValueError/OSError` 只隔离原目标，保留原错误及会话并显示内容核对说明，不能中断其他账号的启动恢复。提示写入须复查代次、工作、更新时间与最近事件，避免覆盖新故障；不借该降级吞掉全局数据库错误。
+- `recovery` 仅投影当前未运行控制者的 scheduled／exhausted／paused 恢复事件，并要求当前消息仍匹配该恢复记录，避免旧模型错误盖住新门禁。页面复用原 `schedule.next_run_at`、SSE 和时钟显示原因、次数、下一次时间及低频冷却；GET／SSE 不触发诊断或启动。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 处理 |
+| --- | --- |
+| 缺少 finish_reason 或真实成功 HTTP 中未知 SDK 结束码 | 有界恢复，持续失败后持久冷却 |
+| 成功正文出现错误文字、取消、明确认证／权限拒绝、禁止恢复或非法等待 | 不因断流规则自动重试；展示具体原因 |
+| valid ready 后进程退出 | 严格收口后自动接续原目标；未就绪或坏协议则保留具体运行时故障 |
+| 旧通用错误与完整会话终态匹配 | 幂等绑定原事件；开启计划则自动检查，关闭计划则等待显式启动 |
+| 原错误／工作／会话时间不符、后续事件覆盖或存在未知输入 | 不解除阻塞、不重发操作 |
+| 原冻结内容不可读取 | 仅更新仍匹配旧快照的提示，原目标保持 blocked，其他账号继续恢复 |
+| 暂时被兄弟空间占用或额度未放行 | 保留自动检查时间，条件恢复后续原工作 |
+| CLI 收口未确认，同时存在可重试准备故障 | 收口不确定优先，保留现场，不自动调度 |
+
+### 5. Scenarios and Examples
+
+- 正常：一次响应在已确认工具之后中断，SDK 保存错误记录，恢复继续使用该工具结果；后续不完整工具不会执行。
+- 历史：原错误 E 与同一会话最后失败记录匹配，保存 `session-diagnosis:stream-incomplete:event-E`；定时认领原工作，重复重启不重复诊断。
+- 边界：另一个空间仍持有控制权时先安排检查，空闲后继续；用户关闭计划时只建立有效恢复资格，不启动模型。
+- 错误做法：批量把 blocked 改成 paused，或清空原会话重新开始。正确做法：绑定原错误证据并经过现有身份、投递、授权和执行门禁；内容不可读取时保留原目标并隔离该项故障。
+
+### 6. Tests Required
+
+- `cd images/pi-agent && npm test`：真实 SDK 的缺失结束标记、半截工具、已确认结果复用、持续失败交接、明确拒绝优先与响应隐私；普通推理及摘要共享恢复继续通过。
+- `.venv/bin/python -m unittest discover -s orchestrator -p 'test_projects*.py'`：两空间旧诊断幂等、关闭计划、临时占用／额度等待、取消与代次竞争、坏会话、会话时间不符、执行收口优先，以及 `ValueError/OSError` 时另一账号继续恢复和提示竞争。
+- `.venv/bin/python deploy/v3/verify_pi_projects_browser.py --evidence <临时证据目录>`：真实 Chrome、API、SQLite、SSE 核对等待／低频状态、原因、次数、下次时间、刷新与账号切换；合成验证不代表正式上游或生产目标已恢复。
 
 ## Scenario: 验收反馈与自动复验
 
