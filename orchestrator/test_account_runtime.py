@@ -12,11 +12,11 @@ from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from docker import APIClient
 
-from account_runtime import AccountRuntime, atomic_json, derive_v3_fingerprint, locale_for_timezone
+from account_runtime import AccountRuntime, RuntimeBusy, atomic_json, derive_v3_fingerprint, locale_for_timezone
 from account_isolation import ROLE_COLUMNS, role_labels
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_PROBE, DMI_DIRECTORIES,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_PROBE, generate_computer_profile, generate_system_profile)
@@ -315,10 +315,15 @@ class AccountRuntimeTests(unittest.TestCase):
             role = options["labels"]["vibebench.role"]
             container = network if role == "account-network" and network is not None else Mock()
             container.id, container.status, container.labels = role + "-new", "running", options["labels"]
+            container.attrs = {"Mounts": [{"Type": "bind", "Source": source,
+                "Destination": mount["bind"], "RW": mount["mode"] != "ro"}
+                for source, mount in options.get("volumes", {}).items()]}
             previous = container.exec_run.side_effect if container is network else None
 
             def execute(command, **kwargs):
                 """提供真实 CPU 入口和覆盖探针的合成响应，其余沿用原场景。"""
+                if command == ["python3", "-I", "/usr/local/bin/v3-cli-control", "orphans"]:
+                    return SimpleNamespace(exit_code=0, output=b'{"orphans": []}')
                 if command == ["cat", "/proc/cpuinfo"]:
                     return SimpleNamespace(exit_code=0, output=self._cpuinfo().encode())
                 if command == ["python3", "-I", "-c", SYSTEM_PROFILE_PROBE]:
@@ -348,6 +353,245 @@ class AccountRuntimeTests(unittest.TestCase):
         self.client.containers.run.side_effect = create
         self.client.containers.get.side_effect = lambda identifier: containers[identifier]
         return containers
+
+    def _saved_login_draft(self) -> tuple[dict, dict, dict]:
+        """创建没有账号额度挂载的真实形状草稿，再绑定正式账号。
+
+        :return: 正式账号配置、已绑定环境及原三角色替身。
+        """
+        containers = self._isolated_docker()
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=NULL WHERE id=1")
+        draft = {"name": "synthetic", "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080}
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0):
+            row, _ = self.runtime.ensure(draft)
+        original = {role: containers[row[column]] for role, column in ROLE_COLUMNS.items()}
+        self.assertFalse(any(mount["Destination"].startswith("/quota-accounts/")
+            for mount in original["network"].attrs["Mounts"]))
+        return {**draft, "id": 1}, self.runtime._row("synthetic", 1), original
+
+    def test_saved_login_draft_repairs_quota_mount_once_and_preserves_data(self) -> None:
+        """草稿绑定后的首次准备补齐本账号只读挂载，重复准备保留原资料。@return None。"""
+        account, row, original = self._saved_login_draft()
+        root = self.runtime._root(row)
+        identity = root / "home/.claude.json"
+        credentials = root / "home/.claude/.credentials.json"
+        project = root / "projects/preserved/main.py"
+        atomic_json(identity, {"userID": "synthetic-device"})
+        atomic_json(credentials, {"claudeAiOauth": {"accessToken": "synthetic-at", "refreshToken": "synthetic-rt"}})
+        project.parent.mkdir(parents=True)
+        project.write_text("preserved\n")
+        before = {path: path.read_bytes() for path in (identity, credentials, project)}
+        fingerprint = row["fingerprint_json"]
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0):
+            repaired, _ = self.runtime.ensure(account)
+            repeated, _ = self.runtime.ensure(account)
+        network = self.client.containers.get(repaired["network_container_id"])
+        self.assertIn({"Type": "bind", "Source": str(self.root / "quota/1"),
+            "Destination": "/quota-accounts/1", "RW": False}, network.attrs["Mounts"])
+        self.assertEqual(self.client.containers.run.call_count, 6)
+        self.assertEqual(repaired["generation"], row["generation"] + 1)
+        self.assertEqual(repeated["generation"], repaired["generation"])
+        self.assertEqual(repaired["environment_id"], row["environment_id"])
+        self.assertEqual(repaired["fingerprint_json"], fingerprint)
+        self.assertEqual(before, {path: path.read_bytes() for path in before})
+        for container in original.values():
+            container.stop.assert_called_once_with(timeout=5)
+            container.remove.assert_called_once_with()
+        self.assertFalse(self.runtime.jobs)
+
+    def test_existing_quota_mount_and_login_recovery_do_not_rebuild(self) -> None:
+        """原草稿恢复不提前重建，正式账号已有正确挂载时直接复用。@return None。"""
+        account, row, original = self._saved_login_draft()
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0):
+            self.runtime.ensure({key: value for key, value in account.items() if key != "id"}, allow_login_recovery=True)
+            original["network"].attrs["Mounts"].append({"Type": "bind", "Source": str(self.root / "quota/1"),
+                "Destination": "/quota-accounts/1", "RW": False})
+            reused, _ = self.runtime.ensure(account)
+        self.assertEqual(self.client.containers.run.call_count, 3)
+        self.assertEqual(reused["generation"], row["generation"])
+        for container in original.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+
+    def test_invalid_quota_mount_metadata_never_rebuilds_or_starts(self) -> None:
+        """其他账号、可写、重复、错来源及坏 Docker 观察均失败关闭。@return None。"""
+        account, _, original = self._saved_login_draft()
+        mounts = original["network"].attrs["Mounts"]
+        expected = {"Type": "bind", "Source": str(self.root / "quota/1"),
+            "Destination": "/quota-accounts/1", "RW": False}
+        invalid = [None, {}, [{}], [None],
+            mounts + [{**expected, "RW": True}], mounts + [{**expected, "RW": 0}],
+            mounts + [{**expected, "Source": str(self.root / "quota/2")}],
+            mounts + [{**expected, "Destination": "/quota-accounts/2"}],
+            mounts + [{**expected, "Destination": "/quota-accounts"}],
+            mounts + [{**expected, "Type": "volume"}], mounts + [expected, expected]]
+        with patch.object(self.runtime, "_make_room") as make_room:
+            for value in invalid:
+                with self.subTest(mounts=value):
+                    original["network"].attrs["Mounts"] = value
+                    with self.assertRaisesRegex(ValueError, "挂载"):
+                        self.runtime.ensure(account)
+            make_room.assert_not_called()
+        self.assertEqual(self.client.containers.run.call_count, 3)
+        for container in original.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+
+    def test_missing_quota_mount_keeps_active_cli_and_execution_record(self) -> None:
+        """实际认领的兄弟 CLI 阻止自动维护，其租约和登记均保持。@return None。"""
+        account, row, original = self._saved_login_draft()
+        job = self.runtime.claim(row, account, "run:in-flight", shared_cli=True)
+        record = self.runtime._execution_path(job)
+        before = record.read_bytes()
+        with self.assertRaises(RuntimeBusy):
+            self.runtime.ensure(account)
+        self.assertEqual(record.read_bytes(), before)
+        self.assertIs(self.runtime.job_for_container(job["token"]), job)
+        for container in original.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+
+    def test_missing_quota_mount_respects_active_waiting_and_maintenance_api(self) -> None:
+        """既有维护认领拒绝活动、排队和排他占用 API，不影响原角色。@return None。"""
+        account, row, original = self._saved_login_draft()
+        account.update(cc2api_account_id=7, upstream_proxy_scheme="socks5", upstream_socks5_user="", upstream_socks5_pass="")
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=7 WHERE id=1")
+        snapshot = {}
+
+        def request(method, path, body=None):
+            """仅提供原账号配置和已占用的真实形状门禁。@return 管理响应。"""
+            if method == "GET" and path.endswith("/config"):
+                return {"auth_type": "oauth", "status": "active", "proxy_url": "socks5://192.0.2.2:1080"}
+            if method == "GET" and path.endswith("/lease"):
+                return snapshot
+            self.fail("占用期间不应认领或修改 API 门禁")
+
+        self.gateway._request.side_effect = request
+        for active, waiting, lease in ((1, 0, None), (0, 1, None), (0, 0, {"owner": "existing-maintenance"})):
+            with self.subTest(active=active, waiting=waiting, lease=lease):
+                snapshot.update(active=active, waiting=waiting, lease=lease)
+                with self.assertRaises(RuntimeBusy):
+                    self.runtime.ensure(account)
+                self.assertFalse(self.runtime.jobs)
+                self.assertEqual(self.runtime._row("synthetic", 1)["state"], row["state"])
+        for container in original.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+
+    def test_missing_quota_mount_preserves_unknown_executions_and_commit(self) -> None:
+        """持久单执行、共享执行和未知提交记录不能被自动维护覆盖。@return None。"""
+        account, row, original = self._saved_login_draft()
+        root = self.runtime._root(row)
+        for relative in ("runtime/execution.json", "runtime/executions/unknown.json", "runtime/login-commit.json"):
+            path = root / relative
+            atomic_json(path, {"source": "synthetic-unknown"})
+            before = path.read_bytes()
+            with self.subTest(record=relative):
+                with self.assertRaisesRegex(ValueError, "未确认"):
+                    self.runtime.ensure(account)
+                self.assertEqual(path.read_bytes(), before)
+                self.assertFalse(self.runtime.jobs)
+            path.unlink()
+        for container in original.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+
+    def test_api_transport_keeps_missing_cli_quota_mount_without_waiting_on_itself(self) -> None:
+        """API 自持并发许可时继续使用健康发送器，CLI 补挂载不反向阻断 API。@return None。"""
+        account, row, original = self._saved_login_draft()
+        account.update(cc2api_account_id=7, upstream_proxy_scheme="socks5", upstream_socks5_user="", upstream_socks5_pass="")
+        with self.database() as connection:
+            connection.execute("UPDATE accounts SET cc2api_account_id=7 WHERE id=1")
+        configuration = {"proxy_url": "socks5://192.0.2.2:1080", "binding": {"account_id": 7}, "quota_identity": ""}
+        atomic_json(self.runtime._sender_config(row), configuration)
+        self.gateway._request.return_value = {"auth_type": "oauth", "status": "active", "proxy_url": configuration["proxy_url"]}
+        with patch.object(self.runtime, "_sender_active", return_value=1), patch.object(self.runtime, "_ensure_version") as install:
+            self.assertEqual(self.runtime.transport(account, "2.1.293"), configuration["binding"])
+            install.assert_not_called()
+        self.assertEqual(self.gateway._request.call_args_list, [call("GET", "/admin/runtime/accounts/7/config")])
+        self.assertEqual(self.client.containers.run.call_count, 3)
+        for container in original.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+
+    def test_missing_quota_mount_rejects_orphans_and_unknown_process_proof(self) -> None:
+        """未登记进程或坏进程观察不能借补挂载路径被清理。@return None。"""
+        account, _, original = self._saved_login_draft()
+        for code, output in ((0, b'{"orphans":[123]}'), (0, b'{}'), (0, b'bad-json'), (1, b'')):
+            with self.subTest(code=code, output=output), patch.object(original["cli"], "exec_run",
+                    return_value=SimpleNamespace(exit_code=code, output=output)):
+                with self.assertRaisesRegex(ValueError, "进程"):
+                    self.runtime.ensure(account)
+        for container in original.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+
+    def test_missing_quota_mount_rebuild_failure_retains_reconciliation(self) -> None:
+        """维护中途失败保留执行证明并进入对账，不能继续创建下一代。@return None。"""
+        account, row, original = self._saved_login_draft()
+        original["sender"].stop.side_effect = OSError("synthetic Docker stop failure")
+        with patch.object(self.runtime, "_sender_active", return_value=0):
+            with self.assertRaises(OSError):
+                self.runtime.ensure(account)
+        current = self.runtime._row("synthetic", 1)
+        self.assertEqual(current["state"], "reconcile")
+        self.assertTrue((self.runtime._root(row) / "runtime/execution.json").is_file())
+        self.assertTrue(self.runtime.jobs)
+        self.assertEqual(self.client.containers.run.call_count, 3)
+        with self.assertRaisesRegex(ValueError, "先对账"):
+            self.runtime.ensure(account)
+        for container in original.values():
+            container.remove.assert_not_called()
+
+    def test_missing_quota_mount_keeps_active_review_handoff(self) -> None:
+        """正在交接评审资源时，原发送器保持，下一 CLI 等待。@return None。"""
+        account, row, original = self._saved_login_draft()
+        with patch.object(self.runtime.reviews, "serial_state", return_value={"phase": "reviewing"}):
+            with self.assertRaises(RuntimeBusy):
+                self.runtime.ensure(account, "2.1.293")
+            available, container = self.runtime.ensure(account)
+        self.assertEqual(available["environment_id"], row["environment_id"])
+        self.assertIs(container, original["cli"])
+        for container in original.values():
+            container.stop.assert_not_called()
+            container.remove.assert_not_called()
+
+    def test_rebuilt_network_without_quota_mount_requires_reconciliation(self) -> None:
+        """创建返回成功也要核对实际挂载，缺失时不能发布 ready 或反复重建。@return None。"""
+        account, row, _ = self._saved_login_draft()
+        create = self.client.containers.run.side_effect
+
+        def without_quota(image, **options):
+            """模拟 Docker 返回没有预期额度挂载的实例。@return 新容器。"""
+            container = create(image, **options)
+            if options["labels"]["vibebench.role"] == "account-network":
+                container.attrs["Mounts"] = [mount for mount in container.attrs["Mounts"]
+                    if not mount["Destination"].startswith("/quota-accounts/")]
+            return container
+
+        self.client.containers.run.side_effect = without_quota
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0):
+            with self.assertRaisesRegex(ValueError, "新账号网络"):
+                self.runtime.ensure(account)
+        self.assertEqual(self.runtime._row("synthetic", 1)["state"], "reconcile")
+        self.assertEqual(self.client.containers.run.call_count, 6)
+        with self.assertRaisesRegex(ValueError, "先对账"):
+            self.runtime.ensure(account)
+        self.assertEqual(self.client.containers.run.call_count, 6)
+
+    def test_concurrent_saved_draft_preparation_rebuilds_once(self) -> None:
+        """两个首次准备共用生命周期锁，只补齐一次挂载。@return None。"""
+        account, row, original = self._saved_login_draft()
+        with patch.object(self.runtime, "_make_room"), patch.object(self.runtime, "_sender_active", return_value=0), ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(self.runtime.ensure, account) for _ in range(2)]
+            results = [future.result(timeout=5)[0] for future in futures]
+        self.assertEqual(self.client.containers.run.call_count, 6)
+        self.assertEqual([item["generation"] for item in results], [row["generation"] + 1] * 2)
+        for container in original.values():
+            container.stop.assert_called_once_with(timeout=5)
+            container.remove.assert_called_once_with()
 
     @staticmethod
     def _cpuinfo() -> str:
@@ -994,7 +1238,9 @@ class AccountRuntimeTests(unittest.TestCase):
         (root / "home/marker").write_text("preserved")
         atomic_json(self.runtime._sender_config(row), {"proxy_url": "http://old.invalid:80", "binding": {}})
         for role, column in ROLE_COLUMNS.items():
-            containers[row[column]] = Mock(id=row[column], status="exited", labels=role_labels(self.runtime, row, role))
+            containers[row[column]] = Mock(id=row[column], status="exited", labels=role_labels(self.runtime, row, role),
+                attrs={"Mounts": [{"Type": "bind", "Source": str(self.root / "quota/1"),
+                    "Destination": "/quota-accounts/1", "RW": False}] if role == "network" else []})
         old = list(containers.values())
         self.gateway._request.return_value = {"proxy_url": "http://u%40name:p%3Aword@new.invalid:8080", "auth_type": "oauth", "status": "active"}
         account = {"id": 1, "name": "synthetic", "cc2api_account_id": 7, "upstream_socks5_host": "old.invalid"}
@@ -1305,7 +1551,9 @@ class AccountRuntimeTests(unittest.TestCase):
         configuration = {"proxy_url": "", "binding": {"account_id": 7}, "quota_identity": ""}
         atomic_json(self.runtime._sender_config(row), configuration)
         for role in ROLE_COLUMNS:
-            container = Mock(status="running", labels=role_labels(self.runtime, row, role))
+            container = Mock(status="running", labels=role_labels(self.runtime, row, role),
+                attrs={"Mounts": [{"Type": "bind", "Source": str(self.root / "quota/1"),
+                    "Destination": "/quota-accounts/1", "RW": False}] if role == "network" else []})
             container.exec_run.return_value = SimpleNamespace(exit_code=0)
             containers[role] = container
         self.gateway._request.return_value = {"proxy_url": "", "auth_type": "oauth", "status": "active"}

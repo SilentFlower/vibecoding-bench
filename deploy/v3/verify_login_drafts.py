@@ -10,6 +10,101 @@ from manage import REPO
 from verify_browser import ACCOUNT_STARTUP_TIMEOUT
 
 
+def verify_saved_draft_quota_mount(client, deployment, data, orchestrator, account_id, environment_id) -> object:
+    """验证真实草稿提交后的首次准备、额度隔离和 Recorder 观察。
+
+    :param client: 本次 Docker 客户端。
+    :param deployment: 随机验证部署。
+    :param data: 本次独立数据根。
+    :param orchestrator: 本次管理容器。
+    :param account_id: 刚保存的合成正式账号 ID。
+    :param environment_id: 原草稿环境 ID。
+    :return: 补齐后实际的 CLI 容器，供后续清理核对。
+    """
+    root = data / "bench/environments" / environment_id
+    with sqlite3.connect(data / "bench/db.sqlite") as database:
+        before = database.execute("SELECT fingerprint_json,generation,network_container_id FROM account_environments WHERE environment_id=?",
+            (environment_id,)).fetchone()
+    files = {path: path.read_bytes() for path in (root / "home/.claude.json", root / "home/.claude/.credentials.json")}
+    program = '''
+import json,time,uuid
+import main,docker
+from account_runtime import AccountRuntime,atomic_json
+r=AccountRuntime(docker.from_env(),main.BENCH_DATA,main.HOST_BENCH_DATA,main.get_db,main.derive_v3_fingerprint,main.cc2api_client)
+main.account_runtime=r
+connection=main.get_db()
+try:
+    account=dict(connection.execute('SELECT * FROM accounts WHERE id=?',(__ACCOUNT_ID__,)).fetchone())
+finally:
+    connection.close()
+try:
+    row,cli=r.ensure(account)
+    assert row['environment_id']==__ENVIRONMENT_ID__
+    repeated,_=r.ensure(account)
+    assert repeated['generation']==row['generation']
+    guard=main.QuotaGuard(main.Runner())
+    source='projects:'+uuid.uuid4().hex+':1'
+    assert guard.admit(account,source,warmup=True,workload='warmup')
+    flows=r.execution_flows(account,source,main.BENCH_DATA/'flows'/account['name']/'quota-regression')
+    controls=r._root(row)/'controls/quota-regression'
+    context=guard.prepare(account,source,flows,controls,warmup=True)
+    flow_path='/flows/'+str(flows.relative_to(r._root(row)/'flows'))
+    context.update(NETWORK_INSPECTION_MODE='capture',QUOTA_STATE_FILE='/quota-accounts/'+str(account['id'])+'/state.json',
+        QUOTA_SIGNAL_FILE='/controls/quota-regression/pause.json',QUOTA_OBSERVATIONS_FILE=flow_path+'/passive-quota.jsonl',
+        STATS_FILE=flow_path+'/stats.jsonl',CAPTURE_FULL_HTTP='0')
+    try:
+        atomic_json(r._network_runtime(row)/'context.json',context)
+        r._configure_network_context(cli,context)
+        # Recorder 每 0.2 秒观察一次，等待多个周期才能检出缺文件导致的误停。
+        time.sleep(2)
+        assert not (controls/'pause.json').exists(),'Recorder 仍错误发布额度暂停'
+    finally:
+        idle={'NETWORK_INSPECTION_MODE':'passthrough','QUOTA_SOURCE':''}
+        atomic_json(r._network_runtime(row)/'context.json',idle)
+        r._configure_network_context(cli,idle)
+        guard.release(account,source,unstarted=True)
+    print(json.dumps({'generation':row['generation'],'network':row['network_container_id'],'cli':row['container_id']}))
+finally:
+    r.heartbeat_pool.shutdown()
+'''
+    program = program.replace("__ACCOUNT_ID__", repr(account_id)).replace("__ENVIRONMENT_ID__", repr(environment_id))
+    result = orchestrator.exec_run(["python", "-c", program])
+    assert result.exit_code == 0, result.output.decode(errors="replace")[-2000:]
+    prepared = json.loads(result.output.decode().strip().splitlines()[-1])
+    assert prepared["generation"] == before[1] + 1 and prepared["network"] != before[2]
+    network = client.containers.get(prepared["network"])
+    network.reload()
+    quota = [mount for mount in network.attrs["Mounts"] if mount["Destination"].startswith("/quota-accounts")]
+    assert len(quota) == 1 and quota[0]["Type"] == "bind" and quota[0]["RW"] is False
+    assert quota[0]["Destination"] == "/quota-accounts/" + str(account_id)
+    assert quota[0]["Source"] == str(data / "bench/quota" / str(account_id))
+    probe = '''
+import errno,json
+from pathlib import Path
+p=Path('/quota-accounts/__ACCOUNT_ID__/state.json')
+state=json.loads(p.read_text())
+# 新账号尚无被动额度观测时，快照允许不包含 windows。
+assert isinstance(state,dict) and isinstance(state.get('windows',{}),dict)
+assert [child.name for child in p.parent.parent.iterdir()]==['__ACCOUNT_ID__']
+try:
+    p.write_text('forbidden')
+except OSError as error:
+    assert error.errno in (errno.EROFS,errno.EACCES)
+else:
+    raise AssertionError('额度挂载允许写入')
+'''.replace("__ACCOUNT_ID__", str(account_id))
+    inspected = network.exec_run(["python3", "-I", "-c", probe])
+    assert inspected.exit_code == 0, inspected.output.decode(errors="replace")[-2000:]
+    with sqlite3.connect(data / "bench/db.sqlite") as database:
+        assert database.execute("SELECT fingerprint_json FROM account_environments WHERE environment_id=?",
+            (environment_id,)).fetchone()[0] == before[0]
+    assert files == {path: path.read_bytes() for path in files}
+    container = client.containers.get(prepared["cli"])
+    assert container.labels.get("vibebench.deployment") == deployment
+    print("通过：真实草稿转正式账号后首次准备补齐专属只读额度挂载，身份凭据保留，Recorder 不误停，重复准备不重建")
+    return container
+
+
 async def verify_login_drafts(client, deployment, data, browser, base, proxy_address, rpc, evaluate, wait_for, session_id):
     """验证未提交账号发现、终态、重启、提交和完整删除。
 
@@ -168,6 +263,7 @@ async def verify_login_drafts(client, deployment, data, browser, base, proxy_add
     assert browser.delete(base + f"/runtime/api/accounts/login-drafts/{environment_id}", params={"generation": interrupted["generation"]}, timeout=10).status_code == 409
     assert browser.get(base + "/runtime/api/accounts/login-drafts", timeout=10).json() == []
     print("通过：重启后真实认证检查保留产物，原环境完成提交，正式账号不能被草稿删除")
+    container = verify_saved_draft_quota_mount(client, deployment, data, orchestrator, account_id, environment_id)
 
     # 单独合成草稿完整删除，不能删除刚保存账号；同名可重新创建。
     name = "delete-draft-fixture"

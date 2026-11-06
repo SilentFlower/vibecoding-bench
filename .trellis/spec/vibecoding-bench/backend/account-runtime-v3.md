@@ -435,6 +435,7 @@ status = sending | delivered | uncertain | rejected
 ### 1. Scope / Trigger
 
 - 修改新账号登录开始、草稿列表/恢复/重登/删除、首次提交或宕机恢复时适用。已有正式账号的重授权及历史软删除保持原契约；终端交互见 [登录终端生命周期](../frontend/hook-guidelines.md#scenario-v3-登录终端重连与授权链接)。
+- 正式绑定后的首次准备及历史草稿环境遗漏额度挂载也适用；数据库绑定不会改变 Docker 创建时固定的挂载。
 
 ### 2. Signatures
 
@@ -448,6 +449,11 @@ LoginDraftActionIn: {generation: string}；extra=forbid
 AccountRuntime.recover_login(sid: str, account: dict, version: str, home: str)
   -> tuple[dict, object]
 AccountRuntime.login_terminal_alive(session) -> bool
+AccountRuntime.ensure(account: dict, version: str | None = None,
+  allow_inactive_login: bool = False, allow_login_recovery: bool = False,
+  preserve_proxy: bool = False, scenario_resources: bool = False,
+  ownership_source: str | None = None, require_quota_mount: bool = True)
+  -> tuple[dict, object]
 bench/login-drafts/<32位小写hex环境ID>.json
 ```
 
@@ -465,6 +471,9 @@ bench/login-drafts/<32位小写hex环境ID>.json
 - 本地首次提交先写 submitting，持有 owner → profile 锁；中间 accounts 行保持 enabled=0。只要 submitting 标记仍存在，正式列表和 `_get_available_account` 均隔离该账号；仅原登录恢复路径允许 `allow_login_recovery=True` 穿过本地保存门禁。HOME 镜像成功后先把恢复入口改为主 HOME，再清暂存，失败仍能继续提交。全部保存和清理完成才启用账号、移除标记并缓存幂等结果。submitting 拒绝取消、删除及新登录，不能丢掉未确认产物。
 - 完整删除采用 owner → profile → environment 锁序，锁内重读环境和代次。任一正式/软删除账号、同 profile 引用、run/flow 历史、未知提交/对账、其他作业或活动发送连接均拒绝。容器必须通过完整产品/部署/角色/环境 labels；目录须为专属 realpath，根或父目录链接、跨树内部链接均拒绝，npm 指向本专属树的链接允许。
 - 先保存 deleting，收口原登录和执行，再停止并移除唯一归属容器，清环境 HOME/CLI 缓存/暂存和专属 profile；外部清理完成后才条件删除 account_environments，最后删除标记。Docker/文件/最终标记失败不能假成功；保留可见 deleting/reconcile 供重试，禁止期间唤醒/重建。重复删除已不存在草稿返回 ok；草稿已经正式提交时拒绝删除。
+- 布局 2 正式账号复用网络角色前，核对已验证归属并 reload 的实际 `Mounts`：唯一额度挂载必须为 `Type=bind`、`Source=HOST_BENCH_DATA/quota/<bench_id>`、`Destination=/quota-accounts/<bench_id>`、`RW is False`。新建正式环境后也须核对；不能根据数据库 ID 或宿主文件存在推断容器可读。错误账号、来源、可写、重复或不可核验的元数据均拒绝，不能按普通缺失处理。
+- 明确没有额度挂载时，默认 `ensure()` 在原环境锁内补齐：只接受 ready/stopped 且无内存作业、单执行/共享执行登记、未确认提交和 CLI 遗留进程的环境，再经原 `maintenance(..., 'rebuild')` 排他空闲认领核对 active/waiting API、维护租约、发送连接和评审交接。保留环境 ID、画像、HOME/最新凭据、工作区及原任务会话，重读新代次后继续准备；正确挂载及重复准备直接复用。草稿无正式 ID、状态查询和旧隔离布局不触发此补齐。
+- 仅独立 `transport()` 内部传 `require_quota_mount=False`：API 在准备前已持有自身并发许可，也不读取 CLI 额度文件，因此明确缺失时复用健康发送器；错误或不可核验的挂载仍拒绝。CLI 等其它准备沿默认 true，不新增 HTTP 参数或用户配置。
 
 ### 4. Validation & Error Matrix
 
@@ -480,6 +489,10 @@ bench/login-drafts/<32位小写hex环境ID>.json
 | 草稿恢复遇到活动工作、未知提交、旧代次或坏归属 | 409，不解除保护；只提供环境诊断 |
 | 提交期间 DB/HOME/清理中断 | 不启用可用账号，保留 submitting，继续原提交 |
 | 重复删除资源已不存在 | ok；正式提交后新草稿删除仍为 409 |
+| 正式账号明确缺少额度挂载且已通过空闲门禁 | 补齐一次，核实新挂载后才继续准备 |
+| 活动作业、active/waiting API、评审或维护占用 | 保留原容器和执行，沿 `RuntimeBusy` 等待/拒绝语义处理 |
+| 错误/可写/其他账号挂载、坏 Docker 元数据或未知执行 | `ValueError`，不停止原容器来制造空闲 |
+| 补齐时停止/移除/租约收口失败，或新挂载仍缺失 | `reconcile`，保留现场；不得发布 ready 或盲建下一代 |
 
 ### 5. Scenarios and Examples
 
@@ -488,6 +501,8 @@ bench/login-drafts/<32位小写hex环境ID>.json
 - 错误用法：只有 credentials 文件就标记已登录，或提交 IO 失败后通过删除放行。正确处理：真实 CLI 认证检查；submitting 保留资料和门禁，继续提交/对账。
 - 错误用法：用旧页面代次删除新登录，或凭账号名称前缀批量删容器。正确处理：锁内重读代次、精确标签和目录归属，仅清专属未提交资源。
 - 基础：取消清理失败进入 reconcile，但原执行可核对且已停止；使用恢复检查收口旧会话，保留 HOME 后开放继续/重登/删除，不把恢复当作删除。
+- 正常/基础：无 ID 草稿保存为正式账号后调用 `runtime.ensure(account)`，空闲时补齐专属只读额度挂载；再次调用沿用新一代。若独立 API 正在转发，先维持 API，后续需要 CLI 额度文件的准备等待空闲。
+- 错误用法：仅更新 `account_environments.account_id` 就认定旧容器额度可读，或挂整个全局额度目录绕过缺失。正确处理：核对实际单账号只读挂载，明确缺失才经过原空闲维护补齐。
 
 ### 6. Tests Required
 
@@ -496,6 +511,8 @@ bench/login-drafts/<32位小写hex环境ID>.json
 - `verify_stack.py --manifest <最终联合清单> --browser --reauth` 串入 `verify_login_drafts.py`：真实 Docker/Chrome/HTTP/WS/tmux、刷新原 SID、CLI 结束与迟到事件、管理器 SIGKILL 后对账/恢复、原环境提交、鼠标确认完整删除；验证全部专属目录/CID/DB 消失且正式账号保留。
 - 合成 CLI/OAuth 和故障替身必须明确标注，不访问真实 OAuth；按随机部署精确标签清理测试数据与容器，核对旧哨兵不变和最终冻结源码哈希。真实 OAuth/正式 API 另作上线后验证。
 - 清理故障验证 503、can_reconcile 与原 SID/名称释放；拒绝活动工作、未知证明、旧代次及未确认保存，恢复前后 HOME/身份不变。代理 JSON/DOM 不含 userinfo，配置读取失败为 unknown；真实浏览器点恢复后可完整删除草稿而正式账号保留。
+- `test_account_runtime.py` 从真实形状的无 ID 草稿创建与正式绑定开始，断言补齐一次、并发幂等、原资料不变；覆盖错误挂载、CLI/API active/waiting、评审、持久记录、孤儿进程和部分维护失败。独立 API 自持许可且明确缺挂载时继续准备，不进入排他认领。
+- `verify_login_drafts.py` 在真实浏览器正式提交后准备原环境：容器读取本账号额度 JSON、写入被拒且看不到其他账号目录，Recorder 多次观察不因缺文件误停，重复准备不重建。新账号额度窗口未知允许缺省 `windows`，不能伪造 0% 或主动探测；本地源码覆盖不替代正式镜像发布后验证。
 
 ## Scenario: v3 原生 TLS 账号身份与同步
 

@@ -583,7 +583,8 @@ class AccountRuntime:
 
     def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
                allow_login_recovery: bool = False, preserve_proxy: bool = False,
-               scenario_resources: bool = False, ownership_source: str | None = None) -> tuple[dict, object]:
+               scenario_resources: bool = False, ownership_source: str | None = None,
+               require_quota_mount: bool = True) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
@@ -593,6 +594,7 @@ class AccountRuntime:
         :param preserve_proxy: 指标读取只核对权威代理，不回写账号代理字段
         :param scenario_resources: 提前核验项目串行评审预算，新旧固定容器均保持原限额
         :param ownership_source: 只有原受控登录会话可进入凭据维护阶段
+        :param require_quota_mount: 是否要求补齐额度挂载；仅独立 API 传输准备可跳过明确缺失
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
@@ -654,7 +656,13 @@ class AccountRuntime:
                         self._update(row, state="reconcile")
                         raise ValueError("账号隔离角色缺失，需要先对账") from None
                     configuration = _read_json(self._sender_config(row))
-                    if configuration.get("proxy_source", configuration["proxy_url"]) != self._proxy(account):
+                    if (account.get("id") is not None
+                            and not self._network_has_quota_mount(account["id"], containers["network"])
+                            and require_quota_mount):
+                        self._rebuild_missing_quota_mount(row, containers)
+                        row = self._row(account["name"], account["id"])
+                        present = [False]
+                    elif configuration.get("proxy_source", configuration["proxy_url"]) != self._proxy(account):
                         if any(current.status == "running" for current in containers.values()) or self.environment_jobs(row["environment_id"]):
                             raise ValueError("代理已改变，请先空闲维护账号环境")
                         self._stop_environment(row, remove=True)
@@ -685,6 +693,15 @@ class AccountRuntime:
                     deployment_key = hashlib.sha256(self.deployment.encode()).hexdigest()[:12]
                     name = f"v3-{deployment_key}-account-{row['environment_id']}"
                     create_environment(self, row, account, name, atomic_json)
+                    if account.get("id") is not None:
+                        try:
+                            network = role_container(self, row, "network")
+                            network.reload()
+                            if not self._network_has_quota_mount(account["id"], network):
+                                raise ValueError("新账号网络缺少本账号只读额度挂载")
+                        except Exception:
+                            self._update(row, state="reconcile")
+                            raise
                 self._wait_network(row)
                 container = self._container(row)
                 deadline = time.monotonic() + 30
@@ -709,6 +726,64 @@ class AccountRuntime:
             with self.environment_lock(row['environment_id']):
                 self.reviews.serial_layout(row,container)
         return row, container
+
+    def _network_has_quota_mount(self, account_id: int, network) -> bool:
+        """核对实际账号额度挂载，只把明确无挂载视为可补齐缺失。
+
+        :param account_id: 不可变的正式 bench 账号 ID。
+        :param network: 已核验归属并刷新过的网络角色容器。
+        :return: 本账号专属只读挂载完整时为 True；完全缺失时为 False。
+        """
+        if type(account_id) is not int or account_id < 1:
+            raise ValueError("正式账号 ID 不合法，拒绝核验额度挂载")
+        mounts = network.attrs.get("Mounts")
+        if not isinstance(mounts, list) or any(not isinstance(mount, dict)
+                or not isinstance(mount.get("Destination"), str) for mount in mounts):
+            raise ValueError("账号网络挂载信息不可核验，拒绝继续执行")
+        quota = [mount for mount in mounts if mount["Destination"] == "/quota-accounts"
+            or mount["Destination"].startswith("/quota-accounts/")]
+        if not quota:
+            return False
+        expected = {"Type": "bind", "Source": str(self.host_data / "quota" / str(account_id)),
+            "Destination": "/quota-accounts/" + str(account_id), "RW": False}
+        if len(quota) != 1 or any(quota[0].get(key) != value for key, value in expected.items()) or quota[0].get("RW") is not False:
+            raise ValueError("账号额度挂载的归属、来源或只读属性不符，请核对环境")
+        return True
+
+    def _rebuild_missing_quota_mount(self, row: dict, containers: dict) -> None:
+        """正式账号首次使用时，经原空闲维护门禁补齐草稿阶段遗漏的挂载。
+
+        :param row: 已持有生命周期锁并核验的布局 2 环境。
+        :param containers: 已刷新且归属正确的原三角色容器。
+        :return: None；占用或未知执行保留现场，拒绝自动重建。
+        """
+        if self.environment_jobs(row["environment_id"]):
+            raise RuntimeBusy("账号仍有 CLI 或维护工作，等待空闲后补齐额度挂载")
+        root = self._root(row)
+        execution = root / "runtime/execution.json"
+        pending = root / "runtime/login-commit.json"
+        if (row["state"] not in ("ready", "stopped") or execution.exists() or execution.is_symlink()
+                or pending.exists() or pending.is_symlink() or self._execution_records(row)):
+            raise ValueError("账号有未确认的执行或提交，请先对账再补齐额度挂载")
+        if containers["cli"].status == "running":
+            result = containers["cli"].exec_run(["python3", "-I", "/usr/local/bin/v3-cli-control", "orphans"])
+            try:
+                observed = json.loads(result.output) if not result.exit_code else None
+            except (ValueError, TypeError):
+                raise ValueError("账号 CLI 进程信息不可核验，拒绝自动重建") from None
+            if not isinstance(observed, dict) or observed.get("orphans") != []:
+                raise ValueError("账号仍有未确认的 CLI 进程，拒绝自动重建")
+        elif containers["cli"].status not in ("exited", "created"):
+            raise ValueError("账号 CLI 状态不可核验，拒绝自动重建")
+        try:
+            # 挂载在 Docker 创建时固定；复用原排他租约，不能截断已有 API 或兄弟 CLI。
+            self.maintenance(row["environment_id"], "rebuild")
+        except RuntimeBusy:
+            raise
+        except Exception:
+            # 移除或维护租约收口不确定时保留登记，由原对账入口恢复，不能盲建下一代。
+            self._update(row, state="reconcile")
+            raise
 
     def _ensure_version(self, container, version: str) -> None:
         if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9._-]+)?", version):
@@ -861,7 +936,8 @@ class AccountRuntime:
         :param version: 兼容旧调用方的 CLI 版本，不参与 API 环境准备
         :return: 当前账号传输绑定，含受限服务秘密
         """
-        row, _ = self.ensure(account)
+        # API 已持有自己的并发许可，不能在这里等待排空自己；它也不读取 CLI 的额度文件。
+        row, _ = self.ensure(account, require_quota_mount=False)
         config_path = self._sender_config(row)
         config = _read_json(config_path)
         binding = config["binding"]
