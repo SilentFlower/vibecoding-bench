@@ -73,11 +73,13 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     """
     root = runtime._root(row)
     fingerprint = json.loads(row['fingerprint_json'])
-    limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'))
+    native = account.get('native_sender')
+    limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'),
+        str(native['memory_mib']) + 'm' if native else None)
     layout_path = root / 'runtime/project-review-layout.json'
     review_layout = json.loads(layout_path.read_text()) if layout_path.is_file() else None
     if review_layout:
-        expected_limits = scenario_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'))
+        expected_limits = scenario_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'), fingerprint.get('native_sender_memory'))
         if review_layout.get('limits') != {key: list(value) for key, value in expected_limits.items()}:
             raise ValueError('冻结评审资源布局与原账号预算不符')
         limits = expected_limits
@@ -128,7 +130,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     resolved_proxy = urlunsplit((parsed.scheme, f'{userinfo}{address}:{parsed.port}', parsed.path, parsed.query, ''))
     sender_file = paths['sender'] / 'sender.json'
     write_json(sender_file, {'binding': binding, 'proxy_url': resolved_proxy, 'proxy_source': proxy,
-        'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
+        'native': native, 'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
     os.chown(sender_file, 0, 1001)
     write_json(paths['network'] / 'context.json', {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''})
     (paths['network'] / 'ready').unlink(missing_ok=True)
@@ -145,10 +147,11 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
 
     def launch(role, **options):
         memory, total = limits[role]
+        role_pids = 128 + 32 * native['max_workers'] if role == 'sender' and native else 512 if role == 'cli' else 128
         options.update(name=name if role == 'network' else name + '-' + role,
             labels=role_labels(runtime, row, role), detach=True, auto_remove=False, read_only=True,
             mem_limit=memory, memswap_limit=total, nano_cpus=cpu * (6 if role == 'cli' else 1) // 8,
-            pids_limit=512 if role == 'cli' else 128, security_opt=['no-new-privileges:true'],
+            pids_limit=role_pids, security_opt=['no-new-privileges:true'],
             log_config={'type': 'json-file', 'config': {'max-size': '10m', 'max-file': '3'}}, mounts=[machine_mount])
         if role == 'cli' and review_layout:
             options.update(nano_cpus=review_layout['cli_nano_cpus'], pids_limit=384)
@@ -214,7 +217,8 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
                 ('flows', '/flows', 'rw'), ('runtime/empty', '/flows/api', 'ro'), ('controls', '/controls', 'ro')]),
             tmpfs={'/tmp': 'rw,noexec,nosuid,nodev,size=128m,mode=1777'})
         runtime.check_system_profile(row, cli)
-        sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw')])
+        _directory(root / 'runtime/native', 1001, 1001, 0o700)
+        sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw'), ('runtime/native', '/native', 'rw')])
         verification = root / 'runtime/verification-ca.der'
         if verification.is_file():
             # 父目录按只读挂载，runc 不能在其中创建嵌套 bind 的目标文件。

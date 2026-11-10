@@ -57,6 +57,8 @@ web/src/components/Accounts.vue
 
 `AccountStore` 使用 SQLx Any：PostgreSQL 的 JSONB 写入参数必须显式转为 `::JSONB`；查询和 INSERT RETURNING 的原生 JSONB/时间列须投影为 TEXT 后解码。时间解析同时接受 SQLite RFC3339 和 PostgreSQL 带时区文本，不能把无法直接解码的原生类型误当作空 JSON、无到期时间或当前时间。
 
+`accounts.request_backend TEXT NOT NULL DEFAULT 'legacy'` 同步双库建表、幂等补列、投影、绑定、局部更新及 DTO；账号配置及空闲切换语义由 [按账号选择固定 293 原生后端](./service-architecture.md#scenario-按账号选择固定-293-原生后端)所有。
+
 `five_hour_usage_limit_percent`、`seven_day_usage_limit_percent` 的账号字段、双库升级和局部更新合同见 [每账号 5h/7d 用量控制线](./service-architecture.md#scenario-每账号-5h7d-用量控制线)。凭据刷新、进程指标更新和状态快捷操作必须保留这两个配置；状态与控制线同时提交时用独立控制线 SQL 避免旧 Account 快照覆盖新凭据或状态。
 
 ## 时间字段
@@ -64,6 +66,42 @@ web/src/components/Accounts.vue
 - 后端持久化时间优先使用 RFC3339 字符串。
 - 前端展示前只做格式化，不反推出业务窗口。
 - usage window、RPM window、telemetry session 过期时间不能混用。
+
+## Scenario: PostgreSQL 账号可空参数的类型缓存
+
+### 1. Scope / Trigger
+
+- 修改 SQLx Any 0.7.4 下账号创建、全量更新及停用的可空绑定时适用。Any 将无类型 NULL 编码为 i32，PostgreSQL 预编译缓存以 SQL 文本为键。
+
+### 2. Signatures
+
+- `AccountStore::ts(n:u32) -> String`：PostgreSQL 使用 `$n::TEXT::TIMESTAMPTZ`，SQLite 保持原占位符。
+- `nullable_query(query:String,present:&[bool]) -> String`；`account_query(query:String,account:&Account) -> String`，均为 store 私有辅助。
+
+### 3. Contracts
+
+- PostgreSQL 的账号创建/全量更新按 expires_at、oauth_refreshed_at、account_uuid、organization_uuid、subscription_type、rate_limit_tier 六项 Option 的存在状态追加固定布尔注释 `/* any-null:bits */`，同一 SQL 缓存项保持相同参数类型。停用按 rate_limit_reset_at 的存在状态分组。
+- 值继续参数绑定，NULL 与合法空字符串保持不同语义；缓存键只含固定布尔位。SQLite SQL 保持原样，不能为消除类型错误改写业务值。
+- 只加时间 cast 解决初次 NULL 转换仍不足以保证缓存中的 NULL/文本交替；实际 PostgreSQL 单连接验证是该合同验收依据。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 首次 NULL、实际值、再清空 | 各自绑定类型稳定，按值保存或清空 |
+| 合法 Some(空字符串) | 保留空字符串，与 NULL 区分 |
+| SQLite 同一更新序列 | 既有 SQL/时间/提交可见性保持 |
+
+### 5. Scenarios and Examples
+
+- 正常：单连接创建 NULL 时间账号，随后更新实际时间并清空，重复操作均成功；后端字段及另一个账号独立保持。
+- 边界：四个可空文本字段交替 NULL/实际文本，真实空字符串仍保存为空字符串。
+- 错误用法：仅添加 `::TEXT::TIMESTAMPTZ`，或用空字符串哨兵吞掉合法空字符串。正确处理：原始绑定值保持，按有限存在状态区分 PostgreSQL 缓存项。
+
+### 6. Tests Required
+
+- `postgres_native_backend_migration_create_update_and_rollback`：独立 PostgreSQL、max_connections=1，覆盖历史升级、创建/全量/局部更新、六项 NULL 交替、空字符串、停用 reset 时间及按账号回退。
+- `account_store_timestamp_test` 和 store 单元：SQLite 原时间、配置与字段默认保持；PG 用例显式启用并绑定本地合成测试库。
 
 ## Scenario: 创建账号的提交可见性
 

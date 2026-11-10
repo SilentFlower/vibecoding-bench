@@ -261,7 +261,7 @@ class ProjectReviewRuntime:
                 or not isinstance(state.get('cli_limits'),dict) or not isinstance(state.get('review_limits'),dict)):
             raise ValueError('评审资源交接记录与原环境、执行或代次不符')
         fingerprint = json.loads(row['fingerprint_json'])
-        memory, total = serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'))
+        memory, total = serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory"))
         if (state['review_limits'].get('Memory') != memory or state['review_limits'].get('MemorySwap') != total
                 or any(type(state['cli_limits'].get(key)) is not int or state['cli_limits'][key] <= 0
                     for key in ('Memory','MemorySwap','NanoCpus','PidsLimit'))):
@@ -287,7 +287,7 @@ class ProjectReviewRuntime:
             raise ValueError('旧账号隔离版本须先显式空闲升级')
         layout = self.check_layout(row,cli)
         fingerprint = json.loads(row['fingerprint_json'])
-        expected = isolated_account_limits(fingerprint['mem'],fingerprint.get('swap','0'))
+        expected = isolated_account_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory"))
         cpu = layout['cli_nano_cpus']
         for role in ('network','sender'):
             current = role_container(self.runtime,row,role)
@@ -300,7 +300,7 @@ class ProjectReviewRuntime:
         if cpu > int(float(os.environ.get('V3_ACCOUNT_CPUS','2'))*1_000_000_000):
             raise ValueError('账号实际 CPU 限额超过配置预算，拒绝串行交接')
         layout = {**layout,'limits':{**layout['limits'],
-            'review':list(serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0')))},
+            'review':list(serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory")))},
             'review_nano_cpus':layout['cli_nano_cpus']}
         return layout
 
@@ -510,7 +510,7 @@ class ProjectReviewRuntime:
         path = self.runtime._root(row) / 'runtime/project-review-layout.json'
         if not path.exists() and not path.is_symlink():
             fingerprint = json.loads(row['fingerprint_json'])
-            limits = isolated_account_limits(fingerprint['mem'],fingerprint.get('swap','0'))
+            limits = isolated_account_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory"))
             cli.reload()
             config = cli.attrs['HostConfig']
             if (config.get('Memory') != limits['cli'][0] or config.get('MemorySwap') != limits['cli'][1]
@@ -520,7 +520,7 @@ class ProjectReviewRuntime:
                 'cli_nano_cpus':config['NanoCpus']}
         layout = read_document(path)
         fingerprint = json.loads(row['fingerprint_json'])
-        expected = {key: list(value) for key, value in scenario_account_limits(fingerprint['mem'], fingerprint.get('swap', '0')).items()}
+        expected = {key: list(value) for key, value in scenario_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'), fingerprint.get("native_sender_memory")).items()}
         cli.reload()
         config = cli.attrs['HostConfig']
         if (layout.get('schema') != 1 or layout.get('review_capacity') != 1 or layout.get('limits') != expected
@@ -543,8 +543,8 @@ class ProjectReviewRuntime:
             '/usr/local/bin/v3-cli-control','sample'])
         sample = json.loads(result.output)
         fingerprint = json.loads(job['row']['fingerprint_json'])
-        expected = (serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'))[0]
-            if job.get('resource_mode') == SERIAL_MODE else scenario_account_limits(fingerprint['mem'],fingerprint.get('swap','0'))['review'][0])
+        expected = (serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory"))[0]
+            if job.get('resource_mode') == SERIAL_MODE else scenario_account_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory"))['review'][0])
         if result.exit_code or sample['memory'] != expected:
             raise ValueError('实际评审内存限制或内核采样不符')
         write_document(self.root_for_job(job)/'runtime/process-metrics.json',{'observed_at':time.time(),'sample':sample})

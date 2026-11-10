@@ -727,6 +727,7 @@ verify_roles(cli, sender, network, fingerprint: dict) -> dict
 - 网络过滤器在本账号 netns 原子安装 INPUT/FORWARD/OUTPUT 默认 DROP，先拒绝 Docker DNS 127.0.0.11，再开放回环、既有连接、指定代理 TCP、TUN；其他私网和 IPv6 拒绝。sender 8091 入站仅允许核验过的本部署 gateway/orchestrator 及桥网关。网络 ready 最多等 120 秒，确认前不启动业务；删路由/网络进程故障不能回退 bridge 直连，不修改宿主共享规则。
 - 服务端 OAuth 仍由 gateway 的原 HTTP/TLS 客户端发出，账号 netns 防火墙不能保护它。`V3_RUNTIME_URL` 或 `V3_DEPLOYMENT_ID` 任一非空时，空串/空白代理在创建 OAuth 客户端前返回 ServiceUnavailable；授权交换、刷新和 usage 共用该入口。非空非法代理解析失败也不得直连；两个标识均为空的独立部署保留原空代理语义。不伪造浏览器网页授权的出口。
 - 基础布局总 RAM/swap 来自已保存画像：network 256 MiB、sender 128 MiB、CLI 取剩余且至少 512 MiB，额外 swap 只归 CLI；Docker memswap 为角色 RAM 加其额外 swap。CPU 按 CLI:network:sender=6:1:1 分配，pids 分别为 512/128/128；CLI /tmp 为 128 MiB noexec。部署预检、容量及停止不能漏计辅助角色或放大账号总预算。
+- 上述 sender 128 MiB 为 legacy 布局；native293 使用下文显式原生预算，CLI/评审/指标从同一冻结预算扣除 sender 份额。
 - 新登录与项目环境均使用基础三角色预算，不再静态预留512MiB或创建 `runtime/project-review-layout.json`。评审先停止原固定CLI，再串行复用扣除network/sender后的RAM，结束后恢复同一CLI。旧schema1布局只读核验实际限制，不隐式扩容、重建或改写固定配额；旧隔离版本仍须显式空闲升级。`account_environments.container_id`始终指固定CLI；交接记录、私有目录、原owner刷新及严格收口以[项目场景契约](./project-iterations.md#scenario-内容-schema-2-的真实项目多场景任务与-policy-3)为准。
 - 创建按网络 ready 再业务角色，逐个登记；失败停止本代已创建实例并保留对账证据，未知/部分角色不能 ready。停止按 CLI→sender→network；维护、备份、草稿删除与孤儿处理核对完整角色集合。管理端重启与 CLI 单次取消保留健康 API/SSE；CLI 单独异常仅关闭下一 CLI。
 - 布局 0 的已有实例只在显式空闲重建时转换，GET/普通发送不能静默迁移。先停机备份，转换保存私有 isolation-upgrade 快照；回退保留最新 HOME/凭据，不恢复旧 RT/数据库覆盖轮换结果。未创建实例的新行保持布局 0，受控 ensure 才登记 2。
@@ -1233,3 +1234,53 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `test_tls_capture_artifacts.py`：嵌套canary、全组预算、半行／损坏／缺指纹／链接／读错误、旧数据、合法空值、共用渲染和XSS。已有账号运行生命周期定向回归覆盖独立API及历史目录。
 - 将 `deploy/v3/verify_tls_clienthello.py` 挂入固定11.1.3隔离账号镜像，仅回环模拟上游：TLS1.2／1.3各同socket两GET，独立BytesIO／struct核全部字段和JA3，核HTTP/index连接；真实写失败后另两GET成功。此结果标 synthetic，不能充作官方CLI样本。
 - 上线核同批Actions／镜像源码、真实项目新文件0600、执行版本／来源及成功Claude HTTP连接，独立复算并验证真实鉴权页面的安全展示；目标版本完整对齐仍需无解密透传对照。
+
+## Scenario: V3 原生 sender 共享映像池与资源预算
+
+### 1. Scope / Trigger
+
+- `request_backend=native293` 在现有账号 sender 内执行固定 293 独立二进制。三角色及凭据所有权继续遵循本文件；账号/Gateway 合同见 [按账号选择固定 293 原生后端](../../cc2api/backend/service-architecture.md#scenario-按账号选择固定-293-原生后端)。
+- 实现依据：`orchestrator/{native_sender,account_runtime,resource_budget,account_isolation}.py`、`images/v3/Dockerfile` 与 `cc2api/src/service/native_runtime.rs`。
+
+### 2. Signatures
+
+- `sender_config(configuration:dict,memory:str,swap:str='0',budget:str|None=None) -> dict|None`；configuration 的后端及 concurrency 来自网关权威快照。
+- `NativeSenderConfig = {binary_path,work_root,memory_mib:u64,max_workers:usize}`；legacy 的 native 配置为 None。
+- 显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.2 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
+- fingerprint 新增可选 `native_sender_memory`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
+
+### 3. Contracts
+
+- 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。预算预检为 `256+192*max_workers` MiB，容量同时受账号有限总 RAM 与 CLI 最低512 MiB约束。legacy sender 仍为128 MiB。
+- 已验证 N=3、max_workers=6、sender=1536 MiB；预检最低1408 MiB。bench 创建账号默认N=4，最低1792 MiB；1536 MiB 配置须显式设置N=3。配置限额和实际占用分别报告。
+- 原生sender为UID1001，私有可写 `/native` 与CLI UID1000/HOME分离。PID限额 `128+32*max_workers`；CPU份额保持三角色规则，额外swap只归CLI。CLI指标、physical_features及静态/串行评审从同一冻结sender预算计算剩余份额。
+- 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
+- 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
+- 单个弱引用回收任务在额外进程空闲60秒后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
+- 布局/预算变化只在job和API活动为空时重建。配置事务已停sender时复用 `_running_sender_active` 记零活动；运行中读取真实活动，归属或查询失败仍拒绝重建。
+- SOCKS5/5h使用逐进程随机Basic鉴权的回环CONNECT，固定目标 `api.anthropic.com:443`，保持原生TLS；socks5本地DNS、socks5h代理DNS。隧道不构造业务请求，生命周期绑定进程。
+- 镜像构建冻结实际附件，校验27387960 B及SHA后复制。Cargo使用项目独立BuildKit锁定缓存和 `--locked`，输出复制至普通 `/out` 层；联合清单继续登记实际源摘要和最终镜像身份。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 缺显式预算、容量不足、未知后端 | 准备拒绝，保持原环境 |
+| 镜像缺能力、分发/执行体不符或映像未封存 | 准备失败，模型零发送 |
+| 活动中变更布局 | 忙门禁拒绝 |
+| 请求取消、协议故障或旧代次迟到帧 | 退役并等待物理退出后归还进程计数 |
+| 原生方式显式回退legacy | 空闲重建128 MiB sender，另一个账号保持其选择 |
+
+### 5. Scenarios and Examples
+
+- 正常：账号总4g、N=3、原生sender1536m时，network256m、CLI2304m；3普通/6Haiku实际TLS与加权准入保持。
+- 边界：六个进程共享一个封存映像；60秒后剩一个暖进程，下次并发按需重建。隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；大正文及长流按实际负载另验峰值。
+- 错误用法：把磁盘26.12 MiB当作进程RAM，或用1536m预算承载默认N=4。正确处理：分别登记分发/展开/实际cgroup数据，按当前并发验证预算。
+- 错误用法：布局检查查询已被配置事务停止的HTTP sender。正确处理：核验归属后按停止状态处理；运行中仍查询真实活动。
+
+### 6. Tests Required
+
+- `test_native_sender.py`：默认legacy、显式预算、总RAM/CLI下限、未知后端、容量无任意64进程上限；`test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected`：忙时拒绝、停止后正确重建和代次/预算。
+- Rust实际 `native_real_binary`：共享dev/inode及四项封存、6→1空闲回收、取消→0、全部原进程退出后缓存重建、独立凭据及一次提交。
+- `deploy/v3/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、60秒回收及按账号回退；验证镜像的额外CA仅限本地夹具。
+- 发布验收从实际Release下载附件，核SHA/大小、冻结构建输入并运行真实消费者；合成回环与真实付费推理分开记录。

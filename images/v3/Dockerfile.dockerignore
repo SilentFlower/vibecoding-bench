@@ -1,4 +1,6 @@
 *
+!native-runtime
+!native-runtime/ccrb-runtime
 !cc2api
 !cc2api/Cargo.toml
 !cc2api/Cargo.lock

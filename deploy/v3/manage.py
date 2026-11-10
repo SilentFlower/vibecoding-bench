@@ -28,6 +28,7 @@ COMPOSE = Path(__file__).with_name("compose.yml")
 # 独立部署脚本复用镜像内的纯预算模块，避免预检和容器解释不同单位。
 sys.path.insert(0, str(REPO / "orchestrator"))
 from resource_budget import account_limits, isolated_account_limits
+from native_sender import stage_asset
 from storage_assets import essential_exclusions
 from storage_backup import create_backup_data, verify_backup_data
 from storage_cleanup import apply_storage_plan, storage_plan
@@ -194,6 +195,8 @@ def preflight(values: dict) -> Path:
     active_limit = int(values.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
     account_memory, total_memory = account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
     isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
+    if values.get("V3_NATIVE_SENDER_MEMORY"):
+        isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"), values["V3_NATIVE_SENDER_MEMORY"])
     database = root / "bench/db.sqlite"
     if database.is_file():
         if not database.resolve().is_relative_to(root):
@@ -438,6 +441,7 @@ def build(release: str, manifest_path: Path) -> None:
         for relative in ("cc2api/Cargo.toml", "cc2api/Cargo.lock", "topics.md"):
             (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(REPO / relative, snapshot / relative)
+        native_runtime = stage_asset(snapshot / "native-runtime/ccrb-runtime")
         restore_upstream_checkout_bytes(snapshot)
         digest = hashlib.sha256()
         for path in sorted(item for item in snapshot.rglob("*") if item.is_file()):
@@ -463,7 +467,7 @@ def build(release: str, manifest_path: Path) -> None:
     with manifest_path.open("x") as output:
         json.dump({"schema": 3, "bridge_protocol": 1, "credential_ownership_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
-            "dirty_worktree": dirty, "source_content_sha256": source_hash, "images": images}, output, indent=2)
+            "dirty_worktree": dirty, "source_content_sha256": source_hash, "native_runtime": native_runtime, "images": images}, output, indent=2)
         output.write("\n")
 
 

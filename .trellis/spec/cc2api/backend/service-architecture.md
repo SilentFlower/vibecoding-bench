@@ -24,6 +24,51 @@ src/tlsfp/
 - `store/` 放持久化与缓存抽象。不要让 handler 直接写 SQL。
 - `tlsfp/` 和 `craftls/` 是 TLS 指纹链路，改动要按协议/抓包任务处理。
 
+## Scenario: 按账号选择固定 293 原生后端
+
+### 1. Scope / Trigger
+
+- 账号管理、Gateway Messages 分流与 V3 sender 原生池属于跨层合同。实现依据为 `model/account.rs`、`handler/router.rs`、`service/{gateway,native_contract,native_runtime,runtime_transport}.rs` 及账号前端。
+
+### 2. Signatures
+
+- 账号 DTO/模型字段 `request_backend: String`，仅接受 `legacy|native293`；历史和省略值默认 `legacy`。
+- `PreparedTransport::native_ready(&self) -> Result<(), AppError>`；`submit_native(self, submission: NativeSubmission, ttfb_timeout: Duration) -> Result<reqwest::Response, AppError>`。
+- 服务鉴权的 `GET /internal/native/status` 返回 `raw_input_protocol:1,version,environment_id,generation`；`POST /internal/native/messages` 接收 `NativeSubmission`。
+- `NativeSubmission` 字段为 `request: PreparedRequest,input: Value,bearer,device_id,account_uuid?,organization_uuid?,email,concurrency:i32`，禁止 Debug 输出。input 为同 request_id 的 schema 1 原始信封。
+
+### 3. Contracts
+
+- 创建、编辑、列表、OAuth 默认与表单重置同步后端值。切换进入现有排空门禁；非 V3 同样检查本地活动。状态快捷操作单独保存该字段，避免用旧 Account 快照覆盖凭据。
+- 普通准入、账号选择、凭据解析及加权许可仍由 Gateway 所有。原生分支在 Rust 正文/头部/CCH 重写前接管精确 Messages；保留逻辑 JSON 与 HeaderMap 多值，头值在私有信封中按 Latin-1 字节串传递。
+- 账号 Fast/1M 权限先明确拒绝越权申请；允许时保持原始输入交给二进制。当前 bearer 和受控身份进入工作进程，RT 留在既有凭据所有者。原生池的 Linux x64、身份、封存、预算及回收规则由 [V3 原生 sender](../../vibecoding-bench/backend/account-runtime-v3.md#scenario-v3-原生-sender-共享映像池与资源预算)所有。
+- 原生请求最多一次模型提交，错误直接返回；legacy 的重写、401/signature/429 重试与其他端点保持各自原路径。调度 submitted 记录实际内部 POST，包含原生初始化耗时，不能解释为供应商已接收。
+- sender 校验现有绑定、代次、deadline、目标及秘密，原生目标仅 POST `/v1/messages` 且无 query。response 继续经过共用用量观察及流许可，取消、EOF、Drop 各按既有一次收口。
+- 诊断通过 `x-v3-native-observation` 取得实际 cc_prepared 的受限摘要，固定画像 `2.1.293`、来源 `native293_cc_prepared`，私有作业 UUID 与 sender 证据关联。上游同名控制头先剔除；网关消费后移除内部头。观察缺失标记 `native293_unobserved`，准备拒绝保持零模型尝试；组装快照不能当作最终 TLS。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 未知 request_backend、Fast/1M 超出账号权限 | 400，原账号或模型零发送 |
+| 忙时切换后端 | 现有忙门禁拒绝，归属保持 |
+| 缺 V3/二进制/预算、能力或代次不符、平台不支持 | 503 准备失败 |
+| 固定 293 无法接纳正文版本或参数 | 二进制受控错误，模型零发送 |
+| 提交后断线或状态不明 | 502，保持单次提交语义 |
+| 原生上游状态错误 | 返回本次状态及响应，管理员空闲时显式切回 legacy |
+
+### 5. Scenarios and Examples
+
+- 正常：账号 A 选择 native293，账号 B 保持 legacy，A 的标准并发 3 支持 3 普通或 6 Haiku；普通 API 与原生 293 由同一二进制构造。
+- 边界：历史账号缺字段仍走 legacy；count_tokens 等端点继续其既有路径；两个账号空闲切换相互独立。
+- 错误用法：原生失败后自动回落 legacy，或复用旧凭据代次的 idle worker。正确处理：当前请求明确失败，后续作业按当前代次重建，回退由管理员显式选择。
+
+### 6. Tests Required
+
+- `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
+- `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
+- `native_real_binary`、`native_real_gateway`：实际附件、独立 TLS/CCH、HTTP/SOCKS、多值白名单、工具/thinking、主子会话、单次发送、取消/代次和诊断来源。跨平台备用实现编译验证明确 503。
+
 ## Gateway 热路径规则
 
 `GatewayService::handle_request` / `handle_request_inner` 是最高风险路径。修改前必须明确：

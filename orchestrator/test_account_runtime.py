@@ -1565,6 +1565,43 @@ class AccountRuntimeTests(unittest.TestCase):
             installer.assert_not_called()
         self.assertEqual(self.runtime._row("synthetic", 1)["state"], "cli_reconcile")
 
+    def test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected(self) -> None:
+        """忙时保留原角色，配置事务已停止 sender 后允许空闲重建。@return None。"""
+        containers = self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+        account = {'id': 1, 'name': 'synthetic', 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        activity = 0
+
+        def sender_active(row):
+            """模拟真实 HTTP 状态入口，停止的实例查询立即失败。@param row 环境行。@return 活动数。"""
+            self.assertEqual(containers[row['sender_container_id']].status, 'running')
+            return activity
+
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', side_effect=sender_active), \
+                patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': '1536m'}):
+            row, _ = self.runtime.ensure(account)
+            old_roles = list(containers.values())
+            self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+                'request_backend': 'native293', 'concurrency': 3}
+            account['cc2api_account_id'] = 7
+            activity = 1
+            with self.assertRaisesRegex(ValueError, '活动作业'):
+                self.runtime.ensure(account)
+            for container in old_roles:
+                container.stop.assert_not_called()
+                container.status = 'exited'
+            activity = 0
+            self.runtime._update(row, state='stopped')
+            rebuilt, _ = self.runtime.ensure(account)
+        configuration = json.loads(self.runtime._sender_config(rebuilt).read_text())
+        self.assertEqual(configuration['native']['max_workers'], 6)
+        self.assertEqual(configuration['native']['memory_mib'], 1536)
+        self.assertEqual(json.loads(rebuilt['fingerprint_json'])['native_sender_memory'], '1536m')
+        self.assertEqual(rebuilt['generation'], row['generation'] + 1)
+        for container in old_roles:
+            container.remove.assert_called_once()
+
     def test_three_role_permissions_and_secret_mount_boundaries(self) -> None:
         """普通角色不携带网络权限或其他角色秘密，配额合计保持。@return None。"""
         self._isolated_docker()

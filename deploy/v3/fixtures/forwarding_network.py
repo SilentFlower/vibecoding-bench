@@ -16,6 +16,7 @@ from mock_network import forward_http, read_exact, serve_dns
 
 ROOT = Path('/fixtures-data')
 LOCK = threading.Lock()
+NATIVE_BARRIERS = {count: threading.Barrier(count, timeout=60) for count in (3, 6)}
 
 
 def record(kind, **values):
@@ -55,6 +56,10 @@ class Upstream(BaseHTTPRequestHandler):
             self.wfile.write(response)
             return
         marker = payload.get('marker') or payload.get('messages', [{}])[-1].get('content', '')
+        if isinstance(marker, list):
+            # 原生普通 API 会附加环境提醒；夹具标识仍来自业务用户文本。
+            marker = next((block['text'] for block in reversed(marker)
+                if block.get('type') == 'text' and not block.get('text', '').startswith('<system-reminder>')), 'synthetic')
         tool_fixture = self.path.startswith('/v1/messages') and (ROOT / 'cli-tools').exists()
         tool_result = any(isinstance(item, dict) and item.get('type') == 'tool_result'
             for message in payload.get('messages', []) for item in (message.get('content') if isinstance(message.get('content'), list) else []))
@@ -64,6 +69,9 @@ class Upstream(BaseHTTPRequestHandler):
                billing_rewritten=any('x-anthropic-billing-header:' in str(item) and 'cc_version=0.0.1' not in str(item)
                    for item in payload.get('system', [])),
                metadata=payload.get('metadata'), tls=isinstance(self.connection, ssl.SSLSocket))
+        if str(marker).startswith('native-parallel-'):
+            # 只有全部模型请求都到达真实 TLS 上游才返回，验证网关实际加权并发。
+            NATIVE_BARRIERS[int(str(marker).split('-')[2])].wait()
         self.send_response(200)
         self.send_header('request-id', 'synthetic-' + str(marker))
         self.send_header('anthropic-ratelimit-unified-verify-marker', str(marker))
@@ -105,12 +113,20 @@ class Upstream(BaseHTTPRequestHandler):
                     'description': '执行本地隔离构建夹具'})}})
             sequence[-2][1]['delta']['stop_reason'] = 'tool_use'
         slow = str(marker).startswith('slow-')
-        repeats = 600 if str(marker).startswith('slow-cancel') else 120 if marker == 'slow-restart' else 1
-        chunks = [*sequence[:2], *[sequence[2]] * repeats, *sequence[3:]]
+        repeats = 600 if str(marker).startswith('slow-cancel') else 1800 if marker == 'slow-restart' else 1
+
+        def chunks():
+            """保持重启场景的流，直到控制端确认恢复。@return 有界 SSE 事件迭代器。"""
+            yield from sequence[:2]
+            for _ in range(repeats):
+                yield sequence[2]
+                if marker == 'slow-restart' and (ROOT / 'release-restart').exists():
+                    break
+            yield from sequence[3:]
         digest = hashlib.sha256()
         completed = False
         try:
-            for name, value in chunks:
+            for name, value in chunks():
                 event = ('event: ' + name + '\ndata: ' + json.dumps(value, separators=(',', ':')) + '\n\n').encode()
                 digest.update(event)
                 self.wfile.write(f'{len(event):x}\r\n'.encode() + event + b'\r\n')

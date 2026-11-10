@@ -122,7 +122,7 @@ def configured_features(row: dict) -> dict:
     values.update({key: dmi.get(key) for key in ("manufacturer", "product", "version", "family", "serial", "uuid")})
     try:
         values["account_memory_bytes"] = memory_bytes(fingerprint["mem"])
-        values["memory_bytes"] = (isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))["cli"][0]
+        values["memory_bytes"] = (isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"), fingerprint.get("native_sender_memory"))["cli"][0]
             if row.get("isolation_version") == 2 else values["account_memory_bytes"])
     except (KeyError, TypeError, ValueError):
         # 配置缺失只影响展示，不能为了得到资源值重建环境或伪造宿主总内存。

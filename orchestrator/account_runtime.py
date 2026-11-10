@@ -31,6 +31,7 @@ from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_proc
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, isolated_account_limits
+from native_sender import sender_config
 from runtime_diagnostics import NetworkContextError, network_failure
 from runtime_files import atomic_json, atomic_text, directory_fd as _directory_fd
 from storage_maintenance import deduplicate_immutable_tree
@@ -609,8 +610,10 @@ class AccountRuntime:
             if not self.release_id or image_labels.get("vibebench.product") != "v3" or image_labels.get("vibebench.role") != "account" or image_labels.get("vibebench.release") != self.release_id:
                 raise ValueError("账号镜像角色或构建批次不匹配")
             self._cli_artifact_protocol = 2 if image_labels.get('vibebench.cli-install-version') == '2' else 0
+            gateway_configuration = {}
             if account.get("cc2api_account_id") is not None:
                 configuration = self.gateway._request("GET", f"/admin/runtime/accounts/{account['cc2api_account_id']}/config")
+                gateway_configuration = configuration
                 if configuration["auth_type"] != "oauth" or (configuration["status"] != "active" and not allow_inactive_login):
                     raise ValueError("绑定账号认证类型或状态不可用")
                 if preserve_proxy:
@@ -618,6 +621,11 @@ class AccountRuntime:
                         raise ValueError("代理配置不一致，请先完成账号配置维护")
                 else:
                     self._sync_proxy(account, configuration)
+            fingerprint = json.loads(row["fingerprint_json"])
+            native = sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"))
+            account = {**account, "native_sender": native}
+            if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
+                raise ValueError("账号镜像缺少固定 293 原生能力")
             draft_path = self.data / "login-drafts" / (row["environment_id"] + ".json")
             if draft_path.exists() and _read_json(draft_path).get("phase") == "submitting" and not allow_login_recovery:
                 raise ValueError("原登录保存尚未完成，请先继续登录提交")
@@ -656,7 +664,12 @@ class AccountRuntime:
                         self._update(row, state="reconcile")
                         raise ValueError("账号隔离角色缺失，需要先对账") from None
                     configuration = _read_json(self._sender_config(row))
-                    if (account.get("id") is not None
+                    if configuration.get("native") != native:
+                        if self.environment_jobs(row["environment_id"]) or self._running_sender_active(row):
+                            raise ValueError("账号有活动作业，不能调整 sender 布局")
+                        self._stop_environment(row, remove=True)
+                        present = [False]
+                    elif (account.get("id") is not None
                             and not self._network_has_quota_mount(account["id"], containers["network"])
                             and require_quota_mount):
                         self._rebuild_missing_quota_mount(row, containers)
@@ -689,6 +702,11 @@ class AccountRuntime:
                     elif containers["cli"].status != "running":
                         self._update(row, state="cli_reconcile")
                 if not any(present):
+                    if native:
+                        fingerprint["native_sender_memory"] = str(native["memory_mib"]) + "m"
+                    else:
+                        fingerprint.pop("native_sender_memory", None)
+                    self._update(row, fingerprint_json=json.dumps(fingerprint))
                     self._make_room(row)
                     deployment_key = hashlib.sha256(self.deployment.encode()).hexdigest()[:12]
                     name = f"v3-{deployment_key}-account-{row['environment_id']}"
@@ -2809,7 +2827,7 @@ class AccountRuntime:
         try:
             value = validate_process_metrics(payload, row["environment_id"], version)
             fingerprint = json.loads(row["fingerprint_json"])
-            expected, _ = (isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))["cli"]
+            expected, _ = (isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"), fingerprint.get("native_sender_memory"))["cli"]
                 if row.get("isolation_version") == ISOLATION_VERSION else account_limits(fingerprint["mem"], fingerprint.get("swap", "0")))
             if (self._root(row)/'runtime/project-review-layout.json').is_file():
                 expected = self.reviews.check_layout(row,container)['limits']['cli'][0]
@@ -2827,7 +2845,7 @@ class AccountRuntime:
         try:
             sample = json.loads(result.output)
             fingerprint = json.loads(row["fingerprint_json"])
-            expected = isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))["cli"][0]
+            expected = isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"), fingerprint.get("native_sender_memory"))["cli"][0]
             if (self._root(row)/'runtime/project-review-layout.json').is_file():
                 expected = self.reviews.check_layout(row,container)['limits']['cli'][0]
             if sample["memory"] != expected:

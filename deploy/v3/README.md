@@ -37,6 +37,14 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 ## RAM 与 swap 预算
 
+账号可在 cc2api 选择 `request_backend=native293`。该方式使用固定 2.1.293 单文件执行内核，在独立 sender 角色中按需启动进程。构建会下载并校验固定 beta 二进制；发布前可设置 `V3_NATIVE_RUNTIME_ASSET` 指向同 SHA256 的本地候选。联合清单记录其版本、大小和摘要，镜像再次校验分发文件。
+
+原生方式需要显式 `V3_NATIVE_SENDER_MEMORY`。标准并发 3 对应最多 6 个 Haiku 进程，已验证配置为 `1536m`，账号总 RAM `4g` 时 CLI 剩余 2304 MiB。sender 和 network 使用各自有限 RAM，额外 swap 只交给 CLI。原生池的 HOME/config/cwd 位于 UID 1001 独占的 `/native`，与 CLI 角色的 HOME 分离。池内共享经SHA与封存校验的只读执行映像，进程保持独立堆和上下文。额外进程空闲60秒后回收并保留1个暖进程。真实V3六路峰值约646 MiB，1536 MiB限额内OOM为0，回收后sender约189 MiB。
+
+最低 sender 预算为 `256 + 192 × 2 × 标准并发` MiB。bench 创建账号默认标准并发 4，需要至少 `1792m`；使用已验证的 `1536m` 时，将该账号标准并发显式设为 3。账号总 RAM 还须覆盖 network 的 256 MiB 和 CLI 最低 512 MiB。
+
+后端配置来自网关账号 runtime config。模式或资源布局改变时，环境无活动作业才允许重建。缺能力或预算时准备失败。空闲时切回 `legacy` 会恢复原 sender 布局。
+
 `V3_ACCOUNT_MEMORY` 是每账号 RAM 上限，`V3_ACCOUNT_SWAP` 是额外 swap 上限，默认 `0` 保持禁用。Docker 的内存加 swap 总上限由两者相加生成，账号首次保存预算；历史环境缺 swap 字段时保持关闭。以后修改全局配置不会自动改已有账号预算或身份。隔离布局 2 在原总额度内预留 network 256 MiB、sender 128 MiB，剩余分配 CLI；额外 swap 只分配 CLI。CLI 至少需要 512 MiB，总预算不足时拒绝启动。1536 MiB 账号的 CLI 实际 constrainedMemory 为 1152 MiB。
 
 美国服务器起步配置：`V3_ACCOUNT_MEMORY=1536m`、`V3_ACCOUNT_SWAP=2048m`、`V3_MAX_ACTIVE_ACCOUNTS=1`，RAM 1.5 GiB，额外 swap 2 GiB，总额度 3.5 GiB。部署预检分别要求可用 RAM 至少为账号预算加可配置余量 `V3_MEMORY_HEADROOM_BYTES`（默认 256 MiB）、空闲 swap 足够覆盖活跃账号额度且 Docker 支持 swap 限额；显式更高的 `V3_MIN_FREE_MEMORY_BYTES` 仍生效。默认 4 GiB、单账号配置要求至少 4.25 GiB 可用 RAM，swap 不能代替物理余量。起步上限不代表真实 CLI 的峰值已经验证。

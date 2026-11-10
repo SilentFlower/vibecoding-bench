@@ -21,7 +21,12 @@ COPY cc2api/craftls ./craftls
 COPY cc2api/vendor ./vendor
 COPY cc2api/src ./src
 COPY --from=frontend /source/cc2api/web/dist ./web/dist
-RUN cargo build --locked --release --bins
+# 依赖及增量产物按项目锁定缓存；交付文件复制到普通镜像层，保持来源与缓存分离。
+RUN --mount=type=cache,id=vibebench-v3-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=vibebench-v3-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=vibebench-v3-cargo-target,target=/source/cc2api/target,sharing=locked \
+    cargo build --locked --release --bins \
+    && mkdir -p /out && cp target/release/claude-code-gateway target/release/account-sender /out/
 
 FROM python:3.12-slim-bookworm AS control
 RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates \
@@ -51,7 +56,7 @@ COPY --from=frontend /terminal/xterm/LICENSE /webui/vendor/xterm-LICENSE
 COPY --from=frontend /terminal/fit/lib/xterm-addon-fit.js /webui/vendor/xterm-addon-fit.js
 COPY --from=frontend /terminal/fit/LICENSE /webui/vendor/xterm-addon-fit-LICENSE
 RUN python -c "from pathlib import Path; p=Path('/webui/index.html'); s=p.read_text(); s=s.replace('https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css','vendor/xterm.css').replace('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js','vendor/xterm.js').replace('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js','vendor/xterm-addon-fit.js'); p.write_text(s)"
-COPY --from=backend /source/cc2api/target/release/claude-code-gateway /app/claude-code-gateway
+COPY --from=backend /out/claude-code-gateway /app/claude-code-gateway
 COPY --from=frontend /source/cc2api/web/dist /app/web/dist
 COPY images/v3/control-entrypoint.sh /usr/local/bin/v3-control
 RUN chmod 755 /usr/local/bin/v3-control
@@ -105,7 +110,10 @@ RUN cc -shared -fPIC -O2 -Wall -Wextra -Werror -Wl,-z,relro,-z,now \
 COPY orchestrator/cli_quota.py /usr/local/bin/v3-cli-quota
 COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
-COPY --from=backend /source/cc2api/target/release/account-sender /usr/local/bin/account-sender
+COPY --from=backend /out/account-sender /usr/local/bin/account-sender
+COPY native-runtime/ccrb-runtime /usr/local/bin/ccrb-runtime
+RUN echo 'a6998db0128cb3d0a9862f3b72e9e359e434840c9be4d57b69d56092847fd800  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
+    && chmod 755 /usr/local/bin/ccrb-runtime
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
     /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \
     /usr/local/bin/v3-process-metrics /usr/local/bin/v3-network-guard /sidecar \
@@ -119,6 +127,7 @@ LABEL vibebench.product="v3" vibebench.role="account" vibebench.release=$V3_RELE
     vibebench.credential-ownership-protocol="1" \
     vibebench.isolation-version="2" \
     vibebench.cli-install-version="2" \
+    vibebench.native-runtime="293-raw-1" \
     vibebench.system-profile-version="1" \
     vibebench.computer-profile-version="1" \
     vibebench.parent-revision=$V3_PARENT_REV vibebench.gateway-revision=$V3_GATEWAY_REV \
@@ -128,12 +137,16 @@ ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/v3-account-init"]
 
 # 显式测试目标覆盖二进制，正式 control/account 目标完全不依赖此阶段。
 FROM backend AS verification-backend
-RUN cargo build --locked --release --bins --features v3-verification
+RUN --mount=type=cache,id=vibebench-v3-cargo-registry,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,id=vibebench-v3-cargo-git,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,id=vibebench-v3-cargo-target,target=/source/cc2api/target,sharing=locked \
+    cargo build --locked --release --bins --features v3-verification \
+    && cp target/release/claude-code-gateway target/release/account-sender /out/
 
 FROM control AS verification-control
-COPY --from=verification-backend /source/cc2api/target/release/claude-code-gateway /app/claude-code-gateway
+COPY --from=verification-backend /out/claude-code-gateway /app/claude-code-gateway
 LABEL vibebench.verification="extra-ca"
 
 FROM account AS verification-account
-COPY --from=verification-backend /source/cc2api/target/release/account-sender /usr/local/bin/account-sender
+COPY --from=verification-backend /out/account-sender /usr/local/bin/account-sender
 LABEL vibebench.verification="extra-ca"

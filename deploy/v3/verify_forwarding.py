@@ -9,6 +9,7 @@ import io
 import ipaddress
 import json
 import os
+import re
 import shutil
 import socket
 import sqlite3
@@ -18,6 +19,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 
 import docker
@@ -105,12 +107,13 @@ def certificates(root):
             '-CAcreateserial', '-days', '1', '-extfile', mode + '.ext', '-out', mode + '.crt')
 
 
-def verify(manifest_path, output, binary):
+def verify(manifest_path, output, binary, native=False):
     """运行全链路和浏览器场景，最终仅清理本次标签资源。
 
     :param manifest_path: 测试专用联合镜像清单。
     :param output: 脱敏结果目录，不保存令牌或代理密码。
     :param binary: 已安装的官方 CLI 原生二进制。
+    :param native: 增加新原生后端的真实角色及预算验证。
     :return: None；任一场景不符即失败。
     """
     manifest = json.loads(manifest_path.read_text())
@@ -145,6 +148,8 @@ def verify(manifest_path, output, binary):
             'V3_INTERNAL_TOKEN': uuid.uuid4().hex + uuid.uuid4().hex,
             'V3_SESSION_SECRET': uuid.uuid4().hex + uuid.uuid4().hex,
             'V3_CLI_VERSION': '2.1.293', 'V3_MAX_ACTIVE_ACCOUNTS': '2', 'V3_ACCOUNT_MEMORY': '1536m', 'V3_ACCOUNT_SWAP': '0'}
+        if native:
+            values.update(V3_ACCOUNT_MEMORY='4g', V3_NATIVE_SENDER_MEMORY='1536m')
         environment_file = root / 'v3.env'
         environment_file.write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
         environment_file.chmod(0o600)
@@ -194,9 +199,9 @@ def verify(manifest_path, output, binary):
             :param account: 当前合成账号。
             :return: 当前账号容器。
             """
-            code = "import os,urllib.request;r=urllib.request.Request('http://127.0.0.1:8000/internal/v3/transport/" + str(account['gid']) + "',headers={'Authorization':'Bearer '+os.environ['V3_INTERNAL_TOKEN']});print(urllib.request.urlopen(r,timeout=90).status)"
+            code = "import os,urllib.request,urllib.error;r=urllib.request.Request('http://127.0.0.1:8000/internal/v3/transport/" + str(account['gid']) + "',headers={'Authorization':'Bearer '+os.environ['V3_INTERNAL_TOKEN']})\ntry:print(urllib.request.urlopen(r,timeout=90).status)\nexcept urllib.error.HTTPError as error:print(error.code,error.read(1024).decode());raise SystemExit(1)"
             result = orchestrator.exec_run(['python', '-c', code])
-            assert result.exit_code == 0 and result.output.strip() == b'200', '实际调度器传输绑定未就绪'
+            assert result.exit_code == 0 and result.output.strip() == b'200', '实际调度器传输绑定未就绪：' + result.output.decode(errors='replace')[:1024]
             roles = {item.labels['vibebench.role']: item for item in client.containers.list(filters={'label': [*filters['label'], 'vibebench.environment=' + account['eid']]})}
             container = roles['account']
             account['sender_container'], account['network_container'] = roles['account-sender'], roles['account-network']
@@ -209,7 +214,29 @@ def verify(manifest_path, output, binary):
 
         try:
             subprocess.run(manager + ['up', '--env', str(environment_file)], cwd=REPO, check=True)
-            wait_until(lambda: request('POST', '/admin/runtime/session', headers=admin).status_code == 200, '管理桥未就绪')
+            management_state = {}
+
+            def management_ready():
+                """保留启动响应摘要，便于定位实际管理桥失败。@return 会话是否就绪。"""
+                response = request('POST', '/admin/runtime/session', headers=admin)
+                management_state['status'] = response.status_code
+                management_state['body'] = response.text[:512]
+                return response.status_code == 200
+
+            try:
+                wait_until(management_ready, '管理桥未就绪', seconds=ACCOUNT_STARTUP_TIMEOUT)
+            except AssertionError:
+                # 启动失败时尚无账号凭据；仅保存本次容器的有界日志并去除服务秘密。
+                startup = {'response': management_state, 'containers': []}
+                for container in client.containers.list(all=True, filters=filters):
+                    container.reload()
+                    logs = container.logs(tail=100).decode(errors='replace')
+                    for key in ('V3_ADMIN_PASSWORD', 'V3_INTERNAL_TOKEN', 'V3_SESSION_SECRET'):
+                        logs = logs.replace(values[key], '[已脱敏]')
+                    startup['containers'].append({'role': container.labels['vibebench.role'],
+                        'status': container.status, 'logs': logs})
+                (output / 'startup-failure.json').write_text(json.dumps(startup, ensure_ascii=False, indent=2))
+                raise
             containers = client.containers.list(filters=filters)
             gateway = next(item for item in containers if item.labels['vibebench.role'] == 'gateway')
             orchestrator = next(item for item in containers if item.labels['vibebench.role'] == 'orchestrator')
@@ -310,7 +337,7 @@ def verify(manifest_path, output, binary):
                         row = database.execute('SELECT billing_mode,upstream_session_pool_enabled,upstream_session_pool_size,upstream_session_refresh_policy,concurrency,rpm_limit,upstream_session_ttl_minutes,canonical_process FROM accounts WHERE id=?', (gid,)).fetchone()
                     assert row[:7] == ('rewrite', 1, 4, 'owner_only', 4, 50, 60), row[:7]
                     metrics = json.loads(row[7])
-                    assert metrics['constrained_memory'] == 1207959552 and metrics['observation']['rss_bytes'] is None
+                    assert metrics['constrained_memory'] == (3712 if native else 1152) * 1024 ** 2 and metrics['observation']['rss_bytes'] is None
                     wake(account)
                 with sqlite3.connect(data / 'bench/db.sqlite') as database:
                     fingerprint = json.loads(database.execute('SELECT fingerprint_json FROM account_environments WHERE environment_id=?',
@@ -545,6 +572,8 @@ def verify(manifest_path, output, binary):
                 orchestrator.restart(timeout=5)
                 wait_until(lambda: request('GET','/runtime/api/environments').status_code == 200, '实际调度器重启未恢复', seconds=60)
                 assert request('GET', lease_path, headers=admin).json()['active'] > 0, '重启结束前 API 长流已丢失'
+                # 在恢复条件成立后结束本次流，避免自然结束时间掩盖重启生命周期。
+                (account['network'] / 'release-restart').touch()
                 received += b''.join(chunks)
                 assert b'event: message_stop\n' in received
             account['sender_container'].reload()
@@ -631,6 +660,73 @@ except urllib.error.HTTPError as error:print(json.dumps({'status':error.code,'ph
                 os.chown(manage_file,0,1001)
                 manage_file.replace(configuration_path)
             passed('S8 错误身份/代次/目标/秘密在发送前拒绝；正式 API 绑定故障无直连回退')
+            if native:
+                for account in accounts:
+                    response = request('PUT', f"/admin/accounts/{account['gid']}", headers=admin,
+                        json={'request_backend':'native293', 'concurrency':3, 'rpm_limit':0})
+                    assert response.status_code == 200, response.status_code
+                    wake(account)
+                    configuration = json.loads((account['root'] / 'runtime/sender/sender.json').read_text())
+                    assert configuration['native']['max_workers'] == 6 and configuration['native']['memory_mib'] == 1536
+                    with sqlite3.connect(data / 'bench/db.sqlite') as database:
+                        fingerprint = json.loads(database.execute('SELECT fingerprint_json FROM account_environments WHERE environment_id=?',
+                            (account['eid'],)).fetchone()[0])
+                    roles = verify_roles(account['container'], account['sender_container'], account['network_container'], fingerprint)
+                    assert roles['sender']['memory'] == 1536 * 1024 ** 2 and roles['cli']['memory'] == 2304 * 1024 ** 2
+                    marker = 'native-' + account['scheme']
+                    payload = {'model':'claude-sonnet-4-6','max_tokens':64,'stream':False,'messages':[{'role':'user','content':marker}]}
+                    response = request('POST', '/v1/messages', headers={**account['headers'], 'cf-ray':'synthetic-cdn','new-api-user':'synthetic-user'}, json=payload)
+                    assert response.status_code == 200 and response.json()['type'] == 'message', response.status_code
+                    entries = [item for item in evidence(account['network']) if item.get('marker') == marker and item['kind'] == 'upstream']
+                    assert len(entries) == 1 and entries[0]['tls']
+                    identity = json.loads(entries[0]['metadata']['user_id'])
+                    assert identity['device_id'] == account['top']['userID'] and identity['account_uuid'] == account['name']
+                    for count in (3, 6):
+                        def submit(index):
+                            """使用独立 HTTP 会话提交并发合成请求。@param index 本组序号。@return 状态码。"""
+                            payload = {'model':'claude-haiku-4-5' if count == 6 else 'claude-sonnet-4-6','max_tokens':64,'stream':False,
+                                'messages':[{'role':'user','content':f'native-parallel-{count}-{account["scheme"]}-{index}'}]}
+                            with requests.Session() as channel:
+                                channel.trust_env = False
+                                result = channel.post(base + '/v1/messages', headers=account['headers'], json=payload, timeout=90)
+                                assert result.status_code == 200, (result.status_code, result.text[:512])
+                                assert result.json()['type'] == 'message', result.status_code
+                                return result.status_code
+                        with ThreadPoolExecutor(max_workers=count) as executor:
+                            assert list(executor.map(submit, range(count))) == [200] * count
+                    account['native_probe'] = (
+                        "import pathlib,json,fcntl;ps=[p for p in pathlib.Path('/proc').iterdir() if p.name.isdigit()];workers=[];images=set();"
+                        "\nfor p in ps:\n try:\n  if 'memfd:ccrb' in str((p/'exe').readlink()):\n   env=(p/'environ').read_bytes();assert b'REFRESH_TOKEN=' not in env;workers.append(p.name)\n   with (p/'exe').open('rb') as image:assert fcntl.fcntl(image,fcntl.F_GET_SEALS)&15==15\n   images.add((p/'exe').stat().st_ino)\n except FileNotFoundError:pass\n"
+                        "print(json.dumps({'workers':len(workers),'images':len(images)}))")
+                    probe = account['sender_container'].exec_run(['python3','-c',account['native_probe']])
+                    assert probe.exit_code == 0 and json.loads(probe.output) == {'workers':6,'images':1}
+                    assert request('POST', '/api/v3-verification', headers=account['headers'], json={'marker':'legacy-endpoint-native-account'}).status_code == 200
+                    peak = account['sender_container'].exec_run(['cat','/sys/fs/cgroup/memory.peak'])
+                    assert peak.exit_code == 0 and int(peak.output.strip()) < 1536 * 1024 ** 2
+                    events = account['sender_container'].exec_run(['cat','/sys/fs/cgroup/memory.events'])
+                    assert events.exit_code == 0
+                    counters = {key:int(value) for key,value in (line.split() for line in events.output.decode().splitlines())}
+                    assert counters['oom'] == counters['oom_kill'] == 0
+                    passed('N1/N2 原生 Messages 与旧端点共存，三角色及预算一致：' + account['scheme'], sender_peak=int(peak.output.strip()), sender_events=counters)
+                account = accounts[0]
+                def idle_reclaimed():
+                    """读取实际池的空闲回收结果。@return 是否仅剩一个暖进程。"""
+                    probe = account['sender_container'].exec_run(['python3','-c',account['native_probe']])
+                    assert probe.exit_code == 0
+                    return json.loads(probe.output) == {'workers':1,'images':1}
+                wait_until(idle_reclaimed, '原生池空闲后未回收到一个暖进程', seconds=75)
+                current = account['sender_container'].exec_run(['cat','/sys/fs/cgroup/memory.current'])
+                assert current.exit_code == 0 and int(current.output.strip()) < 512 * 1024 ** 2
+                passed('N4 共享封存映像，60秒空闲回收后保留一个暖进程', sender_idle=int(current.output.strip()))
+                response = request('PUT', f"/admin/accounts/{account['gid']}", headers=admin, json={'request_backend':'legacy'})
+                assert response.status_code == 200
+                wake(account)
+                configuration = json.loads((account['root'] / 'runtime/sender/sender.json').read_text())
+                account['sender_container'].reload()
+                assert configuration.get('native') is None and account['sender_container'].attrs['HostConfig']['Memory'] == 128 * 1024 ** 2
+                selections = {item['id']: item['request_backend'] for item in request('GET', '/admin/accounts', headers=admin).json()['data']}
+                assert selections[accounts[0]['gid']] == 'legacy' and selections[accounts[1]['gid']] == 'native293'
+                passed('N3 按账号空闲回退恢复原 sender 布局，另一个账号保持原生方式')
             code = "import subprocess;v=subprocess.check_output(['iptables','-nvxL','V3VERIFY'],text=True);print(sum(int(line.split()[0]) for line in v.splitlines() if line.split() and line.split()[0].isdigit()))"
             attempts = client.containers.run(values['V3_ACCOUNT_IMAGE'], ['-c', code], entrypoint='python3',
                 network_mode='container:' + gateway.id, cap_add=['NET_ADMIN'], remove=True,
@@ -643,6 +739,16 @@ except urllib.error.HTTPError as error:print(json.dumps({'status':error.code,'ph
                 (output / f'network-{index}.json').write_text(json.dumps(evidence(account['network']), ensure_ascii=False, indent=2))
                 shutil.copy2(account['root'] / 'runtime/process-metrics.json', output / f'process-{index}.json')
                 shutil.copy2(account['root'] / 'flows/api/observations.jsonl', output / f'sender-{index}.jsonl')
+        except Exception:
+            diagnostics = []
+            for container in client.containers.list(all=True, filters=filters):
+                logs = container.logs(tail=100).decode(errors='replace')
+                for key in ('V3_ADMIN_PASSWORD', 'V3_INTERNAL_TOKEN', 'V3_SESSION_SECRET'):
+                    logs = logs.replace(values[key], '[已脱敏]')
+                logs = re.sub(r'(?i)Bearer\s+[^\s"\']+', 'Bearer [已脱敏]', logs)
+                diagnostics.append({'role': container.labels['vibebench.role'], 'logs': logs})
+            (output / 'failure-logs.json').write_text(json.dumps(diagnostics, ensure_ascii=False, indent=2))
+            raise
         finally:
             (output / 'partial-results.json').write_text(json.dumps(results, ensure_ascii=False, indent=2))
             # 失败场景也保留脱敏证据，先定位偏差再清理本次隔离资源。
@@ -671,13 +777,14 @@ def main():
     parser.add_argument('--release')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--cli-binary', type=Path)
+    parser.add_argument('--native', action='store_true')
     args = parser.parse_args()
     if args.build:
         build_verification(args.release or 'verify-' + uuid.uuid4().hex[:16], args.manifest)
     else:
         if not args.output or not args.cli_binary:
             parser.error('验收需要 --output 和 --cli-binary')
-        verify(args.manifest, args.output, args.cli_binary)
+        verify(args.manifest, args.output, args.cli_binary, args.native)
 
 
 if __name__ == '__main__':
