@@ -1,4 +1,4 @@
-"""部署预检与固定账号容器共用的有限内存预算。"""
+"""部署预检与固定账号容器共用的账号内存策略。"""
 import re
 
 
@@ -20,12 +20,15 @@ def memory_bytes(value: str, allow_zero: bool = False) -> int:
 def account_limits(memory: str, swap: str = "0") -> tuple[int, int]:
     """统一 RAM 与额外 swap 的语义，返回 Docker 需要的总额度。
 
-    :param memory: RAM 上限
+    :param memory: RAM 上限或 unlimited
     :param swap: 额外 swap 上限，默认禁用
-    :return: RAM 字节数、RAM 加 swap 的总字节数
+    :return: RAM 与合计字节数；无限模式为 Docker 的 (0, -1)
     """
+    extra = memory_bytes(swap, allow_zero=True)
+    if memory == "unlimited":
+        return 0, -1
     ram = memory_bytes(memory)
-    return ram, ram + memory_bytes(swap, allow_zero=True)
+    return ram, ram + extra
 
 
 def isolated_account_limits(memory: str, swap: str = "0", native_sender_memory: str | None = None) -> dict[str, tuple[int, int]]:
@@ -37,6 +40,8 @@ def isolated_account_limits(memory: str, swap: str = "0", native_sender_memory: 
     :return: 各角色的 RAM 与 RAM 加 swap 上限；不足时拒绝。
     """
     ram, total = account_limits(memory, swap)
+    if memory == "unlimited":
+        return {role: (0, -1) for role in ("network", "sender", "cli")}
     network, sender = 256 * 1024 ** 2, 128 * 1024 ** 2
     if native_sender_memory is not None:
         sender = memory_bytes(native_sender_memory)
@@ -52,9 +57,12 @@ def scenario_account_limits(memory: str, swap: str = '0', native_sender_memory: 
     :param memory: 已保存的账号合计RAM。
     :param swap: 已保存额外swap，仅保留给固定CLI。
     :param native_sender_memory: 冻结的原生 sender RAM；省略保持旧布局。
-    :return: 三个原角色及单评审的有限份额；小环境明确拒绝。
+    :return: 三个原角色及单评审的额度；有限小环境明确拒绝。
     """
     limits = isolated_account_limits(memory, swap, native_sender_memory)
+    if memory == "unlimited":
+        limits["review"] = (0, -1)
+        return limits
     review = 512 * 1024 ** 2
     ram, total = limits['cli']
     if ram - review < 512 * 1024 ** 2:
@@ -70,7 +78,7 @@ def serial_review_limits(memory: str, swap: str = '0', native_sender_memory: str
     :param memory: 已固化的账号总 RAM。
     :param swap: 已固化的账号额外 swap，用于核验原预算。
     :param native_sender_memory: 冻结的原生 sender RAM；省略保持旧布局。
-    :return: 私有评审的 RAM 与 RAM 加 swap 上限，两者相等。
+    :return: 私有评审额度；有限模式两者相等，无限模式为 (0, -1)。
     """
-    ram, _ = isolated_account_limits(memory, swap, native_sender_memory)['cli']
-    return ram, ram
+    ram, total = isolated_account_limits(memory, swap, native_sender_memory)['cli']
+    return (0, -1) if memory == "unlimited" else (ram, ram)

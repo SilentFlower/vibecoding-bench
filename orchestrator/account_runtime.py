@@ -664,7 +664,8 @@ class AccountRuntime:
                         self._update(row, state="reconcile")
                         raise ValueError("账号隔离角色缺失，需要先对账") from None
                     configuration = _read_json(self._sender_config(row))
-                    if configuration.get("native") != native:
+                    if (configuration.get("native") != native
+                            or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if fingerprint.get("native_capture_enabled") is True else None)):
                         if self.environment_jobs(row["environment_id"]) or self._running_sender_active(row):
                             raise ValueError("账号有活动作业，不能调整 sender 布局")
                         self._stop_environment(row, remove=True)
@@ -703,7 +704,7 @@ class AccountRuntime:
                         self._update(row, state="cli_reconcile")
                 if not any(present):
                     if native:
-                        fingerprint["native_sender_memory"] = str(native["memory_mib"]) + "m"
+                        fingerprint["native_sender_memory"] = "unlimited" if native["memory_mib"] == 0 else str(native["memory_mib"]) + "m"
                     else:
                         fingerprint.pop("native_sender_memory", None)
                     self._update(row, fingerprint_json=json.dumps(fingerprint))
@@ -2634,6 +2635,8 @@ class AccountRuntime:
                         fingerprint.get("system_profile"))
                 fingerprint["mem"] = previous.get("mem", os.environ.get("V3_ACCOUNT_MEMORY", "4g"))
                 fingerprint["swap"] = previous.get("swap", "0")
+                if "native_capture_enabled" in previous:
+                    fingerprint["native_capture_enabled"] = previous["native_capture_enabled"]
                 account_limits(str(fingerprint["mem"]), str(fingerprint["swap"]))
                 root = self._root(row)
                 shutil.rmtree(root / "ca", ignore_errors=True)

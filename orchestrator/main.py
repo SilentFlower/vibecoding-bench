@@ -39,6 +39,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import docker
 from docker.errors import DockerException, NotFound
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from native_capture import read_capture
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -12627,6 +12628,32 @@ def v3_quiesce(account_id: int, body: dict):
                 pass
         account_runtime._update(row, state="stopped")
     return {"ok": True}
+
+
+@app.get("/internal/v3/native-captures/{account_id}/{attempt_id}")
+def v3_native_capture(account_id: int, attempt_id: str):
+    """按唯一账号绑定读取私有组装快照，保持环境休眠状态。
+
+    :param account_id: 网关账号 ID。
+    :param attempt_id: 当前诊断尝试 UUID。
+    :return: 已脱敏快照；缺失 404，损坏或读取失败 503。
+    """
+    if not V3_ENABLED or not account_runtime:
+        raise HTTPException(404)
+    connection = get_db()
+    try:
+        rows = connection.execute("SELECT e.* FROM account_environments e JOIN accounts a ON a.id=e.account_id "
+            "WHERE a.cc2api_account_id=? AND a.deleted_at IS NULL", (account_id,)).fetchall()
+    finally:
+        connection.close()
+    if len(rows) != 1:
+        raise HTTPException(409, "账号没有唯一的 v3 环境绑定")
+    try:
+        return read_capture(account_runtime._root(dict(rows[0])), account_id, attempt_id)
+    except FileNotFoundError:
+        raise HTTPException(404, "采集文件缺失、尚未生成或已清理")
+    except (ValueError, OSError):
+        raise HTTPException(503, "采集文件读取失败")
 
 
 @app.get("/internal/v3/transport/{account_id}")

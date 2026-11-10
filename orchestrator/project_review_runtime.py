@@ -262,10 +262,15 @@ class ProjectReviewRuntime:
             raise ValueError('评审资源交接记录与原环境、执行或代次不符')
         fingerprint = json.loads(row['fingerprint_json'])
         memory, total = serial_review_limits(fingerprint['mem'],fingerprint.get('swap','0'),fingerprint.get("native_sender_memory"))
-        if (state['review_limits'].get('Memory') != memory or state['review_limits'].get('MemorySwap') != total
+        cli_limits = state['cli_limits']
+        cli_memory_valid = (all(type(cli_limits.get(key)) is int for key in ('Memory', 'MemorySwap'))
+            and (cli_limits.get('Memory'), cli_limits.get('MemorySwap')) == (0, -1)
+            if fingerprint['mem'] == 'unlimited' else all(type(cli_limits.get(key)) is int and cli_limits[key] > 0
+                for key in ('Memory', 'MemorySwap')))
+        if (not cli_memory_valid or state['review_limits'].get('Memory') != memory or state['review_limits'].get('MemorySwap') != total
                 or any(type(state['cli_limits'].get(key)) is not int or state['cli_limits'][key] <= 0
-                    for key in ('Memory','MemorySwap','NanoCpus','PidsLimit'))):
-            raise ValueError('评审资源交接记录的有限预算无效')
+                    for key in ('NanoCpus','PidsLimit'))):
+            raise ValueError('评审资源交接记录的预算无效')
         return state
 
     def _serial_phase(self, job: dict, phase: str, **values) -> dict:

@@ -2,7 +2,7 @@
 import unittest
 
 from native_sender import sender_config
-from resource_budget import isolated_account_limits, scenario_account_limits, serial_review_limits
+from resource_budget import account_limits, memory_bytes, isolated_account_limits, scenario_account_limits, serial_review_limits
 
 
 class NativeSenderTests(unittest.TestCase):
@@ -41,3 +41,21 @@ class NativeSenderTests(unittest.TestCase):
         for configuration in [{'request_backend':'unknown'}, {'request_backend':'native293', 'concurrency':100}]:
             with self.assertRaises(ValueError):
                 sender_config(configuration, '32g', budget='30g')
+
+    def test_unlimited_preserves_capacity_and_explicit_resource_semantics(self):
+        """无限账号跳过 RAM 门槛，保留并发与严格有限解析。@return None。"""
+        configuration = sender_config({'request_backend': 'native293', 'concurrency': 2}, 'unlimited', '2048m', budget='')
+        self.assertEqual((configuration['memory_mib'], configuration['max_workers']), (0, 4))
+        self.assertEqual(account_limits('unlimited', '2048m'), (0, -1))
+        self.assertEqual(set(isolated_account_limits('unlimited', '2048m', 'unlimited').values()), {(0, -1)})
+        self.assertEqual(scenario_account_limits('unlimited')['review'], (0, -1))
+        self.assertEqual(serial_review_limits('unlimited', '2048m'), (0, -1))
+        for invalid in ['0', '-1', 'Unlimited', 'unlimited ']:
+            with self.assertRaises(ValueError):
+                account_limits(invalid)
+        with self.assertRaises(ValueError):
+            memory_bytes('unlimited')
+        with self.assertRaises(ValueError):
+            account_limits('unlimited', '-1')
+        with self.assertRaises(ValueError):
+            sender_config({'request_backend': 'native293', 'concurrency': 0}, 'unlimited')

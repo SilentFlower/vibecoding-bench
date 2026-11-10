@@ -194,6 +194,8 @@ def preflight(values: dict) -> Path:
         if line.startswith(("MemAvailable:", "SwapFree:"))}
     active_limit = int(values.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
     account_memory, total_memory = account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
+    if account_memory == 0:
+        raise ValueError("无限内存仅允许显式配置到账号，全局默认必须有限")
     isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
     if values.get("V3_NATIVE_SENDER_MEMORY"):
         isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"), values["V3_NATIVE_SENDER_MEMORY"])
@@ -208,6 +210,9 @@ def preflight(values: dict) -> Path:
                     fingerprint = json.loads(saved)
                     ram, combined = account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
                     isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))
+                    if fingerprint["mem"] == "unlimited":
+                        # 显式无限账号使用共享宿主资源，有限账号仍按全局预算核验。
+                        continue
                     if ram > account_memory or combined - ram > total_memory - account_memory:
                         raise ValueError("已有账号固化预算超过当前配置，请提高部署预算后再启动")
     if active_limit < 1 or float(values.get("V3_ACCOUNT_CPUS", "2")) <= 0:

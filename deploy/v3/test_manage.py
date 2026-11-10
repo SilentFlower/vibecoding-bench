@@ -322,6 +322,22 @@ class ResourceBudgetTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     manage.account_limits(ram, swap)
 
+    def test_unlimited_is_account_only_and_keeps_global_preflight_finite(self) -> None:
+        """显式无限账号沿用有限全局预检，全局无限配置明确拒绝。@return None。"""
+        self.root.mkdir()
+        (self.root / '.v3-deployment.json').write_text('{"deployment":"test"}')
+        database = self.root / 'bench/db.sqlite'
+        database.parent.mkdir()
+        with sqlite3.connect(database) as connection:
+            connection.execute('CREATE TABLE account_environments(fingerprint_json TEXT)')
+            connection.execute('INSERT INTO account_environments VALUES(?)', (json.dumps({'mem':'unlimited','swap':'2048m'}),))
+        with patch.object(manage, 'inspect_images', return_value={}), patch.object(manage, 'command', side_effect=['', '']):
+            self.assertEqual(manage.preflight(self.values), self.root)
+        self.values['V3_ACCOUNT_MEMORY'] = 'unlimited'
+        with patch.object(manage, 'inspect_images', return_value={}), patch.object(manage, 'command', side_effect=['', '']):
+            with self.assertRaisesRegex(ValueError, '全局默认必须有限'):
+                manage.preflight(self.values)
+
     def test_frozen_existing_budget_cannot_be_hidden_by_lower_global_config(self) -> None:
         """既有大预算账号仍可能被唤醒，下调配置必须拒绝且不改其记录。
 

@@ -1246,14 +1246,17 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 - `sender_config(configuration:dict,memory:str,swap:str='0',budget:str|None=None) -> dict|None`；configuration 的后端及 concurrency 来自网关权威快照。
 - `NativeSenderConfig = {binary_path,work_root,memory_mib:u64,max_workers:usize}`；legacy 的 native 配置为 None。
-- 显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.2 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
-- fingerprint 新增可选 `native_sender_memory`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
+- 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.2 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
+- `account_limits(memory,swap)`、`isolated_account_limits`、`scenario_account_limits`、`serial_review_limits` 接受账号 `mem="unlimited"`，无限模式 Docker 额度为 `(0,-1)`；`memory_bytes` 继续只解析有限配置。
+- fingerprint 可选 `native_sender_memory`，无限原生账号保存 `"unlimited"`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
 
 ### 3. Contracts
 
-- 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。预算预检为 `256+192*max_workers` MiB，容量同时受账号有限总 RAM 与 CLI 最低512 MiB约束。legacy sender 仍为128 MiB。
-- 已验证 N=3、max_workers=6、sender=1536 MiB；预检最低1408 MiB。bench 创建账号默认N=4，最低1792 MiB；1536 MiB 配置须显式设置N=3。配置限额和实际占用分别报告。
-- 原生sender为UID1001，私有可写 `/native` 与CLI UID1000/HOME分离。PID限额 `128+32*max_workers`；CPU份额保持三角色规则，额外swap只归CLI。CLI指标、physical_features及静态/串行评审从同一冻结sender预算计算剩余份额。
+- 原生进程上限为 `2*concurrency`，覆盖普通请求2单位和Haiku1单位。有限账号预算预检为 `256+192*max_workers` MiB，容量同时受账号有限总 RAM 与 CLI 最低512 MiB约束。legacy sender 仍为128 MiB。
+- 账号 `fingerprint_json.mem="unlimited"` 显式取消 network/CLI/sender 与静态/串行评审的 RAM/swap 限额；额外 swap 保存原值，仍严格校验其格式。全局 `V3_ACCOUNT_MEMORY` 必须有限；部署预检识别已固化的无限账号，有限账号继续原额度比较。无限账号直接竞争宿主可用内存，不能把其零上限当作零资源占用。
+- 无限账号生成 `NativeSenderConfig.memory_mib=0`，缺省 sender 预算也可准备；Rust 仅豁免 RAM 容量公式，max_workers 始终为正数，版本/摘要/身份/目标/代次及并发许可保持。指标与配置内存均以 0 表示无限，界面显示“未限制”；评审交接接受精确 `(Memory=0,MemorySwap=-1)`，CPU/PID 仍必须有限有效。
+- 已验证有限 N=3、max_workers=6、sender=1536 MiB；预检最低1408 MiB。bench 创建账号默认N=4，最低1792 MiB；1536 MiB 配置须显式设置N=3。配置限额和实际占用分别报告。
+- 原生sender为UID1001，私有可写 `/native` 与CLI UID1000/HOME分离。PID限额 `128+32*max_workers`；CPU份额保持三角色规则，有限模式额外swap只归CLI。CLI指标、physical_features及静态/串行评审从同一冻结sender预算计算剩余份额。
 - 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
 - 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
 - 单个弱引用回收任务在额外进程空闲60秒后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
@@ -1265,7 +1268,9 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 | 条件 | 行为 |
 | --- | --- |
-| 缺显式预算、容量不足、未知后端 | 准备拒绝，保持原环境 |
+| 有限账号缺显式预算、容量不足、未知后端 | 准备拒绝，保持原环境 |
+| 无限账号缺 sender 预算 | 生成 memory_mib=0，仍检查并发及原生身份 |
+| 全局无限、未知 mem 或非法 swap | 明确拒绝 |
 | 镜像缺能力、分发/执行体不符或映像未封存 | 准备失败，模型零发送 |
 | 活动中变更布局 | 忙门禁拒绝 |
 | 请求取消、协议故障或旧代次迟到帧 | 退役并等待物理退出后归还进程计数 |
@@ -1273,13 +1278,15 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ### 5. Scenarios and Examples
 
-- 正常：账号总4g、N=3、原生sender1536m时，network256m、CLI2304m；3普通/6Haiku实际TLS与加权准入保持。
+- 正常：无限账号 N=2、max_workers=4，三个角色与派生评审的 cgroup `memory.max/memory.swap.max` 均为 max，CPU/PID 保留。
+- 正常：有限账号总4g、N=3、原生sender1536m时，network256m、CLI2304m；3普通/6Haiku实际TLS与加权准入保持。
 - 边界：六个进程共享一个封存映像；60秒后剩一个暖进程，下次并发按需重建。隔离合成小请求的V3实测六路峰值约646 MiB、空闲约189 MiB，OOM计数为0；大正文及长流按实际负载另验峰值。
 - 错误用法：把磁盘26.12 MiB当作进程RAM，或用1536m预算承载默认N=4。正确处理：分别登记分发/展开/实际cgroup数据，按当前并发验证预算。
 - 错误用法：布局检查查询已被配置事务停止的HTTP sender。正确处理：核验归属后按停止状态处理；运行中仍查询真实活动。
 
 ### 6. Tests Required
 
+- `test_native_unlimited_layout_and_capture_are_frozen_per_account`、`test_serial_unlimited_handoff_restores_exact_cli_limits` 及部署预检：零哨兵、4 物理进程、实际 Docker/cgroup max、指标 0、全局有限默认和旧布局恢复；重画像保留资源与采集开关。
 - `test_native_sender.py`：默认legacy、显式预算、总RAM/CLI下限、未知后端、容量无任意64进程上限；`test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected`：忙时拒绝、停止后正确重建和代次/预算。
 - Rust实际 `native_real_binary`：共享dev/inode及四项封存、6→1空闲回收、取消→0、全部原进程退出后缓存重建、独立凭据及一次提交。
 - `deploy/v3/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、60秒回收及按账号回退；验证镜像的额外CA仅限本地夹具。

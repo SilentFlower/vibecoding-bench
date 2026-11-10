@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from stat import S_ISREG
 
-from resource_budget import isolated_account_limits, memory_bytes
+from resource_budget import account_limits, isolated_account_limits
 
 
 MAX_SNAPSHOT_BYTES = 64 * 1024
@@ -121,7 +121,7 @@ def configured_features(row: dict) -> dict:
         "machine_id": bool(fingerprint.get("machine_id"))}
     values.update({key: dmi.get(key) for key in ("manufacturer", "product", "version", "family", "serial", "uuid")})
     try:
-        values["account_memory_bytes"] = memory_bytes(fingerprint["mem"])
+        values["account_memory_bytes"] = account_limits(fingerprint["mem"], fingerprint.get("swap", "0"))[0]
         values["memory_bytes"] = (isolated_account_limits(fingerprint["mem"], fingerprint.get("swap", "0"), fingerprint.get("native_sender_memory"))["cli"][0]
             if row.get("isolation_version") == 2 else values["account_memory_bytes"])
     except (KeyError, TypeError, ValueError):

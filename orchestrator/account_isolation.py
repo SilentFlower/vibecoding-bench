@@ -75,7 +75,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     fingerprint = json.loads(row['fingerprint_json'])
     native = account.get('native_sender')
     limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'),
-        str(native['memory_mib']) + 'm' if native else None)
+        ('unlimited' if native['memory_mib'] == 0 else str(native['memory_mib']) + 'm') if native else None)
     layout_path = root / 'runtime/project-review-layout.json'
     review_layout = json.loads(layout_path.read_text()) if layout_path.is_file() else None
     if review_layout:
@@ -130,7 +130,7 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     resolved_proxy = urlunsplit((parsed.scheme, f'{userinfo}{address}:{parsed.port}', parsed.path, parsed.query, ''))
     sender_file = paths['sender'] / 'sender.json'
     write_json(sender_file, {'binding': binding, 'proxy_url': resolved_proxy, 'proxy_source': proxy,
-        'native': native, 'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
+        'native': native, 'native_capture_dir': '/flows/api/cc-prepared' if fingerprint.get('native_capture_enabled') is True else None, 'allowed_origin': 'https://api.anthropic.com', 'evidence_file': '/flows/api/observations.jsonl', 'quota_identity': ''}, 0o640)
     os.chown(sender_file, 0, 1001)
     write_json(paths['network'] / 'context.json', {'NETWORK_INSPECTION_MODE': 'passthrough', 'QUOTA_SOURCE': ''})
     (paths['network'] / 'ready').unlink(missing_ok=True)

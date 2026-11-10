@@ -62,13 +62,13 @@ class PrivateReviewTests(unittest.TestCase):
         write_document(self.root/'project-review-private/test/access/.credentials.json',self.credentials)
         self.path=self.root/'project-review-owner-refresh/1.json'
 
-    def _serial_fixture(self, legacy: bool = False) -> SimpleNamespace:
+    def _serial_fixture(self, legacy: bool = False, memory: str = '1536m') -> SimpleNamespace:
         """创建带状态变化的容器替身，核真实持久交接和恢复。@param legacy 旧布局。@return 夹具。"""
-        fingerprint={**json.loads(self.row['fingerprint_json']),'mem':'1536m','swap':'2048m'}
+        fingerprint={**json.loads(self.row['fingerprint_json']),'mem':memory,'swap':'2048m'}
         self.runtime._update(self.row,fingerprint_json=json.dumps(fingerprint),generation=1,
             isolation_version=ISOLATION_VERSION,container_id='fixed-cli',network_container_id='network',
             sender_container_id='sender',state='ready')
-        limits=isolated_account_limits('1536m','2048m')
+        limits=isolated_account_limits(memory,'2048m')
         if legacy:
             limits=scenario_account_limits('1536m','2048m')
             write_document(self.runtime._root(self.row)/'runtime/project-review-layout.json',
@@ -223,6 +223,17 @@ class PrivateReviewTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'配额发生变化'):
             self.runtime.cleanup(fixture.job['token'])
         fixture.cli.start.assert_not_called()
+
+    def test_serial_unlimited_handoff_restores_exact_cli_limits(self) -> None:
+        """无限模式保留 CPU/PID 与原 CLI，交接恢复识别精确哨兵。@return None。"""
+        fixture=self._serial_fixture(memory='unlimited')
+        self.assertEqual([0,-1],fixture.layout['limits']['review'])
+        self.review.prepare_serial(fixture.job,fixture.cli,fixture.layout)
+        self.assertEqual(-1,self.review.serial_state(self.row)['cli_limits']['MemorySwap'])
+        self.runtime.cleanup(fixture.job['token'])
+        self.assertEqual(0,fixture.cli.attrs['HostConfig']['Memory'])
+        self.assertEqual(-1,fixture.cli.attrs['HostConfig']['MemorySwap'])
+        self.assertEqual(512,fixture.cli.attrs['HostConfig']['PidsLimit'])
 
     def test_serial_legacy_layout_keeps_original_cli_budget(self) -> None:
         """旧环境的 CLI 仍为原配额，评审只在停止后借原总预算。@return None。"""

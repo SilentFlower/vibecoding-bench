@@ -224,7 +224,7 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 根记录包含起止时间、下游状态、最终选中账号、结果和尝试数。根状态与尝试实际上游状态分开；中间认证或签名错误不得覆盖后续尝试结果。首字节字段 `ttft_ms` 测量响应头到达耗时，不解释为首个模型文本 token。
 - 本地拒绝、模拟和缓存命中有根记录，但无虚构的上游尝试。EOF、末帧、读取错误和 Drop 只终结一次；HTTP 200 内的错误事件与成功区分，缺用量或采样失败标记 `incomplete/partial`。发送错误不伪造上游 HTTP 状态或断言未提交。
 - session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
-- 不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
+- 默认诊断摘要不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。按账号显式开启的私有组装快照遵循[CC 组装后私有采集](#scenario-cc-组装后私有采集)。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
 - 有界异步队列容量 1024，热路径不等待数据库；每个摘要上限 16 KiB。响应观察按完整 JSON／单行／单事件各限 1 MiB，压缩 SSE 增量解码，不限制整流累计长度；编码层数、窗口及失败边界见[有界响应观察](#scenario-messages-响应的有界事件观察)。`health.dropped_records` 统计丢弃写入事件，`write_failures` 统计写入/清理失败，`observation_failures` 统计采样/解码/解析失败尝试；均为进程内计数，重启清零，日志只输出固定文案、计数及内部 UUID。
 - 按请求开始时间保留至少八天，后台每小时清理，列表 GET 不删除。已提交记录跨重启可查，进程崩溃前未提交缓冲不承诺恢复；`in_progress` 不能被直接当作仍在运行。追加表支持回滚旧程序后保留，不影响原费用表。
 - 请求与尝试分别 upsert，迟到的进行中快照不得覆盖终态。SQLx Any 0.7 将无类型 NULL 参数编码为 i32；同一缓存 SQL 的可空字段先空后有值时须保持绑定类型稳定。内部非空标识/时间用字符串绑定再 `NULLIF($n,'')`，正整数账号 ID 用 i64 绑定再 `NULLIF($n,0)`；不得把这些占位约定用于允许真实空字符串或零值的业务字段。
@@ -379,3 +379,51 @@ let observed = capture.observation(complete);
 - router/service/identity：创建与局部更新、先校验后写状态、旧导入序列化、幂等冲突和真实分级/Ultra 未知协议值。
 - Python `test_main/test_login_reauth`：真实 profile 创建、已有同步和重新授权载荷。
 - `web/tests/subscription.test.mjs`：套餐与 5h 语义矩阵；`node --experimental-strip-types --test tests/subscription.test.mjs`，并运行前端 build。
+
+## Scenario: CC 组装后私有采集
+
+### 1. Scope / Trigger
+
+- 修改原生 `cc_prepared` 完整头/正文采集、私有文件读取和「请求记录 → 详情」时适用。复用固定二进制事件，阶段显示「CC 组装后」。最终 TLS 写出及上游实收属于独立证据。
+
+### 2. Signatures
+
+- 账号固化 `fingerprint_json.native_capture_enabled:bool`，仅精确 true 开启；sender 的 `native_capture_dir:Option<String>` 缺省 None。V3 生成 `/flows/api/cc-prepared`，布局变更空闲重建，重画像保留开关。
+- `native_capture::record(Option<&str>, &NativeSubmission, &Value) -> String`（async），输出 disabled/saved/dropped/failed/timeout；受信任私有观察和 `AttemptDiagnostic.capture_status:Option<String>` 保存状态，历史缺字段为 None。诊断沿已有 summary_json 保存，无追加数据库列。
+- `GET /admin/request-diagnostics/:request_id/captures/:attempt_id`：管理员鉴权，先从该请求详情验证尝试归属。经 `runtime_bridge::native_capture(i64,&str)` 服务鉴权读取调度器 `GET /internal/v3/native-captures/{account_id}/{attempt_id}`。
+- 返回 `{state:"saved",snapshot:{schema_version:1,stage:"cc_prepared",account_id,attempt_id,captured_at_ms,headers:[string,string][],body:string,body_truncated,headers_truncated,original_body_bytes,original_body_sha256}}`；缺失为 `{state:"missing",message}`，其它后端为 `{state:"unsupported",message}`。响应设置 `Cache-Control: no-store`。
+
+### 3. Contracts
+
+- 从该账号现有二进制事件复制有序头及正文。先收集输入对象字段、`[头名,值]` 数组及出站头中的已知凭据，包含大小写不敏感的敏感头、完整 Authorization 与 Bearer 内容。统一脱敏正文和任意头值中的重复引用，覆盖 JSON 转义表示，采集对象与转发对象独立。
+- 组装正文仅替换秘密并按完整 UTF-8 字符截断，保持其键顺序和空白。普通头名称、值及重复值顺序保留。原始正文长度和 SHA256 单独保存，展示内容脱敏后的摘要不得冒充原始摘要。
+- 保存 `<attempt_id>.json`，目录 0700、文件 0600，原子重命名发布；每账号最多 50 份、100 MiB，正文 2 MiB、请求头 128 KiB。写入前按最旧文件轮转并回收中断临时文件。
+- 有界阻塞线程写入最多 2 个许可，同进程串行轮转；模型路径等待保存的期限为 250 ms。timeout 表示最终写入结果待核对，后台继续持有许可。失败或丢弃只改变采集状态，保持模型单次提交语义，普通日志保持摘要。
+- 调度器按网关账号找到唯一未删除账号环境，校验标准 UUID、路径、普通文件、6 MiB 读取上限及文件内账号/尝试/阶段归属。查询保持环境休眠状态。管理桥也限制 6 MiB 并核对归属。
+- 界面通过既有管理 API client 读取，阶段、截断、缺失和失败状态分别显示；所有头及正文以转义文本展示。换请求、换页或离开组件时取消旧读取并核对响应归属。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 默认关闭 / 历史缺状态 | disabled / 状态缺失，保持历史摘要 |
+| 未鉴权 / 尝试属于其他请求 | 401 / 404 |
+| 文件轮转、未产生或缺失 | missing，显示缺失原因 |
+| 保存许可已满 / I/O 失败 / 250 ms 超时 | dropped / failed / timeout，独立于模型状态 |
+| 正文或头超限 | 保留前缀并分别标记截断，原始长度及摘要保持 |
+| 非唯一绑定、链接、超限文件、错归属或坏 JSON | 读取明确失败，保持环境状态 |
+| 入站凭据被白名单删除后在正文或扩展头重复出现 | 仍脱敏已注册的凭据 |
+
+### 5. Scenarios and Examples
+
+- 正常：原生账号显式开启，管理员从请求详情看到 CC 组装后的多值头与正文，Authorization 为 `[REDACTED]`。
+- 边界：正文超过 2 MiB 时显示截断；saved 记录轮转后显示文件缺失；timeout 的落盘结果通过详情读取核对。
+- 错误用法：只从过滤后的出站 Authorization 注册秘密，遗漏入站客户端密钥在消息正文中的重复引用。正确处理：先注册原始头数组的凭据值，再对头和正文统一脱敏。
+- 错误用法：把组装快照重标为最终 TLS。正确处理：固定 stage=cc_prepared，保留独立来源。
+
+### 6. Tests Required
+
+- `incoming_header_credentials_are_redacted_across_persisted_content`：落盘全文没有客户端 Authorization/Cookie/API Key 和上游 bearer，普通多值头与正文顺序保持，原始转发对象保持。
+- `snapshot_preserves_duplicate_headers_and_masks_credentials_before_clipping`、`retention_is_bounded_and_storage_failure_is_visible`：UTF-8 边界、原始摘要、50 份/100 MiB、权限、关闭及失败状态。
+- Python `test_native_capture.py`：只读、错账号、UUID、链接、缺失和超限；账号运行时冻结开关；管理路由鉴权和跨请求尝试拒绝。
+- `native_real_gateway`：独立模拟 TLS 核对实际账号凭据、输入客户端密钥重复出现、快照及管理读取链脱敏、请求一次提交；完整 `cargo test --locked`、包级格式检查与前端构建。

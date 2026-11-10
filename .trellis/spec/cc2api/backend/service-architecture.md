@@ -46,7 +46,7 @@ src/tlsfp/
 - 原生请求最多一次模型提交，错误直接返回；legacy 的重写、401/signature/429 重试与其他端点保持各自原路径。调度 submitted 记录实际内部 POST，包含原生初始化耗时，不能解释为供应商已接收。
 - sender 校验现有绑定、代次、deadline、目标及秘密，原生目标仅 POST `/v1/messages` 且无 query。response 继续经过共用用量观察及流许可，取消、EOF、Drop 各按既有一次收口。
 - 私有`deadline_unix_ms`采用一次墙钟采样：过期拒绝，未来上限允许120秒预算加5秒跨进程时钟偏差，实际剩余预算钳制120秒。legacy发送和原生启动、首响应共用接收时冻结的单调截止；池内不重复按墙钟验期。暖进程在业务投递前复核单调截止，启动耗时不能换取新预算。
-- 诊断通过 `x-v3-native-observation` 取得实际 cc_prepared 的受限摘要，固定画像 `2.1.293`、来源 `native293_cc_prepared`，私有作业 UUID 与 sender 证据关联。上游同名控制头先剔除；网关消费后移除内部头。观察缺失标记 `native293_unobserved`，准备拒绝保持零模型尝试；组装快照不能当作最终 TLS。
+- 诊断通过 `x-v3-native-observation` 取得实际 cc_prepared 的受限摘要，固定画像 `2.1.293`、来源 `native293_cc_prepared`，私有作业 UUID 与 sender 证据关联。上游同名控制头先剔除；网关消费后移除内部头。观察缺失标记 `native293_unobserved`，准备拒绝保持零模型尝试；组装快照不能当作最终 TLS。按账号开启的完整头与正文遵循[CC 组装后私有采集](./settings-database.md#scenario-cc-组装后私有采集)，观察仅新增可选采集状态，完整内容经独立管理员入口读取。
 
 ### 4. Validation & Error Matrix
 

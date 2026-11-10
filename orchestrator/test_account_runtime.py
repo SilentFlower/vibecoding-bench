@@ -846,6 +846,8 @@ class AccountRuntimeTests(unittest.TestCase):
         row = self.runtime._row("synthetic", 1)
         legacy = json.loads(row["fingerprint_json"])
         legacy.pop("profile_version")
+        legacy["mem"] = "unlimited"
+        legacy["native_capture_enabled"] = True
         legacy["system_profile"] = generate_system_profile(self._cpuinfo())
         legacy["computer_profile"] = generate_computer_profile(legacy["system_profile"])
         self.runtime._update(row, fingerprint_json=json.dumps(legacy))
@@ -862,6 +864,8 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual("b" * 12, json.loads(current["fingerprint_json"])["hostname"])
         self.assertEqual(legacy["system_profile"], json.loads(current["fingerprint_json"])["system_profile"])
         self.assertEqual(legacy["computer_profile"], json.loads(current["fingerprint_json"])["computer_profile"])
+        self.assertEqual("unlimited", json.loads(current["fingerprint_json"])["mem"])
+        self.assertIs(True, json.loads(current["fingerprint_json"])["native_capture_enabled"])
         self.assertEqual(before, credentials.read_bytes())
         with self.assertRaisesRegex(ValueError, "profile v2"):
             self.runtime.maintenance(row["environment_id"], "reprofile")
@@ -1601,6 +1605,27 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(rebuilt['generation'], row['generation'] + 1)
         for container in old_roles:
             container.remove.assert_called_once()
+
+    def test_native_unlimited_layout_and_capture_are_frozen_per_account(self) -> None:
+        """无限账号省略 sender 预算，三角色与私有采集合同保持一致。@return None。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+        row = self.runtime._row('synthetic', 1)
+        fingerprint = {**json.loads(row['fingerprint_json']), 'mem': 'unlimited', 'native_capture_enabled': True}
+        self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
+        account = {'id': 1, 'name': 'synthetic', 'cc2api_account_id': 7, 'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080}
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '', 'request_backend': 'native293', 'concurrency': 2}
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), patch.object(self.runtime, '_sender_active', return_value=0), patch.dict(os.environ, {'V3_NATIVE_SENDER_MEMORY': ''}):
+            row, _ = self.runtime.ensure(account)
+        configuration = json.loads(self.runtime._sender_config(row).read_text())
+        self.assertEqual(configuration['native']['memory_mib'], 0)
+        self.assertEqual(configuration['native']['max_workers'], 4)
+        self.assertEqual(configuration['native_capture_dir'], '/flows/api/cc-prepared')
+        self.assertEqual(json.loads(row['fingerprint_json'])['native_sender_memory'], 'unlimited')
+        created = self.client.containers.run.call_args_list
+        self.assertEqual(len(created), 3)
+        self.assertTrue(all(item.kwargs['mem_limit'] == 0 and item.kwargs['memswap_limit'] == -1 for item in created))
+        self.assertTrue(all(item.kwargs['nano_cpus'] > 0 and item.kwargs['pids_limit'] > 0 for item in created))
 
     def test_three_role_permissions_and_secret_mount_boundaries(self) -> None:
         """普通角色不携带网络权限或其他角色秘密，配额合计保持。@return None。"""

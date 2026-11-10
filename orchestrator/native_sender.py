@@ -29,11 +29,12 @@ def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str
     if backend != 'native293':
         raise ValueError('未知账号请求后端')
     value = os.environ.get('V3_NATIVE_SENDER_MEMORY', '') if budget is None else budget
-    if not value:
+    unlimited = memory == 'unlimited'
+    if not value and not unlimited:
         raise ValueError('原生方式需要显式 V3_NATIVE_SENDER_MEMORY')
     workers = int(configuration.get('concurrency', 3)) * 2
-    ram = memory_bytes(value)
-    if workers <= 0 or ram < (POOL_MIB + workers * WORKER_MIB) * 1024 ** 2:
+    ram = 0 if unlimited else memory_bytes(value)
+    if workers <= 0 or (not unlimited and ram < (POOL_MIB + workers * WORKER_MIB) * 1024 ** 2):
         raise ValueError('原生 sender 预算不足以覆盖账号加权并发')
     isolated_account_limits(memory, swap, value)
     return {'binary_path': '/usr/local/bin/ccrb-runtime', 'work_root': '/native',
