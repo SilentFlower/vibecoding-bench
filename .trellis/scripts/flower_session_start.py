@@ -26,24 +26,24 @@ SOL_MODEL = "gpt-6-sol"
 SOL_6_1_MODEL = "gpt-6.1-sol"
 MODEL_HINT_MAX_BYTES = 2048
 WORKFLOW_STATE_REFRESH_ARG = "--trellis-session-start-refresh"
-CONFIRMATION_CONTEXT_HINT = """<trellis-confirmation-timeout>
-Session confirmation entry present. For Brief, Check-All disposition and Push, read .trellis/scripts/confirmation.md. Validate status, frozen display and a matching single-use claim before acting; otherwise keep manual confirmation. Other gates remain unchanged.
-</trellis-confirmation-timeout>"""
 CODE_DESIGN_HINT = """<trellis-code-design>
 Prefer simple, clear code for confirmed needs (KISS, YAGNI). Apply SOLID and DRY when they reduce complexity or duplicated business knowledge; favor clarity if these principles conflict. Reuse project patterns. Avoid premature abstractions, extra layers, excessive splitting, and speculative config or dependencies. Preserve behavior, compatibility, required verification, workflows, review gates, and templates.
 </trellis-code-design>"""
 CODEX_USER_INTERACTION_HINT = """<trellis-codex-user-interaction>
-For questions, use synchronous request_user_input when allowed by active tool/schema; otherwise ask in final and wait. Do not call request_user_input_async, send_user_message_async, or async equivalents. Use commentary for progress, final for results. Preserve review gates; never change modes to unlock tools. Only a verified session policy-timeout claim satisfies its matching gate; silence is not approval.
+For questions, use synchronous request_user_input when allowed by the active tool instructions and schema; otherwise ask in the final reply and wait. Do not call request_user_input_async, send_user_message_async, or async equivalents. Show progress in commentary and results in final. Keep existing review/approval gates; never switch modes to unlock a tool or infer consent from silence.
 </trellis-codex-user-interaction>"""
-MODEL_WORKFLOW_HINT_BODY = """Applies only while the active model is {model}; it does not apply after switching models. Check internally without a routine checklist report. Keep ordinary answers brief.
+CONFIRMATION_HINT = """<trellis-confirmation>
+Before final Brief/Check-All/Push output, follow .trellis/scripts/confirmation.md: resolve --entry, attempt eligible prepare, background wait, full display, end turn. Manual fallback needs an exclusion or actual failure reason. Generic commit intent does not approve a later plan. Execute only on valid human/runner authorization or policy_timeout claim plus started receipt. Human decisions and host approvals stay manual.
+</trellis-confirmation>"""
+MODEL_WORKFLOW_HINT_BODY = """Applies only to active {model}. Keep ordinary replies brief; perform checks internally.
 When executing the current task:
-- Act autonomously within applicable SKILL and WORKFLOW steps. Do not waive required steps, references, review gates or templates because work seems simple, a check seems redundant, or fewer interruptions are preferred.
-- Before a step, review its rules and required references. Reuse material already read in full and unchanged; search matches are not full reads.
-- Preserve required heading levels, section order, and conditional sections in specified templates. General brevity or no-heading preferences apply to ordinary prose and do not justify flattening, shortening, or reshaping a specified template.
-- Resolve conflicts by instruction hierarchy. Follow the owning workflow's phase-transition and review requirements. Permission to begin planning does not approve the final plan.
-- Where the workflow requires review of a displayed plan, a generic request such as "commit and push" starts that workflow; it does not itself confirm a plan produced afterward. Reuse approval of the same plan or an explicit waiver within its scope, including valid auto-loop preauthorization. A verified policy-timeout claim satisfies only its matching gate. Otherwise, display the plan and wait for confirmation. Verify the actual reply or claim; displaying a plan or asserting authorization is not confirmation.
-- Before claiming "read", "checked", or "complete", verify actual tool records and artifacts. Successful reading and compliant execution are separate facts.
-- When corrected, review the applicable rules, execution records, and actual result before repairing it. If evidence is missing, state uncertainty. Do not invent causes such as "not read", "forgot", or "file missing", or consult unrelated rules in place of the relevant ones."""
+- Follow SKILL and WORKFLOW steps autonomously. Simplicity, redundant checks or fewer interruptions do not waive required steps, references, gates or templates.
+- Before a step, read its rules and required references. Reuse fully read, unchanged material; search matches are not full reads.
+- Preserve required template headings, order and conditional sections. Brevity does not waive structure.
+- Resolve conflicts by instruction hierarchy; follow the owner's phase transitions. Planning intent does not approve a final plan.
+- Generic work/Git intent does not approve a later plan. Follow the gate owner BEFORE ending the turn: eligible prepare, background wait, full display; exclusions or actual failures use manual confirmation. Act only on a verified user reply, valid runner authorization, or policy_timeout claim AND started receipt. Silence and display are not human approval; unresolved decisions and host approvals stay manual.
+- Verify actual tool records and artifacts before claiming read, checked or complete. Reading and compliance are separate facts.
+- When corrected, inspect applicable rules, records and results before repairing. State missing evidence; do not invent causes or substitute unrelated rules."""
 ASTRA_WORKFLOW_HINT = (f'<trellis-astra-workflow-hint model="{ASTRA_MODEL}" version="1">\n'
                        f'{MODEL_WORKFLOW_HINT_BODY.format(model=ASTRA_MODEL)}\n'
                        '</trellis-astra-workflow-hint>')
@@ -135,33 +135,6 @@ def _load_hook(root: Path, hook: str):
     module = module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-def _confirmation_context(root: Path, hook: str, hook_input: dict) -> str:
-    """绑定受控入口并返回短提示；普通原生会话不读取或创建确认状态。
-
-    @param root: 当前项目根目录。
-    @param hook: 原生SessionStart入口。
-    @param hook_input: 原生会话事件。
-    @return: 已绑定且启用时的提示，缺少接入或配置无效时为空串。
-    """
-    if not os.environ.get("FLOWER_CONFIRMATION_SESSION"):
-        return ""
-    script = root / ".trellis/scripts/confirmation.py"
-    if not script.is_file():
-        return ""
-    try:
-        result = subprocess.run(
-            [sys.executable, "-X", "utf8", str(script), "bind", "--root", str(root)],
-            cwd=root, input=json.dumps(hook_input, ensure_ascii=False), encoding="utf-8",
-            capture_output=True, check=False, timeout=5,
-        )
-        bound = json.loads(result.stdout)
-        if result.returncode != 0 or not bound.get("bound") or not bound.get("enabled"):
-            return ""
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        return ""
-    return CONFIRMATION_CONTEXT_HINT
 
 
 def _run_native_hook(root: Path, hook: str, hook_input: dict) -> dict | None:
@@ -367,16 +340,17 @@ def render_part(root: Path, hook: str, part: str, hook_input: dict) -> dict | No
         if source in ("startup", "resume"):
             maintenance_message = _run_task_maintenance(root)
         if source == "resume":
-            confirmation = _confirmation_context(root, hook, hook_input)
-            if not maintenance_message and not confirmation:
+            if _load_hook(root, hook).should_skip_injection():
                 return None
-            return {
-                "systemMessage": maintenance_message,
+            result = {
                 "hookSpecificOutput": {
                     "hookEventName": "SessionStart",
-                    "additionalContext": confirmation,
+                    "additionalContext": CONFIRMATION_HINT,
                 },
             }
+            if maintenance_message:
+                result["systemMessage"] = maintenance_message
+            return result
         result = _run_native_hook(root, hook, hook_input)
         if result is None:
             return None
@@ -385,7 +359,6 @@ def render_part(root: Path, hook: str, part: str, hook_input: dict) -> dict | No
                 filter(None, [result.get("systemMessage"), maintenance_message])
             )
         context = result["hookSpecificOutput"]["additionalContext"]
-        _confirmation_context(root, hook, hook_input)
         if len(WORKFLOW_BLOCK.findall(context)) != 1:
             raise ValueError("原生启动输出必须包含且仅包含一个 trellis-workflow 块")
         context = WORKFLOW_BLOCK.sub("", context)
@@ -416,7 +389,7 @@ def render_part(root: Path, hook: str, part: str, hook_input: dict) -> dict | No
             result["systemMessage"] = "\n".join(filter(None, [result.get("systemMessage"), message]))
             print(message, file=sys.stderr)
         if source in ("startup", "clear", "compact"):
-            context = f"{context}\n{CODE_DESIGN_HINT}"
+            context = f"{context}\n{CODE_DESIGN_HINT}\n{CONFIRMATION_HINT}"
         if hook == HOOKS[0] and source in ("startup", "clear", "compact"):
             # 交互方式属于 Codex 平台规则，不能因模型切换或关闭模型提示而消失。
             context = f"{context}\n{CODEX_USER_INTERACTION_HINT}"
@@ -446,9 +419,6 @@ def render_part(root: Path, hook: str, part: str, hook_input: dict) -> dict | No
         builder = module._build_workflow_toc if hook == HOOKS[0] else module._build_workflow_overview
         platform = "codex" if hook == HOOKS[0] else "claude"
         context = split_workflow(builder(root / ".trellis/workflow.md", platform))[part]
-        if part == "rules" and os.environ.get("FLOWER_CONFIRMATION_SESSION"):
-            # rules仍无绑定副作用；这里只提示读取协议，真实能力由state和后续status严格核验。
-            context = f"{context}\n{CONFIRMATION_CONTEXT_HINT}"
         result = {"hookSpecificOutput": {"hookEventName": "SessionStart"}}
 
     context = f'<trellis-session-part name="{part}">\n{context}\n</trellis-session-part>'
