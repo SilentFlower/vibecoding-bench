@@ -36,6 +36,7 @@ src/tlsfp/
 - `PreparedTransport::native_ready(&self) -> Result<(), AppError>`；`submit_native(self, submission: NativeSubmission, ttfb_timeout: Duration) -> Result<reqwest::Response, AppError>`。
 - 服务鉴权的 `GET /internal/native/status` 返回 `raw_input_protocol:1,version,environment_id,generation`；`POST /internal/native/messages` 接收 `NativeSubmission`。
 - `NativeSubmission` 字段为 `request: PreparedRequest,input: Value,bearer,device_id,account_uuid?,organization_uuid?,email,concurrency:i32`，禁止 Debug 输出。input 为同 request_id 的 schema 1 原始信封。
+- `validate_request(prepared: &PreparedRequest, config: &SenderConfig) -> Result<tokio::time::Instant, AppError>`冻结接收边界的单调截止。`NativePool::submit_validated(config, submission, deadline)`只接收已校验信封；直接`submit`先校验一次。
 
 ### 3. Contracts
 
@@ -44,6 +45,7 @@ src/tlsfp/
 - 账号 Fast/1M 权限先明确拒绝越权申请；允许时保持原始输入交给二进制。当前 bearer 和受控身份进入工作进程，RT 留在既有凭据所有者。原生池的 Linux x64、身份、封存、预算及回收规则由 [V3 原生 sender](../../vibecoding-bench/backend/account-runtime-v3.md#scenario-v3-原生-sender-共享映像池与资源预算)所有。
 - 原生请求最多一次模型提交，错误直接返回；legacy 的重写、401/signature/429 重试与其他端点保持各自原路径。调度 submitted 记录实际内部 POST，包含原生初始化耗时，不能解释为供应商已接收。
 - sender 校验现有绑定、代次、deadline、目标及秘密，原生目标仅 POST `/v1/messages` 且无 query。response 继续经过共用用量观察及流许可，取消、EOF、Drop 各按既有一次收口。
+- 私有`deadline_unix_ms`采用一次墙钟采样：过期拒绝，未来上限允许120秒预算加5秒跨进程时钟偏差，实际剩余预算钳制120秒。legacy发送和原生启动、首响应共用接收时冻结的单调截止；池内不重复按墙钟验期。暖进程在业务投递前复核单调截止，启动耗时不能换取新预算。
 - 诊断通过 `x-v3-native-observation` 取得实际 cc_prepared 的受限摘要，固定画像 `2.1.293`、来源 `native293_cc_prepared`，私有作业 UUID 与 sender 证据关联。上游同名控制头先剔除；网关消费后移除内部头。观察缺失标记 `native293_unobserved`，准备拒绝保持零模型尝试；组装快照不能当作最终 TLS。
 
 ### 4. Validation & Error Matrix
@@ -53,6 +55,7 @@ src/tlsfp/
 | 未知 request_backend、Fast/1M 超出账号权限 | 400，原账号或模型零发送 |
 | 忙时切换后端 | 现有忙门禁拒绝，归属保持 |
 | 缺 V3/二进制/预算、能力或代次不符、平台不支持 | 503 准备失败 |
+| 私有期限已过期或剩余超过125秒 | sender在提交前拒绝；原生网关映射为503准备失败，模型零发送 |
 | 固定 293 无法接纳正文版本或参数 | 二进制受控错误，模型零发送 |
 | 提交后断线或状态不明 | 502，保持单次提交语义 |
 | 原生上游状态错误 | 返回本次状态及响应，管理员空闲时显式切回 legacy |
@@ -61,6 +64,7 @@ src/tlsfp/
 
 - 正常：账号 A 选择 native293，账号 B 保持 legacy，A 的标准并发 3 支持 3 普通或 6 Haiku；普通 API 与原生 293 由同一二进制构造。
 - 边界：历史账号缺字段仍走 legacy；count_tokens 等端点继续其既有路径；两个账号空闲切换相互独立。
+- 时钟边界：原120秒信封遇到1275毫秒回拨时可接纳，实际预算为120秒；偏差恰好5秒可接纳，超过5秒拒绝。错误用法是按墙钟反复重算期限或直接等待125秒。正确处理是一次转换并沿同一`Instant`传递。
 - 错误用法：原生失败后自动回落 legacy，或复用旧凭据代次的 idle worker。正确处理：当前请求明确失败，后续作业按当前代次重建，回退由管理员显式选择。
 
 ### 6. Tests Required
@@ -68,6 +72,7 @@ src/tlsfp/
 - `account_backend_defaults_validate_and_obey_busy_gate`、`historical_backend_migration_and_account_updates_are_independent`：默认/非法值/忙门禁/两账号和回退。
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
 - `native_real_binary`、`native_real_gateway`：实际附件、独立 TLS/CCH、HTTP/SOCKS、多值白名单、工具/thinking、主子会话、单次发送、取消/代次和诊断来源。跨平台备用实现编译验证明确 503。
+- `rejects_wrong_environment_and_arbitrary_target`覆盖回拨1275毫秒、5秒偏差边界/超界、过期及临近截止的剩余预算；`native_real_binary`覆盖暖进程到期后的零业务投递。离线驱动在子阶段断言前保存可选实收摘要，失败报告由合成缺失二进制故障注入核验。
 
 ## Gateway 热路径规则
 
