@@ -35,7 +35,10 @@ src/tlsfp/
 - 账号 DTO/模型字段 `request_backend: String`，仅接受 `legacy|native293`；历史和省略值默认 `legacy`。
 - `PreparedTransport::native_ready(&self) -> Result<(), AppError>`；`submit_native(self, submission: NativeSubmission, ttfb_timeout: Duration) -> Result<reqwest::Response, AppError>`。
 - 服务鉴权的 `GET /internal/native/status` 返回 `raw_input_protocol:1,version,environment_id,generation`；`POST /internal/native/messages` 接收 `NativeSubmission`。
-- `NativeSubmission` 字段为 `request: PreparedRequest,input: Value,bearer,device_id,account_uuid?,organization_uuid?,email,concurrency:i32`，禁止 Debug 输出。input 为同 request_id 的 schema 1 原始信封。
+- 零模型接口：`POST /internal/native/prepare` 接收 `NativePreparation`，`POST /internal/native/prepare/cancel` 接收 `NativePreparationControl`；均沿用当前 sender 私有鉴权和绑定校验。
+- 管理接口 `GET|POST /admin/accounts/:id/native-preparation` 分别查询状态、合并准备提示；POST 返回 `queued:true,preparation`，不等待加载。`GET /internal/v3/transport/:id?wake=false` 只解析已运行绑定，缺失/休眠返回 null。
+- `NativePreparation` 字段：`account_id:i64,environment_id:String,generation:u64,preparation_id:UUID,deadline_unix_ms:u64,bearer,device_id,account_uuid?,organization_uuid?,email,concurrency:i32`；取消合同仅含前四个归属字段。准备响应包含 `state,account_id,environment_id,generation,preparation_id,version,raw_input_protocol,pid?,idle_workers,reused`。
+- `NativeSubmission` 字段为 `request: PreparedRequest,input: Value,bearer,device_id,account_uuid?,organization_uuid?,email,concurrency:i32,log_mode:RequestLogMode`，禁止 Debug 输出。input 为同 request_id 的 schema 1 原始信封；日志模式缺省 info，详见[CC 组装后私有采集](./settings-database.md#scenario-cc-组装后私有采集)。
 - `validate_request(prepared: &PreparedRequest, config: &SenderConfig) -> Result<tokio::time::Instant, AppError>`冻结接收边界的单调截止。`NativePool::submit_validated(config, submission, deadline)`只接收已校验信封；直接`submit`先校验一次。
 
 ### 3. Contracts
@@ -46,6 +49,10 @@ src/tlsfp/
 - 原生请求最多一次模型提交，错误直接返回；legacy 的重写、401/signature/429 重试与其他端点保持各自原路径。调度 submitted 记录实际内部 POST，包含原生初始化耗时，不能解释为供应商已接收。
 - sender 校验现有绑定、代次、deadline、目标及秘密，原生目标仅 POST `/v1/messages` 且无 query。response 继续经过共用用量观察及流许可，取消、EOF、Drop 各按既有一次收口。
 - 私有`deadline_unix_ms`采用一次墙钟采样：过期拒绝，未来上限允许120秒预算加5秒跨进程时钟偏差，实际剩余预算钳制120秒。legacy发送和原生启动、首响应共用接收时冻结的单调截止；池内不重复按墙钟验期。暖进程在业务投递前复核单调截止，启动耗时不能换取新预算。
+- 准备仅 checkout/真实 worker_ready/回池，禁止调用 execute、模型或计费。后台协调并行2、待处理账号最多128；启动及5/20/60秒补偿只解析运行绑定。bench 环境就绪在生命周期锁外按环境/代次通知一次；在途新提示合并为一次后续执行。账号更新、凭据提交及交接重新开放门禁后触发准备。
+- 准备执行时重读权威账号，解析 bearer 后核对同一身份；成功前再次核对账号及只读运行绑定。失效、维护、凭据门禁关闭及取消优先收口，已处理取消的迟到完成不能发布 ready。取消按账号/环境/代次/准备 UUID 隔离，保留130秒撤销记录覆盖提前到达与迟到重放；最多16个在途和256条登记，满时明确拒绝。
+- 原生能力检查和热路径复用保持打开的已验证分发体 FD；每轮检查规范路径、dev/inode、大小、mode/uid/gid、纳秒 mtime/ctime，变化后重新完整校验 SHA。新进程启动仍执行固定分发体、精确执行 FD、执行体 SHA 和四项封存核验。
+- Claude Code 原生 messages 在封口前复用现有账号级上游会话池开关、容量、TTL、刷新策略与缓存原子映射；缓存故障沿现有失败开放。窄映射只替换一致的 UUID session 头及 metadata，真实下游 session 继续拥有 sticky/RPM/排队/取消/本地历史。Prompt ID、轮次、thread、显式代理/父代理保留；隐式主代理 ID 冻结为真实 session，避免池映射改变子代理父归属。冲突/重复/畸形会话继续由原生边界拒绝。诊断将预期上游 session 与实际 cc_prepared 核对，异常显示观察缺口。
 - 诊断通过 `x-v3-native-observation` 取得实际 cc_prepared 的受限摘要，固定画像 `2.1.293`、来源 `native293_cc_prepared`，私有作业 UUID 与 sender 证据关联。上游同名控制头先剔除；网关消费后移除内部头。观察缺失标记 `native293_unobserved`，准备拒绝保持零模型尝试；组装快照不能当作最终 TLS。按账号开启的完整头与正文遵循[CC 组装后私有采集](./settings-database.md#scenario-cc-组装后私有采集)，观察仅新增可选采集状态，完整内容经独立管理员入口读取。
 
 ### 4. Validation & Error Matrix
@@ -59,6 +66,9 @@ src/tlsfp/
 | 固定 293 无法接纳正文版本或参数 | 二进制受控错误，模型零发送 |
 | 提交后断线或状态不明 | 502，保持单次提交语义 |
 | 原生上游状态错误 | 返回本次状态及响应，管理员空闲时显式切回 legacy |
+| 后台环境缺失/休眠或首次控制面未就绪 | sleeping 或 failed 状态，保持零模型；由后续通知或有界启动补偿恢复 |
+| 准备后账号/凭据/运行代次变化 | 回执失效并取消本次准备，下一轮重新读取当前身份 |
+| 撤销早于准备到达、准备重复或登记满 | 准备受控503；取消登记满返回明确503 |
 
 ### 5. Scenarios and Examples
 
@@ -66,6 +76,8 @@ src/tlsfp/
 - 边界：历史账号缺字段仍走 legacy；count_tokens 等端点继续其既有路径；两个账号空闲切换相互独立。
 - 时钟边界：原120秒信封遇到1275毫秒回拨时可接纳，实际预算为120秒；偏差恰好5秒可接纳，超过5秒拒绝。错误用法是按墙钟反复重算期限或直接等待125秒。正确处理是一次转换并沿同一`Instant`传递。
 - 错误用法：原生失败后自动回落 legacy，或复用旧凭据代次的 idle worker。正确处理：当前请求明确失败，后续作业按当前代次重建，回退由管理员显式选择。
+- 正常：账号启动预热一个进程，首次业务复用同一 PID；预热和重复准备的模型计数增量为0。池容量1时，下游主会话和子代理可共享上游 session，子代理的 parentAgentId 仍指向真实主会话。
+- 错误用法：因账号已有准备在途而跳过新代次提示，或把 sender 的旧成功回执直接当作当前 ready。正确处理：保留合并提示，并在发布成功前复核当前绑定与身份。
 
 ### 6. Tests Required
 
@@ -73,6 +85,8 @@ src/tlsfp/
 - `native_backend_preserves_account_feature_authorization_without_rewriting`：Fast/1M 权限拒绝且正文保持；前端 `npm run build` 及创建/编辑/reset 链路核对。
 - `native_real_binary`、`native_real_gateway`：实际附件、独立 TLS/CCH、HTTP/SOCKS、多值白名单、工具/thinking、主子会话、单次发送、取消/代次和诊断来源。跨平台备用实现编译验证明确 503。
 - `rejects_wrong_environment_and_arbitrary_target`覆盖回拨1275毫秒、5秒偏差边界/超界、过期及临近截止的剩余预算；`native_real_binary`覆盖暖进程到期后的零业务投递。离线驱动在子阶段断言前保存可选实收摘要，失败报告由合成缺失二进制故障注入核验。
+- `native_real_gateway`：首次只读绑定503后的启动补偿、零模型预热、首次同PID、在途提示后绑定故障仍继续准备、准备完成时换代拒绝、凭据轮换旧PID退出、真实主/子会话映射与观察对应。使用隔离网络及合成 TLS，不触发真实账号模型。
+- `ownership_return_is_atomic_idempotent_and_old_reply_cannot_reopen`断言交接 finish 与同操作重放产生原生就绪通知；`test_account_runtime.py`覆盖只读休眠/缺失、绑定归属/代次及通知去重/失败补偿。分发体缓存覆盖同大小改写且恢复mtime、chmod及inode替换后拒绝/重验；取消覆盖提前登记、等待初始化与跨代次隔离。
 
 ## Gateway 热路径规则
 

@@ -83,6 +83,89 @@ class AccountRuntimeTests(unittest.TestCase):
             cli=Mock(exec_run=Mock(return_value=SimpleNamespace(exit_code=0, output=b"3.11.9\n"))),
             network=Mock())
 
+    def test_background_binding_query_keeps_absent_and_sleeping_environments(self) -> None:
+        """后台解析只读持久绑定，缺失或休眠时不创建角色。@return None。"""
+        account = {"id": 1, "name": "synthetic", "cc2api_account_id": 7}
+        with patch.object(self.runtime, "ensure", side_effect=AssertionError("禁止唤醒")), \
+                patch("main.account_runtime", self.runtime), patch("main.get_db", self.database):
+            self.assertIsNone(main.v3_transport(7, wake=False))
+            row = self.runtime._row("synthetic", 1)
+            self.runtime._update(row, state="stopped", isolation_version=2)
+            self.assertIsNone(self.runtime.existing_transport(account))
+        self.client.containers.run.assert_not_called()
+
+    def test_capture_cleanup_starts_without_traffic_and_preserves_sleeping_state(self) -> None:
+        """独立线程启动回收停止环境的过期日志，保持容器和状态。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        directory = self.runtime._root(row) / 'flows/api/cc-prepared'
+        directory.mkdir(parents=True)
+        attempt = '11111111-1111-4111-8111-111111111111'
+        path = directory / (attempt + '.json')
+        path.write_text(json.dumps({'schema_version': 1, 'stage': 'cc_prepared', 'account_id': 7,
+            'attempt_id': attempt, 'captured_at_ms': int((time.time() - 8 * 86400) * 1000)}))
+        with patch.object(self.runtime, 'ensure', side_effect=AssertionError('禁止唤醒')):
+            self.runtime.capture_cleanup.start()
+            try:
+                deadline = time.monotonic() + 3
+                while path.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertFalse(path.exists())
+            finally:
+                self.runtime.stopping.set()
+                self.runtime.capture_cleanup.join(timeout=3)
+        self.assertFalse(self.runtime.capture_cleanup.is_alive())
+        self.assertEqual(self.runtime.capture_cleanup_health['deleted'], 1)
+        with self.database() as connection:
+            self.assertEqual(connection.execute('SELECT state FROM account_environments').fetchone()['state'], 'stopped')
+        self.client.containers.run.assert_not_called()
+
+    def test_capture_cleanup_resumes_bounded_cursor_and_recovers_failures(self) -> None:
+        """大目录按批次继续，故障后下一周期恢复且临时文件保留。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        directory = self.runtime._root(row) / 'flows/api/cc-prepared'
+        directory.mkdir(parents=True)
+        for index in range(514):
+            (directory / f'{index}.tmp').write_text('在写入或遗留临时文件')
+        with patch.object(self.runtime, '_capture_cleanup_steps', side_effect=OSError('合成目录故障')):
+            self.runtime._capture_cleanup_cycle()
+        self.assertEqual(self.runtime.capture_cleanup_health['failed'], 1)
+        self.runtime._capture_cleanup_cycle()
+        self.assertEqual(self.runtime.capture_cleanup_health['scanned'], 512)
+        self.runtime._capture_cleanup_cycle()
+        self.assertEqual(self.runtime.capture_cleanup_health['scanned'], 514)
+        self.assertIsNone(self.runtime._capture_cleanup_cursor)
+        self.assertEqual(len(list(directory.iterdir())), 514)
+
+    def test_background_binding_validates_running_generation_and_owner(self) -> None:
+        """运行绑定必须匹配账号及代次，旧实例明确拒绝。@return None。"""
+        account = {"id": 1, "name": "synthetic", "cc2api_account_id": 7}
+        row = self.runtime._row("synthetic", 1)
+        self.runtime._update(row, state="ready", isolation_version=2, generation=3)
+        binding = {"account_id": 7, "environment_id": row["environment_id"], "generation": 3,
+            "release_id": self.runtime.release_id, "endpoint": "http://synthetic:8091", "secret": "synthetic-secret"}
+        config = {"binding": binding, "proxy_url": ""}
+        with patch("account_runtime.role_container", return_value=Mock(status="running")), \
+                patch("account_runtime._read_json", return_value=config), \
+                patch.object(self.runtime, "ensure", side_effect=AssertionError("禁止唤醒")):
+            self.assertEqual(self.runtime.existing_transport(account), binding)
+            binding["generation"] = 2
+            with self.assertRaisesRegex(ValueError, "归属或配置"):
+                self.runtime.existing_transport(account)
+
+    def test_preparation_notifications_deduplicate_and_retry_failed_delivery(self) -> None:
+        """按环境代次去重，失败通知保留下一次补偿机会。@return None。"""
+        account = {"id": 1, "name": "synthetic", "cc2api_account_id": 7}
+        row = {"environment_id": "a" * 32, "generation": 1, "state": "ready"}
+        self.gateway._request.side_effect = RuntimeError("合成通知故障")
+        self.runtime._notify_native_preparation(account, row)
+        self.gateway._request.side_effect = None
+        self.runtime._notify_native_preparation(account, row)
+        self.runtime._notify_native_preparation(account, row)
+        self.assertEqual(self.gateway._request.call_count, 2)
+        row["generation"] = 2
+        self.runtime._notify_native_preparation(account, row)
+        self.assertEqual(self.gateway._request.call_count, 3)
+
     def test_cli_storage_failure_keeps_verified_private_version_available(self) -> None:
         """去重是可选优化，磁盘缓存故障不能使已验证安装的 CLI 登录失败。@return None。"""
         row = self.runtime._row('synthetic', 1)

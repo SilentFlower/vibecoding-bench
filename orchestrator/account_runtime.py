@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import secrets
@@ -32,6 +33,7 @@ from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, valid
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, isolated_account_limits
 from native_sender import sender_config
+from native_capture import cleanup_captures
 from runtime_diagnostics import NetworkContextError, network_failure
 from runtime_files import atomic_json, atomic_text, directory_fd as _directory_fd
 from storage_maintenance import deduplicate_immutable_tree
@@ -148,8 +150,12 @@ class AccountRuntime:
         self.capacity_lock = threading.RLock()
         self.heartbeat_pool = ThreadPoolExecutor(max_workers=self.limit * self.cli_limit + 1, thread_name_prefix="v3-lease")
         self.jobs: dict[str, dict] = {}
+        self._native_notified: dict[int, tuple[str, int]] = {}
         self.stopping = threading.Event()
         self.heartbeat = threading.Thread(target=self._heartbeat, daemon=True)
+        self.capture_cleanup = threading.Thread(target=self._capture_cleanup, name="v3-capture-cleanup", daemon=True)
+        self._capture_cleanup_cursor = None
+        self.capture_cleanup_health = {"scanned": 0, "deleted": 0, "failed": 0}
         connection = database()
         try:
             with connection:
@@ -744,7 +750,69 @@ class AccountRuntime:
         if scenario_resources:
             with self.environment_lock(row['environment_id']):
                 self.reviews.serial_layout(row,container)
+        if native:
+            self._notify_native_preparation(account, row)
         return row, container
+
+    def _notify_native_preparation(self, account: dict, row: dict) -> None:
+        """环境就绪后只入队通知，避免生命周期锁内等待原生加载。
+
+        :param account: 已完成环境准备的 bench 账号
+        :param row: 当前持久环境记录
+        :return: None
+        """
+        account_id = account.get("cc2api_account_id")
+        if not account_id or row.get("state") not in ("ready", "cli_reconcile"):
+            return
+        key = (row["environment_id"], int(row["generation"]))
+        with self.lock:
+            if self._native_notified.get(int(account_id)) == key:
+                return
+            self._native_notified[int(account_id)] = key
+        try:
+            self.gateway._request("POST", f"/admin/accounts/{int(account_id)}/native-preparation", {})
+        except Exception:
+            # 通知失败允许后续环境准备补偿，业务仍使用原来的惰性池。
+            with self.lock:
+                if self._native_notified.get(int(account_id)) == key:
+                    self._native_notified.pop(int(account_id), None)
+
+    def existing_transport(self, account: dict) -> dict | None:
+        """只读取当前运行绑定，保持休眠和停止环境的生命周期。
+
+        :param account: 唯一绑定的 bench 账号
+        :return: 已运行环境的受限绑定；停止或休眠时为空
+        """
+        connection = self.database()
+        try:
+            stored = connection.execute("SELECT * FROM account_environments WHERE account_id=?", (account["id"],)).fetchone()
+        finally:
+            connection.close()
+        if stored is None:
+            return None
+        row = dict(stored)
+        with self.environment_lock(row["environment_id"]):
+            if row["state"] not in ("ready", "cli_reconcile") or row.get("isolation_version") != ISOLATION_VERSION:
+                return None
+            if self.credential_ownership:
+                self.credential_ownership.guard(account)
+            try:
+                for role in ("network", "sender"):
+                    container = role_container(self, row, role)
+                    container.reload()
+                    if container.status != "running":
+                        return None
+            except NotFound:
+                return None
+            config = _read_json(self._sender_config(row))
+            binding = config["binding"]
+            if (binding["account_id"] != account["cc2api_account_id"]
+                    or binding["environment_id"] != row["environment_id"]
+                    or binding["generation"] != row["generation"]
+                    or binding.get("release_id") != self.release_id
+                    or config.get("proxy_source", config["proxy_url"]) != self._proxy(account)):
+                raise ValueError("运行绑定归属或配置不一致")
+            return binding
 
     def _network_has_quota_mount(self, account_id: int, network) -> bool:
         """核对实际账号额度挂载，只把明确无挂载视为可补齐缺失。
@@ -1274,6 +1342,81 @@ class AccountRuntime:
                 with self.lock:
                     if released or job.get('execution_role')!='project-review':
                         self._remove_job(job)
+
+    def _capture_cleanup_steps(self):
+        """按持久环境分页生成清理步骤，迭代游标只持有一个目录。
+
+        :return: 当前步骤的受控计数。
+        """
+        after = ""
+        while not self.stopping.is_set():
+            connection = self.database()
+            try:
+                rows = connection.execute("SELECT e.*,a.cc2api_account_id FROM account_environments e "
+                    "JOIN accounts a ON a.id=e.account_id WHERE a.cc2api_account_id IS NOT NULL "
+                    "AND e.environment_id>? ORDER BY e.environment_id LIMIT 32", (after,)).fetchall()
+            finally:
+                connection.close()
+            if not rows:
+                return
+            for stored in rows:
+                if self.stopping.is_set():
+                    return
+                row = dict(stored)
+                after = row["environment_id"]
+                try:
+                    if not re.fullmatch(r"[a-f0-9]{32}", after) or type(row["cc2api_account_id"]) is not int or row["cc2api_account_id"] <= 0:
+                        raise ValueError("环境归属无效")
+                    yield from cleanup_captures(self._root(row), row["cc2api_account_id"], stopping=self.stopping.is_set)
+                    yield {"scanned": 0, "deleted": 0, "failed": 0}
+                except FileNotFoundError:
+                    yield {"scanned": 0, "deleted": 0, "failed": 0}
+                except (ValueError, OSError):
+                    yield {"scanned": 0, "deleted": 0, "failed": 1}
+
+    def _capture_cleanup_cycle(self) -> None:
+        """执行有界后台批次，剩余目录项由下一周期继续。
+
+        :return: None；失败只记录固定计数。
+        """
+        totals = {"scanned": 0, "deleted": 0, "failed": 0}
+        try:
+            if self._capture_cleanup_cursor is None:
+                self._capture_cleanup_cursor = self._capture_cleanup_steps()
+            deadline = time.monotonic() + 2
+            for _ in range(512):
+                if self.stopping.is_set() or time.monotonic() >= deadline:
+                    break
+                try:
+                    result = next(self._capture_cleanup_cursor)
+                except StopIteration:
+                    self._capture_cleanup_cursor = None
+                    break
+                for key in totals:
+                    totals[key] += result[key]
+        except Exception:
+            self._capture_cleanup_cursor = None
+            totals["failed"] += 1
+        for key in totals:
+            self.capture_cleanup_health[key] += totals[key]
+        logger = logging.getLogger(__name__)
+        report = logger.warning if totals["failed"] else logger.info
+        report("请求快照清理 scanned=%d deleted=%d failed=%d", totals["scanned"], totals["deleted"], totals["failed"])
+
+    def _capture_cleanup(self) -> None:
+        """启动及每小时清理，使用独立线程保护租约续期。
+
+        :return: 服务停止后释放游标。
+        """
+        try:
+            while not self.stopping.is_set():
+                self._capture_cleanup_cycle()
+                if self.stopping.wait(3600):
+                    return
+        finally:
+            if self._capture_cleanup_cursor is not None:
+                self._capture_cleanup_cursor.close()
+                self._capture_cleanup_cursor = None
 
     def _heartbeat(self) -> None:
         while not self.stopping.wait(5):
@@ -3131,6 +3274,7 @@ class AccountRuntime:
         :return: None
         """
         self.heartbeat.start()
+        self.capture_cleanup.start()
 
     def stop(self) -> None:
         """停止调度时收口 CLI，保留独立 API 与持久环境。
@@ -3138,6 +3282,8 @@ class AccountRuntime:
         :return: None
         """
         self.stopping.set()
+        if self.capture_cleanup.is_alive():
+            self.capture_cleanup.join(timeout=6)
         if self.heartbeat.is_alive():
             self.heartbeat.join(timeout=6)
         self.heartbeat_pool.shutdown(wait=False, cancel_futures=True)

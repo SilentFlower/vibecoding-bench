@@ -215,6 +215,8 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - `GET /admin/request-diagnostics`：沿用管理鉴权；参数为 `page`、`page_size`、`account_id`、`correlation_id`、`outcome`、`since`、`until`；返回 `items/total/page/page_size/health`。
 - `GET /admin/request-diagnostics/:request_id`：返回 `request` 和按序排列的 `attempts`。
 - `PreparedRequest.request_id`：有合法内部 UUID 时保留，空值继续生成；v3 sender 的既有 observations 复用该尝试 UUID。
+- `RequestLogMode::{Info,Debug}` 序列化为 `info|debug`；根请求与尝试的 `log_mode:Option<RequestLogMode>` 兼容历史缺字段。`GatewayService::reload_request_log_mode()` 热加载，`request_log_mode()` 返回实际缓存。
+- `/admin/settings` 的 `request_diagnostics_log_mode` 为字符串，默认 `info`；GET 返回实际生效缓存，PUT 在全部写入前校验 `info|debug`。迁移只补缺键，保留显式 debug。
 
 ### 3. Contracts
 
@@ -226,9 +228,10 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - session/thread/响应消息仅存带账号及标识类型域的 SHA256 前 128 位；线程前驱和响应消息使用同一消息域。只观察既有池解析结果，不能额外 resolve 或刷新 TTL；上游 session 摘要以实际最终 body 为准。
 - 默认诊断摘要不持久化正文、工具参数、完整 headers、凭据、Cookie、邮箱、设备 ID、账号 UUID、完整 session 或任意 error.message。按账号显式开启的私有组装快照遵循[CC 组装后私有采集](#scenario-cc-组装后私有采集)。响应模型、参数枚举及错误类型执行白名单；非标准关联头只保存散列。
 - 有界异步队列容量 1024，热路径不等待数据库；每个摘要上限 16 KiB。响应观察按完整 JSON／单行／单事件各限 1 MiB，压缩 SSE 增量解码，不限制整流累计长度；编码层数、窗口及失败边界见[有界响应观察](#scenario-messages-响应的有界事件观察)。`health.dropped_records` 统计丢弃写入事件，`write_failures` 统计写入/清理失败，`observation_failures` 统计采样/解码/解析失败尝试；均为进程内计数，重启清零，日志只输出固定文案、计数及内部 UUID。
-- 按请求开始时间保留至少八天，后台每小时清理，列表 GET 不删除。已提交记录跨重启可查，进程崩溃前未提交缓冲不承诺恢复；`in_progress` 不能被直接当作仍在运行。追加表支持回滚旧程序后保留，不影响原费用表。
+- 模式在入口冻结，独立于诊断存储可用性；排队/在途切换沿原模式。info 在完整内容克隆与写入前关闭私有采集，429/非流式专项全文日志也受同次模式门控；上游错误普通日志只保留长度。debug 继续受账号采集资格和原专项开关限制。设置读取失败保留已生效缓存，首次装配沿 info。
+- 按请求开始时间保留七天，启动及每小时后台清理；严格早于 UTC `now-7 days` 删除，等于边界保留。列表与详情只读过滤过期记录。当前进程的真实请求许可保护在途记录，终结/取消/Drop 释放；重启遗留 `in_progress` 按时间清理。已提交记录跨重启可查，进程崩溃前未提交缓冲不承诺恢复。追加表支持回滚旧程序后保留，不影响原费用表。
 - 请求与尝试分别 upsert，迟到的进行中快照不得覆盖终态。SQLx Any 0.7 将无类型 NULL 参数编码为 i32；同一缓存 SQL 的可空字段先空后有值时须保持绑定类型稳定。内部非空标识/时间用字符串绑定再 `NULLIF($n,'')`，正整数账号 ID 用 i64 绑定再 `NULLIF($n,0)`；不得把这些占位约定用于允许真实空字符串或零值的业务字段。
-- 分页默认 1/50，每页 1..=200；账号 ID 为正整数。关联条件最多 128 字节，并执行与写入相同的规范化。时间为 RFC3339，统一 UTC 毫秒，筛选区间左闭右开。无新环境变量或 setting。
+- 分页默认 1/50，每页 1..=200；账号 ID 为正整数。关联条件最多 128 字节，并执行与写入相同的规范化。时间为 RFC3339，统一 UTC 毫秒，筛选区间左闭右开。保留期只覆盖诊断表和私有快照，服务/容器日志物理轮转沿部署配置。
 
 ### 4. Validation & Error Matrix
 
@@ -242,6 +245,8 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 | 非法分页、账号、时间或结果筛选 | 400 |
 | 未鉴权管理查询 / 不存在详情 / 存储不可用 | 401 / 404 / 503，不伪装为空列表 |
 | SQLite/PG 首次/重复迁移，可空字段从开始到终态 | 幂等、正确保留 NULL，无参数类型漂移 |
+| 非法模式 / 设置读取失败 / 历史缺 log_mode | 400且同批零写入 / 保留缓存 / 显示历史未知 |
+| 七天边界 / 超期仍有真实许可 / 超期无许可 | 保留 / 保护 / 查询隐藏并由后台回收 |
 
 ### 5. Scenarios and Examples
 
@@ -249,10 +254,12 @@ pub async fn create(&self, a: &mut Account) -> Result<(), AppError>
 - 边界：两个真实 session 借用同一上游成员时，真实散列不同、上游散列相同；目标过期后可观察新目标，诊断不能延长旧目标 TTL。
 - 错误用法：HTTP 200 且没有完整 usage 就填零并标成功，或把缓存/中间重试写入原费用表。正确处理：未知值为 `null`，结果与完整性分开判定，费用保持原语义。
 - PostgreSQL 可空正整数示例：`.bind(request.account_id.unwrap_or(0))` 配合 `NULLIF($7,0)`；不能直接复用先绑定 `None::<i64>`、再绑定实值的 Any 缓存语句，也不能把未知账号持久化为真实 0。
+- 正常：info 请求排队后切换 debug，该次仍保存 info 摘要且完整内容零落盘；后续请求采用 debug。错误用法是发送时重读模式或用当前设置填补历史模式。正确处理是入口冻结并读取各记录的可选字段。
 
 ### 6. Tests Required
 
-- `sqlite_diagnostics_storage_contract` 与显式执行 `postgres_diagnostics_storage_contract`：开始→终态、重复写入、迟到快照、NULL、分页/账号/关联过滤、重开连接、八天精确边界。PG 使用 `CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN` 指向独立临时库，ignored 不等于通过。
+- `sqlite_diagnostics_storage_contract` 与显式执行 `postgres_diagnostics_storage_contract`：开始→终态、重复写入、迟到快照、NULL、分页/账号/关联过滤、重开连接、七天精确边界。PG 使用 `CC2API_DIAGNOSTICS_TEST_POSTGRES_DSN` 指向独立临时库，ignored 不等于通过。
+- `retention_protects_live_requests_and_expires_stale_unfinished_records`、`migrate_request_log_mode_preserves_explicit_debug`、`log_mode_setting_validates_atomically_and_defaults_to_info`、`request_log_mode_reload_preserves_effective_cache_on_failure`：真实在途保护、结束回收、默认迁移/幂等、校验原子性与实际缓存。
 - `diagnostics_preserve_bytes_and_correlate_anonymous_sessions`：最终参数、stop_reason、null token、匿名标识、头值保留/散列反查及合成秘密不泄露。
 - `diagnostics_record_stream_errors_and_cancellation_once`、`diagnostics_report_observation_failures_without_changing_bytes`、`diagnostics_cover_early_cancellation_and_unavailable_storage`：流内错误、读取失败、取消、超限/解码/解析、数据库故障与响应保真。
 - `diagnostics_overload_and_write_failures_are_observable` 与 `diagnostics_routes_require_admin_and_expose_committed_requests`：队列立即返回、健康计数、管理员鉴权、分页错误和详情查询。
@@ -390,17 +397,20 @@ let observed = capture.observation(complete);
 
 - 账号固化 `fingerprint_json.native_capture_enabled:bool`，仅精确 true 开启；sender 的 `native_capture_dir:Option<String>` 缺省 None。V3 生成 `/flows/api/cc-prepared`，布局变更空闲重建，重画像保留开关。
 - `native_capture::record(Option<&str>, &NativeSubmission, &Value) -> String`（async），输出 disabled/saved/dropped/failed/timeout；受信任私有观察和 `AttemptDiagnostic.capture_status:Option<String>` 保存状态，历史缺字段为 None。诊断沿已有 summary_json 保存，无追加数据库列。
+- 私有 `NativeSubmission.log_mode:RequestLogMode` 缺省 info，未知枚举拒绝；只由网关冻结，调用方 headers/body/context 无法覆盖。该字段不进入进程复用 key。Python `read_capture(root,account_id,attempt_id,*,now_ms=None)` 只读验期；`cleanup_captures(...)` 以逐项计数迭代器供独立后台批次消费。
 - `GET /admin/request-diagnostics/:request_id/captures/:attempt_id`：管理员鉴权，先从该请求详情验证尝试归属。经 `runtime_bridge::native_capture(i64,&str)` 服务鉴权读取调度器 `GET /internal/v3/native-captures/{account_id}/{attempt_id}`。
-- 返回 `{state:"saved",snapshot:{schema_version:1,stage:"cc_prepared",account_id,attempt_id,captured_at_ms,headers:[string,string][],body:string,body_truncated,headers_truncated,original_body_bytes,original_body_sha256}}`；缺失为 `{state:"missing",message}`，其它后端为 `{state:"unsupported",message}`。响应设置 `Cache-Control: no-store`。
+- 返回 `{state:"saved",snapshot:{schema_version:1,stage:"cc_prepared",account_id,attempt_id,captured_at_ms,headers:[string,string][],body:string,body_truncated,headers_truncated,original_body_bytes,original_body_sha256}}`；缺失为 `{state:"missing",message}`，过期为 `{state:"expired",message}`，其它后端为 `{state:"unsupported",message}`。响应设置 `Cache-Control: no-store`。
 
 ### 3. Contracts
 
 - 从该账号现有二进制事件复制有序头及正文。先收集输入对象字段、`[头名,值]` 数组及出站头中的已知凭据，包含大小写不敏感的敏感头、完整 Authorization 与 Bearer 内容。统一脱敏正文和任意头值中的重复引用，覆盖 JSON 转义表示，采集对象与转发对象独立。
+- 仅同次 debug 且账号配置采集目录时保存；info 在克隆前返回 disabled。模式切换保留暖进程，已保存的有效 debug 历史继续按原归属读取。
 - 组装正文仅替换秘密并按完整 UTF-8 字符截断，保持其键顺序和空白。普通头名称、值及重复值顺序保留。原始正文长度和 SHA256 单独保存，展示内容脱敏后的摘要不得冒充原始摘要。
 - 保存 `<attempt_id>.json`，目录 0700、文件 0600，原子重命名发布；每账号最多 50 份、100 MiB，正文 2 MiB、请求头 128 KiB。写入前按最旧文件轮转并回收中断临时文件。
 - 有界阻塞线程写入最多 2 个许可，同进程串行轮转；模型路径等待保存的期限为 250 ms。timeout 表示最终写入结果待核对，后台继续持有许可。失败或丢弃只改变采集状态，保持模型单次提交语义，普通日志保持摘要。
-- 调度器按网关账号找到唯一未删除账号环境，校验标准 UUID、路径、普通文件、6 MiB 读取上限及文件内账号/尝试/阶段归属。查询保持环境休眠状态。管理桥也限制 6 MiB 并核对归属。
-- 界面通过既有管理 API client 读取，阶段、截断、缺失和失败状态分别显示；所有头及正文以转义文本展示。换请求、换页或离开组件时取消旧读取并核对响应归属。
+- 调度器按网关账号找到唯一未删除账号环境，逐级无链接目录 FD 固定路径，校验标准 UUID、普通文件、6 MiB 读取上限及文件内账号/尝试/阶段归属。`captured_at_ms` 为正整数 UTC 毫秒，超过当前时间五分钟视为异常；严格早于七天边界返回410，管理桥映射为 expired。查询保持环境休眠状态。管理桥也限制 6 MiB 并核对归属。
+- AccountRuntime 在启动及每小时使用独立清理线程，按持久环境32条分页、每批最多512步及2秒预算继续游标，覆盖停止/休眠环境。只处理 `flows/api/cc-prepared` 下标准 UUID 普通 JSON；复核账号/阶段/时间及删除前文件身份，保留临时文件、链接、损坏、未来异常及错归属记录。停止前核对取消标记，故障只记受控 scanned/deleted/failed 计数；租约续期资源独立。Rust 容量轮转容忍后台已删除旧文件的 NotFound。
+- 界面通过既有管理 API client 读取，在 Dialog 中展示根时间/账号/最终结果/尝试数、实际尝试及按需快照。阶段、截断、缺失和失败状态分别显示；所有头及正文以转义文本展示。列表/详情分别持有取消与代次，关闭/换请求/离开组件作废旧详情，保留列表筛选、分页及焦点返回。
 
 ### 4. Validation & Error Matrix
 
@@ -413,6 +423,7 @@ let observed = capture.observation(complete);
 | 正文或头超限 | 保留前缀并分别标记截断，原始长度及摘要保持 |
 | 非唯一绑定、链接、超限文件、错归属或坏 JSON | 读取明确失败，保持环境状态 |
 | 入站凭据被白名单删除后在正文或扩展头重复出现 | 仍脱敏已注册的凭据 |
+| 超期快照 / 未来超过五分钟 / 关闭或切换详情 | expired / 受控读取失败 / 取消并忽略迟到响应 |
 
 ### 5. Scenarios and Examples
 
@@ -420,6 +431,7 @@ let observed = capture.observation(complete);
 - 边界：正文超过 2 MiB 时显示截断；saved 记录轮转后显示文件缺失；timeout 的落盘结果通过详情读取核对。
 - 错误用法：只从过滤后的出站 Authorization 注册秘密，遗漏入站客户端密钥在消息正文中的重复引用。正确处理：先注册原始头数组的凭据值，再对头和正文统一脱敏。
 - 错误用法：把组装快照重标为最终 TLS。正确处理：固定 stage=cc_prepared，保留独立来源。
+- 边界：切换 info 后仍可读取七天内旧 debug 快照；本地拒绝且尝试数0时，弹窗仍显示根结果。错误用法是按当前模式隐藏所有历史内容，或清理时调用 ensure 唤醒环境。正确处理是按历史尝试归属读取，并只遍历持久日志目录。
 
 ### 6. Tests Required
 
@@ -427,3 +439,4 @@ let observed = capture.observation(complete);
 - `snapshot_preserves_duplicate_headers_and_masks_credentials_before_clipping`、`retention_is_bounded_and_storage_failure_is_visible`：UTF-8 边界、原始摘要、50 份/100 MiB、权限、关闭及失败状态。
 - Python `test_native_capture.py`：只读、错账号、UUID、链接、缺失和超限；账号运行时冻结开关；管理路由鉴权和跨请求尝试拒绝。
 - `native_real_gateway`：独立模拟 TLS 核对实际账号凭据、输入客户端密钥重复出现、快照及管理读取链脱敏、请求一次提交；完整 `cargo test --locked`、包级格式检查与前端构建。
+- `info_short_circuits_before_creating_capture_files` 与 `native_real_gateway`：默认 info、未知私有模式拒绝、排队后模式切换仍零完整落盘、debug 脱敏及暖 PID 复用。Python覆盖七天边界、过期只读、未来/错账号/链接/替换/停止保护、启动无流量与512步游标/故障恢复。浏览器覆盖弹窗即开、关闭/卸载/快速切换、焦点、长正文、筛选分页、模式失败恢复和无尝试根摘要。

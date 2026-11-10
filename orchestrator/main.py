@@ -39,7 +39,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import docker
 from docker.errors import DockerException, NotFound
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
-from native_capture import read_capture
+from native_capture import CaptureExpired, read_capture
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -12650,6 +12650,8 @@ def v3_native_capture(account_id: int, attempt_id: str):
         raise HTTPException(409, "账号没有唯一的 v3 环境绑定")
     try:
         return read_capture(account_runtime._root(dict(rows[0])), account_id, attempt_id)
+    except CaptureExpired:
+        raise HTTPException(410, "采集文件已超过七天保留期")
     except FileNotFoundError:
         raise HTTPException(404, "采集文件缺失、尚未生成或已清理")
     except (ValueError, OSError):
@@ -12657,7 +12659,7 @@ def v3_native_capture(account_id: int, attempt_id: str):
 
 
 @app.get("/internal/v3/transport/{account_id}")
-def v3_transport(account_id: int):
+def v3_transport(account_id: int, wake: bool = True):
     """解析唯一绑定账号并返回受限发送实例，浏览器无法直接调用。"""
     if not account_runtime:
         raise HTTPException(404)
@@ -12670,6 +12672,8 @@ def v3_transport(account_id: int):
     if len(rows) != 1:
         raise HTTPException(409, "账号没有唯一的 v3 环境绑定")
     try:
+        if not wake:
+            return account_runtime.existing_transport(dict(rows[0]))
         return account_runtime.transport(dict(rows[0]), effective_claude_code_version())
     except (ValueError, RuntimeError):
         raise HTTPException(503, "账号环境未就绪或需要维护")
