@@ -12724,7 +12724,9 @@ def v3_environments() -> list[dict]:
     finally:
         connection.close()
     ownerships = credential_ownership.summaries() if credential_ownership else {}
+    native_preparations = account_runtime.native_preparation_snapshots()
     for row in rows:
+        account = None
         row['credential_ownership'] = ownerships.get(row['account_id'])
         row["role_status"] = account_runtime.role_status(row)
         blocker = account_runtime.reprofile_blocker(row)
@@ -12738,6 +12740,7 @@ def v3_environments() -> list[dict]:
             row["run_window"] = _account_run_window(dict(account), public=True, zone=row["fingerprint"]["tz"]) if account else None
         else:
             row["run_window"] = None
+        row['native_preparation'] = account_runtime.native_preparation_summary(row, dict(account) if account else None, native_preparations)
         row["physical_features"] = physical_features_summary(row,
             account_runtime._root(row) / "runtime/physical-features.json", time.time())
         with account_runtime.lock:

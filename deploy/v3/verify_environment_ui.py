@@ -31,6 +31,8 @@ def sample_rows() -> list[dict]:
         'physical_features': {'message': '上次采集快照', 'observed_at': time.time(), 'fields': [
             {'key': 'ram_bytes', 'label': '容器 RAM 上限', 'configured': 0, 'observed': 0, 'status': 'match'},
             {'key': 'cpu', 'label': 'CPU 型号', 'configured': None, 'observed': None, 'status': 'unobserved'}]},
+        'native_preparation': {'state': 'ready', 'idle_workers': 1, 'live_workers': 1,
+            'pid': 27, 'checked_at_ms': int(time.time() * 1000)},
         'native_kernel': {'state': 'active', 'revision': '10:initial',
             'current': {'release': 'v0.1.0-beta.3', 'launcher_sha256': OLD_SHA},
             'prepared': {'release': 'v0.1.0-beta.4', 'launcher_sha256': NEW_SHA},
@@ -40,7 +42,7 @@ def sample_rows() -> list[dict]:
     for number, status in [(2, 'ready'), (3, 'stopped'), (4, 'future-state')]:
         other = copy.deepcopy(row)
         other.update(environment_id=str(number) * 32, name=f'演示环境 {number}', account_id=number,
-            state=status, native_kernel=None)
+            state=status, native_kernel=None, native_preparation=None)
         if status != 'ready':
             other['role_status'] = {'cli': 'exited', 'network': 'missing', 'sender': 'exited'}
         rows.append(other)
@@ -86,6 +88,22 @@ class Fixture:
             assert request.method == 'POST'
             self.sessions += 1
             payload = {'ok': True}
+        elif path == '/admin/settings':
+            payload = {'request_diagnostics_log_mode': 'info'}
+        elif path.startswith('/admin/request-diagnostics'):
+            root = {'request_id': '11111111-1111-4111-8111-111111111111', 'started_at': '2026-11-12T00:00:00Z',
+                'status_code': 200, 'account_id': 1, 'outcome': 'success', 'attempt_count': 2, 'log_mode': 'info'}
+            if path == '/admin/request-diagnostics':
+                payload = {'items': [root], 'total': 1, 'health': {}}
+            else:
+                attempt = {'attempt_id': '22222222-2222-4222-8222-222222222222', 'account_id': 1,
+                    'ordinal': 1, 'profile_selection': 'native293_cc_prepared', 'status_code': 200,
+                    'outcome': 'success', 'log_mode': 'info', 'capture_status': 'disabled'}
+                legacy = dict(attempt, ordinal=2, attempt_id='33333333-3333-4333-8333-333333333333')
+                attempt['runtime'] = {'worker_id': '44444444-4444-4444-8444-444444444444', 'worker_pid': 27,
+                    'kernel_generation': None, 'warm_hit': True, 'preparation_wait_ms': 0, 'checkout_ms': 1,
+                    'worker_start_ms': None, 'prepared_ms': 185}
+                payload = {'request': root, 'attempts': [attempt, legacy]}
         elif '/api/' in path:
             api = path.split('/api/', 1)[1]
             if request.method != 'GET':
@@ -218,6 +236,22 @@ async def run(output: Path, gateway: Path) -> dict:
             await expect(frame.locator('.env-badge')).to_have_text('未知状态：future-state')
             await frame.locator('#environment-status').select_option('all')
             scenes.append('名称/ID 搜索、实际状态筛选和未知状态，刷新保留选择')
+
+            previous = len(fixture.writes)
+            preparation = target.locator('[data-native-preparation]')
+            await expect(preparation).to_contain_text('热进程就绪')
+            await expect(preparation).to_contain_text('27')
+            fixture.rows[0]['native_preparation'] = {'state': 'unknown', 'reason': 'check_expired'}
+            await refresh()
+            await expect(preparation).to_contain_text('最近检查已过期')
+            await expect(preparation).to_contain_text('未观测')
+            fixture.rows[0]['native_preparation'] = {'state': 'preparing', 'checked_at_ms': int(time.time() * 1000)}
+            await refresh()
+            await expect(preparation).to_contain_text('正在准备')
+            fixture.rows[0]['native_preparation'] = sample_rows()[0]['native_preparation']
+            await refresh()
+            assert len(fixture.writes) == previous
+            scenes.append('实时准备、过期与准备中状态准确展示，状态读取零业务写入')
 
             await target.get_by_text('环境与物理详情', exact=True).click()
             physical = target.locator('details.physical-features')
@@ -392,6 +426,15 @@ async def run(output: Path, gateway: Path) -> dict:
             await frame.locator('[data-tab="environments"]').click()
             await expect(frame.locator('.env-card')).to_have_count(4)
             scenes.append('环境作用域退出后恢复原主题偏好和其他页样式')
+            await page.get_by_role('link', name='请求记录', exact=True).click()
+            await page.get_by_role('button', name='详情', exact=True).click()
+            runtime = page.locator('[data-native-runtime]')
+            await expect(runtime).to_contain_text('命中热进程')
+            await expect(runtime).to_contain_text('PID 27')
+            await expect(runtime).to_contain_text('本地准备合计 185 ms')
+            await expect(page.get_by_text('原生进程复用与本地阶段：未观测', exact=True)).to_be_visible()
+            assert await page.locator('html').evaluate('node=>node.scrollWidth<=innerWidth')
+            scenes.append('请求详情展示真实 PID/热命中/本地分段；历史记录保留未观测，手机无溢出')
             assert not errors, errors
             assert not fixture.unexpected, fixture.unexpected
             return {'status': 'passed', 'scenes': scenes, 'scene_count': len(scenes), 'script_errors': errors,

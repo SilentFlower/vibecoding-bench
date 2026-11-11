@@ -166,6 +166,38 @@ class AccountRuntimeTests(unittest.TestCase):
         self.runtime._notify_native_preparation(account, row)
         self.assertEqual(self.gateway._request.call_count, 3)
 
+    def test_native_readiness_snapshots_keep_binding_freshness_and_secrets_separate(self) -> None:
+        """列表仅发一次批量读取，旧代次、过期值和秘密不会冒充当前热进程。@return None。"""
+        row = self.runtime._row('synthetic', 1)
+        row.update(state='ready', generation=3)
+        account = {'cc2api_account_id': 7}
+        checked = int(time.time() * 1000)
+        value = {'account_id': 7, 'environment_id': row['environment_id'], 'generation': 3,
+            'state': 'ready', 'pid': 123, 'idle_workers': 1, 'live_workers': 1,
+            'checked_at_ms': checked, 'bearer': 'synthetic-secret', 'reason': 'arbitrary-secret'}
+        self.gateway._request.return_value = [value]
+        snapshots = self.runtime.native_preparation_snapshots()
+        self.gateway._request.assert_called_once_with('GET', '/admin/native-preparations', timeout=3)
+        with patch('account_runtime._read_json', return_value={'native': {'binary_path': 'synthetic'}}), \
+                patch.object(self.runtime, 'ensure', side_effect=AssertionError('禁止唤醒')):
+            summary = self.runtime.native_preparation_summary(row, account, snapshots)
+            self.assertEqual((summary['state'], summary['pid']), ('ready', 123))
+            self.assertNotIn('bearer', summary)
+            self.assertIsNone(summary['reason'])
+            value['kernel_generation'] = 'old-kernel-generation'
+            self.assertEqual(self.runtime.native_preparation_summary(row, account, snapshots)['state'], 'unknown')
+            value.pop('kernel_generation')
+            value['generation'] = 2
+            self.assertEqual(self.runtime.native_preparation_summary(row, account, snapshots)['state'], 'unknown')
+            value.update(generation=3, checked_at_ms=checked - 46000)
+            self.assertEqual(self.runtime.native_preparation_summary(row, account, snapshots)['reason'], 'check_expired')
+            row['state'] = 'stopped'
+            self.assertEqual(self.runtime.native_preparation_summary(row, account, snapshots)['state'], 'sleeping')
+        with patch('account_runtime._read_json', return_value={'native': None}):
+            self.assertIsNone(self.runtime.native_preparation_summary(row, account, snapshots))
+        self.gateway._request.side_effect = OSError('合成故障')
+        self.assertEqual(self.runtime.native_preparation_snapshots(), {})
+
     def test_cli_storage_failure_keeps_verified_private_version_available(self) -> None:
         """去重是可选优化，磁盘缓存故障不能使已验证安装的 CLI 登录失败。@return None。"""
         row = self.runtime._row('synthetic', 1)

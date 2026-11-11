@@ -55,6 +55,8 @@ async function renderEnvironments() {
       // 操作期间只串行读取状态；离页立即释放定时器，避免迟到回执污染下一页。
       if (ui.pending.size || ui.rows.some(row => KERNEL_BUSY_STATES.includes(row.native_kernel?.state))) {
         ui.timer = setTimeout(renderEnvironments, 2000);
+      } else if (ui.rows.some(row => row.native_preparation)) {
+        ui.timer = setTimeout(renderEnvironments, 20000);
       }
     }
   }
@@ -120,10 +122,36 @@ function renderEnvironmentCard(row) {
     ${ownership ? `<p class="env-notice" role="status">${escapeHTML(ownership.message)}${ownership.phase !== 'ready' && ['return', 'attach', 'authorize'].includes(ownership.direction) ? action('cancel-credential-return', '取消未提交交接', row.busy) : ''}</p>` : ''}
     ${ui.feedback.has(id) ? `<p class="env-notice" role="status">${escapeHTML(ui.feedback.get(id))}</p>` : ''}
     ${renderNativeKernel(row)}
+    ${renderNativePreparation(row)}
     <section class="env-window"><div><h4>当地运行窗口</h4>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : '<p class="env-muted">运行窗口尚未提供</p>'}</div>${row.run_window && row.account_id != null ? `<button type="button" class="btn btn-sm" data-run-window-config="${escapeHTML(row.account_id)}" data-environment="${escapeHTML(id)}" data-env-focus="${escapeHTML(id + ':window')}">配置时段</button>` : ''}</section>
     <details class="env-details" data-env-details="${escapeHTML(id + ':technical')}"><summary>环境与物理详情</summary><div class="env-details-body"><dl><dt>环境 ID</dt><dd><code>${escapeHTML(id)}</code></dd><dt>主机名</dt><dd>${escapeHTML(fingerprint.hostname || '未提供')}</dd><dt>设备身份</dt><dd>${escapeHTML(row.identity_status || '待核对')}</dd><dt>语言区域</dt><dd>${escapeHTML(fingerprint.lang || '未提供')}</dd><dt>画像版本</dt><dd>${escapeHTML(fingerprint.profile_version ?? '未提供')}</dd></dl>${row.physical_features ? renderPhysicalFeatures(row) : '<p class="env-muted">物理实测尚未采集。</p>'}</div></details>
     <details class="env-details" data-env-details="${escapeHTML(id + ':maintenance')}"><summary>维护操作</summary><div class="env-details-body"><p class="env-muted">停止和重建保留 HOME、身份及证据。画像校正按服务器许可执行。</p><div class="env-actions">${action('stop', '停止环境', row.busy)}${action('rebuild', '重建容器', row.busy)}${action('reconcile', '故障对账', row.busy)}${action('reprofile', '校正画像', !row.can_reprofile)}</div>${row.reprofile_message ? `<p class="env-muted">${escapeHTML(row.reprofile_message)}</p>` : ''}</div></details>
   </article>`;
+}
+
+/**
+ * 展示最近真实巡检结果，与内核操作的历史预热回执分开呈现。
+ * @param {object} row 含原生准备安全摘要的环境。
+ * @return {string} 已转义的准备状态区域。
+ */
+function renderNativePreparation(row) {
+  const value = row.native_preparation;
+  if (!value) return '';
+  const labels = {ready: '热进程就绪', busy: '进程使用中', preparing: '正在准备', unprepared: '等待准备',
+    sleeping: '环境休眠', disabled: '账号停用', maintenance: '维护中', failed: '准备失败', unknown: '待检查'};
+  const reasons = {identity_changed: '运行身份已变化', worker_unavailable: '进程退出或管道异常',
+    check_expired: '最近检查已过期', check_failed: '状态检查失败', preparation_failed: '本地准备失败',
+    invalidated: '准备已失效', capability_unknown: '原生能力待核对', binding_unverified: '当前环境代次待核对',
+    maintenance: '账号正在维护', sleeping: '环境休眠', disabled: '账号已停用'};
+  const tone = value.state === 'ready' ? 'good' : ['busy', 'sleeping', 'disabled'].includes(value.state) ? 'muted' : 'warning';
+  const checked = typeof value.checked_at_ms === 'number' && Number.isFinite(value.checked_at_ms)
+    ? new Date(value.checked_at_ms).toLocaleString() : '未观测';
+  return `<section class="env-preparation" data-native-preparation>
+    <div class="env-card-head"><h4>原生准备</h4><span class="env-badge env-${tone}">${escapeHTML(labels[value.state] || '未知状态')}</span></div>
+    <div class="env-resources"><div><span>空闲热进程</span><strong>${escapeHTML(value.idle_workers ?? '未观测')}</strong></div><div><span>实际进程数</span><strong>${escapeHTML(value.live_workers ?? '未观测')}</strong></div><div><span>空闲 PID</span><strong>${escapeHTML(value.pid ?? '未观测')}</strong></div></div>
+    <p class="env-muted">最近检查：${escapeHTML(checked)}</p>
+    ${value.reason ? `<p class="env-notice">${escapeHTML(reasons[value.reason] || '状态待核对')}</p>` : ''}
+  </section>`;
 }
 
 /**

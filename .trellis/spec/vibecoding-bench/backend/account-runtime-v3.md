@@ -1255,6 +1255,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.2 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
 - `account_limits(memory,swap)`、`isolated_account_limits`、`scenario_account_limits`、`serial_review_limits` 接受账号 `mem="unlimited"`，无限模式 Docker 额度为 `(0,-1)`；`memory_bytes` 继续只解析有限配置。
 - fingerprint 可选 `native_sender_memory`，无限原生账号保存 `"unlimited"`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
+- `AccountRuntime.native_preparation_snapshots() -> dict[int,dict]` 通过一次 `GET /admin/native-preparations` 读取批量快照，超时3秒；`native_preparation_summary(row,account,snapshots) -> dict|None` 为 `/api/environments` 生成安全的 `native_preparation`。
 
 ### 3. Contracts
 
@@ -1266,6 +1267,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 每次新进程先核验固定分发体，通过FD启动，握手验证PID/版本/raw_input_protocol，再核实际执行体SHA。首个实际映像要求 WRITE/GROW/SHRINK/SEAL 四项封存，池缓存只读FD；后续重新exec共享同一dev/inode。分发/执行体固定摘要由消费者代码及桥接运行时合同登记，外部manifest不授信。
 - 每个进程独立HOME/config/cwd、当前bearer及worker_id，每轮独立原生根。账号/身份/代理/凭据/并发摘要改变产生新代次，旧活动自然收口，空闲旧进程退役。单进程一次作业，唯一终态及匹配idle后复用；取消、迟到/损坏帧和状态不明均退役。
 - 单个弱引用回收任务在额外进程空闲60秒后保留1个暖进程；忙进程保持当前归属。映像缓存可在所有原进程退出后支持重建，池销毁释放FD。
+- 运行中原生账号由网关每20秒零模型巡检并按需恢复，具体身份、退避和计时合同见[原生持续预热](../../cc2api/backend/service-architecture.md#scenario-原生持续预热实时就绪与请求进程诊断)。巡检只查询已有绑定，不唤醒休眠环境。
+- 环境摘要先核验账号绑定、环境 ID/代次及本地 sender 的 `native.kernel_generation`；检查时间必须在当前时间前0～45000毫秒。只投影受控 state/reason、检查时间、环境归属和非负进程数/正 PID。ready 必须同时有空闲进程和 PID。历史 `native_kernel` 预热回执继续作为历史信息。
 - 启动预热只解析唯一绑定且启用的原生账号；复用环境启动和既有首 worker 准备。有空余环境容量才启动新角色，保持原账号回收与维护策略。启动补偿有界，服务运行期间不循环唤醒。
 - 首条业务拿走唯一进程且账号允许两条普通并发时，sender 可为当前代次登记一次后台补位。首条直接投递；后续请求优先取空闲进程，缺空闲时可在自己的截止前等这一轮就绪。补位失败沿现有 checkout 路径处理。补位使用原物理计数与已核验映像，只提交初始化指令；结果通过真实握手后进入同一空闲池。
 - 布局/预算变化只在job和API活动为空时重建。配置事务已停sender时复用 `_running_sender_active` 记零活动；运行中读取真实活动，归属或查询失败仍拒绝重建。
@@ -1285,6 +1288,8 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 | 原生方式显式回退legacy | 空闲重建128 MiB sender，另一个账号保持其选择 |
 | 后台预启动遇到环境容量已满或需要维护 | 跳过预启动，保留在运行的账号 |
 | 补位期间切换内核或绑定代次变化 | 撤销旧补位，迟到进程退役 |
+| 批量通道失败、未知能力、绑定或内核代次不符、检查过期 | 环境状态 unknown，显示受控原因 |
+| legacy/草稿或停止环境 | 摘要分别为 null 或 sleeping；读取保持零模型调用 |
 
 ### 5. Scenarios and Examples
 
@@ -1295,6 +1300,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 错误用法：布局检查查询已被配置事务停止的HTTP sender。正确处理：核验归属后按停止状态处理；运行中仍查询真实活动。
 - 正常：配置试点后服务启动先准备一个 worker；首条占用后才补位，回收超期额外进程时仍保留一个。
 - 错误用法：用合成 Messages 请求暖机，或让并发等待者各启动一个备用进程。正确处理：只做零模型握手，复用当前代次已有的补位登记。
+- 正常：批量巡检快照显示最近检查时间和暖进程 PID；进程退出后下一轮重新准备。错误用法：将任意错误文本、bearer 或旧内核 ready 转发到环境页面。正确处理：只投影当前归属的白名单摘要。
 
 ### 6. Tests Required
 
@@ -1302,6 +1308,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `test_native_sender.py`：默认legacy、显式预算、总RAM/CLI下限、未知后端、容量无任意64进程上限；`test_native_layout_rebuild_after_quiesce_keeps_busy_sender_protected`：忙时拒绝、停止后正确重建和代次/预算。
 - Rust实际 `native_real_binary`：共享dev/inode及四项封存、6→1空闲回收、取消→0、全部原进程退出后缓存重建、独立凭据及一次提交。
 - 预启动回归：`test_account_runtime.py` 验证仅启用绑定、满容量时不腾挪、sender 开关先写后通知；`native_real_binary` 验证首个预热 PID、第二个唯一补位、回收到一个以及零模型计数。
+- `test_account_runtime.py` 核验批量读取、绑定/内核代次、新鲜度、非法数字、legacy/休眠及秘密过滤；合成环境页断言读取零写入且准备失败/过期明确显示。
 - `deploy/v3/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、60秒回收及按账号回退；验证镜像的额外CA仅限本地夹具。
 - 发布验收从实际Release下载附件，核SHA/大小、冻结构建输入并运行真实消费者；合成回环与真实付费推理分开记录。
 

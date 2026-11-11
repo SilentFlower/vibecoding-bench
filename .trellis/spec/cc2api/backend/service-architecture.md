@@ -88,6 +88,50 @@ src/tlsfp/
 - `native_real_gateway`：首次只读绑定503后的启动补偿、零模型预热、首次同PID、在途提示后绑定故障仍继续准备、准备完成时换代拒绝、凭据轮换旧PID退出、真实主/子会话映射与观察对应。使用隔离网络及合成 TLS，不触发真实账号模型。
 - `ownership_return_is_atomic_idempotent_and_old_reply_cannot_reopen`断言交接 finish 与同操作重放产生原生就绪通知；`test_account_runtime.py`覆盖只读休眠/缺失、绑定归属/代次及通知去重/失败补偿。分发体缓存覆盖同大小改写且恢复mtime、chmod及inode替换后拒绝/重验；取消覆盖提前登记、等待初始化与跨代次隔离。
 
+## Scenario: 原生持续预热、实时就绪与请求进程诊断
+
+### 1. Scope / Trigger
+
+- `native_prewarm.rs`、`native_runtime.rs`、`runtime_transport.rs` 和请求诊断共用当前原生池，增加零模型存活检查和实际业务进程观测。准备成功回执与实时可接单状态分别保存。
+
+### 2. Signatures
+
+- 私有鉴权 `POST /internal/native/readiness` 接收既有 `NativePreparation`，返回 `NativeReadinessStatus`。`GET /internal/native/status` 继续只表示能力。
+- `GET /admin/accounts/:id/native-preparation` 主动检查当前身份；`GET /admin/native-preparations` 返回最近巡检快照数组；既有 POST 继续合并准备提示。
+- `NativeRequestObservation.runtime`、持久化 `AttemptDiagnostic.runtime` 为可选 `NativeRuntimeObservation`，历史记录缺字段按 None 解析；沿用诊断 JSON，数据库结构保持原合同。
+
+### 3. Contracts
+
+- `NativeReadinessStatus` 字段为 `state:String,account_id:i64,environment_id:String,generation:u64,kernel_generation:Option<String>,release:Option<NativeReleaseRef>,checked_at_ms:u64,idle_workers:usize,live_workers:usize,pid:Option<u32>,reason:Option<String>`。池状态为 `ready|busy|preparing|unprepared|failed`，协调器另投影休眠、停用、维护、失败和未知。
+- 就绪必须属于与业务相同的配置、bearer、账号身份及并发池键。检查真实子进程与空闲管道，坏进程退役；固定分发体、执行映像及封存校验完成后才记录 worker 的 ready 时刻。旧身份物理进程仍忙时不得充当新身份 busy。
+- readiness 只检查本地状态，不启动进程或执行模型。业务 checkout 再原子校验和占用。准备仍由原 prepare 接口完成真实握手并回到同一池；冷池首轮初始化共享代次锁，后续扩容维持原物理上限。
+- 启动补偿外，每20秒巡检已启用原生账号，仅解析 `wake=false` 运行绑定。待处理最多128、并行2、按账号去重，轮转扫描避免高 ID 饥饿；失败退避40/80/160/300秒，显式变更提示清除退避。`busy|preparing` 等待后续巡检，`unprepared|failed` 才重新准备。
+- 发布前重读权威账号与绑定；排他维护、更新门禁、凭据活动关闭和取消继续优先。批量缓存的 ready 超过45秒转 `unknown/check_expired`。`last_preparation` 仅保存历史准备回执；GET 主动检查不承担恢复启动。
+- `NativeRuntimeObservation` 字段为 `worker_id:UUID,worker_pid:u32,kernel_generation:Option<UUID>,warm_hit:bool,preparation_wait_ms:u64,checkout_ms:u64,worker_start_ms:Option<u64>,prepared_ms:u64`。毫秒值来自单调时钟。`warm_hit` 表示该 worker 在本次池接收前已经 ready；`worker_start_ms` 仅记录本次 checkout 启动的 worker。
+- `prepared_ms` 从已验证信封进入 `submit_validated` 计至实际收到 `cc_prepared`，包含准备锁等待、checkout 与正文组装；`worker_start_ms` 包含于 checkout。该段不包含此前网关上传及解码，也不等于最终 TLS 发出或上游首字。原完整提交耗时继续保留，页面不得将重叠字段相加。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 身份改变、进程退出、EOF 或迟到帧 | 原 ready 失效，后台按当前身份恢复；业务保留原截止与单次提交 |
+| 正在初始化或全忙 | preparing 或 busy，保持原并发与物理上限 |
+| 错误绑定、过期信封、证据禁用或平台不支持 | 沿私有通道拒绝，模型零发送 |
+| 诊断 PID 为0、UUID非法或计时关系越界 | 丢弃损坏观察，保持观察缺口可见；计时关系允许2毫秒取整偏差 |
+| `preparation_wait_ms + checkout_ms > prepared_ms + 2` 或 `worker_start_ms > checkout_ms + 2` | 原生观察校验失败 |
+
+### 5. Scenarios and Examples
+
+- 正常：准备得到 PID 123，业务到达前该 worker 已 ready，首次业务记录 `worker_pid=123,warm_hit=true,worker_start_ms=null`。准备与巡检的模型 POST 增量为0。
+- 边界：准备与业务竞争时，业务记录实际等待；凭据轮换后旧忙进程自然收口，新身份单独建立可接单进程。进程故障恢复包含巡检及启动时间。
+- 错误用法：用上次准备成功回执显示持续就绪，或把 `prepared_ms` 当作端到端首字延迟。正确处理：核对实时身份、活性及检查时间，并分别显示原始阶段口径。
+
+### 6. Tests Required
+
+- `native_real_binary`：当前/错误身份、真实61秒等待与可控1800/14400秒空闲年龄、同 PID 首次复用、冷暖相同正文与资源对照、并发上限及取消退役；长空闲年龄与实际等待分别标注。
+- `native_real_gateway`：终止预热进程后周期恢复为新 PID，恢复模型计数增量0；业务诊断持久化真实 PID、暖命中与启动字段，凭据轮换隔离。
+- 诊断与历史记录单测覆盖缺字段、非法 PID/UUID 和计时越界；前端构建及合成浏览器覆盖历史未观测、实际暖命中与阶段口径。
+
 ## Gateway 热路径规则
 
 `GatewayService::handle_request` / `handle_request_inner` 是最高风险路径。修改前必须明确：

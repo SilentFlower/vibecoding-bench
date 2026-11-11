@@ -157,7 +157,7 @@
 .environment-page :is(.env-resources, .env-versions) strong { font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
 .environment-page .env-notice { margin: 14px 22px !important; padding: 10px 12px; background: var(--env-warning-bg); border-radius: 9px !important; color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
 .environment-page .env-notice .btn { margin: 8px 4px 0 0; }
-.environment-page .env-kernel { margin: 18px 22px; padding: 16px; background: var(--env-kernel-bg); border: 1px solid var(--env-kernel-border); border-radius: 10px !important; }
+.environment-page :is(.env-kernel, .env-preparation) { margin: 18px 22px; padding: 16px; background: var(--env-kernel-bg); border: 1px solid var(--env-kernel-border); border-radius: 10px !important; }
 .environment-page .env-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .environment-page .env-tag { font-size: 10px; color: var(--amber-deep); background: var(--env-accent-bg); padding: 2px 8px; border-radius: 4px !important; }
 .environment-page .env-kernel-version { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 12px; }
@@ -223,7 +223,7 @@
   .environment-page .env-card-head { padding: 17px 18px 13px; }
   .environment-page .env-roles { padding-inline: 18px; }
   .environment-page :is(.env-resources, .env-window) { margin-inline: 18px; }
-  .environment-page .env-kernel { margin: 16px 18px; padding: 14px; }
+  .environment-page :is(.env-kernel, .env-preparation) { margin: 16px 18px; padding: 14px; }
   .environment-page .env-kernel-version strong { font-size: 18px; }
   .environment-page .env-details { padding: 12px 18px; }
   .environment-page .env-badge { white-space: normal; max-width: 110px; }

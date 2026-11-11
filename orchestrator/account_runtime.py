@@ -801,6 +801,63 @@ class AccountRuntime:
             self._notify_native_preparation(account, row)
         return row, container
 
+    def native_preparation_snapshots(self) -> dict[int, dict]:
+        """批量读取最近巡检结果，避免列表逐账号阻塞。
+
+        :return: 按网关账号 ID 索引的快照；通道失败时为空。
+        """
+        try:
+            values = self.gateway._request('GET', '/admin/native-preparations', timeout=3)
+            if not isinstance(values, list):
+                return {}
+            return {value['account_id']: value for value in values if isinstance(value, dict)
+                and type(value.get('account_id')) is int and value['account_id'] > 0}
+        except (ValueError, OSError, RuntimeError):
+            return {}
+
+    def native_preparation_summary(self, row: dict, account: dict | None, snapshots: dict[int, dict]) -> dict | None:
+        """将巡检快照投影到当前环境，秘密和旧代次证据不进入页面。
+
+        :param row: 当前环境记录
+        :param account: bench 账号和网关绑定
+        :param snapshots: 本次批量读取的网关快照
+        :return: 原生安全状态；legacy 或草稿为空。
+        """
+        if not account or not account.get('cc2api_account_id'):
+            return None
+        try:
+            configuration = _read_json(self._sender_config(row))
+            if not isinstance(configuration, dict):
+                return {'state': 'unknown', 'reason': 'capability_unknown'}
+            if not configuration.get('native'):
+                return None
+        except (OSError, ValueError, TypeError):
+            return {'state': 'unknown', 'reason': 'capability_unknown'}
+        if row.get('state') == 'stopped':
+            return {'state': 'sleeping', 'reason': None}
+        value = snapshots.get(account['cc2api_account_id'], {})
+        state = value.get('state')
+        if state in ('sleeping', 'disabled', 'maintenance'):
+            return {'state': state, 'reason': state}
+        native = configuration.get('native')
+        if (value.get('environment_id') != row['environment_id'] or value.get('generation') != row['generation']
+                or not isinstance(native, dict) or value.get('kernel_generation') != native.get('kernel_generation')):
+            return {'state': 'unknown', 'reason': 'binding_unverified'}
+        checked = value.get('checked_at_ms')
+        if type(checked) is not int or not 0 <= time.time() * 1000 - checked <= 45000:
+            return {'state': 'unknown', 'reason': 'check_expired', 'checked_at_ms': checked if type(checked) is int else None}
+        states = {'ready', 'busy', 'preparing', 'unprepared', 'failed', 'unknown'}
+        reasons = {'identity_changed', 'worker_unavailable', 'check_expired', 'check_failed', 'preparation_failed', 'invalidated'}
+        result = {key: value[key] for key in ('checked_at_ms', 'generation', 'environment_id') if key in value}
+        result['state'] = state if state in states else 'unknown'
+        result['reason'] = value.get('reason') if value.get('reason') in reasons else None
+        for key in ('idle_workers', 'live_workers', 'pid'):
+            number = value.get(key)
+            result[key] = number if type(number) is int and number >= (1 if key == 'pid' else 0) else None
+        if result['state'] == 'ready' and (not result['idle_workers'] or not result['pid']):
+            return {'state': 'unknown', 'reason': 'check_failed'}
+        return result
+
     def _notify_native_preparation(self, account: dict, row: dict) -> None:
         """环境就绪后只入队通知，避免生命周期锁内等待原生加载。
 
