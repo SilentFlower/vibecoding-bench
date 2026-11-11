@@ -10,6 +10,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from docker.types import Mount
 
+from account_update_identity import configured_release, image_origin, role_release, save_image_origin
+
 from native_kernel_upgrade import applied_kernel, pilot_key
 from resource_budget import isolated_account_limits, scenario_account_limits
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
@@ -30,7 +32,7 @@ def role_labels(runtime, row: dict, role: str) -> dict:
     :return: Docker 标签。
     """
     return {**runtime._labels(row), 'vibebench.role': ROLE_LABELS[role],
-        'vibebench.release': runtime.release_id, 'vibebench.isolation-version': str(ISOLATION_VERSION)}
+        'vibebench.release': role_release(runtime, row), 'vibebench.isolation-version': str(ISOLATION_VERSION)}
 
 
 def role_container(runtime, row: dict, role: str, allow_old_release: bool = False):
@@ -46,9 +48,13 @@ def role_container(runtime, row: dict, role: str, allow_old_release: bool = Fals
     if not identifier:
         raise ValueError('账号隔离角色尚未登记，需要先对账')
     container = runtime.client.containers.get(identifier)
-    expected = role_labels(runtime, row, role)
-    if allow_old_release:
-        expected.pop('vibebench.release')
+    expected = {**runtime._labels(row), 'vibebench.role': ROLE_LABELS[role],
+        'vibebench.isolation-version': str(ISOLATION_VERSION)}
+    if not allow_old_release:
+        expected['vibebench.release'] = role_release(runtime, row)
+        origin = image_origin(runtime, row)
+        if origin and container.attrs.get('Image') != origin['image_id']:
+            raise ValueError('账号角色实际镜像与原始来源不符')
     if any(container.labels.get(key) != value for key, value in expected.items()):
         raise ValueError('账号隔离角色归属、代次或镜像批次不匹配')
     return container
@@ -132,9 +138,10 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     resolver.chmod(0o444)
     generation = int(row['generation']) + 1
     runtime._update(row, generation=generation, state='starting', isolation_version=ISOLATION_VERSION)
+    save_image_origin(runtime, row)
     binding = {'account_id': int(account.get('cc2api_account_id') or 0), 'environment_id': row['environment_id'],
         'generation': generation, 'endpoint': f'http://{name}:8091',
-        'secret': secrets.token_hex(32), 'release_id': runtime.release_id}
+        'secret': secrets.token_hex(32), 'release_id': configured_release(runtime)}
     userinfo = parsed.netloc.rsplit('@', 1)[0] + '@' if '@' in parsed.netloc else ''
     resolved_proxy = urlunsplit((parsed.scheme, f'{userinfo}{address}:{parsed.port}', parsed.path, parsed.query, ''))
     sender_file = paths['sender'] / 'sender.json'

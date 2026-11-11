@@ -1,0 +1,16 @@
+# 首次接入后显式叠加此模板；目录由 root 独立更新服务管理。
+services:
+  gateway:
+    environment:
+      V3_ACCOUNT_RELEASE: ${V3_ACCOUNT_RELEASE:?需要精确账号镜像来源}
+      V3_UPDATE_GATE_DIR: /run/v3-updates/gate
+    volumes:
+      - ${V3_UPDATE_ROOT:?需要独立更新目录}/gate:/run/v3-updates/gate:ro
+  orchestrator:
+    environment:
+      V3_ACCOUNT_RELEASE: ${V3_ACCOUNT_RELEASE:?需要精确账号镜像来源}
+      V3_UPDATE_GATE_DIR: /run/v3-updates/gate
+      V3_UPDATE_SOCKET_DIR: /run/v3-updates/socket
+    volumes:
+      - ${V3_UPDATE_ROOT}/gate:/run/v3-updates/gate:ro
+      - ${V3_UPDATE_ROOT}/socket:/run/v3-updates/socket:ro

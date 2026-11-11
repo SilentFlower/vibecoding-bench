@@ -9,14 +9,23 @@ jobs:
   build:
     if: github.ref == 'refs/heads/v3'
     permissions:
-      contents: read
+      contents: write
       packages: write
+    concurrency:
+      group: v3-signed-system-release
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     steps:
       - name: 检出父仓与子仓
         uses: actions/checkout@v6
         with:
           submodules: recursive
+      - name: 验证系统更新合同与恢复状态机
+        run: |
+          python3 -m venv "$RUNNER_TEMP/v3-update-venv"
+          "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r orchestrator/requirements.txt
+          "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s deploy/v3 -p 'test_system*.py'
+          "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s orchestrator -p 'test_system_update*.py'
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/v3/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
       - name: 登录 GHCR
@@ -37,3 +46,8 @@ jobs:
           path: |
             releases/v3.json
             releases/v3-images.tar.gz
+      - name: 发布受信系统版本与原子目录
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          V3_SYSTEM_RELEASE_PRIVATE_KEY: ${{ secrets.V3_SYSTEM_RELEASE_PRIVATE_KEY }}
+        run: python3 deploy/v3/publish_system_release.py

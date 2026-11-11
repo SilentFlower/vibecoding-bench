@@ -100,6 +100,8 @@ def inspect_images(values: dict) -> dict:
             raise ValueError("联合镜像缺少三角色隔离能力")
         if manifest.get('credential_ownership_protocol') == 1 and labels.get('vibebench.credential-ownership-protocol') != '1':
             raise ValueError('联合镜像缺少凭据归属协议能力，禁止单侧更新')
+        if manifest.get('system_update_protocol') == 1 and labels.get('vibebench.system-update-protocol') != '1':
+            raise ValueError('联合镜像缺少部署更新协议能力')
         for label, key in (("release", "release"), ("parent-revision", "parent_revision"), ("gateway-revision", "gateway_revision")):
             if labels.get("vibebench." + label) != manifest[key]:
                 raise ValueError("镜像构建批次不匹配")
@@ -473,10 +475,11 @@ def build(release: str, manifest_path: Path) -> None:
             info = json.loads(command("docker", "image", "inspect", reference, capture=True))[0]
             images[role] = {"reference": reference, "digest": info["Id"],
                 "config_digest": _image_config_digest(reference),
+                "unpacked_bytes": info.get("Size", 0),
                 "platform": info["Os"] + "/" + info["Architecture"]}
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("x") as output:
-        json.dump({"schema": 3, "bridge_protocol": 1, "credential_ownership_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",
+        json.dump({"schema": 3, "bridge_protocol": 1, "credential_ownership_protocol": 1, "system_update_protocol": 1, "layout_version": 2, "default_cli_version": "2.1.293",
             "release": release, "parent_revision": parent, "gateway_revision": gateway,
             "dirty_worktree": dirty, "source_content_sha256": source_hash, "native_runtime": native_runtime, "images": images}, output, indent=2)
         output.write("\n")

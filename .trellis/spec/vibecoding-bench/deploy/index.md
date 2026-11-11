@@ -26,6 +26,7 @@
 | [Auth Design](./auth-design.md) | Cookie session 中间件契约、为什么不用 Basic Auth、WS 间接保护 | Filled |
 | [Claude Code 官方协议抓包](./official-protocol-capture.md) | 权限模式/模型矩阵、正式代理链路、限频、CCH / 后缀、条件头与索引盲区、TLS 采集边界 | Filled |
 | [v3 固定账号环境与交付](../backend/account-runtime-v3.md) | 两镜像联合清单、独立 Compose/端口/数据、生命周期、本地隔离验收与部署后旧镜像回收 | Filled |
+| [v3 平台在线更新](./platform-online-update.md) | 签名发行、双端排空、组件来源、管理 API、首次接入及中断恢复合同 | Filled |
 
 ---
 

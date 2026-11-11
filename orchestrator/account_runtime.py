@@ -27,6 +27,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 from docker.errors import DockerException, NotFound
 from account_isolation import ISOLATION_VERSION, ROLE_COLUMNS, ROLE_LABELS, create_environment, role_container
+from account_update_identity import configured_release, image_origin, role_release
 from capture_artifacts import capture_context_json
 from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_process_metrics
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
@@ -38,6 +39,7 @@ from native_capture import cleanup_captures
 from runtime_diagnostics import NetworkContextError, network_failure
 from runtime_files import atomic_json, atomic_text, directory_fd as _directory_fd
 from storage_maintenance import deduplicate_immutable_tree
+from system_update_gate import UPDATE_GATE, update_open
 from system_profile import (MAX_CPUINFO_BYTES, generate_computer_profile, generate_system_profile,
     render_computer_profile, render_system_profile, validate_computer_profile, validate_system_profile,
     verify_computer_profile, verify_system_profile)
@@ -138,6 +140,7 @@ class AccountRuntime:
         self._cli_artifact_protocol = 0
         self.network = os.environ["V3_NETWORK"]
         self.release_id = os.environ.get("V3_RELEASE", "")
+        self.account_release_id = (os.environ.get("V3_ACCOUNT_RELEASE") or self.release_id) if os.environ.get('V3_UPDATE_GATE_DIR') else self.release_id
         self.limit = int(os.environ.get("V3_MAX_ACTIVE_ACCOUNTS", "1"))
         if self.limit < 1:
             raise ValueError("v3 活跃环境预算必须大于零")
@@ -199,12 +202,20 @@ class AccountRuntime:
         key = environment_id + ":" + job["source"] if job.get("shared_cli") else environment_id
         if key in self.jobs and self.jobs[key] is not job:
             raise RuntimeBusy("该执行来源已经占用账号环境")
-        self.jobs[key] = job
+        if self.jobs.get(key) is job:
+            return
+        with UPDATE_GATE.lock:
+            if not update_open() and not UPDATE_GATE.continuing():
+                raise RuntimeBusy('平台正在维护，新的执行认领等待更新完成')
+            job['system_update_admitted'] = True
+            job['update_activity_id'] = UPDATE_GATE.reserve(job['source'])
+            self.jobs[key] = job
 
     def _remove_job(self, job: dict) -> None:
         for key, current in list(self.jobs.items()):
             if current is job:
                 self.jobs.pop(key)
+                UPDATE_GATE.release_reserved(job.get('update_activity_id'))
 
     def _execution_path(self, job: dict) -> Path:
         root = self._root(job["row"]) / "runtime"
@@ -617,7 +628,7 @@ class AccountRuntime:
                 self._update(row, state="reconcile" if row["state"] == "profile_reauth_reconcile" else "stopped")
             image = self.client.images.get(self.image)
             image_labels = image.attrs["Config"].get("Labels") or {}
-            if not self.release_id or image_labels.get("vibebench.product") != "v3" or image_labels.get("vibebench.role") != "account" or image_labels.get("vibebench.release") != self.release_id:
+            if not configured_release(self) or image_labels.get("vibebench.product") != "v3" or image_labels.get("vibebench.role") != "account" or image_labels.get("vibebench.release") != configured_release(self):
                 raise ValueError("账号镜像角色或构建批次不匹配")
             self._cli_artifact_protocol = 2 if image_labels.get('vibebench.cli-install-version') == '2' else 0
             gateway_configuration = {}
@@ -670,6 +681,17 @@ class AccountRuntime:
                 if any(present) and not all(present):
                     self._update(row, state="reconcile")
                     raise ValueError("账号隔离角色登记不完整，需要先对账")
+                if all(present) and os.environ.get('V3_UPDATE_GATE_DIR'):
+                    origin = image_origin(self, row)
+                    if origin['image_id'] != image.attrs['Id']:
+                        originals = [role_container(self, row, role) for role in ROLE_COLUMNS]
+                        for current in originals:
+                            current.reload()
+                        if (startup_prewarm or any(current.status == 'running' for current in originals)
+                                or self.environment_jobs(row['environment_id'])):
+                            raise ValueError('账号镜像需要由系统更新操作在空闲维护阶段重建')
+                        self._stop_environment(row, remove=True)
+                        present = [False]
                 if all(present):
                     try:
                         containers = {role: role_container(self, row, role) for role in ROLE_COLUMNS}
@@ -834,7 +856,7 @@ class AccountRuntime:
             if (binding["account_id"] != account["cc2api_account_id"]
                     or binding["environment_id"] != row["environment_id"]
                     or binding["generation"] != row["generation"]
-                    or binding.get("release_id") != self.release_id
+                    or binding.get("release_id") != role_release(self, row)
                     or config.get("proxy_source", config["proxy_url"]) != self._proxy(account)):
                 raise ValueError("运行绑定归属或配置不一致")
             return binding
@@ -1707,7 +1729,7 @@ class AccountRuntime:
                 try:
                     with connection:
                         connection.execute("UPDATE runs SET environment_id=?,environment_generation=?,execution_source=?,runtime_release=? WHERE id=?",
-                            (row["environment_id"], row["generation"], source, self.release_id, run_id))
+                            (row["environment_id"], row["generation"], source, role_release(self, row), run_id))
                 finally:
                     connection.close()
                 if (self.project_iterations and self.project_iterations.run_context(run_id)
@@ -3317,7 +3339,7 @@ class AccountRuntime:
         account_id = self.native_prewarm_account_id
         logger = logging.getLogger(__name__)
         for delay in (0, 5, 15):
-            if self.stopping.wait(delay):
+            if self.stopping.wait(delay) or not update_open():
                 return
             try:
                 connection = self.database()

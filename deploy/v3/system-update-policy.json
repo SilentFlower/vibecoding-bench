@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "rollback_compatible": {
+    "bench": [],
+    "gateway": []
+  }
+}

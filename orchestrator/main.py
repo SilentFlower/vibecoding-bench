@@ -53,6 +53,7 @@ from starlette.websockets import WebSocketState
 
 from quota_protocol import merge_quota_observation, passive_recovery_decision, quota_decision, quota_observation, quota_timestamp, warmup_quota_decision, warmup_sample_used
 from account_runtime import AccountRuntime, RuntimeBusy, V3_DEFAULT_TIMEZONE, atomic_json, derive_v3_fingerprint
+from account_update_identity import role_release
 from credential_ownership import CredentialOwnership
 from cli_quota import statusline_quota_observation
 from capture_artifacts import _capture_files, _read_capture_index, _redact_capture_headers, _redact_capture_record, _redact_capture_value, capture_context_json, capture_summary
@@ -73,6 +74,8 @@ from projects_runtime import ProjectsTerminal
 from projects_verification import ProjectsVerification
 from pi_owners import AccountPiOwners
 from warmup_pi_api import warmup_pi_router
+from system_update_gate import UPDATE_GATE, background_activity, scheduled_activity, update_open
+from system_updates import SystemUpdateAdmissionMiddleware, system_updates_router
 from projects_warmup import migrate_warmup_configuration, warmup_migration_blocker
 from topic_library import (decode_followup_timing, decode_followups, encode_followups, parse_topics,
     sample_followup_timing, sample_followups)
@@ -729,6 +732,7 @@ class Cc2ApiClient:
         payload = None
         if body is not None:
             payload = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        update_proof = UPDATE_GATE.proof() if os.environ.get('V3_UPDATE_GATE_DIR') else None
         request = urllib.request.Request(
             f"{self.base_url}{path}",
             data=payload,
@@ -737,6 +741,8 @@ class Cc2ApiClient:
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.admin_password}",
+                **({'x-v3-update-admission': update_proof, 'x-v3-service-token': os.environ.get('V3_INTERNAL_TOKEN', '')}
+                    if update_proof else {}),
                 **({"x-v3-service-token": os.environ.get("V3_INTERNAL_TOKEN", "")} if
                     (path == "/admin/accounts" and body and body.get("cli_identity"))
                     or path == '/admin/runtime/credential-capabilities'
@@ -3727,6 +3733,7 @@ class QuotaGuard:
             pass
         return "failed"
 
+    @background_activity
     def tick(self) -> None:
         """消费真实响应并恢复已有等待工作，不发送探测。
 
@@ -6152,6 +6159,7 @@ class OAuthRefreshScheduler:
                 pass
             self._stop.wait(OAUTH_REFRESH_INTERVAL_SEC)
 
+    @background_activity
     def _tick(self) -> None:
         conn = get_db()
         try:
@@ -6611,6 +6619,7 @@ class Scheduler:
                         self._batch_threads[batch_id] = t
                         t.start()
 
+    @scheduled_activity
     def _create_batch_task_and_run(
         self, batch: dict, account: dict, item: dict, run_id: str
     ) -> Optional[tuple[int, str, str]]:
@@ -6828,6 +6837,7 @@ class Scheduler:
         finally:
             conn.close()
 
+    @scheduled_activity
     def _execute(self, run_id: str, account: dict, task: dict) -> None:
         attempt = int(task.get("quota_attempt") or 0)
         with self._execution_lock:
@@ -7883,7 +7893,7 @@ def _project_admission(account: dict, run_id: str) -> bool:
     :param run_id: 本次运行。
     :return: 是否仍可开始正式执行。
     """
-    if not _account_run_window(account)["allowed"]:
+    if (not update_open() and not UPDATE_GATE.continuing()) or not _account_run_window(account)["allowed"]:
         return False
     if not quota_guard:
         return True
@@ -7927,6 +7937,8 @@ def _project_schedule_admission(account: dict) -> dict:
     message = (state.get("message") or "账号额度或认证门禁尚未解除" if state.get("blocked") or state.get("account_error") else
         policy.get("message") if policy.get("blocked") else _window_message(window) if not window["allowed"] else
         "账号环境等待对账" if environment and environment["state"] in ("reconcile", "cli_reconcile", "rebuilding") else "")
+    if not update_open():
+        message = '平台正在维护，等待更新完成后继续调度'
     if not message and login_manager and login_manager.has_active_name(str(account["name"])):
         message = "账号正在登录或重新授权"
     jobs = account_runtime.environment_jobs(environment["environment_id"]) if account_runtime and environment else []
@@ -8015,6 +8027,9 @@ def _pi_admission(account: dict, work: dict | None, *, admitted_round: bool = Fa
     :param snapshot_only: 页面只读取已持久的观察，不等待全局消费锁或重写额度文件。
     :return: 是否放行、机器可读原因、是否可被动重试及可信恢复时间。
     """
+    if not admitted_round and not update_open():
+        return {'allowed': False, 'reason': 'system_maintenance', 'retryable': True,
+            'retry_at': None, 'message': '平台正在维护，等待更新完成后继续', 'quota': None, 'window': None}
     if credential_ownership:
         try:
             credential_ownership.guard(account)
@@ -8274,6 +8289,8 @@ def _projects_credentials(account: dict) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global runner, scheduler, login_manager, continue_manager, oauth_refresh_scheduler, warmup_scheduler, quota_guard, account_runtime, credential_ownership, project_iterations, project_iteration_error, project_requester_settings, projects_service, warmup_pi_service, pi_owners
+    if V3_ENABLED and os.environ.get('V3_UPDATE_GATE_DIR') and UPDATE_GATE.state()['phase'] not in ('idle', 'blocked'):
+        raise RuntimeError('平台维护状态需要先对账，暂停初始化')
     init_db()
     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
     FLOWS_DIR.mkdir(parents=True, exist_ok=True)
@@ -8391,6 +8408,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="vibecoding-bench", lifespan=lifespan)
+app.include_router(system_updates_router(lambda: account_runtime))
 app.include_router(projects_router(lambda: projects_service))
 app.include_router(warmup_pi_router(lambda: warmup_pi_service))
 app.add_middleware(
@@ -8473,6 +8491,9 @@ def _verify_session_token(token: str) -> Optional[str]:
         return user
     except Exception:
         return None
+
+
+app.add_middleware(SystemUpdateAdmissionMiddleware, runtime_provider=lambda: account_runtime)
 
 
 @app.middleware("http")
@@ -12740,7 +12761,13 @@ def v3_environments() -> list[dict]:
             row["native_kernel"] = native_kernel_status(account_runtime, row)
         except (OSError, ValueError, TypeError):
             row["native_kernel"] = None
-        row["runtime_release"] = account_runtime.release_id
+        row["platform_release"] = account_runtime.release_id
+        try:
+            row["runtime_release"] = role_release(account_runtime, row)
+            row["runtime_release_error"] = None
+        except (OSError, ValueError):
+            row["runtime_release"] = None
+            row["runtime_release_error"] = "账号镜像来源待对账"
         row["cli_versions"] = sorted(path.name for path in (account_runtime._root(row) / "cli").glob("*/.ready") for path in [path.parent])
     return rows
 
