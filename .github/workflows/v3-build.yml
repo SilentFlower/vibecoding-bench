@@ -20,6 +20,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: recursive
+      # 与正式镜像保持同一 Python 次版本，避免 runner 默认版本漂移破坏依赖安装。
+      - name: 设置 Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
       - name: 验证系统更新合同与恢复状态机
         run: |
           python3 -m venv "$RUNNER_TEMP/v3-update-venv"

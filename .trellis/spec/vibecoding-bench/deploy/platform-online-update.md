@@ -34,6 +34,8 @@ compatible_data(original: dict, target: dict) -> bool
 
 ## 3. 数据与环境合同
 
+CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设置 `python-version: '3.12'`，与 `images/v3/Dockerfile` 的两个正式 Python 阶段一致。验证虚拟环境和后续发行命令继承该解释器。变更次版本时应联合验证锁定依赖与正式镜像。
+
 ### 受信发行
 
 - 独立 Ed25519 密钥由 CI secret `V3_SYSTEM_RELEASE_PRIVATE_KEY` 提供。宿主保存 64 位十六进制公钥，签名原始长度为 64 字节，按原始 JSON 字节验签。
@@ -90,6 +92,8 @@ compatible_data(original: dict, target: dict) -> bool
 
 ## 5. 场景与示例
 
+错误用法：依赖 runner 默认 Python 创建验证环境，随宿主升级到 3.14 后，锁定的 `pydantic-core==2.23.4` 安装失败。正确处理：先显式设置与正式镜像一致的 Python 3.12，再创建干净虚拟环境验证原依赖和测试命令。
+
 正常：管理员读取 status 与 releases，用页面生成的 UUID、当前 revision 和清单摘要提交 install。下载时继续服务；排空完成后切换控制服务，验收成功持久提交并恢复准入。
 
 边界：长响应仍在发送时，活动计数一直保留到正文结束。批次下一项在维护期间等待，当前有限执行结束后计数归零。控制重启保留原待认领项。目录过期时检查新目录；已安装历史仍按数据兼容条件提供回退。
@@ -102,6 +106,7 @@ compatible_data(original: dict, target: dict) -> bool
 
 ## 6. 必需验证与断言
 
+- CI 解释器变更：用干净 Python 3.12 虚拟环境安装 `orchestrator/requirements.txt`，执行 workflow 中两条 `unittest discover` 命令；检查设置步骤先于验证，且与两个正式镜像的 Python 次版本一致。工作流 YAML、shell 语法和 `git diff --check` 通过。
 - `deploy/v3/test_system_*.py`：签名、目录顺序/时间、严格字段与大小、数据兼容、同参幂等、revision 冲突、恢复与清理保护。首次接入覆盖 dry-run、状态提交中断、释放响应中断、原 installed_at、外来门禁、后来 revision、配置 CAS、真实文件锁互斥。
 - `orchestrator/test_system_update*.py`：实际线程/文件准入、ASGI 正文结束、原登录撤销、部分恢复边界；真实 Scheduler + SQLite 验证批次等待不阻塞排空、维护抢先分派、重启续调度、原工程续接与时间窗口/被动配额拒绝。
 - Rust `cargo test` 与 `cargo fmt --check`：门禁启动验证、完整 HttpBody 释放、租约与管理桥回归。Vue `npm --prefix web run build` 验证类型和构建。
