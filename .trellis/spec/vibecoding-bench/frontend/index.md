@@ -10,6 +10,8 @@
 
 视觉上是 "Terminal Lab" 终端实验室皮肤(暗色主 + `[data-theme=light]` 明亮变体)。
 
+环境页是独立的主后台视觉作用域，使用 `webui/environments.js`、`webui/environments.css`；具体入口、样式隔离和内核弹窗合同见 [Component Guidelines](./component-guidelines.md) 的环境页场景。
+
 所有规范文件:
 - **诚实描述代码实际是什么样**,不假装这是个 React/TS 项目
 - 模板里给出的 hook / state-management / type-safety 等概念**在本栈下不直接存在**,本目录对应文件改为说明"等价物是什么、如何在原生 JS 下解决相同问题"

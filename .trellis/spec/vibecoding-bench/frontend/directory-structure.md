@@ -10,6 +10,8 @@
 
 **核心理念**:WebUI 只服务 P1 内部使用,加载几十个题目卡片 + 一个 SSE 长连。为这点交互引 React 工具链反而拖慢迭代。**只要三个文件够用,就保持三个文件**。
 
+环境模块已独立为 `webui/environments.js`、`webui/environments.css`，由 `index.html` 顺序装载；共享 state、API、路由与时段表单仍在 `app.js`。该模块的行为和样式作用域见 [组件规范](./component-guidelines.md) 的环境页场景。
+
 ---
 
 ## Directory Layout

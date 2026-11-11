@@ -48,6 +48,9 @@ const state = {
   runWindowConfig: null,
   cliSettings: null,
   workCapture: null,
+  environmentUI: {rows: [], query: '', status: 'all', expanded: new Set(), pending: new Set(),
+    feedback: new Map(), request: 0, timer: null, loaded: false},
+  kernelDialog: null,
 };
 
 // ===================== Pi 项目指挥 =====================
@@ -124,10 +127,12 @@ function currentTab() {
 /** 切换视图并使旧页面、时段弹窗的异步回调失效。@return {void} */
 function navigate() {
   state.viewGeneration += 1;
+  leaveEnvironments();
   closeModal('#run-window-modal');
   closeProjectDialogs();
   window.ProjectsUI.unmount();
   const tab = currentTab();
+  document.documentElement.classList.toggle('environment-page', tab === 'environments');
   $$('.tabs a').forEach(a => a.classList.toggle('active', a.dataset.tab === (tab === 'warmup' ? 'projects' : tab)));
   const view = $('#view');
   view.innerHTML = '';
@@ -145,155 +150,6 @@ function navigate() {
 }
 
 window.addEventListener('hashchange', navigate);
-
-/** 加载固定环境状态及空闲维护入口。@return 页面渲染完成。 */
-/**
- * 按字段实际口径显示配置与观察值，零 RAM 仅表示明确无限制。
- * @param {string} key 字段名
- * @param {*} value 已校验的公开标量
- * @return {string} 供转义后展示的文本
- */
-function physicalFeatureValue(key, value) {
-  if (value == null) return '未采集';
-  if (typeof value === 'boolean') return value ? '有' : '无';
-  if (key.endsWith('_bytes')) return value === 0 ? '未限制' : `${(value / 1024 ** 2).toFixed(0)} MiB`;
-  return String(value);
-}
-
-/**
- * 展示保存配置和上次容器实测，避免将缓存值描述为实时采集。
- * @param {Object} row 环境公开摘要
- * @return {string} 已转义的详情 HTML
- */
-function renderPhysicalFeatures(row) {
-  const features = row.physical_features;
-  if (!features) return '';
-  const statuses = {match: '一致', mismatch: '有差异', observed: '已采集', unobserved: '未采集', stale: '旧代观察'};
-  const observed = features.observed_at ? new Date(features.observed_at * 1000).toLocaleString('zh-CN') : '未采集';
-  return `<details class="physical-features" data-physical-details="${escapeHTML(row.environment_id)}">
-    <summary>物理特征 · ${escapeHTML(observed)}</summary>
-    <p class="hint">${escapeHTML(features.message)}。实测取自 CLI 容器可见环境，资源按实际限制展示。</p>
-    <button type="button" class="btn btn-sm" data-physical-refresh="${escapeHTML(row.environment_id)}"
-      ${row.busy || row.role_status?.cli !== 'running' ? 'disabled' : ''}>刷新实测</button>
-    <div class="physical-table-wrap"><table class="data physical-table">
-      <thead><tr><th>特征</th><th>保存配置</th><th>容器实测</th><th>对照</th></tr></thead>
-      <tbody>${features.fields.map(field => `<tr>
-        <th>${escapeHTML(field.label)}</th>
-        <td>${escapeHTML(field.configured == null ? '无对应配置' : physicalFeatureValue(field.key, field.configured))}</td>
-        <td>${escapeHTML(physicalFeatureValue(field.key, field.observed))}</td>
-        <td>${escapeHTML(statuses[field.status] || '未采集')}</td>
-      </tr>`).join('')}</tbody>
-    </table></div>
-  </details>`;
-}
-
-/**
- * 渲染单环境的内核操作及实际预热回执。
- * @param {object} row 环境与内核状态。
- * @return {string} 内核管理卡片。
- */
-function renderNativeKernel(row) {
-  const kernel = row.native_kernel;
-  if (!kernel) return '';
-  const states = {idle:'可准备', preparing:'正在下载并校验', draining:'等待在途请求结束', switching:'预热候选',
-    restoring:'恢复原版', finishing:'核对并开放接单', active:'已生效', failed:'保持原版',
-    restored:'已恢复原版', reconcile:'待对账'};
-  const busy = ['preparing','draining','switching','restoring','finishing','reconcile'].includes(kernel.state);
-  const button = (action, label, enabled, digest = '') => `<button type="button" data-kernel-action="${action}" data-kernel-environment="${escapeHTML(row.environment_id)}" data-kernel-release="${escapeHTML(kernel.prepared?.release || '')}" data-kernel-digest="${escapeHTML(digest)}" data-kernel-revision="${escapeHTML(kernel.revision)}" ${enabled ? '' : 'disabled'}>${label}</button>`;
-  const description = reference => reference ? `${reference.release} (${reference.launcher_sha256.slice(0, 12)})` : '无';
-  return `<div><p role="status">请求内核 · ${escapeHTML(states[kernel.state] || '待核对')} · 上次确认 ${escapeHTML(description(kernel.current))}${kernel.pid ? ` · 预热回执 PID ${escapeHTML(kernel.pid)}` : ''}</p>
-    <p>上一版 ${escapeHTML(description(kernel.previous))} · 已准备 ${escapeHTML(description(kernel.prepared))}</p>
-    ${kernel.error ? `<p role="alert">${escapeHTML(kernel.error)}</p>` : ''}
-    ${button('prepare', '准备内核', !busy)}
-    ${button('activate', '激活候选', !busy && kernel.prepared && kernel.prepared.launcher_sha256 !== kernel.current.launcher_sha256, kernel.prepared?.launcher_sha256)}
-    ${button('rollback', '回滚内核', !busy && kernel.previous, kernel.previous?.launcher_sha256)}
-    ${kernel.state === 'reconcile' ? button('recover', '恢复对账', true) : ''}
-  </div>`;
-}
-
-/**
- * 提交明确的管理动作，并在服务器执行期间读取进度。
- * @param {HTMLButtonElement} button 当前内核操作。
- * @return {Promise<void>} 操作完成后刷新环境视图。
- */
-async function submitNativeKernel(button) {
-  const {kernelAction: operation, kernelEnvironment: environment, kernelRelease: candidate, kernelDigest: digest, kernelRevision: revision} = button.dataset;
-  let release = null;
-  if (operation === 'prepare') {
-    release = prompt('输入要准备的发布标签，例如 v0.1.0-beta.4');
-    if (release === null) return;
-    release = release.trim();
-  } else {
-    if (!confirm('将等待该账号的在途请求结束，然后切换或恢复请求内核。继续？')) return;
-    if (operation === 'activate') release = candidate;
-  }
-  const random = crypto.getRandomValues(new Uint8Array(16));
-  random[6] = (random[6] & 15) | 64;
-  random[8] = (random[8] & 63) | 128;
-  const hex = Array.from(random, value => value.toString(16).padStart(2, '0')).join('');
-  const operation_id = [hex.slice(0,8), hex.slice(8,12), hex.slice(12,16), hex.slice(16,20), hex.slice(20)].join('-');
-  button.disabled = true;
-  const timer = setInterval(() => {
-    if (currentTab() === 'environments') renderEnvironments().catch(() => {});
-  }, 2000);
-  try {
-    await API(`/environments/${encodeURIComponent(environment)}/native-kernel`, {
-      method: 'POST', body: JSON.stringify({operation, operation_id, release, expected_sha256: digest || null, expected_revision: revision})
-    });
-  } catch (error) {
-    alert('内核操作：' + error.message);
-  } finally {
-    clearInterval(timer);
-    if (currentTab() === 'environments') await renderEnvironments();
-  }
-}
-
-/**
- * 读取固定环境及已有实测快照，并绑定显式维护和采集操作。
- * @return {Promise<void>} 完成本次页面渲染
- */
-async function renderEnvironments() {
-  const generation = state.viewGeneration;
-  const rows = await API('/environments');
-  if (currentTab() !== 'environments' || generation !== state.viewGeneration) return;
-  const view = $('#view');
-  view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。画像校正只适用于没有运行历史的未绑定账号，保留原 HOME 和登录凭据。</p>' +
-    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${row.credential_ownership ? `<p role="status">${escapeHTML(row.credential_ownership.message)}</p>${row.credential_ownership.phase !== 'ready' && ['return', 'attach', 'authorize'].includes(row.credential_ownership.direction) ? `<button type="button" data-environment="${escapeHTML(row.environment_id)}" data-operation="cancel-credential-return" ${row.busy ? 'disabled' : ''}>取消未提交交接</button>` : ''}` : ''}<p>${escapeHTML(Object.entries(row.role_status || {}).map(([role, status]) => `${({cli:"CLI",network:"网络",sender:"API"})[role] || role}: ${status}`).join(" · "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : ''}${renderNativeKernel(row)}${renderPhysicalFeatures(row)}</article>`).join('');
-  $$('[data-kernel-action]', view).forEach(button => { button.onclick = () => submitNativeKernel(button); });
-  $$('[data-physical-refresh]', view).forEach(button => {
-    button.onclick = async () => {
-      button.disabled = true;
-      try {
-        const id = button.dataset.physicalRefresh;
-        await API(`/environments/${encodeURIComponent(id)}/physical-features/refresh`, {method: 'POST'});
-        await renderEnvironments();
-        const details = $$('[data-physical-details]', view).find(item => item.dataset.physicalDetails === id);
-        if (details) details.open = true;
-      } catch (error) {
-        alert('采集失败：' + error.message);
-        button.disabled = false;
-      }
-    };
-  });
-  $$('[data-operation]', view).forEach(button => button.addEventListener('click', async () => {
-    const reprofile = button.dataset.operation === 'reprofile';
-    const message = reprofile
-      ? '画像校正会生成新的固定环境参数，保留已有登录凭据。确认继续？'
-      : '确认在账号空闲时执行此维护操作？持久数据会保留。';
-    if (!confirm(message)) return;
-    try {
-      await API(`/environments/${button.dataset.environment}/maintenance`, { method: 'POST', body: JSON.stringify({ operation: button.dataset.operation }) });
-      if (reprofile) {
-        alert('画像已校正，已有登录凭据保留，可继续运行任务。');
-        location.hash = '#accounts';
-        return;
-      }
-      await renderEnvironments();
-    } catch (error) {
-      alert(error.message);
-    }
-  }));
-}
 
 // ===================== Accounts =====================
 function formatDuration(sec) {
@@ -647,15 +503,6 @@ async function renderAccounts() {
     if (state.accLogin?.authorizationURL) window.open(state.accLogin.authorizationURL, '_blank', 'noopener,noreferrer');
   };
   $('#acc-modal-close').onclick = () => endAccLogin({ alsoCloseModal: true });
-  $('#run-window-form').onsubmit = saveRunWindowConfig;
-  $('#run-window-form').elements.enabled.onchange = updateRunWindowForm;
-  $('#run-window-add').onclick = () => {
-    if ($$('.run-window-interval', $('#run-window-form')).length >= 8) return;
-    $('#run-window-intervals').insertAdjacentHTML('beforeend', runWindowIntervalRow());
-  };
-  $('#run-window-intervals').onclick = event => {
-    if (event.target.hasAttribute('data-window-remove')) event.target.closest('.run-window-interval').remove();
-  };
   $('#warmup-form').onsubmit = saveWarmupConfig;
   $('#cc2api-binding-form').onsubmit = saveCc2apiBinding;
 }
@@ -920,6 +767,15 @@ function updateRunWindowForm() {
  * @return {Promise<void>} 完成表单初始化
  */
 async function openRunWindowConfig(aid) {
+  $('#run-window-form').onsubmit = saveRunWindowConfig;
+  $('#run-window-form').elements.enabled.onchange = updateRunWindowForm;
+  $('#run-window-add').onclick = () => {
+    if ($$('.run-window-interval', $('#run-window-form')).length >= 8) return;
+    $('#run-window-intervals').insertAdjacentHTML('beforeend', runWindowIntervalRow());
+  };
+  $('#run-window-intervals').onclick = event => {
+    if (event.target.hasAttribute('data-window-remove')) event.target.closest('.run-window-interval').remove();
+  };
   closeModal('#run-window-modal');
   const request = {accountId: aid};
   state.runWindowConfig = request;
@@ -2705,6 +2561,7 @@ function openModal(sel) { $(sel).classList.remove('hidden'); }
  * @return {void}
  */
 function closeModal(sel) {
+  if (sel === '#native-kernel-modal') return closeNativeKernelDialog();
   if (sel === '#cli-settings-modal') state.cliSettings = null;
   if (sel === '#work-capture-modal') state.workCapture = null;
   if (sel === '#run-window-modal') {
@@ -2899,6 +2756,7 @@ function bindShortcuts() {
       return;
     }
 
+    if (!$('#native-kernel-modal').classList.contains('hidden')) return;
     if (inField) return;     // 后续快捷键在输入框中不响应
 
     // 登录框未关之前，数字键和搜索键都不导航，防止键盘漏到底层页面。
@@ -2907,6 +2765,7 @@ function bindShortcuts() {
     // 项目页优先搜索当前项目池，其它页面沿用题库搜索。
     if (e.key === '/') {
       e.preventDefault();
+      if (currentTab() === 'environments') { $('#environment-search')?.focus(); return; }
       if (['projects', 'warmup'].includes(currentTab())) {
         const filter = $('#projects-filter');
         const settings = filter?.closest('details');

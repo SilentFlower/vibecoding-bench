@@ -1,0 +1,237 @@
+/* 环境路由独立使用主后台色板；移除作用域后其它页面继续使用原主题。 */
+:root.environment-page {
+  --bg: #f9f6f1;
+  --surface: #ffffff;
+  --surface-2: #ffffff;
+  --surface-3: #f0ebe4;
+  --border: #e8e2d9;
+  --border-bright: #ded5c9;
+  --text: #29261e;
+  --text-dim: #5c5647;
+  --text-faint: #8c8475;
+  --text-muted: #8c8475;
+  --amber: #c4704f;
+  --amber-soft: #b5623f;
+  --amber-deep: #a65f43;
+  --amber-glow: transparent;
+  --border-amber: #e8c5b5;
+  --success: #25834a;
+  --failed: #b44637;
+  --running: #25834a;
+  --env-good-bg: #ecf8ef;
+  --env-good-border: #d9efdf;
+  --env-warning: #925e19;
+  --env-warning-bg: #fff7e8;
+  --env-muted-bg: #f0ebe4;
+  --env-kernel-bg: #fcfaf7;
+  --env-kernel-border: #eee6dc;
+  --env-accent-bg: #f5e9e0;
+  --env-modal-overlay: #29261e80;
+  --env-shadow: 0 16px 48px #29261e24;
+  --env-font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color-scheme: light;
+}
+
+.environment-page body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 var(--env-font);
+  font-feature-settings: normal;
+}
+
+.environment-page .scanlines,
+.environment-page .brand,
+.environment-page .statline,
+.environment-page .hintbar { display: none; }
+
+.environment-page .topbar {
+  display: block;
+  padding: 0 24px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.environment-page .tabs {
+  max-width: 1168px;
+  margin: auto;
+  padding: 0;
+  justify-content: flex-start;
+  gap: 24px;
+  border: 0;
+}
+
+.environment-page .tabs a {
+  padding: 15px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: 13px var(--env-font);
+  color: var(--text-faint);
+  text-shadow: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.environment-page .tabs a.active,
+.environment-page .tabs a:hover {
+  color: var(--amber);
+  background: transparent;
+  border-bottom-color: var(--amber);
+  box-shadow: none;
+}
+
+.environment-page .tabs a::before,
+.environment-page .tabs a::after,
+.environment-page .tabs .tab-en,
+.environment-page .tabs .nav-group-start::before { display: none; }
+.environment-page .tabs .tab-cn { font: inherit; color: inherit; }
+.environment-page .tabs .nav-group-start { margin-left: 0; padding-left: 0; border-left: 0; }
+
+.environment-page main#view { max-width: 1216px; margin: auto; padding: 28px 24px 40px; }
+.environment-page h2,
+.environment-page h3,
+.environment-page h4 { font-family: var(--env-font); letter-spacing: normal; }
+.environment-page .env-page h2 { margin: 0; font-size: 24px; font-weight: 650; }
+.environment-page .env-page h3 { margin: 0; font-size: 18px; font-weight: 650; }
+.environment-page .env-page h4 { margin: 0; font-size: 13px; font-weight: 600; }
+.environment-page .env-page p { margin: 4px 0; }
+.environment-page .env-page-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.environment-page .env-page-head p { color: var(--text-faint); }
+.environment-page .env-page-head > .btn { flex-shrink: 0; white-space: nowrap; }
+.environment-page .env-muted { color: var(--text-faint); }
+.environment-page .env-good { color: var(--success); }
+.environment-page .env-warning { color: var(--env-warning); }
+
+/* 用具体作用域覆盖旧版的全局直角 reset，圆角只影响当前页及其弹窗。 */
+.environment-page .btn,
+.environment-page input,
+.environment-page select,
+.environment-page textarea { border-radius: 9px !important; }
+.environment-page .btn {
+  background: var(--surface);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  font: 13px var(--env-font);
+  letter-spacing: normal;
+  text-transform: none;
+  box-shadow: none;
+}
+.environment-page .btn::before,
+.environment-page .btn::after { content: none; }
+.environment-page .btn:hover { background: var(--surface-3); border-color: var(--border-bright); color: var(--text); box-shadow: none; }
+.environment-page .btn-primary { background: var(--amber); color: var(--surface); border-color: var(--amber); }
+.environment-page .btn-primary:hover { background: var(--amber-soft); color: var(--surface); border-color: var(--amber-soft); }
+.environment-page .btn-danger { color: var(--failed); }
+.environment-page .btn-sm { font-size: 12px; padding: 6px 11px; }
+.environment-page .btn:disabled { opacity: .45; cursor: not-allowed; }
+.environment-page :is(button, input, select, summary, a):focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; box-shadow: none; }
+
+.environment-page .env-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
+.environment-page .env-metric { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border: 1px solid var(--border); border-radius: 12px !important; background: var(--surface); }
+.environment-page .env-metric span { font-size: 13px; color: var(--text-faint); }
+.environment-page .env-metric strong { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.environment-page .env-metric:nth-child(2) strong { color: var(--success); }
+.environment-page .env-metric:nth-child(3) strong { color: var(--text-faint); }
+.environment-page .env-metric:nth-child(4) strong { color: var(--amber); }
+.environment-page .env-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+.environment-page .env-toolbar label { min-width: 0; }
+.environment-page .env-toolbar input { width: 320px; max-width: 100%; }
+.environment-page .env-toolbar :is(input, select) { padding: 9px 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); font: inherit; }
+.environment-page .env-toolbar > span { margin-left: auto; font-size: 12px; }
+.environment-page .env-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+.environment-page .env-card { min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 14px !important; overflow: hidden; }
+.environment-page .env-card-head { padding: 19px 22px 14px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.environment-page .env-card-head > div { min-width: 0; }
+.environment-page .env-card-head p { font-size: 12px; color: var(--text-faint); overflow-wrap: anywhere; }
+.environment-page .env-card h3 { overflow-wrap: anywhere; }
+.environment-page .env-badge { white-space: nowrap; font-size: 11px; border-radius: 20px !important; padding: 3px 9px; border: 1px solid var(--border); background: var(--env-muted-bg); }
+.environment-page .env-badge.env-good { background: var(--env-good-bg); border-color: var(--env-good-border); }
+.environment-page .env-badge.env-warning { background: var(--env-warning-bg); }
+.environment-page .env-roles { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 0 22px 15px; font-size: 12px; }
+.environment-page .env-role i { display: inline-block; width: 6px; height: 6px; margin-right: 6px; background: currentColor; border-radius: 50% !important; }
+.environment-page .env-resources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 22px; padding: 13px 0; border-block: 1px solid var(--border); }
+.environment-page :is(.env-resources, .env-versions) span { display: block; margin-bottom: 4px; font-size: 11px; color: var(--text-faint); }
+.environment-page :is(.env-resources, .env-versions) strong { font-size: 13px; font-weight: 550; overflow-wrap: anywhere; }
+.environment-page .env-notice { margin: 14px 22px !important; padding: 10px 12px; background: var(--env-warning-bg); border-radius: 9px !important; color: var(--text-dim); font-size: 12px; overflow-wrap: anywhere; }
+.environment-page .env-notice .btn { margin: 8px 4px 0 0; }
+.environment-page .env-kernel { margin: 18px 22px; padding: 16px; background: var(--env-kernel-bg); border: 1px solid var(--env-kernel-border); border-radius: 10px !important; }
+.environment-page .env-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.environment-page .env-tag { font-size: 10px; color: var(--amber-deep); background: var(--env-accent-bg); padding: 2px 8px; border-radius: 4px !important; }
+.environment-page .env-kernel-version { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0 12px; }
+.environment-page .env-kernel-version strong { font-size: 20px; font-weight: 650; overflow-wrap: anywhere; }
+.environment-page .env-kernel-version span { font-size: 11px; color: var(--text-dim); }
+.environment-page .env-versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-bottom: 14px; }
+.environment-page .env-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.environment-page .env-kernel-unavailable { background: var(--surface); border-style: dashed; color: var(--text-faint); font-size: 12px; }
+.environment-page .env-kernel-unavailable h4 { color: var(--text-dim); margin-bottom: 6px; }
+.environment-page .env-kernel-details { margin-top: 14px; font-size: 11px; }
+.environment-page summary { cursor: pointer; color: var(--text-faint); }
+.environment-page .env-window { margin: 0 22px; padding: 14px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); font-size: 12px; }
+.environment-page .env-window > div { min-width: 0; }
+.environment-page .env-window .run-window-display { min-width: 0; margin-top: 5px; overflow-wrap: anywhere; }
+.environment-page .env-window > .btn { flex-shrink: 0; }
+.environment-page .env-window h4 { color: var(--text-faint); font-size: 11px; font-weight: 400; }
+.environment-page .env-details { border-top: 1px solid var(--border); padding: 13px 22px; font-size: 12px; }
+.environment-page .env-details-body { padding-top: 12px; }
+.environment-page .env-details-body > .env-actions { margin: 12px 0; }
+.environment-page :is(.env-details, .env-kernel-details, .env-operation-summary) dl,
+.environment-page dl.env-operation-summary { display: grid; grid-template-columns: minmax(80px, auto) minmax(0, 1fr); gap: 7px 12px; margin: 12px 0; }
+.environment-page :is(dt, dd) { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.environment-page dt { color: var(--text-faint); }
+.environment-page code { color: var(--text-dim); background: var(--surface-3); border: 0; padding: 1px 4px; font-family: var(--mono); overflow-wrap: anywhere; }
+.environment-page .env-empty { grid-column: 1 / -1; padding: 34px 20px; text-align: center; color: var(--text-faint); border: 1px dashed var(--border); border-radius: 12px !important; }
+.environment-page .env-error { color: var(--failed); font-size: 12px; overflow-wrap: anywhere; }
+.environment-page .env-error:empty { display: none; }
+.environment-page #environment-feedback { margin: 0 0 16px; }
+.environment-page .env-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.environment-page .physical-features { margin-top: 14px; }
+.environment-page .physical-table-wrap { max-width: 100%; overflow-x: auto; }
+.environment-page .physical-features table.data { font: 12px var(--env-font); }
+
+.environment-page .modal { background: var(--env-modal-overlay); padding: 48px 16px 24px; }
+.environment-page .modal-card { border: 1px solid var(--border); border-radius: 14px !important; box-shadow: var(--env-shadow); max-height: calc(100dvh - 72px); overflow-y: auto; }
+.environment-page .modal-frame { display: none; }
+.environment-page .modal-titlebar { background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); font: 600 16px var(--env-font); padding: 16px 20px; text-transform: none; letter-spacing: normal; }
+.environment-page .modal-close { color: var(--text-faint); border: 0; border-radius: 6px !important; font: 22px var(--env-font); }
+.environment-page .modal-close:hover { background: var(--surface-3); color: var(--text); }
+.environment-page .modal-card > .form { padding: 20px; }
+.environment-page .form { font: 13px/1.6 var(--env-font); }
+.environment-page .form :is(input, select, textarea) { color: var(--text); background: var(--surface); font-family: var(--env-font); }
+.environment-page .form :is(input, select, textarea):focus { background: var(--surface); box-shadow: 0 0 0 2px var(--border-amber); }
+.environment-page .form .lbl { font-size: 12px; letter-spacing: normal; text-transform: none; }
+.environment-page .form fieldset { min-width: 0; border-color: var(--border); }
+.environment-page .run-window-days label { border-radius: 6px !important; }
+.environment-page .run-window-days label:has(input:checked) { background: var(--env-accent-bg); color: var(--amber-deep); }
+
+@media (max-width: 800px) {
+  .environment-page .env-list { grid-template-columns: minmax(0, 1fr); }
+  .environment-page .env-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .environment-page .env-metric { padding: 12px 15px; }
+}
+@media (max-width: 480px) {
+  .environment-page .topbar { padding: 0 16px; }
+  .environment-page .tabs { flex-wrap: nowrap; gap: 20px; overflow-x: auto; }
+  .environment-page .tabs a { flex-shrink: 0; }
+  .environment-page main#view { padding: 22px 16px 32px; }
+  .environment-page .env-page h2 { font-size: 22px; }
+  .environment-page .env-toolbar > label:first-child { flex: 1; min-width: 180px; }
+  .environment-page .env-toolbar input { width: 100%; }
+  .environment-page .env-toolbar > span { width: 100%; margin-left: 0; }
+  .environment-page .env-card-head { padding: 17px 18px 13px; }
+  .environment-page .env-roles { padding-inline: 18px; }
+  .environment-page :is(.env-resources, .env-window) { margin-inline: 18px; }
+  .environment-page .env-kernel { margin: 16px 18px; padding: 14px; }
+  .environment-page .env-kernel-version strong { font-size: 18px; }
+  .environment-page .env-details { padding: 12px 18px; }
+  .environment-page .env-badge { white-space: normal; max-width: 110px; }
+  .environment-page .modal { padding: 20px 10px; }
+  .environment-page .modal-card { max-height: calc(100dvh - 40px); }
+  .environment-page .run-window-interval { flex-wrap: wrap; }
+  .environment-page .run-window-interval > label { min-width: 90px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .environment-page *, .environment-page *::before, .environment-page *::after { animation: none !important; transition: none !important; }
+}
