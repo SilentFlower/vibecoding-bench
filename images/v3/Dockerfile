@@ -42,6 +42,7 @@ COPY orchestrator/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN python -c "from zoneinfo import ZoneInfo; [ZoneInfo(name) for name in ('UTC','Asia/Tokyo','Asia/Singapore','Asia/Seoul','Australia/Sydney','Europe/London','Europe/Berlin','Europe/Paris','America/Los_Angeles','America/New_York','America/Chicago')]"
 COPY orchestrator/*.py ./
+COPY orchestrator/database-migration-registry.json ./
 COPY topics.md /repo/topics.md
 COPY project_library /repo/project_library
 COPY research/github-projects /repo/research/github-projects

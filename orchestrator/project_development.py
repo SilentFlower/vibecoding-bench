@@ -1,6 +1,8 @@
 """在既有场景执行上推进完整开发任务的外部需求方交流。"""
 from __future__ import annotations
 
+from database_schema import DEVELOPMENT_SQL
+
 import json
 import time
 from typing import TYPE_CHECKING
@@ -11,20 +13,6 @@ if TYPE_CHECKING:
     from project_scenarios import ProjectScenarios
 
 
-DEVELOPMENT_SQL = '''
-CREATE TABLE IF NOT EXISTS project_dialogue_jobs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL,
-  evaluation_job_id INTEGER NOT NULL UNIQUE, generation INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending', phase TEXT NOT NULL,
-  request_json TEXT NOT NULL, result_json TEXT, attempts_json TEXT NOT NULL DEFAULT '[]',
-  model TEXT, work_sec REAL NOT NULL DEFAULT 0, reserved_sec REAL NOT NULL DEFAULT 0,
-  recoveries INTEGER NOT NULL DEFAULT 0, retry_at REAL, error TEXT,
-  created_at REAL NOT NULL, ended_at REAL,
-  FOREIGN KEY(task_id) REFERENCES project_scenario_tasks(id),
-  FOREIGN KEY(evaluation_job_id) REFERENCES project_evaluation_jobs(id)
-);
-CREATE INDEX IF NOT EXISTS idx_dialogue_task ON project_dialogue_jobs(task_id,id);
-'''
 
 
 class ProjectDevelopment:

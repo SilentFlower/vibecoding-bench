@@ -1,6 +1,8 @@
 """同一次 CLI 的持久多步计划、逐步验收及中断接续。"""
 from __future__ import annotations
 
+from database_schema import PLAN_SCHEMA, initialize_plan_schema
+
 import json
 import hashlib
 import os
@@ -19,87 +21,12 @@ if TYPE_CHECKING:
     from project_iteration import ProjectIterationManager
 
 
-PLAN_SCHEMA = '''
-CREATE TABLE IF NOT EXISTS project_execution_plans (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, instance_id INTEGER NOT NULL,
-  generation INTEGER NOT NULL, start_index INTEGER NOT NULL, target_index INTEGER NOT NULL,
-  completed_steps INTEGER NOT NULL DEFAULT 0, session_id TEXT NOT NULL,
-  execution_json TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ready', error TEXT,
-  created_at REAL NOT NULL, updated_at REAL NOT NULL, ended_at REAL,
-  FOREIGN KEY(instance_id) REFERENCES project_instances(id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_project_plan_open_instance
-  ON project_execution_plans(instance_id) WHERE status IN ('ready','running','finalizing','quota_wait');
-CREATE TABLE IF NOT EXISTS project_plan_executions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, plan_id INTEGER NOT NULL, run_id TEXT NOT NULL UNIQUE,
-  quota_attempt INTEGER NOT NULL DEFAULT 0, source TEXT, phase_seq INTEGER NOT NULL DEFAULT 0,
-  current_attempt_id INTEGER, request_relative TEXT, decision_relative TEXT, native_relative TEXT,
-  cwd TEXT, evidence_start_json TEXT, decision_json TEXT,
-  not_before REAL NOT NULL DEFAULT 0, released_at REAL, released_quota_attempt INTEGER,
-  execution_error TEXT, created_at REAL NOT NULL, ended_at REAL,
-  FOREIGN KEY(plan_id) REFERENCES project_execution_plans(id), FOREIGN KEY(run_id) REFERENCES runs(id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_project_plan_open_execution
-  ON project_plan_executions(plan_id) WHERE ended_at IS NULL;
-'''
 
 PLAN_DEFAULTS = {'schema':2, 'concurrency':2, 'active_projects':3, 'rotation_steps':5,
     'steps_per_plan':2, 'timeout_sec':1800, 'interval_min_sec':0, 'interval_max_sec':0, 'repair_limit':2}
 RUN_TERMINAL = {'success','failed','timeout','stopped','auth_failed'}
 
 
-def initialize_plan_schema(connection) -> None:
-    """幂等增加计划结构并保留旧尝试主键，移除单 Run 唯一限制。
-
-    :param connection: 已初始化基础项目表的 SQLite 连接。
-    :return: None；迁移异常回滚尝试表，不删除历史成果。
-    """
-    connection.executescript(PLAN_SCHEMA)
-    try:
-        connection.execute('BEGIN IMMEDIATE')
-        indexes = connection.execute("SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='project_step_attempts' AND sql IS NOT NULL").fetchall()
-        unique_run = False
-        for index in connection.execute('PRAGMA index_list(project_step_attempts)'):
-            if index['unique'] and [item['name'] for item in connection.execute('PRAGMA index_info("'+index['name'].replace('"','""')+'")')]==['run_id']:
-                unique_run = True
-        if unique_run:
-            original = connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='project_step_attempts'").fetchone()['sql']
-            replacement, count = re.subn(r'\brun_id\s+TEXT\s+NOT\s+NULL\s+UNIQUE\b', 'run_id TEXT NOT NULL', original, flags=re.I)
-            if count!=1:
-                raise ValueError('旧项目尝试表结构未知，不能猜测重建')
-            replacement = re.sub(r'CREATE TABLE\s+(?:IF NOT EXISTS\s+)?["`\[]?project_step_attempts["`\]]?',
-                'CREATE TABLE project_step_attempts_upgrade', replacement, count=1, flags=re.I)
-            columns = [item['name'] for item in connection.execute('PRAGMA table_info(project_step_attempts)')]
-            quoted = ','.join('"'+name.replace('"','""')+'"' for name in columns)
-            sequence = None
-            if connection.execute("SELECT 1 FROM sqlite_master WHERE name='sqlite_sequence'").fetchone():
-                sequence = connection.execute("SELECT seq FROM sqlite_sequence WHERE name='project_step_attempts'").fetchone()
-            connection.execute(replacement)
-            connection.execute(f'INSERT INTO project_step_attempts_upgrade({quoted}) SELECT {quoted} FROM project_step_attempts')
-            connection.execute('DROP TABLE project_step_attempts')
-            connection.execute('ALTER TABLE project_step_attempts_upgrade RENAME TO project_step_attempts')
-            for index in indexes:
-                connection.execute(index['sql'])
-            if sequence:
-                connection.execute("UPDATE sqlite_sequence SET seq=MAX(seq,?) WHERE name='project_step_attempts'",(sequence['seq'],))
-        additions = {
-            'project_step_attempts': {'plan_id':'INTEGER', 'phase_seq':'INTEGER', 'expected_prompt':'TEXT',
-                'native_start_json':'TEXT', 'native_end_json':'TEXT', 'fenced_at':'REAL', 'fenced_source':'TEXT'},
-            'project_instances': {'initial_order':'INTEGER', 'in_pool':'INTEGER NOT NULL DEFAULT 0',
-                'visit_completed':'INTEGER NOT NULL DEFAULT 0'},
-            'project_iteration_batches': {'launches_started':'INTEGER NOT NULL DEFAULT 0', 'last_launch_at':'REAL', 'wait_reason':'TEXT'},
-            'project_plan_executions': {'native_relative':'TEXT','cwd':'TEXT','evidence_start_json':'TEXT','decision_json':'TEXT'},
-        }
-        for table, fields in additions.items():
-            present = {item['name'] for item in connection.execute(f'PRAGMA table_info({table})')}
-            for name, kind in fields.items():
-                if name not in present:
-                    connection.execute(f'ALTER TABLE {table} ADD COLUMN {name} {kind}')
-        connection.execute('CREATE INDEX IF NOT EXISTS idx_project_attempts_run ON project_step_attempts(run_id,id)')
-        connection.commit()
-    except Exception:
-        connection.rollback()
-        raise
 
 
 def normalized_policy(values: dict, project_count: int, maximum_steps: int, account_limit: int) -> dict:

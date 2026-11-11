@@ -10,16 +10,20 @@ import shutil
 import sqlite3
 import subprocess
 import time
+from contextlib import closing
 from pathlib import Path
 from urllib.parse import quote
 from urllib.request import ProxyHandler, Request, build_opener
 
 from manage import _check_local_reference, _local_image_matches, _container_image_matches, load_bundle, load_environment
 from runtime_files import atomic_json, atomic_text
-from system_update_contract import DOWNLOAD_ROOT, ROLES, ReleaseRedirect, fetch_bytes, safe_read, strict_json
+from system_update_contract import DOWNLOAD_ROOT, ROLES, ReleaseRedirect, fetch_bytes, safe_read, strict_json, validate_migration_plan
 from system_update_gate import read_gate
+from system_update_database import assert_quiescent, create_snapshot, restore_snapshot, rotate_snapshots
 
 SOFTWARE_FIELDS = ('version', 'version_base', 'build_time', 'node_version')
+ENVIRONMENT_IDENTITY = ('environment_id', 'name', 'account_id', 'fingerprint_json')
+ENVIRONMENT_BINDINGS = ('generation', 'container_id', 'network_container_id', 'sender_container_id', 'state', 'isolation_version')
 
 
 def docker(*arguments: str, timeout: int = 120) -> str:
@@ -121,7 +125,7 @@ class HostDeployment:
 
         :return: 受保护身份摘要与软件字段前值。
         """
-        with sqlite3.connect('file:' + quote(str(self.data / 'bench/db.sqlite'), safe='/') + '?mode=ro', uri=True) as connection:
+        with closing(sqlite3.connect('file:' + quote(str(self.data / 'bench/db.sqlite'), safe='/') + '?mode=ro', uri=True)) as connection, connection:
             rows = connection.execute('SELECT environment_id,name,account_id,fingerprint_json FROM account_environments ORDER BY environment_id').fetchall()
             bench_accounts = connection.execute('SELECT id,name,profile_path,cc2api_account_id FROM accounts ORDER BY id').fetchall()
             ownership = {'bench': connection.execute('SELECT account_id,record_json FROM account_credential_ownerships ORDER BY account_id').fetchall(),
@@ -129,7 +133,7 @@ class HostDeployment:
             bench_schema = connection.execute("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name").fetchall()
         gateway = []
         software = {}
-        with sqlite3.connect('file:' + quote(str(self.data / 'gateway/gateway.sqlite'), safe='/') + '?mode=ro', uri=True) as connection:
+        with closing(sqlite3.connect('file:' + quote(str(self.data / 'gateway/gateway.sqlite'), safe='/') + '?mode=ro', uri=True)) as connection, connection:
             gateway_schema = connection.execute("SELECT type,name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY type,name").fetchall()
             gateway_accounts = connection.execute('SELECT id,email,device_id,account_uuid,organization_uuid FROM accounts ORDER BY id').fetchall()
             ownership['gateway'] = connection.execute('SELECT account_id,record_json FROM oauth_account_ownerships ORDER BY account_id').fetchall()
@@ -152,7 +156,7 @@ class HostDeployment:
         :param observed: 本次启动后已观察的软件字段。
         :return: None；并发漂移立即拒绝。
         """
-        with sqlite3.connect(self.data / 'gateway/gateway.sqlite') as connection:
+        with closing(sqlite3.connect(self.data / 'gateway/gateway.sqlite')) as connection, connection:
             for identity, fields in before.items():
                 row = connection.execute('SELECT canonical_env FROM accounts WHERE id=?', (int(identity),)).fetchone()
                 if not row or not row[0]:
@@ -332,7 +336,7 @@ class HostDeployment:
         docker('compose', '--env-file', str(self.env), '-f', self.policy['compose_file'],
             '-f', self.policy['override_file'], *arguments, timeout=240)
 
-    def switch(self, operation: dict, selected: dict) -> None:
+    def _stage_selection(self, operation: dict, selected: dict) -> None:
         """仅切换两个控制服务，所有账号操作继续由目标运行时执行。
 
         :param operation: 已持久操作。
@@ -366,6 +370,11 @@ class HostDeployment:
         lines.extend(key + '=' + shlex.quote(value) for key, value in updates.items())
         candidate = '\n'.join(lines) + '\n'
         atomic_text(folder / 'candidate.env', candidate)
+    def switch(self, operation: dict, selected: dict) -> None:
+        """按冻结来源切换两个控制服务。:param operation: 持久操作。:param selected: 目标组合。:return: None。"""
+        self._stage_selection(operation, selected)
+        folder = self.root / 'operations' / operation['operation_id']
+        candidate = safe_read(folder / 'candidate.env', private=True).decode()
         # 原门禁和排空证明仍被持有；通用 stop 会影响账号容器，所以仅指定控制服务。
         self._compose('stop', '-t', '30', 'orchestrator', 'gateway')
         atomic_text(self.env, candidate)
@@ -385,6 +394,160 @@ class HostDeployment:
             except (OSError, ValueError, RuntimeError, KeyError):
                 time.sleep(0.5)
         raise TimeoutError('候选控制服务健康验收超时')
+
+    def snapshot_databases(self, operation: dict, selected: dict, save) -> None:
+        """停止写入服务后保存同组双库快照。
+
+        :param operation: 持久维护操作。
+        :param selected: 已验证目标组合。
+        :param save: 原子持久回调。
+        :return: None。
+        """
+        self._stage_selection(operation, selected)
+        self._compose('stop', '-t', '30', 'orchestrator', 'gateway')
+        if any(item['State']['Running'] for item in self.controls().values()):
+            raise ValueError('数据库快照前控制服务仍在运行')
+        gate = read_gate(self.gate, self.policy['deployment'])
+        if gate['phase'] != 'blocked' or gate['epoch'] != operation['epoch'] or gate['operation_id'] != operation['operation_id']:
+            raise ValueError('数据库快照维护归属失效')
+        assert_quiescent(self.data)
+        folder = self.root / 'operations' / operation['operation_id'] / 'database-snapshot'
+        snapshot = create_snapshot(self.data, folder, self.policy['deployment'], operation)
+        operation['database_snapshot'] = {'state': 'verified', 'completed_at': snapshot['completed_at'],
+            'bytes': sum(item['size'] for item in snapshot['databases'].values())}
+        save()
+
+    def migrate_databases(self, operation: dict, plan: dict, save) -> None:
+        """在精确候选镜像内离线执行固定维护入口。
+
+        :param operation: 持久维护操作。
+        :param plan: 已验签资产中的完整迁移计划。
+        :param save: 每库执行前后的持久回调。
+        :return: None。
+        """
+        image = self.verify_images(operation['selected']['selection'])['control']['Id']
+        for name, entry in plan['databases'].items():
+            gate = read_gate(self.gate, self.policy['deployment'])
+            if gate['phase'] != 'blocked' or gate['epoch'] != operation['epoch'] or gate['operation_id'] != operation['operation_id']:
+                raise ValueError('数据库迁移维护归属失效')
+            status = operation.setdefault('database_migrations', {})
+            status[name] = {'state': 'running', 'target_version': entry['version']}
+            save()
+            if name == 'bench':
+                command = ['python3', '-m', 'database_migrations', 'apply']
+                environment = []
+                directory = self.data / 'bench'
+            else:
+                command = ['/app/claude-code-gateway', 'database-migrations', 'apply']
+                environment = ['--env', 'DATABASE_DRIVER=sqlite', '--env', 'DATABASE_DSN=/data/gateway.sqlite']
+                directory = self.data / 'gateway'
+            # 参数和入口均由宿主固定；发行只提供已校验版本，不能改变命令或挂载。
+            container_name = 'bench-database-' + operation['operation_id'] + '-' + name
+            operation.setdefault('database_containers', {})[name] = container_name
+            save()
+            identifier = docker('create', '--name', container_name, '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+                '--tmpfs', '/tmp:rw,noexec,nosuid,size=64m',
+                '--security-opt', 'no-new-privileges', '--pids-limit', '64', '--memory', '512m',
+                '--label', 'vibebench.product=v3', '--label', 'vibebench.deployment=' + self.policy['deployment'],
+                '--label', 'vibebench.role=database-migration', '--label', 'vibebench.operation=' + operation['operation_id'], '--mount', f'type=bind,source={directory},target=/data',
+                '--entrypoint', command[0], *environment, image, *command[1:],
+                '--operation-id', operation['operation_id'], '--target-version', str(entry['version'])).strip()
+            try:
+                output = docker('start', '--attach', identifier, timeout=300)
+                actual = json.loads(docker('inspect', identifier))[0]
+                if actual['State']['Running'] or actual['State']['ExitCode'] != 0:
+                    raise ValueError('离线数据库迁移进程执行失败')
+            finally:
+                self.stop_database_jobs(operation)
+            result = strict_json(output.encode())
+            if (result.get('database') != name or type(result.get('current_version')) is not int or result['current_version'] < entry['version']
+                    or result.get('target_version') != entry['version']
+                    or [(step.get('id'), step.get('checksum'), step.get('state')) for step in result.get('steps', [])]
+                    != [(step['id'], step['checksum'], 'completed') for step in entry['steps']]):
+                raise ValueError('数据库迁移实际回执与目标不符')
+            status[name] = {'state': 'completed', 'target_version': entry['version']}
+            save()
+
+    def cleanup_database_snapshots(self, protected: set[str]) -> dict:
+        """轮换当前部署的完成快照并保护活动操作。
+
+        :param protected: 所有仍需恢复的操作 ID。
+        :return: 脱敏轮换结果。
+        """
+        return rotate_snapshots(self.root / 'operations', self.policy['deployment'], protected)
+
+    def capture_restore_bindings(self, operation: dict, folder: Path, save) -> None:
+        """冻结本操作已重建角色的登记，避免数据快照恢复丢失其收口归属。
+
+        :param operation: 具有精确环境维护意图的原操作。
+        :param folder: 本操作双库快照目录。
+        :param save: 副作用前的持久回调。
+        :return: None；身份或代次异常保持维护阻断。
+        """
+        if 'environment_restore_bindings' in operation:
+            return
+        bindings = {}
+        if operation.get('environment_intents'):
+            with closing(sqlite3.connect((self.data / 'bench/db.sqlite').as_uri() + '?mode=ro', uri=True)) as current, closing(sqlite3.connect((folder / 'bench.sqlite').as_uri() + '?mode=ro&immutable=1', uri=True)) as original:
+                current.row_factory = original.row_factory = sqlite3.Row
+                for identifier, intent in operation['environment_intents'].items():
+                    before = original.execute('SELECT * FROM account_environments WHERE environment_id=?', (identifier,)).fetchone()
+                    after = current.execute('SELECT * FROM account_environments WHERE environment_id=?', (identifier,)).fetchone()
+                    if (before is None or after is None or any(before[key] != after[key] for key in ENVIRONMENT_IDENTITY)
+                            or type(after['generation']) is not int or not intent['generation'] <= after['generation'] <= intent['generation'] + 1
+                            or before['generation'] != intent['generation']):
+                        raise ValueError('数据库恢复的环境身份或角色代次出现外来变化')
+                    bindings[identifier] = {'identity': {key: before[key] for key in ENVIRONMENT_IDENTITY},
+                        'before': {key: before[key] for key in ENVIRONMENT_BINDINGS},
+                        'current': {key: after[key] for key in ENVIRONMENT_BINDINGS}}
+        operation['environment_restore_bindings'] = bindings
+        save()
+
+    def restore_environment_bindings(self, operation: dict, save) -> None:
+        """在业务数据恢复后续接已登记角色，重复执行按精确前后值收口。
+
+        :param operation: 已恢复双库且仍关闭准入的原操作。
+        :param save: 完成回执的持久回调。
+        :return: None；未知数据变化拒绝覆盖。
+        """
+        if operation.get('environment_restore_bindings_applied') or not operation.get('environment_restore_bindings'):
+            return
+        with closing(sqlite3.connect(self.data / 'bench/db.sqlite')) as connection, connection:
+            connection.row_factory = sqlite3.Row
+            connection.execute('BEGIN IMMEDIATE')
+            for identifier, binding in operation['environment_restore_bindings'].items():
+                actual = connection.execute('SELECT * FROM account_environments WHERE environment_id=?', (identifier,)).fetchone()
+                if (actual is None or any(actual[key] != value for key, value in binding['identity'].items())
+                        or {key: actual[key] for key in ENVIRONMENT_BINDINGS} not in (binding['before'], binding['current'])):
+                    raise ValueError('恢复角色登记发现后来或外来的环境变化')
+                # 业务字段保留快照值；仅续接原维护意图的角色，交由原运行时安全停止和重建。
+                connection.execute('UPDATE account_environments SET generation=?,container_id=?,network_container_id=?,sender_container_id=?,state=?,isolation_version=? WHERE environment_id=?',
+                    (*[binding['current'][key] for key in ENVIRONMENT_BINDINGS], identifier))
+        operation['environment_restore_bindings_applied'] = True
+        save()
+
+    def stop_database_jobs(self, operation: dict) -> None:
+        """收口本操作的离线进程，超时或重启后也不得遗留数据库写入者。
+
+        :param operation: 已冻结的维护操作。
+        :return: None；外来角色或归属不明立即阻断恢复。
+        """
+        identifiers = docker('ps', '-aq', '--filter', 'label=vibebench.product=v3',
+            '--filter', 'label=vibebench.deployment=' + self.policy['deployment'],
+            '--filter', 'label=vibebench.operation=' + operation['operation_id']).split()
+        if not identifiers:
+            return
+        image = self.verify_images(operation['selected']['selection'])['control']['Id']
+        for item in json.loads(docker('inspect', *identifiers)):
+            labels = item['Config'].get('Labels') or {}
+            name = item['Name'].lstrip('/')
+            database = next((key for key in ('bench', 'gateway') if name == 'bench-database-' + operation['operation_id'] + '-' + key), None)
+            if (database is None or labels.get('vibebench.role') != 'database-migration' or item['Image'] != image
+                    or not any(mount.get('Source') == str(self.data / database) and mount.get('Destination') == '/data' for mount in item.get('Mounts', []))):
+                raise ValueError('数据库维护进程归属或挂载不符')
+            if item['State']['Running']:
+                docker('stop', '-t', '5', item['Id'])
+            docker('rm', item['Id'])
 
     def update_environments(self, operation: dict, selected: dict, save) -> None:
         """按原运行状态逐项维护需要变化的账号环境。
@@ -431,6 +594,21 @@ class HostDeployment:
                 raise ValueError('真实控制服务镜像或状态验收失败')
         after = self.metadata()
         before = operation['before']['metadata']
+        if selected['release']['schema_version'] == 2:
+            asset = selected['release']['migrations']['plan']
+            raw = safe_read(self.root / 'releases' / selected['release']['release'] / asset['name'])
+            if len(raw) != asset['size'] or hashlib.sha256(raw).hexdigest() != asset['sha256']:
+                raise ValueError('健康验收的迁移计划摘要不符')
+            plan = validate_migration_plan(strict_json(raw), selected['release'])
+            for name, filename in (('bench', 'db.sqlite'), ('gateway', 'gateway.sqlite')):
+                try:
+                    with closing(sqlite3.connect('file:' + quote(str(self.data / name / filename), safe='/') + '?mode=ro', uri=True)) as connection, connection:
+                        rows = connection.execute('SELECT migration_id,version,checksum FROM system_schema_migrations ORDER BY version').fetchall()
+                except sqlite3.Error as error:
+                    raise ValueError('候选数据库迁移台账未完成') from error
+                expected = [(step['id'], step['version'], step['checksum']) for step in plan['databases'][name]['steps']]
+                if rows[:len(expected)] != expected:
+                    raise ValueError('候选数据库台账与受信计划不符')
         if after['identity_sha256'] != before['identity_sha256']:
             raise ValueError('更新改变了受保护账号身份或资源')
         for name in ('bench', 'gateway'):
@@ -509,6 +687,9 @@ class HostDeployment:
         original = operation['original']
         # 释放门禁后的持久化故障也可能进入恢复；先重新接管并复核新接单，避免中断后来活动。
         released = read_gate(self.gate, self.policy['deployment'])['phase'] == 'idle'
+        if released and not operation.get('release_started'):
+            operation['release_started'] = True
+            save()
         self.block(operation)
         if released:
             runtime = self.request('orchestrator', '/internal/v3/system-updates/snapshot', {})
@@ -529,7 +710,20 @@ class HostDeployment:
         candidate = safe_read(folder / 'candidate.env', private=True)
         if actual not in (before, candidate):
             raise ValueError('恢复发现外部修改的部署配置')
+        self.stop_database_jobs(operation)
         self._compose('stop', '-t', '30', 'orchestrator', 'gateway')
+        if operation.get('database_snapshot') and not operation.get('release_started') and not operation.get('database_restored'):
+            assert_quiescent(self.data)
+            self.capture_restore_bindings(operation, folder / 'database-snapshot', save)
+            operation['phase'] = 'restoring_data'
+            save()
+            restore_snapshot(self.data, folder / 'database-snapshot', self.policy['deployment'], operation, save)
+            # 原程序启动后会合法写库；持久完成边界让恢复重启继续程序验收。
+            operation['database_restored'] = True
+            operation['phase'] = 'restoring'
+            save()
+        if operation.get('database_restored') and not operation.get('release_started'):
+            self.restore_environment_bindings(operation, save)
         atomic_text(self.env, before.decode())
         self._compose('up', '-d', '--no-deps', 'gateway', 'orchestrator')
         self.wait_controls(time.monotonic() + 180)

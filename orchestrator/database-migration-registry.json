@@ -1,0 +1,15 @@
+{
+  "database": "bench",
+  "schema_version": 1,
+  "steps": [
+    {
+      "checksum": "a23b326713ba172e650e89c998c1233b6510e26f63e31f6a53adf846195545b6",
+      "engine": "sqlite",
+      "id": "bench.baseline.1",
+      "kind": "schema",
+      "predecessor": 0,
+      "rollback_mode": "compatible",
+      "version": 1
+    }
+  ]
+}

@@ -1,6 +1,8 @@
 """场景任务的持久状态、执行归属及跨恢复预算。"""
 from __future__ import annotations
 
+from database_schema import SCENARIO_SCHEMA, initialize_scenario_schema
+
 import json
 import hashlib
 import os
@@ -26,96 +28,8 @@ SCENARIO_DEFAULTS = {'schema': 3, 'concurrency': 2, 'active_projects': 3, 'rotat
     'review_timeout_sec': 180, 'review_budget_sec': 720,
     'interval_min_sec': 0, 'interval_max_sec': 0, 'repair_limit': 2}
 TASK_TERMINAL = frozenset({'passed', 'failed', 'exhausted', 'blocked', 'cancelled'})
-SCENARIO_SCHEMA = '''
-CREATE TABLE IF NOT EXISTS project_scenario_instances (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, instance_id INTEGER NOT NULL, scenario_key TEXT NOT NULL,
-  entry_key TEXT NOT NULL, definition_json TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
-  workspace_relative TEXT, session_id TEXT NOT NULL, seed_digest TEXT NOT NULL,
-  checkpoint_digest TEXT NOT NULL, execution_json TEXT, error TEXT,
-  created_at REAL NOT NULL, updated_at REAL NOT NULL, UNIQUE(instance_id,scenario_key),
-  FOREIGN KEY(instance_id) REFERENCES project_instances(id)
-);
-CREATE TABLE IF NOT EXISTS project_scenario_tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, scenario_instance_id INTEGER NOT NULL,
-  task_key TEXT NOT NULL, kind TEXT NOT NULL, definition_json TEXT NOT NULL,
-  selected INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'pending',
-  phase TEXT NOT NULL DEFAULT 'ready', turn_no INTEGER NOT NULL DEFAULT 1,
-  attempt_count INTEGER NOT NULL DEFAULT 0, infra_recoveries INTEGER NOT NULL DEFAULT 0,
-  next_reason TEXT NOT NULL DEFAULT 'initial', next_prompt TEXT NOT NULL, result_json TEXT, input_checkpoint_digest TEXT,
-  accepted_checkpoint_digest TEXT, error TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL,
-  UNIQUE(scenario_instance_id,task_key),
-  FOREIGN KEY(scenario_instance_id) REFERENCES project_scenario_instances(id)
-);
-CREATE TABLE IF NOT EXISTS project_task_attempts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, attempt_no INTEGER NOT NULL,
-  reason TEXT NOT NULL, consumed_at REAL NOT NULL, ended_at REAL, result TEXT,
-  UNIQUE(task_id,attempt_no), FOREIGN KEY(task_id) REFERENCES project_scenario_tasks(id)
-);
-CREATE TABLE IF NOT EXISTS project_task_executions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, attempt_id INTEGER,
-  plan_id INTEGER,
-  run_id TEXT NOT NULL UNIQUE, role TEXT NOT NULL CHECK(role IN ('candidate','review')),
-  evaluation_job_id INTEGER, review_attempt INTEGER, turn_no INTEGER NOT NULL,
-  generation INTEGER NOT NULL, session_id TEXT NOT NULL, delivery_id INTEGER,
-  resume INTEGER NOT NULL DEFAULT 0, result_json TEXT, created_at REAL NOT NULL, ended_at REAL,
-  FOREIGN KEY(task_id) REFERENCES project_scenario_tasks(id), FOREIGN KEY(run_id) REFERENCES runs(id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_scenario_task_open_candidate
-  ON project_task_executions(task_id) WHERE role='candidate' AND ended_at IS NULL;
-CREATE TABLE IF NOT EXISTS project_execution_sources (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, execution_id INTEGER NOT NULL, quota_attempt INTEGER NOT NULL,
-  source TEXT NOT NULL, delivery_id INTEGER, native_relative TEXT, cwd TEXT, request_relative TEXT, decision_relative TEXT,
-  evidence_start_json TEXT, evidence_end_json TEXT, work_relative TEXT,
-  released_at REAL, execution_error TEXT, start_permitted INTEGER NOT NULL DEFAULT 0, created_at REAL NOT NULL,
-  UNIQUE(execution_id,quota_attempt,source), FOREIGN KEY(execution_id) REFERENCES project_task_executions(id)
-);
-CREATE TABLE IF NOT EXISTS project_task_deliveries (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, phase_key TEXT NOT NULL,
-  prompt TEXT NOT NULL, input_digest TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
-  input_key TEXT, consumed_source_id INTEGER, created_at REAL NOT NULL, consumed_at REAL,
-  UNIQUE(task_id,phase_key), FOREIGN KEY(task_id) REFERENCES project_scenario_tasks(id)
-);
-CREATE TABLE IF NOT EXISTS project_evaluation_jobs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, source_id INTEGER NOT NULL,
-  turn_no INTEGER NOT NULL, generation INTEGER NOT NULL, response_key TEXT NOT NULL,
-  response_digest TEXT NOT NULL, input_digest TEXT NOT NULL, basis_digest TEXT NOT NULL,
-  candidate_digest TEXT NOT NULL, candidate_relative TEXT NOT NULL, answer_relative TEXT NOT NULL,
-  evidence_json TEXT NOT NULL, version INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'waiting_release',
-  native_result_json TEXT, review_result_json TEXT, review_attempt INTEGER NOT NULL DEFAULT 0,
-  infra_recoveries INTEGER NOT NULL DEFAULT 0, review_resume INTEGER NOT NULL DEFAULT 0, response_budget_sec INTEGER NOT NULL,
-  error TEXT, created_at REAL NOT NULL, ended_at REAL,
-  UNIQUE(source_id,response_key,version), FOREIGN KEY(task_id) REFERENCES project_scenario_tasks(id),
-  FOREIGN KEY(source_id) REFERENCES project_execution_sources(id)
-);
-CREATE TABLE IF NOT EXISTS project_work_segments (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, source_id INTEGER NOT NULL, segment_seq INTEGER NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('candidate','review')), boot_id TEXT NOT NULL,
-  start_mono REAL NOT NULL, reserved_sec REAL NOT NULL CHECK(reserved_sec>0),
-  confirmed_sec REAL NOT NULL DEFAULT 0 CHECK(confirmed_sec>=0),
-  status TEXT NOT NULL DEFAULT 'reserved' CHECK(status IN ('reserved','active','settled','uncertain')),
-  usage_json TEXT, created_at REAL NOT NULL, settled_at REAL,
-  UNIQUE(source_id,segment_seq), FOREIGN KEY(source_id) REFERENCES project_execution_sources(id)
-);
-CREATE INDEX IF NOT EXISTS idx_scenario_task_instance ON project_scenario_tasks(scenario_instance_id,selected,status);
-CREATE INDEX IF NOT EXISTS idx_scenario_evaluation_ready ON project_evaluation_jobs(status,created_at);
-CREATE TABLE IF NOT EXISTS project_scenario_plans (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, scenario_instance_id INTEGER NOT NULL,
-  generation INTEGER NOT NULL, task_ids_json TEXT NOT NULL, passed_ids_json TEXT NOT NULL DEFAULT '[]',
-  status TEXT NOT NULL DEFAULT 'running', created_at REAL NOT NULL, ended_at REAL,
-  FOREIGN KEY(scenario_instance_id) REFERENCES project_scenario_instances(id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_scenario_open_plan ON project_scenario_plans(scenario_instance_id)
-  WHERE ended_at IS NULL;
-'''
 
 
-def initialize_scenario_schema(connection) -> None:
-    """幂等建立新表，不改写旧实例或自增序列。
-
-    :param connection: 已初始化通用与项目基础表的连接。
-    :return: None。
-    """
-    connection.executescript(SCENARIO_SCHEMA + DEVELOPMENT_SQL)
 
 
 def normalized_scenario_policy(values: dict, project_count: int, account_limit: int) -> dict:

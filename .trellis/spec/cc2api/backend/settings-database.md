@@ -5,14 +5,14 @@
 `cc2api` 同时支持 SQLite 和 PostgreSQL：
 
 - 初始化入口：`src/store/db.rs::init_db`
-- schema/migration 入口：`src/store/db.rs::migrate`
+- schema/migration 入口：`src/store/db.rs::migrate` 保留导出，SQLite 委托 `database_migrations`；纯定义为 `src/store/database_schema.rs`。
 - 运行时连接：`sqlx::AnyPool`
 
 所有 SQL 变更都必须考虑 SQLite 与 PostgreSQL 两套 schema。不要只改其中一套。
 
 ## 迁移规则
 
-- `ALTER TABLE ... ADD COLUMN` 目前采用幂等失败吞掉的方式支持旧库升级；新增列要确认重复执行安全。
+- SQLite 原初始化冻结为 `gateway.baseline.1`，由 `database_migrations` 与固定登记核验后执行。已登记库仍检查最低实际结构。新增版本同时实现执行分支并完成新旧程序兼容验收；已登记摘要保持。PostgreSQL 继续原迁移语义。基线中的历史 ADD COLUMN 幂等容忍保持，登记成功前核验实际完成结构。
 - settings 默认值通过 `settings` 表插入 key/value；新增 setting 必须有默认值、老值迁移策略和非法值兜底。
 - `claude_code_profile_selection_mode` 缺失时幂等插入 `client_version`，SQLite 使用 `INSERT OR IGNORE`、PostgreSQL 使用 `ON CONFLICT (key) DO NOTHING`；不得覆盖显式模式值。仅补齐选择模式不批量修改账号 env。
 - 版本画像相关迁移必须更新已有账号的 `canonical_env.version/version_base/build_time/node_version`，不能只改新账号默认值。
@@ -21,12 +21,14 @@
 - 迁移不得改写禁止版本和其它 UA；出厂禁止列表仍为空。「仅允许 280、293」是管理员明确保存的设置页预设，不是启动时自动覆盖的安全策略。
 - 删除或废弃 setting key 时，加入 `OBSOLETE_SETTINGS_KEYS`，并确认 UI 不再提交旧 key。
 
+SQLite 固定维护入口为 `claude-code-gateway database-migrations plan|apply|verify --operation-id <UUID> --target-version <N>`。迁移台账、签名证据、两库恢复及错误合同统一见[平台自动迁移规范](../../vibecoding-bench/deploy/platform-online-update.md#scenario-自动数据库迁移与原操作恢复)。
+
 ## Settings Key 契约
 
 新增 setting 必须同步：
 
 1. `src/store/settings_store.rs` 的 `DEFAULT_*` 常量。
-2. `src/store/db.rs` 的默认插入或迁移。
+2. 按当前版本更新迁移定义、登记及默认值来源，保持已登记基线冻结。
 3. `src/handler/router.rs` 的校验、解析、`update_settings` reload。
 4. `src/service/gateway.rs` 或对应 service 的内存缓存字段。
 5. `web/src/components/Settings.vue` 的控件。

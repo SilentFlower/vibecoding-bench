@@ -33,6 +33,11 @@ SOURCE_FILES = ('deploy/v3/manage.py', 'deploy/v3/system_release.py', 'deploy/v3
     'orchestrator/storage_assets.py', 'orchestrator/storage_backup.py', 'orchestrator/storage_cleanup.py',
     'orchestrator/storage_maintenance.py')
 
+SOURCE_FILES += ('deploy/v3/system_update_database.py', 'deploy/v3/upgrade_system_updater.py',
+    'orchestrator/database_migrations.py', 'orchestrator/database_migration_contract.py',
+    'orchestrator/database_schema.py', 'orchestrator/database-migration-registry.json', 'orchestrator/projects_store.py')
+SOURCE_FILES += ('orchestrator/system_update_connection.py',)
+
 
 def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: str, *, apply: bool = False,
         backend_type=HostDeployment) -> dict:
@@ -54,8 +59,13 @@ def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: s
     raw = safe_read(release_dir / 'system-release.json')
     signature = safe_read(release_dir / 'system-release.sig', 64)
     release = validate_release(verify_signed(raw, signature, public_key))
+    migration_assets = [] if release['schema_version'] == 1 else [release['migrations'][field] for field in ('plan', 'evidence')]
+    for asset in migration_assets:
+        content = safe_read(release_dir / asset['name'])
+        if len(content) != asset['size'] or hashlib.sha256(content).hexdigest() != asset['sha256']:
+            raise ValueError('首次接入迁移附件摘要不符')
     data = Path(values['V3_DATA_ROOT'])
-    policy = {'schema_version': 1, 'deployment': values['V3_DEPLOYMENT_ID'], 'data_root': str(data),
+    policy = {'schema_version': release['schema_version'], 'deployment': values['V3_DEPLOYMENT_ID'], 'data_root': str(data),
         'env_file': str(env), 'state_root': str(root), 'public_key': public_key,
         'compose_file': str(root / 'source/deploy/v3/compose.yml'),
         'compose_file_sha256': hashlib.sha256((REPO / 'deploy/v3/compose.yml').read_bytes()).hexdigest(),
@@ -93,6 +103,8 @@ def prepare_installation(env: Path, release_dir: Path, root: Path, public_key: s
         if len(content) != asset['size'] or hashlib.sha256(content).hexdigest() != asset['sha256']:
             raise ValueError('首次接入原始构建清单摘要不符')
         atomic_text(folder / asset['name'], content.decode())
+    for asset in migration_assets:
+        atomic_text(folder / asset['name'], safe_read(release_dir / asset['name']).decode())
     atomic_text(root / 'socket/token', secrets.token_hex(32))
     atomic_json(root / 'policy.json', policy)
     revision, epoch, operation_id = str(uuid.uuid4()), str(uuid.uuid4()), str(uuid.uuid4())

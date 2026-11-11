@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import hashlib
 import json
 import os
@@ -14,7 +13,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / 'orchestrator'))
-from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, ROLES, strict_json, utc_now, validate_index, validate_release
+from database_migrations import schema_checksum
+from database_migration_contract import load_registry, registry_contract
+from system_update_contract import INDEX_LIMIT, MANIFEST_LIMIT, ROLES, strict_json, utc_now, validate_index, validate_release, validate_migration_evidence, validate_migration_plan
 
 
 def data_contracts(root: Path) -> dict:
@@ -23,27 +24,20 @@ def data_contracts(root: Path) -> dict:
     :param root: 冻结源码根。
     :return: 两库合同 SHA256。
     """
-    main = (root / 'orchestrator/main.py').read_text()
-    tree = ast.parse(main)
-    pieces = []
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == 'init_db':
-            pieces.append(ast.dump(node, include_attributes=False))
-        if isinstance(node, ast.Assign) and any(isinstance(item, ast.Name) and item.id == '_SCHEMA' for item in node.targets):
-            pieces.append(ast.dump(node, include_attributes=False))
-    if len(pieces) != 2:
-        raise ValueError('数据库初始化来源不完整')
-    # 其他模块自带幂等建表；整个定义变化采用保守失配，避免默许未知迁移。
-    for path in sorted((root / 'orchestrator').glob('*.py')):
-        if path.name.startswith('test_') or path.name == 'main.py':
-            continue
-        content = path.read_text()
-        if 'CREATE TABLE' in content or 'ALTER TABLE' in content:
-            pieces.extend((path.name, content))
-    gateway = b''.join((root / relative).read_bytes() for relative in
-        ('cc2api/src/store/db.rs', 'cc2api/src/store/settings_store.rs'))
-    return {'bench': hashlib.sha256('\0'.join(pieces).encode()).hexdigest(),
-        'gateway': hashlib.sha256(gateway).hexdigest()}
+    registries = migration_registries(root)
+    return {name: registry_contract(value) for name, value in registries.items()}
+
+
+def migration_registries(root: Path) -> dict:
+    """读取源码登记并核对首版纯迁移定义。:param root: 冻结源码根。:return: 两库登记。"""
+    values = {'bench': load_registry(root / 'orchestrator/database-migration-registry.json', 'bench'),
+        'gateway': load_registry(root / 'cc2api/src/store/database-migration-registry.json', 'gateway')}
+    actual = {'bench': schema_checksum(root / 'orchestrator/database_schema.py'),
+        'gateway': hashlib.sha256((root / 'cc2api/src/store/database_schema.rs').read_bytes().split(b'#[cfg(test)]', 1)[0]).hexdigest()}
+    if any(value['steps'][0]['checksum'] != actual[name] for name, value in values.items()):
+        raise ValueError('迁移定义与版本登记不符')
+    return values
+
 
 
 def sign_file(path: Path, key: Path) -> Path:
@@ -91,7 +85,7 @@ def component_content(root: Path, role: str) -> str:
 
 
 def create_release(manifest_path: Path, policy_path: Path, output: Path, key: Path,
-        sequence: list[int], changes: str, *, root: Path = REPO) -> dict:
+        sequence: list[int], changes: str, *, root: Path = REPO, migration_evidence: Path | None = None) -> dict:
     """将已发布同批制品转换为严格平台发行，禁止覆盖身份。
 
     :param manifest_path: 现有 schema3 发布清单。
@@ -101,6 +95,7 @@ def create_release(manifest_path: Path, policy_path: Path, output: Path, key: Pa
     :param sequence: 工作流顺序及 attempt。
     :param changes: 普通文本版本说明。
     :param root: 冻结来源根。
+    :param migration_evidence: 可选的真实镜像迁移演练证据，提供时生成 v2。
     :return: 已签署平台合同。
     """
     raw = manifest_path.read_bytes()
@@ -113,10 +108,11 @@ def create_release(manifest_path: Path, policy_path: Path, output: Path, key: Pa
     if set(policy) != {'schema_version', 'rollback_compatible'} or policy['schema_version'] != 1 or set(policy['rollback_compatible']) != {'bench', 'gateway'}:
         raise ValueError('数据兼容证明格式无效')
     contracts = data_contracts(root)
-    value = {'schema_version': 1, 'release': 'system-' + build['release'], 'sequence': sequence,
+    version = 2 if migration_evidence is not None else 1
+    value = {'schema_version': version, 'release': 'system-' + build['release'], 'sequence': sequence,
         'published_at': utc_now(), 'platform': 'linux/amd64', 'changes': changes,
         'build_manifests': {role: {'name': 'v3.json', 'size': len(raw), 'sha256': hashlib.sha256(raw).hexdigest()} for role in ROLES},
-        'compatibility': {'updater': 1, 'gate': 1, 'bridge': 1, 'layout': 2, 'cli_install': 2,
+        'compatibility': {'updater': version, 'gate': 1, 'bridge': 1, 'layout': 2, 'cli_install': 2,
             'credential_ownership': 1, 'account_protocols': [1]},
         'data_compatibility': {}, 'bundle': build['bundle']}
     for name, digest in contracts.items():
@@ -131,8 +127,25 @@ def create_release(manifest_path: Path, policy_path: Path, output: Path, key: Pa
         value[role] = {field: entry[field] for field in ('reference', 'registry_digest', 'config_digest', 'unpacked_bytes')}
         value[role].update(release=build['release'], revision=build['parent_revision'])
         value[role]['content_sha256'] = component_content(root, role)
-    validate_release(value)
+    evidence = None
+    if migration_evidence is not None:
+        evidence = strict_json(migration_evidence.read_bytes())
+        validate_migration_evidence(evidence, value)
+        for name in contracts:
+            allowed = [source['contracts'][name] for source in evidence['sources']]
+            value['data_compatibility'][name]['rollback_compatible'] = list(dict.fromkeys([contracts[name], *allowed]))
     output.mkdir(mode=0o700)
+    if evidence is not None:
+        registries = migration_registries(root)
+        plan = {'schema_version': 1, 'databases': {name: {'version': len(registries[name]['steps']),
+            'contract': digest, 'steps': registries[name]['steps']} for name, digest in contracts.items()}}
+        value['migrations'] = {'protocol': 1}
+        for field, filename, content in (('plan', 'database-migrations.json', plan), ('evidence', 'database-compatibility.json', evidence)):
+            raw_asset = json.dumps(content, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+            (output / filename).write_bytes(raw_asset)
+            value['migrations'][field] = {'name': filename, 'size': len(raw_asset), 'sha256': hashlib.sha256(raw_asset).hexdigest()}
+        validate_migration_plan(plan, value)
+    validate_release(value)
     (output / 'v3.json').write_bytes(raw)
     path = output / 'system-release.json'
     path.write_text(json.dumps(value, ensure_ascii=False, separators=(',', ':')))
@@ -181,6 +194,7 @@ def main() -> None:
     release.add_argument('--key', type=Path, required=True)
     release.add_argument('--run-number', type=int, required=True)
     release.add_argument('--attempt', type=int, required=True)
+    release.add_argument('--migration-evidence', type=Path)
     release.add_argument('--changes', default='平台联合构建，组件变化及兼容条件见版本清单。')
     index = sub.add_parser('index')
     index.add_argument('--release', type=Path, required=True)
@@ -190,7 +204,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.action == 'release':
         value = create_release(args.manifest, args.policy, args.output, args.key,
-            [args.run_number, args.attempt], args.changes)
+            [args.run_number, args.attempt], args.changes, migration_evidence=args.migration_evidence)
     else:
         value = create_index(args.release, args.previous, args.output, args.key)
     print(json.dumps({'status': 'signed', 'identity': value.get('release', value['sequence'])}))

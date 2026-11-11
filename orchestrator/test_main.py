@@ -1125,14 +1125,11 @@ class ClaudeCodeVersionTests(unittest.TestCase):
         """
         old_db_path = self.base / "old-runs.sqlite"
         conn = sqlite3.connect(old_db_path)
-        conn.execute(
-            "CREATE TABLE runs(id TEXT PRIMARY KEY, task_id INTEGER NOT NULL, "
-            "account_id INTEGER NOT NULL, status TEXT NOT NULL)"
-        )
-        conn.execute(
-            "CREATE TABLE app_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL, "
-            "updated_at REAL)"
-        )
+        # 历史夹具保留原有基础字段，只移除本场景待补齐的执行快照列。
+        conn.executescript(main._SCHEMA)
+        for column in ("claude_code_version", "claude_code_version_source", "claude_effort_level",
+                "capture_permission_mode", "quota_attempt", "quota_resume_at", "quota_identity", "execution_model"):
+            conn.execute("ALTER TABLE runs DROP COLUMN " + column)
         conn.execute(
             "INSERT INTO runs(id, task_id, account_id, status) "
             "VALUES('preserved-run',7,9,'success')"
@@ -1623,6 +1620,10 @@ global.fetch = async (_url, options) => {
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               name TEXT UNIQUE NOT NULL,
               profile_path TEXT NOT NULL,
+              upstream_socks5_host TEXT,
+              upstream_socks5_port INTEGER,
+              upstream_socks5_user TEXT,
+              upstream_socks5_pass TEXT,
               enabled INTEGER DEFAULT 1,
               created_at REAL
             );

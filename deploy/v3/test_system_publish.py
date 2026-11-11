@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import publish_system_release
 import test_system_release as release_tests
+from test_system_migrations import evidence_for
 
 
 class SystemPublishTests(unittest.TestCase):
@@ -49,10 +50,47 @@ class SystemPublishTests(unittest.TestCase):
             return b'a' * 40 + b'\n'
         return b''
 
-    def publish(self) -> dict:
-        """调用实际发布协调逻辑。@return 发布结果。"""
+    def publish(self, evidence=None) -> dict:
+        """调用实际发布协调逻辑。:param evidence: 合成兼容证据。@return 发布结果。"""
         with patch.object(publish_system_release, 'run', self.command_run):
-            return publish_system_release.publish(self.fixture.manifest, self.bundle, self.fixture.key.read_text())
+            return publish_system_release.publish(self.fixture.manifest, self.bundle, self.fixture.key.read_text(), evidence)
+
+    def test_v2_assets_are_published_before_migration_catalog(self) -> None:
+        """迁移附件上传成功后推进独立新通道。@return None。"""
+        original = json.loads((self.fixture.output / 'system-release.json').read_text())
+        evidence = self.fixture.root / 'evidence.json'
+        evidence.write_text(json.dumps(evidence_for(self.fixture, original, (self.fixture.output / 'system-release.json').read_bytes())))
+        self.assertEqual(self.publish(evidence)['status'], 'published')
+        uploads = [i for i, call in enumerate(self.calls) if call[:3] == ('gh', 'release', 'upload')]
+        published = next(i for i, call in enumerate(self.calls) if call[:3] == ('gh', 'release', 'edit'))
+        self.assertEqual(len(uploads), 2)
+        self.assertLess(max(uploads), published)
+        self.assertEqual({item.rsplit('/', 1)[-1] for item in self.calls[uploads[1]][-2:]},
+            {'database-migrations.json', 'database-compatibility.json'})
+        push = next(call for call in self.calls if call[:2] == ('git', 'push'))
+        self.assertTrue(push[-1].endswith(':refs/heads/updates/v3-migrations'))
+
+    def test_legacy_refresh_preserves_entries_and_format(self) -> None:
+        """旧通道只刷新签名有效期及序号，保持旧发行可读。@return None。"""
+        from system_release import create_index
+        index_path = self.fixture.root / 'legacy-index.json'
+        old = create_index(self.fixture.output / 'system-release.json', None, index_path, self.fixture.key)
+        blobs = []
+        def run(*arguments, data=None, environment=None):
+            if arguments[:2] == ('git', 'ls-remote'):
+                return b'a' * 40
+            if arguments[:2] == ('git', 'show'):
+                suffix = 'legacy-index.sig' if arguments[-1].endswith('index.sig') else 'legacy-index.json'
+                return (self.fixture.root / suffix).read_bytes()
+            if arguments[:2] == ('git', 'hash-object'):
+                blobs.append(data)
+            return b'a' * 40
+        with patch.object(publish_system_release, 'run', run):
+            publish_system_release.refresh_legacy_catalog(self.fixture.root, self.fixture.key, self.fixture.public, [100, 1])
+        updated = json.loads(blobs[0])
+        self.assertEqual(updated['releases'], old['releases'])
+        self.assertEqual(updated['schema_version'], 1)
+        self.assertEqual(updated['sequence'], old['sequence'])
 
     def test_all_assets_then_publish_then_advance_catalog(self) -> None:
         """附件齐备后正式发布，再推进原子目录。@return None。"""

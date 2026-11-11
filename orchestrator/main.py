@@ -9,6 +9,11 @@ vibecoding bench · Orchestrator
 """
 from __future__ import annotations
 
+from database_migrations import apply_migrations
+from database_schema import initialize_session_schema
+
+from database_schema import _SCHEMA, _ensure_column
+
 import asyncio
 import base64
 import hashlib
@@ -1363,173 +1368,6 @@ def _resolve_capture_flows_dirs(
 
 
 # ============== DB ==============
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS accounts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT UNIQUE NOT NULL,
-  profile_path TEXT NOT NULL,
-  upstream_proxy_scheme TEXT DEFAULT 'socks5',
-  upstream_socks5_host TEXT,
-  upstream_socks5_port INTEGER,
-  upstream_socks5_user TEXT,
-  upstream_socks5_pass TEXT,
-  timezone TEXT,
-  run_window_json TEXT,
-  claude_code_version TEXT,
-  projects_capture_enabled INTEGER NOT NULL DEFAULT 0,
-  warmup_capture_enabled INTEGER NOT NULL DEFAULT 0,
-  cc2api_account_id INTEGER,
-  warmup_enabled INTEGER DEFAULT 0,
-  warmup_interval_min_hours INTEGER DEFAULT 3,
-  warmup_interval_max_hours INTEGER DEFAULT 5,
-  warmup_quota_5h_limit_percent INTEGER,
-  warmup_quota_7d_limit_percent INTEGER,
-  warmup_next_run_at REAL,
-  warmup_last_attempt_at REAL,
-  warmup_last_run_id TEXT,
-  warmup_last_status TEXT,
-  warmup_last_error TEXT,
-  warmup_auth_failures INTEGER DEFAULT 0,
-  oauth_refresh_last_attempt_at REAL,
-  oauth_refresh_last_status TEXT,
-  oauth_refresh_last_error TEXT,
-  enabled INTEGER DEFAULT 1,
-  deleted_at REAL,
-  created_at REAL DEFAULT (julianday('now'))
-);
-
-CREATE TABLE IF NOT EXISTS topics (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  no INTEGER UNIQUE NOT NULL,
-  title TEXT NOT NULL,
-  description TEXT NOT NULL DEFAULT '',
-  category TEXT NOT NULL DEFAULT '',
-  enabled INTEGER DEFAULT 1,
-  deleted_at REAL,
-  followups_json TEXT NOT NULL DEFAULT '[]',
-  created_at REAL DEFAULT (julianday('now')),
-  updated_at REAL DEFAULT (julianday('now'))
-);
-
-CREATE TABLE IF NOT EXISTS tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  topic_no INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  prompt TEXT NOT NULL,
-  account_id INTEGER NOT NULL,
-  batch_id INTEGER,
-  topic_id INTEGER,
-  status TEXT DEFAULT 'active',
-  deleted_at REAL,
-  timeout_sec INTEGER DEFAULT 1800,
-  repeat_n INTEGER DEFAULT 1,
-  followup_candidates_json TEXT NOT NULL DEFAULT '[]',
-  created_at REAL DEFAULT (julianday('now')),
-  FOREIGN KEY(account_id) REFERENCES accounts(id)
-);
-
-CREATE TABLE IF NOT EXISTS task_batches (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  account_id INTEGER NOT NULL,
-  name TEXT NOT NULL,
-  concurrency INTEGER DEFAULT 2,
-  interval_min_sec INTEGER DEFAULT 0,
-  interval_max_sec INTEGER DEFAULT 0,
-  timeout_sec INTEGER DEFAULT 1800,
-  status TEXT NOT NULL DEFAULT 'active',
-  next_launch_at REAL,
-  window_wait_until REAL,
-  deleted_at REAL,
-  created_at REAL DEFAULT (julianday('now')),
-  updated_at REAL DEFAULT (julianday('now')),
-  FOREIGN KEY(account_id) REFERENCES accounts(id)
-);
-
-CREATE TABLE IF NOT EXISTS task_batch_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  batch_id INTEGER NOT NULL,
-  topic_id INTEGER NOT NULL,
-  task_id INTEGER,
-  run_id TEXT,
-  prompt TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'pending',
-  followup_candidates_json TEXT NOT NULL DEFAULT '[]',
-  created_at REAL DEFAULT (julianday('now')),
-  updated_at REAL DEFAULT (julianday('now')),
-  FOREIGN KEY(batch_id) REFERENCES task_batches(id),
-  FOREIGN KEY(topic_id) REFERENCES topics(id)
-);
-
-CREATE TABLE IF NOT EXISTS app_settings (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL,
-  updated_at REAL DEFAULT (julianday('now'))
-);
-
-CREATE TABLE IF NOT EXISTS runs (
-  id TEXT PRIMARY KEY,
-  task_id INTEGER NOT NULL,
-  account_id INTEGER NOT NULL,
-  batch_id INTEGER,
-  topic_id INTEGER,
-  status TEXT NOT NULL DEFAULT 'queued',
-  exit_code INTEGER,
-  worker_container TEXT,
-  sidecar_container TEXT,
-  workspace_dir TEXT,
-  flows_dir TEXT,
-  run_kind TEXT DEFAULT 'normal',
-  capture_mode TEXT,
-  capture_summary_path TEXT,
-  capture_model_override TEXT,
-  capture_permission_mode TEXT DEFAULT 'bypassPermissions',
-  claude_code_version TEXT,
-  claude_code_version_source TEXT,
-  claude_effort_level TEXT,
-  execution_model TEXT,
-  quota_attempt INTEGER NOT NULL DEFAULT 0,
-  quota_resume_at REAL,
-  window_wait_until REAL,
-  quota_identity TEXT,
-  started_at REAL,
-  ended_at REAL,
-  stop_requested_at REAL,
-  deleted_at REAL,
-  error TEXT,
-  followup_plan_json TEXT NOT NULL DEFAULT '[]',
-  followup_timing_json TEXT,
-  created_at REAL DEFAULT (julianday('now'))
-);
-CREATE INDEX IF NOT EXISTS idx_runs_status  ON runs(status);
-CREATE INDEX IF NOT EXISTS idx_runs_account ON runs(account_id);
-CREATE INDEX IF NOT EXISTS idx_runs_task    ON runs(task_id);
-CREATE INDEX IF NOT EXISTS idx_topics_no    ON topics(no);
-CREATE INDEX IF NOT EXISTS idx_batches_account ON task_batches(account_id);
-CREATE INDEX IF NOT EXISTS idx_batch_items_batch ON task_batch_items(batch_id);
-CREATE TABLE IF NOT EXISTS account_quota_states (
-  account_id INTEGER PRIMARY KEY,
-  identity TEXT NOT NULL,
-  state_json TEXT NOT NULL DEFAULT '{}',
-  recovery_source TEXT,
-  updated_at REAL NOT NULL
-);
-CREATE TABLE IF NOT EXISTS quota_observation_cursors (
-  source TEXT PRIMARY KEY,
-  account_id INTEGER NOT NULL,
-  identity TEXT NOT NULL,
-  path TEXT NOT NULL,
-  file_identity TEXT,
-  byte_offset INTEGER NOT NULL DEFAULT 0
-);
-CREATE TABLE IF NOT EXISTS warmup_quota_admissions (
-  account_id INTEGER PRIMARY KEY,
-  identity TEXT NOT NULL,
-  policy_key TEXT NOT NULL,
-  window_key TEXT NOT NULL,
-  source TEXT NOT NULL,
-  created_at REAL NOT NULL
-);
-"""
 
 _db_lock = threading.Lock()
 
@@ -1541,99 +1379,17 @@ def get_db() -> sqlite3.Connection:
 
 
 def init_db() -> None:
+    """初始化版本化数据库并沿原规则填充空题库。@return None。"""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
     try:
+        apply_migrations(conn)
         with conn:
-            conn.executescript(_SCHEMA)
-            conn.executescript(PROJECT_SCHEMA)
-            conn.executescript(PROJECTS_SCHEMA)
-            initialize_plan_schema(conn)
-            initialize_scenario_schema(conn)
-            _ensure_column(conn, "accounts", "upstream_proxy_scheme", "TEXT DEFAULT 'socks5'")
-            _ensure_column(conn, "accounts", "timezone", "TEXT")
-            _ensure_column(conn, "accounts", "run_window_json", "TEXT")
-            _ensure_column(conn, "accounts", "claude_code_version", "TEXT")
-            _ensure_column(conn, "accounts", "projects_capture_enabled", "INTEGER NOT NULL DEFAULT 0")
-            _ensure_column(conn, "accounts", "warmup_capture_enabled", "INTEGER NOT NULL DEFAULT 0")
-            _ensure_column(conn, "runs", "window_wait_until", "REAL")
-            _ensure_column(conn, "task_batches", "window_wait_until", "REAL")
-            _ensure_column(conn, "accounts", "deleted_at", "REAL")
-            _ensure_column(conn, "accounts", "cc2api_account_id", "INTEGER")
-            _ensure_column(conn, "accounts", "warmup_enabled", "INTEGER DEFAULT 0")
-            _ensure_column(conn, "accounts", "warmup_quota_5h_limit_percent", "INTEGER")
-            _ensure_column(conn, "accounts", "warmup_quota_7d_limit_percent", "INTEGER")
-            _ensure_column(
-                conn, "accounts", "warmup_interval_min_hours", "INTEGER DEFAULT 3"
-            )
-            _ensure_column(
-                conn, "accounts", "warmup_interval_max_hours", "INTEGER DEFAULT 5"
-            )
-            _ensure_column(conn, "accounts", "warmup_next_run_at", "REAL")
-            _ensure_column(conn, "accounts", "warmup_last_attempt_at", "REAL")
-            _ensure_column(conn, "accounts", "warmup_last_run_id", "TEXT")
-            _ensure_column(conn, "accounts", "warmup_last_status", "TEXT")
-            _ensure_column(conn, "accounts", "warmup_last_error", "TEXT")
-            _ensure_column(
-                conn, "accounts", "warmup_auth_failures", "INTEGER DEFAULT 0"
-            )
-            _ensure_column(conn, "accounts", "oauth_refresh_last_attempt_at", "REAL")
-            _ensure_column(conn, "accounts", "oauth_refresh_last_status", "TEXT")
-            _ensure_column(conn, "accounts", "oauth_refresh_last_error", "TEXT")
-            _ensure_column(conn, "tasks", "batch_id", "INTEGER")
-            _ensure_column(conn, "tasks", "topic_id", "INTEGER")
-            _ensure_column(conn, "tasks", "status", "TEXT DEFAULT 'active'")
-            _ensure_column(conn, "tasks", "deleted_at", "REAL")
-            _ensure_column(conn, "runs", "batch_id", "INTEGER")
-            _ensure_column(conn, "runs", "topic_id", "INTEGER")
-            _ensure_column(conn, "runs", "stop_requested_at", "REAL")
-            _ensure_column(conn, "runs", "deleted_at", "REAL")
-            _ensure_column(conn, "runs", "run_kind", "TEXT DEFAULT 'normal'")
-            _ensure_column(conn, "runs", "capture_mode", "TEXT")
-            _ensure_column(conn, "runs", "capture_summary_path", "TEXT")
-            _ensure_column(conn, "runs", "capture_model_override", "TEXT")
-            _ensure_column(
-                conn,
-                "runs",
-                "capture_permission_mode",
-                "TEXT DEFAULT 'bypassPermissions'",
-            )
-            _ensure_column(conn, "runs", "claude_code_version", "TEXT")
-            _ensure_column(conn, "runs", "claude_code_version_source", "TEXT")
-            _ensure_column(conn, "runs", "claude_effort_level", "TEXT")
-            _ensure_column(conn, "runs", "execution_model", "TEXT")
-            _ensure_column(conn, "runs", "quota_attempt", "INTEGER NOT NULL DEFAULT 0")
-            _ensure_column(conn, "runs", "quota_resume_at", "REAL")
-            _ensure_column(conn, "runs", "quota_identity", "TEXT")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_runs_batch ON runs(batch_id)")
-            conn.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_cc2api_account_id "
-                "ON accounts(cc2api_account_id) WHERE cc2api_account_id IS NOT NULL"
-            )
-            _ensure_column(conn, "topics", "followups_json", "TEXT NOT NULL DEFAULT '[]'")
-            _ensure_column(conn, "tasks", "followup_candidates_json", "TEXT NOT NULL DEFAULT '[]'")
-            _ensure_column(conn, "task_batch_items", "followup_candidates_json", "TEXT NOT NULL DEFAULT '[]'")
-            _ensure_column(conn, "runs", "followup_plan_json", "TEXT NOT NULL DEFAULT '[]'")
-            _ensure_column(conn, "runs", "followup_timing_json", "TEXT")
             _seed_topics_if_empty(conn)
     finally:
         conn.close()
 
 
-def _ensure_column(conn: sqlite3.Connection, table: str, column: str, ddl: str) -> None:
-    """
-    幂等补 SQLite 列，兼容已经存在的旧 `data/db.sqlite`。
-
-    :param conn: 当前数据库连接
-    :param table: 表名
-    :param column: 需要补齐的列名
-    :param ddl: `ALTER TABLE ADD COLUMN` 后的列定义
-    :return: None
-    """
-    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
-    if any(r["name"] == column for r in rows):
-        return
-    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
 
 # ============== Topics（SQLite 为主，topics.md 首次 seed）==============
@@ -8430,7 +8186,7 @@ def _v3_session_store():
     """打开独立会话登记，仅保存 token 摘要和过期时间。"""
     connection = get_db()
     with connection:
-        connection.execute("CREATE TABLE IF NOT EXISTS v3_management_sessions (token_hash TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)")
+        initialize_session_schema(connection)
     return connection
 
 

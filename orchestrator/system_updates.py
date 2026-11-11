@@ -1,6 +1,8 @@
 """平台更新管理桥和受证环境维护，宿主执行器拥有切换生命周期。"""
 from __future__ import annotations
 
+from system_update_connection import UnixUpdateConnection
+
 import json
 import os
 import re
@@ -111,26 +113,6 @@ class EnvironmentUpdate(BaseModel):
     allowed_image_ids: list[StrictStr] = []
 
 
-class UnixUpdateConnection(HTTPConnection):
-    """使用既有 HTTP 编码访问私有 Unix socket。"""
-
-    def __init__(self, path: Path) -> None:
-        """保存固定 socket 路径。
-
-        :param path: 首次接入固化的 Unix socket。
-        :return: None。
-        """
-        super().__init__('localhost', timeout=10)
-        self.path = path
-
-    def connect(self) -> None:
-        """建立有界本机连接。
-
-        :return: None。
-        """
-        self.sock = socket(AF_UNIX, SOCK_STREAM)
-        self.sock.settimeout(self.timeout)
-        self.sock.connect(str(self.path))
 
 
 def update_token() -> str:

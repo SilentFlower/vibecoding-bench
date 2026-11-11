@@ -13,6 +13,9 @@ from install_system_updater import finalize_installation, prepare_installation
 from runtime_files import atomic_json, atomic_text
 from system_update_contract import strict_json, safe_read
 from system_update_gate import read_gate
+from system_release import create_release
+from system_updater import SystemUpdater
+from test_system_migrations import evidence_for
 
 
 class BootstrapHost:
@@ -100,6 +103,24 @@ class SystemInstallTests(unittest.TestCase):
             finalize_installation(self.root / 'policy.json', apply=True, backend_type=BootstrapHost)
         self.assertIn(b'18081', self.env.read_bytes())
         self.assertEqual(read_gate(self.root / 'gate', 'test')['phase'], 'blocked')
+
+    def test_v2_first_install_copies_signed_assets_and_enables_capability(self) -> None:
+        """首次接入新发行时保留资产并启用迁移底座。@return None。"""
+        original = self.fixture.release
+        proof = self.fixture.root / 'evidence.json'
+        proof.write_text(json.dumps(evidence_for(self.fixture, original, (self.fixture.output / 'system-release.json').read_bytes())))
+        destination = self.fixture.root / 'release-v2'
+        create_release(self.fixture.manifest, self.fixture.policy, destination, self.fixture.key,
+            [11, 1], '合成新版', migration_evidence=proof)
+        self.fixture.output = destination
+        self.assertEqual(self.prepare(True)['status'], 'prepared')
+        policy = strict_json(safe_read(self.root / 'policy.json', private=True))
+        self.assertEqual(policy['schema_version'], 2)
+        engine = SystemUpdater(policy, BootstrapHost(policy))
+        self.assertTrue(engine.status()['migration_capability'])
+        folder = self.root / 'releases' / original['release']
+        self.assertTrue((folder / 'database-migrations.json').is_file())
+        self.assertTrue((folder / 'database-compatibility.json').is_file())
 
     def test_restart_between_state_commit_and_gate_release_finishes_original(self) -> None:
         """状态提交后的中断可重试原接入，安装时间和门禁代次保持。@return None。"""

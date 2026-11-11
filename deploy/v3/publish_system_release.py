@@ -9,8 +9,9 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from system_release import REPO, create_index, create_release
-from system_update_contract import INDEX_LIMIT, REPOSITORY, strict_json, verify_signed
+from system_release import REPO, create_index, create_release, sign_file
+from datetime import datetime, timedelta, timezone
+from system_update_contract import INDEX_LIMIT, REPOSITORY, strict_json, verify_signed, utc_now, validate_index
 
 
 def run(*arguments: str, data: bytes | None = None, environment: dict | None = None) -> bytes:
@@ -28,12 +29,13 @@ def run(*arguments: str, data: bytes | None = None, environment: dict | None = N
     return result.stdout
 
 
-def publish(manifest: Path, bundle: Path, private_key: str) -> dict:
+def publish(manifest: Path, bundle: Path, private_key: str, migration_evidence: Path | None = None) -> dict:
     """发布当前 Action 的精确发行和有界目录，私钥只存临时私有文件。
 
     :param manifest: 已完成的联合发布清单。
     :param bundle: 同批完整镜像包。
     :param private_key: CI 私有 Ed25519 PEM。
+    :param migration_evidence: 真实镜像兼容验收证据；正式入口必需。
     :return: 本次发布事实。
     """
     build = strict_json(manifest.read_bytes())
@@ -57,11 +59,12 @@ def publish(manifest: Path, bundle: Path, private_key: str) -> dict:
         public = run('openssl', 'pkey', '-in', str(key), '-pubout', '-outform', 'DER')[-32:].hex()
         release = create_release(manifest, Path(__file__).with_name('system-update-policy.json'), root / 'release', key,
             [int(os.environ['GITHUB_RUN_NUMBER']), int(os.environ['GITHUB_RUN_ATTEMPT'])],
-            '平台联合更新。组件变化与回退条件由受信清单核验。')
-        reference = run('git', 'ls-remote', 'origin', 'refs/heads/updates/v3').decode().strip()
+            '平台联合更新。数据库迁移、快照恢复及旧版兼容已经隔离演练。', migration_evidence=migration_evidence)
+        channel = 'updates/v3-migrations' if release['schema_version'] == 2 else 'updates/v3'
+        reference = run('git', 'ls-remote', 'origin', 'refs/heads/' + channel).decode().strip()
         previous, parent = None, None
         if reference:
-            run('git', 'fetch', '--depth=1', 'origin', 'refs/heads/updates/v3')
+            run('git', 'fetch', '--depth=1', 'origin', 'refs/heads/' + channel)
             parent = run('git', 'rev-parse', 'FETCH_HEAD').decode().strip()
             raw = run('git', 'show', parent + ':index.json')
             signature = run('git', 'show', parent + ':index.sig')
@@ -70,6 +73,16 @@ def publish(manifest: Path, bundle: Path, private_key: str) -> dict:
                 return {'status': 'skipped', 'reason': '通道已有更新的完整发行', 'release': release['release']}
             previous = root / 'previous.json'
             previous.write_bytes(raw)
+        elif release['schema_version'] == 2:
+            # 新通道首发承接旧受信发行，让后续 CI 继续验证尚未升级的安装来源。
+            legacy = run('git', 'ls-remote', 'origin', 'refs/heads/updates/v3').decode().strip()
+            if legacy:
+                run('git', 'fetch', '--depth=1', 'origin', 'refs/heads/updates/v3')
+                legacy_parent = run('git', 'rev-parse', 'FETCH_HEAD').decode().strip()
+                raw = run('git', 'show', legacy_parent + ':index.json')
+                verify_signed(raw, run('git', 'show', legacy_parent + ':index.sig'), public, INDEX_LIMIT)
+                previous = root / 'previous.json'
+                previous.write_bytes(raw)
         index = root / 'index.json'
         create_index(root / 'release/system-release.json', previous, index, key)
         notes = root / 'notes.md'
@@ -80,6 +93,8 @@ def publish(manifest: Path, bundle: Path, private_key: str) -> dict:
         run('gh', 'release', 'upload', tag, '--repo', REPOSITORY,
             str(root / 'release/system-release.json'), str(root / 'release/system-release.sig'),
             str(root / 'release/v3.json'), str(bundle))
+        if release['schema_version'] == 2:
+            run('gh', 'release', 'upload', tag, '--repo', REPOSITORY, str(root / 'release/database-migrations.json'), str(root / 'release/database-compatibility.json'))
         run('gh', 'release', 'edit', tag, '--repo', REPOSITORY, '--draft=false', '--latest=false')
         blobs = {}
         for name in ('index.json', 'index.sig'):
@@ -90,8 +105,42 @@ def publish(manifest: Path, bundle: Path, private_key: str) -> dict:
         commit = run('git', 'commit-tree', tree, *(['-p', parent] if parent else []),
             data=f'更新受信平台目录 {tag}\n'.encode(), environment=environment).decode().strip()
         # 普通 fast-forward push 保留竞争保护；发布失败不能 force 覆盖后来目录。
-        run('git', 'push', 'origin', commit + ':refs/heads/updates/v3')
+        run('git', 'push', 'origin', commit + ':refs/heads/' + channel)
+        if release['schema_version'] == 2:
+            refresh_legacy_catalog(root, key, public, release['sequence'])
         return {'status': 'published', 'release': tag, 'catalog_commit': commit}
+
+
+def refresh_legacy_catalog(root: Path, key: Path, public_key: str, sequence: list[int]) -> None:
+    """刷新旧通道已支持发行的有效期，保持旧格式目录可用。
+
+    :param root: 本次私有临时根。
+    :param key: 本次私有签名文件。
+    :param public_key: 原信任根公钥。
+    :param sequence: 本批目录顺序。
+    :return: None；外来后来目录保持 fast-forward 保护。
+    """
+    reference = run('git', 'ls-remote', 'origin', 'refs/heads/updates/v3').decode().strip()
+    if not reference:
+        return
+    run('git', 'fetch', '--depth=1', 'origin', 'refs/heads/updates/v3')
+    parent = run('git', 'rev-parse', 'FETCH_HEAD').decode().strip()
+    value = verify_signed(run('git', 'show', parent + ':index.json'), run('git', 'show', parent + ':index.sig'), public_key, INDEX_LIMIT)
+    if value['sequence'] >= sequence:
+        return
+    # v1 序号必须对应目录内最新发行；刷新有效期继续使用原发行序号。
+    value.update(issued_at=utc_now(), expires_at=(datetime.now(timezone.utc)+timedelta(days=30)).isoformat(timespec='seconds').replace('+00:00','Z'))
+    validate_index(value)
+    folder = root / 'legacy'
+    folder.mkdir()
+    (folder / 'index.json').write_text(json.dumps(value, ensure_ascii=False, separators=(',', ':')))
+    sign_file(folder / 'index.json', key)
+    blobs = {name: run('git', 'hash-object', '-w', '--stdin', data=(folder / name).read_bytes()).decode().strip() for name in ('index.json','index.sig')}
+    tree = run('git', 'mktree', data=''.join(f'100644 blob {digest}\t{name}\n' for name,digest in sorted(blobs.items())).encode()).decode().strip()
+    environment = {**os.environ, 'GIT_AUTHOR_NAME':'v3-system-release','GIT_AUTHOR_EMAIL':'v3-system-release@users.noreply.github.com',
+        'GIT_COMMITTER_NAME':'v3-system-release','GIT_COMMITTER_EMAIL':'v3-system-release@users.noreply.github.com'}
+    commit = run('git','commit-tree',tree,'-p',parent,data='刷新旧受信目录有效期\n'.encode(),environment=environment).decode().strip()
+    run('git','push','origin',commit+':refs/heads/updates/v3')
 
 
 def main() -> None:
@@ -103,7 +152,10 @@ def main() -> None:
     if not key:
         print(json.dumps({'status': 'skipped', 'reason': 'signing_not_configured'}))
         return
-    print(json.dumps(publish(REPO / 'releases/v3.json', REPO / 'releases/v3-images.tar.gz', key), ensure_ascii=False))
+    evidence = REPO / 'releases/database-compatibility.json'
+    if not evidence.is_file():
+        raise ValueError('真实数据库升级与回退演练证据缺失，停止签名发布')
+    print(json.dumps(publish(REPO / 'releases/v3.json', REPO / 'releases/v3-images.tar.gz', key, evidence), ensure_ascii=False))
 
 
 if __name__ == '__main__':

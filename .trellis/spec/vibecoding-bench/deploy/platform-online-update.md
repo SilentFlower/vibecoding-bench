@@ -40,9 +40,9 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 ### 受信发行
 
 - 独立 Ed25519 密钥由 CI secret `V3_SYSTEM_RELEASE_PRIVATE_KEY` 提供。宿主保存 64 位十六进制公钥，签名原始长度为 64 字节，按原始 JSON 字节验签。
-- 平台发行 `system-ci-*` 的必需字段为 `schema_version=1`、`release`、`sequence`、`published_at`、`platform`、`build_manifests`、`control`、`account`、`compatibility`、`data_compatibility`、`changes`、`bundle`。平台固定为 `linux/amd64`。
+- v1 平台发行 `system-ci-*` 的必需字段为 `schema_version=1`、`release`、`sequence`、`published_at`、`platform`、`build_manifests`、`control`、`account`、`compatibility`、`data_compatibility`、`changes`、`bundle`。平台固定为 `linux/amd64`。
 - 组件字段固定为 `release`、`reference`、`registry_digest`、`config_digest`、`revision`、`unpacked_bytes`、`content_sha256`。镜像仓固定为 `ghcr.io/silentflower/vibebench-v3-{control|account}`，精确来源为 `v3-ci-*`。仓库摘要、配置摘要和内容摘要分别校验。
-- 兼容能力固定为 `updater=1`、`gate=1`、`bridge=1`、`layout=2`、`cli_install=2`、`credential_ownership=1`、`account_protocols=[1]`。
+- v1 兼容能力固定为 `updater=1`、`gate=1`、`bridge=1`、`layout=2`、`cli_install=2`、`credential_ownership=1`、`account_protocols=[1]`。
 - 双库 `bench`、`gateway` 各有 `contract` 和 `rollback_compatible`。目标声明必须包含原版合同，才允许在线切换。默认策略仅认可自身合同。新增旧合同需要实际兼容验证。
 - 签名目录字段固定为 `schema_version=1`、`sequence`、`issued_at`、`expires_at`、`releases`。目录和签名从同一 Git commit 获取；序号不得低于最高已接受序号。发布有效期为 30 天，校验上限为 31 天。准备和安装需要新鲜目录；回退使用独立验签的已安装历史。
 - `fetch_repository_file` 只接受 `index.json|index.sig`、完整 40 位 commit 和 `1..INDEX_LIMIT` 字节上限。Contents API 仅定位固定提交下的文件路径、大小及 blob SHA；原始载荷从 Git Blob API 的 Base64 字段取得，严格核对编码、解码大小及 Git blob SHA，再执行原有 Ed25519 验签。Contents 的 raw 响应及 `content` 字段可能转换二进制签名字节。
@@ -64,7 +64,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 已接受的 `cancel_requested=true` 是单向持久意图，执行线程写阶段时必须合并该标记。排空后最后一次现场采集完成，再在与取消接口共用的锁内核对取消并持久进入 `switching`。此前接受的取消收口为 `cancelled`；进入切换后的取消返回 `409`。
 
-已接入状态包含 `installed`、`revision`、`deployment`、`current_release`、`components`、`operation`、`busy`、`history`、`checked_at`、`check_error`；管理桥补充 `environments`。未接入返回 `installed=false` 与接入说明。公开操作只包含 `operation_id`、`action`、`phase`、`created_at`、`updated_at`、`target_release`、`error`、`blockers`、`cancel_requested`、`cleanup`、`environment_results`。
+已接入状态包含 `installed`、`revision`、`deployment`、`current_release`、`components`、`operation`、`busy`、`history`、`checked_at`、`check_error`；管理桥补充 `environments`。未接入返回 `installed=false` 与接入说明。公开操作包含 `operation_id`、`action`、`phase`、`created_at`、`updated_at`、`target_release`、`error`、`blockers`、`cancel_requested`、`cleanup`、`environment_results`，迁移版本额外返回 `database_snapshot`、`database_migrations`。状态额外提供 `migration_capability:bool`。
 
 ### 来源、准入与恢复
 
@@ -75,7 +75,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 - 两端活动计数覆盖响应正文 EOF、错误及断连。批次排队等待属于待认领工作；有限分派事务和实际执行计入活动。维护期间保留待认领项，释放门禁或控制重启后继续调度。
 - 原工程或登录只能凭实际仍登记的有限作业续接。续接继续检查身份、时间窗口与配额；作业撤销后证明失效。
 - 排空核对实际 API、jobs、executions、租约、sender、CLI 孤儿、三角色镜像及未决意图。未知活动阻断切换。排空超时和切换前取消按原操作释放门禁。
-- 安装正常阶段为 `preparing → draining → switching → verifying → committing → cleaning → succeeded`。单独 prepare 在 `prepared` 完成。恢复按持久意图、真实容器、配置 CAS、软件字段 CAS 与双库/身份摘要确定动作；不确定现场进入 `reconcile`。
+- v1 安装正常阶段为 `preparing → draining → switching → verifying → committing → cleaning → succeeded`。v2 在排空并锁定切换意图后增加 `snapshotting`；目标为 v2 时执行 `migrating`，随后进入 `switching`。失败恢复增加 `restoring_data`。单独 prepare 在 `prepared` 完成。恢复按持久意图、真实容器、配置 CAS、软件字段 CAS 与双库/身份摘要确定动作；不确定现场进入 `reconcile`。
 - 账号部分恢复最多允许冻结的原版和候选两个实际镜像 ID。恢复仍要求环境、代次、epoch 以及原作业证明一致。恢复已释放的门禁前重新检查后来工作。
 - `finalize --apply` 与独立执行器共用 `service.lock` 及存储维护锁。原首次接入在状态提交后、门禁释放前后中断，均可用同一发行重试收口。已完成重试保留原 `installed_at`；外来门禁和后来 revision 拒绝覆盖。
 - 清理保护当前组合、最近两个完整历史组合、全部容器引用和恢复引用。只精确删除经证明的历史镜像；Docker 删除最后一个 tag 时可同步移除其 RepoDigest。清理失败记录 `succeeded_cleanup_pending`，通过原操作恢复重试。
@@ -125,3 +125,72 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 - `verify_system_update_browser.py`：真实构建页面配合合成 API，覆盖桌面/移动端、确认、断线重连、409、回退/恢复、未接入；断言零脚本异常与零真实模型调用。
 - `verify_system_update.py`：随机部署、独立数据根、本地 TLS 和合成密钥下验证真实 Docker 长流排空、控制复用、账号重建、停止状态保留、显式回退、健康失败恢复、部分角色恢复、独立进程中断恢复、容器引用保护与精确回收。Bookworm 二进制沿项目 Docker 构建路径验证兼容性。
 - 生产首次接入、CI 私钥配置和真实发行获取由上线单另行核验。进程中断证据命名为进程恢复，宿主重启采用独立现场核验。
+
+
+## Scenario: 自动数据库迁移与原操作恢复
+
+### 1. Scope / Trigger
+
+v3 的双 SQLite、签名发行及固定宿主执行器共同改变持久合同。适用数据库为 `bench/db.sqlite` 和 `gateway/gateway.sqlite`。gateway 的 PostgreSQL 继续使用原初始化语义。常规在线范围仅接纳已登记并完成旧程序兼容演练的迁移。
+
+### 2. Signatures
+
+```text
+python3 -m database_migrations plan|apply|verify --operation-id <UUID> --target-version <N>
+claude-code-gateway database-migrations plan|apply|verify --operation-id <UUID> --target-version <N>
+python3 deploy/v3/upgrade_system_updater.py --policy <绝对路径> --source-root <核验源码根> --service <原服务> [--apply]
+python3 deploy/v3/upgrade_system_updater.py --policy <原策略> --service <原服务> --recover <原UUID> [--apply]
+system_schema_migrations(migration_id TEXT PRIMARY KEY, version INTEGER NOT NULL UNIQUE,
+  checksum TEXT NOT NULL, applied_at TEXT NOT NULL, operation_id TEXT NOT NULL)
+```
+
+bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。gateway 从原配置读取连接。宿主固定入口、参数、精确候选镜像和单库挂载，关闭维护容器网络并采用只读程序层；发行附件只提供版本声明。
+
+### 3. Contracts
+
+- 两库登记为 `{schema_version:1,database,steps}`；每步固定 `id,version,predecessor,checksum,engine,kind,rollback_mode`，要求连续前驱、`engine=sqlite`、`kind=schema|data`、`rollback_mode=compatible`。首版仅登记各自 `baseline.1`。增加版本需同时实现对应执行分支及演练。
+- 合同为按 key 排序、紧凑 UTF-8 JSON 登记的 SHA256。Python 冻结定义使用忽略文档/注释的 AST 摘要，Rust 使用测试段之前的纯定义原字节摘要。冻结 SQL、默认值、历史画像及命名空间依赖归纯迁移模块所有，普通业务查询和页面改动保持合同。
+- CLI 返回 `database,contract,current_version,target_version,steps,state,reason`；执行完成保留原台账 operation_id。已知台账摘要冲突或版本断链拒绝；旧程序读取兼容新增版本返回 `compatible_newer`。
+- 旧库迁移前核验稳定账号核心字段。迁移完成且写入成功台账之前、以及已登记库 plan/apply 时，复核冻结基线的最低表/列、SQLite 亲和、主键及完整性。允许兼容新增表/列；非主键数字亲和支持历史兼容。空库沿相同初始化建立基线。
+- v2 清单保留原字段，设置 `schema_version=2,compatibility.updater=2`，新增 `migrations:{protocol:1,plan,evidence}`。两个资产精确名为 `database-migrations.json`、`database-compatibility.json`，按大小和原字节 SHA256 绑定签名。计划包含两库版本、合同和完整步骤链；证据绑定候选源码、两类镜像配置摘要、旧版清单/镜像/合同及 upgrade/candidate_read_write/previous_read_write/idempotent 四项成功断言。
+- v2 使用独立 `updates/v3-migrations` 通道，首发继承旧受信发行。`updates/v3` 保留 v1 及原最高序号，仅刷新时间和签名。受信新通道 ref 404 才允许读取旧通道；已有通道资产缺失直接失败。正式证据要求干净同批镜像。
+- 从空闲现场关闭门禁并排空，停止双端并确认数据库 FD 退出后，保存同操作私有双库快照。回执绑定 deployment、operation_id、epoch、原发行、权限/归属及每库文件/逻辑摘要；空间预算先于迁移。默认保留最近两组完成快照，另外保护活动恢复引用，异常目录保留并报告。
+- `database_snapshot` 仅公开 `state,completed_at,bytes`；`database_migrations` 按库公开 state 和 target_version。页面显示快照、迁移、数据恢复及具体阻断原因，未知值保留可见。
+- `release_started` 先于实际释放准入持久化。此前失败按原 UUID 恢复同组两库和原程序；恢复意图先于暂存复制和替换，支持部分两库完成。账号重建后的六项生命周期登记以原身份和 CAS 续接，再恢复原环境。`database_restored` 先于原程序启动落盘，重启收口保护原程序后来写入。重新接单后的显式回退保留当前数据。
+- 底座首次能力接入默认预览，持有独立接入锁；完整备份后发布 `updater-upgrades/<UUID>/upgrade.json`。未完成日志阻止新接入。`--recover` 默认预览，允许服务 inactive，按精确原/新源码 SHA、原策略/状态副本摘要、空闲门禁及服务归属验收，持有服务锁和存储锁后恢复原版并验证 socket。恢复再次中断继续原 UUID；后来状态、外来源码及后续接入日志触发现场保护。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 行为 |
+| --- | --- |
+| 缺稳定核心字段、已登记库缺必要字段、类型/主键异常 | CLI 非零，拒绝登记成功 |
+| 重复 ID、前驱断链、校验和改变、未登记结构定义 | 构建或维护验证失败 |
+| 同合同仅历史许可列表变化 | 允许常规兼容安装 |
+| v2 附件、来源清单或实际镜像证据不符 | 阻止准备/安装及兼容发布 |
+| 快照空间不足、写入者未退出、损坏或外来快照 | 停止迁移并保持原操作恢复权 |
+| 维护窗口中迁移/候选健康失败 | 同组双库及原程序恢复 |
+| 已持久开放准入或存在后来操作 | 保护当前数据，按兼容回退或对账收口 |
+| 底座接入中断 | 显示原 UUID，先预览 `--recover`，再显式 apply |
+| 恢复副本摘要、服务、源码或后续接入记录发生外来变化 | 保留现场并拒绝覆盖 |
+
+### 5. Scenarios and Examples
+
+正常：旧预热版本通过 v1 底座一次接入能力后，在 `/updates` 准备并安装签名 v2；双库自动快照、迁移和验收，完成后轮换快照。
+
+边界：bench 台账已为1而 gateway 仍为0时进程中断，使用原操作恢复同组双库。原程序已经启动后再次中断，按持久恢复标记继续收口。
+
+错误用法：以台账存在代替结构验证，缺少 `accounts.token` 仍标记成功。正确处理：旧库核心准入、完成后最低结构复核及已登记复核均执行，缺列保持非零退出和原台账。
+
+错误用法：底座源码替换中断后重新发起接入。正确处理：按日志原 UUID 执行 `--recover` 预览，复核后追加 `--apply`；服务停机沿同一恢复路径执行。
+
+错误用法：CI 测试依赖终端额外设置 PYTHONPATH。正确处理：脚本自举所属项目路径，并以 `env -u PYTHONPATH` 验证 workflow 默认入口及独立 discover。
+
+### 6. Tests Required
+
+- `verify_database_definitions.py`：DDL 所有权和冻结摘要；业务模块 DDL、触发器/视图及纯定义外部依赖必须被拒绝。
+- 两库迁移测试：空库、旧库、重复执行、台账冲突、兼容新增；缺列/类型/主键异常拒绝登记。Python 增量事务失败保持数据与台账。
+- `test_system_database.py`、`test_system_migrations.py`：WAL、空间、损坏/外来快照、部分复制/替换恢复、保留轮换、同合同准入及开放后的数据保护。
+- `test_system_upgrade.py`：来源/服务归属、失败恢复、源码/策略/状态替换真实进程终止、按 UUID 预览、恢复再次中断、重复恢复及后来状态保护。
+- `verify_database_compatibility.py`：真实旧库→候选→原程序读写、重复迁移及快照恢复；结果绑定精确镜像及合同。默认环境独立入口必须工作。
+- `verify_system_update.py --migration-manifest <候选清单>`：真实旧底座接入、固定源码独立导入、双库半完成中断、恢复后启动中断、健康失败、账号部分角色恢复、显式回退及最近两组快照断言。
+- 页面真实浏览器覆盖迁移计划/阶段、未知状态、断线重连、390px 以及冻结 UUID/revision；合成环境真实模型请求计数为0。

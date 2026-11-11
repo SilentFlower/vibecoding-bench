@@ -28,13 +28,14 @@ class UpdateFixture:
                 'content_sha256': 'a' * 64} for role in ('control', 'account')},
             'history': [{'release': 'system-ci-99-1', 'manifest_sha256': 'c' * 64, 'rollback_available': True}],
             'environments': [{'environment_id': 'synthetic', 'name': '合成环境', 'release': 'ci-100-1', 'running': True, 'verified': True}],
-            'checked_at': '2026-11-11T00:00:00Z', 'check_error': None}
+            'checked_at': '2026-11-11T00:00:00Z', 'check_error': None, 'migration_capability': True}
         self.catalog = {'releases': [{'release': 'system-ci-101-1', 'sequence': [101, 1],
             'published_at': '2026-11-11T00:00:00Z', 'changes': '统一平台更新\n兼容账号环境继续复用',
-            'manifest_sha256': 'b' * 64, 'data_compatible': True, 'account_changed': False},
+            'manifest_sha256': 'b' * 64, 'data_compatible': True, 'account_changed': False,
+            'migrations': [{'database': name, 'target_version': 1, 'steps': 1} for name in ('bench', 'gateway')]},
             {'release': 'system-ci-102-1', 'sequence': [102, 1], 'published_at': '2026-11-11T00:00:00Z',
                 'changes': '<img src=x onerror="window.fixtureXss=true">', 'manifest_sha256': 'd' * 64,
-                'data_compatible': False, 'account_changed': True}],
+                'data_compatible': False, 'account_changed': True, 'compatibility_reason': 'migration_evidence_missing'}],
             'fresh': True, 'checking': False, 'checked_at': '2026-11-11T00:00:00Z', 'check_error': None}
         self.writes = []
         self.requests = []
@@ -131,7 +132,9 @@ async def verify(output: Path) -> dict:
         fixture = UpdateFixture()
         context, page = await page_for(fixture)
         await expect(page.get_by_role('button', name='安装更新', exact=True)).to_be_visible()
-        await expect(page.get_by_role('button', name='需要专项维护')).to_be_disabled()
+        await expect(page.get_by_role('button', name='兼容验证待补齐')).to_be_disabled()
+        await expect(page.get_by_text('此来源版本的升级与回退演练证据待发布端补齐。')).to_be_visible()
+        await expect(page.get_by_text('平台数据库 → 版本 1 · 1 项登记')).to_be_visible()
         assert await page.evaluate('window.fixtureXss') is None
         await page.screenshot(path=str(output / 'updates-1280.png'), full_page=True)
         await page.get_by_role('button', name='安装更新', exact=True).click()
@@ -143,7 +146,7 @@ async def verify(output: Path) -> dict:
         await page.keyboard.press('Escape')
         await expect(page.locator('dialog')).not_to_be_visible()
         assert not fixture.writes
-        cases.append('桌面样式、专项维护、普通文本转义、取消和 Esc 零安装写入')
+        cases.append('桌面样式、具体兼容原因、迁移计划、普通文本转义、取消和 Esc 零安装写入')
         await context.close()
 
         fixture = UpdateFixture()
@@ -161,6 +164,19 @@ async def verify(output: Path) -> dict:
         fixture.unavailable = True
         await expect(page.get_by_role('alert')).to_contain_text('正在重新连接', timeout=7000)
         fixture.unavailable = False
+        fixture.state['operation'].update(phase='snapshotting', blockers=[],
+            database_snapshot={'state': 'verified', 'bytes': 1048576, 'completed_at': '2026-11-11T00:00:00Z'})
+        await expect(page.get_by_role('heading', name='保存数据库快照', exact=True)).to_be_visible(timeout=15000)
+        await expect(page.get_by_text('数据库快照已校验 · 1.0 MiB')).to_be_visible()
+        fixture.state['operation'].update(phase='migrating', database_migrations={
+            'bench': {'state': 'completed', 'target_version': 1}, 'gateway': {'state': 'running', 'target_version': 1}})
+        await expect(page.get_by_role('heading', name='执行数据库迁移', exact=True)).to_be_visible(timeout=15000)
+        await expect(page.get_by_text('网关数据库 · 目标版本 1 · 正在迁移')).to_be_visible()
+        await page.screenshot(path=str(output / 'migrations-390.png'), full_page=True)
+        fixture.state['operation']['database_migrations']['gateway']['state'] = 'synthetic-new-state'
+        await expect(page.get_by_text('网关数据库 · 目标版本 1 · 未知状态：synthetic-new-state')).to_be_visible(timeout=15000)
+        fixture.state['operation'].update(phase='restoring_data')
+        await expect(page.get_by_role('heading', name='正在恢复数据库', exact=True)).to_be_visible(timeout=15000)
         fixture.state.update(busy=False, current_release='system-ci-101-1')
         fixture.state['components']['control'].update(release='ci-101-1', reference='ghcr.io/silentflower/vibebench-v3-control:v3-ci-101-1')
         fixture.state['operation'].update(phase='succeeded', blockers=[])
@@ -171,7 +187,7 @@ async def verify(output: Path) -> dict:
         assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
         await page.screenshot(path=str(output / 'updates-390.png'), full_page=True)
         total_writes += len(fixture.writes)
-        cases.append('移动端、冻结参数、双击幂等、长流提示、切换断线、刷新恢复')
+        cases.append('移动端、冻结参数、双击幂等、切换断线、快照和迁移进度、数据恢复、刷新恢复')
         await context.close()
 
         fixture = UpdateFixture()

@@ -27,7 +27,7 @@ from runtime_files import atomic_json, atomic_text, directory_fd
 from storage_maintenance import acquire_storage_lock
 from system_update_contract import (DEPLOYMENT_RE, DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT,
     RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, fetch_bytes, fetch_repository_file, safe_read, strict_json,
-    utc_now, validate_index, validate_operation, validate_release, verify_signed)
+    utc_now, validate_index, validate_operation, validate_release, verify_signed, validate_migration_plan, validate_migration_evidence)
 from system_update_host import HostDeployment
 
 DONE = TERMINAL | {'prepared'}
@@ -46,7 +46,7 @@ def validate_policy(value: dict) -> dict:
     """
     fields = {'schema_version', 'deployment', 'data_root', 'env_file', 'state_root', 'public_key',
         'compose_file', 'compose_file_sha256', 'override_file', 'override_file_sha256'}
-    if set(value) != fields or type(value['schema_version']) is not int or value['schema_version'] != 1:
+    if set(value) != fields or type(value['schema_version']) is not int or value['schema_version'] not in (1, 2):
         raise ValueError('更新服务策略格式无效')
     if not isinstance(value['deployment'], str) or not DEPLOYMENT_RE.fullmatch(value['deployment']):
         raise ValueError('更新服务部署身份无效')
@@ -130,10 +130,14 @@ class SystemUpdater:
         identity = hashlib.sha256(raw + signature).hexdigest()
         cached = self._verified.get(release)
         if cached and cached[0] == identity:
+            self._migration_assets(cached[1])
             return copy.deepcopy(cached[1])
         value = validate_release(verify_signed(raw, signature, self.policy['public_key']))
         if value['release'] != release:
             raise ValueError('缓存发行标签与清单不符')
+        if value['schema_version'] > self.policy['schema_version']:
+            raise ValueError('当前更新底座需要接入数据库迁移能力')
+        self._migration_assets(value)
         self._verified[release] = (identity, copy.deepcopy(value))
         return value
 
@@ -152,15 +156,53 @@ class SystemUpdater:
             for entry in sorted(self.state.get('catalog', {}).get('releases', []), key=lambda item: item['sequence'], reverse=True)[:8]:
                 try:
                     value = self.load_release(entry['release'], entry['manifest']['sha256'])
+                    compatible = compatible_data(self.state['current']['release']['data_compatibility'], value['data_compatibility'])
+                    reason = None if compatible else 'data_contract_unverified'
+                    migrations = []
+                    if value['schema_version'] == 2:
+                        assets = self._migration_assets(value)
+                        migrations = [{'database': name, 'target_version': item['version'], 'steps': len(item['steps'])}
+                            for name, item in assets['plan']['databases'].items()]
+                        try:
+                            self._migration_path(self.state['current'], value)
+                        except (ValueError, OSError):
+                            compatible, reason = False, 'migration_evidence_missing'
                     rows.append({'release': value['release'], 'sequence': value['sequence'],
                         'published_at': value['published_at'], 'changes': value['changes'],
                         'manifest_sha256': entry['manifest']['sha256'],
-                        'data_compatible': compatible_data(self.state['current']['release']['data_compatibility'], value['data_compatibility']),
+                        'data_compatible': compatible, 'compatibility_reason': reason, 'migrations': migrations,
                         'account_changed': self.state['current']['selection']['account']['content_sha256'] != value['account']['content_sha256']})
                 except (ValueError, OSError):
                     continue
             return {'releases': rows, 'fresh': fresh, 'checking': self.checking, 'checked_at': self.state.get('checked_at'),
                 'check_error': self.state.get('check_error') or (None if fresh else '版本目录待重新检查，已安装版本继续保留')}
+
+    def _migration_assets(self, release: dict, folder: Path | None = None) -> dict:
+        if release['schema_version'] == 1:
+            return {}
+        folder = folder or self.root / 'releases' / release['release']
+        values = {}
+        for field in ('plan', 'evidence'):
+            asset = release['migrations'][field]
+            raw = safe_read(folder / asset['name'])
+            if len(raw) != asset['size'] or hashlib.sha256(raw).hexdigest() != asset['sha256']:
+                raise ValueError('迁移附件来源或摘要失效')
+            values[field] = strict_json(raw)
+        validate_migration_plan(values['plan'], release)
+        validate_migration_evidence(values['evidence'], release)
+        return values
+
+    def _migration_path(self, original: dict, target: dict) -> None:
+        evidence = self._migration_assets(target)['evidence']
+        if all(original['release']['data_compatibility'][name]['contract'] == target['data_compatibility'][name]['contract']
+                for name in ('bench', 'gateway')):
+            return
+        source = next((item for item in evidence['sources'] if item['release'] == original['release']['release']), None)
+        raw = safe_read(self.root / 'releases' / original['release']['release'] / 'system-release.json')
+        if (not source or source['manifest_sha256'] != hashlib.sha256(raw).hexdigest()
+                or source['control_digest'] != original['selection']['control']['config_digest']
+                or any(source['contracts'][name] != original['release']['data_compatibility'][name]['contract'] for name in ('bench', 'gateway'))):
+            raise ValueError('此来源版本缺少真实迁移演练证据')
 
     def status(self) -> dict:
         """读取安装和操作状态，重启后仍能继续展示。
@@ -181,11 +223,12 @@ class SystemUpdater:
                     for role, entry in current['selection'].items()},
                 'operation': self._public_operation(operation) if operation else None,
                 'busy': bool(self.state.get('active_operation')), 'history': history,
-                'checked_at': self.state.get('checked_at'), 'check_error': self.state.get('check_error')}
+                'checked_at': self.state.get('checked_at'), 'check_error': self.state.get('check_error'),
+                'migration_capability': self.policy['schema_version'] == 2}
 
     def _public_operation(self, operation: dict) -> dict:
         return {key: copy.deepcopy(operation.get(key)) for key in ('operation_id', 'action', 'phase', 'created_at',
-            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results')}
+            'updated_at', 'target_release', 'error', 'blockers', 'cancel_requested', 'cleanup', 'environment_results', 'database_snapshot', 'database_migrations')}
 
     def operation(self, identifier: str) -> dict:
         """读取指定操作的脱敏进度。
@@ -216,6 +259,14 @@ class SystemUpdater:
             stream.write(signature)
             stream.flush()
             os.fsync(stream.fileno())
+        if value['schema_version'] == 2:
+            for field in ('plan', 'evidence'):
+                asset = value['migrations'][field]
+                body = fetch_bytes(f'{DOWNLOAD_ROOT}/{entry["release"]}/{asset["name"]}', MANIFEST_LIMIT)
+                if len(body) != asset['size'] or hashlib.sha256(body).hexdigest() != asset['sha256']:
+                    raise ValueError('迁移附件与受信摘要不符')
+                atomic_text(temporary / asset['name'], body.decode())
+            self._migration_assets(value, temporary)
         os.rename(temporary, folder)
         directory = directory_fd(folder.parent)
         try:
@@ -234,7 +285,8 @@ class SystemUpdater:
             self.checking = True
         def worker():
             try:
-                reference = strict_json(fetch_bytes(f'https://api.github.com/repos/{REPOSITORY}/git/ref/heads/updates/v3', 65536))
+                channel = 'updates/v3-migrations' if self.policy['schema_version'] == 2 else 'updates/v3'
+                reference = strict_json(fetch_bytes(f'https://api.github.com/repos/{REPOSITORY}/git/ref/heads/{channel}', 65536))
                 commit = reference.get('object', {}).get('sha', '')
                 if not re.fullmatch(r'[a-f0-9]{40}', commit):
                     raise ValueError('版本目录提交身份无效')
@@ -295,7 +347,9 @@ class SystemUpdater:
                 selected = copy.deepcopy(stored)
             elif not compatible_data(original['release']['data_compatibility'], target['data_compatibility']):
                 raise ValueError('本版本涉及不兼容数据迁移，需要专项维护')
-            elif original['selection']['account']['content_sha256'] == target['account']['content_sha256']:
+            elif target['schema_version'] == 2:
+                self._migration_path(original, target)
+            if action != 'rollback' and original['selection']['account']['content_sha256'] == target['account']['content_sha256']:
                 selected['selection']['account'] = copy.deepcopy(original['selection']['account'])
             if (action != 'prepare' and selected['release']['release'] == original['release']['release']
                     and selected['selection'] == original['selection']):
@@ -368,6 +422,14 @@ class SystemUpdater:
                 self.backend.abandon(operation)
                 self._finish(operation, 'cancelled')
                 return
+            if self.policy['schema_version'] == 2:
+                self._phase(operation, 'snapshotting')
+                self.backend.snapshot_databases(operation, selected, lambda: self._record(operation))
+                if operation['target']['schema_version'] == 2:
+                    assets = self._migration_assets(operation['target'])
+                    self._phase(operation, 'migrating')
+                    self.backend.migrate_databases(operation, assets['plan'], lambda: self._record(operation))
+                self._phase(operation, 'switching')
             self.backend.switch(operation, selected)
             self._phase(operation, 'verifying')
             self.backend.wait_controls(time.monotonic() + 180)
@@ -382,6 +444,8 @@ class SystemUpdater:
                     if item['release']['release'] != selected['release']['release']]][:64]
                 self.state['current'] = selected
                 self._record(operation)
+            operation['release_started'] = True
+            self._record(operation)
             self.backend.release(operation)
             self._phase(operation, 'cleaning')
             self._clean(operation)
@@ -416,6 +480,8 @@ class SystemUpdater:
     def _clean(self, operation: dict) -> None:
         try:
             result = self.backend.cleanup(self.state['current'], self.state['history'], [operation['original']])
+            if self.policy['schema_version'] == 2:
+                result['database_snapshots'] = self.backend.cleanup_database_snapshots({operation['operation_id']})
             self._finish(operation, 'succeeded', cleanup=result, error=None)
         except Exception:
             self._finish(operation, 'succeeded_cleanup_pending', error='服务已验收，旧制品回收需要重试')
@@ -466,6 +532,9 @@ class SystemUpdater:
             if 'before' not in operation:
                 self._finish(operation, 'failed', error='执行在准备阶段中断')
                 return
+            if operation['phase'] == 'committing' and self.state['current']['release']['release'] == operation['target_release']:
+                operation['release_started'] = True
+                self._record(operation)
             if (operation['phase'] == 'committing' and self.state['current']['release']['release'] == operation['target_release']
                     and self.backend.committed(operation)):
                 self._phase(operation, 'cleaning')

@@ -5,12 +5,15 @@ import sqlite3
 import tempfile
 import unittest
 import uuid
+import gc
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import Mock
 
 from system_update_host import HostDeployment
 from runtime_files import atomic_json
 from system_update_gate import read_gate
+from system_update_database import assert_quiescent, create_snapshot, restore_snapshot
 
 
 class HostMetadataTests(unittest.TestCase):
@@ -81,6 +84,46 @@ class HostMetadataTests(unittest.TestCase):
         after = self.host.metadata()
         self.assertEqual(after['identity_sha256'], before['identity_sha256'])
         self.assertNotEqual(after['database_schema']['bench'], before['database_schema']['bench'])
+
+    def test_metadata_closes_database_descriptors_before_snapshot(self) -> None:
+        """元数据读取结束后释放持库句柄，明确识别仍在运行的读取者。@return None。"""
+        gc.collect()
+        self.host.metadata()
+        assert_quiescent(self.root)
+        with closing(sqlite3.connect(self.root / 'bench/db.sqlite')) as database:
+            database.execute('SELECT * FROM accounts').fetchall()
+            with self.assertRaisesRegex(ValueError, '仍有本机进程'):
+                assert_quiescent(self.root)
+        assert_quiescent(self.root)
+
+    def test_snapshot_restore_retains_registered_role_recovery_and_generation(self) -> None:
+        """双库恢复后保留候选角色收口登记，事务回执中断可幂等续接。@return None。"""
+        gc.collect()
+        with closing(sqlite3.connect(self.root / 'bench/db.sqlite')) as database, database:
+            for name, kind in [('generation', 'INTEGER DEFAULT 4'), ('container_id', 'TEXT'),
+                    ('network_container_id', 'TEXT'), ('sender_container_id', 'TEXT'),
+                    ('state', "TEXT DEFAULT 'ready'"), ('isolation_version', 'INTEGER DEFAULT 2')]:
+                database.execute('ALTER TABLE account_environments ADD COLUMN ' + name + ' ' + kind)
+        operation = {'operation_id': str(uuid.uuid4()), 'epoch': str(uuid.uuid4()),
+            'original': {'release': {'release': 'system-ci-1-1'}}, 'environment_intents': {'synthetic': {'generation': 4}}}
+        folder = self.root / 'snapshot'
+        create_snapshot(self.root, folder, 'test', operation)
+        with closing(sqlite3.connect(self.root / 'bench/db.sqlite')) as database, database:
+            database.execute("UPDATE account_environments SET generation=5,container_id='candidate-cli',network_container_id='candidate-network',sender_container_id='candidate-sender'")
+        self.host.capture_restore_bindings(operation, folder, lambda: None)
+        restore_snapshot(self.root, folder, 'test', operation, lambda: None)
+        before_receipt = copy.deepcopy(operation)
+        with self.assertRaisesRegex(RuntimeError, '合成回执中断'):
+            self.host.restore_environment_bindings(operation, Mock(side_effect=RuntimeError('合成回执中断')))
+        operation = before_receipt
+        self.host.restore_environment_bindings(operation, lambda: None)
+        with closing(sqlite3.connect(self.root / 'bench/db.sqlite')) as database:
+            self.assertEqual(database.execute('SELECT generation,container_id FROM account_environments').fetchone(), (5, 'candidate-cli'))
+        operation['environment_restore_bindings_applied'] = False
+        with closing(sqlite3.connect(self.root / 'bench/db.sqlite')) as database, database:
+            database.execute('UPDATE account_environments SET generation=6')
+        with self.assertRaisesRegex(ValueError, '后来或外来'):
+            self.host.restore_environment_bindings(operation, lambda: None)
 
     def test_binding_and_credential_ownership_changes_are_visible(self) -> None:
         """账号绑定和单一凭据所有权属于受保护身份。@return None。"""

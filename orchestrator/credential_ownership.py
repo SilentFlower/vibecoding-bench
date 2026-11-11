@@ -1,6 +1,8 @@
 """协调本地与网关的单一刷新权，持久待办不保存令牌或代理秘密。"""
 from __future__ import annotations
 
+from database_schema import initialize_ownership_schema
+
 import hashlib
 import json
 import re
@@ -46,10 +48,7 @@ class CredentialOwnership:
             connection = database()
             try:
                 with connection:
-                    connection.execute("CREATE TABLE IF NOT EXISTS account_credential_ownerships ("
-                        "account_id INTEGER PRIMARY KEY,record_json TEXT NOT NULL)")
-                    connection.execute("CREATE TABLE IF NOT EXISTS local_credential_authorizations ("
-                        "account_id INTEGER PRIMARY KEY,record_json TEXT NOT NULL)")
+                    initialize_ownership_schema(connection)
             finally:
                 connection.close()
 

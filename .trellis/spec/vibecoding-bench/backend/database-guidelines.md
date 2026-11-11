@@ -8,8 +8,8 @@
 
 - **数据库**:SQLite 单文件,位于 `data/db.sqlite`(容器内为 `/data/db.sqlite`)
 - **驱动**:Python 标准库 `sqlite3`,**不用任何 ORM**(无 SQLAlchemy / Tortoise / Peewee)
-- **schema 定义**:`orchestrator/main.py` 顶部一个 `_SCHEMA` 字符串常量,内含 `CREATE TABLE IF NOT EXISTS` + `CREATE INDEX IF NOT EXISTS`
-- **migration**:**没有 migration 系统**。P1 阶段表结构小、迭代少,直接改 `_SCHEMA` + 手动 ALTER 或推倒重来。P2 真要 migration 时再引入(候选:yoyo-migrations / 手写脚本)
+- **schema 定义**：冻结于 `orchestrator/database_schema.py`；原 `_SCHEMA` 和各 store 导出保留兼容别名。
+- **migration**：`orchestrator/database_migrations.py` 按固定登记执行，`main.init_db()` 复用同一入口；版本台账为 `system_schema_migrations`。
 - **连接**:每次操作 `get_db()` 新建一个 `sqlite3.Connection`,**用完显式 close**(放进 `try/finally`)
 - **行类型**:`conn.row_factory = sqlite3.Row` —— 取出的行可以按列名访问(`row["name"]`),返回前 `dict(row)` 转为 JSON 友好
 - **并发写**:全局 `_db_lock = threading.Lock()` 保护所有写入(SQLite 写本来就是串行的,加锁是为了让 Python 这一层也不会拿到 `database is locked`)
@@ -82,14 +82,11 @@ conn.execute(f"SELECT * FROM tasks WHERE id={tid}")
 
 ## Migrations
 
-**P1 无 migration**。改 schema 的当前流程:
+现有初始化已登记为 `bench.baseline.1`，纯定义及其默认值、命名空间依赖保持冻结。新增结构或回填按新版本登记并实现执行分支，保留已登记摘要；构建检查拒绝业务模块中的 DDL 和迁移纯模块对可变业务默认值的依赖。
 
-1. 直接编辑 `_SCHEMA` 字符串里的 `CREATE TABLE IF NOT EXISTS`
-2. 如果是**新表**或**新增 nullable 列**,加 `ALTER TABLE ... ADD COLUMN ...` 到 `init_db()` 末尾,用 `try/except sqlite3.OperationalError: pass` 兜底(列已存在会报错)
-3. **破坏性变更**(改列类型、改约束):停服务,删 `data/db.sqlite`,重启自动重建。**P1 数据不重要,允许丢**
-4. P2 持久化数据有价值后,再引入正式 migration 框架,届时把上面这条约定作废
+维护入口为 `python3 -m database_migrations plan|apply|verify --operation-id <UUID> --target-version <N>`。默认数据库 `/data/db.sqlite`。已登记库仍核验最低实际结构；兼容新增字段保留。基线沿原幂等初始化，完成后核验再登记；后续增量执行与台账在显式事务内提交。`init_db()` 重复执行保留数据和原台账身份。
 
-`init_db()` 永远幂等:重启不应破坏现有数据。
+字段、错误矩阵、双库快照及回退合同统一见[平台自动迁移规范](../deploy/platform-online-update.md#scenario-自动数据库迁移与原操作恢复)。
 
 ---
 

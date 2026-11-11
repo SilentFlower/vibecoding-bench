@@ -1,6 +1,8 @@
 """持久项目实例、阶段轮换与独立业务验收的自动推进器。"""
 from __future__ import annotations
 
+from database_schema import PROJECT_SCHEMA
+
 import hashlib
 import json
 import os
@@ -22,43 +24,6 @@ from project_dialogue import ProjectDialogueClient
 PROJECT_RUN_KIND = 'project_iteration'
 PROJECT_REVIEW_KIND = 'project_review'
 PROJECT_RUN_KINDS = frozenset({PROJECT_RUN_KIND, PROJECT_REVIEW_KIND})
-PROJECT_SCHEMA = '''
-CREATE TABLE IF NOT EXISTS project_catalog_releases (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, version TEXT NOT NULL, digest TEXT NOT NULL UNIQUE,
-  relative_path TEXT NOT NULL, created_at REAL NOT NULL
-);
-CREATE TABLE IF NOT EXISTS project_iteration_batches (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL, account_identity TEXT NOT NULL,
-  name TEXT NOT NULL, catalog_release_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'paused',
-  policy_json TEXT NOT NULL, active_instance_id INTEGER, generation INTEGER NOT NULL DEFAULT 1,
-  stop_requested_at REAL, next_launch_at REAL, error TEXT, created_at REAL NOT NULL, updated_at REAL NOT NULL,
-  FOREIGN KEY(account_id) REFERENCES accounts(id),
-  FOREIGN KEY(catalog_release_id) REFERENCES project_catalog_releases(id)
-);
-CREATE TABLE IF NOT EXISTS project_instances (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER NOT NULL, project_key TEXT NOT NULL,
-  manifest_json TEXT NOT NULL, seed_digest TEXT NOT NULL, roadmap_digest TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'not_started', next_step_index INTEGER NOT NULL DEFAULT 0,
-  workspace_relative TEXT, started_at REAL, checkpoint_digest TEXT NOT NULL,
-  visit_order INTEGER NOT NULL DEFAULT 0, switch_reason TEXT, error TEXT,
-  created_at REAL NOT NULL, updated_at REAL NOT NULL, UNIQUE(batch_id,project_key),
-  FOREIGN KEY(batch_id) REFERENCES project_iteration_batches(id)
-);
-CREATE TABLE IF NOT EXISTS project_step_attempts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, instance_id INTEGER NOT NULL, step_id TEXT NOT NULL,
-  attempt_no INTEGER NOT NULL, generation INTEGER NOT NULL, run_id TEXT NOT NULL UNIQUE,
-  expected_checkpoint_digest TEXT NOT NULL, execution_released_at REAL, released_quota_attempt INTEGER,
-  execution_error TEXT, validation_status TEXT NOT NULL DEFAULT 'pending', verification_errors INTEGER NOT NULL DEFAULT 0,
-  result_digest TEXT, report_relative TEXT, candidate_digest TEXT, accepted_checkpoint_digest TEXT,
-  created_at REAL NOT NULL, ended_at REAL, UNIQUE(instance_id,step_id,attempt_no),
-  FOREIGN KEY(instance_id) REFERENCES project_instances(id), FOREIGN KEY(run_id) REFERENCES runs(id)
-);
-CREATE INDEX IF NOT EXISTS idx_project_batches_account ON project_iteration_batches(account_id,status);
-CREATE INDEX IF NOT EXISTS idx_project_instances_batch ON project_instances(batch_id,status);
-CREATE INDEX IF NOT EXISTS idx_project_attempts_instance ON project_step_attempts(instance_id,ended_at);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_project_step_accepted ON project_step_attempts(instance_id,step_id)
-  WHERE validation_status='passed';
-'''
 DEFAULT_POLICY = {'active_projects': 3, 'repair_limit': 2, 'timeout_sec': 1800}
 TERMINAL_RUNS = {'success', 'failed', 'timeout', 'stopped', 'auth_failed'}
 

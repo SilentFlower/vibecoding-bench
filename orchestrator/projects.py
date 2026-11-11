@@ -1,6 +1,10 @@
 """以每账号一个 Pi 控制者为中心的 Projects；仅保存事实和操作，不编排对话阶段。"""
 from __future__ import annotations
 
+from database_schema import initialize_projects_schema
+
+from database_schema import PROJECTS_SCHEMA
+
 import hashlib
 import json
 import math
@@ -23,57 +27,6 @@ from project_runtime_policy import ProjectRuntimeError
 from runtime_diagnostics import runtime_failure, write_runtime_failure
 
 
-PROJECTS_SCHEMA = '''
-CREATE TABLE IF NOT EXISTS projects_agents (
-  account_id INTEGER PRIMARY KEY, generation INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'off', project_keys_json TEXT NOT NULL DEFAULT '[]',
-  instructions TEXT NOT NULL DEFAULT '', session_file TEXT, current_work_id TEXT,
-  budget_sec INTEGER NOT NULL DEFAULT 3600, message TEXT, updated_at REAL NOT NULL,
-  schedule_enabled INTEGER NOT NULL DEFAULT 0, schedule_interval_sec INTEGER NOT NULL DEFAULT 3600,
-  schedule_next_at REAL, schedule_last_started_at REAL, schedule_state TEXT NOT NULL DEFAULT 'off',
-  schedule_message TEXT, schedule_identity TEXT,
-  schedule_interval_max_sec INTEGER, cycle_no INTEGER NOT NULL DEFAULT 1,
-  FOREIGN KEY(account_id) REFERENCES accounts(id)
-);
-CREATE TABLE IF NOT EXISTS projects_work (
-  id TEXT PRIMARY KEY, account_id INTEGER NOT NULL, project_key TEXT NOT NULL,
-  objective_id TEXT NOT NULL, goal TEXT NOT NULL, definition_json TEXT NOT NULL,
-  library_root TEXT NOT NULL, library_digest TEXT NOT NULL, settings_json TEXT NOT NULL,
-  generation INTEGER NOT NULL, status TEXT NOT NULL, session_id TEXT NOT NULL,
-  runtime_json TEXT, baseline_json TEXT, observation_json TEXT, observation_id TEXT,
-  account_identity TEXT, claude_usage_json TEXT NOT NULL DEFAULT '{}',
-  started_at REAL, segment_started_at REAL, work_sec REAL NOT NULL DEFAULT 0,
-  created_at REAL NOT NULL, ended_at REAL, message TEXT, failure_json TEXT,
-  cycle_no INTEGER NOT NULL DEFAULT 1,
-  FOREIGN KEY(account_id) REFERENCES projects_agents(account_id)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS projects_one_work_per_account ON projects_work(account_id)
-  WHERE status NOT IN ('passed','stopped','deferred');
-CREATE TABLE IF NOT EXISTS projects_actions (
-  id TEXT PRIMARY KEY, work_id TEXT NOT NULL, generation INTEGER NOT NULL,
-  request_json TEXT NOT NULL, status TEXT NOT NULL, error TEXT,
-  created_at REAL NOT NULL, ended_at REAL,
-  FOREIGN KEY(work_id) REFERENCES projects_work(id)
-);
-CREATE TABLE IF NOT EXISTS projects_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL,
-  work_id TEXT, kind TEXT NOT NULL, payload_json TEXT NOT NULL,
-  event_key TEXT UNIQUE, created_at REAL NOT NULL,
-  FOREIGN KEY(account_id) REFERENCES projects_agents(account_id)
-);
-CREATE TABLE IF NOT EXISTS projects_submissions (
-  id TEXT PRIMARY KEY, work_id TEXT NOT NULL, generation INTEGER NOT NULL,
-  digest TEXT NOT NULL, status TEXT NOT NULL, report_json TEXT,
-  created_at REAL NOT NULL, ended_at REAL,
-  FOREIGN KEY(work_id) REFERENCES projects_work(id)
-);
-CREATE TABLE IF NOT EXISTS projects_verification_holds (
-  work_id TEXT PRIMARY KEY, retry_at REAL NOT NULL DEFAULT 0,
-  deferrals INTEGER NOT NULL DEFAULT 0, timeout_turns INTEGER NOT NULL DEFAULT 0,
-  last_deferred_at REAL NOT NULL DEFAULT 0, reason TEXT,
-  FOREIGN KEY(work_id) REFERENCES projects_work(id)
-);
-'''
 
 
 AGENT_GUIDE = '''你是这个账号唯一的项目负责人和 Claude Code 操作者。
@@ -195,32 +148,7 @@ class ProjectsService:
         connection = self.database()
         try:
             with write_lock, connection:
-                connection.executescript(PROJECTS_SCHEMA)
-                index_name = ('warmup_' if namespace == 'warmup' else '') + 'projects_one_work_per_account'
-                index = connection.execute("SELECT sql FROM sqlite_master WHERE type='index' AND name=?", (index_name,)).fetchone()
-                if index and 'deferred' not in index['sql']:
-                    # 待复验保留原work，但不能继续占用该账号唯一的活动目标槽位。
-                    connection.execute('DROP INDEX projects_one_work_per_account')
-                    connection.execute("CREATE UNIQUE INDEX projects_one_work_per_account ON projects_work(account_id) WHERE status NOT IN ('passed','stopped','deferred')")
-                columns = {row['name'] for row in connection.execute('PRAGMA table_info(projects_work)')}
-                for name, definition in (('account_identity', 'TEXT'), ('claude_usage_json', "TEXT NOT NULL DEFAULT '{}'"),
-                        ('failure_json', 'TEXT')):
-                    if name not in columns:
-                        connection.execute(f'ALTER TABLE projects_work ADD COLUMN {name} {definition}')
-                if 'cycle_no' not in columns:
-                    connection.execute('ALTER TABLE projects_work ADD COLUMN cycle_no INTEGER NOT NULL DEFAULT 1')
-                columns = {row['name'] for row in connection.execute('PRAGMA table_info(projects_agents)')}
-                for name, definition in (
-                        ('schedule_enabled', 'INTEGER NOT NULL DEFAULT 0'),
-                        ('schedule_interval_sec', 'INTEGER NOT NULL DEFAULT 3600'),
-                        ('schedule_next_at', 'REAL'), ('schedule_last_started_at', 'REAL'),
-                        ('schedule_state', "TEXT NOT NULL DEFAULT 'off'"),
-                        ('schedule_message', 'TEXT'), ('schedule_identity', 'TEXT')):
-                    if name not in columns:
-                        connection.execute(f'ALTER TABLE projects_agents ADD COLUMN {name} {definition}')
-                for name, definition in (('schedule_interval_max_sec', 'INTEGER'), ('cycle_no', 'INTEGER NOT NULL DEFAULT 1')):
-                    if name not in columns:
-                        connection.execute(f'ALTER TABLE projects_agents ADD COLUMN {name} {definition}')
+                initialize_projects_schema(connection, namespace)
         finally:
             connection.close()
 

@@ -155,10 +155,12 @@ def validate_release(value: dict) -> dict:
     :param value: 已解析清单。
     :return: 原对象；不兼容抛出 ValueError。
     """
-    _fields(value, {'schema_version', 'release', 'sequence', 'published_at', 'platform',
-        'build_manifests', 'control', 'account', 'compatibility', 'data_compatibility', 'changes', 'bundle'}, '平台发行')
-    if type(value['schema_version']) is not int or value['schema_version'] != 1:
+    version = value.get('schema_version')
+    if type(version) is not int or version not in (1, 2):
         raise ValueError('平台发行格式不受支持')
+    _fields(value, {'schema_version', 'release', 'sequence', 'published_at', 'platform',
+        'build_manifests', 'control', 'account', 'compatibility', 'data_compatibility', 'changes', 'bundle'}
+        | ({'migrations'} if version == 2 else set()), '平台发行')
     if not isinstance(value['release'], str) or not RELEASE_RE.fullmatch(value['release']):
         raise ValueError('平台发行标签无效')
     _sequence(value['sequence'])
@@ -183,7 +185,7 @@ def validate_release(value: dict) -> dict:
         _integer(entry['unpacked_bytes'], 1, 64 * 1024 ** 3, '镜像空间')
     capabilities = value['compatibility']
     _fields(capabilities, {'updater', 'gate', 'bridge', 'layout', 'cli_install', 'credential_ownership', 'account_protocols'}, '兼容协议')
-    for key, expected in {'updater': 1, 'gate': 1, 'bridge': 1, 'layout': 2, 'cli_install': 2, 'credential_ownership': 1}.items():
+    for key, expected in {'updater': version, 'gate': 1, 'bridge': 1, 'layout': 2, 'cli_install': 2, 'credential_ownership': 1}.items():
         if type(capabilities[key]) is not int or capabilities[key] != expected:
             raise ValueError(f'更新所需{key}协议不受支持')
     if capabilities['account_protocols'] != [1] or any(type(item) is not int for item in capabilities['account_protocols']):
@@ -200,6 +202,83 @@ def validate_release(value: dict) -> dict:
         if entry['contract'] not in accepted:
             raise ValueError('数据合同缺少自身兼容声明')
     _asset(value['bundle'], MAX_BUNDLE_BYTES)
+    if version == 2:
+        _fields(value['migrations'], {'protocol', 'plan', 'evidence'}, '数据库迁移')
+        if type(value['migrations']['protocol']) is not int or value['migrations']['protocol'] != 1:
+            raise ValueError('数据库迁移协议不受支持')
+        for field, name in (('plan', 'database-migrations.json'), ('evidence', 'database-compatibility.json')):
+            _asset(value['migrations'][field], MANIFEST_LIMIT)
+            if value['migrations'][field]['name'] != name:
+                raise ValueError('数据库迁移附件名称无效')
+    return value
+
+
+def validate_migration_plan(value: dict, release: dict) -> dict:
+    """核对受签名绑定的迁移登记与发行数据合同。
+
+    :param value: 完整迁移计划。
+    :param release: 已验证的 v2 发行。
+    :return: 原计划；未知版本或摘要不符时拒绝。
+    """
+    _fields(value, {'schema_version', 'databases'}, '迁移计划')
+    if type(value['schema_version']) is not int or value['schema_version'] != 1:
+        raise ValueError('迁移计划格式不受支持')
+    _fields(value['databases'], {'bench', 'gateway'}, '迁移数据库')
+    for name, entry in value['databases'].items():
+        _fields(entry, {'version', 'contract', 'steps'}, '迁移目标')
+        _integer(entry['version'], 1, 100000, '迁移版本')
+        if entry['contract'] != release['data_compatibility'][name]['contract']:
+            raise ValueError('迁移计划与数据合同摘要不符')
+        if not isinstance(entry['steps'], list) or len(entry['steps']) != entry['version']:
+            raise ValueError('迁移步骤链不完整')
+        identifiers = set()
+        for version, step in enumerate(entry['steps'], 1):
+            _fields(step, {'id', 'version', 'predecessor', 'checksum', 'engine', 'kind', 'rollback_mode'}, '迁移步骤')
+            if (not isinstance(step['id'], str) or not re.fullmatch(name + r'\.[a-z][a-z0-9_.-]{0,80}', step['id']) or step['id'] in identifiers or type(step['version']) is not int or step['version'] != version
+                    or type(step['predecessor']) is not int or step['predecessor'] != version - 1
+                    or step['engine'] != 'sqlite' or step['kind'] not in ('schema', 'data') or step['rollback_mode'] != 'compatible'):
+                raise ValueError('迁移步骤归属或执行方式无效')
+            _digest(step['checksum'], '迁移步骤')
+            identifiers.add(step['id'])
+        registry = {'schema_version': 1, 'database': name, 'steps': entry['steps']}
+        raw = json.dumps(registry, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+        if hashlib.sha256(raw).hexdigest() != entry['contract']:
+            raise ValueError('迁移步骤与登记合同不符')
+    return value
+
+
+def validate_migration_evidence(value: dict, release: dict) -> dict:
+    """校验真实镜像升级演练证据的来源与完成项。
+
+    :param value: 完整兼容演练证据。
+    :param release: 已验证发行或待签署的完整组件来源。
+    :return: 原证据；来源、合同或断言缺失时拒绝。
+    """
+    _fields(value, {'schema_version', 'revision', 'images', 'target_contracts', 'sources'}, '迁移兼容证据')
+    if type(value['schema_version']) is not int or value['schema_version'] != 1 or value['revision'] != release['control']['revision']:
+        raise ValueError('迁移兼容证据源码不符')
+    _fields(value['images'], set(ROLES), '兼容镜像')
+    _fields(value['target_contracts'], {'bench', 'gateway'}, '兼容目标')
+    if any(value['images'][role] != release[role]['config_digest'] for role in ROLES):
+        raise ValueError('迁移兼容证据镜像不符')
+    if any(value['target_contracts'][name] != release['data_compatibility'][name]['contract'] for name in ('bench', 'gateway')):
+        raise ValueError('迁移兼容证据目标合同不符')
+    if not isinstance(value['sources'], list) or not 1 <= len(value['sources']) <= 8:
+        raise ValueError('迁移兼容证据缺少实际旧版本')
+    seen = set()
+    for source in value['sources']:
+        _fields(source, {'release', 'manifest_sha256', 'control_digest', 'contracts', 'checks'}, '旧版本演练')
+        if not isinstance(source['release'], str) or not RELEASE_RE.fullmatch(source['release']) or source['release'] in seen:
+            raise ValueError('旧版本演练来源无效或重复')
+        seen.add(source['release'])
+        _digest(source['manifest_sha256'], '旧版本清单')
+        _digest(source['control_digest'], '旧版本镜像', True)
+        _fields(source['contracts'], {'bench', 'gateway'}, '旧版本数据合同')
+        for digest in source['contracts'].values():
+            _digest(digest, '旧版本合同')
+        _fields(source['checks'], {'upgrade', 'candidate_read_write', 'previous_read_write', 'idempotent'}, '兼容断言')
+        if any(result is not True for result in source['checks'].values()):
+            raise ValueError('旧版本真实升级与回退演练未通过')
     return value
 
 

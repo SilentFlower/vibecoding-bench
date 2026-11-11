@@ -1,6 +1,8 @@
 """v3 单账号固定容器、执行句柄和服务间传输登记。"""
 from __future__ import annotations
 
+from database_schema import initialize_account_runtime_schema
+
 import hashlib
 import json
 import logging
@@ -165,22 +167,7 @@ class AccountRuntime:
         connection = database()
         try:
             with connection:
-                connection.execute("""CREATE TABLE IF NOT EXISTS account_environments (
-                    environment_id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE,
-                    account_id INTEGER UNIQUE, fingerprint_json TEXT NOT NULL,
-                    generation INTEGER NOT NULL DEFAULT 0, container_id TEXT,
-                    state TEXT NOT NULL DEFAULT 'stopped')""")
-                environment_columns = {row["name"] for row in connection.execute("PRAGMA table_info(account_environments)")}
-                for column, kind in (("network_container_id", "TEXT"), ("sender_container_id", "TEXT"),
-                        ("isolation_version", "INTEGER NOT NULL DEFAULT 0")):
-                    if column not in environment_columns:
-                        connection.execute(f"ALTER TABLE account_environments ADD COLUMN {column} {kind}")
-                columns = {row["name"] for row in connection.execute("PRAGMA table_info(runs)")}
-                if columns:
-                    for column, kind in (("environment_id", "TEXT"), ("environment_generation", "INTEGER"),
-                            ("execution_source", "TEXT"), ("runtime_release", "TEXT")):
-                        if column not in columns:
-                            connection.execute(f"ALTER TABLE runs ADD COLUMN {column} {kind}")
+                initialize_account_runtime_schema(connection)
         finally:
             connection.close()
 
