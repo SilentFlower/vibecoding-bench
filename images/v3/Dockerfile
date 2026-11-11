@@ -112,7 +112,7 @@ COPY orchestrator/process_metrics.py /usr/local/bin/process_metrics.py
 COPY orchestrator/process_metrics.py /usr/local/bin/v3-process-metrics
 COPY --from=backend /out/account-sender /usr/local/bin/account-sender
 COPY native-runtime/ccrb-runtime /usr/local/bin/ccrb-runtime
-RUN echo 'a6998db0128cb3d0a9862f3b72e9e359e434840c9be4d57b69d56092847fd800  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
+RUN echo '423a6a848c84e09bcc73a8b7be481ed4ead44a6644cef94bbf47d2009d3f6b80  /usr/local/bin/ccrb-runtime' | sha256sum -c - \
     && chmod 755 /usr/local/bin/ccrb-runtime
 RUN chmod 700 /usr/local/bin/v3-account-init /usr/local/bin/v3-network-context \
     /usr/local/bin/v3-cli-version /usr/local/bin/v3-passthrough /usr/local/bin/process_metrics.py \

@@ -7,9 +7,9 @@ from pathlib import Path
 
 from resource_budget import isolated_account_limits, memory_bytes
 
-VERSION = 'v0.1.0-beta.2'
+VERSION = 'v0.1.0-beta.3'
 ASSET = 'ccrb-runtime-linux-x64'
-SHA256 = 'a6998db0128cb3d0a9862f3b72e9e359e434840c9be4d57b69d56092847fd800'
+SHA256 = '423a6a848c84e09bcc73a8b7be481ed4ead44a6644cef94bbf47d2009d3f6b80'
 POOL_MIB = 256
 WORKER_MIB = 192
 
