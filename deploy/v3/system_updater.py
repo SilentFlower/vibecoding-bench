@@ -26,7 +26,7 @@ sys.path.insert(0, str(REPO / 'orchestrator'))
 from runtime_files import atomic_json, atomic_text, directory_fd
 from storage_maintenance import acquire_storage_lock
 from system_update_contract import (DEPLOYMENT_RE, DOWNLOAD_ROOT, INDEX_LIMIT, MANIFEST_LIMIT,
-    RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, fetch_bytes, safe_read, strict_json,
+    RELEASE_RE, REPOSITORY, SHA_RE, TERMINAL, compatible_data, fetch_bytes, fetch_repository_file, safe_read, strict_json,
     utc_now, validate_index, validate_operation, validate_release, verify_signed)
 from system_update_host import HostDeployment
 
@@ -101,7 +101,11 @@ class SystemUpdater:
 
     def _record(self, operation: dict) -> None:
         with self.lock:
-            atomic_json(self.root / 'operations' / operation['operation_id'] / 'operation.json', operation)
+            path = self.root / 'operations' / operation['operation_id'] / 'operation.json'
+            # 控制线程单独读取并保存取消意图，执行线程的旧快照必须保留该单向标记。
+            if path.exists() and self._operation(operation['operation_id']).get('cancel_requested') is True:
+                operation['cancel_requested'] = True
+            atomic_json(path, operation)
             self._persist()
 
     def _operation(self, identifier: str) -> dict:
@@ -234,9 +238,8 @@ class SystemUpdater:
                 commit = reference.get('object', {}).get('sha', '')
                 if not re.fullmatch(r'[a-f0-9]{40}', commit):
                     raise ValueError('版本目录提交身份无效')
-                base = f'https://api.github.com/repos/{REPOSITORY}/contents/'
-                raw = fetch_bytes(base + 'index.json?ref=' + commit, INDEX_LIMIT)
-                signature = fetch_bytes(base + 'index.sig?ref=' + commit, 64)
+                raw = fetch_repository_file('index.json', commit, INDEX_LIMIT)
+                signature = fetch_repository_file('index.sig', commit, 64)
                 with self.lock:
                     highest = self.state.get('catalog', {}).get('sequence')
                 value = validate_index(verify_signed(raw, signature, self.policy['public_key'], INDEX_LIMIT), highest)
@@ -356,7 +359,15 @@ class SystemUpdater:
                 time.sleep(0.5)
             # 以在途自然结束后的身份和环境为切换基线，接纳原工作合法完成的变化。
             operation['before'] = self.backend.capture(operation['original'])
-            self._phase(operation, 'switching', blockers=[])
+            # 与取消接口共用锁，使最后一次取消核对和进入切换成为同一个边界。
+            with self.lock:
+                cancelled = self._cancelled(operation)
+                if not cancelled:
+                    self._phase(operation, 'switching', blockers=[])
+            if cancelled:
+                self.backend.abandon(operation)
+                self._finish(operation, 'cancelled')
+                return
             self.backend.switch(operation, selected)
             self._phase(operation, 'verifying')
             self.backend.wait_controls(time.monotonic() + 180)

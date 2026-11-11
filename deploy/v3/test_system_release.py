@@ -1,4 +1,5 @@
 """以真实合成签名验证发行信任、目录回放与严格数据兼容。"""
+import base64
 import copy
 import hashlib
 import json
@@ -7,9 +8,10 @@ import tempfile
 import unittest
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 from system_release import REPO, create_index, create_release, data_contracts, sign_file
-from system_update_contract import compatible_data, safe_read, strict_json, validate_index, validate_operation, validate_release, verify_signed
+from system_update_contract import compatible_data, fetch_repository_file, safe_read, strict_json, validate_index, validate_operation, validate_release, verify_signed
 
 
 class SystemReleaseTests(unittest.TestCase):
@@ -104,6 +106,46 @@ class SystemReleaseTests(unittest.TestCase):
         target['gateway']['rollback_compatible'].append(original['gateway']['contract'])
         self.assertTrue(compatible_data(original, target))
         self.assertEqual(set(data_contracts(REPO)), {'bench', 'gateway'})
+
+    def test_repository_files_preserve_real_signed_binary(self) -> None:
+        """目录与真实签名经 Base64 元数据读取后仍能逐字节验签。@return None。"""
+        path = self.root / 'index.json'
+        create_index(self.output / 'system-release.json', None, path, self.key)
+        observed = {}
+        for source in (path, path.with_suffix('.sig')):
+            raw = source.read_bytes()
+            metadata = {'type': 'file', 'path': source.name, 'encoding': 'base64', 'size': len(raw),
+                'content': base64.encodebytes(raw).decode(),
+                'sha': hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()}
+            # Contents 的 content 可能经过文本转换，真正载荷只取 Git Blob API。
+            contents = {**metadata, 'content': base64.b64encode('已转换的内容'.encode()).decode()}
+            with patch('system_update_contract.fetch_bytes', side_effect=[json.dumps(contents).encode(), json.dumps(metadata).encode()]) as fetch:
+                observed[source.name] = fetch_repository_file(source.name, 'a' * 40, len(raw))
+                self.assertEqual(observed[source.name], raw)
+                self.assertEqual(fetch.call_args.kwargs['accept'], 'application/vnd.github+json')
+                self.assertIn('/git/blobs/' + metadata['sha'], fetch.call_args.args[0])
+        self.assertEqual(validate_index(verify_signed(observed['index.json'], observed['index.sig'], self.public))['sequence'], [10, 1])
+
+    def test_repository_file_rejects_invalid_binary_metadata(self) -> None:
+        """拒绝路径、大小、编码或 Git blob 身份漂移。@return None。"""
+        raw = bytes(range(64))
+        metadata = {'type': 'file', 'path': 'index.sig', 'encoding': 'base64', 'size': len(raw),
+            'content': base64.b64encode(raw).decode(),
+            'sha': hashlib.sha1(b'blob 64\0' + raw).hexdigest()}
+        for field, value in (('type', 'symlink'), ('path', 'foreign.sig'), ('encoding', 'none'),
+                ('size', 65), ('size', True), ('size', 63), ('content', '???'), ('sha', 'b' * 40)):
+            with self.subTest(field=field, value=value), patch('system_update_contract.fetch_bytes',
+                    return_value=json.dumps({**metadata, field: value}).encode()), self.assertRaises(ValueError):
+                fetch_repository_file('index.sig', 'a' * 40, 64)
+
+    def test_repository_file_rejects_unfrozen_sources(self) -> None:
+        """目录读取只接受固定文件、完整提交及有界解码大小。@return None。"""
+        for arguments in (('../index.sig', 'a' * 40, 64), ('index.sig', 'updates/v3', 64),
+                ('index.sig', 'a' * 40, True), ('index.sig', 'a' * 40, 0), ('index.sig', 'a' * 40, 262145)):
+            with self.subTest(arguments=arguments), patch('system_update_contract.fetch_bytes') as fetch:
+                with self.assertRaises(ValueError):
+                    fetch_repository_file(*arguments)
+                fetch.assert_not_called()
 
     def test_operation_frozen_fields_and_private_file(self) -> None:
         """冻结字段拒绝未知参数，私有读取拒绝符号链接。

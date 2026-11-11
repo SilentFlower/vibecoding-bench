@@ -267,6 +267,53 @@ class SystemUpdaterTests(unittest.TestCase):
         self.assertNotIn('switch', self.backend.calls)
         self.assertFalse(self.backend.blocked)
 
+    def test_cancel_survives_worker_stale_phase_snapshot(self) -> None:
+        """已接受的取消意图不会被执行线程的旧阶段快照覆盖。@return None。"""
+        body = self.request()
+        with patch.object(self.engine, '_execute'):
+            self.engine.submit('install', body)
+            self.engine.worker.join(1)
+        stale = self.engine._operation(body['operation_id'])
+        self.engine._phase(stale, 'draining')
+        accepted = self.engine.control(body['operation_id'], 'cancel', {'expected_revision': self.engine.state['revision']})
+        self.assertTrue(accepted['cancel_requested'])
+        self.engine._phase(stale, 'draining', blockers=['合成在途工作'])
+        self.assertTrue(self.engine._cancelled(stale))
+        self.assertTrue(self.engine.operation(body['operation_id'])['cancel_requested'])
+
+    def test_cancel_during_final_capture_prevents_switch(self) -> None:
+        """排空后最后一次现场采集期间接受的取消必须保持原版。@return None。"""
+        body = self.request()
+        capture = self.backend.capture
+        calls = 0
+
+        def cancel_during_capture(*args):
+            """在最后一次采集精确插入已接受的取消。:param args: 原现场。@return 合成快照。"""
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                self.engine.control(body['operation_id'], 'cancel', {'expected_revision': self.engine.state['revision']})
+            return capture(*args)
+
+        with patch.object(self.backend, 'capture', side_effect=cancel_during_capture):
+            self.engine.submit('install', body)
+            state = self.join()
+        self.assertEqual(state['operation']['phase'], 'cancelled')
+        self.assertEqual(state['current_release'], self.old['release'])
+        self.assertNotIn('switch', self.backend.calls)
+        self.assertFalse(self.backend.blocked)
+
+    def test_cancel_after_switch_boundary_is_rejected(self) -> None:
+        """进入已持久化的切换阶段后取消请求明确冲突。@return None。"""
+        body = self.request()
+        with patch.object(self.engine, '_execute'):
+            self.engine.submit('install', body)
+            self.engine.worker.join(1)
+        operation = self.engine._operation(body['operation_id'])
+        self.engine._phase(operation, 'switching')
+        with self.assertRaises(UpdateConflict):
+            self.engine.control(body['operation_id'], 'cancel', {'expected_revision': self.engine.state['revision']})
+
     def test_restart_before_switch_recovers_without_repeating_install(self) -> None:
         """切换前持久中断在重启后收口，原版保持。
 

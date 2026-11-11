@@ -28,6 +28,7 @@ validate_release(value: dict) -> dict
 validate_index(value: dict, highest: list[int] | None = None, now: float | None = None) -> dict
 validate_operation(value: dict) -> dict
 compatible_data(original: dict, target: dict) -> bool
+fetch_repository_file(name: str, commit: str, limit: int) -> bytes
 ```
 
 首次接入使用 `python3 deploy/v3/install_system_updater.py prepare --env <配置> --release-dir <发行目录> --state-root <目录> --public-key <公钥>`；提交使用 `finalize --policy <策略>`。两者默认预览，实际执行显式追加 `--apply`。
@@ -44,6 +45,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 - 兼容能力固定为 `updater=1`、`gate=1`、`bridge=1`、`layout=2`、`cli_install=2`、`credential_ownership=1`、`account_protocols=[1]`。
 - 双库 `bench`、`gateway` 各有 `contract` 和 `rollback_compatible`。目标声明必须包含原版合同，才允许在线切换。默认策略仅认可自身合同。新增旧合同需要实际兼容验证。
 - 签名目录字段固定为 `schema_version=1`、`sequence`、`issued_at`、`expires_at`、`releases`。目录和签名从同一 Git commit 获取；序号不得低于最高已接受序号。发布有效期为 30 天，校验上限为 31 天。准备和安装需要新鲜目录；回退使用独立验签的已安装历史。
+- `fetch_repository_file` 只接受 `index.json|index.sig`、完整 40 位 commit 和 `1..INDEX_LIMIT` 字节上限。Contents API 仅定位固定提交下的文件路径、大小及 blob SHA；原始载荷从 Git Blob API 的 Base64 字段取得，严格核对编码、解码大小及 Git blob SHA，再执行原有 Ed25519 验签。Contents 的 raw 响应及 `content` 字段可能转换二进制签名字节。
 - 清单上限 128 KiB，目录上限 256 KiB，版本说明上限 8000 字符，持久状态与操作读取上限 8 MiB。重复 JSON 字段、非有限数字和未知字段拒绝。下载采用固定 HTTPS 来源、有限重定向及有界字节数。
 
 ### 冻结操作与响应
@@ -60,6 +62,8 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 同一 UUID 与同一动作、参数重试返回原操作。复用 UUID 改动参数属于冲突。取消与恢复请求精确包含 `expected_revision`。
 
+已接受的 `cancel_requested=true` 是单向持久意图，执行线程写阶段时必须合并该标记。排空后最后一次现场采集完成，再在与取消接口共用的锁内核对取消并持久进入 `switching`。此前接受的取消收口为 `cancelled`；进入切换后的取消返回 `409`。
+
 已接入状态包含 `installed`、`revision`、`deployment`、`current_release`、`components`、`operation`、`busy`、`history`、`checked_at`、`check_error`；管理桥补充 `environments`。未接入返回 `installed=false` 与接入说明。公开操作只包含 `operation_id`、`action`、`phase`、`created_at`、`updated_at`、`target_release`、`error`、`blockers`、`cancel_requested`、`cleanup`、`environment_results`。
 
 ### 来源、准入与恢复
@@ -75,6 +79,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 - 账号部分恢复最多允许冻结的原版和候选两个实际镜像 ID。恢复仍要求环境、代次、epoch 以及原作业证明一致。恢复已释放的门禁前重新检查后来工作。
 - `finalize --apply` 与独立执行器共用 `service.lock` 及存储维护锁。原首次接入在状态提交后、门禁释放前后中断，均可用同一发行重试收口。已完成重试保留原 `installed_at`；外来门禁和后来 revision 拒绝覆盖。
 - 清理保护当前组合、最近两个完整历史组合、全部容器引用和恢复引用。只精确删除经证明的历史镜像；Docker 删除最后一个 tag 时可同步移除其 RepoDigest。清理失败记录 `succeeded_cleanup_pending`，通过原操作恢复重试。
+- 宿主执行器沿既有专项运维边界修复：固定安装源码根及原、新文件 SHA256，核对无活动更新和 `idle` 门禁，停止独立服务后更换精确源码，再启动并复核原安装状态、门禁和签名目录检查。失败恢复原源码及服务。控制镜像发行与宿主执行器源码分别验收。
 
 ## 4. 校验与错误矩阵
 
@@ -87,6 +92,8 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 | 独立服务连接失败 | 管理桥 `503`，状态允许重试 |
 | 维护期间新业务请求 | `503` 与 `Retry-After`；迟到原登录证明返回 `409` |
 | 签名错误、目录回放/过期、数据合同不兼容 | 准备/安装受阻，记录具体原因 |
+| 目录文件解码大小、Git blob 身份或签名不符 | 检查失败，保留上次已验证目录 |
+| 准备或排空期间已接受取消；已经进入切换 | 前者保持取消意图并收口；后者取消返回 `409` |
 | 未知进程、租约或角色归属 | 阻止切换，按实际阶段等待或进入 `reconcile` |
 | 首次接入遇到活动服务锁 | 拒绝提交；按 SOP 停止独立更新服务后重试原 finalize |
 
@@ -100,6 +107,10 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 错误用法：收到 `409` 后仅替换 UUID 自动重放原确认。正确处理：重新读取 revision、候选摘要和重建范围，再由管理员确认新请求。
 
+错误用法：把 Contents API 返回的二进制签名作为文本重新编码，或直接信任其中的 Base64 `content`。正确处理：按固定提交取得 blob 身份，从 Git Blob API 读取原始字节，校验大小、blob SHA 及 Ed25519 签名。
+
+错误用法：取消接口已经返回成功，执行线程随后用旧操作快照覆盖取消标记。正确处理：持久写入保留单向取消意图，并将最后一次取消核对与进入切换合为同一加锁边界。
+
 错误用法：首次 finalize 中断后直接写 idle 门禁。正确处理：重试原 `finalize --policy <原策略> --apply`，由原发行、epoch、配置及共享服务锁证明收口。
 
 错误用法：将整个批次等待循环计入维护活动，或以原作业证明绕过配额。正确处理：只登记有限分派和执行，续接保留其他准入校验。
@@ -108,6 +119,7 @@ CI 在安装依赖及执行验证前，使用 `actions/setup-python` 显式设�
 
 - CI 解释器变更：用干净 Python 3.12 虚拟环境安装 `orchestrator/requirements.txt`，执行 workflow 中两条 `unittest discover` 命令；检查设置步骤先于验证，且与两个正式镜像的 Python 次版本一致。工作流 YAML、shell 语法和 `git diff --check` 通过。
 - `deploy/v3/test_system_*.py`：签名、目录顺序/时间、严格字段与大小、数据兼容、同参幂等、revision 冲突、恢复与清理保护。首次接入覆盖 dry-run、状态提交中断、释放响应中断、原 installed_at、外来门禁、后来 revision、配置 CAS、真实文件锁互斥。
+- 目录读取覆盖 Contents 载荷转换、真实签名字节保留、错误编码/大小/blob SHA 及非固定来源拒绝；取消覆盖执行线程旧快照、最后一次现场采集中的取消，以及切换后的 `409`。真实 Docker 取消验收断言原控制容器保留且操作最终为 `cancelled`。
 - `orchestrator/test_system_update*.py`：实际线程/文件准入、ASGI 正文结束、原登录撤销、部分恢复边界；真实 Scheduler + SQLite 验证批次等待不阻塞排空、维护抢先分派、重启续调度、原工程续接与时间窗口/被动配额拒绝。
 - Rust `cargo test` 与 `cargo fmt --check`：门禁启动验证、完整 HttpBody 释放、租约与管理桥回归。Vue `npm --prefix web run build` 验证类型和构建。
 - `verify_system_update_browser.py`：真实构建页面配合合成 API，覆盖桌面/移动端、确认、断线重连、409、回退/恢复、未接入；断言零脚本异常与零真实模型调用。
