@@ -103,6 +103,10 @@ async def verify_visible_logout(base: str, password: str, exercise=None, insecur
                 await wait_for("Boolean(Array.from(document.querySelectorAll('a')).find(a=>a.textContent.trim()==='环境与任务'))")
                 await evaluate("Array.from(document.querySelectorAll('a')).find(a=>a.textContent.trim()==='环境与任务').click()")
                 await wait_for("Boolean(document.querySelector('iframe'))")
+                # HTML 与 API 返回 200 时，资源白名单缺项仍会让 iframe 初始化失败。
+                await wait_for("(() => {const frame=document.querySelector('iframe'), view=frame?.contentWindow, doc=frame?.contentDocument;"
+                    "return Boolean(doc && typeof view.renderEnvironments==='function' && Array.from(doc.styleSheets).some(sheet=>"
+                    "sheet.href && new URL(sheet.href).pathname.endsWith('/environments.css') && sheet.cssRules.length>0));})()")
                 assert await evaluate("fetch('/runtime/api/environments').then(response=>response.status)") == 200
                 if exercise is not None:
                     await exercise(rpc, evaluate, wait_for, session_id)

@@ -231,6 +231,8 @@ artifact `v3-release-<run_id>-<run_attempt>` 保存发布清单与同批 gzip �
 
 统一 Vue 后台通过受鉴权的 `/runtime/` 桥访问 bench，保留 HTTP/SSE/WS。浏览器桥限定路径/方法，拒绝内部和编码绕过；v3 Cookie 名和 scope 独立，退出撤销服务端会话及旧票据。终端资源打包到镜像，不依赖运行时 CDN。
 
+环境页固定资源 `GET|HEAD /runtime/environments.js`、`GET|HEAD /runtime/environments.css` 必须与 `webui/index.html` 的引用同步进入管理桥精确白名单，查询参数随原 URI 转发。资源沿用原 v3 会话鉴权，写方法、近似路径、编码及点段路径继续拒绝。新增本地脚本或样式时同时核对镜像分发和浏览器桥准入。
+
 **管理页面布局**：`route.name === 'environments'` 时 Dashboard 使用 `100dvh` 纵向 flex，隐藏统计卡片，main 全宽且 `flex: 1; min-height: 0`；Environments 的 iframe 填满剩余空间，无额外边距、圆角或固定高度扣减。外层不承担内容滚动，bench 保留原主题和自身滚动；离开该路由后恢复网关普通页的内容宽度、统计卡片和滚动。
 
 bench 导航项不拆分中英文标签。宽屏顶部三列使用 `max-content minmax(0, 1fr) max-content`，品牌和状态栏保留实际宽度；中间 `.tabs` 设置 `min-width:0` 并允许整项换行，不能让不换行的副标题溢入导航列。状态栏限制 `max-width:100%` 并允许控件换行，避免极窄屏横向溢出。
@@ -274,6 +276,7 @@ bench 导航项不拆分中英文标签。宽屏顶部三列使用 `max-content 
 | 包名称/大小/SHA256、镜像角色/ID/平台不符 | 拒绝交付；本地同批标签不覆盖 |
 | 新备份失败／旧目录无完整同源归属 | 保留旧恢复点／该目录不参与自动轮换 |
 | 桌面或窄屏打开环境与任务 | iframe 全宽，底边贴合视口；标签保持横排，外层不产生额外滚动 |
+| 环境页 HTML/API 为 200，脚本或样式为 404 | 页面验收失败，核对固定静态资源白名单及实际 iframe 初始化 |
 
 ### 5. Scenarios and Examples
 
@@ -295,10 +298,12 @@ bench 导航项不拆分中英文标签。宽屏顶部三列使用 `max-content 
 - 错误用法：将 memswap_limit 设成 RAM值却声称容器可用宿主 swap，或用 SwapFree 抵扣 RAM 预算。正确做法：总限额为RAM＋额外swap，预检分别比较两种余量。
 - 错误用法：把本地 Docker Id 当作仓库 digest，或只成功推一件就生成可部署清单。正确做法：三种哈希明确区分，两个角色都成功后才保存完整交付结果。
 - 错误用法：把 bench 放进网关的 max-width 容器，叠加统计卡片和 iframe 的 `100vh - 100px` 高度。正确做法：环境路由独占导航下方工作区，flex 根据实际导航高度分配 iframe 空间。
+- 错误用法：新增 `environments.js/css` 后，仅验证 HTML 和环境 API 返回 200。正确做法：核对两个资源成功加载，并断言 iframe 的 `renderEnvironments` 已定义及样式表已解析。
 
 ### 6. Tests Required
 
 - Rust `cargo fmt --check && cargo test`：画像/改写、weighted FIFO/RPM、共享/排他租约、旧记录/过期/重启、绑定校验、原始字节/有序头/SSE取消、不重放；回环临时 CA 验证 HTTPS 正常响应及错误证书/主机名拒绝。测试 CA 不进入正式客户端。
+- `runtime_bridge::tests::environment_assets_are_exact_and_read_only` 覆盖资源 GET/HEAD、写方法和近似／编码路径拒绝；`verify_browser.py` 在真实 iframe 中核对脚本函数和 CSS 规则，缺失资源必须使浏览器验收失败。
 - Python orchestrator 回归：原快照与 session 恢复、旧 token/绑定保护、并行与安装续租、证据/游标分代、统计不重复、错误链接拒绝、鉴权和永久额度门禁。
 - `images/account/test_passthrough.py` 与 network-context 回归：HTTP CONNECT、SOCKS5/H 认证、IPv4/IPv6/域名、字节保真、代理失败无直连、静默关闭、跨空闲窗口单向活动，以及 PID/ACK/mode/source 归属。
 - 环境回归：默认 LA/en_US、显式 UTC/Tokyo、既有画像和页面 GET 不分配；真实 Runner → AccountRuntime 启动、HOME settings.env、登录与续聊使用同源值；实际 UID1000 locale/date/ls 符合设置。
