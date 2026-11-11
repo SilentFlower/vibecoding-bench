@@ -1,0 +1,1 @@
+{"schema_version":1,"sequence":[193,2],"issued_at":"2026-11-11T12:26:19Z","expires_at":"2026-12-11T12:26:19Z","releases":[{"release":"system-ci-43016902583-2","sequence":[193,2],"manifest":{"name":"system-release.json","size":2045,"sha256":"37f74f75acf8754f7eb1e3ca34b8129dbdf6d57c05d33fb6c56e69572869bb04"}}]}
