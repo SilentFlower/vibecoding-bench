@@ -28,7 +28,7 @@ COMPOSE = Path(__file__).with_name("compose.yml")
 # 独立部署脚本复用镜像内的纯预算模块，避免预检和容器解释不同单位。
 sys.path.insert(0, str(REPO / "orchestrator"))
 from resource_budget import account_limits, isolated_account_limits
-from native_sender import stage_asset
+from native_sender import prewarm_account_id, stage_asset
 from storage_assets import essential_exclusions
 from storage_backup import create_backup_data, verify_backup_data
 from storage_cleanup import apply_storage_plan, storage_plan
@@ -199,6 +199,7 @@ def preflight(values: dict) -> Path:
     isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"))
     if values.get("V3_NATIVE_SENDER_MEMORY"):
         isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"), values["V3_NATIVE_SENDER_MEMORY"])
+    prewarm_account_id(values.get("V3_NATIVE_PREWARM_ACCOUNT_ID", ""))
     public_key = values.get("V3_NATIVE_RELEASE_PUBLIC_KEY", "")
     pilot = values.get("V3_NATIVE_RELEASE_PILOT_ENVIRONMENT", "")
     if (public_key or pilot) and (not re.fullmatch(r"[a-f0-9]{64}", public_key)

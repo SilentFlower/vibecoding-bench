@@ -41,6 +41,8 @@ pull 按 `registry_digest` 固定下载，核对配置 ID后建立清单中的�
 
 原生方式需要显式 `V3_NATIVE_SENDER_MEMORY`。标准并发 3 对应最多 6 个 Haiku 进程，已验证配置为 `1536m`，账号总 RAM `4g` 时 CLI 剩余 2304 MiB。sender 和 network 使用各自有限 RAM，额外 swap 只交给 CLI。原生池的 HOME/config/cwd 位于 UID 1001 独占的 `/native`，与 CLI 角色的 HOME 分离。池内共享经SHA与封存校验的只读执行映像，进程保持独立堆和上下文。额外进程空闲60秒后回收并保留1个暖进程。真实V3六路峰值约646 MiB，1536 MiB限额内OOM为0，回收后sender约189 MiB。
 
+`V3_NATIVE_PREWARM_ACCOUNT_ID` 默认为空。设为单个网关账号 ID 后，orchestrator 启动时尝试用空余容量提前启动该启用的原生账号，并准备一个 worker。首条业务占用唯一进程时，有足够并发额度则后台准备第二个。预热零模型调用，额外空闲进程仍按原时限回收。容量不足或账号需要维护时跳过后台启动。
+
 最低 sender 预算为 `256 + 192 × 2 × 标准并发` MiB。bench 创建账号默认标准并发 4，需要至少 `1792m`；使用已验证的 `1536m` 时，将该账号标准并发显式设为 3。账号总 RAM 还须覆盖 network 的 256 MiB 和 CLI 最低 512 MiB。
 
 后端配置来自网关账号 runtime config。模式或资源布局改变时，环境无活动作业才允许重建。缺能力或预算时准备失败。空闲时切回 `legacy` 会恢复原 sender 布局。

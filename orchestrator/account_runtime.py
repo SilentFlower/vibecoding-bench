@@ -33,7 +33,7 @@ from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, valid
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, isolated_account_limits
 from native_kernel_upgrade import pending_upgrade, recover_interrupted
-from native_sender import sender_config
+from native_sender import prewarm_account_id, sender_config
 from native_capture import cleanup_captures
 from runtime_diagnostics import NetworkContextError, network_failure
 from runtime_files import atomic_json, atomic_text, directory_fd as _directory_fd
@@ -153,6 +153,8 @@ class AccountRuntime:
         self.jobs: dict[str, dict] = {}
         self._native_notified: dict[int, tuple[str, int]] = {}
         self.stopping = threading.Event()
+        self.native_prewarm_account_id = prewarm_account_id(os.environ.get("V3_NATIVE_PREWARM_ACCOUNT_ID", ""))
+        self.native_startup = threading.Thread(target=self._prewarm_startup, name="v3-native-startup", daemon=True)
         self.heartbeat = threading.Thread(target=self._heartbeat, daemon=True)
         self.capture_cleanup = threading.Thread(target=self._capture_cleanup, name="v3-capture-cleanup", daemon=True)
         self._capture_cleanup_cursor = None
@@ -592,7 +594,7 @@ class AccountRuntime:
     def ensure(self, account: dict, version: str | None = None, allow_inactive_login: bool = False,
                allow_login_recovery: bool = False, preserve_proxy: bool = False,
                scenario_resources: bool = False, ownership_source: str | None = None,
-               require_quota_mount: bool = True) -> tuple[dict, object]:
+               require_quota_mount: bool = True, startup_prewarm: bool = False) -> tuple[dict, object]:
         """创建或唤醒固定环境，沿用首次固化参数。
 
         :param account: bench 账号或登录草稿
@@ -603,6 +605,7 @@ class AccountRuntime:
         :param scenario_resources: 提前核验项目串行评审预算，新旧固定容器均保持原限额
         :param ownership_source: 只有原受控登录会话可进入凭据维护阶段
         :param require_quota_mount: 是否要求补齐额度挂载；仅独立 API 传输准备可跳过明确缺失
+        :param startup_prewarm: 后台启动只使用空余容量，且不重建现有容器
         :return: 环境记录与 Docker container
         """
         with self._account_lock(account):
@@ -630,6 +633,8 @@ class AccountRuntime:
                     self._sync_proxy(account, configuration)
             fingerprint = json.loads(row["fingerprint_json"])
             native = sender_config(gateway_configuration, fingerprint["mem"], fingerprint.get("swap", "0"))
+            if startup_prewarm and (not native or self.stopping.is_set() or row["state"] not in ("ready", "stopped")):
+                raise RuntimeBusy("账号环境当前不接受预启动")
             account = {**account, "native_sender": native}
             if native and image_labels.get("vibebench.native-runtime") != "293-raw-1":
                 raise ValueError("账号镜像缺少固定 293 原生能力")
@@ -639,6 +644,8 @@ class AccountRuntime:
             root = self._root(row)
             if (root / "runtime/credential-handoff.json").exists():
                 raise ValueError("解绑凭据交接尚未完成，请再次解绑完成交接")
+            if startup_prewarm and pending_upgrade(root):
+                raise RuntimeBusy("账号内核维护中，跳过后台预启动")
             if self.reviews.serial_state(row):
                 # 发送器仍可服务 API；任何 CLI 准备均须等原评审完成资源交接。
                 if version is not None:
@@ -657,6 +664,7 @@ class AccountRuntime:
                 self._update(row, isolation_version=ISOLATION_VERSION)
             if image_labels.get("vibebench.isolation-version") != str(ISOLATION_VERSION):
                 raise ValueError("账号镜像不支持当前隔离布局，请使用同批新镜像")
+            configuration = None
             with self.capacity_lock:
                 present = [bool(row.get(column)) for column in ROLE_COLUMNS.values()]
                 if any(present) and not all(present):
@@ -678,6 +686,8 @@ class AccountRuntime:
                             if key not in ("release", "kernel_generation")}
                     if (actual_native != native
                             or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if fingerprint.get("native_capture_enabled") is True else None)):
+                        if startup_prewarm:
+                            raise RuntimeBusy("后台预启动跳过需要重建的账号环境")
                         if pending_upgrade(root) or self.environment_jobs(row["environment_id"]) or self._running_sender_active(row):
                             raise ValueError("账号有活动作业，不能调整 sender 布局")
                         self._stop_environment(row, remove=True)
@@ -689,12 +699,14 @@ class AccountRuntime:
                         row = self._row(account["name"], account["id"])
                         present = [False]
                     elif configuration.get("proxy_source", configuration["proxy_url"]) != self._proxy(account):
+                        if startup_prewarm:
+                            raise RuntimeBusy("后台预启动跳过需要代理维护的账号环境")
                         if any(current.status == "running" for current in containers.values()) or self.environment_jobs(row["environment_id"]):
                             raise ValueError("代理已改变，请先空闲维护账号环境")
                         self._stop_environment(row, remove=True)
                         present = [False]
                     elif not any(current.status == "running" for current in containers.values()):
-                        self._make_room(row)
+                        self._make_room(row, allow_eviction=not startup_prewarm)
                         generation = int(row["generation"]) + 1
                         configuration["binding"].update(generation=generation, secret=secrets.token_hex(32))
                         self._write_sender_config(row, configuration)
@@ -720,10 +732,11 @@ class AccountRuntime:
                     else:
                         fingerprint.pop("native_sender_memory", None)
                     self._update(row, fingerprint_json=json.dumps(fingerprint))
-                    self._make_room(row)
+                    self._make_room(row, allow_eviction=not startup_prewarm)
                     deployment_key = hashlib.sha256(self.deployment.encode()).hexdigest()[:12]
                     name = f"v3-{deployment_key}-account-{row['environment_id']}"
                     create_environment(self, row, account, name, atomic_json)
+                    configuration = None
                     if account.get("id") is not None:
                         try:
                             network = role_container(self, row, "network")
@@ -749,6 +762,12 @@ class AccountRuntime:
                         time.sleep(0.1)
                 if row["state"] != "cli_reconcile":
                     self._update(row, state="ready")
+                if configuration is None:
+                    configuration = _read_json(self._sender_config(row))
+                adaptive = bool(native and account.get("cc2api_account_id") == self.native_prewarm_account_id)
+                if configuration.get("native_adaptive_prewarm", False) != adaptive:
+                    configuration["native_adaptive_prewarm"] = adaptive
+                    self._write_sender_config(row, configuration)
         # 版本缓存准备不持有环境生命周期锁，API 不等待 CLI 安装。
         if version is not None:
             self.check_system_profile(row, container)
@@ -2339,7 +2358,7 @@ class AccountRuntime:
             return self.data / "missing-run-artifact" / run_id / name
         return self.data / "environments" / row["environment_id"] / "runtime" / "runs" / run_id / name
 
-    def _make_room(self, requested: dict) -> None:
+    def _make_room(self, requested: dict, *, allow_eviction: bool = True) -> None:
         running = self.client.containers.list(filters={"label": ["vibebench.product=v3",
             f"vibebench.deployment={self.deployment}"]})
         running = [container for container in running if container.labels.get("vibebench.role")
@@ -2347,6 +2366,8 @@ class AccountRuntime:
         active_environments = {container.labels.get("vibebench.environment") or container.id for container in running}
         if requested["environment_id"] in active_environments or len(active_environments) < self.limit:
             return
+        if not allow_eviction:
+            raise RuntimeBusy("后台预启动跳过：当前没有空余账号环境容量")
         connection = self.database()
         try:
             rows = [dict(row) for row in connection.execute("SELECT * FROM account_environments")]
@@ -3288,6 +3309,36 @@ class AccountRuntime:
         """
         self.heartbeat.start()
         self.capture_cleanup.start()
+        if self.native_prewarm_account_id is not None:
+            self.native_startup.start()
+
+    def _prewarm_startup(self) -> None:
+        """为显式启用的绑定账号预启动一次；控制面暂未就绪时限次补偿。"""
+        account_id = self.native_prewarm_account_id
+        logger = logging.getLogger(__name__)
+        for delay in (0, 5, 15):
+            if self.stopping.wait(delay):
+                return
+            try:
+                connection = self.database()
+                try:
+                    rows = connection.execute(
+                        "SELECT * FROM accounts WHERE cc2api_account_id=? AND deleted_at IS NULL",
+                        (account_id,),
+                    ).fetchall()
+                finally:
+                    connection.close()
+                if len(rows) != 1 or not rows[0]["enabled"]:
+                    return
+                self.ensure(dict(rows[0]), preserve_proxy=True, require_quota_mount=False, startup_prewarm=True)
+                logger.info("账号环境预启动就绪 account_id=%s", account_id)
+                return
+            except RuntimeBusy:
+                logger.info("账号环境预启动已跳过 account_id=%s", account_id)
+                return
+            except Exception:
+                # 异常可能携带代理或鉴权信息，只记录稳定的阶段和结果。
+                logger.warning("账号环境预启动失败 account_id=%s", account_id)
 
     def stop(self) -> None:
         """停止调度时收口 CLI，保留独立 API 与持久环境。
@@ -3295,6 +3346,8 @@ class AccountRuntime:
         :return: None
         """
         self.stopping.set()
+        if self.native_startup.is_alive():
+            self.native_startup.join(timeout=6)
         if self.capture_cleanup.is_alive():
             self.capture_cleanup.join(timeout=6)
         if self.heartbeat.is_alive():

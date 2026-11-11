@@ -1,6 +1,7 @@
 """固定 293 sender 的部署合同与构建输入；不读取账号凭据。"""
 import hashlib
 import os
+import re
 import shutil
 import urllib.request
 from pathlib import Path
@@ -12,6 +13,19 @@ ASSET = 'ccrb-runtime-linux-x64'
 SHA256 = '423a6a848c84e09bcc73a8b7be481ed4ead44a6644cef94bbf47d2009d3f6b80'
 POOL_MIB = 256
 WORKER_MIB = 192
+
+
+def prewarm_account_id(value: str) -> int | None:
+    """读取预启动试点账号。
+
+    :param value: 配置中的网关账号 ID；空值表示关闭。
+    :return: 已校验的正整数或 None。
+    """
+    if not value:
+        return None
+    if not re.fullmatch(r"[1-9][0-9]{0,18}", value) or int(value) > 2**63 - 1:
+        raise ValueError("V3_NATIVE_PREWARM_ACCOUNT_ID 必须是有效的网关账号 ID")
+    return int(value)
 
 
 def sender_config(configuration: dict, memory: str, swap: str = '0', budget: str | None = None) -> dict | None:

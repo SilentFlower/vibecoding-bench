@@ -1397,6 +1397,27 @@ class AccountRuntimeTests(unittest.TestCase):
                 setup.join(timeout=2)
         self.assertFalse(errors)
 
+    def test_startup_prewarm_uses_enabled_binding_and_never_evicts(self) -> None:
+        """预启动只选择启用账号，资源不足时保留其他账号。"""
+        self.runtime.native_prewarm_account_id = 7
+        self.runtime.limit = 1
+        other = Mock()
+        other.labels = {"vibebench.role": "account", "vibebench.environment": "other"}
+        self.client.containers.list.return_value = [other]
+        with patch.object(self.runtime, "ensure", side_effect=lambda *args, **kwargs:
+                self.runtime._make_room({"environment_id": "target"}, allow_eviction=not kwargs["startup_prewarm"])) as ensure:
+            self.runtime._prewarm_startup()
+        ensure.assert_called_once()
+        self.assertEqual(ensure.call_args.args[0]["cc2api_account_id"], 7)
+        self.assertTrue(ensure.call_args.kwargs["startup_prewarm"])
+        self.assertFalse(ensure.call_args.kwargs["require_quota_mount"])
+        other.stop.assert_not_called()
+        with self.runtime.database() as connection:
+            connection.execute("UPDATE accounts SET enabled=0 WHERE id=1")
+        with patch.object(self.runtime, "ensure") as ensure:
+            self.runtime._prewarm_startup()
+        ensure.assert_not_called()
+
     def test_drain_timeout_releases_gate_without_stopping_accepted_api(self) -> None:
         """排空失败时 CLI 未启动，不得截断已接受的流。@return None。"""
         row = self.runtime._row("synthetic", 1)
@@ -1709,6 +1730,29 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertEqual(len(created), 3)
         self.assertTrue(all(item.kwargs['mem_limit'] == 0 and item.kwargs['memswap_limit'] == -1 for item in created))
         self.assertTrue(all(item.kwargs['nano_cpus'] > 0 and item.kwargs['pids_limit'] > 0 for item in created))
+
+    def test_native_startup_prewarm_configures_sender_before_notification(self) -> None:
+        """三角色就绪后写入补位开关，再通知网关预热首个 worker。"""
+        self._isolated_docker()
+        self.runtime.native_prewarm_account_id = 7
+        self.client.images.get.return_value.attrs["Config"]["Labels"]["vibebench.native-runtime"] = "293-raw-1"
+        account = {"id": 1, "name": "synthetic", "cc2api_account_id": 7,
+            "upstream_socks5_host": "192.0.2.2", "upstream_socks5_port": 1080}
+        self.gateway._request.return_value = {"auth_type": "oauth", "status": "active",
+            "proxy_url": self.runtime._proxy(account), "request_backend": "native293", "concurrency": 2}
+
+        def notify(_, row):
+            self.assertEqual(row["state"], "ready")
+            self.assertTrue(json.loads(self.runtime._sender_config(row).read_text())["native_adaptive_prewarm"])
+
+        with (
+            patch.object(self.runtime, "_sender_active", return_value=0),
+            patch.object(self.runtime, "_notify_native_preparation", side_effect=notify) as preparation,
+            patch.dict(os.environ, {"V3_NATIVE_SENDER_MEMORY": "1024m"}),
+        ):
+            self.runtime.ensure(account, preserve_proxy=True, require_quota_mount=False, startup_prewarm=True)
+        preparation.assert_called_once()
+        self.assertEqual(self.client.containers.run.call_count, 3)
 
     def test_three_role_permissions_and_secret_mount_boundaries(self) -> None:
         """普通角色不携带网络权限或其他角色秘密，配额合计保持。@return None。"""
