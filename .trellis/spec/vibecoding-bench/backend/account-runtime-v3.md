@@ -1291,3 +1291,52 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - Rust实际 `native_real_binary`：共享dev/inode及四项封存、6→1空闲回收、取消→0、全部原进程退出后缓存重建、独立凭据及一次提交。
 - `deploy/v3/verify_forwarding.py --native`：真实两账号三角色、HTTP/SOCKS、3普通/6Haiku、同映像/秘密隔离、cgroup峰值与OOM0、60秒回收及按账号回退；验证镜像的额外CA仅限本地夹具。
 - 发布验收从实际Release下载附件，核SHA/大小、冻结构建输入并运行真实消费者；合成回环与真实付费推理分开记录。
+
+## Scenario: 单账号原生内核在线切换与回滚
+
+### 1. Scope / Trigger
+
+- 固定官方293的内核修订；bench分发和状态、cc2api维护鉴权与sender进程生命周期共同生效。
+
+### 2. Signatures
+
+- POST /api/environments/{environment_id}/native-kernel：{operation:prepare|activate|rollback|recover,operation_id:UUID,release?:string,expected_sha256?:string,expected_revision:string}。
+- 环境列表 native_kernel：state、revision、current、previous、prepared、pid、image_sha256、error、operation_id、binding_generation。未启用灰度或非原生环境返回null。
+- POST /admin/runtime/accounts/:id/native-kernel-probe：owner、lease_generation、binding、target{release:NativeReleaseRef|null,kernel_generation:UUID}；私有 sender /internal/native/prepare-switch 包含 target、identity。
+- NativeSenderConfig可选release{release,launcher_sha256}、kernel_generation；历史省略使用内置beta.3。NativePreparationStatus增加release、kernel_generation、image_sha256。
+
+### 3. Contracts
+
+- V3_NATIVE_RELEASE_PUBLIC_KEY为部署固定Ed25519原始32字节公钥的小写hex；V3_NATIVE_RELEASE_PILOT_ENVIRONMENT为唯一32位环境ID。首次底座只给灰度sender只读挂载bench/native-releases至/runtime-releases，并传公钥；CLI不取得该挂载。
+- 下载固定SilentFlower/cc-runtime-bridge的精确标签，HTTPS跳转只接受github.com、release-assets.githubusercontent.com、objects.githubusercontent.com。清单≤4096B、签名64B、分发≤27933052B；使用签名原字节及独立SHA核验。版本目录按标签/分发SHA寻址，原子写入，已有候选可离线复核。
+- 管理请求绑定唯一账号与环境。expected_revision同时含环境代次和持久操作版本；新准备、激活及对账消费原版本。同操作ID只接受完全相同参数，之后操作消费版本后旧请求拒绝。
+- 环境私有runtime/native-kernel-upgrade.json保存准备、draining、switching、restoring、finishing、active/restored/failed/reconcile及原/候选/上一版。准备不占账号API门禁；激活和回滚使用现有排他租约，CLI忙时延后。排空≤120秒，等待原流收齐，未知活动不得视为空闲。
+- 专用预热由管理员服务证明与对应kernel:UUID维护租约触发；账号凭据所有权保护保持，AT由网关读取，RT不传sender。普通准备遇维护主动取消。
+- sender专用切换锁排除业务和普通准备；在warmup写锁内等待live==idle.len，退役旧空闲集合后等待live=0才启动候选。物理退出等待最多8秒且受本轮截止约束，失败保持明确恢复路径。
+- 分发体仍通过完整SHA和精确FD启动；真实PID/worker_ready、memfd执行体SHA、四项封存逐次核验。共享映像按分发SHA隔离，即使执行体相同也先实际运行新的加载器。
+- 成功预热后持久提交选择及实际PID/映像SHA，再释放门禁；候选失败恢复原版后开放，无法确认则reconcile。启动时识别中断，原账号门禁保持到显式恢复。排空中断且选择仍是原版时按原所有权释放，finishing中断按提交结果补收口。
+- 内核选择与容器布局比较分开；同合同切换只换worker，下一业务不因release/kernel_generation差异重建角色。现有预算、代理、设备及环境身份保持。当前/上一版/操作引用的制品保留，移除信任根前先回到内置版。
+
+### 4. Validation & Error Matrix
+
+| 条件 | 结果 |
+| --- | --- |
+| 签名/来源/平台/协议/摘要不符 | 准备失败，原内核运行 |
+| expected_revision或目标摘要过期 | 冲突，版本保持 |
+| 已持CLI租约、排空超时 | 保持原版，释放本操作门禁或明确待对账 |
+| HTTP取消后旧worker尚未退出 | 候选启动等待物理许可；超时恢复/待对账 |
+| 候选预热失败 | 原版真实预热后再开放 |
+| 操作中断或释放结果未知 | 可见reconcile，禁止复跑模型请求 |
+| 下一请求重新读取环境 | 内核选择不触发容器布局重建 |
+
+### 5. Scenarios and Examples
+
+- 正常：准备beta.4，目标账号长流自然结束，切换预热零模型，下一请求复用新PID；回滚恢复beta.3，所有容器ID和对照账号PID保持。
+- 边界：先激活再回滚，迟到首次激活的相同ID和旧revision必须冲突。
+- 错误用法：HTTP active=0就假定物理进程全部退出。正确处理：等待物理许可并收口旧池后再启动候选。
+
+### 6. Tests Required
+
+- orchestrator/test_native_kernel_upgrade.py：签名及摘要拒绝、准备与接单独立、排空/回滚、旧请求重放、超时、恢复及候选摘要漂移。
+- Rust native_real_binary：模拟一个退出未收口许可和一个空闲worker，归还前零启动，归还后换PID；native_real_gateway验证维护归属、长流、实际新PID和零模型切换。
+- deploy/v3/verify_forwarding.py --native --kernel-release <测试签名目录> --kernel-public-key <公钥>：双账号真实三角色、管理端准备/激活/回滚、长流只发送一次、下一业务复用、对照账号PID与所有容器ID/StartedAt保持、管理端公网发送计数为0。

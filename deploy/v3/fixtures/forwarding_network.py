@@ -113,14 +113,14 @@ class Upstream(BaseHTTPRequestHandler):
                     'description': '执行本地隔离构建夹具'})}})
             sequence[-2][1]['delta']['stop_reason'] = 'tool_use'
         slow = str(marker).startswith('slow-')
-        repeats = 600 if str(marker).startswith('slow-cancel') else 1800 if marker == 'slow-restart' else 1
+        repeats = 600 if str(marker).startswith('slow-cancel') else 1800 if marker in ('slow-restart', 'slow-kernel') else 1
 
         def chunks():
             """保持重启场景的流，直到控制端确认恢复。@return 有界 SSE 事件迭代器。"""
             yield from sequence[:2]
             for _ in range(repeats):
                 yield sequence[2]
-                if marker == 'slow-restart' and (ROOT / 'release-restart').exists():
+                if marker in ('slow-restart', 'slow-kernel') and (ROOT / ('release-' + marker[5:])).exists():
                     break
             yield from sequence[3:]
         digest = hashlib.sha256()

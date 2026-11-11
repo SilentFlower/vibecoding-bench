@@ -32,6 +32,7 @@ from process_metrics import PROCESS_SOURCE, merge_process_metrics, validate_proc
 from physical_features import MAX_SNAPSHOT_BYTES, PHYSICAL_FEATURES_PROBE, validate_features
 from project_runtime_policy import ProjectRuntimeError, check_python_runtime
 from resource_budget import account_limits, isolated_account_limits
+from native_kernel_upgrade import pending_upgrade, recover_interrupted
 from native_sender import sender_config
 from native_capture import cleanup_captures
 from runtime_diagnostics import NetworkContextError, network_failure
@@ -670,9 +671,14 @@ class AccountRuntime:
                         self._update(row, state="reconcile")
                         raise ValueError("账号隔离角色缺失，需要先对账") from None
                     configuration = _read_json(self._sender_config(row))
-                    if (configuration.get("native") != native
+                    actual_native = configuration.get("native")
+                    if isinstance(actual_native, dict):
+                        # 内核选择属于 sender 进程代次；只有部署预算及路径变化才要求重建角色。
+                        actual_native = {key: value for key, value in actual_native.items()
+                            if key not in ("release", "kernel_generation")}
+                    if (actual_native != native
                             or configuration.get("native_capture_dir") != ("/flows/api/cc-prepared" if fingerprint.get("native_capture_enabled") is True else None)):
-                        if self.environment_jobs(row["environment_id"]) or self._running_sender_active(row):
+                        if pending_upgrade(root) or self.environment_jobs(row["environment_id"]) or self._running_sender_active(row):
                             raise ValueError("账号有活动作业，不能调整 sender 布局")
                         self._stop_environment(row, remove=True)
                         present = [False]
@@ -2763,6 +2769,8 @@ class AccountRuntime:
                 account = connection.execute("SELECT * FROM accounts WHERE id=?", (row["account_id"],)).fetchone()
             finally:
                 connection.close()
+            if pending_upgrade(self._root(row)):
+                raise ValueError("请求内核升级待对账，请在内核面板恢复")
             account = dict(account) if account else {"name": row["name"]}
             if operation == "reprofile":
                 blocker = self.reprofile_blocker(row)
@@ -3033,6 +3041,11 @@ class AccountRuntime:
         for row in rows:
             if environment_id is not None and row["environment_id"] != environment_id:
                 continue
+            with self.environment_lock(row["environment_id"]):
+                if environment_id is None and recover_interrupted(self._root(row)):
+                    continue
+                if pending_upgrade(self._root(row)):
+                    continue
             record = self._root(row) / "runtime" / "execution.json"
             shared = row["state"] == "cli_reconcile"
             # 历史画像校正状态按正常对账收口，失败仍保留真实执行和提交门禁。

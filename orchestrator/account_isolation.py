@@ -10,6 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from docker.types import Mount
 
+from native_kernel_upgrade import applied_kernel, pilot_key
 from resource_budget import isolated_account_limits, scenario_account_limits
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
@@ -74,6 +75,14 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     root = runtime._root(row)
     fingerprint = json.loads(row['fingerprint_json'])
     native = account.get('native_sender')
+    kernel_key = pilot_key(row['environment_id']) if native else ''
+    if native:
+        saved_kernel = applied_kernel(root, int(account.get('cc2api_account_id') or 0))
+        if saved_kernel.get('current') and not kernel_key:
+            raise ValueError('已生效内核仍依赖灰度信任根，请先回滚')
+        if saved_kernel:
+            native = {**native, 'release': saved_kernel.get('current'),
+                'kernel_generation': saved_kernel.get('kernel_generation')}
     limits = isolated_account_limits(fingerprint['mem'], fingerprint.get('swap', '0'),
         ('unlimited' if native['memory_mib'] == 0 else str(native['memory_mib']) + 'm') if native else None)
     layout_path = root / 'runtime/project-review-layout.json'
@@ -219,13 +228,18 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
         runtime.check_system_profile(row, cli)
         _directory(root / 'runtime/native', 1001, 1001, 0o700)
         sender_mounts = mounts([*common_files, ('runtime/sender', '/run/v3', 'ro'), ('flows/api', '/flows/api', 'rw'), ('runtime/native', '/native', 'rw')])
+        sender_env = {'V3_SENDER_CONFIG': '/run/v3/sender.json', 'TOKIO_WORKER_THREADS': '2'}
+        if kernel_key:
+            _directory(runtime.data / 'native-releases', mode=0o755)
+            sender_mounts[str(runtime.host_data / 'native-releases')] = {'bind': '/runtime-releases', 'mode': 'ro'}
+            sender_env['V3_NATIVE_RELEASE_PUBLIC_KEY'] = kernel_key
         verification = root / 'runtime/verification-ca.der'
         if verification.is_file():
             # 父目录按只读挂载，runc 不能在其中创建嵌套 bind 的目标文件。
             (paths['sender'] / 'verification-ca.der').touch(mode=0o444)
             sender_mounts[str(host_root / 'runtime/verification-ca.der')] = {'bind': '/run/v3/verification-ca.der', 'mode': 'ro'}
         launch('sender', **base, user='1001:1001', entrypoint=['/usr/local/bin/account-sender'],
-            environment={'V3_SENDER_CONFIG': '/run/v3/sender.json', 'TOKIO_WORKER_THREADS': '2'},
+            environment=sender_env,
             volumes=sender_mounts, tmpfs={'/tmp': 'rw,noexec,nosuid,nodev,size=16m,mode=1777'})
     except Exception:
         for container in reversed(created):

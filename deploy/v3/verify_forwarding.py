@@ -107,13 +107,91 @@ def certificates(root):
             '-CAcreateserial', '-days', '1', '-extfile', mode + '.ext', '-out', mode + '.crt')
 
 
-def verify(manifest_path, output, binary, native=False):
+def verify_kernel_switch(client, filters, request, accounts, release_data, passed):
+    """用两个真实账号角色及管理桥验证指定内核的在线切换和回滚。"""
+    account, other = accounts
+    pilot = account['eid']
+    candidate, digest = release_data['release'], release_data['launcher_sha256']
+    api = '/runtime/api/environments'
+    endpoint = f'{api}/{pilot}/native-kernel'
+
+    def submit(action, **fields):
+        response = request('POST', endpoint, json={'operation': action,
+            'operation_id': str(uuid.uuid4()), 'expected_revision': listed(pilot)['revision'], **fields})
+        assert response.status_code == 200, response.text[:512]
+        return response.json()
+
+    def listed(environment):
+        response = request('GET', api)
+        assert response.status_code == 200, response.text[:512]
+        return next(row['native_kernel'] for row in response.json() if row['environment_id'] == environment)
+
+    def running():
+        return {item.id: item.attrs['State']['StartedAt'] for item in client.containers.list(filters=filters)}
+
+    def workers(entry):
+        code = """import json,pathlib,hashlib
+out={}
+for p in pathlib.Path('/proc').iterdir():
+ try:
+  if p.name.isdigit() and 'memfd:ccrb' in str((p/'exe').readlink()):
+   with (p/'exe').open('rb') as f:out[p.name]=hashlib.file_digest(f,'sha256').hexdigest()
+ except FileNotFoundError:pass
+print(json.dumps(out))"""
+        result = entry['sender_container'].exec_run(['python', '-c', code])
+        assert result.exit_code == 0, result.output[:300]
+        return json.loads(result.output)
+
+    initial = listed(pilot)
+    assert initial['current']['release'] == 'v0.1.0-beta.3'
+    assert listed(other['eid']) is None
+    prepared = submit('prepare', release=candidate)
+    assert prepared['prepared']['launcher_sha256'] == digest
+    before_roles = running()
+    before_other = wait_until(lambda: state if len(state := workers(other)) == 1 else None,
+        '对照账号没有单暖进程', seconds=75)
+    before_current = workers(account)
+    long_request = {'model':'claude-sonnet-4-6','max_tokens':64,'stream':True,
+        'messages':[{'role':'user','content':'slow-kernel'}]}
+    with request('POST', '/v1/messages', headers=account['headers'], json=long_request, stream=True) as stream:
+        assert stream.status_code == 200
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            operation = worker.submit(submit, 'activate', release=candidate, expected_sha256=digest)
+            try:
+                wait_until(lambda: listed(pilot)['state'] == 'draining', '管理端未出现账号排空状态')
+                assert not operation.done() and workers(account) == before_current
+            finally:
+                (account['network'] / 'release-kernel').touch()
+            assert b'message_stop' in stream.content
+            switched = operation.result(timeout=90)
+    assert switched['state'] == 'active' and switched['current']['launcher_sha256'] == digest
+    assert workers(account) == {str(switched['pid']): release_data['image_sha256']}
+    assert str(switched['pid']) not in before_current
+    # 下一次真实 API 会重新解析环境；新版选择不能被误判成容器布局变更。
+    check_request = {**long_request, 'stream':False, 'messages':[{'role':'user','content':'after-kernel-switch'}]}
+    assert request('POST', '/v1/messages', headers=account['headers'], json=check_request).status_code == 200
+    assert workers(account) == {str(switched['pid']): release_data['image_sha256']}
+    restored = submit('rollback', expected_sha256=initial['current']['launcher_sha256'])
+    assert restored['current'] == initial['current'] and restored['pid'] != switched['pid']
+    assert workers(account) == {str(restored['pid']): restored['image_sha256']}
+    assert workers(other) == before_other and running() == before_roles
+    entries = [json.loads(line) for line in (account['network'] / 'evidence.jsonl').read_text().splitlines()]
+    related = [item for item in entries if item.get('marker') == 'slow-kernel']
+    assert sum(item['kind'] == 'upstream' for item in related) == 1
+    assert any(item['kind'] == 'stream-end' and item['completed'] for item in related)
+    passed('N5 真实管理端内核切换和回滚，原有流完整且对照账号、管理服务及容器保持',
+        switched=switched['current'], restored=restored['current'])
+
+
+def verify(manifest_path, output, binary, native=False, kernel_release=None, kernel_key=None):
     """运行全链路和浏览器场景，最终仅清理本次标签资源。
 
     :param manifest_path: 测试专用联合镜像清单。
     :param output: 脱敏结果目录，不保存令牌或代理密码。
     :param binary: 已安装的官方 CLI 原生二进制。
     :param native: 增加新原生后端的真实角色及预算验证。
+    :param kernel_release: 离线签署的候选附件目录，可选。
+    :param kernel_key: 仅用于该夹具的发布公钥。
     :return: None；任一场景不符即失败。
     """
     manifest = json.loads(manifest_path.read_text())
@@ -150,6 +228,12 @@ def verify(manifest_path, output, binary, native=False):
             'V3_CLI_VERSION': '2.1.293', 'V3_MAX_ACTIVE_ACCOUNTS': '2', 'V3_ACCOUNT_MEMORY': '1536m', 'V3_ACCOUNT_SWAP': '0'}
         if native:
             values.update(V3_ACCOUNT_MEMORY='4g', V3_NATIVE_SENDER_MEMORY='1536m')
+        pilot = uuid.uuid4().hex if kernel_release else None
+        if pilot:
+            release_data = json.loads((kernel_release / 'runtime-release.json').read_text())
+            assert re.fullmatch(r'v0[.]1[.]0-beta[.][1-9][0-9]{0,8}', release_data['release'])
+            assert re.fullmatch(r'[a-f0-9]{64}', release_data['launcher_sha256'])
+            values.update(V3_NATIVE_RELEASE_PUBLIC_KEY=kernel_key, V3_NATIVE_RELEASE_PILOT_ENVIRONMENT=pilot)
         environment_file = root / 'v3.env'
         environment_file.write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
         environment_file.chmod(0o600)
@@ -214,6 +298,12 @@ def verify(manifest_path, output, binary, native=False):
 
         try:
             subprocess.run(manager + ['up', '--env', str(environment_file)], cwd=REPO, check=True)
+            if pilot:
+                directory = data / 'bench/native-releases' / release_data['release'] / release_data['launcher_sha256']
+                directory.mkdir(parents=True)
+                for name in ('runtime-release.json', 'runtime-release.sig', 'ccrb-runtime-linux-x64'):
+                    shutil.copy2(kernel_release / name, directory / name)
+                    (directory / name).chmod(0o555 if name == 'ccrb-runtime-linux-x64' else 0o444)
             management_state = {}
 
             def management_ready():
@@ -281,6 +371,11 @@ def verify(manifest_path, output, binary, native=False):
                 result = orchestrator.exec_run(['python', '-c', code])
                 assert result.exit_code == 0, '创建环境行失败'
                 eid = result.output.decode().strip().splitlines()[-1]
+                if pilot and index == 0:
+                    with sqlite3.connect(data / 'bench/db.sqlite') as database:
+                        database.execute('UPDATE account_environments SET environment_id=? WHERE environment_id=? AND account_id=?',
+                            (pilot, eid, aid))
+                    eid = pilot
                 env_root = data / 'bench/environments' / eid
                 for directory in ('home/.claude', 'runtime'):
                     (env_root / directory).mkdir(parents=True, exist_ok=True)
@@ -718,6 +813,8 @@ except urllib.error.HTTPError as error:print(json.dumps({'status':error.code,'ph
                 current = account['sender_container'].exec_run(['cat','/sys/fs/cgroup/memory.current'])
                 assert current.exit_code == 0 and int(current.output.strip()) < 512 * 1024 ** 2
                 passed('N4 共享封存映像，60秒空闲回收后保留一个暖进程', sender_idle=int(current.output.strip()))
+                if pilot:
+                    verify_kernel_switch(client, filters, request, accounts, release_data, passed)
                 response = request('PUT', f"/admin/accounts/{account['gid']}", headers=admin, json={'request_backend':'legacy'})
                 assert response.status_code == 200
                 wake(account)
@@ -778,13 +875,17 @@ def main():
     parser.add_argument('--output', type=Path)
     parser.add_argument('--cli-binary', type=Path)
     parser.add_argument('--native', action='store_true')
+    parser.add_argument('--kernel-release', type=Path)
+    parser.add_argument('--kernel-public-key')
     args = parser.parse_args()
     if args.build:
         build_verification(args.release or 'verify-' + uuid.uuid4().hex[:16], args.manifest)
     else:
         if not args.output or not args.cli_binary:
             parser.error('验收需要 --output 和 --cli-binary')
-        verify(args.manifest, args.output, args.cli_binary, args.native)
+        if args.kernel_release and (not args.native or not args.kernel_public_key):
+            parser.error('内核在线切换需要 --native 及测试签名公钥')
+        verify(args.manifest, args.output, args.cli_binary, args.native, args.kernel_release, args.kernel_public_key)
 
 
 if __name__ == '__main__':

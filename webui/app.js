@@ -188,6 +188,67 @@ function renderPhysicalFeatures(row) {
 }
 
 /**
+ * 渲染单环境的内核操作及实际预热回执。
+ * @param {object} row 环境与内核状态。
+ * @return {string} 内核管理卡片。
+ */
+function renderNativeKernel(row) {
+  const kernel = row.native_kernel;
+  if (!kernel) return '';
+  const states = {idle:'可准备', preparing:'正在下载并校验', draining:'等待在途请求结束', switching:'预热候选',
+    restoring:'恢复原版', finishing:'核对并开放接单', active:'已生效', failed:'保持原版',
+    restored:'已恢复原版', reconcile:'待对账'};
+  const busy = ['preparing','draining','switching','restoring','finishing','reconcile'].includes(kernel.state);
+  const button = (action, label, enabled, digest = '') => `<button type="button" data-kernel-action="${action}" data-kernel-environment="${escapeHTML(row.environment_id)}" data-kernel-release="${escapeHTML(kernel.prepared?.release || '')}" data-kernel-digest="${escapeHTML(digest)}" data-kernel-revision="${escapeHTML(kernel.revision)}" ${enabled ? '' : 'disabled'}>${label}</button>`;
+  const description = reference => reference ? `${reference.release} (${reference.launcher_sha256.slice(0, 12)})` : '无';
+  return `<div><p role="status">请求内核 · ${escapeHTML(states[kernel.state] || '待核对')} · 上次确认 ${escapeHTML(description(kernel.current))}${kernel.pid ? ` · 预热回执 PID ${escapeHTML(kernel.pid)}` : ''}</p>
+    <p>上一版 ${escapeHTML(description(kernel.previous))} · 已准备 ${escapeHTML(description(kernel.prepared))}</p>
+    ${kernel.error ? `<p role="alert">${escapeHTML(kernel.error)}</p>` : ''}
+    ${button('prepare', '准备内核', !busy)}
+    ${button('activate', '激活候选', !busy && kernel.prepared && kernel.prepared.launcher_sha256 !== kernel.current.launcher_sha256, kernel.prepared?.launcher_sha256)}
+    ${button('rollback', '回滚内核', !busy && kernel.previous, kernel.previous?.launcher_sha256)}
+    ${kernel.state === 'reconcile' ? button('recover', '恢复对账', true) : ''}
+  </div>`;
+}
+
+/**
+ * 提交明确的管理动作，并在服务器执行期间读取进度。
+ * @param {HTMLButtonElement} button 当前内核操作。
+ * @return {Promise<void>} 操作完成后刷新环境视图。
+ */
+async function submitNativeKernel(button) {
+  const {kernelAction: operation, kernelEnvironment: environment, kernelRelease: candidate, kernelDigest: digest, kernelRevision: revision} = button.dataset;
+  let release = null;
+  if (operation === 'prepare') {
+    release = prompt('输入要准备的发布标签，例如 v0.1.0-beta.4');
+    if (release === null) return;
+    release = release.trim();
+  } else {
+    if (!confirm('将等待该账号的在途请求结束，然后切换或恢复请求内核。继续？')) return;
+    if (operation === 'activate') release = candidate;
+  }
+  const random = crypto.getRandomValues(new Uint8Array(16));
+  random[6] = (random[6] & 15) | 64;
+  random[8] = (random[8] & 63) | 128;
+  const hex = Array.from(random, value => value.toString(16).padStart(2, '0')).join('');
+  const operation_id = [hex.slice(0,8), hex.slice(8,12), hex.slice(12,16), hex.slice(16,20), hex.slice(20)].join('-');
+  button.disabled = true;
+  const timer = setInterval(() => {
+    if (currentTab() === 'environments') renderEnvironments().catch(() => {});
+  }, 2000);
+  try {
+    await API(`/environments/${encodeURIComponent(environment)}/native-kernel`, {
+      method: 'POST', body: JSON.stringify({operation, operation_id, release, expected_sha256: digest || null, expected_revision: revision})
+    });
+  } catch (error) {
+    alert('内核操作：' + error.message);
+  } finally {
+    clearInterval(timer);
+    if (currentTab() === 'environments') await renderEnvironments();
+  }
+}
+
+/**
  * 读取固定环境及已有实测快照，并绑定显式维护和采集操作。
  * @return {Promise<void>} 完成本次页面渲染
  */
@@ -197,7 +258,8 @@ async function renderEnvironments() {
   if (currentTab() !== 'environments' || generation !== state.viewGeneration) return;
   const view = $('#view');
   view.innerHTML = '<h2>固定账号环境</h2><p>停止和重建会保留 HOME、身份和证据。画像校正只适用于没有运行历史的未绑定账号，保留原 HOME 和登录凭据。</p>' +
-    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${row.credential_ownership ? `<p role="status">${escapeHTML(row.credential_ownership.message)}</p>${row.credential_ownership.phase !== 'ready' && ['return', 'attach', 'authorize'].includes(row.credential_ownership.direction) ? `<button type="button" data-environment="${escapeHTML(row.environment_id)}" data-operation="cancel-credential-return" ${row.busy ? 'disabled' : ''}>取消未提交交接</button>` : ''}` : ''}<p>${escapeHTML(Object.entries(row.role_status || {}).map(([role, status]) => `${({cli:"CLI",network:"网络",sender:"API"})[role] || role}: ${status}`).join(" · "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : ''}${renderPhysicalFeatures(row)}</article>`).join('');
+    rows.map(row => `<article class="card"><h3>${escapeHTML(row.name)}</h3><p>${escapeHTML(row.state)} · ${row.busy ? '执行中' : '无 CLI 作业'} · ${escapeHTML(row.fingerprint.hostname)} · ${escapeHTML(row.fingerprint.mem)}</p><p>环境 ${escapeHTML(row.environment_id)} · 容器代次 ${row.generation} · profile v${escapeHTML(row.fingerprint.profile_version || 1)} · ${escapeHTML(row.fingerprint.tz)} / ${escapeHTML(row.fingerprint.lang)}</p><p>${escapeHTML(row.identity_status)} · CLI ${escapeHTML((row.cli_versions || []).join(", "))}</p>${row.credential_ownership ? `<p role="status">${escapeHTML(row.credential_ownership.message)}</p>${row.credential_ownership.phase !== 'ready' && ['return', 'attach', 'authorize'].includes(row.credential_ownership.direction) ? `<button type="button" data-environment="${escapeHTML(row.environment_id)}" data-operation="cancel-credential-return" ${row.busy ? 'disabled' : ''}>取消未提交交接</button>` : ''}` : ''}<p>${escapeHTML(Object.entries(row.role_status || {}).map(([role, status]) => `${({cli:"CLI",network:"网络",sender:"API"})[role] || role}: ${status}`).join(" · "))}</p>${['stop', 'rebuild', 'reconcile'].map(operation => `<button data-environment="${escapeHTML(row.environment_id)}" data-operation="${operation}" ${row.busy ? 'disabled' : ''}>${({stop:'停止',rebuild:'重建容器',reconcile:'故障对账'})[operation]}</button>`).join('')}<button data-environment="${escapeHTML(row.environment_id)}" data-operation="reprofile" ${row.can_reprofile ? '' : 'disabled'} title="${escapeHTML(row.reprofile_message || '校正保留原登录凭据')}">校正画像</button>${row.run_window ? renderAccountRunWindow({id: row.account_id, run_window: row.run_window}) : ''}${renderNativeKernel(row)}${renderPhysicalFeatures(row)}</article>`).join('');
+  $$('[data-kernel-action]', view).forEach(button => { button.onclick = () => submitNativeKernel(button); });
   $$('[data-physical-refresh]', view).forEach(button => {
     button.onclick = async () => {
       button.disabled = true;

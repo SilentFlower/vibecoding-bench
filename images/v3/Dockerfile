@@ -29,7 +29,7 @@ RUN --mount=type=cache,id=vibebench-v3-cargo-registry,target=/usr/local/cargo/re
     && mkdir -p /out && cp target/release/claude-code-gateway target/release/account-sender /out/
 
 FROM python:3.12-slim-bookworm AS control
-RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates openssl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
