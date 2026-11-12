@@ -25,14 +25,15 @@
 - 仅解析唯一Content-Length的HTTP/1.1 `POST /v1/messages`（可带query）。复制和哈希前限制本实体范围，越界字节直接丢弃。不能把连接复用后的下一请求拼入当前副本。
 - 最终对象`source=native_tls_uprobe`、`representation=http_entity_from_tls_accepted_write`。`complete/status/reason`区分完整与缺口；实体`observed_body_bytes/body_sha256`及整体`observed_http_bytes/http_sha256`只在完整时提供。`flushed=null`，保持TLS接受、网络刷出和上游实收的独立语义。
 - 外部故障导致连续性待核对时清空头和正文预览；保留固定原因及空哈希/未知范围。Rust持久化前再次清空非HTTP_PARTIAL的不完整原文，连续HTTP前缀裁剪未闭合字符串后统一脱敏。对应平台可选快照与容量合同由`.trellis/spec/gateway/backend/settings-database.md`的“CC组装后私有采集”所有。
-- 物理worker后台预备一个单次采集器，业务即时取用。准备中记CAPTURE_PREPARING，就绪后绑定当前业务ID；启动及收口各2秒后台期限。迟到启动、退役、取消及重读均按采集代次和业务归属隔离，采集故障保持零模型重放。
+- 物理worker后台预备一个单次采集器。平台sender通过`NativeTlsSlot::prepare(deadline)`在新Worker初始化和复用checkout交接前有界等待同代准备，最多2秒并服从更早原截止；槽take仍即时，就绪后绑定当前业务ID。超时撤销启动代次并记OBSERVER_START_TIMEOUT，迟到启动、退役、取消及重读隔离。取消时Worker先关闭已登记槽；后继补热复用原零模型prepare及巡检路径。探针失败保持缺口，业务保持原截止和零模型重放，收口预算仍2秒。
 
 ### 4. Validation & Error Matrix
 
 | 条件 | 结果 |
 | --- | --- |
 | 缺配置/未知映像/权限或帮助进程异常 | 明确OBSERVER_NOT_CONFIGURED/IMAGE_NOT_ADMITTED/受控OBSERVER原因，业务独立执行 |
-| 首条到达时探针准备中 | CAPTURE_PREPARING，即时发送本条业务 |
+| 新Worker或连续请求交接时探针准备中 | 同代有界等待；成功后交接ready，原截止或2秒先到则撤销该代并记OBSERVER_START_TIMEOUT |
+| 旧sender或独立即时take在准备中 | 保留CAPTURE_PREPARING真实缺口 |
 | 额外HTTP字节/未知长度或协议 | HTTP_EXTRA_BYTES/HTTP_LENGTH_UNKNOWN/HTTP_UNSUPPORTED，未知全量摘要 |
 | 序号缺口或最终计数不符 | EVENT_SEQUENCE/EVENT_LOSS，清空不连续预览，哈希与范围null |
 | 正文仅预览限长，事件及范围完整 | 全量实际SHA保留，正文截断单独标记 |
@@ -40,13 +41,14 @@
 ### 5. Scenarios and Examples
 
 - 正常：同次原生TLS接受的实体SHA和整体HTTP SHA与隔离接收器实收一致；原生握手协议投影在采集开关两组保持一致。
-- 基础边界：首次冷worker显示准备缺口。高负载可能丢副本或保存任务，固定原因独立于模型终态。
+- 基础边界：新worker正常探针准备在交接前完成；未配置、启动故障或截止先到保留受控原因。高负载可能丢副本或保存任务，固定原因独立于模型终态。
+- 错误用法：把worker_ready直接显示为TLS ready，或取消后复用旧PID的采集器。正确处理：交接等待本PID、本代次准备，超时作废；后继零模型prepare使用独立PID和采集代次。
 - 错误用法：跨缺口拼接后用完整凭据字符串替换，或把下一请求当旧请求的尾部。正确处理：先限制实体边界，缺口后冻结解析并清空不安全原文。
 
 ### 6. Tests Required
 
 - `python3 -m unittest discover -s native/tls-observer -p 'test_*.py'`：任意头边界、部分实体、整体SHA、重复长度、连接复用分段/合并、首中尾缺口及跨事件凭据。
-- `scripts/testing/cc2api-native.ts`配合CCRB_TEST_TLS_ONLY=1：已就绪六PID并发、真实beta.5、独立TLS实体SHA、实际Rust保存及生产Python读取器；仅合成凭据和隔离回环。
+- `scripts/testing/cc2api-native.ts`配合CCRB_TEST_TLS_ONLY=1：交接时六PID已就绪、慢流取消后同身份补热及连续两次请求（共9次合成模型请求）、真实beta.5、独立TLS实体SHA、实际Rust保存及生产Python读取器；仅合成凭据和隔离回环。
 - 强制测试ring丢副本，核对业务单次完成、EVENT_LOSS及清空预览；采集开关按完整ClientHello协议字段比较，排除真实随机及密钥材料。生产权限与资源验收由独立上线授权承接。
 - `test_broker.py`覆盖六档容量、有效副本读取范围、peer/映像拒绝、目标句柄耗尽、EOF与弃读回收；`verify_container.py --image <候选> --binary <固定分发体> --output <证据目录>`在关闭外网的真实容器覆盖取消后再准备、512KiB、4MiB以上、六worker及独立TLS实收摘要。平台角色验收分别核对加载器与真实业务，不能用容器默认root身份冒充业务权限。
 

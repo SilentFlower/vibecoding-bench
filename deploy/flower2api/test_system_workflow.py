@@ -71,11 +71,31 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn(required, validation)
 
     def test_legacy_main_publish_is_manual(self) -> None:
-        """main 的旧交付仍须手动触发。@return None。"""
+        """历史入口保留明确退役说明，写权限和镜像发布步骤归零。@return None。"""
         value = self.workflow('docker-publish.yml')
         self.assertEqual(set(value['on']), {'workflow_dispatch'})
         self.assertIn('workflow_dispatch', value['jobs']['publish']['if'])
         self.assertIn('refs/heads/main', value['jobs']['publish']['if'])
+        self.assertEqual(value['permissions'], {'contents': 'read'})
+        self.assertIn('LEGACY_IMAGES_RETIRED', str(value))
+        for forbidden in ('packages', 'docker/build-push-action', 'docker/login-action', 'matrix', 'docker push'):
+            self.assertNotIn(forbidden, str(value))
+
+    def test_package_cleanup_requires_exact_preview_and_trusted_manual_branch(self) -> None:
+        """清理默认预览，仅受信手动分支可应用带运行和摘要的计划。@return None。"""
+        value = self.workflow('ghcr-legacy-cleanup.yml')
+        self.assertEqual(set(value['on']), {'workflow_dispatch'})
+        self.assertEqual(value['on']['workflow_dispatch']['inputs']['apply']['default'], 'false')
+        self.assertEqual(value['permissions'], {'contents': 'read'})
+        job = value['jobs']['cleanup']
+        for expected in ('workflow_dispatch', 'SilentFlower/vibecoding-bench', 'refs/heads/flower2api'):
+            self.assertIn(expected, job['if'])
+        self.assertEqual(job['permissions'], {'contents': 'read', 'actions': 'read', 'packages': 'write'})
+        commands = '\n'.join(step.get('run', '') for step in job['steps'])
+        for expected in ('--plan-run', '--plan-sha256', 'legacy_packages.py', 'legacy-package-preview'):
+            self.assertIn(expected, commands)
+        self.assertFalse(any('${{' in step.get('run', '') for step in job['steps']))
+        self.assertEqual(value['concurrency']['cancel-in-progress'], 'false')
 
     def test_frozen_updater_can_import_build_helpers(self) -> None:
         """固定源码包在仓库外独立导入，避免依赖只在开发树中可用。@return None。"""

@@ -15,7 +15,7 @@ python3 -m unittest discover -s native/tls-observer -p 'test_*.py'
 
 平台镜像内置可信采集制品，账号采集字段缺省为开启；显式false保持关闭。环境页“请求内容采集”统一控制入口、组装及TLS采集，debug保存脱敏原文。系统更新与环境重建自动恢复该选择。页面分别显示安装能力与实际探针就绪，单次完整性以请求记录为准。
 
-容器内固定broker持有加载权限，固定启动器派生UID1001、零能力、NoNewPrivs的sender与原生worker。`CCRB_TLS_OBSERVER`自动指向镜像内`client.py`，私有Unixsocket校验SO_PEERCRED、本sender直属关系、进程启动时刻与pidfd；observer在ready前清零能力。独立使用`observer.py`时保留原直属PPID校验。sender为已验证worker后台预备单次探针，业务即时取用。启动及收口各2秒后台预算，退出回收等待上限25ms，后台保存使用两个许可及250ms等待。
+容器内固定broker持有加载权限，固定启动器派生UID1001、零能力、NoNewPrivs的sender与原生worker。`CCRB_TLS_OBSERVER`自动指向镜像内`client.py`，私有Unixsocket校验SO_PEERCRED、本sender直属关系、进程启动时刻与pidfd；observer在ready前清零能力。独立使用`observer.py`时保留原直属PPID校验。sender为已验证worker后台预备单次探针。新worker初始化和复用交接会在原截止内有界收口探针准备，槽的业务取用保持即时；失败保持明确缺证。启动及收口各2秒预算，退出回收等待上限25ms，后台保存使用两个许可及250ms等待。
 
 正式导出要求canonical已提交且相关路径干净：
 
@@ -45,7 +45,7 @@ python3 native/tls-observer/verify_container.py --image <账号候选镜像> --b
 
 ## 异步与准备缺口
 
-每个worker最多一个在途预备。业务取用时的迟到启动结果会释放。worker退役直接取消在途启动并关闭就绪帮助进程。完整TLS实体收口后可在响应流期间预备下一份，worker_idle合并补偿。首次冷worker和连续快速请求可能取得CAPTURE_PREPARING。
+每个worker最多一个在途预备。业务取用时的迟到启动结果会释放。worker退役直接取消在途启动并关闭就绪帮助进程。完整TLS实体收口后可在响应流期间预备下一份，worker_idle合并补偿。新worker初始化完成及连续快速请求交接前，最多等待原二秒启动预算，并服从更早的请求/准备截止；成功后才交给业务。超时会撤销本代启动并记录OBSERVER_START_TIMEOUT，旧代迟到结果保持失效。取消后通过原零模型prepare路径补热，实际PID与采集代次独立于已退役进程。
 
 初始快照返回queued并记录CAPTURE_PENDING；后台按真实request_id、worker及binding_generation原子更新。最终完整证据优先于迟到初始写入。保存失败按固定原因和作业标识记录安全日志。页面按相同尝试有限重读，关闭或换请求通过取消代次作废旧结果。
 

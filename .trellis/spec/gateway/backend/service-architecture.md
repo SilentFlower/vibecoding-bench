@@ -107,6 +107,8 @@ src/tlsfp/
 - `NativeReadinessStatus` 字段为 `state:String,account_id:i64,environment_id:String,generation:u64,kernel_generation:Option<String>,release:Option<NativeReleaseRef>,checked_at_ms:u64,idle_workers:usize,live_workers:usize,pid:Option<u32>,reason:Option<String>`。池状态为 `ready|busy|preparing|unprepared|failed`，协调器另投影休眠、停用、维护、失败和未知。
 - 就绪必须属于与业务相同的配置、bearer、账号身份及并发池键。检查真实子进程与空闲管道，坏进程退役；固定分发体、执行映像及封存校验完成后才记录 worker 的 ready 时刻。旧身份物理进程仍忙时不得充当新身份 busy。
 - 池身份统一规范化SenderConfig.quota_identity为空、native_adaptive_prewarm=false；额度观察字段首次补写与备用开关变化保持暖池。bearer、代理、设备、账号、组织、环境/内核代次及并发继续隔离。准备、readiness、切换与业务共用这一入口。
+- `NativeTlsSlot::prepare(deadline: Instant)`复用后台warm并等待同采集代次结束；新Worker初始化和复用checkout交接最多等待2秒，服从更早的请求/准备截止。Worker在等待前登记采集槽，取消时Drop关闭本代启动；超时撤销代次并记录OBSERVER_START_TIMEOUT。`take`保持即时，失败保持明确缺口，业务最多一次发送。
+- 取消后的补热沿原prepare及20秒巡检协调路径；进程就绪、TLS就绪与单请求完整性分别判断。连续快速请求沿同一交接收口，旧PID和迟到代次隔离。
 - readiness 只检查本地状态，不启动进程或执行模型。业务 checkout 再原子校验和占用。准备仍由原 prepare 接口完成真实握手并回到同一池；冷池首轮初始化共享代次锁，后续扩容维持原物理上限。
 - 启动补偿外，每20秒巡检已启用原生账号，仅解析 `wake=false` 运行绑定。待处理最多128、并行2、按账号去重，轮转扫描避免高 ID 饥饿；失败退避40/80/160/300秒，显式变更提示清除退避。`busy|preparing` 等待后续巡检，`unprepared|failed` 才重新准备。
 - 发布前重读权威账号与绑定；排他维护、更新门禁、凭据活动关闭和取消继续优先。批量缓存的 ready 超过45秒转 `unknown/check_expired`。`last_preparation` 仅保存历史准备回执；GET 主动检查不承担恢复启动。
@@ -119,6 +121,7 @@ src/tlsfp/
 | --- | --- |
 | 身份改变、进程退出、EOF 或迟到帧 | 原 ready 失效，后台按当前身份恢复；业务保留原截止与单次提交 |
 | 正在初始化或全忙 | preparing 或 busy，保持原并发与物理上限 |
+| TLS探针启动失败、未配置或原截止先到 | 保留受控缺口；超时撤销该代采集，业务沿原截止至多一次发送，过期零发送 |
 | 错误绑定、过期信封、证据禁用或平台不支持 | 沿私有通道拒绝，模型零发送 |
 | 诊断 PID 为0、UUID非法或计时关系越界 | 丢弃损坏观察，保持观察缺口可见；计时关系允许2毫秒取整偏差 |
 | `preparation_wait_ms + checkout_ms > prepared_ms + 2` 或 `worker_start_ms > checkout_ms + 2` | 原生观察校验失败 |
@@ -126,11 +129,12 @@ src/tlsfp/
 ### 5. Scenarios and Examples
 
 - 正常：准备得到 PID 123，业务到达前该 worker 已 ready，首次业务记录 `worker_pid=123,warm_hit=true,worker_start_ms=null`。准备与巡检的模型 POST 增量为0。
-- 边界：准备与业务竞争时，业务记录实际等待；凭据轮换后旧忙进程自然收口，新身份单独建立可接单进程。进程故障恢复包含巡检及启动时间。
+- 边界：慢流取消后先退休原PID，再以原零模型prepare补热，新PID完成探针准备后交接；连续下一请求同样等待有界准备。准备与业务竞争时，业务记录实际等待；凭据轮换后旧忙进程自然收口，新身份单独建立可接单进程。进程故障恢复包含巡检及启动时间。
 - 错误用法：用上次准备成功回执显示持续就绪，或把 `prepared_ms` 当作端到端首字延迟。正确处理：核对实时身份、活性及检查时间，并分别显示原始阶段口径。
 
 ### 6. Tests Required
 
+- `native_tls_observer`：慢探针交接、原截止超时、关闭唤醒、迟到代次、未配置及替换PID。`CCRB_TEST_TLS_ONLY=1`覆盖六worker并发、慢流取消、同身份补热和连续两次请求；实际模拟请求9次、完整TLS实体与独立接收器一致、准备模型增量0。
 - `native_real_binary`：当前/错误身份、真实61秒等待与可控1800/14400秒空闲年龄、同 PID 首次复用、冷暖相同正文与资源对照、并发上限及取消退役；长空闲年龄与实际等待分别标注。
 - `native_real_gateway`：终止预热进程后周期恢复为新 PID，恢复模型计数增量0；业务诊断持久化真实 PID、暖命中与启动字段，凭据轮换隔离。
 - `native_real_gateway`另核候选激活/回滚后首次补写quota_identity保持预热PID；设置强制1h经真实SettingsStore和能力声明到达回环出站。`stream_error`及流日志测试覆盖截断、超时、EOF、Drop、秘密过滤与关联字段。

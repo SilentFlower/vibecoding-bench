@@ -839,16 +839,18 @@ impl Worker {
         } else {
             worker.execution_image = Some(Arc::new(executable));
         }
-        worker.ready_at = Instant::now();
         if config.native_capture_dir.is_some() {
             let slot = super::native_tls_observer::NativeTlsSlot::new(
                 pid,
                 &worker.id,
                 &worker.image_sha256,
             );
-            slot.warm();
-            worker.tls_observer = Some(slot);
+            // 等待期间取消也要由Worker的Drop撤销同代帮助进程。
+            worker.tls_observer = Some(slot.clone());
+            // 冷启动和取消后的新进程必须先完成同PID采集预备，再交给首条业务取用。
+            slot.prepare(deadline).await;
         }
+        worker.ready_at = Instant::now();
         worker.startup_ms = started.elapsed().as_millis() as u64;
         Ok(worker)
     }
@@ -1619,6 +1621,10 @@ impl NativePool {
             };
             // 空闲时的 EOF、部分帧或迟到事件都先隔离，不能写入下一作业后再发现旧归属。
             if worker.reusable() {
+                // 连续快速请求也可能抢在下一份探针之前；交接沿原截止有界收口。
+                if let Some(slot) = &worker.tls_observer {
+                    slot.prepare(deadline).await;
+                }
                 if prepare_spare {
                     self.start_spare(
                         config,
@@ -2483,22 +2489,15 @@ mod tests {
                 workers.push(worker);
             }
             pool.state.lock().unwrap().idle.extend(workers);
-            timeout(Duration::from_secs(5), async {
-                loop {
-                    let ready = pool.state.lock().unwrap().idle.iter().all(|worker| {
-                        worker
-                            .tls_observer
-                            .as_ref()
-                            .is_some_and(|slot| slot.is_ready())
-                    });
-                    if ready {
-                        break;
-                    }
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-                }
-            })
-            .await
-            .unwrap();
+            assert!(
+                pool.state.lock().unwrap().idle.iter().all(|worker| {
+                    worker
+                        .tls_observer
+                        .as_ref()
+                        .is_some_and(|slot| slot.is_ready())
+                }),
+                "新worker交接时TLS采集必须已就绪"
+            );
             let mut ids = Vec::new();
             let operations = (0..6)
                 .map(|_| {
@@ -2547,6 +2546,83 @@ mod tests {
                 }
                 snapshots.push(snapshot);
             }
+            // 全部旧worker退出后，真实慢流取消必须退休原PID；同身份补热完成即发送下一请求。
+            let idle = std::mem::take(&mut pool.state.lock().unwrap().idle);
+            for worker in idle {
+                worker.retire().await;
+            }
+            let mut identity = make("readiness-latency", "synthetic-bearer-a");
+            identity.input = json!({"schema_version":1,"request_id":identity.request.request_id});
+            let before = pool
+                .prepare(
+                    config.clone(),
+                    identity,
+                    Instant::now() + Duration::from_secs(30),
+                )
+                .await
+                .unwrap();
+            let old_pid = before.pid.unwrap();
+            let response = pool
+                .submit(config.clone(), make("slow", "synthetic-bearer-a"))
+                .await
+                .unwrap();
+            drop(response);
+            timeout(Duration::from_secs(5), async {
+                while pool.state.lock().unwrap().live != 0
+                    || Path::new(&format!("/proc/{old_pid}")).exists()
+                {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await
+            .unwrap();
+            assert!(!Path::new(&format!("/proc/{old_pid}")).exists());
+            let mut identity = make("readiness-latency", "synthetic-bearer-a");
+            identity.input = json!({"schema_version":1,"request_id":identity.request.request_id});
+            let replacement = pool
+                .prepare(
+                    config.clone(),
+                    identity,
+                    Instant::now() + Duration::from_secs(30),
+                )
+                .await
+                .unwrap();
+            assert_ne!(replacement.pid, Some(old_pid));
+            assert_eq!(pool.tls_status(&config)["state"], "ready");
+            for _ in 0..2 {
+                let submission = make("readiness-latency", "synthetic-bearer-a");
+                let id = submission.request.request_id.clone();
+                let response = pool.submit(config.clone(), submission).await.unwrap();
+                assert_eq!(response.status(), 200);
+                to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+                let path = directory.join(format!("{id}.json"));
+                let snapshot = timeout(Duration::from_secs(5), async {
+                    loop {
+                        if let Ok(bytes) = fs::read(&path) {
+                            if let Ok(value) = serde_json::from_slice::<Value>(&bytes) {
+                                if value["wire_final"]["reason"] != "CAPTURE_PENDING" {
+                                    break value;
+                                }
+                            }
+                        }
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                })
+                .await
+                .unwrap();
+                assert_eq!(
+                    snapshot["wire_final"]["complete"], true,
+                    "{}",
+                    snapshot["wire_final"]
+                );
+                assert_eq!(snapshot["wire_final"]["request_id"], id);
+                assert_eq!(
+                    snapshot["wire_final"]["worker_pid"],
+                    replacement.pid.unwrap()
+                );
+                assert!(!snapshot.to_string().contains("synthetic-bearer-"));
+                snapshots.push(snapshot);
+            }
             let evidence: Value = Client::builder()
                 .no_proxy()
                 .build()
@@ -2584,7 +2660,7 @@ mod tests {
                 );
                 pids.insert(wire["worker_pid"].as_u64().unwrap());
             }
-            assert_eq!(pids.len(), 6);
+            assert_eq!(pids.len(), 7);
             if let Ok(path) = var("CCRB_TEST_CAPTURE_FIXTURE") {
                 fs::write(path, serde_json::to_vec(&snapshots[0]).unwrap()).unwrap();
             }

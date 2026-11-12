@@ -1,108 +1,53 @@
-# Image Build & GHCR Push
+# 镜像构建与 GHCR 包维护
 
-> GitHub Actions 三镜像多架构构建 + GHCR 双 tag 发布的可执行流程。
+当前正式control/account两镜像的构建、手动发行、签名和升级合同由[平台在线更新](platform-online-update.md)所有。旧orchestrator/worker/sidecar三镜像发布入口已退役。下文保留兼容实现的代理、完成判定和进程重建经验。
 
----
+## Scenario: 旧三镜像包精确退役
 
-## Scope / Trigger
+### 1. Scope / Trigger
 
-手动运行 `.github/workflows/docker-publish.yml` 并选择 `main`，构建并推送全部三个镜像。普通 push 不触发该发布入口。下表只说明哪些文件会改变对应镜像内容:
+- 仅清理SilentFlower/vibecoding-bench关联的vibebench-orchestrator、vibebench-worker、vibebench-sidecar三个container包及其全部版本时适用。
+- main与flower2api的docker-publish.yml只保留LEGACY_IMAGES_RETIRED失败提示和contents:read。历史三镜像matrix、latest/短SHA发布及公开包操作已退出当前流程。
 
-| 改了 | 重建 |
-|------|------|
-| `services/orchestrator/main.py` 或 `services/orchestrator/requirements.txt` 或 `services/orchestrator/Dockerfile` | orchestrator |
-| `images/worker/entrypoint.sh` 或 `images/worker/Dockerfile` | worker |
-| `images/sidecar/start.sh` / `recorder.py` / `Dockerfile` | sidecar |
-| `apps/legacy-web/*` 或 `topics.md` | **不改变镜像内容**(都是 bind mount,远程 git pull 即可;手动发布仍按 main ref 契约发布三件套 tag) |
+### 2. Signatures
 
----
+- `python3 deploy/flower2api/legacy_packages.py --output <新文件> --reference-evidence <核验JSON>`默认预览。
+- 应用追加`--apply --plan <预览JSON> --plan-run <运行ID> --plan-sha256 <64位小写hex>`。
+- 入口`.github/workflows/ghcr-legacy-cleanup.yml`仅workflow_dispatch且限定本仓flower2api，apply缺省false。任务申请contents:read、actions:read、packages:write，使用GITHUB_TOKEN。
+- REST只请求固定api.github.com：`GET|DELETE /users/SilentFlower/packages/container/<白名单名>`、版本分页及本仓Actions来源核对。
 
-## 命名 & Tag 契约(锁定)
+### 3. Contracts
 
-镜像 namespace:`ghcr.io/silentflower/vibebench-{orchestrator,worker,sidecar}`
+- 保护集固定为vibebench-v3-control/account及flower2api-control/account；目标路径由固定白名单生成。
+- 部署核验文件为`deploy/flower2api/legacy-package-reference-evidence.json`，schema_version=1、checked_at为带时区时间、container_count为非负整数、legacy_references=[]，protected_packages与保护集顺序相同。读取时限24小时。
+- 预览完整核对owner、container类型、关联仓库、正整数包ID、全部版本ID/name/tags和version_count。分页最多100页、每页100项；响应预算4MiB、单请求30秒，携认证重定向拒绝。
+- 冻结计划包含schema_version、repository、完整revision、reference_evidence_sha256及三个包快照。规范摘要使用UTF-8、sort_keys、紧凑分隔、ensure_ascii=false、allow_nan=false。
+- 应用要求本仓同一源码、flower2api、规范清理工作流的成功workflow_dispatch预览，重建完整计划一致后逐项再核验。先记录204删除事实，再核对404；只有完整三项成功才标completed。
+- 旧发布queued/in_progress/waiting/pending/requested运行均须为零。main默认注册与flower2api源码分别核对，清理执行保持串行且cancel-in-progress=false。
+- 收据记录plan_sha256、status、deleted与failed。部分失败停止后续项并保留已完成事实；日志不输出令牌、远端错误正文或宿主秘密。
 
-每次发版 **同时打两个 tag**:
+### 4. Validation & Error Matrix
 
-| Tag | 语义 | 谁用 |
-|-----|------|------|
-| `:latest` | mutable,跟随 main 最新 | 跟随式部署(开发 / 单实例) |
-| `:<git-sha-short>`(如 `158b462`) | immutable,锁死一个 commit | 生产 / 需要回滚能力 |
+| 条件 | 行为 |
+| --- | --- |
+| 403、不可见404、错误owner/仓库/类型 | 预览失败，零删除 |
+| 宿主引用非空、核验过期/未来、旧发布在途 | 停止操作 |
+| 来源、SHA、摘要或任一包/版本漂移 | 全量核对失败，零删除 |
+| 第二项删除失败 | 第一项正向收据保留，后续项停止 |
+| DELETE=204且随后GET=404 | 记录该项已删除并复查 |
+| 正式保护包或任意其他路径 | 白名单拒绝 |
 
-**关键约束**:三镜像即便只有一个改了,**全部打同一个 sha tag** —— 这样部署侧拉 `:158b462` 三件套永远配套,不会出现"orchestrator 是新的,worker 是旧的"的 sha tag 缺失情况。
+### 5. Scenarios and Examples
 
----
+- 正常：先`gh workflow run ghcr-legacy-cleanup.yml --ref flower2api -f apply=false`，核对legacy-package-preview；同源码提供准确plan_run和plan_sha256再应用，核对legacy-package-receipt。
+- 边界：缺read:packages或包admin权限时保存真实权限失败，由权限核验决定后续操作。
+- 错误用法：把未授权GET的404当作已删除，或继续运行旧docker-publish发布三件套。正确处理：要求本次204正向记录及复查，正式镜像发行使用v3-release.yml。
 
-## GitHub Actions 发布流程
+### 6. Tests Required
 
-### Trigger
-
-- 普通 push：不触发发布。
-- `workflow_dispatch`：发布 job 同时校验手动事件和 `main` ref;其它 ref 的发布 job 会跳过,防止功能分支覆盖 `latest`。
-- concurrency group 为 `docker-publish-${{ github.ref }}`,同 ref 的新运行取消旧运行。
-
-### Permissions / Auth
-
-workflow 只申请:
-
-```yaml
-permissions:
-  contents: read
-  packages: write
-```
-
-GHCR 登录只使用 `${{ github.actor }}` + `${{ secrets.GITHUB_TOKEN }}`。禁止新增 Docker Hub token、GHCR PAT 或把 token 写入文件 / 日志。
-
-### Build Matrix
-
-matrix 固定包含 orchestrator / worker / sidecar,每项都构建 `linux/amd64,linux/arm64`。使用当前官方主版本:
-
-- `actions/checkout@v6`
-- `docker/setup-qemu-action@v4`
-- `docker/setup-buildx-action@v4`
-- `docker/login-action@v4`
-- `docker/metadata-action@v6`
-- `docker/build-push-action@v7`
-
-每个镜像使用独立 `type=gha,scope=vibebench-<image>` cache,写入使用 `mode=max`。
-
-### First Publish: Package Visibility
-
-GHCR 新 package 首次发布默认 private。首次 workflow 成功后,必须在 GitHub package settings 把以下三个 package 分别改成 public:
-
-- `vibebench-orchestrator`
-- `vibebench-worker`
-- `vibebench-sidecar`
-
-公开后远程主机才能匿名 pull。package 公开后不能再改回 private;workflow 不负责自动修改可见性。
-
-### Local Build Smoke
-
-本地构建只用于开发验证,不再承担正式发布:
-
-```bash
-docker compose build orchestrator
-docker compose --profile build build worker-image
-docker compose --profile build build sidecar-image
-```
-
-worker 镜像约 1.37 GB(node:22 基础大),arm64 通过 QEMU 构建会明显更慢。后续 workflow 依赖 GHA cache 复用未变化层。
-
-### Compose Image Wiring
-
-`docker-compose.remote.yml` 只有 orchestrator 是 Compose service。worker / sidecar 由 orchestrator 通过 Docker SDK 启动,镜像地址分别来自 orchestrator environment 的 `WORKER_IMAGE` / `SIDECAR_IMAGE`。
-
-因此 `docker compose ... config --images` 只输出 orchestrator 是正常行为,不能据此误判 worker / sidecar 镜像未配置。完整验证必须同时检查:
-
-```bash
-docker compose -f docker-compose.remote.yml --env-file .env.example config --quiet
-docker compose -f docker-compose.remote.yml --env-file .env.example config --images
-docker compose -f docker-compose.remote.yml --env-file .env.example config \
-  | grep -E 'WORKER_IMAGE:|SIDECAR_IMAGE:'
-```
-
-三处值必须使用同一个 `VIBEBENCH_TAG`,并分别指向 `ghcr.io/silentflower/vibebench-{orchestrator,worker,sidecar}`。
-
----
+- `python3 -m unittest discover -s deploy/flower2api -p test_legacy_packages.py`：默认只读、403/404、归属与版本漂移、保护包、来源冻结、核验时效及部分删除。
+- `test_system_workflow`及actionlint：受信手动分支、默认预览、精确权限、输入经环境传递、串行清理及旧入口零发布能力。
+- 实际外部操作按任务release.md核对包权限、身份、计划摘要、204删除与404复查，全部完成后才关闭任务。
 
 ## 账号上游代理协议契约
 
@@ -557,7 +502,7 @@ worker entrypoint 读取该变量后执行 `strip_managed_refresh_token`。是�
 
 ---
 
-## Recreate 协议(关键 ⚠)
+## 历史 worker 重建经验（兼容实现）
 
 orchestrator 的 `main.py` 是 `COPY` 进镜像的(不是挂载),改了 main.py 后:
 
@@ -569,86 +514,3 @@ orchestrator 的 `main.py` 是 `COPY` 进镜像的(不是挂载),改了 main.py 
 apps/legacy-web/ 和 topics.md 是 bind mount → **改它们不需要 recreate**,远程 git pull 即可生效(浏览器需要 Ctrl+F5 绕缓存)。
 
 ---
-
-## Validation & Error Matrix
-
-| 操作 | 错误现象 | 根因 | 修复 |
-|------|---------|------|------|
-| Actions push 403 | `permission_denied: write_package` | workflow 缺 `packages: write`,或 package 未关联当前仓库 | 检查 permissions、OCI source label 与 package 的 Actions access |
-| 远程匿名 pull 403 | `denied` / `unauthorized` | 新 GHCR package 仍是 private | 在三个 package settings 中分别改为 public |
-| 远程 pull 慢/卡 | worker 1.37 GB 一直 0% | GHCR 网络慢 / worker 镜像层较大 | 检查远程到 `ghcr.io` 的网络与代理配置,等待大层下载 |
-| recreate 后还是旧行为 | 改了代码但容器内仍是旧版 | 用了 `restart` 不是 `--force-recreate`,或镜像 tag 没动 | `docker compose pull` + `up -d --force-recreate` |
-| 三镜像版本错配 | worker 调用 sidecar 接口字段对不上 | workflow 有 matrix 项失败,却部署了部分更新的 `latest` | 只部署三个 matrix 项全部成功的短 SHA tag |
-
----
-
-## Good / Base / Bad Cases
-
-**Good**:改 orchestrator 一处 → push `main` → 手动触发 workflow（main ref）→ workflow 三个 matrix 项全部成功并发布同一短 SHA + latest → 远程锁定该短 SHA → `pull && up -d --force-recreate`。
-
-**Base**:只改 `apps/legacy-web/` 或 `topics.md` → 手动运行 workflow 时仍发布三镜像同一新 tag,但镜像内容层可复用缓存;远程仍必须 `git pull`,因为实际前端 / 题库来自 bind mount。
-
-**Bad**:workflow 有一个 matrix 项失败仍部署 `latest`;或首次发布后没有把 package 改为 public,远程匿名 pull 直接失败;或 pull 后只 `restart`,远程仍跑旧容器。
-
----
-
-## Tests Required
-
-workflow / GHCR 发布完成后至少断言:
-
-1. `docker compose ... config --quiet` 通过;`config --images` 输出 GHCR orchestrator;完整 `config` 中 `WORKER_IMAGE` / `SIDECAR_IMAGE` 输出对应 GHCR 地址和同一 tag。
-2. Actions 页面三个 matrix 项全部成功。
-3. `docker buildx imagetools inspect ghcr.io/silentflower/vibebench-orchestrator:<sha>` 显示 `linux/amd64` 与 `linux/arm64`;worker / sidecar 同样检查。
-4. 三个 package 均存在 `latest` 和同一个原始 7 位短 SHA tag。
-5. 使用未登录 GHCR 的 Docker config 能匿名 pull 三个 public package。
-6. 远程 `docker inspect vibebench-orchestrator --format='{{.Config.Image}}'` 是目标 GHCR 短 SHA 地址。
-7. `curl http://<host>:<port>/api/auth/me` 返回符合新版本的 contract,orchestrator 日志末尾出现 `Application startup complete` 且无 ERROR。
-
----
-
-## Wrong vs Correct
-
-### ❌ Wrong: 改 main.py 后只 restart
-
-```bash
-# 错:用 docker compose restart
-docker compose build orchestrator
-docker compose restart orchestrator   # 仍是旧 image 跑!
-```
-
-### ✅ Correct: 改 main.py 后 force-recreate
-
-```bash
-docker compose build orchestrator
-docker compose up -d --force-recreate orchestrator
-```
-
-### ❌ Wrong: 手工只 push 改了的镜像 sha tag
-
-```bash
-docker push ghcr.io/silentflower/vibebench-orchestrator:158b462
-# worker/sidecar 还停在 9787fc1 — sha 配套缺失
-```
-
-### ✅ Correct: 由 workflow 发布三件套对齐 sha tag
-
-```bash
-gh workflow run docker-publish.yml --ref main
-# 等待 docker-publish.yml 的 orchestrator / worker / sidecar 三个 matrix 项全部成功。
-docker buildx imagetools inspect ghcr.io/silentflower/vibebench-orchestrator:158b462
-docker buildx imagetools inspect ghcr.io/silentflower/vibebench-worker:158b462
-docker buildx imagetools inspect ghcr.io/silentflower/vibebench-sidecar:158b462
-```
-
----
-
-## Common Mistakes
-
-| 反模式 | 现象 | 怎么改 |
-|--------|------|--------|
-| `docker compose restart` 当作"重启加载新镜像" | 改代码不生效 | `up -d --force-recreate` |
-| 单 tag(只 latest) | 想回滚找不到旧版 | 每发版必打 `:<git-sha>` |
-| workflow matrix 未全绿就部署 latest | 三镜像可能短暂错配 | 只部署三个 matrix 项全部成功的短 SHA |
-| 首次发布忘记公开 package | 远程匿名 pull 403 | 把三个 GHCR package 分别改为 public |
-| 手工 push 单个镜像 | 用 `:某 sha` 拉时缺其中两个 | 正式发布只走 main 的 GitHub Actions matrix |
-| 在 build profile 之外去 build worker/sidecar | `service "worker-image" not found` | 加 `--profile build` |

@@ -265,7 +265,7 @@ bench 默认使用 `/data/db.sqlite`，本地维护可显式传 `--database`。g
 - 工作流拆分后的 run_number 不用作发行序号；从同信任根已验签目录主序号最大值加1，第二项使用实际 attempt。历史目录按签发时刻校验原合同，主序号达到2^53-1时拒绝新发行。完整附件后才普通 fast-forward 推进目录，保留原版本递增与批次不可覆盖规则。
 - 原仓库、v3镜像名、system-ci/v3-ci身份、updates/v3-migrations及updates/v3语义、信任根与双库兼容合同保持。管理员从原系统更新页准备/安装；旧底座按既有SOP原地补齐能力。
 - `install_system_updater.SOURCE_FILES` 含 manage 的直接依赖 platform_version.py、release_ci.py；固定源码复制后必须能在仓库外独立导入。
-- 旧 main 的 docker-publish 只接受手动事件+main ref。触发规则按所在分支生效；修复需同步到 v3/main，新手动入口需在默认分支 main 注册。分支同步、正式发布和线上安装分别验收。
+- 旧三镜像docker-publish在main与flower2api保留只读退役提示。包清理遵循[旧三镜像包精确退役](image-build-push.md#scenario-旧三镜像包精确退役)。手动入口需在默认main注册；分支同步、正式发布和线上安装分别验收。
 
 ### 4. Validation & Error Matrix
 

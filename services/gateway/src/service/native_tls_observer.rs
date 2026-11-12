@@ -9,8 +9,9 @@ use std::time::Duration;
 use serde_json::{Value, from_slice, from_value, json};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::sync::Notify;
 use tokio::task::AbortHandle;
-use tokio::time::timeout;
+use tokio::time::{Instant, timeout, timeout_at};
 use uuid::Uuid;
 
 use crate::service::native_contract::NativeSubmission;
@@ -32,6 +33,7 @@ struct SlotState {
 #[derive(Clone)]
 pub(super) struct NativeTlsSlot {
     state: Arc<Mutex<SlotState>>,
+    settled: Arc<Notify>,
     pid: u32,
     worker_id: String,
     image: String,
@@ -39,6 +41,40 @@ pub(super) struct NativeTlsSlot {
 }
 
 impl NativeTlsSlot {
+    /// 在worker交接前完成有界探针预备。@param deadline 原请求或准备截止。@return 无，失败保留在槽状态。
+    pub(super) async fn prepare(&self, deadline: Instant) {
+        self.warm();
+        let generation = self.state.lock().unwrap().generation;
+        let wait = async {
+            loop {
+                // 先登记通知再检查状态，覆盖启动恰好在检查之间完成的竞态。
+                let changed = self.settled.notified();
+                tokio::pin!(changed);
+                changed.as_mut().enable();
+                {
+                    let state = self.state.lock().unwrap();
+                    if !state.starting || state.closed || state.generation != generation {
+                        return;
+                    }
+                }
+                changed.await;
+            }
+        };
+        let limit = deadline.min(Instant::now() + Duration::from_secs(2));
+        if timeout_at(limit, wait).await.is_err() {
+            let mut state = self.state.lock().unwrap();
+            if state.generation == generation && state.starting {
+                state.generation += 1;
+                state.starting = false;
+                state.reason = "OBSERVER_START_TIMEOUT";
+                if let Some(startup) = state.startup.take() {
+                    startup.abort();
+                }
+                self.settled.notify_waiters();
+            }
+        }
+    }
+
     /// 只读核对当前采集槽。@return 实际状态和受控缺口；不启动帮助进程。
     pub(super) fn status(&self) -> (&'static str, Option<&'static str>) {
         let mut state = self.state.lock().unwrap();
@@ -77,6 +113,7 @@ impl NativeTlsSlot {
                 closed: false,
                 startup: None,
             })),
+            settled: Arc::new(Notify::new()),
             pid,
             worker_id: worker_id.into(),
             image: image.into(),
@@ -115,6 +152,7 @@ impl NativeTlsSlot {
             }
             state.starting = false;
             state.startup = None;
+            slot.settled.notify_waiters();
             if state.consumed {
                 if let Err(reason) = result {
                     state.reason = reason;
@@ -169,6 +207,7 @@ impl NativeTlsSlot {
         if let Some(startup) = state.startup.take() {
             startup.abort();
         }
+        self.settled.notify_waiters();
     }
 }
 
@@ -450,6 +489,82 @@ mod tests {
     use tokio::runtime::Builder;
     use tokio::time::sleep;
     use uuid::Uuid;
+
+    /// 初始化交接须等慢探针真实ready，取消后新PID使用独立采集代次。@return 无。
+    #[tokio::test]
+    async fn worker_initialization_waits_for_capture_and_replacement_ownership() {
+        let directory = temp_dir().join(format!("native-initial-{}", Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        let script = directory.join("observer.py");
+        fs::write(&script, "import json,sys,time\ntime.sleep(0.15)\na=sys.argv\nprint(json.dumps({'schema_version':1,'ready':True,'capture_id':a[a.index('--capture')+1],'worker_id':a[a.index('--worker')+1]}),flush=True)\nsys.stdin.buffer.read()\n").unwrap();
+        let mut previous = None;
+        for pid in [123, 456] {
+            let worker = Uuid::new_v4().to_string();
+            let mut slot = NativeTlsSlot::new(pid, &worker, "synthetic-image");
+            slot.path = Some(script.to_string_lossy().into_owned());
+            slot.prepare(tokio::time::Instant::now() + Duration::from_secs(1))
+                .await;
+            assert_eq!(slot.status(), ("ready", None));
+            let observer = slot.take().expect("初始化完成后采集器应已就绪");
+            assert_eq!(observer.worker_pid, pid);
+            assert_eq!(observer.worker_id, worker);
+            assert_ne!(previous.as_ref(), Some(&observer.capture_id));
+            previous = Some(observer.capture_id.clone());
+            slot.close();
+            assert_eq!(slot.status(), ("unavailable", Some("WORKER_UNAVAILABLE")));
+            drop(observer);
+        }
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// 原截止先到或关闭时使迟到启动失效，下一代可以独立重新预备。@return 无。
+    #[tokio::test]
+    async fn initialization_timeout_and_close_reject_late_capture() {
+        let directory = temp_dir().join(format!("native-initial-limit-{}", Uuid::new_v4()));
+        fs::create_dir(&directory).unwrap();
+        let script = directory.join("observer.py");
+        fs::write(&script, "import json,sys,time\ntime.sleep(0.3)\na=sys.argv\nprint(json.dumps({'schema_version':1,'ready':True,'capture_id':a[a.index('--capture')+1],'worker_id':a[a.index('--worker')+1]}),flush=True)\nsys.stdin.buffer.read()\n").unwrap();
+        let mut slot = NativeTlsSlot::new(123, "old-worker", "synthetic-image");
+        slot.path = Some(script.to_string_lossy().into_owned());
+        let started = tokio::time::Instant::now();
+        slot.prepare(started + Duration::from_millis(40)).await;
+        assert!(started.elapsed() < Duration::from_millis(250));
+        assert_eq!(
+            slot.status(),
+            ("unavailable", Some("OBSERVER_START_TIMEOUT"))
+        );
+        sleep(Duration::from_millis(350)).await;
+        assert!(matches!(slot.take(), Err("OBSERVER_START_TIMEOUT")));
+        let preparing = slot.clone();
+        let wait = tokio::spawn(async move {
+            preparing
+                .prepare(tokio::time::Instant::now() + Duration::from_secs(1))
+                .await;
+        });
+        tokio::task::yield_now().await;
+        slot.close();
+        timeout(Duration::from_millis(100), wait)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(slot.status(), ("unavailable", Some("WORKER_UNAVAILABLE")));
+        sleep(Duration::from_millis(350)).await;
+        assert!(!slot.is_ready());
+        let mut missing = NativeTlsSlot::new(456, "unconfigured-worker", "synthetic-image");
+        missing.path = None;
+        missing.state.lock().unwrap().reason = "OBSERVER_NOT_CONFIGURED";
+        timeout(
+            Duration::from_millis(50),
+            missing.prepare(tokio::time::Instant::now() + Duration::from_secs(1)),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            missing.status(),
+            ("unavailable", Some("OBSERVER_NOT_CONFIGURED"))
+        );
+        fs::remove_dir_all(directory).unwrap();
+    }
 
     /// 能力状态核对帮助进程实际存活，退出后旧ready立即失效。@return 无。
     #[tokio::test]

@@ -188,7 +188,7 @@ try {
     assert.equal(code, 0);
   }
   assert.equal(code, 0);
-  assert.equal(messages.length, (tlsOnly ? 6 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
+  assert.equal(messages.length, (tlsOnly ? 9 : benchmarkOnly ? 9 : phases.length === 2 ? (process.env.CCRB_TEST_UNLIMITED === '1' ? 25 : 28) : 6) + (process.env.CCRB_TEST_SWITCH_DIGEST ? 3 : 0));
   if (!benchmarkOnly && !tlsOnly) assert.ok(runningBindingReads >= 3, '启动补偿与凭据轮换均重新核对只读运行绑定');
   if (phases.length === 2) assert.equal(messages.find(message => message.label === 'rotated')?.bearer, 'Bearer synthetic-bearer-b');
   console.log(JSON.stringify({ messages: messages.length, parallelPeak, processTreePeakRssKiB: peakRssKiB }));
