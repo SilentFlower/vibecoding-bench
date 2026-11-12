@@ -1,9 +1,9 @@
-name: v3 手动发布
+name: flower2api 手动发布
 on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 确认发布当前所选分支的版本，供现有 v3 实例升级
+        description: 确认发布当前所选分支的版本，供现有 flower2api／v3 实例升级
         required: true
         default: false
         type: boolean

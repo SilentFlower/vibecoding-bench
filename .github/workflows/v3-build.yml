@@ -1,0 +1,53 @@
+name: flower2api 联合构建验证
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3, flower2api]
+  pull_request:
+    branches: [v3, flower2api]
+permissions:
+  contents: read
+concurrency:
+  group: v3-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    if: >-
+      github.repository == 'SilentFlower/vibecoding-bench' &&
+      (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出统一源码仓库
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      # 与正式镜像保持同一 Python 次版本，避免 runner 默认版本漂移破坏依赖安装。
+      - name: 设置 Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: 验证系统更新合同与恢复状态机
+        run: |
+          python3 -m venv "$RUNNER_TEMP/v3-update-venv"
+          "$RUNNER_TEMP/v3-update-venv/bin/pip" install -r services/orchestrator/requirements.txt PyYAML==6.0.3
+          python3 deploy/v3/verify_database_definitions.py
+          # 宿主快照测试需核验跨进程数据库句柄，使用与正式执行器相同的 root 权限。
+          sudo "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s deploy/v3 -p 'test_system*.py'
+          "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s services/orchestrator -p 'test_system_update*.py'
+          PYTHONPATH=services/orchestrator:deploy/v3 "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility
+      - name: 准备共享构建缓存
+        id: flower2api-cache
+        continue-on-error: true
+        uses: ./.github/actions/flower2api-build-cache
+      - name: 记录缓存准备回退
+        if: steps.flower2api-cache.outcome == 'failure'
+        run: printf '%s\n' '::warning::CI缓存准备失败，本次沿普通Docker构建路径执行。'
+      - name: 构建两个镜像并生成版本清单
+        run: python3 deploy/v3/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
+      - name: 保存本地构建清单
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-build-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 14
+          if-no-files-found: error
+          path: releases/v3-local.json

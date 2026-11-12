@@ -1,0 +1,63 @@
+name: flower2api 构建缓存
+description: 为 flower2api 两个镜像准备分角色层缓存和具名 Cargo 挂载缓存
+runs:
+  using: composite
+  steps:
+    - name: 配置独立 Buildx builder
+      id: builder
+      uses: docker/setup-buildx-action@v4
+      with:
+        driver: docker-container
+    - name: 生成兼容配方和源码缓存键
+      id: config
+      shell: bash
+      env:
+        DEPENDENCIES: ${{ hashFiles('images/v3/Dockerfile', 'services/gateway/Cargo.toml', 'services/gateway/Cargo.lock', 'services/gateway/vendor/**', 'services/gateway/craftls/**') }}
+        SOURCES: ${{ hashFiles('services/gateway/src/**', 'apps/web/**', 'deploy/v3/platform-release.json') }}
+        CACHE_PLATFORM: ${{ runner.os }}-${{ runner.arch }}
+        CACHE_WRITE: ${{ github.repository == 'SilentFlower/vibecoding-bench' && (github.ref == 'refs/heads/v3' || github.ref == 'refs/heads/flower2api') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+      run: |
+        printf 'key=flower2api-cargo-v1-%s-%s-%s\n' "$CACHE_PLATFORM" "$DEPENDENCIES" "$SOURCES" >> "$GITHUB_OUTPUT"
+        printf 'prefix=flower2api-cargo-v1-%s-%s-\n' "$CACHE_PLATFORM" "$DEPENDENCIES" >> "$GITHUB_OUTPUT"
+        printf 'write=%s\n' "$CACHE_WRITE" >> "$GITHUB_OUTPUT"
+    # 先注册保存动作，再注册挂载提取；job post 会按相反顺序完成提取、保存与 builder 回收。
+    - name: 恢复并保存可信分支 Cargo 缓存
+      id: cargo
+      if: steps.config.outputs.write == 'true'
+      uses: actions/cache@v5
+      with:
+        path: ${{ runner.temp }}/flower2api-cargo
+        key: ${{ steps.config.outputs.key }}
+        restore-keys: ${{ steps.config.outputs.prefix }}
+    - name: 只读恢复 PR Cargo 缓存
+      if: steps.config.outputs.write != 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ runner.temp }}/flower2api-cargo
+        key: ${{ steps.config.outputs.key }}
+        restore-keys: ${{ steps.config.outputs.prefix }}
+    - name: 接入当前 job 的缓存 API 环境
+      uses: crazy-max/ghaction-github-runtime@04d248b84655b509d8c44dc1d6f990c879747487 # v4.0.0
+    - name: 导入并在 job 结束时提取 Cargo 挂载
+      uses: reproducible-containers/buildkit-cache-dance@5422eac04292c961a382e0f584ea0f03ad9da723 # v3.4.0
+      with:
+        builder: ${{ steps.builder.outputs.name }}
+        scratch-dir: ${{ runner.temp }}/flower2api-cache-dance
+        skip-extraction: ${{ steps.config.outputs.write != 'true' || steps.cargo.outputs.cache-hit == 'true' }}
+        cache-map: |
+          {
+            "${{ runner.temp }}/flower2api-cargo/registry": {"target": "/usr/local/cargo/registry", "id": "vibebench-v3-cargo-registry"},
+            "${{ runner.temp }}/flower2api-cargo/git": {"target": "/usr/local/cargo/git", "id": "vibebench-v3-cargo-git"},
+            "${{ runner.temp }}/flower2api-cargo/target": {"target": "/source/services/gateway/target", "id": "vibebench-v3-cargo-target"}
+          }
+    # 只在全部准备成功后启用缓存驱动，准备失败时调用方继续普通 Docker build。
+    - name: 启用当前构建的缓存配置
+      shell: bash
+      env:
+        BUILDER_NAME: ${{ steps.builder.outputs.name }}
+        CACHE_SCOPE: flower2api-${{ runner.os }}-${{ runner.arch }}-v1
+        CACHE_WRITE: ${{ steps.config.outputs.write }}
+      run: |
+        printf 'FLOWER2API_BUILDX_BUILDER=%s\n' "$BUILDER_NAME" >> "$GITHUB_ENV"
+        printf 'FLOWER2API_BUILD_CACHE_SCOPE=%s\n' "$CACHE_SCOPE" >> "$GITHUB_ENV"
+        printf 'FLOWER2API_BUILD_CACHE_WRITE=%s\n' "$CACHE_WRITE" >> "$GITHUB_ENV"
