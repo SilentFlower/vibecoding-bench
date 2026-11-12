@@ -203,10 +203,8 @@ def preflight(values: dict) -> Path:
         isolated_account_limits(values.get("V3_ACCOUNT_MEMORY", "4g"), values.get("V3_ACCOUNT_SWAP", "0"), values["V3_NATIVE_SENDER_MEMORY"])
     prewarm_account_id(values.get("V3_NATIVE_PREWARM_ACCOUNT_ID", ""))
     public_key = values.get("V3_NATIVE_RELEASE_PUBLIC_KEY", "")
-    pilot = values.get("V3_NATIVE_RELEASE_PILOT_ENVIRONMENT", "")
-    if (public_key or pilot) and (not re.fullmatch(r"[a-f0-9]{64}", public_key)
-            or not re.fullmatch(r"[a-f0-9]{32}", pilot)):
-        raise ValueError("原生内核在线升级需要有效发布公钥及唯一灰度环境")
+    if public_key and not re.fullmatch(r"[a-f0-9]{64}", public_key):
+        raise ValueError("原生内核在线升级需要有效发布公钥")
     database = root / "bench/db.sqlite"
     if database.is_file():
         if not database.resolve().is_relative_to(root):

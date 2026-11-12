@@ -1,6 +1,7 @@
 """固定版本签名、账号门禁和异常恢复的离线回归。"""
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -72,6 +73,37 @@ class FixtureRuntime:
         return {'active': self.active, 'lease': self.lease}
 
 
+class NativeKernelAvailabilityTest(unittest.TestCase):
+    """验证发行信任根覆盖各原生环境，并保留缺失配置的拒绝行为。"""
+
+    def test_all_native_environments_share_deployment_key(self):
+        """旧试点配置保留时，两个环境仍分别提供管理状态。@return None。"""
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {
+                'V3_NATIVE_RELEASE_PUBLIC_KEY': 'b' * 64,
+                'V3_NATIVE_RELEASE_PILOT_ENVIRONMENT': 'a' * 32}):
+            runtime = FixtureRuntime(Path(directory))
+            for identity in ('a' * 32, 'c' * 32):
+                row = {'environment_id': identity, 'generation': 1, 'sender_container_id': 'synthetic'}
+                runtime._write_sender_config(row, {'binding': {'account_id': 7}, 'native': {'memory_mib': 0}})
+                self.assertEqual(upgrade.release_key(), 'b' * 64)
+                self.assertEqual(upgrade.status(runtime, row)['current']['release'], upgrade.VERSION)
+                self.assertEqual(upgrade.status(runtime, row)['revision'], '1:initial')
+            row = {'environment_id': 'c' * 32, 'generation': 1, 'sender_container_id': 'synthetic'}
+            upgrade.atomic_json(runtime._sender_config(row), {'binding': {'account_id': 7}, 'native': None})
+            self.assertIsNone(upgrade.status(runtime, row))
+
+    def test_missing_or_invalid_public_key_keeps_management_disabled(self):
+        """缺失、截短或非法公钥保持关闭状态。@return None。"""
+        with tempfile.TemporaryDirectory() as directory:
+            runtime = FixtureRuntime(Path(directory))
+            row = {'environment_id': 'a' * 32, 'generation': 1, 'sender_container_id': 'synthetic'}
+            runtime._write_sender_config(row, {'binding': {'account_id': 7}, 'native': {'memory_mib': 0}})
+            for key in ('', 'b' * 63, 'z' * 64):
+                with self.subTest(key=key), patch.dict(os.environ, {'V3_NATIVE_RELEASE_PUBLIC_KEY': key}):
+                    self.assertEqual(upgrade.release_key(), '')
+                    self.assertIsNone(upgrade.status(runtime, row))
+
+
 class NativeKernelUpgradeTest(unittest.TestCase):
     """覆盖制品准入和受控切换的可观察合同。"""
 
@@ -103,7 +135,7 @@ class NativeKernelUpgradeTest(unittest.TestCase):
         self.runtime._write_sender_config(self.row, self.runtime.config)
         self.runtime.events.clear()
         for mock in (
-            patch.object(upgrade, 'pilot_key', return_value=self.key),
+            patch.object(upgrade, 'release_key', return_value=self.key),
             patch.object(upgrade, '_context', side_effect=lambda rt, row, account: json.loads(json.dumps(rt.config))),
             patch.object(upgrade, '_download', side_effect=lambda url, path, limit: shutil.copyfile(self.source / path.name, path)),
             patch.object(upgrade.time, 'sleep'),

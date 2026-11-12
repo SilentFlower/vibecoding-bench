@@ -208,6 +208,18 @@ async def run(output: Path, gateway: Path) -> dict:
                 await expect(frame.locator('#native-kernel-modal')).to_be_hidden()
                 await expect(frame.locator('#environment-refresh')).to_be_enabled()
 
+            # 两个原生环境均提供管理入口，打开第二个账号的窗口必须保持其独立归属。
+            fixture.rows[1]['native_kernel'] = copy.deepcopy(fixture.rows[0]['native_kernel'])
+            fixture.rows[1]['native_kernel']['revision'] = '11:second-account'
+            await refresh()
+            other = frame.locator('.env-card').filter(has=frame.get_by_role('heading', name='演示环境 2', exact=True))
+            await expect(frame.locator('.env-tag').filter(has_text='在线内核管理')).to_have_count(2)
+            await other.get_by_role('button', name='准备内核', exact=True).click()
+            await expect(frame.locator('#native-kernel-account')).to_have_text('演示环境 2')
+            await frame.locator('#native-kernel-modal').get_by_role('button', name='取消', exact=True).click()
+            assert not fixture.writes
+            scenes.append('两个原生账号均显示在线管理，第二账号窗口保持独立归属且取消零写入')
+
             for width in (1280, 720, 390):
                 await page.set_viewport_size({'width': width, 'height': 1000 if width > 390 else 844})
                 for theme in ('dark', 'light'):
@@ -327,7 +339,7 @@ async def run(output: Path, gateway: Path) -> dict:
             await open_operation('恢复对账')
             await submit_operation('恢复对账')
             assert fixture.writes[-1]['body']['operation'] == 'recover'
-            scenes.append('CLI 忙碌、候选缺失、灰度外及待对账状态的操作许可')
+            scenes.append('CLI 忙碌、候选缺失、管理未开放及待对账状态的操作许可')
 
             await open_operation('激活候选')
             frozen = kernel['revision']

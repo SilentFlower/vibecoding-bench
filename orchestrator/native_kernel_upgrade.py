@@ -1,4 +1,4 @@
-"""固定 293 请求内核的签名分发及单环境在线切换。"""
+"""固定 293 请求内核的签名分发及按账号在线切换。"""
 from __future__ import annotations
 
 import hashlib
@@ -180,11 +180,13 @@ def applied_kernel(root: Path, account_id: int) -> dict:
     return {key: record[key] for key in ('current', 'kernel_generation') if key in record}
 
 
-def pilot_key(environment_id: str) -> str:
-    """返回只对已配置灰度环境生效的部署信任根。"""
+def release_key() -> str:
+    """读取部署内原生账号共用的发行信任根。
+
+    :return: 有效发行公钥；未配置或格式错误时为空字符串。
+    """
     value = os.environ.get('V3_NATIVE_RELEASE_PUBLIC_KEY', '')
-    return value if PUBLIC_KEY.fullmatch(value) and environment_id == os.environ.get(
-        'V3_NATIVE_RELEASE_PILOT_ENVIRONMENT') else ''
+    return value if PUBLIC_KEY.fullmatch(value) else ''
 
 
 def _shown(reference: dict | None) -> dict:
@@ -196,8 +198,8 @@ def _revision(record: dict, row: dict) -> str:
 
 
 def status(runtime, row: dict) -> dict | None:
-    """显示本灰度环境的操作状态，不公开服务地址或凭据。"""
-    if not pilot_key(row['environment_id']) or not row.get('sender_container_id'):
+    """显示原生环境的在线内核状态。@param runtime 运行时。@param row 环境行。@return 状态或None。"""
+    if not release_key() or not row.get('sender_container_id'):
         return None
     value = _load(runtime._root(row))
     try:
@@ -249,9 +251,9 @@ def run_upgrade(runtime, row: dict, account_id: int, operation: str,
     :return: 操作完成后可显示的受限状态。
     """
     environment_id = row['environment_id']
-    key = pilot_key(environment_id)
+    key = release_key()
     if not key or not isinstance(operation_id, str) or str(uuid.UUID(operation_id)) != operation_id:
-        raise ValueError('账号未启用灰度升级或操作标识无效')
+        raise ValueError('未配置有效内核发行公钥或操作标识无效')
     root = runtime._root(row)
     record_path = _record(root)
     lock = runtime.environment_lock(environment_id)

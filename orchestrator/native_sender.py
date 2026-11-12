@@ -8,9 +8,9 @@ from pathlib import Path
 
 from resource_budget import isolated_account_limits, memory_bytes
 
-VERSION = 'v0.1.0-beta.3'
+VERSION = 'v0.1.0-beta.5'
 ASSET = 'ccrb-runtime-linux-x64'
-SHA256 = '423a6a848c84e09bcc73a8b7be481ed4ead44a6644cef94bbf47d2009d3f6b80'
+SHA256 = '64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89'
 POOL_MIB = 256
 WORKER_MIB = 192
 
@@ -70,8 +70,8 @@ def stage_asset(destination: Path, source: str | None = None) -> dict:
         url = f'https://github.com/SilentFlower/cc-runtime-bridge/releases/download/{VERSION}/{ASSET}'
         with urllib.request.urlopen(url, timeout=60) as response, destination.open('xb') as output:
             shutil.copyfileobj(response, output)
-    if destination.stat().st_size != 27387960 or hashlib.sha256(destination.read_bytes()).hexdigest() != SHA256:
+    if destination.stat().st_size != 27388048 or hashlib.sha256(destination.read_bytes()).hexdigest() != SHA256:
         destination.unlink()
         raise ValueError('原生运行时附件身份不匹配')
     destination.chmod(0o755)
-    return {'version': VERSION, 'asset': ASSET, 'sha256': SHA256, 'bytes': 27387960}
+    return {'version': VERSION, 'asset': ASSET, 'sha256': SHA256, 'bytes': 27388048}

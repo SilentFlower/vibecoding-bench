@@ -1252,7 +1252,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - `sender_config(configuration:dict,memory:str,swap:str='0',budget:str|None=None) -> dict|None`；configuration 的后端及 concurrency 来自网关权威快照。
 - `NativeSenderConfig = {binary_path,work_root,memory_mib:u64,max_workers:usize}`；legacy 的 native 配置为 None。
 - `V3_NATIVE_PREWARM_ACCOUNT_ID` 缺省为空，可配置一个正整数网关账号 ID；`SenderConfig.native_adaptive_prewarm` 为私有布尔字段，旧配置缺省 false。
-- 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.2 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
+- 有限账号显式环境键 `V3_NATIVE_SENDER_MEMORY`；构建可选 `V3_NATIVE_RUNTIME_ASSET` 指定本地候选，否则下载固定 beta.5 附件。`stage_asset(destination:Path,source:str|None=None) -> dict` 冻结版本/大小/SHA。
 - `account_limits(memory,swap)`、`isolated_account_limits`、`scenario_account_limits`、`serial_review_limits` 接受账号 `mem="unlimited"`，无限模式 Docker 额度为 `(0,-1)`；`memory_bytes` 继续只解析有限配置。
 - fingerprint 可选 `native_sender_memory`，无限原生账号保存 `"unlimited"`，布局变更时保存，回退 legacy 时移除；镜像原生能力标签为 `vibebench.native-runtime=293-raw-1`。
 - `AccountRuntime.native_preparation_snapshots() -> tuple[dict[int,dict],str|None]` 通过一次 `GET /admin/native-preparations` 读取批量快照，超时3秒；`native_preparation_summary(row,account,snapshots,read_error=None) -> dict|None` 为 `/api/environments` 生成安全的 `native_preparation`。
@@ -1274,7 +1274,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 首条业务拿走唯一进程且账号允许两条普通并发时，sender 可为当前代次登记一次后台补位。首条直接投递；后续请求优先取空闲进程，缺空闲时可在自己的截止前等这一轮就绪。补位失败沿现有 checkout 路径处理。补位使用原物理计数与已核验映像，只提交初始化指令；结果通过真实握手后进入同一空闲池。
 - 布局/预算变化只在job和API活动为空时重建。配置事务已停sender时复用 `_running_sender_active` 记零活动；运行中读取真实活动，归属或查询失败仍拒绝重建。
 - SOCKS5/5h使用逐进程随机Basic鉴权的回环CONNECT，固定目标 `api.anthropic.com:443`，保持原生TLS；socks5本地DNS、socks5h代理DNS。隧道不构造业务请求，生命周期绑定进程。
-- 镜像构建冻结实际附件，校验27387960 B及SHA后复制。Cargo使用项目独立BuildKit锁定缓存和 `--locked`，输出复制至普通 `/out` 层；联合清单继续登记实际源摘要和最终镜像身份。
+- 镜像构建冻结正式beta.5附件，校验27388048 B及分发SHA `64c61cae565e9097de18cf61a35f46e7595f633cb14f7d6b8c6609fcd294ce89`后复制；Rust默认消费者核验执行体SHA `af4cea9e21aa959c5e39c389173ba30ebb19b354b67acfe99164946450e9776d`及112839864 B，固定官方来源仍为2.1.293。默认发行、Python下载、Docker校验和Rust准入同步更新，正式附件真实回环通过后交付。Cargo使用项目独立BuildKit锁定缓存和 `--locked`，输出复制至普通 `/out` 层；联合清单继续登记实际源摘要和最终镜像身份。
 
 ### 4. Validation & Error Matrix
 
@@ -1322,13 +1322,14 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 ### 2. Signatures
 
 - POST /api/environments/{environment_id}/native-kernel：{operation:prepare|activate|rollback|recover,operation_id:UUID,release?:string,expected_sha256?:string,expected_revision:string}。
-- 环境列表 native_kernel：state、revision、current、previous、prepared、pid、image_sha256、error、operation_id、binding_generation。未启用灰度或非原生环境返回null。
+- 环境列表 native_kernel：state、revision、current、previous、prepared、pid、image_sha256、error、operation_id、binding_generation。未配置有效发行公钥、缺少sender或非原生环境返回null。
 - POST /admin/runtime/accounts/:id/native-kernel-probe：owner、lease_generation、binding、target{release:NativeReleaseRef|null,kernel_generation:UUID}；私有 sender /internal/native/prepare-switch 包含 target、identity。
-- NativeSenderConfig可选release{release,launcher_sha256}、kernel_generation；历史省略使用内置beta.3。NativePreparationStatus增加release、kernel_generation、image_sha256。
+- NativeSenderConfig可选release{release,launcher_sha256}、kernel_generation；省略时使用当前镜像固定的内置beta.5。历史镜像内置版本按其实际分发身份判定。NativePreparationStatus增加release、kernel_generation、image_sha256。
 
 ### 3. Contracts
 
-- V3_NATIVE_RELEASE_PUBLIC_KEY为部署固定Ed25519原始32字节公钥的小写hex；V3_NATIVE_RELEASE_PILOT_ENVIRONMENT为唯一32位环境ID。首次底座只给灰度sender只读挂载bench/native-releases至/runtime-releases，并传公钥；CLI不取得该挂载。
+- V3_NATIVE_RELEASE_PUBLIC_KEY为部署固定Ed25519原始32字节公钥的小写hex，`release_key() -> str`仅返回有效公钥；配置有效公钥后覆盖部署内全部native293账号。旧V3_NATIVE_RELEASE_PILOT_ENVIRONMENT停止参与准入，部署预检只校验可选发行公钥格式。
+- 创建原生sender时只读挂载bench/native-releases至/runtime-releases并传公钥，CLI及network角色不取得该挂载或发行公钥。已有sender首次取得该挂载需要空闲重建；各账号独立保存版本选择与操作记录。
 - 下载固定SilentFlower/cc-runtime-bridge的精确标签，HTTPS跳转只接受github.com、release-assets.githubusercontent.com、objects.githubusercontent.com。清单≤4096B、签名64B、分发≤27933052B；使用签名原字节及独立SHA核验。版本目录按标签/分发SHA寻址，原子写入，已有候选可离线复核。
 - 管理请求绑定唯一账号与环境。expected_revision同时含环境代次和持久操作版本；新准备、激活及对账消费原版本。同操作ID只接受完全相同参数，之后操作消费版本后旧请求拒绝。
 - 环境私有runtime/native-kernel-upgrade.json保存准备、draining、switching、restoring、finishing、active/restored/failed/reconcile及原/候选/上一版。准备不占账号API门禁；激活和回滚使用现有排他租约，CLI忙时延后。排空≤120秒，等待原流收齐，未知活动不得视为空闲。
@@ -1337,6 +1338,7 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 - 分发体仍通过完整SHA和精确FD启动；真实PID/worker_ready、memfd执行体SHA、四项封存逐次核验。共享映像按分发SHA隔离，即使执行体相同也先实际运行新的加载器。
 - 成功预热后持久提交选择及实际PID/映像SHA，再释放门禁；候选失败恢复原版后开放，无法确认则reconcile。启动时识别中断，原账号门禁保持到显式恢复。排空中断且选择仍是原版时按原所有权释放，finishing中断按提交结果补收口。
 - 内核选择与容器布局比较分开；同合同切换只换worker，下一业务不因release/kernel_generation差异重建角色。现有预算、代理、设备及环境身份保持。当前/上一版/操作引用的制品保留，移除信任根前先回到内置版。
+- 基础ready仅证明原生进程完成握手；启用强制1h/5m策略前还须核验cache_ttl_rewrite_protocol=1，并以该策略验证真实消费者。旧beta.3缺少该能力，强制策略下在模型投递前拒绝。显式在线内核选择独立于镜像默认值，升级镜像继续保留账号选择；回滚旧内核前先检查并关闭其不支持的强制策略。
 
 ### 4. Validation & Error Matrix
 
@@ -1352,13 +1354,14 @@ CAPTURE_CONTEXT = JSON({schema: 1, source, claude_code_version, ...})
 
 ### 5. Scenarios and Examples
 
-- 正常：准备beta.4，目标账号长流自然结束，切换预热零模型，下一请求复用新PID；回滚恢复beta.3，所有容器ID和对照账号PID保持。
+- 历史回归（强制TTL关闭）：从内置beta.3准备beta.4，目标账号长流自然结束，切换预热零模型，下一请求复用新PID；回滚恢复beta.3，所有容器ID和对照账号PID保持。
 - 边界：先激活再回滚，迟到首次激活的相同ID和旧revision必须冲突。
 - 错误用法：HTTP active=0就假定物理进程全部退出。正确处理：等待物理许可并收口旧池后再启动候选。
 
 ### 6. Tests Required
 
-- orchestrator/test_native_kernel_upgrade.py：签名及摘要拒绝、准备与接单独立、排空/回滚、旧请求重放、超时、恢复及候选摘要漂移。
+- orchestrator/test_native_kernel_upgrade.py：两个不同环境在同一发行公钥下开放管理，旧试点字段忽略，缺失/非法公钥与非原生环境保持关闭；签名及摘要拒绝、准备与接单独立、排空/回滚、旧请求重放、超时、恢复及候选摘要漂移。
+- orchestrator/test_account_runtime.py核对两个原生sender均有只读版本挂载及发行公钥，其他角色保持隔离；deploy/v3/test_manage.py核对仅公钥即可配置，非法公钥拒绝，旧试点配置兼容忽略。
 - Rust native_real_binary：模拟一个退出未收口许可和一个空闲worker，归还前零启动，归还后换PID；native_real_gateway验证维护归属、长流、实际新PID和零模型切换。
 - deploy/v3/verify_forwarding.py --native --kernel-release <测试签名目录> --kernel-public-key <公钥>：双账号真实三角色、管理端准备/激活/回滚、长流只发送一次、下一业务复用、对照账号PID与所有容器ID/StartedAt保持、管理端公网发送计数为0。
 

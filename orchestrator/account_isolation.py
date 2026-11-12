@@ -13,7 +13,7 @@ from cpu_resources import read_policy as read_cpu_policy
 
 from account_update_identity import configured_release, image_origin, role_release, save_image_origin
 
-from native_kernel_upgrade import applied_kernel, pilot_key
+from native_kernel_upgrade import applied_kernel, release_key
 from resource_budget import isolated_account_limits, scenario_account_limits
 from system_profile import (COMPUTER_PROFILE_LABEL, COMPUTER_PROFILE_VERSION, SYSTEM_PROFILE_DIRECTORY,
     SYSTEM_PROFILE_LABEL, SYSTEM_PROFILE_VERSION)
@@ -82,11 +82,11 @@ def create_environment(runtime, row: dict, account: dict, name: str, write_json)
     root = runtime._root(row)
     fingerprint = json.loads(row['fingerprint_json'])
     native = account.get('native_sender')
-    kernel_key = pilot_key(row['environment_id']) if native else ''
+    kernel_key = release_key() if native else ''
     if native:
         saved_kernel = applied_kernel(root, int(account.get('cc2api_account_id') or 0))
         if saved_kernel.get('current') and not kernel_key:
-            raise ValueError('已生效内核仍依赖灰度信任根，请先回滚')
+            raise ValueError('已生效内核仍依赖发行信任根，请先回滚')
         if saved_kernel:
             native = {**native, 'release': saved_kernel.get('current'),
                 'kernel_generation': saved_kernel.get('kernel_generation')}

@@ -74,7 +74,7 @@ function paintEnvironments() {
   const focus = list.contains(document.activeElement) ? document.activeElement.dataset.envFocus : null;
   const counts = [ui.rows.length, ui.rows.filter(row => row.state === 'ready').length,
     ui.rows.filter(row => row.state === 'stopped').length, ui.rows.filter(row => row.native_kernel).length];
-  $('#environment-summary').innerHTML = ['全部环境', '就绪', '已停止', '内核试点'].map((label, index) =>
+  $('#environment-summary').innerHTML = ['全部环境', '就绪', '已停止', '内核管理'].map((label, index) =>
     `<div class="env-metric"><span>${label}</span><strong>${counts[index]}</strong></div>`).join('');
   const statuses = new Set(ui.rows.map(row => row.state || 'unknown'));
   if (ui.status !== 'all') statuses.add(ui.status);
@@ -159,7 +159,7 @@ function renderNativePreparation(row) {
 }
 
 /**
- * 渲染服务器提供的内核版本、进度和灰度操作能力。
+ * 渲染服务器提供的内核版本、进度和在线管理能力。
  * @param {object} row 含 native_kernel 的环境摘要。
  * @return {string} 内核管理面板。
  */
@@ -170,7 +170,7 @@ function renderNativeKernel(row) {
   const available = !busy && !row.busy && Object.hasOwn(KERNEL_STATES, kernel.state) && kernel.state !== 'reconcile';
   const version = reference => escapeHTML(reference?.release || '无');
   const button = (operation, label, enabled, digest = '') => `<button type="button" class="btn btn-sm ${operation === 'activate' ? 'btn-primary' : ''}" data-kernel-action="${operation}" data-environment="${escapeHTML(id)}" data-kernel-revision="${escapeHTML(kernel.revision)}" data-kernel-release="${escapeHTML(kernel.prepared?.release || '')}" data-kernel-digest="${escapeHTML(digest)}" data-env-focus="${escapeHTML(id + ':' + operation)}" ${enabled ? '' : 'disabled'}>${label}</button>`;
-  return `<section class="env-kernel"><div class="env-section-head"><h4>请求内核</h4><span class="env-tag">在线切换试点</span></div>
+  return `<section class="env-kernel"><div class="env-section-head"><h4>请求内核</h4><span class="env-tag">在线内核管理</span></div>
     <div class="env-kernel-version"><strong>${version(kernel.current)}</strong><span role="status">${escapeHTML(KERNEL_STATES[kernel.state] || '状态待核对')}</span></div>
     <div class="env-versions"><div><span>已准备候选</span><strong>${version(kernel.prepared)}</strong></div><div><span>上一版本</span><strong>${version(kernel.previous)}</strong></div></div>
     ${kernel.error ? `<p class="env-error" role="alert">${escapeHTML(kernel.error)}</p>` : ''}

@@ -94,6 +94,20 @@ class PreflightTests(unittest.TestCase):
                 patch.object(manage.Path, "read_text", return_value="MemAvailable: 2097152 kB\nSwapFree: 0 kB\n"):
             self.assertEqual(self.root, manage.preflight(self.values))
 
+    def test_native_release_key_enables_all_environments_without_pilot(self) -> None:
+        """发行公钥独立启用管理，旧环境选择字段作为历史配置忽略。@return None。"""
+        self.values.update(V3_ACCOUNT_MEMORY='1536m', V3_NATIVE_RELEASE_PUBLIC_KEY='b' * 64)
+        with patch.object(manage, 'command', return_value=''), \
+                patch.object(manage, 'inspect_images', return_value={}), \
+                patch.object(manage.Path, 'read_text', return_value='MemAvailable: 2097152 kB\nSwapFree: 0 kB\n'):
+            self.assertEqual(manage.preflight(self.values), self.root)
+            self.values['V3_NATIVE_RELEASE_PILOT_ENVIRONMENT'] = 'obsolete'
+            self.assertEqual(manage.preflight(self.values), self.root)
+            for key in ('b' * 63, 'z' * 64):
+                self.values['V3_NATIVE_RELEASE_PUBLIC_KEY'] = key
+                with self.subTest(key=key), self.assertRaisesRegex(ValueError, '有效发布公钥'):
+                    manage.preflight(self.values)
+
     def test_published_docker_nat_port_rejects_without_host_listener(self) -> None:
         """Docker 禁用 userland proxy 时，也必须检查 NAT 发布端口。@return None。"""
         self.values["V3_HOST_PORT"] = "18080"
@@ -368,7 +382,7 @@ class OfflineAndStatusTests(unittest.TestCase):
         (self.root / ".v3-deployment.json").write_text('{"deployment":"test"}')
         database = self.root / "bench/db.sqlite"
         database.parent.mkdir()
-        tree = ast.parse((manage.REPO / "orchestrator/main.py").read_text())
+        tree = ast.parse((manage.REPO / "orchestrator/database_schema.py").read_text())
         assignment = next(node for node in tree.body if isinstance(node, ast.Assign)
             and any(isinstance(target, ast.Name) and target.id == "_SCHEMA" for target in node.targets))
         with sqlite3.connect(database) as connection:

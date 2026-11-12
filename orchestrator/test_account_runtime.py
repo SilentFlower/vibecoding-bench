@@ -1785,6 +1785,36 @@ class AccountRuntimeTests(unittest.TestCase):
         self.assertTrue(all(item.kwargs['mem_limit'] == 0 and item.kwargs['memswap_limit'] == -1 for item in created))
         self.assertTrue(all(item.kwargs['nano_cpus'] > 0 and item.kwargs['pids_limit'] > 0 for item in created))
 
+    def test_native_release_mount_is_available_for_two_account_environments(self) -> None:
+        """两个原生环境均取得只读版本目录及发行公钥，CLI保持隔离。@return None。"""
+        self._isolated_docker()
+        self.client.images.get.return_value.attrs['Config']['Labels']['vibebench.native-runtime'] = '293-raw-1'
+        self.gateway._request.return_value = {'auth_type': 'oauth', 'status': 'active', 'proxy_url': '',
+            'request_backend': 'native293', 'concurrency': 4}
+        with self.database() as connection:
+            connection.execute("INSERT INTO accounts(id,name,cc2api_account_id) VALUES(2,'second',8)")
+        with patch.object(self.runtime, '_make_room'), patch.object(self.runtime, '_sync_proxy'), \
+                patch.object(self.runtime, '_sender_active', return_value=0), patch.dict(os.environ, {
+                    'V3_NATIVE_RELEASE_PUBLIC_KEY': 'b' * 64,
+                    'V3_NATIVE_RELEASE_PILOT_ENVIRONMENT': '0' * 32, 'V3_NATIVE_SENDER_MEMORY': ''}):
+            for account_id, name, remote_id in ((1, 'synthetic', 7), (2, 'second', 8)):
+                row = self.runtime._row(name, account_id)
+                fingerprint = json.loads(row['fingerprint_json']); fingerprint['mem'] = 'unlimited'
+                self.runtime._update(row, fingerprint_json=json.dumps(fingerprint))
+                self.runtime.ensure({'id': account_id, 'name': name, 'cc2api_account_id': remote_id,
+                    'upstream_socks5_host': '192.0.2.2', 'upstream_socks5_port': 1080})
+        calls = self.client.containers.run.call_args_list
+        senders = [item.kwargs for item in calls if item.kwargs['labels']['vibebench.role'] == 'account-sender']
+        self.assertEqual(len(senders), 2)
+        for sender in senders:
+            self.assertEqual(sender['environment']['V3_NATIVE_RELEASE_PUBLIC_KEY'], 'b' * 64)
+            self.assertEqual(sender['volumes'][str(self.root / 'native-releases')],
+                {'bind': '/runtime-releases', 'mode': 'ro'})
+        for item in calls:
+            if item.kwargs['labels']['vibebench.role'] != 'account-sender':
+                self.assertNotIn('V3_NATIVE_RELEASE_PUBLIC_KEY', item.kwargs['environment'])
+                self.assertNotIn(str(self.root / 'native-releases'), item.kwargs['volumes'])
+
     def test_native_startup_prewarm_configures_sender_before_notification(self) -> None:
         """三角色就绪后写入补位开关，再通知网关预热首个 worker。"""
         self._isolated_docker()

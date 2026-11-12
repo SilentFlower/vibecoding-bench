@@ -27,6 +27,7 @@ import requests
 
 import manage
 from manage import REPO
+from native_sender import VERSION as NATIVE_RUNTIME_VERSION
 from verify_browser import ACCOUNT_STARTUP_TIMEOUT, verify_visible_logout
 from verify_isolation import verify_official_tools, verify_roles
 
@@ -143,8 +144,8 @@ print(json.dumps(out))"""
         return json.loads(result.output)
 
     initial = listed(pilot)
-    assert initial['current']['release'] == 'v0.1.0-beta.3'
-    assert listed(other['eid']) is None
+    assert initial['current']['release'] == NATIVE_RUNTIME_VERSION
+    assert listed(other['eid'])['current']['release'] == NATIVE_RUNTIME_VERSION
     prepared = submit('prepare', release=candidate)
     assert prepared['prepared']['launcher_sha256'] == digest
     before_roles = running()
@@ -233,7 +234,7 @@ def verify(manifest_path, output, binary, native=False, kernel_release=None, ker
             release_data = json.loads((kernel_release / 'runtime-release.json').read_text())
             assert re.fullmatch(r'v0[.]1[.]0-beta[.][1-9][0-9]{0,8}', release_data['release'])
             assert re.fullmatch(r'[a-f0-9]{64}', release_data['launcher_sha256'])
-            values.update(V3_NATIVE_RELEASE_PUBLIC_KEY=kernel_key, V3_NATIVE_RELEASE_PILOT_ENVIRONMENT=pilot)
+            values.update(V3_NATIVE_RELEASE_PUBLIC_KEY=kernel_key)
         environment_file = root / 'v3.env'
         environment_file.write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
         environment_file.chmod(0o600)
