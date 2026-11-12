@@ -22,7 +22,9 @@ def _validate_stage_details(value: dict) -> None:
     statuses = {'complete', 'truncated', 'unavailable', 'failed', 'incomplete'}
     for name, collection, limit, actions in [
             ('header_policy', 'decisions', 1024, {'keep', 'drop', 'runtime', 'context'}),
-            ('body_changes', 'items', 128, {'added', 'removed', 'changed'})]:
+            ('body_changes', 'items', 128, {'added', 'removed', 'changed'}),
+            ('final_body_changes', 'items', 128, {'added', 'removed', 'changed'}),
+            ('final_header_changes', 'items', 128, {'added', 'removed', 'changed'})]:
         if name not in value:
             continue
         detail = value[name]
@@ -33,7 +35,7 @@ def _validate_stage_details(value: dict) -> None:
         if 'note' in detail and (not isinstance(detail['note'], str) or len(detail['note']) > 1024):
             raise ValueError('采集阶段说明无效')
         for item in detail[collection]:
-            key = 'name' if name == 'header_policy' else 'path'
+            key = 'name' if name in {'header_policy', 'final_header_changes'} else 'path'
             if (not isinstance(item, dict) or item.get('action') not in actions
                     or any(not isinstance(item.get(field), str) for field in (key, 'reason'))
                     or len(item['reason'].encode()) > 8192
@@ -67,6 +69,49 @@ def _validate_stage_details(value: dict) -> None:
                 or not isinstance(value.get('body'), str)
                 or len(value['body'].encode()) + len(preview['body'].encode()) > 2*1024*1024):
             raise ValueError('多阶段预览超出共同预算')
+    if 'wire_final' in value:
+        wire = value['wire_final']
+        if (not isinstance(wire, dict) or wire.get('source') != 'native_tls_uprobe'
+                or wire.get('representation') != 'http_entity_from_tls_accepted_write'
+                or wire.get('status') not in {'complete', 'incomplete', 'unavailable'}
+                or type(wire.get('complete')) is not bool or wire['complete'] != (wire['status'] == 'complete')
+                or 'flushed' not in wire or wire['flushed'] is not None
+                or not isinstance(value.get('body'), str)
+                or not isinstance(wire.get('body'), str) or len(wire['body'].encode()) > 2*1024*1024
+                or type(wire.get('body_truncated')) is not bool or type(wire.get('headers_truncated')) is not bool
+                or not isinstance(wire.get('headers'), list) or len(wire['headers']) > 4096):
+            raise ValueError('原生TLS证据类型无效')
+        for pair in wire['headers']:
+            if not isinstance(pair, list) or len(pair) != 2 or any(not isinstance(part, str) for part in pair):
+                raise ValueError('原生TLS头部类型无效')
+        if (sum(len(part.encode()) for pair in wire['headers'] for part in pair) > 128*1024
+                or sum(len(preview.get('body', '').encode()) for preview in
+                       (value, value.get('ingress', {}), wire)) > 2*1024*1024):
+            raise ValueError('原生TLS多阶段预览超出预算')
+        size, digest = wire.get('observed_body_bytes'), wire.get('body_sha256')
+        if wire['complete']:
+            if (type(size) is not int or size < 0 or not isinstance(digest, str) or len(digest) != 64
+                    or any(char not in '0123456789abcdef' for char in digest)):
+                raise ValueError('完整原生TLS证据范围无效')
+        elif size is not None or digest is not None:
+            raise ValueError('缺口原生TLS证据包含伪完整摘要')
+        if 'observed_http_bytes' in wire or 'http_sha256' in wire:
+            digest = wire.get('http_sha256')
+            if (not wire['complete'] or type(wire.get('observed_http_bytes')) is not int
+                    or wire['observed_http_bytes'] < size or not isinstance(digest, str) or len(digest) != 64
+                    or any(char not in '0123456789abcdef' for char in digest)):
+                raise ValueError('原生TLS整体HTTP摘要无效')
+            digest = wire.get('body_sha256')
+        if (wire.get('original_body_bytes') != size or wire.get('original_body_sha256') != digest
+                or wire.get('request_id', value['attempt_id']) != value['attempt_id']
+                or wire.get('reason') is not None and (not isinstance(wire['reason'], str) or len(wire['reason']) > 128)):
+            raise ValueError('原生TLS证据归属无效')
+        for key in ('worker_id', 'capture_id', 'connection_id'):
+            if key in wire and (not isinstance(wire[key], str) or len(wire[key]) > 128):
+                raise ValueError('原生TLS连接归属无效')
+        for key in ('worker_pid', 'accepted_write_count', 'binding_generation', 'captured_at_ms'):
+            if key in wire and (type(wire[key]) is not int or wire[key] < 0):
+                raise ValueError('原生TLS观测元数据无效')
     if 'stages' in value:
         stages = value['stages']
         if not isinstance(stages, list) or len(stages) > 4:

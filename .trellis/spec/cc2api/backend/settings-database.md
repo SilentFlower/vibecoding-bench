@@ -399,6 +399,7 @@ let observed = capture.observation(complete);
 
 - 账号固化 `fingerprint_json.native_capture_enabled:bool`，仅精确 true 开启；sender 的 `native_capture_dir:Option<String>` 缺省 None。V3 生成 `/flows/api/cc-prepared`，布局变更空闲重建，重画像保留开关。
 - `native_capture::record(Option<&str>, &NativeSubmission, &Value, Option<&Value>) -> String`（async），末参为同次实际header_policy；输出 disabled/saved/dropped/failed/timeout。受信任私有观察和 `AttemptDiagnostic.capture_status:Option<String>` 保存状态，历史缺字段为 None。诊断沿已有 summary_json 保存，无追加数据库列。
+- `native_capture::record_queued(Option<&str>, &NativeSubmission, &Value, Option<&Value>) -> String`同步准入初始快照，返回queued/disabled/dropped；实际文件在后台保存。`record`的250ms等待只用于后台最终收口。
 - 私有 `NativeSubmission.log_mode:RequestLogMode` 缺省 info，未知枚举拒绝；只由网关冻结，调用方 headers/body/context 无法覆盖。该字段不进入进程复用 key。Python `read_capture(root,account_id,attempt_id,*,now_ms=None)` 只读验期；`cleanup_captures(...)` 以逐项计数迭代器供独立后台批次消费。
 - `GET /admin/request-diagnostics/:request_id/captures/:attempt_id`：管理员鉴权，先从该请求详情验证尝试归属。经 `runtime_bridge::native_capture(i64,&str)` 服务鉴权读取调度器 `GET /internal/v3/native-captures/{account_id}/{attempt_id}`。
 - 返回 `{state:"saved",snapshot:{schema_version:1,stage:"cc_prepared",account_id,attempt_id,captured_at_ms,headers:[string,string][],body:string,body_truncated,headers_truncated,original_body_bytes,original_body_sha256}}`；缺失为 `{state:"missing",message}`，过期为 `{state:"expired",message}`，其它后端为 `{state:"unsupported",message}`。响应设置 `Cache-Control: no-store`。
@@ -409,13 +410,16 @@ let observed = capture.observation(complete);
 - 仅同次 debug 且账号配置采集目录时保存；info 在克隆前返回 disabled。模式切换保留暖进程，已保存的有效 debug 历史继续按原归属读取。
 - 组装正文仅替换秘密并按完整 UTF-8 字符截断，保持其键顺序和空白。普通头名称、值及重复值顺序保留。原始正文长度和 SHA256 单独保存，展示内容脱敏后的摘要不得冒充原始摘要。
 - schema1可选追加ingress、header_policy、body_changes及stages。ingress来源gateway_http_ingress，在会话映射前冻结原始逻辑字节的长度/SHA、脱敏有序头与正文；header_policy来源native_header_policy，逐项保存内核实际name/action/reason及观察/保存数量。旧记录缺字段明确显示未采集，不能按当前白名单重建历史。
-- body_changes来源observed_diff，对可解析的脱敏入口与组装正文生成JSON Pointer的added/removed/changed项。最多128项、4096节点、深度16、路径2048字节；截断或解析缺失可见。两个正文预览共享2MiB，入口最多1MiB；头部策略最多1024项/128KiB，脱敏后再次限长。最终序列化不超过6MiB，Python读取器校验可选字段的类型、动作、计数、时间和共同预算。
-- stages分别标记ingress、header_policy、cc_prepared、wire_final的来源、表示和完整性；wire_final当前为unavailable，cc_prepared明确为中间值。页面提供头部动作筛选、正文变化路径及阶段原文，沿既有安全文本、异步归属和390像素展示合同。
+- body_changes来源observed_diff，对可解析的脱敏入口与组装正文生成JSON Pointer的added/removed/changed项。最多128项、4096节点、深度16、路径2048字节；截断或解析缺失可见。所有正文预览共享2MiB，依次分配给最终TLS、组装和入口；入口最多1MiB。头部策略最多1024项/128KiB，脱敏后再次限长。最终序列化不超过6MiB，Python读取器校验可选字段的类型、动作、计数、时间和共同预算。
+- stages分别标记ingress、header_policy、cc_prepared、wire_final的来源、表示和完整性；cc_prepared明确为中间值。旧记录缺独立TLS证据时wire_final保持unavailable。实际PID限定旁路证据使用可选wire_final，source=native_tls_uprobe、representation=http_entity_from_tls_accepted_write；complete/status/reason、可空实体字节及SHA、flushed=null单独核对。采集UUID与业务request_id分别记录，并由同次实际客户端请求头绑定；worker/PID、连接及binding_generation保留实际归属。
+- 可选final_header_changes/final_body_changes分别保存组装到TLS的头及JSON Pointer差异，source=observed_diff，items只保存字段名/路径、动作及固定原因，status区分complete/truncated。页面显示两类分析状态；一致提示只用于complete空列表。头名差异最多128项及128KiB，正文差异沿既有预算。
+- 连续性或范围未知时实体字节和全量SHA为null；非HTTP_PARTIAL的不完整证据在持久化前清空头和正文预览并标截断。连续部分前缀裁剪末尾未闭合字符串后脱敏。采集器的固定映像、ABI、事件计数及复用边界由cc-runtime-bridge的backend/logging-guidelines.md“Linux x64原生TLS接受边界旁路采集”所有。
 - 保存 `<attempt_id>.json`，目录 0700、文件 0600，原子重命名发布；每账号最多 50 份、100 MiB，正文 2 MiB、请求头 128 KiB。写入前按最旧文件轮转并回收中断临时文件。
-- 有界阻塞线程写入最多 2 个许可，同进程串行轮转；模型路径等待保存的期限为 250 ms。timeout 表示最终写入结果待核对，后台继续持有许可。失败或丢弃只改变采集状态，保持模型单次提交语义，普通日志保持摘要。
+- 有界阻塞线程写入最多2个许可，同进程串行轮转。初始快照即时返回queued，CAPTURE_PENDING表示最终证据后台待收口；CAPTURE_PREPARING表示本次到达时的探针准备缺口。后台record最多等待250ms，timeout后继续持有许可。固定原因及作业标识进入安全日志。按同请求原子合并，已有完整TLS证据优先于迟到初始或缺证写入。失败或丢弃只改变采集状态，保持模型单次提交语义。
 - 调度器按网关账号找到唯一未删除账号环境，逐级无链接目录 FD 固定路径，校验标准 UUID、普通文件、6 MiB 读取上限及文件内账号/尝试/阶段归属。`captured_at_ms` 为正整数 UTC 毫秒，超过当前时间五分钟视为异常；严格早于七天边界返回410，管理桥映射为 expired。查询保持环境休眠状态。管理桥也限制 6 MiB 并核对归属。
 - AccountRuntime 在启动及每小时使用独立清理线程，按持久环境32条分页、每批最多512步及2秒预算继续游标，覆盖停止/休眠环境。只处理 `flows/api/cc-prepared` 下标准 UUID 普通 JSON；复核账号/阶段/时间及删除前文件身份，保留临时文件、链接、损坏、未来异常及错归属记录。停止前核对取消标记，故障只记受控 scanned/deleted/failed 计数；租约续期资源独立。Rust 容量轮转容忍后台已删除旧文件的 NotFound。
 - 界面通过既有管理 API client 读取，在 Dialog 中展示根时间/账号/最终结果/尝试数、实际尝试及按需快照。阶段、截断、缺失和失败状态分别显示；所有头及正文以转义文本展示。列表/详情分别持有取消与代次，关闭/换请求/离开组件作废旧详情，保留列表筛选、分页及焦点返回。
+- queued或后台待收口快照每500ms只读重试，最多6轮；关闭或换尝试后停止调度，迟到结果先核对代次。页面提供入口、组装及最终TLS原文切换，TLS接受与网络刷出分开显示。
 
 ### 4. Validation & Error Matrix
 
@@ -428,6 +432,8 @@ let observed = capture.observation(complete);
 | 正文或头超限 | 保留前缀并分别标记截断，原始长度及摘要保持 |
 | 非唯一绑定、链接、超限文件、错归属或坏 JSON | 读取明确失败，保持环境状态 |
 | 入站凭据被白名单删除后在正文或扩展头重复出现 | 仍脱敏已注册的凭据 |
+| TLS事件缺口/同连接额外请求字节 | EVENT_SEQUENCE或EVENT_LOSS/HTTP_EXTRA_BYTES；清空不安全原文，空范围及SHA |
+| 最终差异status=truncated且items=[] | 展示已截断，保持分析缺口可见 |
 | 超期快照 / 未来超过五分钟 / 关闭或切换详情 | expired / 受控读取失败 / 取消并忽略迟到响应 |
 
 ### 5. Scenarios and Examples
@@ -437,6 +443,7 @@ let observed = capture.observation(complete);
 - 错误用法：只从过滤后的出站 Authorization 注册秘密，遗漏入站客户端密钥在消息正文中的重复引用。正确处理：先注册原始头数组的凭据值，再对头和正文统一脱敏。
 - 错误用法：把组装快照重标为最终 TLS。正确处理：固定 stage=cc_prepared，保留独立来源。
 - 基础：旧schema1只有原组装字段仍可读，三块新增明细显示历史缺失。错误用法：把缺失header_policy的空数组当完整删除清单。正确处理：保持unavailable及发生时来源。
+- 边界：debug旧作业后台收口期间同连接开始info请求，只保存旧实体边界内证据。错误用法：把合法JSON但丢过中间事件的预览当作安全文本。正确处理：保留固定缺口原因并清空原文，避免整串替换遗漏凭据片段。
 - 边界：切换 info 后仍可读取七天内旧 debug 快照；本地拒绝且尝试数0时，弹窗仍显示根结果。错误用法是按当前模式隐藏所有历史内容，或清理时调用 ensure 唤醒环境。正确处理是按历史尝试归属读取，并只遍历持久日志目录。
 
 ### 6. Tests Required
@@ -447,3 +454,4 @@ let observed = capture.observation(complete);
 - `native_real_gateway`：独立模拟 TLS 核对实际账号凭据、输入客户端密钥重复出现、快照及管理读取链脱敏、请求一次提交；完整 `cargo test --locked`、包级格式检查与前端构建。
 - `scripts/testing/cc2api-native.ts`通过实际Python read_capture读取Rust落盘；`verify_native_diagnostics_cpu.py`覆盖三块诊断、动作筛选、历史兼容、HTML安全文本及390像素。
 - `info_short_circuits_before_creating_capture_files` 与 `native_real_gateway`：默认 info、未知私有模式拒绝、排队后模式切换仍零完整落盘、debug 脱敏及暖 PID 复用。Python覆盖七天边界、过期只读、未来/错账号/链接/替换/停止保护、启动无流量与512步游标/故障恢复。浏览器覆盖弹窗即开、关闭/卸载/快速切换、焦点、长正文、筛选分页、模式失败恢复和无尝试根摘要。
+- `tls_discontinuous_previews_are_withheld_before_persistence`、`tls_final_is_redacted_bounded_and_monotonic`、`tls_partial_and_shared_budget_preserve_unknown_ranges`：真实私有文件排除凭据片段、单调合并、null范围与共享预算。原生槽位测试覆盖慢启动、取消及运行时关闭。Python核验wire_final可选字段、空范围及历史兼容；浏览器覆盖最终变化的完整空/截断空/截断非空列表、390像素及后台重读归属。

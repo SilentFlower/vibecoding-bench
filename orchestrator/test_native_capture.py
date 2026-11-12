@@ -75,6 +75,32 @@ class NativeCaptureTests(unittest.TestCase):
             path.write_text(json.dumps(base))
             self.assertEqual(read_capture(root,7,attempt,now_ms=now),base)
 
+    def test_tls_final_contract_and_unknown_ranges(self):
+        """最终来源与空范围经过真实读取器，损坏归属及伪完整摘要被拒绝。@return None。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / 'flows/api/cc-prepared'
+            directory.mkdir(parents=True)
+            attempt, now = str(uuid.uuid4()), int(time.time()*1000)
+            path = directory / (attempt+'.json')
+            wire = {'source':'native_tls_uprobe','representation':'http_entity_from_tls_accepted_write',
+                'status':'complete','complete':True,'flushed':None,'headers':[['Authorization','[REDACTED]']],
+                'body':'{}','body_truncated':False,'headers_truncated':False,'observed_body_bytes':2,
+                'body_sha256':'a'*64,'original_body_bytes':2,'original_body_sha256':'a'*64,'request_id':attempt,'reason':None}
+            base = {'schema_version':1,'stage':'cc_prepared','account_id':7,'attempt_id':attempt,
+                'captured_at_ms':now,'body':'{}','headers':[],'wire_final':wire}
+            path.write_text(json.dumps(base))
+            self.assertEqual(read_capture(root,7,attempt)['wire_final'],wire)
+            for delta in ({'source':'native_cc_prepared'},{'request_id':str(uuid.uuid4())},
+                    {'complete':False},{'flushed':True},{'body_sha256':None},
+                    {'body':'x'*(2*1024*1024)}):
+                path.write_text(json.dumps({**base,'wire_final':{**wire,**delta}}))
+                with self.assertRaises(ValueError):read_capture(root,7,attempt)
+            partial = {**wire,'status':'incomplete','complete':False,'reason':'EVENT_LOSS',
+                'observed_body_bytes':None,'body_sha256':None,'original_body_bytes':None,'original_body_sha256':None}
+            path.write_text(json.dumps({**base,'wire_final':partial}))
+            self.assertIsNone(read_capture(root,7,attempt)['wire_final']['body_sha256'])
+
     def test_seven_day_boundary_and_safe_background_cleanup(self):
         """边界保留、过期读取明确、仅删除归属正确的普通快照。@return None。"""
         with tempfile.TemporaryDirectory() as temporary:
