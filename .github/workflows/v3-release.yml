@@ -44,7 +44,7 @@ jobs:
           # 宿主快照测试需核验跨进程数据库句柄，使用与正式执行器相同的 root 权限。
           sudo "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s deploy/flower2api -p 'test_system*.py'
           "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest discover -s services/orchestrator -p 'test_system_update*.py'
-          PYTHONPATH=services/orchestrator:deploy/flower2api "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility test_source_layout
+          PYTHONPATH=services/orchestrator:deploy/flower2api "$RUNNER_TEMP/v3-update-venv/bin/python" -m unittest test_publication test_system_workflow test_database_definitions test_database_migrations test_database_compatibility test_source_layout test_legacy_packages
       - name: 构建两个镜像并生成版本清单
         run: python3 deploy/flower2api/manage.py build --release ci-${{ github.run_id }}-${{ github.run_attempt }} --manifest releases/v3-local.json
       - name: 登录 GHCR

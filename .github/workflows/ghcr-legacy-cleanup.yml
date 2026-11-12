@@ -1,0 +1,62 @@
+name: 手动清理旧三镜像包
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: 应用已核验的三项旧包删除计划
+        type: boolean
+        default: false
+        required: true
+      plan_run:
+        description: 成功预览的运行ID（应用时必填）
+        type: string
+      plan_sha256:
+        description: 预览计划的规范JSON摘要（应用时必填）
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: flower2api-legacy-packages
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'SilentFlower/vibecoding-bench' &&
+      github.ref == 'refs/heads/flower2api'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      APPLY: ${{ inputs.apply }}
+      PLAN_RUN: ${{ inputs.plan_run }}
+      PLAN_SHA256: ${{ inputs.plan_sha256 }}
+    steps:
+      - name: 检出核验源码
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: 验证清理合同
+        run: python3 -m unittest discover -s deploy/flower2api -p test_legacy_packages.py
+      - name: 下载同源码预览
+        if: inputs.apply
+        run: |
+          python3 -c 'import os,re; assert re.fullmatch(r"[1-9][0-9]*",os.environ["PLAN_RUN"]); assert re.fullmatch(r"[0-9a-f]{64}",os.environ["PLAN_SHA256"])'
+          gh run download "$PLAN_RUN" --repo SilentFlower/vibecoding-bench --name legacy-package-preview --dir "$RUNNER_TEMP/legacy-package-preview"
+      - name: 预览或应用精确计划
+        run: |
+          args=(--output "$RUNNER_TEMP/legacy-packages/result.json" --reference-evidence deploy/flower2api/legacy-package-reference-evidence.json)
+          if [ "$APPLY" = true ]; then
+            args+=(--apply --plan "$RUNNER_TEMP/legacy-package-preview/result.json" --plan-run "$PLAN_RUN" --plan-sha256 "$PLAN_SHA256")
+          fi
+          python3 deploy/flower2api/legacy_packages.py "${args[@]}"
+      - name: 保存预览或操作收据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.apply && 'legacy-package-receipt' || 'legacy-package-preview' }}
+          path: ${{ runner.temp }}/legacy-packages/result.json
+          if-no-files-found: error
