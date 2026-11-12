@@ -1,0 +1,71 @@
+{
+  "version": "v1.1.1",
+  "release": "system-ci-43210555291-1",
+  "url": "https://github.com/SilentFlower/vibecoding-bench/releases/tag/system-ci-43210555291-1",
+  "source": "b553fba0bff74b6a094b57f8b9da6b636a5f3ddc",
+  "compatible_sources": 8,
+  "timings": [
+    {
+      "name": "Set up job",
+      "seconds": 1.0
+    },
+    {
+      "name": "检出统一源码仓库",
+      "seconds": 17.0
+    },
+    {
+      "name": "设置 Python 3.12",
+      "seconds": 0.0
+    },
+    {
+      "name": "预检发布来源与签名配置",
+      "seconds": 0.0
+    },
+    {
+      "name": "验证系统更新合同与恢复状态机",
+      "seconds": 39.0
+    },
+    {
+      "name": "构建两个镜像并生成版本清单",
+      "seconds": 327.0
+    },
+    {
+      "name": "登录 GHCR",
+      "seconds": 0.0
+    },
+    {
+      "name": "真实旧库升级与旧程序回退演练",
+      "seconds": 448.0
+    },
+    {
+      "name": "发布同批镜像并保存交付包",
+      "seconds": 44.0
+    },
+    {
+      "name": "保存联合清单与同批镜像包",
+      "seconds": 10.0
+    },
+    {
+      "name": "发布受信系统版本与原子目录",
+      "seconds": 47.0
+    },
+    {
+      "name": "Post 登录 GHCR",
+      "seconds": 0.0
+    },
+    {
+      "name": "Post 设置 Python 3.12",
+      "seconds": 0.0
+    },
+    {
+      "name": "Post 检出统一源码仓库",
+      "seconds": 0.0
+    },
+    {
+      "name": "Complete job",
+      "seconds": 0.0
+    }
+  ],
+  "run_id": 43210555291,
+  "workflow_url": "https://github.com/SilentFlower/vibecoding-bench/actions/runs/43210555291"
+}

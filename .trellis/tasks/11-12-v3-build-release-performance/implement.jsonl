@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/platform/deploy/platform-online-update.md", "reason": "手动发布、来源签名、固定宿主包及单仓路径合同"}
+{"file": ".trellis/spec/platform/deploy/index.md", "reason": "平台部署开发清单及必要验证"}
+{"file": ".trellis/tasks/11-12-v3-build-release-performance/research/cache-and-verification.md", "reason": "缓存机制、固定依赖与有限并发研究"}
+{"file": ".trellis/tasks/11-12-v3-build-release-performance/research/performance-baseline.json", "reason": "v1.1.1 的真实 GitHub CI 耗时与来源"}
+{"file": ".trellis/spec/web/frontend/frontend-guidelines.md", "reason": "Vue展示名称变更的前端规范"}
+{"file": ".trellis/spec/legacy-web/frontend/component-guidelines.md", "reason": "静态工程页文案与内部状态键边界"}
+{"file": ".trellis/spec/runtime/frontend/state-management.md", "reason": "运行时日志页展示名称统一与只读页面合同"}

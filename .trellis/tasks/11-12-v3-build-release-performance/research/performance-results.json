@@ -1,0 +1,230 @@
+{
+  "state": "verified",
+  "baseline_run": 43210555291,
+  "baseline_seconds": {
+    "build": 327,
+    "compatibility": 448
+  },
+  "local": {
+    "compatibility": {
+      "fixture_kind": "local-synthetic-eight-sources-four-real-historical-images",
+      "runs": [
+        {
+          "workers": 1,
+          "seconds": 289.825,
+          "sources": 8,
+          "evidence": ".trellis/.runtime/v3-build-release-performance/docker-benchmark/proof-1.json"
+        },
+        {
+          "workers": 2,
+          "seconds": 147.46,
+          "sources": 8,
+          "evidence": ".trellis/.runtime/v3-build-release-performance/docker-benchmark/proof-2.json"
+        }
+      ],
+      "evidence_equal": true,
+      "reduction_percent": 49.12,
+      "failure_cleanup": {
+        "passed": true,
+        "containers_created": 19,
+        "seconds": 37.3,
+        "successful_evidence_written": false
+      },
+      "historical_image_count": 4,
+      "synthetic_source_count": 8,
+      "real_model_calls": 0
+    },
+    "cache_service_outage": {
+      "service_outage": {
+        "passed": true,
+        "seconds": 0.702,
+        "loaded_image": true
+      },
+      "real_build_failure_propagates": {
+        "passed": true,
+        "exit_code": 1
+      }
+    },
+    "build": {
+      "environment": "local-existing-docker-builder",
+      "absolute_cold_cache": false,
+      "runs": [
+        {
+          "name": "first",
+          "seconds": 229.756,
+          "manifest": ".trellis/.runtime/v3-build-release-performance/build-first.json"
+        },
+        {
+          "name": "repeat",
+          "seconds": 100.831,
+          "manifest": ".trellis/.runtime/v3-build-release-performance/build-repeat.json"
+        }
+      ],
+      "same_source": true,
+      "image_identity_verified": true,
+      "frontend_image_brand_verified": true,
+      "verification_entry": "manage.inspect_images",
+      "initial_harness_failure": "附加脚本引用不存在的image_origin；按现有inspect_images入口独立复核通过"
+    }
+  },
+  "github_ci": {
+    "state": "verified",
+    "required": [
+      "只构建CI首次缓存记录",
+      "同一SHA跨runner手动构建命中和完整耗时"
+    ],
+    "formal_release_compatibility": "首次后续明确发行时核对最近8个真实来源、双路并发及签名证据；本任务不触发正式发行",
+    "source": "73d7f871725194a6b9a7a730992ab0c2bde267d0",
+    "first_run": {
+      "id": 43223707456,
+      "url": "https://github.com/SilentFlower/vibecoding-bench/actions/runs/43223707456",
+      "event": "push",
+      "state": "success",
+      "source": "73d7f871725194a6b9a7a730992ab0c2bde267d0",
+      "runner_id": 1000007108,
+      "job_seconds": 735.0,
+      "steps": [
+        {
+          "name": "Set up job",
+          "seconds": 3.0
+        },
+        {
+          "name": "检出统一源码仓库",
+          "seconds": 21.0
+        },
+        {
+          "name": "设置 Python 3.12",
+          "seconds": 0.0
+        },
+        {
+          "name": "验证系统更新合同与恢复状态机",
+          "seconds": 55.0
+        },
+        {
+          "name": "准备共享构建缓存",
+          "seconds": 9.0
+        },
+        {
+          "name": "构建两个镜像并生成版本清单",
+          "seconds": 548.0
+        },
+        {
+          "name": "保存本地构建清单",
+          "seconds": 1.0
+        },
+        {
+          "name": "Post 准备共享构建缓存",
+          "seconds": 93.0
+        },
+        {
+          "name": "Post 设置 Python 3.12",
+          "seconds": 1.0
+        },
+        {
+          "name": "Post 检出统一源码仓库",
+          "seconds": 0.0
+        },
+        {
+          "name": "Complete job",
+          "seconds": 0.0
+        }
+      ],
+      "cache_inclusive_seconds": 650.0,
+      "role_timings": [
+        {
+          "event": "flower2api-build-role",
+          "role": "control",
+          "seconds": 405.679
+        },
+        {
+          "event": "flower2api-build-role",
+          "role": "account",
+          "seconds": 105.701
+        }
+      ],
+      "cached_vertices": 16
+    },
+    "warm_run": {
+      "id": 43225824340,
+      "url": "https://github.com/SilentFlower/vibecoding-bench/actions/runs/43225824340",
+      "event": "workflow_dispatch",
+      "state": "success",
+      "source": "73d7f871725194a6b9a7a730992ab0c2bde267d0",
+      "runner_id": 1000007109,
+      "job_seconds": 301.0,
+      "steps": [
+        {
+          "name": "Set up job",
+          "seconds": 1.0
+        },
+        {
+          "name": "检出统一源码仓库",
+          "seconds": 22.0
+        },
+        {
+          "name": "设置 Python 3.12",
+          "seconds": 0.0
+        },
+        {
+          "name": "验证系统更新合同与恢复状态机",
+          "seconds": 53.0
+        },
+        {
+          "name": "准备共享构建缓存",
+          "seconds": 32.0
+        },
+        {
+          "name": "构建两个镜像并生成版本清单",
+          "seconds": 186.0
+        },
+        {
+          "name": "保存本地构建清单",
+          "seconds": 1.0
+        },
+        {
+          "name": "Post 准备共享构建缓存",
+          "seconds": 4.0
+        },
+        {
+          "name": "Post 设置 Python 3.12",
+          "seconds": 0.0
+        },
+        {
+          "name": "Post 检出统一源码仓库",
+          "seconds": 0.0
+        },
+        {
+          "name": "Complete job",
+          "seconds": 0.0
+        }
+      ],
+      "cache_inclusive_seconds": 222.0,
+      "role_timings": [
+        {
+          "event": "flower2api-build-role",
+          "role": "control",
+          "seconds": 124.366
+        },
+        {
+          "event": "flower2api-build-role",
+          "role": "account",
+          "seconds": 24.971
+        }
+      ],
+      "cached_vertices": 94
+    },
+    "source_content_sha256": "537d0d747f15f63b943749da5ea44c7bfb3f457c2d21d67c33a01db2e2f8e32c",
+    "different_runners": true,
+    "cargo_exact_key": "flower2api-cargo-v1-Linux-X64-fe5656f6fcf9b783fd67b8b3d96a1b2451b65e6970dfd56a40a388e0f31ee4bc-87bfad69f2e465d1c0426c19a3c9beb3f81f43482ef0cfc192495cac534daef0",
+    "rust_build_layers_cached": true,
+    "source_and_dependency_keys_checked": true,
+    "cache_usage": {
+      "full_name": "SilentFlower/vibecoding-bench",
+      "active_caches_size_in_bytes": 2171228231,
+      "active_caches_count": 91
+    },
+    "cache_inclusive_reduction_percent": 65.85,
+    "old_build_baseline_reduction_percent": 32.11,
+    "job_reduction_percent": 59.05
+  }
+}
